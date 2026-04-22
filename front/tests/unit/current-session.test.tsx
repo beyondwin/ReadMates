@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -147,6 +147,56 @@ describe("CurrentSession", () => {
     render(<RouterProvider router={router} />);
 
     expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "참석" }).length).toBeGreaterThan(0);
+  });
+
+  it("keeps current session content visible when a route refresh fails", async () => {
+    installRouterRequestShim();
+    let currentSessionRequests = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(routeAuthFixture));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        currentSessionRequests += 1;
+
+        if (currentSessionRequests === 1) {
+          return Promise.resolve(jsonResponse(currentSessionData));
+        }
+
+        return Promise.resolve(jsonResponse({ message: "current session unavailable" }, 500));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/",
+          element: <CurrentSessionRoute />,
+          loader: currentSessionLoader,
+          errorElement: <div>route error</div>,
+          hydrateFallbackElement: <div>세션을 불러오는 중</div>,
+        },
+      ],
+      { initialEntries: ["/"] },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+
+    window.dispatchEvent(new Event("readmates:route-refresh"));
+
+    await waitFor(() => {
+      expect(currentSessionRequests).toBe(2);
+    });
+    expect(screen.queryByText("route error")).not.toBeInTheDocument();
+    expect(screen.getAllByText("테스트 책").length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: "참석" }).length).toBeGreaterThan(0);
   });
 
