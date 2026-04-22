@@ -1863,7 +1863,7 @@ Expected: commit succeeds.
 - Modify: `server/src/main/kotlin/com/readmates/session/application/SessionRepository.kt`
 - Test: all focused backend tests from Task 1
 
-- [ ] **Step 1: Search for migrated controller violations**
+- [x] **Step 1: Search for migrated controller violations**
 
 Run:
 
@@ -1875,7 +1875,7 @@ rg -n "MemberAccountRepository|SessionRepository|JdbcTemplate|ObjectProvider<Jdb
 
 Expected: no output from the migrated web adapter directories.
 
-- [ ] **Step 2: Search for old controller package leftovers**
+- [x] **Step 2: Search for old controller package leftovers**
 
 Run:
 
@@ -1885,7 +1885,7 @@ find server/src/main/kotlin/com/readmates/session/api server/src/main/kotlin/com
 
 Expected: no migrated controller files remain in these directories. `NotesFeedController.kt` may remain under `note/api` because archive/note read flow is outside this plan.
 
-- [ ] **Step 3: Keep `SessionRepository` only as a legacy facade if still referenced**
+- [x] **Step 3: Keep `SessionRepository` only as a legacy facade if still referenced**
 
 Run:
 
@@ -1949,7 +1949,7 @@ class InvalidSessionScheduleException : RuntimeException("Session end time must 
 class InvalidQuestionSetException : RuntimeException("Questions must include 2 to 5 non-empty items")
 ```
 
-- [ ] **Step 4: Run focused backend tests**
+- [x] **Step 4: Run focused backend tests**
 
 Run:
 
@@ -1963,7 +1963,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
