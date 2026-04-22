@@ -1626,7 +1626,7 @@ Expected: commit succeeds.
 - Create: `server/src/main/kotlin/com/readmates/session/application/service/CurrentSessionQueryService.kt`
 - Create: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacyCurrentSessionAdapter.kt`
 
-- [ ] **Step 1: Add current session use case**
+- [x] **Step 1: Add current session use case**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/in/GetCurrentSessionUseCase.kt`:
 
@@ -1692,7 +1692,7 @@ class LegacyCurrentSessionAdapter(
 }
 ```
 
-- [ ] **Step 2: Move host/current controller files**
+- [x] **Step 2: Move host/current controller files**
 
 Run:
 
@@ -1711,7 +1711,7 @@ git mv server/src/main/kotlin/com/readmates/session/api/HostDashboardController.
 
 Expected: files are moved.
 
-- [ ] **Step 3: Update moved controllers**
+- [x] **Step 3: Update moved controllers**
 
 Apply these concrete conversions:
 
@@ -1812,7 +1812,7 @@ class HostDashboardController(
 }
 ```
 
-- [ ] **Step 4: Update imports that referenced moved request DTOs**
+- [x] **Step 4: Update imports that referenced moved request DTOs**
 
 Search:
 
@@ -1822,7 +1822,7 @@ rg -n "com\\.readmates\\.session\\.api\\.(AttendanceEntry|HostSessionRequest|Pub
 
 Expected: no production import remains for `com.readmates.session.api.AttendanceEntry`, `com.readmates.session.api.HostSessionRequest`, `com.readmates.session.api.PublicationRequest`, or `com.readmates.session.api.HostDashboardResponse`.
 
-- [ ] **Step 5: Run host/current session tests**
+- [x] **Step 5: Run host/current session tests**
 
 Run:
 
@@ -1835,7 +1835,7 @@ Run:
 
 Expected: PASS. Test package names can remain old if class package declarations are not changed; if declarations are changed, update the `--tests` selectors to the new packages.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -1848,7 +1848,8 @@ git add server/src/main/kotlin/com/readmates/session/application/port/in/GetCurr
   server/src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt \
   server/src/main/kotlin/com/readmates/session/adapter/in/web/AttendanceController.kt \
   server/src/main/kotlin/com/readmates/session/adapter/in/web/PublicationController.kt \
-  server/src/main/kotlin/com/readmates/session/adapter/in/web/HostDashboardController.kt
+  server/src/main/kotlin/com/readmates/session/adapter/in/web/HostDashboardController.kt \
+  server/src/main/kotlin/com/readmates/session/application/SessionRepository.kt
 git add -u server/src/main/kotlin/com/readmates/session/api
 git commit -m "refactor: route host session endpoints through use cases"
 ```
