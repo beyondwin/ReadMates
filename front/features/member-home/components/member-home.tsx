@@ -19,12 +19,10 @@ import {
 } from "@/features/member-home/components/member-home-records-utils";
 import { PrepCard } from "@/features/member-home/components/prep-card";
 import type { AuthMeResponse, CurrentSessionResponse, MyPageResponse, NoteFeedItem } from "@/shared/api/readmates";
-import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "@/shared/ui/readmates-copy";
+import { rsvpLabel } from "@/shared/ui/readmates-display";
 
 const quickLinks = [
   { label: "피드백 문서", sub: "회차 피드백", href: "/app/archive?view=report", icon: "notes" },
-  { label: READMATES_NAV_LABELS.member.archive, sub: "지난 기록", href: "/app/archive", icon: "archive" },
-  { label: READMATES_NAV_LABELS.member.clubNotes, sub: "멤버 기록", href: "/app/notes", icon: "book" },
   { label: "안내문", sub: "모임 가이드", href: "/about", icon: "sparkle" },
 ] satisfies Array<{
   label: string;
@@ -48,8 +46,14 @@ export default function MemberHome({
   const memberName = auth.shortName ?? auth.displayName ?? "멤버";
   const attendanceSummary = attendanceSummaryFromMyPage(myPage);
   const isViewer = auth.membershipStatus === "VIEWER";
+  const authDisplayName = auth.displayName?.trim();
+  const authShortName = auth.shortName?.trim();
   const myRecentItems = noteFeedItems
-    .filter((item) => item.authorName === auth.displayName || item.authorShortName === auth.shortName)
+    .filter(
+      (item) =>
+        (authDisplayName ? item.authorName === authDisplayName : false) ||
+        (authShortName ? item.authorShortName === authShortName : false),
+    )
     .slice(0, 2);
 
   return (
@@ -78,24 +82,13 @@ export default function MemberHome({
                     : "호스트가 새 세션을 등록하면 준비 보드가 열립니다."}
                 </p>
               </div>
-              <div className="row" style={{ gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                {auth.role === "HOST" ? (
-                  <Link to="/app/host" className="btn btn-ghost btn-sm">
-                    {READMATES_WORKSPACE_LABELS.hostWorkspace}
-                  </Link>
-                ) : null}
-                <Link to="/app/archive" className="btn btn-ghost btn-sm">
-                  {READMATES_NAV_LABELS.member.archive}
-                </Link>
-                <Link to="/app/session/current" className="btn btn-primary btn-sm">
-                  {READMATES_NAV_LABELS.member.currentSession}
-                </Link>
-              </div>
             </div>
 
             {isViewer ? <ViewerMemberHomeNotice /> : null}
 
-            <PrepCard session={currentSession} isHost={auth.role === "HOST"} />
+            <HomeAnswerStrip session={currentSession} noteFeedItems={noteFeedItems} isViewer={isViewer} />
+
+            <PrepCard session={currentSession} isHost={auth.role === "HOST"} isViewer={isViewer} />
           </div>
         </section>
 
@@ -125,6 +118,75 @@ export default function MemberHome({
         isViewer={isViewer}
       />
     </main>
+  );
+}
+
+function nextActionFor(session: NonNullable<CurrentSessionResponse["currentSession"]> | null, isViewer: boolean) {
+  if (!session) {
+    return isViewer ? "다음 세션이 열리면 읽기 전용으로 확인할 수 있어요." : "호스트가 세션을 열면 준비를 시작합니다.";
+  }
+
+  if (isViewer) {
+    return "세션을 읽고 공동 보드를 확인할 수 있어요.";
+  }
+
+  if (session.myRsvpStatus === "NO_RESPONSE") {
+    return "RSVP를 먼저 선택해 주세요.";
+  }
+
+  if (!session.myCheckin) {
+    return "읽기 체크인을 남겨 주세요.";
+  }
+
+  if (session.myQuestions.length < 2) {
+    return `질문 ${2 - session.myQuestions.length}개를 더 준비해 주세요.`;
+  }
+
+  if (!session.myOneLineReview) {
+    return "한줄평을 한 문장으로 남겨 주세요.";
+  }
+
+  return "준비가 정리되었습니다. 모임 전까지 수정할 수 있어요.";
+}
+
+function HomeAnswerStrip({
+  session,
+  noteFeedItems,
+  isViewer,
+}: {
+  session: CurrentSessionResponse["currentSession"];
+  noteFeedItems: NoteFeedItem[];
+  isViewer: boolean;
+}) {
+  const preservedCount = noteFeedItems.length;
+  const preservedKinds = new Set(noteFeedItems.map((item) => item.kind)).size;
+
+  return (
+    <section className="rm-home-answer-strip" aria-label="홈 요약">
+      <div className="surface-quiet rm-home-answer-strip__item">
+        <div className="eyebrow">지금 읽는 책</div>
+        <div className="body editorial" style={{ fontSize: "17px", marginTop: "8px" }}>
+          {session ? session.bookTitle : "다음 책을 기다리는 중"}
+        </div>
+        <p className="tiny" style={{ color: "var(--text-3)", margin: "6px 0 0" }}>
+          {session ? `${session.bookAuthor} · 현재 RSVP ${rsvpLabel(session.myRsvpStatus)}` : "새 세션이 열리면 이곳에 표시됩니다."}
+        </p>
+      </div>
+      <div className="surface-quiet rm-home-answer-strip__item">
+        <div className="eyebrow">다음 할 일</div>
+        <p className="body" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+          {nextActionFor(session, isViewer)}
+        </p>
+      </div>
+      <div className="surface-quiet rm-home-answer-strip__item">
+        <div className="eyebrow">이미 보존된 기록</div>
+        <p className="body" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+          {preservedCount > 0
+            ? `최근 기록 ${preservedCount}개, 기록 유형 ${preservedKinds}개를 이어 읽을 수 있어요.`
+            : "아직 표시할 클럽 기록이 없습니다."}
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -175,7 +237,7 @@ function MobileMemberHome({
       <MobileTodayActions session={session} isViewer={isViewer} />
       <MobileMemberActivity items={noteFeedItems.slice(0, 4)} />
       <MobileStats session={session} attendanceSummary={attendanceSummary} />
-      <MobileQuickLinks isHost={auth.role === "HOST"} />
+      <MobileQuickLinks />
     </div>
   );
 }
@@ -216,26 +278,14 @@ function MobileViewerMemberHomeNotice() {
   );
 }
 
-function MobileQuickLinks({ isHost }: { isHost: boolean }) {
-  const links = isHost
-    ? [
-        {
-          label: READMATES_WORKSPACE_LABELS.hostWorkspace,
-          sub: READMATES_NAV_LABELS.host.operations,
-          href: "/app/host",
-          icon: "host" as const,
-        },
-        ...quickLinks,
-      ]
-    : quickLinks;
-
+function MobileQuickLinks() {
   return (
     <section className="m-sec">
       <div className="eyebrow" style={{ marginBottom: 12 }}>
         바로가기
       </div>
       <div className="rm-mobile-shortcuts">
-        {links.map((item) => (
+        {quickLinks.map((item) => (
           <Link key={item.label} to={item.href} className="m-card-quiet">
             <span className="rm-mobile-shortcuts__icon" aria-hidden>
               <MobileIcon name={item.icon} size={18} />

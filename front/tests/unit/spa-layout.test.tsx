@@ -135,8 +135,10 @@ describe("SPA AppRouteLayout", () => {
       "아카이브",
       "내 공간",
     ]);
-    expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
-    expect(screen.getByRole("link", { name: "운영" })).toHaveAttribute("href", "/app/host");
+    expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.getAttribute("href"))).toEqual([
+      "/app/host",
+      "/app/host",
+    ]);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
@@ -148,6 +150,10 @@ describe("SPA AppRouteLayout", () => {
     ]);
     expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
+
+    const appContent = document.querySelector(".app-content");
+    expect(appContent?.querySelector(":scope > .rm-route-reveal")).toBeInTheDocument();
+    expect(appContent?.querySelector(".topnav")).not.toBeInTheDocument();
   });
 
   it("keeps active hosts on host mobile chrome for archive routes", async () => {
@@ -191,7 +197,7 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
 
     expect(screen.getAllByText("기록")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
+    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     await waitFor(() => {
@@ -208,6 +214,56 @@ describe("SPA AppRouteLayout", () => {
       "/app/host/sessions/session-6/edit",
     );
     expect(within(tabs).queryByRole("link", { name: "아카이브" })).not.toBeInTheDocument();
+  });
+
+  it("keeps active hosts on host mobile chrome for feedback document routes", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(hostAuth));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        return Promise.resolve(
+          jsonResponse({
+            currentSession: {
+              sessionId: "session-6",
+            },
+          }),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/app/feedback/session-1"]}>
+          <Routes>
+            <Route path="/app" element={<AppRouteLayout />}>
+              <Route path="feedback/:sessionId" element={<main>feedback child</main>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("feedback child")).toBeInTheDocument();
+    expect(screen.getAllByText("기록")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/archive?view=report");
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    await waitFor(() => {
+      expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
+        "오늘",
+        "세션",
+        "멤버",
+        "기록",
+      ]);
+    });
+    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
   });
 
   it("keeps host edit disabled while the current session tab target is loading", async () => {
@@ -243,11 +299,15 @@ describe("SPA AppRouteLayout", () => {
 
     expect(await screen.findByText("host child")).toBeInTheDocument();
 
-    expect(screen.getByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
+    expect(screen.getAllByRole("link", { name: "멤버 화면으로" }).map((link) => link.getAttribute("href"))).toEqual([
+      "/app",
+      "/app",
+    ]);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
-    expect(within(tabs).getByText("세션").closest("[aria-disabled='true']")).not.toBeNull();
+    expect(within(tabs).getByLabelText("세션 불러오는 중")).toHaveAttribute("aria-disabled", "true");
+    expect(within(tabs).getByText("확인 중")).toBeInTheDocument();
 
     currentSession.resolve(
       jsonResponse({
@@ -263,5 +323,45 @@ describe("SPA AppRouteLayout", () => {
         "/app/host/sessions/session-6/edit",
       );
     });
+  });
+
+  it("renders a shell-aware member loading skeleton while auth is unresolved", () => {
+    const currentAuth = createDeferred<Response>();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url === "/api/bff/api/auth/me") {
+          return currentAuth.promise;
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      }),
+    );
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/app"]}>
+          <Routes>
+            <Route
+              path="/app"
+              element={
+                <RequireMemberApp>
+                  <AppRouteLayout />
+                </RequireMemberApp>
+              }
+            >
+              <Route index element={<main>member child</main>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("불러오는 중");
+    expect(document.querySelector(".rm-route-loading--member")).toBeInTheDocument();
+    expect(document.querySelector(".rm-loading-member-desk")).toBeInTheDocument();
+    expect(screen.queryByText("member child")).not.toBeInTheDocument();
   });
 });

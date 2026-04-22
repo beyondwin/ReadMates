@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import PublicHome from "@/features/public/components/public-home";
 import type { PublicClubResponse } from "@/shared/api/readmates";
@@ -44,34 +44,62 @@ describe("PublicHome", () => {
   it("renders public club API data without design sample session links", () => {
     const { container } = render(<PublicHome data={publicClubFixture} />);
 
-    expect(screen.getByText("책을 읽고,")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "읽는사이", level: 1 })).toBeInTheDocument();
     expect(container).toHaveTextContent("읽는사이");
-    expect(screen.getAllByText("읽는사이 · 함께 읽고 남기는 공개 기록").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("함께 읽고 남기는 공개 기록")).toBeInTheDocument();
     expect(container).toHaveTextContent("한 달에 한 권을 읽고 서로의 생각 사이에 머무르는 독서 모임입니다.");
     expect(container).not.toHaveTextContent("읽는사이 · 공개 기록");
     expect(container).not.toHaveTextContent("공개 소개가 아직 준비되지 않았습니다.");
     expect(screen.getAllByText("가난한 찰리의 연감").length).toBeGreaterThan(0);
     const latestCoverImages = screen.getAllByRole("img", { name: "가난한 찰리의 연감 표지" });
-    expect(latestCoverImages.length).toBeGreaterThanOrEqual(2);
+    expect(latestCoverImages).toHaveLength(1);
     expect(latestCoverImages[0]).toHaveAttribute(
       "src",
       "https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg",
     );
-    expect(latestCoverImages[1]).toHaveAttribute(
-      "src",
-      "https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg",
-    );
-    expect(container.querySelector('a[href="/sessions/00000000-0000-0000-0000-000000000306"]')).toBeTruthy();
+    expect(
+      container.querySelectorAll('a.public-latest-record[href="/sessions/00000000-0000-0000-0000-000000000306"]'),
+    ).toHaveLength(1);
+    expect(container.querySelectorAll('a[href="/sessions/00000000-0000-0000-0000-000000000306"]')).toHaveLength(1);
+    expect(screen.getByText("공개 기록은 색인으로 이어집니다")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "공개 기록 색인 보기" })).toHaveAttribute("href", "/records");
+    expect(container.querySelector(".public-note-list")).not.toHaveTextContent("가난한 찰리의 연감");
+    expect(container.querySelector(".public-note-list")).toHaveTextContent("지대넓얕 무한");
+    expect(container.querySelector(".public-record-list")).not.toHaveTextContent("가난한 찰리의 연감");
+    expect(container.querySelector(".public-record-list")).toHaveTextContent("지대넓얕 무한");
     expect(screen.getAllByText("공개 요약").length).toBeGreaterThan(0);
     expect(screen.getAllByText("하이라이트 3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("한줄평 5").length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "전체 공개 기록" })).toHaveAttribute(
+    expect(screen.getByText("공개 기록은 열려 있고, 참여는 초대제로 운영합니다")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "기존 멤버 로그인" })).toHaveAttribute("href", "/login");
+    const inviteCta = screen.getByRole("button", { name: /초대 수락하기/ });
+    expect(inviteCta).toBeDisabled();
+    expect(inviteCta).toHaveAttribute("aria-disabled", "true");
+    expect(inviteCta).toHaveTextContent("초대 메일의 개인 링크에서만 열립니다.");
+    expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+    expect(container.querySelector('a[href="/login"]')).toHaveTextContent("기존 멤버 로그인");
+    expect(container.querySelector('a[href="/login"]')).not.toHaveTextContent("초대 수락하기");
+    expect(screen.getByRole("link", { name: "최근 공개 기록" })).toHaveAttribute(
       "href",
-      "/sessions/00000000-0000-0000-0000-000000000306",
+      "/records",
     );
-    expect(screen.getByText("→")).toBeInTheDocument();
     expect(container.innerHTML).not.toContain("물고기는 존재하지 않는다");
     expect(container.innerHTML).not.toContain("session-13");
+  });
+
+  it("keeps the mobile hero peek before the latest-record feature in source order", () => {
+    const { container } = render(<PublicHome data={publicClubFixture} />);
+
+    const heroGrid = container.querySelector(".public-home-hero__grid");
+    expect(heroGrid).toBeTruthy();
+    expect(Array.from(heroGrid!.children).map((child) => child.className)).toEqual([
+      "public-home-hero__copy",
+      "public-home-hero__peek",
+      "public-home-hero__latest",
+    ]);
+    expect(within(heroGrid as HTMLElement).getByLabelText("다음 섹션 미리보기")).toHaveTextContent(
+      "최근 기록과 클럽의 읽는 방식",
+    );
   });
 
   it("renders an empty public record state without design sample records", () => {
@@ -88,10 +116,10 @@ describe("PublicHome", () => {
 
     const { container } = render(<PublicHome data={emptyPublicClub} />);
 
-    expect(screen.getAllByText(/아직 공개된 기록이 없습니다/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/아직 발행된 공개 기록이 없습니다/).length).toBeGreaterThanOrEqual(1);
     expect(container).toHaveTextContent("공개 소개가 아직 준비되지 않았습니다.");
-    expect(container).toHaveTextContent("0 기록");
-    expect(container.querySelector('a[href="/about"]')).toHaveTextContent("클럽 소개 보기");
+    expect(container).toHaveTextContent("0공개 모임");
+    expect(screen.getByRole("link", { name: "클럽 소개 보기" })).toHaveAttribute("href", "/about");
     expect(container.innerHTML).not.toContain("물고기는 존재하지 않는다");
     expect(container.innerHTML).not.toContain("session-13");
   });

@@ -146,9 +146,6 @@ export function MyRecent({ items }: { items: NoteFeedItem[] }) {
               >
                 {item.text}
               </p>
-              <Link to="/app/archive" className="btn btn-quiet btn-sm" style={{ margin: "14px 0 0 -10px" }}>
-                아카이브 보기 →
-              </Link>
             </article>
           ))}
         </div>
@@ -249,7 +246,7 @@ export function MobileStats({
         <span className="eyebrow">내 통계</span>
         {session ? (
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            current
+            이번 세션
           </span>
         ) : null}
       </div>

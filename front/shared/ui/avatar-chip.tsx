@@ -36,29 +36,19 @@ export function AvatarChip({
   const safeLabel = displayText(label, displayText(name, "멤버"));
   const initial = avatarInitial(name, fallbackInitial);
   const tone = avatarTones[hashText(safeLabel) % avatarTones.length];
-  const isPending = rsvpStatus === "NO_RESPONSE";
 
   return (
     <span
       aria-label={safeLabel}
       title={safeLabel}
+      className="rm-avatar-chip"
       data-rsvp-status={rsvpStatus}
       style={
         {
-          width: `${size}px`,
-          height: `${size}px`,
-          borderRadius: "999px",
-          background: tone.background,
-          border: `1px solid ${tone.border}`,
-          color: tone.color,
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: `${Math.max(10, size * 0.42)}px`,
-          fontWeight: 600,
-          letterSpacing: "-0.02em",
-          flexShrink: 0,
-          opacity: isPending ? 0.55 : 1,
+          "--avatar-size": `${size}px`,
+          "--avatar-bg": tone.background,
+          "--avatar-border": tone.border,
+          "--avatar-color": tone.color,
         } as CSSProperties
       }
     >

@@ -25,6 +25,51 @@ private const val CLEANUP_SESSION_SIX_TEST_UPLOAD_SQL = """
       and (version > 1 or file_name = 'feedback-6-test.md');
 """
 
+private const val MARK_MEMBER5_SESSION_ONE_REMOVED_SQL = """
+    update session_participants
+    join memberships on memberships.id = session_participants.membership_id
+      and memberships.club_id = session_participants.club_id
+    join users on users.id = memberships.user_id
+    set session_participants.participation_status = 'REMOVED',
+        session_participants.attendance_status = 'ATTENDED'
+    where session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+      and session_participants.session_id = '00000000-0000-0000-0000-000000000301'
+      and users.email = 'member5@example.com';
+"""
+
+private const val RESET_MEMBER5_SESSION_ONE_ACTIVE_SQL = """
+    update session_participants
+    join memberships on memberships.id = session_participants.membership_id
+      and memberships.club_id = session_participants.club_id
+    join users on users.id = memberships.user_id
+    set session_participants.participation_status = 'ACTIVE',
+        session_participants.attendance_status = 'ATTENDED'
+    where session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+      and session_participants.session_id = '00000000-0000-0000-0000-000000000301'
+      and users.email = 'member5@example.com';
+"""
+
+private const val MARK_SESSION_ONE_OPEN_SQL = """
+    update sessions
+    set state = 'OPEN'
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and id = '00000000-0000-0000-0000-000000000301';
+"""
+
+private const val MARK_SESSION_ONE_CLOSED_SQL = """
+    update sessions
+    set state = 'CLOSED'
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and id = '00000000-0000-0000-0000-000000000301';
+"""
+
+private const val RESET_SESSION_ONE_PUBLISHED_SQL = """
+    update sessions
+    set state = 'PUBLISHED'
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and id = '00000000-0000-0000-0000-000000000301';
+"""
+
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
@@ -66,6 +111,105 @@ class FeedbackDocumentControllerTest(
         }.andExpect {
             status { isOk() }
             jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+        }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_SESSION_ONE_OPEN_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_SESSION_ONE_PUBLISHED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `open session feedback document is not listed or directly readable`() {
+        mockMvc.get("/api/feedback-documents/me") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+        }
+
+        mockMvc.get("/api/feedback-documents/me") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+        }
+
+        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isNotFound() }
+        }
+
+        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isNotFound() }
+        }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_SESSION_ONE_CLOSED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_SESSION_ONE_PUBLISHED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `closed session feedback document remains listed and directly readable`() {
+        mockMvc.get("/api/feedback-documents/me") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
+        }
+
+        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionNumber") { value(1) }
+            jsonPath("$.fileName") { value("251126 1차.md") }
+        }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_MEMBER5_SESSION_ONE_REMOVED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_MEMBER5_SESSION_ONE_ACTIVE_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `removed attended member cannot list or read feedback document`() {
+        mockMvc.get("/api/feedback-documents/me") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+        }
+
+        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isForbidden() }
         }
     }
 

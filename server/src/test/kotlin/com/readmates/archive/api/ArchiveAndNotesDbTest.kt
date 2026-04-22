@@ -88,7 +88,7 @@ class ArchiveAndNotesDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `viewer can list and read non draft sessions but cannot read feedback document`() {
+    fun `viewer can list and read preserved sessions but cannot read feedback document`() {
         val cookie = viewerSessionCookie("viewer.archive.${UUID.randomUUID()}@example.com")
         val viewerMembershipId = createdMembershipIds.last()
         insertViewerSessionParticipant(
@@ -100,20 +100,19 @@ class ArchiveAndNotesDbTest(
             cookie(cookie)
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(hasItems(998, 997, 6)) }
-            jsonPath("$[?(@.sessionNumber == 998)].state") { value(hasItem("OPEN")) }
+            jsonPath("$[*].sessionNumber") { value(hasItems(997, 6)) }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(998))) }
             jsonPath("$[?(@.sessionNumber == 997)].state") { value(hasItem("CLOSED")) }
             jsonPath("$[*].sessionNumber") { value(not(hasItem(999))) }
+            jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
+            jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
+            jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
         }
 
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009992") {
             cookie(cookie)
         }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionNumber") { value(998) }
-            jsonPath("$.state") { value("OPEN") }
-            jsonPath("$.attendance") { value(0) }
-            jsonPath("$.total") { value(0) }
+            status { isNotFound() }
         }
 
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009993") {
@@ -222,6 +221,49 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$[0].checkinCount") { value(3) }
                 jsonPath("$[0].totalCount") { value(15) }
                 jsonPath("$[5].sessionNumber") { value(1) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_MEMBER2_SESSION_SIX_REMOVED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_MEMBER2_SESSION_SIX_ACTIVE_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `notes sessions and feed exclude removed participant authored records`() {
+        mockMvc.get("/api/notes/sessions") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[?(@.sessionNumber == 6)].questionCount") { value(hasItem(4)) }
+                jsonPath("$[?(@.sessionNumber == 6)].oneLinerCount") { value(hasItem(2)) }
+                jsonPath("$[?(@.sessionNumber == 6)].highlightCount") { value(hasItem(2)) }
+                jsonPath("$[?(@.sessionNumber == 6)].checkinCount") { value(hasItem(2)) }
+                jsonPath("$[?(@.sessionNumber == 6)].totalCount") { value(hasItem(10)) }
+            }
+
+        mockMvc.get("/api/notes/feed") {
+            param("sessionId", "00000000-0000-0000-0000-000000000306")
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(10) }
+                jsonPath("$[*].text") {
+                    value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?")))
+                }
+                jsonPath("$[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
+                jsonPath("$[*].text") { value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다."))) }
+                jsonPath("$[*].text") { value(not(hasItem("전기의 효용과 정의의 주장을 중심으로 질문을 정리했습니다."))) }
+                jsonPath("$[*].text") { value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")) }
             }
     }
 
@@ -435,6 +477,9 @@ class ArchiveAndNotesDbTest(
                 status { isOk() }
                 jsonPath("$.displayName") { value("이멤버5") }
                 jsonPath("$.email") { value("member5@example.com") }
+                jsonPath("$.role") { value("MEMBER") }
+                jsonPath("$.membershipStatus") { value("ACTIVE") }
+                jsonPath("$.clubName") { value("읽는사이") }
                 jsonPath("$.sessionCount") { value(4) }
                 jsonPath("$.totalSessionCount") { value(6) }
                 jsonPath("$.recentAttendances.length()") { value(6) }
@@ -663,6 +708,30 @@ class ArchiveAndNotesDbTest(
             join memberships on memberships.club_id = sessions.club_id
               and memberships.user_id = users.id
             where sessions.id = '00000000-0000-0000-0000-000000000306';
+        """
+
+        private const val MARK_MEMBER2_SESSION_SIX_REMOVED_SQL = """
+            update session_participants
+            join memberships on memberships.id = session_participants.membership_id
+              and memberships.club_id = session_participants.club_id
+            join users on users.id = memberships.user_id
+            set session_participants.participation_status = 'REMOVED',
+                session_participants.attendance_status = 'ATTENDED'
+            where session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+              and session_participants.session_id = '00000000-0000-0000-0000-000000000306'
+              and users.email = 'member2@example.com';
+        """
+
+        private const val RESET_MEMBER2_SESSION_SIX_ACTIVE_SQL = """
+            update session_participants
+            join memberships on memberships.id = session_participants.membership_id
+              and memberships.club_id = session_participants.club_id
+            join users on users.id = memberships.user_id
+            set session_participants.participation_status = 'ACTIVE',
+                session_participants.attendance_status = 'ATTENDED'
+            where session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+              and session_participants.session_id = '00000000-0000-0000-0000-000000000306'
+              and users.email = 'member2@example.com';
         """
 
         private const val CLEANUP_BULK_SESSION_HIGHLIGHTS_SQL = """

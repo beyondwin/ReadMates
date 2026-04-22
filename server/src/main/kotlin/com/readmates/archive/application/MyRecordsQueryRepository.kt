@@ -107,6 +107,9 @@ class MyRecordsQueryRepository(
                 displayName = currentMember.displayName,
                 shortName = currentMember.shortName,
                 email = currentMember.email,
+                role = currentMember.role.name,
+                membershipStatus = currentMember.membershipStatus.name,
+                clubName = null,
                 joinedAt = "",
                 sessionCount = 0,
                 totalSessionCount = 0,
@@ -144,6 +147,7 @@ class MyRecordsQueryRepository(
         return jdbcTemplate.query(
             """
             select
+              clubs.name as club_name,
               coalesce(date_format(date_add(memberships.joined_at, interval 9 hour), '%Y-%m'), '') as joined_at,
               (
                 select count(*)
@@ -162,6 +166,7 @@ class MyRecordsQueryRepository(
                   and sessions.state = 'PUBLISHED'
               ) as total_session_count
             from memberships
+            join clubs on clubs.id = memberships.club_id
             where memberships.id = ?
               and memberships.club_id = ?
             """.trimIndent(),
@@ -170,6 +175,9 @@ class MyRecordsQueryRepository(
                     displayName = currentMember.displayName,
                     shortName = currentMember.shortName,
                     email = currentMember.email,
+                    role = currentMember.role.name,
+                    membershipStatus = currentMember.membershipStatus.name,
+                    clubName = resultSet.getString("club_name"),
                     joinedAt = resultSet.getString("joined_at"),
                     sessionCount = resultSet.getInt("session_count"),
                     totalSessionCount = resultSet.getInt("total_session_count"),
@@ -182,6 +190,9 @@ class MyRecordsQueryRepository(
             displayName = currentMember.displayName,
             shortName = currentMember.shortName,
             email = currentMember.email,
+            role = currentMember.role.name,
+            membershipStatus = currentMember.membershipStatus.name,
+            clubName = null,
             joinedAt = "",
             sessionCount = 0,
             totalSessionCount = 0,

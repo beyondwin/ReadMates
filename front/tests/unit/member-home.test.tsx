@@ -62,6 +62,9 @@ const myPage: MyPageResponse = {
   displayName: "이멤버5",
   shortName: "수",
   email: "member5@example.com",
+  role: "MEMBER",
+  membershipStatus: "ACTIVE",
+  clubName: "읽는사이",
   joinedAt: "2025-11",
   sessionCount: 3,
   totalSessionCount: 6,
@@ -125,25 +128,29 @@ describe("MemberHome", () => {
     expect(mobileView.getByText("멤버 활동")).toBeInTheDocument();
     expect(mobileView.getByText("내 통계")).toBeInTheDocument();
     expect(mobileView.getByText("바로가기")).toBeInTheDocument();
+    expect(mobileView.getByText("4개")).toBeInTheDocument();
+    expect(mobileView.getByText("이번 세션")).toBeInTheDocument();
+    expect(mobileView.queryByText(/actions/i)).not.toBeInTheDocument();
+    expect(mobileView.queryByText("current")).not.toBeInTheDocument();
 
+    expect(mobileView.getByRole("link", { name: /RSVP/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /읽기 체크인/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /질문 쓰기/ })).toHaveAttribute("href", "/app/session/current");
-    expect(mobileView.getByRole("link", { name: /모임 확인/ })).toHaveAttribute(
-      "href",
-      "https://meet.google.com/readmates-member",
-    );
+    expect(mobileView.getByRole("link", { name: /한줄평/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /모임 링크 열기/ })).toHaveAttribute(
       "href",
       "https://meet.google.com/readmates-member",
     );
     expect(mobileElement.querySelector(".m-timeline-dot")).not.toBeInTheDocument();
-    expect(mobileElement.querySelectorAll(".rm-mobile-shortcuts__icon")).toHaveLength(4);
+    expect(mobileElement.querySelectorAll(".rm-mobile-shortcuts__icon")).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
     expect(mobileView.getByRole("link", { name: /피드백 문서/ })).toHaveAttribute(
       "href",
       "/app/archive?view=report",
     );
     expect(mobileView.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
+    expect(mobileView.queryByRole("link", { name: /아카이브/ })).not.toBeInTheDocument();
+    expect(mobileView.queryByRole("link", { name: /클럽 노트/ })).not.toBeInTheDocument();
   });
 
   it("shows viewer members a read-only notice on member home", () => {
@@ -171,7 +178,13 @@ describe("MemberHome", () => {
     const desktop = getDesktopView(container);
 
     expect(desktop.getByText(/이번 세션 ·/)).toBeInTheDocument();
-    expect(desktop.getByText("테스트 책")).toBeInTheDocument();
+    expect(desktop.getAllByText("테스트 책").length).toBeGreaterThan(0);
+    expect(desktop.getByText("지금 읽는 책")).toBeInTheDocument();
+    expect(desktop.getByText("다음 할 일")).toBeInTheDocument();
+    expect(desktop.getByText("이미 보존된 기록")).toBeInTheDocument();
+    expect(desktop.getByText("내 준비 현황")).toBeInTheDocument();
+    expect(desktop.getAllByText("피드백 문서").length).toBeGreaterThan(0);
+    expect(desktop.getByRole("link", { name: "세션 열기" })).toHaveAttribute("href", "/app/session/current");
     expect(desktop.getByRole("img", { name: "테스트 책 표지" })).toHaveAttribute(
       "src",
       "https://example.com/covers/test-book.jpg",
@@ -240,6 +253,15 @@ describe("MemberHome", () => {
                 rsvpStatus: "NO_RESPONSE",
                 attendanceStatus: "UNKNOWN",
               },
+              {
+                membershipId: "member-removed",
+                displayName: "제외멤버",
+                shortName: "제외",
+                role: "MEMBER",
+                rsvpStatus: "GOING",
+                attendanceStatus: "UNKNOWN",
+                participationStatus: "REMOVED",
+              },
             ],
           },
         }}
@@ -252,9 +274,11 @@ describe("MemberHome", () => {
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
     expect(desktop.getByText("참석 2 / 전체 6")).toBeInTheDocument();
+    expect(desktop.queryByText("참석 3 / 전체 7")).not.toBeInTheDocument();
     expect(desktop.queryByText("참석 3 / 전체 6")).not.toBeInTheDocument();
     expect(desktop.getByText("현재 RSVP: 미응답")).toBeInTheDocument();
     expect(mobile.getByText("참석 2/6 · 현재 RSVP 미응답")).toBeInTheDocument();
+    expect(mobile.queryByText("참석 3/7 · 현재 RSVP 미응답")).not.toBeInTheDocument();
     expect(mobile.getAllByText("3/6").length).toBeGreaterThan(0);
   });
 
@@ -297,18 +321,57 @@ describe("MemberHome", () => {
       "/app/archive?view=report",
     );
     expect(desktop.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
+    expect(desktop.queryByRole("link", { name: "이번 세션" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "아카이브" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: /아카이브 보기/ })).not.toBeInTheDocument();
   });
 
   it("shows practical empty states when there is no current session", () => {
     const { container } = render(<MemberHome auth={auth} current={{ currentSession: null }} noteFeedItems={[]} />);
     const desktop = getDesktopView(container);
+    const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
     expect(desktop.getByText("아직 열린 세션이 없습니다")).toBeInTheDocument();
-    expect(desktop.getByText("호스트가 다음 세션을 등록하면 RSVP와 질문 작성이 열립니다.")).toBeInTheDocument();
-    expect(desktop.getByText("아직 표시할 클럽 기록이 없습니다.")).toBeInTheDocument();
+    expect(desktop.getByText("다음 책이 등록되면 이곳에 책, 일정, 질문 마감, 준비 상태가 한 번에 표시됩니다.")).toBeInTheDocument();
+    expect(desktop.getByText("지금 읽는 책")).toBeInTheDocument();
+    expect(desktop.getByText("다음 책을 기다리는 중")).toBeInTheDocument();
+    expect(desktop.getByText("호스트가 세션을 열면 준비를 시작합니다.")).toBeInTheDocument();
+    expect(desktop.getAllByText("아직 표시할 클럽 기록이 없습니다.").length).toBeGreaterThan(0);
     expect(desktop.queryByText("RSVP · 참석 명단")).not.toBeInTheDocument();
     expect(desktop.getByText("참석 현황 준비 중")).toBeInTheDocument();
     expect(desktop.getByText("새 세션이 등록되면 RSVP와 참석 명단이 표시됩니다.")).toBeInTheDocument();
+    expect(mobile.getByText("0개")).toBeInTheDocument();
+    expect(mobile.queryByText(/actions/i)).not.toBeInTheDocument();
+  });
+
+  it("does not treat anonymous system records as my recent records when auth names are empty", () => {
+    const anonymousAuth: AuthMeResponse = {
+      ...auth,
+      displayName: null,
+      shortName: null,
+    };
+    const anonymousRecord: NoteFeedItem = {
+      sessionId: "session-system",
+      sessionNumber: 8,
+      bookTitle: "시스템 기록",
+      date: "2026-06-20",
+      authorName: null,
+      authorShortName: null,
+      kind: "HIGHLIGHT",
+      text: "작성자 없는 시스템 기록은 내 최근 기록으로 분류되지 않아야 합니다.",
+    };
+
+    const { container } = render(
+      <MemberHome auth={anonymousAuth} current={current} noteFeedItems={[anonymousRecord]} />,
+    );
+    const desktop = getDesktopView(container);
+    const myRecentHeading = desktop.getAllByText("내 최근 기록")[1];
+    const myRecentSection = myRecentHeading.closest("section");
+
+    expect(myRecentSection).not.toBeNull();
+    expect(within(myRecentSection as HTMLElement).getByText("아직 내 기록이 없습니다.")).toBeInTheDocument();
+    expect(within(myRecentSection as HTMLElement).queryByText(anonymousRecord.text)).not.toBeInTheDocument();
   });
 
   it("shows the roster empty state when the current session has no attendees", () => {
@@ -393,9 +456,13 @@ describe("MemberHome", () => {
     expect(screen.getByLabelText("박미정 · 미정")).toHaveAttribute("data-rsvp-status", "MAYBE");
   });
 
-  it("shows a host dashboard link for host members", () => {
+  it("does not repeat the host workspace switch inside member home content", () => {
     render(<MemberHome auth={{ ...auth, role: "HOST" }} current={current} noteFeedItems={noteFeedItems} />);
 
-    expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
+    expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "세션 운영으로" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/session-7/edit",
+    );
   });
 });

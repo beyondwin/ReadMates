@@ -9,6 +9,17 @@ import { PublicFooter } from "@/shared/ui/public-footer";
 import { PublicMobileHeader } from "@/shared/ui/public-mobile-header";
 import { TopNav } from "@/shared/ui/top-nav";
 
+function RouteOutlet() {
+  const location = useLocation();
+
+  // CSS-only route reveal keeps browser snapshots from duplicating persistent chrome.
+  return (
+    <div key={location.pathname} className="rm-route-reveal">
+      <Outlet />
+    </div>
+  );
+}
+
 export function PublicRouteLayout() {
   return (
     <div className="public-shell m-app">
@@ -18,18 +29,22 @@ export function PublicRouteLayout() {
       <div className="mobile-only">
         <PublicMobileHeader />
       </div>
-      <Outlet />
-      <PublicFooter />
+      <div className="rm-route-stage">
+        <RouteOutlet />
+      </div>
+      <PublicFooter showGuestMemberActions={false} />
     </div>
   );
 }
 
 export function AppRouteLayout() {
   const state = useAuth();
-  const pathname = useLocation().pathname;
+  const location = useLocation();
+  const pathname = location.pathname;
   const auth = state.status === "ready" ? state.auth : null;
   const isHostWorkspace = pathname.startsWith("/app/host");
-  const isHostRecordRoute = pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/");
+  const isHostRecordRoute =
+    pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/");
   const isActiveHost = auth?.role === "HOST" && auth.approvalState === "ACTIVE";
   const desktopVariant = isHostWorkspace ? "host" : "member";
   const mobileVariant = isActiveHost && (isHostWorkspace || isHostRecordRoute) ? "host" : "member";
@@ -82,10 +97,10 @@ export function AppRouteLayout() {
         <MobileHeader variant={mobileVariant} showHostEntry={showHostEntry} />
       </div>
       <div className="app-content">
-        <Outlet />
+        <RouteOutlet />
       </div>
       <div className="desktop-only">
-        <PublicFooter />
+        <PublicFooter showGuestMemberActions={false} />
       </div>
       <div className="mobile-only">
         <MobileTabBar variant={mobileVariant} currentSessionId={currentSessionId} />

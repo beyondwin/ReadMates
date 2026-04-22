@@ -13,6 +13,8 @@ import {
   BoardHighlights,
   BoardQuestions,
   CheckinPanel,
+  FeedbackAccessPanel,
+  HostContextPanel,
   LongReviewPanel,
   MyStatusCard,
   OneLineReviewPanel,
@@ -33,13 +35,15 @@ import {
   VIEWER_MEMBER_SHORT_NOTICE,
 } from "@/features/current-session/components/current-session-types";
 import { requestReadmatesRouteRefresh } from "@/src/pages/readmates-page-data";
+import { Link } from "@/src/app/router-link";
 import type { CurrentSessionResponse } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
-import { formatDateLabel, formatDeadlineLabel, formatSessionKicker } from "@/shared/ui/readmates-display";
+import { formatDateLabel, formatDeadlineLabel, formatSessionKicker, rsvpLabel } from "@/shared/ui/readmates-display";
 
 type BoardTab = "questions" | "checkins" | "highlights";
 
 const emptySaveStatuses: Record<SaveScope, SaveState> = {
+  rsvp: "idle",
   checkin: "idle",
   question: "idle",
   longReview: "idle",
@@ -50,14 +54,24 @@ export default function CurrentSession({ auth, data }: { auth?: CurrentSessionAu
   if (data.currentSession === null) {
     return (
       <main>
-        <section className="page-header-compact">
+        <section className="page-header-compact" style={{ padding: "48px 0" }}>
           <div className="container">
-            <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-              아직 열린 세션이 없습니다
-            </h1>
-            <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              호스트가 새 세션을 등록하면 RSVP, 읽기 체크인, 질문 작성이 열립니다.
-            </p>
+            <div className="rm-empty-state" style={{ padding: "34px" }}>
+              <p className="eyebrow" style={{ margin: 0 }}>
+                현재 세션 작업대
+              </p>
+              <h1 className="h1 editorial" style={{ margin: "8px 0 4px" }}>
+                아직 열린 세션이 없습니다
+              </h1>
+              <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+                새 세션이 등록되면 RSVP, 읽기 체크인, 토론 질문, 한줄평 작업대가 열립니다.
+              </p>
+              {auth?.role === "HOST" ? (
+                <Link to="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
+                  새 세션 만들기
+                </Link>
+              ) : null}
+            </div>
           </div>
         </section>
       </main>
@@ -87,6 +101,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
   const writtenQuestionCount = questionInputs.filter((input) => input.text.trim()).length;
   const isViewer = auth?.membershipStatus === "VIEWER";
   const isSuspended = auth?.membershipStatus === "SUSPENDED";
+  const isHost = auth?.role === "HOST";
   const canWrite = auth ? auth.membershipStatus === "ACTIVE" && auth.approvalState === "ACTIVE" : true;
 
   const setSaveStatus = (scope: SaveScope, status: SaveState) => {
@@ -190,12 +205,21 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       return;
     }
 
+    const previousRsvp = rsvp;
     setRsvp(status);
-    void updateRsvp(status).then((response) => {
-      if (response.ok) {
+    setSaveStatus("rsvp", "saving");
+    void updateRsvp(status)
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("rsvp update failed");
+        }
+        setSaveStatus("rsvp", "saved");
         requestReadmatesRouteRefresh();
-      }
-    });
+      })
+      .catch(() => {
+        setRsvp(previousRsvp);
+        setSaveStatus("rsvp", "error");
+      });
   };
 
   const handleBoardTab = (tab: BoardTab) => {
@@ -290,6 +314,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
         questionSaveStatus={saveStatuses.question}
         longReviewSaveStatus={saveStatuses.longReview}
         oneLineReviewSaveStatus={saveStatuses.oneLineReview}
+        rsvpSaveStatus={saveStatuses.rsvp}
         onRsvpChange={handleRsvp}
         mobileTab={mobileTab}
         onMobileTabChange={handleMobileTab}
@@ -298,6 +323,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
         onSaveOneLineReview={handleSaveOneLineReview}
         isSuspended={isSuspended}
         isViewer={isViewer}
+        isHost={isHost}
         canWrite={canWrite}
       />
 
@@ -327,66 +353,108 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
           </div>
         </section>
 
-        <section style={{ padding: "32px 0 24px" }}>
+        <section style={{ padding: "32px 0 24px" }} aria-labelledby="current-session-prep-heading">
           <div className="container">
-            <div className="row" style={{ gap: "10px", marginBottom: "18px" }}>
-              <span className="eyebrow">단계 01</span>
-              <span className="small" style={{ color: "var(--text-3)" }}>
-                개인 준비
-              </span>
+            <div style={{ marginBottom: "18px" }}>
+              <span className="eyebrow">읽기 기록 · 출석 · 질문</span>
+              <h2 id="current-session-prep-heading" className="h3 editorial" style={{ margin: "6px 0 0" }}>
+                내 준비 작업대
+              </h2>
+              <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
+                읽기 기록, RSVP, 토론 질문, 한줄평을 세션 전에 바로 정리합니다.
+              </p>
             </div>
 
             <div className="ws-grid">
-              <fieldset
-                className="stack"
-                disabled={!canWrite}
-                style={{ "--stack": "20px", border: 0, margin: 0, padding: 0, minWidth: 0 } as CSSProperties}
-              >
-                {isSuspended ? <SuspendedMemberNotice /> : null}
-                {isViewer ? <ViewerMemberNotice /> : null}
-
-                <RsvpPanel rsvp={rsvp} onRsvp={handleRsvp} />
-
-                <CheckinPanel
+              {isViewer ? (
+                <ViewerSessionReadOnly
+                  session={session}
+                  rsvp={rsvp}
                   readingProgress={readingProgress}
                   checkinNote={checkinNote}
-                  saveStatus={saveStatuses.checkin}
-                  onReadingProgressChange={handleReadingProgressChange}
-                  onCheckinNoteChange={handleCheckinNoteChange}
-                  onSave={handleSaveCheckin}
-                />
-
-                <QuestionEditor
-                  variant="desktop"
-                  questionInputs={questionInputs}
-                  writtenQuestionCount={writtenQuestionCount}
-                  validationMessage={questionValidationMessage}
-                  saveStatus={saveStatuses.question}
-                  onChangeQuestion={updateQuestionInput}
-                  onAddQuestion={addQuestionInput}
-                  onRemoveQuestion={removeQuestionInput}
-                  onSaveQuestions={handleSaveQuestions}
-                />
-
-                <OneLineReviewPanel
-                  oneLineReview={oneLineReview}
-                  saveStatus={saveStatuses.oneLineReview}
-                  onChange={handleOneLineReviewChange}
-                  onSave={handleSaveOneLineReview}
-                />
-
-                <LongReviewPanel
                   longReview={longReview}
-                  saveStatus={saveStatuses.longReview}
-                  onChange={handleLongReviewChange}
-                  onSave={handleSaveLongReview}
+                  oneLineReview={oneLineReview}
                 />
-              </fieldset>
+              ) : (
+                <fieldset
+                  className="stack"
+                  disabled={!canWrite}
+                  style={{ "--stack": "20px", border: 0, margin: 0, padding: 0, minWidth: 0 } as CSSProperties}
+                >
+                  {isSuspended ? <SuspendedMemberNotice /> : null}
+
+                  <section aria-labelledby="attendance-rsvp-heading">
+                    <div className="eyebrow" id="attendance-rsvp-heading" style={{ marginBottom: "10px" }}>
+                      출석과 RSVP
+                    </div>
+                    <RsvpPanel rsvp={rsvp} saveStatus={saveStatuses.rsvp} onRsvp={handleRsvp} />
+                  </section>
+
+                  <section aria-labelledby="reading-record-heading">
+                    <div className="eyebrow" id="reading-record-heading" style={{ marginBottom: "10px" }}>
+                      읽기 기록
+                    </div>
+                    <CheckinPanel
+                      readingProgress={readingProgress}
+                      checkinNote={checkinNote}
+                      saveStatus={saveStatuses.checkin}
+                      onReadingProgressChange={handleReadingProgressChange}
+                      onCheckinNoteChange={handleCheckinNoteChange}
+                      onSave={handleSaveCheckin}
+                    />
+                  </section>
+
+                  <section aria-labelledby="discussion-questions-heading">
+                    <div className="eyebrow" id="discussion-questions-heading" style={{ marginBottom: "10px" }}>
+                      토론 질문
+                    </div>
+                    <QuestionEditor
+                      variant="desktop"
+                      questionInputs={questionInputs}
+                      writtenQuestionCount={writtenQuestionCount}
+                      validationMessage={questionValidationMessage}
+                      saveStatus={saveStatuses.question}
+                      onChangeQuestion={updateQuestionInput}
+                      onAddQuestion={addQuestionInput}
+                      onRemoveQuestion={removeQuestionInput}
+                      onSaveQuestions={handleSaveQuestions}
+                    />
+                  </section>
+
+                  <section aria-labelledby="one-line-review-heading">
+                    <div className="eyebrow" id="one-line-review-heading" style={{ marginBottom: "10px" }}>
+                      한줄평
+                    </div>
+                    <OneLineReviewPanel
+                      oneLineReview={oneLineReview}
+                      saveStatus={saveStatuses.oneLineReview}
+                      onChange={handleOneLineReviewChange}
+                      onSave={handleSaveOneLineReview}
+                    />
+                  </section>
+
+                  <LongReviewPanel
+                    longReview={longReview}
+                    saveStatus={saveStatuses.longReview}
+                    onChange={handleLongReviewChange}
+                    onSave={handleSaveLongReview}
+                  />
+                </fieldset>
+              )}
 
               <aside className="stack" style={{ "--stack": "20px" } as CSSProperties}>
-                <MyStatusCard rsvp={rsvp} readingProgress={readingProgress} writtenQuestionCount={writtenQuestionCount} />
+                <MyStatusCard
+                  rsvp={rsvp}
+                  readingProgress={readingProgress}
+                  writtenQuestionCount={writtenQuestionCount}
+                  hasOneLineReview={Boolean(oneLineReview.trim())}
+                />
 
                 <SessionMeta session={session} />
+
+                <FeedbackAccessPanel isViewer={isViewer} />
+
+                {isHost ? <HostContextPanel sessionId={session.sessionId} /> : null}
 
                 <RosterList session={session} />
               </aside>
@@ -483,6 +551,132 @@ function ViewerMemberNotice() {
       <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
         정식 멤버가 되면 RSVP와 질문 작성이 열립니다.
       </p>
+    </div>
+  );
+}
+
+function ViewerSessionReadOnly({
+  session,
+  rsvp,
+  readingProgress,
+  checkinNote,
+  longReview,
+  oneLineReview,
+}: {
+  session: CurrentSession;
+  rsvp: CurrentSession["myRsvpStatus"];
+  readingProgress: number;
+  checkinNote: string;
+  longReview: string;
+  oneLineReview: string;
+}) {
+  const questions = session.myQuestions.filter((question) => question.text.trim());
+  const reviewItems = [
+    {
+      label: "한줄평",
+      title: "보존된 한줄평",
+      body: oneLineReview.trim() || "아직 남긴 한줄평이 없습니다.",
+    },
+    {
+      label: "서평",
+      title: "보존된 서평",
+      body: longReview.trim() || "아직 남긴 서평이 없습니다.",
+    },
+  ];
+
+  return (
+    <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
+      <ViewerMemberNotice />
+
+      <section className="surface" aria-labelledby="viewer-session-detail-heading" style={{ padding: "28px" }}>
+        <div className="eyebrow">읽기 전용 세션 상세</div>
+        <h2 id="viewer-session-detail-heading" className="h4 editorial" style={{ margin: "6px 0 0" }}>
+          기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다
+        </h2>
+        <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+          둘러보기 멤버는 RSVP, 체크인, 질문, 서평 저장을 할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.
+        </p>
+        <div className="grid-2" style={{ marginTop: "18px" }}>
+          <ReadOnlyMetric label="RSVP" value={rsvpLabel(rsvp)} />
+          <ReadOnlyMetric label="읽기 기록" value={`${readingProgress}%`} />
+          <ReadOnlyMetric label="토론 질문" value={`${questions.length}개`} />
+          <ReadOnlyMetric label="피드백 문서" value="정식 멤버 전환 후" />
+        </div>
+      </section>
+
+      <section className="surface" aria-labelledby="viewer-checkin-heading" style={{ padding: "28px" }}>
+        <div className="eyebrow" id="viewer-checkin-heading">
+          보존된 읽기 기록
+        </div>
+        <div className="h4 editorial" style={{ marginTop: "6px" }}>
+          {readingProgress}%
+        </div>
+        <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", whiteSpace: "pre-wrap" }}>
+          {checkinNote.trim() || "아직 남긴 체크인 메모가 없습니다."}
+        </p>
+      </section>
+
+      <section className="surface" aria-labelledby="viewer-questions-heading" style={{ padding: "28px" }}>
+        <div className="eyebrow" id="viewer-questions-heading">
+          보존된 질문
+        </div>
+        <div className="stack" style={{ "--stack": "10px", marginTop: "12px" } as CSSProperties}>
+          {questions.length > 0 ? (
+            questions.map((question) => (
+              <article key={`${question.priority}-${question.text}`} className="surface-quiet" style={{ padding: "14px" }}>
+                <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
+                  Q{question.priority}
+                </div>
+                <div className="small editorial" style={{ color: "var(--text)" }}>
+                  {question.text}
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+              아직 남긴 질문이 없습니다. 공동 보드의 다른 멤버 질문은 아래에서 볼 수 있어요.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="surface" aria-labelledby="viewer-reviews-heading" style={{ padding: "28px" }}>
+        <div className="eyebrow" id="viewer-reviews-heading">
+          보존된 서평
+        </div>
+        <div className="stack" style={{ "--stack": "12px", marginTop: "12px" } as CSSProperties}>
+          {reviewItems.map((item) => (
+            <article key={item.label} className="surface-quiet" style={{ padding: "14px" }}>
+              <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
+                {item.title}
+              </div>
+              <p className="small editorial" style={{ color: "var(--text)", margin: 0, whiteSpace: "pre-wrap" }}>
+                {item.body}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="surface-quiet rm-locked-state" role="note" style={{ padding: "22px" }}>
+        <div className="eyebrow">피드백 문서 접근</div>
+        <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+          피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 업로드 여부와 접근 제한만 확인할 수 있어요.
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function ReadOnlyMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="surface-quiet" style={{ padding: "14px" }}>
+      <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: "6px" }}>
+        {label}
+      </div>
+      <div className="body" style={{ fontWeight: 500 }}>
+        {value}
+      </div>
     </div>
   );
 }

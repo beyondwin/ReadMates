@@ -39,6 +39,14 @@ function stateLabel(state: SessionState, published: boolean) {
   return "정리 중";
 }
 
+function stateToneClass(value: string) {
+  if (value === "비공개") return "rm-state rm-state--locked";
+  if (value === "준비 중") return "rm-state rm-state--pending";
+  if (value === "공개됨" || value === "문서 있음") return "rm-state rm-state--success";
+  if (value === "정리 중") return "rm-state rm-state--readonly";
+  return "";
+}
+
 export function SessionIdentity({
   sessionNumber,
   state,
@@ -49,22 +57,27 @@ export function SessionIdentity({
 }: SessionIdentityProps) {
   const dday = state === "OPEN" ? ddayLabel(date) : null;
   const items = [
-    `No.${padSessionNumber(sessionNumber)}`,
-    phaseLabel(state),
-    stateLabel(state, published),
-    dday,
-    feedbackDocumentAvailable ? "문서 있음" : null,
-  ].filter((item): item is string => Boolean(item));
+    { value: `No.${padSessionNumber(sessionNumber)}`, className: "rm-session-identity__number" },
+    { value: phaseLabel(state), className: "rm-session-identity__chip" },
+    { value: stateLabel(state, published), className: `rm-session-identity__chip ${stateToneClass(stateLabel(state, published))}` },
+    dday ? { value: dday, className: "rm-session-identity__chip rm-state rm-state--pending" } : null,
+    feedbackDocumentAvailable
+      ? { value: "문서 있음", className: `rm-session-identity__chip ${stateToneClass("문서 있음")}` }
+      : null,
+  ].filter((item): item is { value: string; className: string } => Boolean(item));
 
   return (
     <div
       className={compact ? "rm-session-identity rm-session-identity--compact" : "rm-session-identity"}
+      data-session-state={state}
+      data-published={published ? "true" : "false"}
+      data-feedback-document={feedbackDocumentAvailable ? "available" : "unavailable"}
       role="group"
-      aria-label={items.join(" · ")}
+      aria-label={items.map((item) => item.value).join(" · ")}
     >
-      {items.map((item, index) => (
-        <span key={item} className={index === 0 ? "rm-session-identity__number" : "rm-session-identity__chip"}>
-          {item}
+      {items.map((item) => (
+        <span key={item.value} className={item.className}>
+          {item.value}
         </span>
       ))}
     </div>

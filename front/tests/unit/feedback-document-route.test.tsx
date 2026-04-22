@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedbackDocumentRoutePage from "@/src/pages/feedback-document";
 import FeedbackDocumentPrintRoutePage from "@/src/pages/feedback-print";
@@ -25,7 +26,10 @@ function setupBffJson(body: unknown) {
   );
 }
 
-function renderFeedbackRoute(path: string, printMode = false) {
+function renderFeedbackRoute(
+  path: string | { pathname: string; state?: unknown },
+  printMode = false,
+) {
   render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
@@ -34,6 +38,29 @@ function renderFeedbackRoute(path: string, printMode = false) {
           element={printMode ? <FeedbackDocumentPrintRoutePage /> : <FeedbackDocumentRoutePage />}
         />
         <Route path="/app/feedback/:sessionId/print" element={<FeedbackDocumentPrintRoutePage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+function LocationStateEcho() {
+  const location = useLocation();
+  const state = location.state as { readmatesReturnTo?: string; readmatesReturnLabel?: string } | null;
+
+  return (
+    <main>
+      <div data-testid="return-to">{state?.readmatesReturnTo ?? ""}</div>
+      <div data-testid="return-label">{state?.readmatesReturnLabel ?? ""}</div>
+    </main>
+  );
+}
+
+function renderFeedbackReturnFlow(path: string | { pathname: string; state?: unknown }) {
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Routes>
+        <Route path="/app/feedback/:sessionId" element={<FeedbackDocumentRoutePage />} />
+        <Route path="/app/sessions/:sessionId" element={<LocationStateEcho />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -107,5 +134,71 @@ describe("Feedback document routes", () => {
 
     expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
     await waitFor(() => expect(printMock).toHaveBeenCalledTimes(1));
+  });
+
+  it("uses route state for the feedback document return affordance", async () => {
+    setupBffJson({
+      sessionId: "session-1",
+      sessionNumber: 1,
+      title: "독서모임 1차 피드백",
+      subtitle: "팩트풀니스 · 2025.11.26",
+      bookTitle: "팩트풀니스",
+      date: "2025-11-26",
+      fileName: "251126 1차.md",
+      uploadedAt: "2026-04-20T09:00:00Z",
+      metadata: [],
+      observerNotes: [],
+      participants: [],
+    });
+
+    renderFeedbackRoute({
+      pathname: "/app/feedback/session-1",
+      state: {
+        readmatesReturnTo: "/app/me",
+        readmatesReturnLabel: "내 공간으로 돌아가기",
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "내 공간으로 돌아가기" })).toHaveAttribute("href", "/app/me");
+    expect(screen.getByRole("link", { name: "PDF로 저장" })).toHaveAttribute("href", "/app/feedback/session-1/print");
+  });
+
+  it("returns to session detail with the session detail archive return state intact", async () => {
+    const user = userEvent.setup();
+    setupBffJson({
+      sessionId: "session-1",
+      sessionNumber: 1,
+      title: "독서모임 1차 피드백",
+      subtitle: "팩트풀니스 · 2025.11.26",
+      bookTitle: "팩트풀니스",
+      date: "2025-11-26",
+      fileName: "251126 1차.md",
+      uploadedAt: "2026-04-20T09:00:00Z",
+      metadata: [],
+      observerNotes: [],
+      participants: [],
+    });
+
+    renderFeedbackReturnFlow({
+      pathname: "/app/feedback/session-1",
+      state: {
+        readmatesReturnTo: "/app/sessions/session-1#feedback",
+        readmatesReturnLabel: "세션으로 돌아가기",
+        readmatesReturnState: {
+          readmatesReturnTo: "/app/archive?view=reviews",
+          readmatesReturnLabel: "아카이브로",
+        },
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
+    const returnLink = screen.getByRole("link", { name: "세션으로 돌아가기" });
+    expect(returnLink).toHaveAttribute("href", "/app/sessions/session-1#feedback");
+
+    await user.click(returnLink);
+
+    expect(screen.getByTestId("return-to")).toHaveTextContent("/app/archive?view=reviews");
+    expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로");
   });
 });

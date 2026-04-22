@@ -26,6 +26,7 @@ data class ArchiveSessionItem(
     val total: Int,
     val published: Boolean,
     val state: String,
+    val feedbackDocument: MemberArchiveFeedbackDocumentStatus,
 )
 
 data class MyArchiveQuestionItem(

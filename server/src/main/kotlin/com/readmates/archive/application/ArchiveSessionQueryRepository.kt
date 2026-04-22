@@ -11,6 +11,7 @@ import com.readmates.archive.api.MemberArchiveQuestionItem
 import com.readmates.archive.api.MemberArchiveSessionDetailResponse
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
+import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.ObjectProvider
@@ -38,17 +39,40 @@ class ArchiveSessionQueryRepository(
               sessions.book_image_url,
               sessions.session_date,
               sessions.state,
+              current_participant.attendance_status as my_attendance_status,
               sum(case when session_participants.attendance_status = 'ATTENDED' then 1 else 0 end) as attendance,
               count(session_participants.id) as total,
-              coalesce(public_session_publications.is_public, false) as published
+              coalesce(public_session_publications.is_public, false) as published,
+              latest_feedback_document.created_at as feedback_document_uploaded_at
             from sessions
+            left join session_participants current_participant on current_participant.session_id = sessions.id
+              and current_participant.club_id = sessions.club_id
+              and current_participant.membership_id = ?
+              and current_participant.participation_status = 'ACTIVE'
             left join session_participants on session_participants.session_id = sessions.id
               and session_participants.club_id = sessions.club_id
               and session_participants.participation_status = 'ACTIVE'
             left join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
+            left join (
+              select session_id, club_id, created_at
+              from (
+                select
+                  session_feedback_documents.session_id,
+                  session_feedback_documents.club_id,
+                  session_feedback_documents.created_at,
+                  row_number() over (
+                    partition by session_feedback_documents.session_id
+                    order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
+                  ) as document_rank
+                from session_feedback_documents
+                where session_feedback_documents.club_id = ?
+              ) ranked_feedback_documents
+              where document_rank = 1
+            ) latest_feedback_document on latest_feedback_document.session_id = sessions.id
+              and latest_feedback_document.club_id = sessions.club_id
             where sessions.club_id = ?
-              and sessions.state in ('OPEN', 'CLOSED', 'PUBLISHED')
+              and sessions.state in ('CLOSED', 'PUBLISHED')
             group by
               sessions.id,
               sessions.number,
@@ -58,10 +82,14 @@ class ArchiveSessionQueryRepository(
               sessions.book_image_url,
               sessions.session_date,
               sessions.state,
-              public_session_publications.is_public
+              current_participant.attendance_status,
+              public_session_publications.is_public,
+              latest_feedback_document.created_at
             order by sessions.number desc
             """.trimIndent(),
-            { resultSet, _ -> resultSet.toArchiveSessionItem() },
+            { resultSet, _ -> resultSet.toArchiveSessionItem(currentMember) },
+            currentMember.membershipId.dbString(),
+            currentMember.clubId.dbString(),
             currentMember.clubId.dbString(),
         )
     }
@@ -111,7 +139,7 @@ class ArchiveSessionQueryRepository(
               and public_session_publications.club_id = sessions.club_id
             where sessions.id = ?
               and sessions.club_id = ?
-              and sessions.state in ('OPEN', 'CLOSED', 'PUBLISHED')
+              and sessions.state in ('CLOSED', 'PUBLISHED')
             """.trimIndent(),
             { resultSet, _ ->
                 val sessionUuid = resultSet.uuid("id")
@@ -461,10 +489,16 @@ class ArchiveSessionQueryRepository(
         )
     }
 
-    private fun ResultSet.toArchiveSessionItem(): ArchiveSessionItem =
-        ArchiveSessionItem(
+    private fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): ArchiveSessionItem {
+        val sessionNumber = getInt("number")
+        val myAttendanceStatus = getString("my_attendance_status")
+        val feedbackDocumentUploadedAt = utcOffsetDateTimeOrNull("feedback_document_uploaded_at")?.toString()
+        val feedbackDocumentReadable = feedbackDocumentUploadedAt != null &&
+            (currentMember.isHost || (!currentMember.isViewer && myAttendanceStatus == "ATTENDED"))
+
+        return ArchiveSessionItem(
             sessionId = uuid("id").toString(),
-            sessionNumber = getInt("number"),
+            sessionNumber = sessionNumber,
             title = getString("title"),
             bookTitle = getString("book_title"),
             bookAuthor = getString("book_author"),
@@ -474,6 +508,18 @@ class ArchiveSessionQueryRepository(
             total = getInt("total"),
             published = getBoolean("published"),
             state = getString("state"),
+            feedbackDocument = MemberArchiveFeedbackDocumentStatus(
+                available = feedbackDocumentUploadedAt != null,
+                readable = feedbackDocumentReadable,
+                lockedReason = when {
+                    feedbackDocumentUploadedAt == null -> "NOT_AVAILABLE"
+                    feedbackDocumentReadable -> null
+                    else -> "NOT_ATTENDED"
+                },
+                title = if (feedbackDocumentUploadedAt == null) null else "독서모임 ${sessionNumber}차 피드백",
+                uploadedAt = feedbackDocumentUploadedAt,
+            ),
         )
+    }
 
 }

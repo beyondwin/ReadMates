@@ -1,8 +1,10 @@
 import { useCallback } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import PublicSession from "@/features/public/components/public-session";
 import type { PublicSessionDetailResponse } from "@/shared/api/readmates";
 import { readmatesFetchResponse } from "@/shared/api/readmates";
+import { publicRecordsReturnTarget, readPublicReadmatesReturnTarget } from "@/src/app/route-continuity";
+import { Link } from "@/src/app/router-link";
 import { useReadmatesData } from "./readmates-page-data";
 import { ReadmatesPageState } from "./readmates-page";
 
@@ -22,6 +24,8 @@ async function loadPublicSession(sessionId: string) {
 
 export default function PublicSessionPage() {
   const sessionId = useParams().sessionId;
+  const location = useLocation();
+  const returnTarget = readPublicReadmatesReturnTarget(location.state, publicRecordsReturnTarget);
   const state = useReadmatesData(
     useCallback(() => {
       if (!sessionId) {
@@ -35,14 +39,14 @@ export default function PublicSessionPage() {
     <ReadmatesPageState state={state}>
       {(session) =>
         session ? (
-          <PublicSession session={session} />
+          <PublicSession session={session} returnTarget={returnTarget} />
         ) : (
           <main className="container">
             <section className="surface" style={{ margin: "48px 0", padding: 28 }}>
               <p className="eyebrow">공개 기록</p>
               <h1 className="h2 editorial">공개 기록을 찾을 수 없습니다.</h1>
-              <Link className="btn btn-ghost btn-sm" to="/about">
-                클럽으로
+              <Link className="btn btn-ghost btn-sm" to={returnTarget.href}>
+                {returnTarget.label}
               </Link>
             </section>
           </main>

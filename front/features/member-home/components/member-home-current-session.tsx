@@ -9,6 +9,10 @@ type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 
 export type MobileIconName = "archive" | "arrow-right" | "arrow-up-right" | "book" | "check" | "host" | "link" | "notes" | "sparkle";
 
+function activeAttendees(session: CurrentSession) {
+  return session.attendees.filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE");
+}
+
 function mobilePrepStepsFor(session: CurrentSession) {
   return [
     {
@@ -34,6 +38,12 @@ function mobilePrepStepsFor(session: CurrentSession) {
       label: "한줄평",
       done: session.myOneLineReview !== null,
       hint: session.myOneLineReview ? "완료" : "언제든",
+    },
+    {
+      id: "feedback",
+      label: "피드백",
+      done: false,
+      hint: "세션 후",
     },
   ];
 }
@@ -183,9 +193,10 @@ export function MobileCurrentSessionCard({
   const locationLabel = displayText(session.locationLabel, "장소 미정");
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
   const dday = daysUntilLabel(session.date);
+  const attendees = activeAttendees(session);
   const attendance = {
-    attended: session.attendees.filter((attendee) => attendee.rsvpStatus === "GOING").length,
-    total: session.attendees.length,
+    attended: attendees.filter((attendee) => attendee.rsvpStatus === "GOING").length,
+    total: attendees.length,
   };
 
   return (
@@ -273,7 +284,7 @@ export function MobileTodayActions({
         <div className="m-eyebrow-row">
           <span className="eyebrow">오늘 할 일</span>
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            0 actions
+            0개
           </span>
         </div>
         <div className="m-card-quiet">
@@ -324,18 +335,18 @@ export function MobileTodayActions({
       <div className="m-eyebrow-row">
         <span className="eyebrow">오늘 할 일</span>
         <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-          3 actions
+          4개
         </span>
       </div>
       <div className="m-action-grid">
-        <MobileActionTile label="읽기 체크인" sub={`${readingProgress}%`} href="/app/session/current" icon="01" />
-        <MobileActionTile label="질문 쓰기" sub={`${session.myQuestions.length}/5 작성`} href="/app/session/current" icon="02" />
+        <MobileActionTile label="RSVP" sub={rsvpLabel(session.myRsvpStatus)} href="/app/session/current" icon="01" />
+        <MobileActionTile label="읽기 체크인" sub={`${readingProgress}%`} href="/app/session/current" icon="02" />
+        <MobileActionTile label="질문 쓰기" sub={`${session.myQuestions.length}/5 작성`} href="/app/session/current" icon="03" />
         <MobileActionTile
-          label="모임 확인"
-          sub={meetingSub}
-          href={meetingHref}
-          icon="03"
-          external={Boolean(meetingUrl)}
+          label="한줄평"
+          sub={session.myOneLineReview ? "작성 완료" : "기록 전"}
+          href="/app/session/current"
+          icon="04"
         />
       </div>
     </section>

@@ -8,7 +8,7 @@ export type PublicAuthAction = {
 
 const authenticatedAction: PublicAuthAction = {
   href: "/app",
-  label: READMATES_NAV_LABELS.member.mySpace,
+  label: READMATES_NAV_LABELS.public.appEntry,
 };
 
 type AuthMeProbe = {

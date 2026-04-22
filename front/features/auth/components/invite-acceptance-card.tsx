@@ -6,28 +6,54 @@ import { fetchInvitationPreview, parseInvitationPreview } from "@/features/auth/
 import type { InvitationPreviewResponse, InvitationStatus } from "@/shared/api/readmates";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
-const statusCopy: Record<InvitationStatus, { title: string; body: string }> = {
+const statusCopy: Record<InvitationStatus, { title: string; body: string; badgeClass: string; badge: string }> = {
   PENDING: {
     title: "읽는사이 초대",
-    body: "초대 대상 Gmail 계정과 이름을 확인한 뒤 Google 로그인으로 수락해 주세요.",
+    body: "초대 대상 Gmail 계정과 이름을 확인한 뒤 같은 Google 계정으로 수락해 주세요.",
+    badgeClass: "badge-pending",
+    badge: "초대 대기",
   },
   ACCEPTED: {
     title: "이미 사용된 초대입니다.",
     body: "이미 수락된 링크입니다. 멤버라면 로그인해서 내 공간으로 이동해 주세요.",
+    badgeClass: "badge-success",
+    badge: "수락 완료",
   },
   EXPIRED: {
     title: "초대가 만료되었습니다.",
     body: "호스트에게 새 초대 링크를 요청해 주세요.",
+    badgeClass: "badge-warning",
+    badge: "만료",
   },
   REVOKED: {
     title: "사용할 수 없는 초대입니다.",
     body: "취소된 초대 링크입니다. 호스트에게 확인해 주세요.",
+    badgeClass: "badge-locked",
+    badge: "취소됨",
   },
 };
 
+function membershipStatusLabel(status: InvitationStatus) {
+  if (status === "PENDING") return "정식 멤버 초대 대기";
+  if (status === "ACCEPTED") return "정식 멤버 연결 완료";
+  if (status === "EXPIRED") return "만료되어 수락 불가";
+  return "취소되어 수락 불가";
+}
+
+type InvitePreviewState = {
+  token: string;
+  preview: InvitationPreviewResponse | null;
+  error: string | null;
+  isLoading: boolean;
+};
+
 export default function InviteAcceptanceCard({ token }: { token: string }) {
-  const [preview, setPreview] = useState<InvitationPreviewResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [previewState, setPreviewState] = useState<InvitePreviewState>({
+    token,
+    preview: null,
+    error: null,
+    isLoading: true,
+  });
   const mountedRef = useRef(false);
 
   useEffect(() => {
@@ -46,18 +72,33 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
           return;
         }
         if (!previewResponse.ok) {
-          setError("초대 링크를 찾을 수 없습니다.");
+          setPreviewState({
+            token,
+            preview: null,
+            error: "초대 링크를 찾을 수 없습니다.",
+            isLoading: false,
+          });
           return;
         }
         const parsedPreview = await parseInvitationPreview(previewResponse);
         if (!active || !mountedRef.current) {
           return;
         }
-        setPreview(parsedPreview);
+        setPreviewState({
+          token,
+          preview: parsedPreview,
+          error: null,
+          isLoading: false,
+        });
       })
       .catch(() => {
         if (active && mountedRef.current) {
-          setError("초대 정보를 불러오지 못했습니다.");
+          setPreviewState({
+            token,
+            preview: null,
+            error: "초대 정보를 불러오지 못했습니다.",
+            isLoading: false,
+          });
         }
       });
 
@@ -66,9 +107,13 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
     };
   }, [token]);
 
+  const isCurrentPreview = previewState.token === token;
+  const preview = isCurrentPreview ? previewState.preview : null;
+  const error = isCurrentPreview ? previewState.error : null;
+  const isLoading = !isCurrentPreview || previewState.isLoading;
   const copy = preview ? statusCopy[preview.status] : null;
   const title = preview?.status === "PENDING" ? `${preview.clubName} 초대` : copy?.title;
-  const heading = title ?? "초대 확인 중";
+  const heading = title ?? "초대장을 확인하는 중입니다.";
   const canAccept = preview?.canAccept === true;
   const isAccepted = preview?.status === "ACCEPTED";
   const googleInviteHref = `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}`;
@@ -76,48 +121,54 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
   return (
     <section className="auth-shell">
       <div className="container" style={{ maxWidth: 520 }}>
-        <Link to="/" className="btn btn-quiet btn-sm" style={{ marginLeft: "-10px", marginBottom: 24 }}>
+        <Link to="/" className="btn btn-quiet btn-sm auth-back-link">
           ← 공개 화면으로
         </Link>
-        <div className="surface auth-card">
-          <div className="eyebrow" style={{ marginBottom: 12 }}>
-            초대 확인
+        <div className="surface auth-card auth-card--boundary" aria-busy={isLoading}>
+          <div className="row-between auth-card__kicker">
+            <div className="eyebrow">초대 확인</div>
+            {copy ? <span className={`badge badge-dot ${copy.badgeClass}`}>{copy.badge}</span> : null}
           </div>
-          <h1 className="h2 editorial" style={{ margin: 0 }}>
-            {heading}
-          </h1>
+          <h1 className="h2 editorial auth-card__title">{heading}</h1>
           {copy ? (
-            <p className="body" style={{ color: "var(--text-2)", marginTop: 16 }}>
+            <p className="body auth-card__lede">
               {copy.body}
             </p>
           ) : null}
           {error ? (
-            <p className="small" role="alert" style={{ margin: "12px 0 0", color: "var(--danger)" }}>
+            <p className="small auth-card__error" role="alert">
               {error}
             </p>
           ) : null}
           {preview ? (
-            <div className="surface-quiet" style={{ padding: 16, marginTop: 20 }}>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>
-                초대 대상
+            <div className="auth-boundary-list" aria-label="초대 경계 정보">
+              <div className="auth-boundary-row">
+                <span>클럽</span>
+                <strong>{preview.clubName}</strong>
               </div>
-              <div className="body" style={{ fontSize: 14, fontWeight: 500 }}>
-                {preview.name}
+              <div className="auth-boundary-row">
+                <span>초대 대상</span>
+                <strong>{preview.name}</strong>
+                <em>{preview.email}</em>
               </div>
-              <div className="mono" style={{ fontSize: 13, color: "var(--text-2)", marginTop: 4 }}>
-                {preview.email}
+              <div className="auth-boundary-row">
+                <span>Google 계정</span>
+                <strong>{preview.emailHint}</strong>
+                <em>로그인 계정은 초대 이메일과 일치해야 합니다.</em>
               </div>
-              <div className="tiny" style={{ marginTop: 8 }}>
-                만료 {formatDateOnlyLabel(preview.expiresAt)}
+              <div className="auth-boundary-row">
+                <span>멤버십</span>
+                <strong>{membershipStatusLabel(preview.status)}</strong>
+                <em>만료 {formatDateOnlyLabel(preview.expiresAt)}</em>
               </div>
             </div>
           ) : null}
           {canAccept ? (
             <>
-              <p className="small" style={{ color: "var(--text-2)", marginTop: 18 }}>
-                Google로 초대 수락하면 바로 정식 멤버가 됩니다.
+              <p className="small auth-card__next-step">
+                Google 인증이 끝나면 정식 멤버로 연결되고 현재 세션, RSVP, 질문과 서평 작성 권한이 열립니다.
               </p>
-              <div className="auth-card__actions">
+              <div className="auth-card__actions auth-card__actions--primary">
                 <a className="btn btn-primary btn-lg" href={googleInviteHref}>
                   Google로 초대 수락
                 </a>
@@ -125,7 +176,7 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
             </>
           ) : null}
           {isAccepted ? (
-            <div className="auth-card__actions">
+            <div className="auth-card__actions auth-card__actions--primary">
               <Link className="btn btn-primary btn-lg" to="/login">
                 로그인하기
               </Link>

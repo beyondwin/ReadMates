@@ -34,6 +34,10 @@ describe("FeedbackDocumentPage", () => {
     expect(screen.getByText("저는 일단 숫자로 반박하고 싶은 마음이 먼저 들어요.")).toBeInTheDocument();
     expect(screen.getByText("팩트풀니스의 데이터 해석 방식을 이야기하던 중 · [00:31]")).toBeInTheDocument();
     expect(screen.getByText("숫자를 검증 도구로 쓰려는 장점과 숫자에 기대어 결론을 서두르는 습관이 함께 드러났다.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "아카이브로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/app/archive?view=report",
+    );
     expect(screen.getByRole("link", { name: "PDF로 저장" })).toHaveAttribute(
       "href",
       "/app/feedback/session-1/print",
@@ -55,6 +59,32 @@ describe("FeedbackDocumentPage", () => {
     expect(styleText).toContain("max-width: 920px !important");
     expect(styleText).not.toContain("background: #fff !important");
     expect(styleText).not.toContain("max-width: none !important");
+    expect(screen.getByRole("link", { name: "아카이브로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/app/archive?view=report",
+    );
+    expect(screen.getByRole("link", { name: "문서로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session-1",
+    );
+  });
+
+  it("encodes feedback document print and document-return hrefs", () => {
+    render(<FeedbackDocumentPage document={{ ...feedbackDocument, sessionId: "session 1/slash" }} />);
+
+    expect(screen.getByRole("link", { name: "PDF로 저장" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session%201%2Fslash/print",
+    );
+
+    cleanup();
+    vi.stubGlobal("print", vi.fn());
+    render(<FeedbackDocumentPage document={{ ...feedbackDocument, sessionId: "session 1/slash" }} printMode />);
+
+    expect(screen.getByRole("link", { name: "문서로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session%201%2Fslash",
+    );
   });
 
   it("labels the missing state as a feedback document", () => {
@@ -62,6 +92,10 @@ describe("FeedbackDocumentPage", () => {
 
     expect(screen.getByText("피드백 문서")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "아직 열람 가능한 피드백 문서가 없습니다." })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "아카이브로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/app/archive?view=report",
+    );
   });
 
   it("uses viewer and full-member wording for locked feedback documents", () => {

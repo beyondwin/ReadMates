@@ -64,7 +64,7 @@ test("host creates invite and member is directed to Google acceptance", async ({
   await page.goto(inviteUrl);
   await expect(page.getByText("테스트멤버").first()).toBeVisible();
   await expect(page.getByText(invitedEmail, { exact: true })).toBeVisible();
-  await expect(page.getByText("초대 대상 Gmail 계정과 이름을 확인한 뒤 Google 로그인으로 수락해 주세요.")).toBeVisible();
+  await expect(page.getByText("초대 대상 Gmail 계정과 이름을 확인한 뒤 같은 Google 계정으로 수락해 주세요.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
     "href",
     expectedGoogleInviteHref(inviteUrl),

@@ -107,6 +107,21 @@ class ArchiveControllerDbTest(
     }
 
     @Test
+    fun `archive session list exposes locked feedback document for member who did not attend`() {
+        mockMvc.get("/api/archive/sessions") {
+            with(user("member1@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.title") { value(hasItem("독서모임 6차 피드백")) }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.uploadedAt") { exists() }
+            }
+    }
+
+    @Test
     fun `archive session detail makes feedback document readable for host`() {
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
             with(user("host@example.com"))
@@ -156,15 +171,20 @@ class ArchiveControllerDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `archive session detail returns same club open non draft session`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000906") {
+    fun `archive preserved records exclude same club open sessions`() {
+        mockMvc.get("/api/archive/sessions") {
             with(user("member5@example.com"))
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000906") }
-                jsonPath("$.sessionNumber") { value(906) }
-                jsonPath("$.state") { value("OPEN") }
+                jsonPath("$[*].sessionNumber") { value(not(hasItem(906))) }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000906") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isNotFound() }
             }
     }
 

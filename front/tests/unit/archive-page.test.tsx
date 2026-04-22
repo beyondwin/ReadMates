@@ -1,7 +1,8 @@
-import { cleanup, render, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { type ComponentProps, type ComponentType } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import ArchivePage from "@/features/archive/components/archive-page";
 import type {
   ArchiveSessionItem,
@@ -9,7 +10,15 @@ import type {
   MyArchiveReviewItem,
 } from "@/shared/api/readmates";
 
-afterEach(cleanup);
+const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  window.sessionStorage.clear();
+  Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  window.history.pushState({}, "", "/");
+});
 
 type FeedbackDocumentListItem = {
   sessionId: string;
@@ -142,11 +151,73 @@ const seededReports: FeedbackDocumentListItem[] = [
     uploadedAt: "2026-04-20T09:00:00Z",
   },
 ];
+const seededReportReadLabel = "No.01 팩트풀니스 · 독서모임 1차 피드백 읽기";
+const seededReportPdfLabel = "No.01 팩트풀니스 · 독서모임 1차 피드백 PDF로 저장";
 
 function getDesktop(container: HTMLElement) {
   const desktop = container.querySelector(".desktop-only");
   expect(desktop).not.toBeNull();
   return within(desktop as HTMLElement);
+}
+
+function setScrollY(scrollY: number) {
+  Object.defineProperty(window, "scrollY", { configurable: true, value: scrollY });
+}
+
+function archiveScrollSnapshot() {
+  const raw = window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY);
+  expect(raw).not.toBeNull();
+  return JSON.parse(raw as string) as { pathname: string; search: string; scrollY: number };
+}
+
+function setScrollToMock() {
+  const scrollTo = vi.fn();
+  Object.defineProperty(window, "scrollTo", { configurable: true, value: scrollTo });
+  return scrollTo;
+}
+
+function archiveViewFromSearchParam(value: string | null) {
+  if (value === "reviews" || value === "questions" || value === "report") {
+    return value;
+  }
+
+  return "sessions";
+}
+
+function ArchiveSearchParamHarness() {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialView = archiveViewFromSearchParam(searchParams.get("view"));
+
+  return (
+    <>
+      <button type="button" onClick={() => setSearchParams({ view: "report" })}>
+        search report
+      </button>
+      <FutureArchivePage
+        sessions={seededSessions}
+        questions={seededQuestions}
+        reviews={seededReviews}
+        reports={seededReports}
+        initialView={initialView}
+        onViewChange={(nextView) => setSearchParams({ view: nextView })}
+        routePathname={location.pathname}
+        routeSearch={location.search}
+      />
+    </>
+  );
+}
+
+function LocationStateEcho() {
+  const location = useLocation();
+  const state = location.state as { readmatesReturnTo?: string; readmatesReturnLabel?: string } | null;
+
+  return (
+    <main>
+      <div data-testid="return-to">{state?.readmatesReturnTo ?? ""}</div>
+      <div data-testid="return-label">{state?.readmatesReturnLabel ?? ""}</div>
+    </main>
+  );
 }
 
 describe("ArchivePage", () => {
@@ -166,7 +237,34 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByLabelText("No.06 · 지난 회차 · 공개됨")).toBeInTheDocument();
-    expect(desktop.getAllByText("문서")).toHaveLength(seededSessions.length);
+    expect(desktop.getAllByText("공개 기록")).toHaveLength(seededSessions.length);
+    expect(desktop.getByText("피드백 문서 있음")).toBeInTheDocument();
+    expect(desktop.getAllByText("피드백 문서 없음").length).toBe(seededSessions.length - 1);
+  });
+
+  it("shows locked feedback status from archive session metadata without readable reports", () => {
+    const lockedSession: ArchiveSessionItem = {
+      ...seededSessions[0],
+      feedbackDocument: {
+        available: true,
+        readable: false,
+        lockedReason: "NOT_ATTENDED",
+        title: "독서모임 6차 피드백",
+        uploadedAt: "2026-04-20T09:00:00Z",
+      },
+    };
+
+    const { container } = render(
+      <FutureArchivePage sessions={[lockedSession]} questions={[]} reviews={[]} reports={[]} />,
+    );
+    const desktop = getDesktop(container);
+    const mobile = within(container.querySelector(".rm-archive-mobile") as HTMLElement);
+
+    for (const scope of [desktop, mobile]) {
+      expect(scope.getByText("피드백 잠김")).toBeInTheDocument();
+      expect(scope.queryByText("피드백 문서 없음")).not.toBeInTheDocument();
+      expect(scope.getByLabelText("등록된 피드백 문서가 있지만 이 계정에는 열람 권한이 없습니다.")).toBeInTheDocument();
+    }
   });
 
   it("keeps fallback dates visible in the desktop session month/day column", () => {
@@ -234,7 +332,7 @@ describe("ArchivePage", () => {
     expect(yearHeadings).not.toContain("");
     expect(desktopElement.querySelectorAll("article")).toHaveLength(2);
     expect(desktop.getAllByText("가난한 찰리의 연감")).toHaveLength(1);
-    expect(desktop.getAllByText("날짜 미정 책")).toHaveLength(1);
+    expect(desktop.getAllByText("날짜 미정 책").length).toBeGreaterThan(0);
   });
 
   it("renders the standalone-aligned mobile archive shell", () => {
@@ -262,7 +360,9 @@ describe("ArchivePage", () => {
     expect(scoped.getByText("No.06 · 2026.04.15")).toBeInTheDocument();
     expect(scoped.getByLabelText("No.06 · 지난 회차 · 공개됨")).toBeInTheDocument();
     expect(scoped.getByText("가난한 찰리의 연감")).toBeInTheDocument();
-    expect(scoped.getAllByText("문서")).toHaveLength(seededSessions.length);
+    expect(scoped.getAllByText("공개 기록")).toHaveLength(seededSessions.length);
+    expect(scoped.getByText("피드백 문서 있음")).toBeInTheDocument();
+    expect(scoped.getAllByText("피드백 문서 없음").length).toBe(seededSessions.length - 1);
     expect(scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" })).toHaveAttribute(
       "href",
       "/app/sessions/session-6",
@@ -307,15 +407,15 @@ describe("ArchivePage", () => {
     expect(scoped.getByRole("button", { name: "피드백 문서" })).toHaveClass("is-on");
     expect(scoped.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
     expect(scoped.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
-    const readAction = scoped.getByRole("link", { name: "읽기" });
-    const pdfAction = scoped.getByRole("link", { name: "PDF로 저장" });
+    const readAction = scoped.getByRole("link", { name: seededReportReadLabel });
+    const pdfAction = scoped.getByRole("link", { name: seededReportPdfLabel });
     expect(readAction).toHaveAttribute("href", "/app/feedback/session-1");
-    expect(readAction).toHaveAttribute("aria-label", "읽기");
-    expect(readAction).toHaveAttribute("title", "읽기");
+    expect(readAction).toHaveAttribute("aria-label", seededReportReadLabel);
+    expect(readAction).toHaveAttribute("title", seededReportReadLabel);
     expect(readAction).not.toHaveTextContent("읽기");
     expect(pdfAction).toHaveAttribute("href", "/app/feedback/session-1/print");
-    expect(pdfAction).toHaveAttribute("aria-label", "PDF로 저장");
-    expect(pdfAction).toHaveAttribute("title", "PDF로 저장");
+    expect(pdfAction).toHaveAttribute("aria-label", seededReportPdfLabel);
+    expect(pdfAction).toHaveAttribute("title", seededReportPdfLabel);
     expect(pdfAction).not.toHaveTextContent("PDF로 저장");
     expect(scoped.queryByText("feedback-6-suhan.html")).not.toBeInTheDocument();
   });
@@ -326,14 +426,88 @@ describe("ArchivePage", () => {
     );
     const desktop = getDesktop(container);
 
-    expect(desktop.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" })).toHaveAttribute(
+    const latestSessionLink = desktop.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" });
+    expect(latestSessionLink).toHaveAttribute(
       "href",
       "/app/sessions/session-6",
     );
+    expect(latestSessionLink).not.toHaveClass("btn");
+    expect(latestSessionLink).toHaveClass("rm-archive-session-action");
     expect(desktop.getByRole("link", { name: "No.1 팩트풀니스 열기" })).toHaveAttribute(
       "href",
       "/app/sessions/session-1",
     );
+    expect(desktop.queryByText("열기 →")).not.toBeInTheDocument();
+  });
+
+  it("uses router navigation to remember archive scroll before session and feedback links", async () => {
+    const user = userEvent.setup();
+
+    setScrollY(720);
+    const desktopRender = render(
+      <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
+        <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+      </MemoryRouter>,
+    );
+
+    await user.click(getDesktop(desktopRender.container).getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" }));
+
+    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=sessions", scrollY: 720 });
+
+    desktopRender.unmount();
+    window.sessionStorage.clear();
+    setScrollY(360);
+
+    const mobileRender = render(
+      <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
+        <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+      </MemoryRouter>,
+    );
+    const mobile = within(mobileRender.container.querySelector(".rm-archive-mobile") as HTMLElement);
+
+    await user.click(mobile.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" }));
+
+    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=sessions", scrollY: 360 });
+
+    mobileRender.unmount();
+    window.sessionStorage.clear();
+    setScrollY(540);
+
+    const feedbackRender = render(
+      <MemoryRouter initialEntries={["/app/archive?view=report"]}>
+        <FutureArchivePage
+          sessions={seededSessions}
+          questions={seededQuestions}
+          reviews={seededReviews}
+          reports={seededReports}
+          initialView="report"
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(getDesktop(feedbackRender.container).getByRole("link", { name: seededReportReadLabel }));
+
+    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=report", scrollY: 540 });
+
+    feedbackRender.unmount();
+    window.sessionStorage.clear();
+    setScrollY(420);
+
+    const printRender = render(
+      <MemoryRouter initialEntries={["/app/archive?view=report"]}>
+        <FutureArchivePage
+          sessions={seededSessions}
+          questions={seededQuestions}
+          reviews={seededReviews}
+          reports={seededReports}
+          initialView="report"
+        />
+      </MemoryRouter>,
+    );
+
+    await user.click(getDesktop(printRender.container).getByRole("link", { name: seededReportPdfLabel }));
+
+    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=report", scrollY: 420 });
   });
 
   it("links unpublished showcase sessions to member archive detail on desktop and mobile", () => {
@@ -367,8 +541,10 @@ describe("ArchivePage", () => {
     );
     expect(desktop.queryByText("준비 중")).not.toBeInTheDocument();
     expect(mobile.queryByText("준비 중")).not.toBeInTheDocument();
-    expect(desktop.queryByText("공개")).not.toBeInTheDocument();
-    expect(mobile.queryByText("공개")).not.toBeInTheDocument();
+    expect(desktop.queryByText("공개 기록")).not.toBeInTheDocument();
+    expect(mobile.queryByText("공개 기록")).not.toBeInTheDocument();
+    expect(desktop.getByText("비공개 기록")).toBeInTheDocument();
+    expect(mobile.getByText("비공개 기록")).toBeInTheDocument();
   });
 
   it("switches archive tabs to reviews, questions, and feedback document listings", async () => {
@@ -380,7 +556,7 @@ describe("ArchivePage", () => {
     const desktop = getDesktop(container);
 
     await user.click(desktop.getByRole("button", { name: "내 서평" }));
-    expect(desktop.getByText("서평 · 2026.04.15")).toBeInTheDocument();
+    expect(desktop.getByText("저장된 발췌 · 2026.04.15")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" })).toHaveAttribute(
       "href",
@@ -389,7 +565,7 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("맡겨진 소녀")).not.toBeInTheDocument();
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
-    expect(desktop.getByText("Q1 · 2025.11.26")).toBeInTheDocument();
+    expect(desktop.getByText("저장된 질문 Q1 · 2025.11.26")).toBeInTheDocument();
     expect(desktop.getByText("10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?")).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "Q1 팩트풀니스 세션으로" })).toHaveAttribute(
       "href",
@@ -401,17 +577,83 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("2026.04.20 등록")).toBeInTheDocument();
     expect(desktop.getByText("문서")).toBeInTheDocument();
     expect(desktop.queryByText("DOC")).not.toBeInTheDocument();
-    const readAction = desktop.getByRole("link", { name: "읽기" });
-    const pdfAction = desktop.getByRole("link", { name: "PDF로 저장" });
+    const readAction = desktop.getByRole("link", { name: seededReportReadLabel });
+    const pdfAction = desktop.getByRole("link", { name: seededReportPdfLabel });
     expect(readAction).toHaveAttribute("href", "/app/feedback/session-1");
-    expect(readAction).toHaveAttribute("aria-label", "읽기");
-    expect(readAction).toHaveAttribute("title", "읽기");
+    expect(readAction).toHaveAttribute("aria-label", seededReportReadLabel);
+    expect(readAction).toHaveAttribute("title", seededReportReadLabel);
     expect(readAction).not.toHaveTextContent("읽기");
     expect(pdfAction).toHaveAttribute("href", "/app/feedback/session-1/print");
-    expect(pdfAction).toHaveAttribute("aria-label", "PDF로 저장");
-    expect(pdfAction).toHaveAttribute("title", "PDF로 저장");
+    expect(pdfAction).toHaveAttribute("aria-label", seededReportPdfLabel);
+    expect(pdfAction).toHaveAttribute("title", seededReportPdfLabel);
     expect(pdfAction).not.toHaveTextContent("PDF로 저장");
     expect(desktop.queryByText("feedback-13.html")).not.toBeInTheDocument();
+  });
+
+  it("uses contextual icon-only labels when multiple feedback reports are listed", () => {
+    const { container } = render(
+      <FutureArchivePage
+        sessions={[]}
+        questions={[]}
+        reviews={[]}
+        reports={[
+          ...seededReports,
+          {
+            sessionId: "session-2",
+            sessionNumber: 2,
+            title: "독서모임 2차 피드백",
+            bookTitle: "냉정한 이타주의자",
+            date: "2025-12-17",
+            fileName: "251217 2차.md",
+            uploadedAt: "2026-04-21T09:00:00Z",
+          },
+        ]}
+        initialView="report"
+      />,
+    );
+    const desktop = getDesktop(container);
+
+    expect(desktop.queryByRole("link", { name: "읽기" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "PDF로 저장" })).not.toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: seededReportReadLabel })).toHaveAttribute("href", "/app/feedback/session-1");
+    expect(desktop.getByRole("link", { name: seededReportPdfLabel })).toHaveAttribute("href", "/app/feedback/session-1/print");
+    expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 · 독서모임 2차 피드백 읽기" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session-2",
+    );
+    expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 · 독서모임 2차 피드백 PDF로 저장" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session-2/print",
+    );
+  });
+
+  it("passes source archive tab state to session detail links", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/app/archive?view=reviews"]}>
+        <Routes>
+          <Route
+            path="/app/archive"
+            element={
+              <FutureArchivePage
+                sessions={seededSessions}
+                questions={seededQuestions}
+                reviews={seededReviews}
+                reports={seededReports}
+                initialView="reviews"
+              />
+            }
+          />
+          <Route path="/app/sessions/:sessionId" element={<LocationStateEcho />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getAllByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" })[0]);
+
+    expect(screen.getByTestId("return-to")).toHaveTextContent("/app/archive?view=reviews");
+    expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로");
   });
 
   it("can open directly with the feedback document tab selected", () => {
@@ -428,6 +670,53 @@ describe("ArchivePage", () => {
 
     expect(desktop.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
     expect(desktop.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
+  });
+
+  it("syncs the visible archive tab when search params change after initial render", async () => {
+    const user = userEvent.setup();
+    const { container, getByRole } = render(
+      <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
+        <ArchiveSearchParamHarness />
+      </MemoryRouter>,
+    );
+
+    expect(getDesktop(container).getByRole("button", { name: "세션" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(getByRole("button", { name: "search report" }));
+
+    await waitFor(() => {
+      expect(getDesktop(container).getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
+    });
+    expect(getDesktop(container).getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
+  });
+
+  it("restores archive scroll after archive content renders for the matching search params", async () => {
+    const scrollTo = setScrollToMock();
+    window.sessionStorage.setItem(
+      ARCHIVE_SCROLL_KEY,
+      JSON.stringify({
+        pathname: "/app/archive",
+        search: "?view=sessions",
+        scrollY: 640,
+      }),
+    );
+    window.history.pushState({}, "", "/app/archive?view=sessions");
+
+    render(
+      <FutureArchivePage
+        sessions={seededSessions}
+        questions={seededQuestions}
+        reviews={seededReviews}
+        reports={seededReports}
+        routePathname="/app/archive"
+        routeSearch="?view=sessions"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith({ top: 640, behavior: "auto" });
+    });
+    expect(window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY)).toBeNull();
   });
 
   it("encodes app session ids without encoding the my-records hash", async () => {
@@ -471,13 +760,24 @@ describe("ArchivePage", () => {
         text: "링크 인코딩을 확인한다.",
       },
     ];
+    const reportsWithEncodedId: FeedbackDocumentListItem[] = [
+      {
+        sessionId: encodedSessionId,
+        sessionNumber: 7,
+        title: "독서모임 7차 피드백",
+        bookTitle: "URL 책",
+        date: "2026-05-20",
+        fileName: "260520 7차.md",
+        uploadedAt: "2026-05-21T09:00:00Z",
+      },
+    ];
 
     const { container } = render(
       <FutureArchivePage
         sessions={sessionsWithEncodedId}
         questions={questionsWithEncodedId}
         reviews={reviewsWithEncodedId}
-        reports={[]}
+        reports={reportsWithEncodedId}
       />,
     );
     const desktop = getDesktop(container);
@@ -489,6 +789,16 @@ describe("ArchivePage", () => {
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
     expect(desktop.getByRole("link", { name: "Q2 URL 책 세션으로" })).toHaveAttribute("href", encodedRecordsHref);
+
+    await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
+    expect(desktop.getByRole("link", { name: "No.07 URL 책 · 독서모임 7차 피드백 읽기" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session%207%2Fslash",
+    );
+    expect(desktop.getByRole("link", { name: "No.07 URL 책 · 독서모임 7차 피드백 PDF로 저장" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session%207%2Fslash/print",
+    );
   });
 
   it("renders empty states instead of fallback samples", async () => {

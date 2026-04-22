@@ -29,7 +29,7 @@ export function BookCover({
   const normalizedImageUrl = safeExternalHttpsUrl(imageUrl) ?? "";
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const shouldRenderImage = normalizedImageUrl.length > 0 && failedImageUrl !== normalizedImageUrl;
-  const coverClassName = className ? `m-cover ${className}` : "m-cover";
+  const coverClassName = className ? `rm-book-cover m-cover ${className}` : "rm-book-cover m-cover";
 
   return (
     <div
@@ -37,13 +37,6 @@ export function BookCover({
       className={coverClassName}
       style={{
         width,
-        aspectRatio: "3 / 4",
-        borderRadius: 4,
-        border: "1px solid var(--line)",
-        overflow: "hidden",
-        flexShrink: 0,
-        background: "var(--bg-sub)",
-        boxShadow: "1px 1px 0 var(--line-soft), 2px 2px 0 var(--line-soft)",
         ...style,
       }}
     >
@@ -61,15 +54,7 @@ export function BookCover({
         />
       ) : (
         <div
-          style={{
-            width: "100%",
-            height: "100%",
-            padding: "10px 8px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            gap: 8,
-          }}
+          className="rm-book-cover__fallback"
         >
           <span className="editorial" style={{ color: "var(--text)", fontSize: 14, lineHeight: 1.25 }}>
             {safeTitle}

@@ -22,8 +22,8 @@ describe("SPA router", () => {
 
     render(<RouterProvider router={router} />);
 
-    expect(screen.getByRole("heading", { name: "Google로 읽는사이에 들어가기" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Google로 계속하기" })).toHaveAttribute(
+    expect(screen.getByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
     );
@@ -34,7 +34,7 @@ describe("SPA router", () => {
 
     render(<RouterProvider router={router} />);
 
-    expect(screen.getByRole("heading", { name: "Google로 계속하기" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "비밀번호 링크는 보관용 안내로 전환되었습니다." })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 계속하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
@@ -106,7 +106,7 @@ describe("SPA router", () => {
     );
 
     expect(
-      await screen.findByRole("heading", { name: "전체 세션은 읽을 수 있고, 참여는 정식 멤버에게 열립니다." }),
+      await screen.findByRole("heading", { name: "읽을 수 있는 공간은 열렸고, 참여는 승인 뒤 열립니다." }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "전체 세션 둘러보기" })).toHaveAttribute("href", "/app/archive");
     expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute("href", "/app/session/current");

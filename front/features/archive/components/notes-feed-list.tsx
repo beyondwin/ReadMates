@@ -21,6 +21,22 @@ function sessionNumberLabel(item: NoteFeedItem) {
   return `No.${String(item.sessionNumber).padStart(2, "0")}`;
 }
 
+function noteKindLabel(item: NoteFeedItem) {
+  if (item.kind === "QUESTION") {
+    return "질문";
+  }
+
+  if (item.kind === "ONE_LINE_REVIEW") {
+    return "한줄평";
+  }
+
+  if (item.kind === "HIGHLIGHT") {
+    return "하이라이트";
+  }
+
+  return "읽기 흔적";
+}
+
 function byKind(items: NoteFeedItem[], kind: string) {
   return items.filter((item) => item.kind === kind);
 }
@@ -99,6 +115,7 @@ export function FeedSections({
 
   return (
     <>
+      <NotesFeedListStyles />
       {(filter === "all" || filter === "questions") && <FeedQuestions items={byKind(items, "QUESTION")} />}
       {(filter === "all" || filter === "oneliners") && <FeedOneLiners items={byKind(items, "ONE_LINE_REVIEW")} />}
       {(filter === "all" || filter === "highlights") && <FeedHighlights items={byKind(items, "HIGHLIGHT")} />}
@@ -136,7 +153,7 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
             }}
           >
             <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} markerSize={22} style={{ gap: "10px", marginBottom: "12px" }}>
-              <span className="tiny mono">{sessionNumberLabel(item)}</span>
+              <span className="tiny mono">{sessionNumberLabel(item)} · {noteKindLabel(item)}</span>
             </FeedAuthorRow>
             <div className="body editorial" style={{ fontSize: "18px", lineHeight: 1.55 }}>
               {item.text}
@@ -150,15 +167,22 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
 
 function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="한줄평">
-      <div className="grid-2">
-        {items.map((item) => (
-          <div key={itemKey(item)} className="surface" style={{ padding: "22px" }}>
-            <div className="quote editorial" style={{ fontSize: "17px" }}>
+    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 서평">
+      <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
+        {items.map((item, index) => (
+          <article
+            key={itemKey(item)}
+            className="rm-notes-excerpt-row"
+            style={{
+              padding: "22px 0",
+              borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
+            }}
+          >
+            <div className="quote editorial" style={{ fontSize: "17px", margin: 0 }}>
               {item.text}
             </div>
-            <FeedAuthorRow item={item} rightLabel={sessionNumberLabel(item)} markerSize={20} style={{ marginTop: "14px" }} />
-          </div>
+            <FeedAuthorRow item={item} rightLabel={`${sessionNumberLabel(item)} · ${formatDateOnlyLabel(item.date)}`} markerSize={20} style={{ marginTop: "14px" }} />
+          </article>
         ))}
       </div>
     </FeedSection>
@@ -180,7 +204,7 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
             <div className="quote editorial" style={{ fontSize: "18px" }}>
               {item.text}
             </div>
-            <FeedAuthorRow item={item} rightLabel={sessionNumberLabel(item)} markerSize={20} style={{ gap: "10px", marginTop: "10px" }} />
+            <FeedAuthorRow item={item} rightLabel={`${sessionNumberLabel(item)} · ${item.bookTitle}`} markerSize={20} style={{ gap: "10px", marginTop: "10px" }} />
           </div>
         ))}
       </div>
@@ -195,6 +219,7 @@ function FeedCheckins({ items }: { items: NoteFeedItem[] }) {
         {items.map((item, index) => (
           <div
             key={itemKey(item)}
+            className="rm-notes-checkin-row"
             style={{
               padding: "20px 0",
               borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
@@ -239,6 +264,29 @@ function FeedSection({ eyebrow, title, children }: { eyebrow: string; title: str
       </div>
       {children}
     </section>
+  );
+}
+
+function NotesFeedListStyles() {
+  return (
+    <style>{`
+      @media (max-width: 768px) {
+        .rm-notes-excerpt-row .quote {
+          border-bottom: 0;
+        }
+
+        .rm-notes-checkin-row {
+          grid-template-columns: minmax(0, 1fr) !important;
+          gap: 6px !important;
+          align-items: start !important;
+        }
+
+        .rm-notes-checkin-row > span:last-child {
+          justify-self: start;
+          color: var(--text-3);
+        }
+      }
+    `}</style>
   );
 }
 

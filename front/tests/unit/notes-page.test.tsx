@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteFeedItem, NoteSessionItem } from "@/shared/api/readmates";
+import type { FeedFilter } from "@/features/archive/components/notes-feed-list";
 import NotesPage from "@/src/pages/notes";
 
 const { notesFeedPageMock } = vi.hoisted(() => ({
@@ -13,6 +14,8 @@ type NotesFeedProps = {
   noteSessions: NoteSessionItem[];
   selectedSessionId: string | null;
   selectedSession: NoteSessionItem | null;
+  initialFilter?: FeedFilter;
+  onFilterChange?: (filter: FeedFilter) => void;
 };
 
 vi.mock("@/features/archive/components/notes-feed-page", () => ({
@@ -103,9 +106,21 @@ function mockNotesBff({
   );
 }
 
-function renderNotesPage(sessionId?: string) {
+function renderNotesPage(sessionId?: string, filter?: string) {
+  const params = new URLSearchParams();
+
+  if (sessionId) {
+    params.set("sessionId", sessionId);
+  }
+
+  if (filter) {
+    params.set("filter", filter);
+  }
+
+  const search = params.toString();
+
   render(
-    <MemoryRouter initialEntries={[`/app/notes${sessionId ? `?sessionId=${sessionId}` : ""}`]}>
+    <MemoryRouter initialEntries={[`/app/notes${search ? `?${search}` : ""}`]}>
       <NotesPage />
     </MemoryRouter>,
   );
@@ -134,6 +149,8 @@ describe("NotesPage", () => {
       noteSessions,
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
+      initialFilter: "all",
+      onFilterChange: expect.any(Function),
     });
     expect(screen.getByTestId("notes-feed")).toHaveTextContent("session-6");
     expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/bff/api/notes/sessions", expect.any(Object));
@@ -161,7 +178,18 @@ describe("NotesPage", () => {
       noteSessions,
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
+      initialFilter: "all",
+      onFilterChange: expect.any(Function),
     });
+  });
+
+  it("passes the URL note filter through to the feed page", async () => {
+    mockNotesBff();
+
+    renderNotesPage("session-6", "questions");
+    const props = await latestNotesProps();
+
+    expect(props.initialFilter).toBe("questions");
   });
 
   it("falls back invalid sessionId to the first session with records", async () => {
@@ -181,6 +209,8 @@ describe("NotesPage", () => {
       noteSessions,
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
+      initialFilter: "all",
+      onFilterChange: expect.any(Function),
     });
   });
 
@@ -210,6 +240,8 @@ describe("NotesPage", () => {
       noteSessions: zeroCountSessions,
       selectedSessionId: "session-7",
       selectedSession: zeroCountSessions[0],
+      initialFilter: "all",
+      onFilterChange: expect.any(Function),
     });
   });
 
@@ -226,6 +258,8 @@ describe("NotesPage", () => {
       noteSessions: [],
       selectedSessionId: null,
       selectedSession: null,
+      initialFilter: "all",
+      onFilterChange: expect.any(Function),
     });
   });
 });
