@@ -29,16 +29,24 @@ function publicTitle(pathname: string) {
 }
 
 function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string) {
+  if (variant === "host" && (pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/"))) {
+    return "기록";
+  }
+
   if (pathname.startsWith("/app/host/sessions/new")) {
-    return READMATES_NAV_LABELS.host.sessionEditor;
+    return variant === "host" ? "세션" : READMATES_NAV_LABELS.host.sessionEditor;
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {
-    return READMATES_NAV_LABELS.host.sessionEditor;
+    return variant === "host" ? "세션" : READMATES_NAV_LABELS.host.sessionEditor;
+  }
+
+  if (variant === "host" && (pathname === "/app/host/invitations" || pathname === "/app/host/members")) {
+    return "멤버";
   }
 
   if (pathname.startsWith("/app/host")) {
-    return READMATES_NAV_LABELS.host.operations;
+    return variant === "host" ? "오늘" : READMATES_NAV_LABELS.host.operations;
   }
 
   if (pathname.startsWith("/app/sessions/")) {

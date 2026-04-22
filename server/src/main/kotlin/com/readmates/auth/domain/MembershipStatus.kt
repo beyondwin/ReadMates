@@ -2,7 +2,7 @@ package com.readmates.auth.domain
 
 enum class MembershipStatus {
     INVITED,
-    PENDING_APPROVAL,
+    VIEWER,
     ACTIVE,
     SUSPENDED,
     LEFT,

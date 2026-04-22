@@ -13,6 +13,7 @@ import type {
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { SessionIdentity } from "@/shared/ui/session-identity";
 
 const segmentLinks = [
   { key: "summary", desktopLabel: "요약", mobileLabel: "요약" },
@@ -163,6 +164,15 @@ function MemberSessionDetailDesktop({ session }: { session: MemberArchiveSession
               <p className="eyebrow" style={{ margin: 0 }}>
                 아카이브 세션 · {sessionNo(session.sessionNumber)} · {date}
               </p>
+              <div style={{ marginTop: 10 }}>
+                <SessionIdentity
+                  sessionNumber={session.sessionNumber}
+                  state={session.state}
+                  date={session.date}
+                  published={Boolean(session.publicSummary)}
+                  feedbackDocumentAvailable={session.feedbackDocument.available}
+                />
+              </div>
               <h1 className="h1 editorial" style={{ margin: "10px 0 0", maxWidth: 720 }}>
                 {session.title}
               </h1>
@@ -251,6 +261,16 @@ function MemberSessionDetailMobile({ session }: { session: MemberArchiveSessionD
           <div style={{ minWidth: 0 }}>
             <div className="tiny mono" style={{ color: "var(--text-3)" }}>
               {sessionNo(session.sessionNumber)} · {date}
+            </div>
+            <div style={{ marginTop: 6 }}>
+              <SessionIdentity
+                sessionNumber={session.sessionNumber}
+                state={session.state}
+                date={session.date}
+                published={Boolean(session.publicSummary)}
+                feedbackDocumentAvailable={session.feedbackDocument.available}
+                compact
+              />
             </div>
             <h1 className="h2 editorial" style={{ margin: "6px 0 4px" }}>
               {session.bookTitle}
@@ -668,7 +688,7 @@ function FeedbackDocumentCard({
     return (
       <article className={className} style={style}>
         <FeedbackCardTitle feedback={feedback} compact={compact} />
-        <EmptyText message="피드백 문서는 해당 회차 참석자에게만 공개됩니다." />
+        <EmptyText message="피드백 문서는 정식 멤버와 참석자에게만 열립니다." />
       </article>
     );
   }

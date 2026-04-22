@@ -50,7 +50,9 @@ class MySqlFlywayMigrationTest(
             """.trimIndent(),
         )
         assertTrue(membershipStatuses.any { row ->
-            row["CHECK_CLAUSE"].toString().contains("SUSPENDED") &&
+            row["CHECK_CLAUSE"].toString().contains("VIEWER") &&
+                !row["CHECK_CLAUSE"].toString().contains("PENDING_APPROVAL") &&
+                row["CHECK_CLAUSE"].toString().contains("SUSPENDED") &&
                 row["CHECK_CLAUSE"].toString().contains("LEFT")
         })
 

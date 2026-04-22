@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import CurrentSession from "@/features/current-session/components/current-session";
+import type { CurrentSessionAuth } from "@/features/current-session/components/current-session-types";
 import type { CurrentSessionResponse } from "@/shared/api/readmates";
 import { currentSessionContractFixture } from "./api-contract-fixtures";
 
@@ -30,6 +31,17 @@ const currentSessionData: CurrentSessionResponse = {
       }
     : null,
 };
+
+const activeMemberAuthFixture = {
+  membershipStatus: "ACTIVE",
+  approvalState: "ACTIVE",
+} satisfies CurrentSessionAuth;
+
+const viewerAuthFixture = {
+  ...activeMemberAuthFixture,
+  membershipStatus: "VIEWER",
+  approvalState: "VIEWER",
+} satisfies CurrentSessionAuth;
 
 function getDesktop(container: HTMLElement) {
   const desktop = container.querySelector(".rm-current-session-desktop");
@@ -88,7 +100,7 @@ describe("CurrentSession", () => {
   it("disables personal save actions for suspended members", () => {
     const { container } = render(
       <CurrentSession
-        auth={{ membershipStatus: "SUSPENDED" }}
+        auth={{ membershipStatus: "SUSPENDED", approvalState: "SUSPENDED" }}
         data={currentSessionData}
       />,
     );
@@ -98,6 +110,53 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByRole("button", { name: "체크인 저장" })).toBeDisabled();
     expect(desktopScope.getByRole("button", { name: "질문 저장" })).toBeDisabled();
     expect(desktopScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
+  });
+
+  it("renders viewer members as read-only on current session", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { container } = render(<CurrentSession auth={viewerAuthFixture} data={currentSessionData} />);
+    const desktopScope = within(getDesktop(container));
+
+    expect(desktopScope.getByText("둘러보기 멤버")).toBeVisible();
+    expect(desktopScope.getByText("정식 멤버가 되면 RSVP와 질문 작성이 열립니다.")).toBeVisible();
+    expect(desktopScope.getByRole("button", { name: "참석" })).toBeDisabled();
+    expect(desktopScope.getByRole("button", { name: "체크인 저장" })).toBeDisabled();
+    expect(desktopScope.getByRole("button", { name: "질문 저장" })).toBeDisabled();
+    expect(desktopScope.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
+    expect(desktopScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
+
+    await user.click(desktopScope.getByRole("button", { name: "체크인 저장" }));
+    await user.click(desktopScope.getByRole("button", { name: "질문 저장" }));
+    await user.click(desktopScope.getByRole("button", { name: "서평 저장" }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("mirrors viewer read-only controls on mobile current session", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<CurrentSession auth={viewerAuthFixture} data={currentSessionData} />);
+
+    const mobileScope = within(await screen.findByTestId("current-session-mobile"));
+
+    expect(mobileScope.getByText("둘러보기 멤버")).toBeVisible();
+    expect(mobileScope.getByText("전체 세션은 읽을 수 있어요. 참여와 피드백 문서는 정식 멤버에게 열립니다.")).toBeVisible();
+    expect(mobileScope.getByRole("button", { name: "참석" })).toBeDisabled();
+    expect(mobileScope.getByRole("button", { name: "체크인 저장" })).toBeDisabled();
+    expect(mobileScope.getByRole("button", { name: "질문 저장" })).toBeDisabled();
+
+    await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
+
+    expect(mobileScope.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
+    expect(mobileScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
+
+    await user.click(mobileScope.getByRole("button", { name: "서평 저장" }));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("renders mobile session structure on the first render", () => {

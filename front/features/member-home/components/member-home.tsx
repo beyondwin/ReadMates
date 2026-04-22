@@ -47,6 +47,7 @@ export default function MemberHome({
   const currentSession = current.currentSession;
   const memberName = auth.shortName ?? auth.displayName ?? "멤버";
   const attendanceSummary = attendanceSummaryFromMyPage(myPage);
+  const isViewer = auth.membershipStatus === "VIEWER";
   const myRecentItems = noteFeedItems
     .filter((item) => item.authorName === auth.displayName || item.authorShortName === auth.shortName)
     .slice(0, 2);
@@ -92,6 +93,8 @@ export default function MemberHome({
               </div>
             </div>
 
+            {isViewer ? <ViewerMemberHomeNotice /> : null}
+
             <PrepCard session={currentSession} isHost={auth.role === "HOST"} />
           </div>
         </section>
@@ -119,6 +122,7 @@ export default function MemberHome({
         noteFeedItems={noteFeedItems}
         memberName={memberName}
         attendanceSummary={attendanceSummary}
+        isViewer={isViewer}
       />
     </main>
   );
@@ -130,12 +134,14 @@ function MobileMemberHome({
   noteFeedItems,
   memberName,
   attendanceSummary,
+  isViewer,
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
   noteFeedItems: NoteFeedItem[];
   memberName: string;
   attendanceSummary: AttendanceSummary | null;
+  isViewer: boolean;
 }) {
   const session = current.currentSession;
 
@@ -151,6 +157,7 @@ function MobileMemberHome({
         <div className="small" style={{ color: "var(--text-2)", marginTop: 4 }}>
           {session ? `다음 모임은 ${session.bookTitle}로 준비 중이에요.` : "다음 세션을 기다리고 있어요."}
         </div>
+        {isViewer ? <MobileViewerMemberHomeNotice /> : null}
       </section>
 
       <section className="m-sec">
@@ -162,10 +169,10 @@ function MobileMemberHome({
             </span>
           ) : null}
         </div>
-        <MobileCurrentSessionCard session={session} isHost={auth.role === "HOST"} />
+        <MobileCurrentSessionCard session={session} isHost={auth.role === "HOST"} isViewer={isViewer} />
       </section>
 
-      <MobileTodayActions session={session} />
+      <MobileTodayActions session={session} isViewer={isViewer} />
       <MobileMemberActivity items={noteFeedItems.slice(0, 4)} />
       <MobileStats session={session} attendanceSummary={attendanceSummary} />
       <MobileQuickLinks isHost={auth.role === "HOST"} />
@@ -181,6 +188,32 @@ function mobileTodayLabel() {
     day: "numeric",
     weekday: "short",
   }).format(today);
+}
+
+function ViewerMemberHomeNotice() {
+  return (
+    <section className="surface-quiet" role="note" style={{ padding: 18, marginBottom: 18 }}>
+      <p className="eyebrow" style={{ margin: 0 }}>
+        둘러보기 멤버
+      </p>
+      <p className="body" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
+        전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
+      </p>
+    </section>
+  );
+}
+
+function MobileViewerMemberHomeNotice() {
+  return (
+    <div className="m-card-quiet" role="note" style={{ marginTop: 14 }}>
+      <p className="eyebrow" style={{ margin: 0 }}>
+        둘러보기 멤버
+      </p>
+      <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
+        전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
+      </p>
+    </div>
+  );
 }
 
 function MobileQuickLinks({ isHost }: { isHost: boolean }) {

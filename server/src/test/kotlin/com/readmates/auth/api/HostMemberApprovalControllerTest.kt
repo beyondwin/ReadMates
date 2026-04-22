@@ -59,27 +59,27 @@ class HostMemberApprovalControllerTest(
     }
 
     @Test
-    fun `host lists pending approvals`() {
+    fun `host lists viewer members`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
-        val pendingEmail = uniqueEmail("pending.list")
-        insertPendingMember(pendingEmail, "Pending List")
+        val viewerEmail = uniqueEmail("viewer.list")
+        insertViewerMember(viewerEmail, "Viewer List")
 
-        mockMvc.get("/api/host/members/pending-approvals") {
+        mockMvc.get("/api/host/members/viewers") {
             cookie(hostCookie)
         }.andExpect {
             status { isOk() }
-            jsonPath("$[0].email") { value(pendingEmail) }
-            jsonPath("$[0].status") { value("PENDING_APPROVAL") }
+            jsonPath("$[0].email") { value(viewerEmail) }
+            jsonPath("$[0].status") { value("VIEWER") }
         }
     }
 
     @Test
-    fun `host approves pending member`() {
+    fun `host activates viewer member and adds them to current session`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
         val sessionId = createOpenSession()
-        val membershipId = insertPendingMember(uniqueEmail("pending.approve"), "Pending Approve")
+        val membershipId = insertViewerMember(uniqueEmail("viewer.activate"), "Viewer Activate")
 
-        mockMvc.post("/api/host/members/$membershipId/approve") {
+        mockMvc.post("/api/host/members/$membershipId/activate") {
             cookie(hostCookie)
         }.andExpect {
             status { isOk() }
@@ -99,7 +99,7 @@ class HostMemberApprovalControllerTest(
 
         val participant = jdbcTemplate.queryForMap(
             """
-            select rsvp_status, attendance_status
+            select rsvp_status, attendance_status, participation_status
             from session_participants
             where session_id = ?
               and membership_id = ?
@@ -109,14 +109,15 @@ class HostMemberApprovalControllerTest(
         )
         assertEquals("NO_RESPONSE", participant["rsvp_status"])
         assertEquals("UNKNOWN", participant["attendance_status"])
+        assertEquals("ACTIVE", participant["participation_status"])
     }
 
     @Test
-    fun `host rejects pending member`() {
+    fun `host deactivates viewer member`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
-        val membershipId = insertPendingMember(uniqueEmail("pending.reject"), "Pending Reject")
+        val membershipId = insertViewerMember(uniqueEmail("viewer.deactivate"), "Viewer Deactivate")
 
-        mockMvc.post("/api/host/members/$membershipId/reject") {
+        mockMvc.post("/api/host/members/$membershipId/deactivate-viewer") {
             cookie(hostCookie)
         }.andExpect {
             status { isOk() }
@@ -136,73 +137,103 @@ class HostMemberApprovalControllerTest(
     }
 
     @Test
-    fun `member cannot list pending approvals`() {
-        val memberCookie = sessionCookieForEmail("member5@example.com")
+    fun `compatibility aliases list approve and reject viewer members`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        val approvedMembershipId = insertViewerMember(uniqueEmail("viewer.alias.approve"), "Viewer Alias Approve")
+        val rejectedMembershipId = insertViewerMember(uniqueEmail("viewer.alias.reject"), "Viewer Alias Reject")
 
         mockMvc.get("/api/host/members/pending-approvals") {
-            cookie(memberCookie)
+            cookie(hostCookie)
         }.andExpect {
-            status { isForbidden() }
+            status { isOk() }
         }
+
+        mockMvc.post("/api/host/members/$approvedMembershipId/approve") {
+            cookie(hostCookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("ACTIVE") }
+        }
+
+        mockMvc.post("/api/host/members/$rejectedMembershipId/reject") {
+            cookie(hostCookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.status") { value("INACTIVE") }
+        }
+
+        assertEquals("ACTIVE", membershipStatus(approvedMembershipId))
+        assertEquals("INACTIVE", membershipStatus(rejectedMembershipId))
     }
 
     @Test
-    fun `member cannot approve or reject pending approvals`() {
+    fun `member cannot list viewer members`() {
         val memberCookie = sessionCookieForEmail("member5@example.com")
-        val approveMembershipId = insertPendingMember(uniqueEmail("member.blocked.approve"), "Blocked Approve")
-        val rejectMembershipId = insertPendingMember(uniqueEmail("member.blocked.reject"), "Blocked Reject")
 
-        mockMvc.post("/api/host/members/$approveMembershipId/approve") {
+        mockMvc.get("/api/host/members/viewers") {
             cookie(memberCookie)
         }.andExpect {
             status { isForbidden() }
         }
-        mockMvc.post("/api/host/members/$rejectMembershipId/reject") {
-            cookie(memberCookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
-
-        assertEquals("PENDING_APPROVAL", membershipStatus(approveMembershipId))
-        assertEquals("PENDING_APPROVAL", membershipStatus(rejectMembershipId))
     }
 
     @Test
-    fun `host cannot list approve or reject pending members outside their club`() {
-        val hostCookie = sessionCookieForEmail("host@example.com")
-        val outsideEmail = uniqueEmail("outside.pending")
-        val outsideMembershipId = insertPendingMemberOutsideClub(outsideEmail, "Outside Pending")
-        val outsideRejectMembershipId = insertPendingMemberOutsideClub(uniqueEmail("outside.reject"), "Outside Reject")
+    fun `member cannot activate or deactivate viewer members`() {
+        val memberCookie = sessionCookieForEmail("member5@example.com")
+        val activateMembershipId = insertViewerMember(uniqueEmail("member.blocked.activate"), "Blocked Activate")
+        val deactivateMembershipId = insertViewerMember(uniqueEmail("member.blocked.deactivate"), "Blocked Deactivate")
 
-        val listResponse = mockMvc.get("/api/host/members/pending-approvals") {
+        mockMvc.post("/api/host/members/$activateMembershipId/activate") {
+            cookie(memberCookie)
+        }.andExpect {
+            status { isForbidden() }
+        }
+        mockMvc.post("/api/host/members/$deactivateMembershipId/deactivate-viewer") {
+            cookie(memberCookie)
+        }.andExpect {
+            status { isForbidden() }
+        }
+
+        assertEquals("VIEWER", membershipStatus(activateMembershipId))
+        assertEquals("VIEWER", membershipStatus(deactivateMembershipId))
+    }
+
+    @Test
+    fun `host cannot list activate or deactivate viewer members outside their club`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        val outsideEmail = uniqueEmail("outside.viewer")
+        val outsideMembershipId = insertViewerMemberOutsideClub(outsideEmail, "Outside Viewer")
+        val outsideDeactivateMembershipId = insertViewerMemberOutsideClub(uniqueEmail("outside.deactivate"), "Outside Deactivate")
+
+        val listResponse = mockMvc.get("/api/host/members/viewers") {
             cookie(hostCookie)
         }.andExpect {
             status { isOk() }
         }.andReturn().response.contentAsString
         assertFalse(listResponse.contains(outsideEmail))
 
-        mockMvc.post("/api/host/members/$outsideMembershipId/approve") {
+        mockMvc.post("/api/host/members/$outsideMembershipId/activate") {
             cookie(hostCookie)
         }.andExpect {
             status { isNotFound() }
         }
-        mockMvc.post("/api/host/members/$outsideRejectMembershipId/reject") {
+        mockMvc.post("/api/host/members/$outsideDeactivateMembershipId/deactivate-viewer") {
             cookie(hostCookie)
         }.andExpect {
             status { isNotFound() }
         }
 
         assertEquals(
-            "PENDING_APPROVAL",
+            "VIEWER",
             membershipStatus(outsideMembershipId),
         )
         assertEquals(
-            "PENDING_APPROVAL",
-            membershipStatus(outsideRejectMembershipId),
+            "VIEWER",
+            membershipStatus(outsideDeactivateMembershipId),
         )
     }
 
-    private fun insertPendingMember(email: String, name: String): String {
+    private fun insertViewerMember(email: String, name: String): String {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         jdbcTemplate.update(
@@ -211,7 +242,7 @@ class HostMemberApprovalControllerTest(
             values (?, ?, ?, ?, ?, null, 'GOOGLE')
             """.trimIndent(),
             userId,
-            "google-pending-approval-$userId",
+            "google-viewer-$userId",
             email,
             name,
             name,
@@ -220,7 +251,7 @@ class HostMemberApprovalControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'PENDING_APPROVAL', null)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null)
             """.trimIndent(),
             membershipId,
             userId,
@@ -229,7 +260,7 @@ class HostMemberApprovalControllerTest(
         return membershipId
     }
 
-    private fun insertPendingMemberOutsideClub(email: String, name: String): String {
+    private fun insertViewerMemberOutsideClub(email: String, name: String): String {
         val clubId = UUID.randomUUID().toString()
         val slug = "outside-approval-${UUID.randomUUID()}"
         jdbcTemplate.update(
@@ -250,7 +281,7 @@ class HostMemberApprovalControllerTest(
             values (?, ?, ?, ?, ?, null, 'GOOGLE')
             """.trimIndent(),
             userId,
-            "google-outside-approval-$userId",
+            "google-outside-viewer-$userId",
             email,
             name,
             name,
@@ -259,7 +290,7 @@ class HostMemberApprovalControllerTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, ?, ?, 'MEMBER', 'PENDING_APPROVAL', null)
+            values (?, ?, ?, 'MEMBER', 'VIEWER', null)
             """.trimIndent(),
             membershipId,
             clubId,

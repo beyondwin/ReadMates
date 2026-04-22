@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter
 import org.springframework.security.web.authentication.HttpStatusEntryPoint
+import org.springframework.security.web.util.matcher.RegexRequestMatcher
 import org.springframework.security.web.util.matcher.RequestMatcher
 import org.springframework.web.filter.ForwardedHeaderFilter
 
@@ -52,6 +53,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/feedback-document$")),
                     methodAndPath("POST", Regex("^/api/host/invitations/[^/]+/revoke$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/password-reset$")),
+                    methodAndPath("POST", Regex("^/api/host/members/[^/]+/(activate|deactivate-viewer)$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/approve$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/reject$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/(suspend|restore|deactivate)$")),
@@ -77,8 +79,15 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                     .requestMatchers("/api/invitations/**").permitAll()
                     .requestMatchers(methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$"))).permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/app/pending").hasRole("PENDING_APPROVAL")
+                    .requestMatchers(HttpMethod.GET, "/api/sessions/current").hasAnyRole("HOST", "MEMBER", "VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/archive/**").hasAnyRole("HOST", "MEMBER", "VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/notes/**").hasAnyRole("HOST", "MEMBER", "VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/app/me").hasAnyRole("HOST", "MEMBER", "VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer").hasRole("VIEWER")
                     .requestMatchers("/api/host/**").hasRole("HOST")
+                    .requestMatchers(HttpMethod.GET, "/api/feedback-documents/me").hasAnyRole("HOST", "MEMBER", "VIEWER")
+                    .requestMatchers(RegexRequestMatcher("^/api/sessions/[^/]+/feedback-document$", "GET"))
+                    .hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("HOST", "MEMBER")
                     .requestMatchers("/api/**").hasAnyRole("HOST", "MEMBER")
                     .anyRequest().authenticated()

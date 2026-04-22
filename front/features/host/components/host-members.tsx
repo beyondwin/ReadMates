@@ -15,6 +15,7 @@ import type {
   MemberLifecycleResponse,
   MembershipStatus,
   SessionParticipationStatus,
+  ViewerMember,
 } from "@/shared/api/readmates";
 import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/readmates";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
@@ -28,13 +29,13 @@ type MemberRowsState = {
   members: HostMemberListItem[];
 };
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
-type MemberTab = "active" | "pending" | "suspended" | "inactive" | "invitations";
+type MemberTab = "active" | "viewer" | "suspended" | "inactive" | "invitations";
 type LifecycleDialog = null | { action: "suspend" | "deactivate"; member: HostMemberListItem };
-type MemberAction = "approve" | "reject";
+type ViewerAction = "activate" | "deactivate-viewer";
 
 const tabs: Array<{ key: MemberTab; label: string }> = [
   { key: "active", label: "활성 멤버" },
-  { key: "pending", label: "승인 대기" },
+  { key: "viewer", label: "둘러보기 멤버" },
   { key: "suspended", label: "정지됨" },
   { key: "inactive", label: "탈퇴/비활성" },
   { key: "invitations", label: "초대" },
@@ -42,8 +43,8 @@ const tabs: Array<{ key: MemberTab; label: string }> = [
 
 const statusLabels: Record<MembershipStatus, string> = {
   INVITED: "초대됨",
-  PENDING_APPROVAL: "승인 대기",
-  ACTIVE: "활동 중",
+  VIEWER: "둘러보기 멤버",
+  ACTIVE: "정식 멤버",
   SUSPENDED: "정지됨",
   LEFT: "탈퇴",
   INACTIVE: "비활성",
@@ -119,7 +120,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
     () => members.filter((member) => member.status === "LEFT" || member.status === "INACTIVE"),
     [members],
   );
-  const pendingMembers = useMemo(() => members.filter((member) => member.status === "PENDING_APPROVAL"), [members]);
+  const viewerMembers = useMemo(() => members.filter((member) => member.status === "VIEWER"), [members]);
 
   const openDialog = (nextDialog: Exclude<LifecycleDialog, null>, trigger: HTMLElement) => {
     dialogTriggerRef.current = trigger;
@@ -192,7 +193,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
     }
   }
 
-  const submitApproval = async (member: HostMemberListItem, action: MemberAction) => {
+  const submitViewerAction = async (member: HostMemberListItem, action: ViewerAction) => {
     if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
       return;
     }
@@ -200,15 +201,13 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
     const key = actionKey(member, action);
     setActionPending(key, true);
     setMessage(null);
-    const successMessage = action === "approve" ? "멤버를 승인했습니다." : "요청을 거절했습니다.";
+    const successMessage =
+      action === "activate" ? "정식 멤버로 전환했습니다." : "둘러보기 멤버를 해제했습니다.";
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/members/${encodeMembershipId(member)}/${action}`, {
+      await readmatesFetch<ViewerMember>(`/api/host/members/${encodeMembershipId(member)}/${action}`, {
         method: "POST",
       });
-      if (!response.ok) {
-        throw new Error(`Member ${action} failed`);
-      }
 
       setMembers((current) => current.filter((item) => item.membershipId !== member.membershipId));
       setMessage({ kind: "status", text: successMessage });
@@ -219,7 +218,10 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
         setMessage({ kind: "alert", text: "처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다." });
       }
     } catch {
-      setMessage({ kind: "alert", text: action === "approve" ? "멤버 승인에 실패했습니다." : "요청 거절에 실패했습니다." });
+      setMessage({
+        kind: "alert",
+        text: action === "activate" ? "정식 멤버 전환에 실패했습니다." : "둘러보기 해제에 실패했습니다.",
+      });
     } finally {
       setActionPending(key, false);
     }
@@ -310,10 +312,10 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
           />
         ) : null}
 
-        {activeTab === "pending" ? (
+        {activeTab === "viewer" ? (
           <MemberList
-            members={pendingMembers}
-            emptyText="승인 대기 중인 멤버가 없습니다."
+            members={viewerMembers}
+            emptyText="둘러보기 멤버가 없습니다."
             renderMeta={requestMeta}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
@@ -324,17 +326,17 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
                     className="btn btn-primary btn-sm"
                     type="button"
                     disabled={rowPending}
-                    onClick={() => void submitApproval(member, "approve")}
+                    onClick={() => void submitViewerAction(member, "activate")}
                   >
-                    승인
+                    정식 멤버로 전환
                   </button>
                   <button
                     className="btn btn-ghost btn-sm"
                     type="button"
-                    disabled={rowPending}
-                    onClick={() => void submitApproval(member, "reject")}
+                    disabled={!member.canDeactivate || rowPending}
+                    onClick={() => void submitViewerAction(member, "deactivate-viewer")}
                   >
-                    거절
+                    둘러보기 해제
                   </button>
                 </>
               );

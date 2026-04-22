@@ -24,7 +24,7 @@ import java.util.UUID
 class ArchiveSessionQueryRepository(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) {
-    fun findArchiveSessions(clubId: UUID): List<ArchiveSessionItem> {
+    fun findArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionItem> {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
 
         return jdbcTemplate.query(
@@ -37,16 +37,18 @@ class ArchiveSessionQueryRepository(
               sessions.book_author,
               sessions.book_image_url,
               sessions.session_date,
+              sessions.state,
               sum(case when session_participants.attendance_status = 'ATTENDED' then 1 else 0 end) as attendance,
               count(session_participants.id) as total,
               coalesce(public_session_publications.is_public, false) as published
             from sessions
             left join session_participants on session_participants.session_id = sessions.id
               and session_participants.club_id = sessions.club_id
+              and session_participants.participation_status = 'ACTIVE'
             left join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
             where sessions.club_id = ?
-              and sessions.state = 'PUBLISHED'
+              and sessions.state in ('OPEN', 'CLOSED', 'PUBLISHED')
             group by
               sessions.id,
               sessions.number,
@@ -55,11 +57,12 @@ class ArchiveSessionQueryRepository(
               sessions.book_author,
               sessions.book_image_url,
               sessions.session_date,
+              sessions.state,
               public_session_publications.is_public
             order by sessions.number desc
             """.trimIndent(),
             { resultSet, _ -> resultSet.toArchiveSessionItem() },
-            clubId.dbString(),
+            currentMember.clubId.dbString(),
         )
     }
 
@@ -76,6 +79,7 @@ class ArchiveSessionQueryRepository(
               sessions.book_author,
               sessions.book_image_url,
               sessions.session_date,
+              sessions.state,
               sessions.location_label,
               (
                 select count(*)
@@ -83,12 +87,14 @@ class ArchiveSessionQueryRepository(
                 where session_participants.session_id = sessions.id
                   and session_participants.club_id = sessions.club_id
                   and session_participants.attendance_status = 'ATTENDED'
+                  and session_participants.participation_status = 'ACTIVE'
               ) as attendance,
               (
                 select count(*)
                 from session_participants
                 where session_participants.session_id = sessions.id
                   and session_participants.club_id = sessions.club_id
+                  and session_participants.participation_status = 'ACTIVE'
               ) as total,
               current_participant.attendance_status as my_attendance_status,
               case
@@ -100,11 +106,12 @@ class ArchiveSessionQueryRepository(
             left join session_participants current_participant on current_participant.session_id = sessions.id
               and current_participant.club_id = sessions.club_id
               and current_participant.membership_id = ?
+              and current_participant.participation_status = 'ACTIVE'
             left join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
             where sessions.id = ?
               and sessions.club_id = ?
-              and sessions.state = 'PUBLISHED'
+              and sessions.state in ('OPEN', 'CLOSED', 'PUBLISHED')
             """.trimIndent(),
             { resultSet, _ ->
                 val sessionUuid = resultSet.uuid("id")
@@ -122,6 +129,7 @@ class ArchiveSessionQueryRepository(
                     locationLabel = resultSet.getString("location_label"),
                     attendance = resultSet.getInt("attendance"),
                     total = resultSet.getInt("total"),
+                    state = resultSet.getString("state"),
                     myAttendanceStatus = myAttendanceStatus,
                     isHost = currentMember.isHost,
                     publicSummary = resultSet.getString("public_summary"),
@@ -155,11 +163,18 @@ class ArchiveSessionQueryRepository(
     ): List<MemberArchiveHighlightItem> =
         jdbcTemplate.query(
             """
-            select text, sort_order
+            select highlights.text, highlights.sort_order
             from highlights
-            where club_id = ?
-              and session_id = ?
-            order by sort_order, created_at
+            left join session_participants on session_participants.session_id = highlights.session_id
+              and session_participants.club_id = highlights.club_id
+              and session_participants.membership_id = highlights.membership_id
+            where highlights.club_id = ?
+              and highlights.session_id = ?
+              and (
+                highlights.membership_id is null
+                or session_participants.participation_status = 'ACTIVE'
+              )
+            order by highlights.sort_order, highlights.created_at
             """.trimIndent(),
             { resultSet, _ ->
                 MemberArchiveHighlightItem(
@@ -188,6 +203,10 @@ class ArchiveSessionQueryRepository(
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
             join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = questions.session_id
+              and session_participants.club_id = questions.club_id
+              and session_participants.membership_id = questions.membership_id
+              and session_participants.participation_status = 'ACTIVE'
             where questions.club_id = ?
               and questions.session_id = ?
             order by questions.priority, users.name, questions.created_at
@@ -221,6 +240,10 @@ class ArchiveSessionQueryRepository(
             join memberships on memberships.id = reading_checkins.membership_id
               and memberships.club_id = reading_checkins.club_id
             join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = reading_checkins.session_id
+              and session_participants.club_id = reading_checkins.club_id
+              and session_participants.membership_id = reading_checkins.membership_id
+              and session_participants.participation_status = 'ACTIVE'
             where reading_checkins.club_id = ?
               and reading_checkins.session_id = ?
               and length(trim(reading_checkins.note)) > 0
@@ -253,6 +276,10 @@ class ArchiveSessionQueryRepository(
             join memberships on memberships.id = one_line_reviews.membership_id
               and memberships.club_id = one_line_reviews.club_id
             join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = one_line_reviews.session_id
+              and session_participants.club_id = one_line_reviews.club_id
+              and session_participants.membership_id = one_line_reviews.membership_id
+              and session_participants.participation_status = 'ACTIVE'
             where one_line_reviews.club_id = ?
               and one_line_reviews.session_id = ?
               and one_line_reviews.visibility = 'PUBLIC'
@@ -281,6 +308,10 @@ class ArchiveSessionQueryRepository(
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
             join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = questions.session_id
+              and session_participants.club_id = questions.club_id
+              and session_participants.membership_id = questions.membership_id
+              and session_participants.participation_status = 'ACTIVE'
             where questions.club_id = ?
               and questions.session_id = ?
               and questions.membership_id = ?
@@ -313,6 +344,10 @@ class ArchiveSessionQueryRepository(
             join memberships on memberships.id = reading_checkins.membership_id
               and memberships.club_id = reading_checkins.club_id
             join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = reading_checkins.session_id
+              and session_participants.club_id = reading_checkins.club_id
+              and session_participants.membership_id = reading_checkins.membership_id
+              and session_participants.participation_status = 'ACTIVE'
             where reading_checkins.club_id = ?
               and reading_checkins.session_id = ?
               and reading_checkins.membership_id = ?
@@ -343,6 +378,14 @@ class ArchiveSessionQueryRepository(
             where club_id = ?
               and session_id = ?
               and membership_id = ?
+              and exists (
+                select 1
+                from session_participants
+                where session_participants.session_id = one_line_reviews.session_id
+                  and session_participants.club_id = one_line_reviews.club_id
+                  and session_participants.membership_id = one_line_reviews.membership_id
+                  and session_participants.participation_status = 'ACTIVE'
+              )
             """.trimIndent(),
             { resultSet, _ -> MemberArchiveOneLineReview(text = resultSet.getString("text")) },
             currentMember.clubId.dbString(),
@@ -362,6 +405,14 @@ class ArchiveSessionQueryRepository(
             where club_id = ?
               and session_id = ?
               and membership_id = ?
+              and exists (
+                select 1
+                from session_participants
+                where session_participants.session_id = long_reviews.session_id
+                  and session_participants.club_id = long_reviews.club_id
+                  and session_participants.membership_id = long_reviews.membership_id
+                  and session_participants.participation_status = 'ACTIVE'
+              )
             """.trimIndent(),
             { resultSet, _ -> MemberArchiveLongReview(body = resultSet.getString("body")) },
             currentMember.clubId.dbString(),
@@ -400,7 +451,7 @@ class ArchiveSessionQueryRepository(
             )
         }
 
-        val readable = currentMember.isHost || myAttendanceStatus == "ATTENDED"
+        val readable = currentMember.isHost || (!currentMember.isViewer && myAttendanceStatus == "ATTENDED")
         return MemberArchiveFeedbackDocumentStatus(
             available = true,
             readable = readable,
@@ -422,6 +473,7 @@ class ArchiveSessionQueryRepository(
             attendance = getInt("attendance"),
             total = getInt("total"),
             published = getBoolean("published"),
+            state = getString("state"),
         )
 
 }

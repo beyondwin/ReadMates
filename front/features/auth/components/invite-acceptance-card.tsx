@@ -81,7 +81,7 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
         </Link>
         <div className="surface auth-card">
           <div className="eyebrow" style={{ marginBottom: 12 }}>
-            Invitation setup
+            초대 확인
           </div>
           <h1 className="h2 editorial" style={{ margin: 0 }}>
             {heading}
@@ -115,7 +115,7 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
           {canAccept ? (
             <>
               <p className="small" style={{ color: "var(--text-2)", marginTop: 18 }}>
-                비밀번호 초대 수락은 종료되었습니다. 초대받은 Gmail 계정({preview.email})으로 Google 로그인을 진행해 주세요.
+                Google로 초대 수락하면 바로 정식 멤버가 됩니다.
               </p>
               <div className="auth-card__actions">
                 <a className="btn btn-primary btn-lg" href={googleInviteHref}>

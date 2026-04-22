@@ -140,7 +140,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
     expect(mobile.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
     expect(desktop.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
-    expect(mobile.getByRole("link", { name: "세션 편집" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(mobile.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*현재 세션을 먼저 만든 뒤 사용할 수 있습니다/);
@@ -313,7 +313,7 @@ describe("HostDashboard", () => {
 
     expect(mobile.getByText("운영 · 김호스트")).toBeInTheDocument();
     expect(mobile.getByText("운영 대시보드")).toBeInTheDocument();
-    expect(mobile.getByText("오늘의 할 일과 다음 모임을 한눈에.")).toBeInTheDocument();
+    expect(mobile.getByText("오늘 처리할 운영 일과 이번 세션 상태를 한눈에 봅니다.")).toBeInTheDocument();
 
     const orderedLabels = [
       "확인 필요",
@@ -329,14 +329,15 @@ describe("HostDashboard", () => {
     const html = container.querySelector(".rm-host-dashboard-mobile")?.textContent ?? "";
     let cursor = -1;
     for (const label of orderedLabels) {
-      const next = html.indexOf(label);
+      const next = html.indexOf(label, cursor + 1);
       expect(next).toBeGreaterThan(cursor);
       cursor = next;
     }
 
     expect(mobile.getByText("No.07 · D-3")).toBeInTheDocument();
+    expect(mobile.getByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).toBeInTheDocument();
     expect(mobile.getByText("2026.05.20 · 20:00")).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "세션 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(mobile.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(mobile.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(mobile.getByText("체크인").parentElement).toHaveTextContent("1/2");
     expect(mobile.getByText("김호스트")).toBeInTheDocument();
@@ -355,6 +356,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("김호스트")).toBeInTheDocument();
     expect(desktop.getByText("안멤버1")).toBeInTheDocument();
     expect(desktop.getByText("No.07 · D-3")).toBeInTheDocument();
+    expect(desktop.getByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).toBeInTheDocument();
     expect(desktop.getByText("2026.05.20 20:00 · 온라인")).toBeInTheDocument();
     expect(desktop.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(desktop.getByText("체크인").parentElement).toHaveTextContent("1/2");
@@ -365,7 +367,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("참석 응답과 미팅 URL 점검")).toBeInTheDocument();
     expect(desktop.getByText("미응답")).toBeInTheDocument();
     expect(desktop.getByText("참석 · 62%")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "확인" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(desktop.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(desktop.getByRole("link", { name: "공개 요약 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(desktop.getByRole("link", { name: "피드백 문서 등록" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(desktop.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
@@ -403,8 +405,8 @@ describe("HostDashboard", () => {
     const mobile = getMobileView(container);
     const expectedHref = "/app/host/sessions/session%2F7%3Fdraft%3Dtrue/edit";
 
-    expect(desktop.getByRole("link", { name: "확인" })).toHaveAttribute("href", expectedHref);
-    expect(mobile.getByRole("link", { name: "세션 편집" })).toHaveAttribute("href", expectedHref);
+    expect(desktop.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", expectedHref);
+    expect(mobile.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", expectedHref);
     expect(desktop.getByRole("link", { name: "공개 요약 편집" })).toHaveAttribute("href", expectedHref);
     expect(mobile.getByRole("link", { name: "공개 요약 편집" })).toHaveAttribute("href", expectedHref);
   });

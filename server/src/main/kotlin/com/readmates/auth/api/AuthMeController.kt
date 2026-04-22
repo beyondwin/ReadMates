@@ -13,7 +13,7 @@ import java.util.UUID
 
 enum class ApprovalState {
     ANONYMOUS,
-    PENDING_APPROVAL,
+    VIEWER,
     ACTIVE,
     SUSPENDED,
     INACTIVE,
@@ -43,7 +43,7 @@ data class AuthMemberResponse(
             role = member.role,
             membershipStatus = member.membershipStatus,
             approvalState = when (member.membershipStatus) {
-                MembershipStatus.PENDING_APPROVAL -> ApprovalState.PENDING_APPROVAL
+                MembershipStatus.VIEWER -> ApprovalState.VIEWER
                 MembershipStatus.ACTIVE -> ApprovalState.ACTIVE
                 MembershipStatus.SUSPENDED -> ApprovalState.SUSPENDED
                 MembershipStatus.LEFT,

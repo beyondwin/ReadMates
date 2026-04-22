@@ -17,8 +17,8 @@ class ArchiveRepository(
     private val myRecordsQueryRepository: MyRecordsQueryRepository,
     private val notesFeedQueryRepository: NotesFeedQueryRepository,
 ) {
-    fun findArchiveSessions(clubId: UUID): List<ArchiveSessionItem> =
-        archiveSessionQueryRepository.findArchiveSessions(clubId)
+    fun findArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionItem> =
+        archiveSessionQueryRepository.findArchiveSessions(currentMember)
 
     fun findArchiveSessionDetail(
         currentMember: CurrentMember,

@@ -63,4 +63,14 @@ describe("FeedbackDocumentPage", () => {
     expect(screen.getByText("피드백 문서")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "아직 열람 가능한 피드백 문서가 없습니다." })).toBeInTheDocument();
   });
+
+  it("uses viewer and full-member wording for locked feedback documents", () => {
+    render(<FeedbackDocumentUnavailablePage reason="forbidden" />);
+
+    expect(screen.getByText("열람 제한")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "피드백 문서는 정식 멤버와 참석자에게만 열립니다." })).toBeInTheDocument();
+    expect(
+      screen.getByText("둘러보기 멤버는 전체 세션 기록을 읽을 수 있지만, 회차 피드백 문서는 볼 수 없습니다."),
+    ).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,6 @@
 export type MemberRole = "HOST" | "MEMBER";
-export type MembershipStatus = "INVITED" | "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
-export type ApprovalState = "ANONYMOUS" | "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "INACTIVE";
+export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
+export type ApprovalState = "ANONYMOUS" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "INACTIVE";
 export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
 export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
 export type CurrentSessionPolicyResult = "APPLIED" | "NOT_APPLICABLE" | "DEFERRED";
@@ -42,7 +42,7 @@ export type HostInvitationResponse = HostInvitationListItem & {
   acceptUrl: string | null;
 };
 
-export type PendingApprovalMember = {
+export type ViewerMember = {
   membershipId: string;
   userId: string;
   email: string;
@@ -82,7 +82,7 @@ export type MemberLifecycleResponse = {
 };
 
 export type PendingApprovalAppResponse = {
-  approvalState: "PENDING_APPROVAL";
+  approvalState: "VIEWER";
   clubName: string;
   currentSession: null | {
     sessionId: string;
@@ -222,6 +222,7 @@ export type ArchiveSessionItem = {
   attendance: number;
   total: number;
   published: boolean;
+  state: SessionState;
 };
 
 export type MemberArchiveHighlightItem = {
@@ -274,6 +275,7 @@ export type MemberArchiveSessionDetailResponse = {
   bookAuthor: string;
   bookImageUrl: string | null;
   date: string;
+  state: SessionState;
   locationLabel: string;
   attendance: number;
   total: number;

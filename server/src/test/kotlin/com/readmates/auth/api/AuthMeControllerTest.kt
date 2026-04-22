@@ -98,40 +98,40 @@ class AuthMeControllerTest(
     }
 
     @Test
-    fun `auth me returns pending approval status without member role`() {
-        val pendingEmail = uniquePendingEmail()
-        val pendingCookie = loginAsGooglePendingUser(pendingEmail)
+    fun `auth me returns viewer status without member write role`() {
+        val viewerEmail = uniqueViewerEmail()
+        val viewerCookie = loginAsGoogleViewerUser(viewerEmail)
 
         mockMvc.get("/api/auth/me") {
-            cookie(pendingCookie)
+            cookie(viewerCookie)
         }.andExpect {
             status { isOk() }
             jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.email") { value(pendingEmail) }
-            jsonPath("$.membershipStatus") { value("PENDING_APPROVAL") }
-            jsonPath("$.approvalState") { value("PENDING_APPROVAL") }
+            jsonPath("$.email") { value(viewerEmail) }
+            jsonPath("$.membershipStatus") { value("VIEWER") }
+            jsonPath("$.approvalState") { value("VIEWER") }
             jsonPath("$.role") { value("MEMBER") }
         }
     }
 
     @Test
-    fun `session cookie authentication gives pending users pending role only`() {
-        val pendingCookie = loginAsGooglePendingUser(uniquePendingEmail())
+    fun `session cookie authentication gives viewer users viewer role only`() {
+        val viewerCookie = loginAsGoogleViewerUser(uniqueViewerEmail())
 
         SecurityContextHolder.clearContext()
         try {
             val request = MockHttpServletRequest("GET", "/api/auth/me")
-            request.setCookies(pendingCookie)
+            request.setCookies(viewerCookie)
             val response = MockHttpServletResponse()
 
             sessionCookieAuthenticationFilter.doFilter(request, response, MockFilterChain())
 
             val authentication = SecurityContextHolder.getContext().authentication
-                ?: error("Expected pending member session to authenticate")
+                ?: error("Expected viewer member session to authenticate")
             val authorities = authentication.authorities
                 .map { it.authority }
                 .toSet()
-            assertEquals(setOf("ROLE_PENDING_APPROVAL"), authorities)
+            assertEquals(setOf("ROLE_VIEWER"), authorities)
             assertFalse("ROLE_MEMBER" in authorities)
         } finally {
             SecurityContextHolder.clearContext()
@@ -156,25 +156,26 @@ class AuthMeControllerTest(
                 .map { it.authority }
                 .toSet()
             assertEquals(setOf("ROLE_MEMBER"), authorities)
-            assertFalse("ROLE_PENDING_APPROVAL" in authorities)
+            assertFalse("ROLE_VIEWER" in authorities)
         } finally {
             SecurityContextHolder.clearContext()
         }
     }
 
     @Test
-    fun `member authority refresh strips stale member roles from pending users`() {
-        val pendingEmail = uniquePendingEmail()
-        loginAsGooglePendingUser(pendingEmail)
+    fun `member authority refresh strips stale member roles from viewer users`() {
+        val viewerEmail = uniqueViewerEmail()
+        loginAsGoogleViewerUser(viewerEmail)
 
         SecurityContextHolder.clearContext()
         try {
             SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(
-                pendingEmail,
+                viewerEmail,
                 null,
                 listOf(
+                    SimpleGrantedAuthority("ROLE_HOST"),
                     SimpleGrantedAuthority("ROLE_MEMBER"),
-                    SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"),
+                    SimpleGrantedAuthority("ROLE_VIEWER"),
                     SimpleGrantedAuthority("ROLE_OTHER"),
                 ),
             )
@@ -184,11 +185,12 @@ class AuthMeControllerTest(
             memberAuthoritiesFilter.doFilter(request, response, MockFilterChain())
 
             val authentication = SecurityContextHolder.getContext().authentication
-                ?: error("Expected pending member authority refresh to authenticate")
+                ?: error("Expected viewer member authority refresh to authenticate")
             val authorities = authentication.authorities
                 .map { it.authority }
                 .toSet()
-            assertEquals(setOf("ROLE_PENDING_APPROVAL", "ROLE_OTHER"), authorities)
+            assertEquals(setOf("ROLE_VIEWER", "ROLE_OTHER"), authorities)
+            assertFalse("ROLE_HOST" in authorities)
             assertFalse("ROLE_MEMBER" in authorities)
         } finally {
             SecurityContextHolder.clearContext()
@@ -206,7 +208,9 @@ class AuthMeControllerTest(
                 suspendedEmail,
                 null,
                 listOf(
-                    SimpleGrantedAuthority("ROLE_PENDING_APPROVAL"),
+                    SimpleGrantedAuthority("ROLE_HOST"),
+                    SimpleGrantedAuthority("ROLE_MEMBER"),
+                    SimpleGrantedAuthority("ROLE_VIEWER"),
                     SimpleGrantedAuthority("ROLE_OTHER"),
                 ),
             )
@@ -221,7 +225,8 @@ class AuthMeControllerTest(
                 .map { it.authority }
                 .toSet()
             assertEquals(setOf("ROLE_MEMBER", "ROLE_OTHER"), authorities)
-            assertFalse("ROLE_PENDING_APPROVAL" in authorities)
+            assertFalse("ROLE_HOST" in authorities)
+            assertFalse("ROLE_VIEWER" in authorities)
         } finally {
             SecurityContextHolder.clearContext()
         }
@@ -241,23 +246,23 @@ class AuthMeControllerTest(
         }
     }
 
-    private fun loginAsGooglePendingUser(email: String): Cookie {
+    private fun loginAsGoogleViewerUser(email: String): Cookie {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         jdbcTemplate.update(
             """
             insert into users (id, google_subject_id, email, name, short_name, auth_provider)
-            values (?, ?, ?, 'Pending Approval', 'Pending', 'GOOGLE')
+            values (?, ?, ?, 'Viewer Member', 'Viewer', 'GOOGLE')
             """.trimIndent(),
             userId,
-            "google-pending-auth-me-$userId",
+            "google-viewer-auth-me-$userId",
             email,
         )
         createdUserIds += userId
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at)
-            select ?, clubs.id, ?, 'MEMBER', 'PENDING_APPROVAL', null
+            select ?, clubs.id, ?, 'MEMBER', 'VIEWER', null
             from clubs
             where clubs.slug = 'reading-sai'
             """.trimIndent(),
@@ -317,7 +322,7 @@ class AuthMeControllerTest(
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun uniquePendingEmail(): String = "pending.approval.${UUID.randomUUID()}@example.com"
+    private fun uniqueViewerEmail(): String = "viewer.${UUID.randomUUID()}@example.com"
 
     private fun uniqueLifecycleEmail(prefix: String): String = "$prefix.${UUID.randomUUID()}@example.com"
 

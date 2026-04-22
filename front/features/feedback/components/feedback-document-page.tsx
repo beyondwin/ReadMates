@@ -88,8 +88,8 @@ export function FeedbackDocumentUnavailablePage({
     reason === "forbidden"
       ? {
           eyebrow: "열람 제한",
-          title: "피드백 문서를 열람할 수 없습니다.",
-          body: "이 문서는 해당 회차에 참석한 멤버만 볼 수 있습니다.",
+          title: "피드백 문서는 정식 멤버와 참석자에게만 열립니다.",
+          body: "둘러보기 멤버는 전체 세션 기록을 읽을 수 있지만, 회차 피드백 문서는 볼 수 없습니다.",
         }
       : {
           eyebrow: "피드백 문서",

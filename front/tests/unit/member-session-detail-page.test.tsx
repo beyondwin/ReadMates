@@ -33,6 +33,7 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(desktop.getByText("아카이브 세션 · No.01 · 2025.11.26")).toBeInTheDocument();
+    expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "요약" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "클럽 기록" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "내 기록" })).toBeInTheDocument();
@@ -41,6 +42,7 @@ describe("MemberSessionDetailPage", () => {
     expect(mobile.getByText("팩트풀니스")).toBeInTheDocument();
     expect(mobile.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(mobile.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
+    expect(mobile.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "클럽 기록" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "피드백 문서" })).toBeInTheDocument();
     expect(mobile.getByText("2026.04.20 등록")).toBeInTheDocument();
@@ -71,7 +73,7 @@ describe("MemberSessionDetailPage", () => {
       },
     });
 
-    expect(screen.getAllByText("피드백 문서는 해당 회차 참석자에게만 공개됩니다.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("피드백 문서는 정식 멤버와 참석자에게만 열립니다.").length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "피드백 문서 열기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PDF 저장" })).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/app/feedback/00000000-0000-0000-0000-000000000301"]')).toBeNull();

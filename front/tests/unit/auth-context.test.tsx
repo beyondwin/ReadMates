@@ -14,10 +14,17 @@ const activeMemberAuth: AuthMeResponse = authMeContractFixture;
 
 const anonymousAuth: AuthMeResponse = anonymousAuthMeContractFixture;
 
-const pendingMemberAuth: AuthMeResponse = {
-  ...activeMemberAuth,
-  membershipStatus: "PENDING_APPROVAL",
-  approvalState: "PENDING_APPROVAL",
+const viewerAuth: AuthMeResponse = {
+  authenticated: true,
+  userId: "viewer-user",
+  membershipId: "viewer-membership",
+  clubId: "club-id",
+  email: "viewer@example.com",
+  displayName: "둘러보기 멤버",
+  shortName: "둘러보기",
+  role: "MEMBER",
+  membershipStatus: "VIEWER",
+  approvalState: "VIEWER",
 };
 
 const inactiveMemberAuth: AuthMeResponse = {
@@ -42,10 +49,10 @@ const activeHostAuth: AuthMeResponse = {
   role: "HOST",
 };
 
-const pendingHostAuth: AuthMeResponse = {
+const viewerHostAuth: AuthMeResponse = {
   ...activeHostAuth,
-  membershipStatus: "PENDING_APPROVAL",
-  approvalState: "PENDING_APPROVAL",
+  membershipStatus: "VIEWER",
+  approvalState: "VIEWER",
 };
 
 type Deferred<T> = {
@@ -109,6 +116,11 @@ afterEach(() => {
 });
 
 describe("AuthProvider", () => {
+  it("accepts viewer auth payloads from the API contract", () => {
+    expect(viewerAuth.membershipStatus).toBe("VIEWER");
+    expect(viewerAuth.approvalState).toBe("VIEWER");
+  });
+
   it("fetches the auth payload without cache and falls back to anonymous on failure", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network failure"));
     vi.stubGlobal("fetch", fetchMock);
@@ -155,8 +167,8 @@ describe("route guards", () => {
     expect(screen.queryByText("protected app")).not.toBeInTheDocument();
   });
 
-  it("redirects pending active-member routes to the pending page", async () => {
-    mockAuthFetch(pendingMemberAuth);
+  it("allows viewer members through member app routes", async () => {
+    mockAuthFetch(viewerAuth);
 
     renderGuard(
       <RequireMemberApp>
@@ -164,8 +176,9 @@ describe("route guards", () => {
       </RequireMemberApp>,
     );
 
-    expect(await screen.findByText("pending page")).toBeInTheDocument();
-    expect(screen.queryByText("active member app")).not.toBeInTheDocument();
+    expect(await screen.findByText("active member app")).toBeInTheDocument();
+    expect(screen.queryByText("pending page")).not.toBeInTheDocument();
+    expect(screen.queryByText("활성 멤버만 이용할 수 있습니다.")).not.toBeInTheDocument();
   });
 
   it("blocks inactive users on active-member routes without redirecting to app home", async () => {
@@ -209,7 +222,7 @@ describe("route guards", () => {
   });
 
   it("redirects non-active hosts away from host routes", async () => {
-    mockAuthFetch(pendingHostAuth);
+    mockAuthFetch(viewerHostAuth);
 
     renderGuard(
       <RequireHost>

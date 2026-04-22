@@ -23,8 +23,14 @@ data class CurrentMember(
         get() = role == MembershipRole.HOST && membershipStatus == MembershipStatus.ACTIVE
     val isActive: Boolean
         get() = membershipStatus == MembershipStatus.ACTIVE
-    val isPendingApproval: Boolean
-        get() = membershipStatus == MembershipStatus.PENDING_APPROVAL
+    val isViewer: Boolean
+        get() = membershipStatus == MembershipStatus.VIEWER
+    val canBrowseMemberContent: Boolean
+        get() = membershipStatus in setOf(
+            MembershipStatus.VIEWER,
+            MembershipStatus.ACTIVE,
+            MembershipStatus.SUSPENDED,
+        )
 }
 
 data class GoogleOidcIdentity(

@@ -56,7 +56,7 @@ class PendingApprovalControllerTest(
     }
 
     @Test
-    fun `pending approval user can read pending app summary`() {
+    fun `viewer user can read pending app summary compatibility route`() {
         val cookie = pendingSessionCookie("pending.summary@example.com")
 
         mockMvc.get("/api/app/pending") {
@@ -64,7 +64,7 @@ class PendingApprovalControllerTest(
         }.andExpect {
             status { isOk() }
             content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
-            jsonPath("$.approvalState") { value("PENDING_APPROVAL") }
+            jsonPath("$.approvalState") { value("VIEWER") }
             jsonPath("$.clubName") { value("ReadMates") }
             jsonPath("$.currentSession.sessionNumber") { value(2) }
             jsonPath("$.currentSession.title") { value("2회차 · 열린 책") }
@@ -72,6 +72,21 @@ class PendingApprovalControllerTest(
             jsonPath("$.currentSession.bookAuthor") { value("열린 저자") }
             jsonPath("$.currentSession.date") { value("2026-05-20") }
             jsonPath("$.currentSession.locationLabel") { value("온라인") }
+        }
+    }
+
+    @Test
+    fun `viewer user can read viewer app summary route`() {
+        val cookie = pendingSessionCookie("viewer.summary@example.com")
+
+        mockMvc.get("/api/app/viewer") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
+            jsonPath("$.approvalState") { value("VIEWER") }
+            jsonPath("$.clubName") { value("ReadMates") }
+            jsonPath("$.currentSession.sessionNumber") { value(2) }
         }
     }
 
@@ -86,7 +101,7 @@ class PendingApprovalControllerTest(
             cookie(cookie)
         }.andExpect {
             status { isOk() }
-            jsonPath("$.approvalState") { value("PENDING_APPROVAL") }
+            jsonPath("$.approvalState") { value("VIEWER") }
             jsonPath("$.clubName") { value("ReadMates") }
             jsonPath("$.currentSession") { value(null) }
         }
@@ -117,7 +132,7 @@ class PendingApprovalControllerTest(
     private fun pendingSessionCookie(email: String, withSessions: Boolean = true): Cookie =
         memberSessionCookie(
             email = email,
-            membershipStatus = "PENDING_APPROVAL",
+            membershipStatus = "VIEWER",
             withSessions = withSessions,
         )
 

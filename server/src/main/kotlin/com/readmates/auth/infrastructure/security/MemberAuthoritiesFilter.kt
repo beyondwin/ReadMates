@@ -30,8 +30,8 @@ class MemberAuthoritiesFilter(
                 .toMutableList()
 
             if (member != null) {
-                val roleAuthority = if (member.isPendingApproval) {
-                    "ROLE_PENDING_APPROVAL"
+                val roleAuthority = if (member.isViewer) {
+                    "ROLE_VIEWER"
                 } else {
                     "ROLE_${member.role}"
                 }
@@ -51,6 +51,6 @@ class MemberAuthoritiesFilter(
     }
 
     private companion object {
-        val MEMBER_ROLE_AUTHORITIES = setOf("ROLE_HOST", "ROLE_MEMBER", "ROLE_PENDING_APPROVAL")
+        val MEMBER_ROLE_AUTHORITIES = setOf("ROLE_HOST", "ROLE_MEMBER", "ROLE_VIEWER")
     }
 }

@@ -39,6 +39,7 @@ const seededSessions: ArchiveSessionItem[] = [
     attendance: 6,
     total: 6,
     published: true,
+    state: "CLOSED",
   },
   {
     sessionId: "session-5",
@@ -51,6 +52,7 @@ const seededSessions: ArchiveSessionItem[] = [
     attendance: 6,
     total: 6,
     published: true,
+    state: "CLOSED",
   },
   {
     sessionId: "session-4",
@@ -63,6 +65,7 @@ const seededSessions: ArchiveSessionItem[] = [
     attendance: 6,
     total: 6,
     published: true,
+    state: "CLOSED",
   },
   {
     sessionId: "session-3",
@@ -75,6 +78,7 @@ const seededSessions: ArchiveSessionItem[] = [
     attendance: 6,
     total: 6,
     published: true,
+    state: "CLOSED",
   },
   {
     sessionId: "session-2",
@@ -87,6 +91,7 @@ const seededSessions: ArchiveSessionItem[] = [
     attendance: 6,
     total: 6,
     published: true,
+    state: "CLOSED",
   },
   {
     sessionId: "session-1",
@@ -99,6 +104,7 @@ const seededSessions: ArchiveSessionItem[] = [
     attendance: 6,
     total: 6,
     published: true,
+    state: "CLOSED",
   },
 ];
 
@@ -159,6 +165,7 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("2026")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
+    expect(desktop.getByLabelText("No.06 · 지난 회차 · 공개됨")).toBeInTheDocument();
     expect(desktop.getAllByText("문서")).toHaveLength(seededSessions.length);
   });
 
@@ -174,6 +181,7 @@ describe("ArchivePage", () => {
       attendance: 0,
       total: 6,
       published: true,
+      state: "CLOSED",
     };
     const validRender = render(
       <FutureArchivePage sessions={[seededSessions[0]]} questions={[]} reviews={[]} reports={[]} />,
@@ -207,6 +215,7 @@ describe("ArchivePage", () => {
       attendance: 0,
       total: 6,
       published: true,
+      state: "CLOSED",
     };
 
     const { container } = render(
@@ -251,6 +260,7 @@ describe("ArchivePage", () => {
     expect(scoped.queryByText("My questions")).not.toBeInTheDocument();
     expect(mobile?.querySelectorAll(".rm-archive-session-card.m-card")).toHaveLength(6);
     expect(scoped.getByText("No.06 · 2026.04.15")).toBeInTheDocument();
+    expect(scoped.getByLabelText("No.06 · 지난 회차 · 공개됨")).toBeInTheDocument();
     expect(scoped.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(scoped.getAllByText("문서")).toHaveLength(seededSessions.length);
     expect(scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" })).toHaveAttribute(
@@ -338,6 +348,7 @@ describe("ArchivePage", () => {
       attendance: 5,
       total: 6,
       published: false,
+      state: "CLOSED",
     };
 
     const { container } = render(
@@ -436,6 +447,7 @@ describe("ArchivePage", () => {
         attendance: 5,
         total: 6,
         published: true,
+        state: "CLOSED",
       },
     ];
     const questionsWithEncodedId: MyArchiveQuestionItem[] = [

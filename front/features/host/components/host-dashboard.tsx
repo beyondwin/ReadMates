@@ -6,6 +6,7 @@ import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "@/shared/ui/readmates-copy";
 import { formatDateOnlyLabel, hostAlertStateLabel, nonNegativeCount, rsvpLabel } from "@/shared/ui/readmates-display";
+import { SessionIdentity } from "@/shared/ui/session-identity";
 
 const HOST_DASHBOARD_LABELS = {
   operations: "운영",
@@ -299,7 +300,7 @@ export default function HostDashboard({
                   운영 대시보드
                 </h1>
                 <div className="small" style={{ color: "var(--text-2)" }}>
-                  멤버 워크스페이스와 같은 세계, 운영 권한이 확장된 화면.
+                  오늘 처리할 운영 일과 이번 세션 상태를 한눈에 봅니다.
                 </div>
               </div>
               <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
@@ -368,7 +369,7 @@ export default function HostDashboard({
                   title={session ? "진행 중인 세션" : "열린 세션 없음"}
                   action={
                     <Link to={sessionEditHref} className="btn btn-ghost btn-sm">
-                      {session ? "확인" : "새 세션 만들기"}
+                      {session ? "이번 세션 편집" : "새 세션 만들기"}
                     </Link>
                   }
                 />
@@ -383,6 +384,15 @@ export default function HostDashboard({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="eyebrow">{formatHostSessionKicker(session)}</div>
+                        <div style={{ marginTop: "8px" }}>
+                          <SessionIdentity
+                            sessionNumber={session.sessionNumber}
+                            state="OPEN"
+                            date={session.date}
+                            published={data.publishPending === 0}
+                            compact
+                          />
+                        </div>
                         <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
                           {session.bookTitle}
                         </h2>
@@ -579,7 +589,7 @@ function MobileHostDashboard({
           </Link>
         </div>
         <div className="small" style={{ color: "var(--text-2)" }}>
-          오늘의 할 일과 다음 모임을 한눈에.
+          오늘 처리할 운영 일과 이번 세션 상태를 한눈에 봅니다.
         </div>
       </section>
 
@@ -632,6 +642,15 @@ function MobileHostDashboard({
                     <h2 className="h4 editorial" style={{ margin: "6px 0 2px" }}>
                       {session.bookTitle}
                     </h2>
+                    <div style={{ marginTop: 6 }}>
+                      <SessionIdentity
+                        sessionNumber={session.sessionNumber}
+                        state="OPEN"
+                        date={session.date}
+                        published={data.publishPending === 0}
+                        compact
+                      />
+                    </div>
                     <div className="tiny">
                       {formatDateOnlyLabel(session.date)} · {session.startTime}
                     </div>
@@ -660,7 +679,7 @@ function MobileHostDashboard({
             )}
           </div>
           <Link to={sessionEditHref} className="btn btn-primary rm-host-dashboard-mobile__session-cta">
-            <span>{READMATES_NAV_LABELS.host.sessionEditor}</span>
+            <span>{session ? "이번 세션 편집" : "새 세션 만들기"}</span>
             <Icon name="arrow-right" size={14} />
           </Link>
         </article>

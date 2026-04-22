@@ -71,8 +71,8 @@ class MemberLifecycleService(
               case memberships.role when 'HOST' then 0 else 1 end,
               case memberships.status
                 when 'ACTIVE' then 0
-                when 'SUSPENDED' then 1
-                when 'PENDING_APPROVAL' then 2
+                when 'VIEWER' then 1
+                when 'SUSPENDED' then 2
                 when 'LEFT' then 3
                 when 'INACTIVE' then 4
                 else 5
@@ -496,13 +496,15 @@ class MemberLifecycleService(
             currentSessionParticipationStatus = participationStatus,
             canSuspend = isMutableMember && status == MembershipStatus.ACTIVE,
             canRestore = isMutableMember && status == MembershipStatus.SUSPENDED,
-            canDeactivate = isMutableMember && status in setOf(MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED),
+            canDeactivate = isMutableMember &&
+                status in setOf(MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED, MembershipStatus.VIEWER),
             canAddToCurrentSession = isMutableMember &&
                 currentSessionId != null &&
                 status == MembershipStatus.ACTIVE &&
                 participationStatus != SessionParticipationStatus.ACTIVE,
             canRemoveFromCurrentSession = isMutableMember &&
                 currentSessionId != null &&
+                status == MembershipStatus.ACTIVE &&
                 participationStatus == SessionParticipationStatus.ACTIVE,
         )
     }

@@ -3,6 +3,7 @@ import type { PublicSessionDetailResponse } from "@/shared/api/readmates";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel } from "@/shared/ui/readmates-display";
+import { PUBLIC_MEMBERSHIP_NOTE } from "./public-club-copy";
 
 type PublicSessionProps = {
   session: PublicSessionDetailResponse;
@@ -138,7 +139,7 @@ export default function PublicSession({ session }: PublicSessionProps) {
             className="body"
             style={{ color: "var(--text-2)", marginTop: "10px", maxWidth: "440px", marginInline: "auto" }}
           >
-            읽는사이는 초대 기반으로 운영됩니다. 초대 링크가 있으시다면 Google 계정으로 로그인해 이어 주세요.
+            {PUBLIC_MEMBERSHIP_NOTE}
           </p>
           <div className="row" style={{ justifyContent: "center", marginTop: "20px", gap: "10px", flexWrap: "wrap" }}>
             <Link to="/login" className="btn btn-primary">

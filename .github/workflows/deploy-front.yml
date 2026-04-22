@@ -1,0 +1,22 @@
+name: Deploy Front
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  deploy:
+    name: Trigger Cloudflare Pages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy hook
+        run: |
+          if [ -z "${CLOUDFLARE_PAGES_DEPLOY_HOOK_URL:-}" ]; then
+            echo "::error::Missing CLOUDFLARE_PAGES_DEPLOY_HOOK_URL repository secret."
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --request POST "$CLOUDFLARE_PAGES_DEPLOY_HOOK_URL"
+        env:
+          CLOUDFLARE_PAGES_DEPLOY_HOOK_URL: ${{ secrets.CLOUDFLARE_PAGES_DEPLOY_HOOK_URL }}

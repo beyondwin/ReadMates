@@ -51,16 +51,16 @@ class GoogleLoginServiceTest(
     }
 
     @Test
-    fun `creates pending approval membership for new google user`() {
+    fun `creates viewer membership for new google user without invite`() {
         val member = googleLoginService.loginVerifiedGoogleUser(
-            googleSubjectId = "google-new-pending-user",
-            email = "new.pending@example.com",
-            displayName = "New Pending",
+            googleSubjectId = "google-new-viewer-user",
+            email = "new.viewer@example.com",
+            displayName = "New Viewer",
             profileImageUrl = "https://example.com/new.png",
         )
 
-        assertEquals("new.pending@example.com", member.email)
-        assertEquals(MembershipStatus.PENDING_APPROVAL, member.membershipStatus)
+        assertEquals("new.viewer@example.com", member.email)
+        assertEquals(MembershipStatus.VIEWER, member.membershipStatus)
         assertEquals("MEMBER", member.role.name)
         assertNotNull(member.membershipId)
     }
@@ -85,9 +85,9 @@ class GoogleLoginServiceTest(
     }
 
     @Test
-    fun `returns existing member when pending creation races with same google account`() {
-        val googleSubjectId = "google-race-pending-user"
-        val email = "race.pending@example.com"
+    fun `returns existing member when viewer creation races with same google account`() {
+        val googleSubjectId = "google-race-viewer-user"
+        val email = "race.viewer@example.com"
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         val executor = Executors.newSingleThreadExecutor()
@@ -98,7 +98,7 @@ class GoogleLoginServiceTest(
                 connection.prepareStatement(
                     """
                     insert into users (id, google_subject_id, email, name, short_name, auth_provider)
-                    values (?, ?, ?, 'Race Pending', 'Race Pending', 'GOOGLE')
+                    values (?, ?, ?, 'Race Viewer', 'Race Viewer', 'GOOGLE')
                     """.trimIndent(),
                 ).use { statement ->
                     statement.setString(1, userId)
@@ -109,7 +109,7 @@ class GoogleLoginServiceTest(
                 connection.prepareStatement(
                     """
                     insert into memberships (id, club_id, user_id, role, status, joined_at)
-                    values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'PENDING_APPROVAL', null)
+                    values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null)
                     """.trimIndent(),
                 ).use { statement ->
                     statement.setString(1, membershipId)
@@ -121,7 +121,7 @@ class GoogleLoginServiceTest(
                     googleLoginService.loginVerifiedGoogleUser(
                         googleSubjectId = googleSubjectId,
                         email = email,
-                        displayName = "Race Pending",
+                        displayName = "Race Viewer",
                         profileImageUrl = null,
                     )
                 }
@@ -132,7 +132,7 @@ class GoogleLoginServiceTest(
 
                 val member = future.get(5, TimeUnit.SECONDS)
                 assertEquals(email, member.email)
-                assertEquals(MembershipStatus.PENDING_APPROVAL, member.membershipStatus)
+                assertEquals(MembershipStatus.VIEWER, member.membershipStatus)
                 assertEquals(userId, member.userId.toString())
             } catch (exception: Throwable) {
                 connection.rollback()
@@ -159,29 +159,29 @@ class GoogleLoginServiceTest(
               select id
               from users
               where email in (
-                'new.pending@example.com',
+                'new.viewer@example.com',
                 'conflict.one@example.com',
                 'conflict.two@example.com',
-                'race.pending@example.com'
+                'race.viewer@example.com'
               )
                  or google_subject_id in (
-                   'google-new-pending-user',
+                   'google-new-viewer-user',
                    'google-conflict-subject',
-                   'google-race-pending-user'
+                   'google-race-viewer-user'
                  )
             );
 
             delete from users
             where email in (
-              'new.pending@example.com',
+              'new.viewer@example.com',
               'conflict.one@example.com',
               'conflict.two@example.com',
-              'race.pending@example.com'
+              'race.viewer@example.com'
             )
                or google_subject_id in (
-                 'google-new-pending-user',
+                 'google-new-viewer-user',
                  'google-conflict-subject',
-                 'google-race-pending-user'
+                 'google-race-viewer-user'
                );
         """
 

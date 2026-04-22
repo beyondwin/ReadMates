@@ -168,6 +168,7 @@ export const archiveSessionDetailContractFixture = {
   bookAuthor: "한스 로슬링",
   bookImageUrl: "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
   date: "2025-11-26",
+  state: "CLOSED",
   locationLabel: "읽는사이 서재",
   attendance: 5,
   total: 6,

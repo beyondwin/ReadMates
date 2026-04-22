@@ -156,16 +156,84 @@ class ArchiveControllerDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `archive session detail returns not found for same club unpublished session`() {
-        mockMvc.perform(
-            requestGet("/api/archive/sessions/00000000-0000-0000-0000-000000000906")
-                .with(user("member5@example.com")),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(handler().handlerType(ArchiveController::class.java))
+    fun `archive session detail returns same club open non draft session`() {
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000906") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000906") }
+                jsonPath("$.sessionNumber") { value(906) }
+                jsonPath("$.state") { value("OPEN") }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_SESSION6_MEMBER2_REMOVED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_SESSION6_MEMBER2_ACTIVE_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `archive sessions exclude removed participant counts and authored records`() {
+        mockMvc.get("/api/archive/sessions") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
+                jsonPath("$[0].attendance") { value(2) }
+                jsonPath("$[0].total") { value(5) }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.attendance") { value(2) }
+                jsonPath("$.total") { value(5) }
+                jsonPath("$.publicHighlights[*].text") {
+                    value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다.")))
+                }
+                jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("최멤버2"))) }
+                jsonPath("$.clubCheckins[*].authorName") { value(not(hasItem("최멤버2"))) }
+                jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
+                jsonPath("$.clubQuestions[*].text") { value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?"))) }
+                jsonPath("$.clubCheckins[*].note") { value(not(hasItem("전기의 효용과 정의의 주장을 중심으로 질문을 정리했습니다."))) }
+                jsonPath("$.publicOneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
+            }
     }
 
     companion object {
+        private const val MARK_SESSION6_MEMBER2_REMOVED_SQL = """
+            update session_participants
+            join memberships on memberships.id = session_participants.membership_id
+              and memberships.club_id = session_participants.club_id
+            join users on users.id = memberships.user_id
+            set session_participants.participation_status = 'REMOVED'
+            where session_participants.session_id = '00000000-0000-0000-0000-000000000306'
+              and session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'member2@example.com';
+        """
+
+        private const val RESET_SESSION6_MEMBER2_ACTIVE_SQL = """
+            update session_participants
+            join memberships on memberships.id = session_participants.membership_id
+              and memberships.club_id = session_participants.club_id
+            join users on users.id = memberships.user_id
+            set session_participants.participation_status = 'ACTIVE'
+            where session_participants.session_id = '00000000-0000-0000-0000-000000000306'
+              and session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'member2@example.com';
+        """
+
         private const val CLEANUP_UNPUBLISHED_SESSION_SQL = """
             delete from session_feedback_documents
             where session_id = '00000000-0000-0000-0000-000000000906';

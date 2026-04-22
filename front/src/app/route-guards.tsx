@@ -4,7 +4,7 @@ import type { AuthMeResponse } from "@/shared/api/readmates";
 import { useAuth } from "./auth-state";
 
 function canUseMemberApp(auth: AuthMeResponse) {
-  return auth.approvalState === "ACTIVE" || auth.approvalState === "SUSPENDED";
+  return auth.approvalState === "VIEWER" || auth.approvalState === "ACTIVE" || auth.approvalState === "SUSPENDED";
 }
 
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -21,7 +21,6 @@ export function RequireMemberApp({ children }: { children: ReactNode }) {
 
   if (state.status === "loading") return <main className="container">불러오는 중</main>;
   if (!state.auth.authenticated) return <Navigate to="/login" replace />;
-  if (state.auth.approvalState === "PENDING_APPROVAL") return <Navigate to="/app/pending" replace />;
   if (!canUseMemberApp(state.auth)) {
     return <main className="container">활성 멤버만 이용할 수 있습니다.</main>;
   }

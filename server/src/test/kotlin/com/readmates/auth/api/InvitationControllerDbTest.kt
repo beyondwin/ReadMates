@@ -1,7 +1,9 @@
 package com.readmates.auth.api
 
+import com.readmates.auth.application.AuthSessionService
 import com.readmates.auth.application.InvitationService
 import com.readmates.support.MySqlTestContainer
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import java.time.LocalDate
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -30,6 +33,7 @@ import java.time.LocalDate
 class InvitationControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val invitationService: InvitationService,
+    @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
     @Test
@@ -74,6 +78,20 @@ class InvitationControllerDbTest(
                 status { isNotFound() }
                 jsonPath("$.code") { value("INVITATION_NOT_FOUND") }
             }
+    }
+
+    @Test
+    fun `accepted google invitation creates active member instead of viewer`() {
+        val invite = createPendingInvitation(email = "invited.active.${UUID.randomUUID()}@example.com")
+        val cookie = completeGoogleInvite(invite.acceptUrl, invite.email)
+
+        mockMvc.get("/api/auth/me") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.membershipStatus") { value("ACTIVE") }
+            jsonPath("$.approvalState") { value("ACTIVE") }
+        }
     }
 
     @Test
@@ -182,6 +200,27 @@ class InvitationControllerDbTest(
         return acceptUrl.substringAfterLast("/")
     }
 
+    private fun createPendingInvitation(email: String): PendingInvitation {
+        val token = createInvitation(email = email, name = "초대 활성 멤버")
+        return PendingInvitation(acceptUrl = "http://localhost:3000/invite/$token", email = email)
+    }
+
+    private fun completeGoogleInvite(acceptUrl: String, email: String): Cookie {
+        val member = invitationService.acceptGoogleInvitation(
+            rawToken = acceptUrl.substringAfterLast("/"),
+            googleSubjectId = "google-invited-active-${UUID.randomUUID()}",
+            email = email,
+            displayName = "초대 활성 멤버",
+            profileImageUrl = null,
+        )
+        val issuedSession = authSessionService.issueSession(
+            userId = member.userId.toString(),
+            userAgent = "InvitationControllerDbTest",
+            ipAddress = "127.0.0.1",
+        )
+        return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
+    }
+
     private fun createOpenSession(
         sessionId: String,
         sessionDate: LocalDate = LocalDate.now().plusDays(7),
@@ -250,8 +289,26 @@ class InvitationControllerDbTest(
             email,
         ) ?: 0
 
+    private data class PendingInvitation(
+        val acceptUrl: String,
+        val email: String,
+    )
+
     companion object {
         const val CLEANUP_SQL = """
+            delete from auth_sessions
+            where user_id in (
+              select id
+              from users
+              where email in (
+                'intent.disabled@example.com',
+                'intent.enabled@example.com',
+                'intent.deadline-passed@example.com',
+                'intent.session-passed@example.com'
+              )
+                 or email like 'invited.active.%@example.com'
+            );
+
             delete from session_participants
             where membership_id in (
               select memberships.id
@@ -263,6 +320,7 @@ class InvitationControllerDbTest(
                 'intent.deadline-passed@example.com',
                 'intent.session-passed@example.com'
               )
+                 or users.email like 'invited.active.%@example.com'
             );
 
             delete from invitations
@@ -273,7 +331,8 @@ class InvitationControllerDbTest(
               'intent.enabled@example.com',
               'intent.deadline-passed@example.com',
               'intent.session-passed@example.com'
-            );
+            )
+               or invited_email like 'invited.active.%@example.com';
 
             delete from sessions
             where title = 'Invitation Current Session Test';
@@ -288,6 +347,7 @@ class InvitationControllerDbTest(
                 'intent.deadline-passed@example.com',
                 'intent.session-passed@example.com'
               )
+                 or email like 'invited.active.%@example.com'
             );
 
             delete from users
@@ -296,7 +356,8 @@ class InvitationControllerDbTest(
               'intent.enabled@example.com',
               'intent.deadline-passed@example.com',
               'intent.session-passed@example.com'
-            );
+            )
+               or email like 'invited.active.%@example.com';
         """
 
         @JvmStatic

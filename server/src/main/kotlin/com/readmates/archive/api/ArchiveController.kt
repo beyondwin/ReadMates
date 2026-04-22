@@ -25,6 +25,7 @@ data class ArchiveSessionItem(
     val attendance: Int,
     val total: Int,
     val published: Boolean,
+    val state: String,
 )
 
 data class MyArchiveQuestionItem(
@@ -57,6 +58,7 @@ data class MemberArchiveSessionDetailResponse(
     val locationLabel: String,
     val attendance: Int,
     val total: Int,
+    val state: String,
     val myAttendanceStatus: String?,
     @get:JsonProperty("isHost")
     val isHost: Boolean,
@@ -123,7 +125,7 @@ class ArchiveController(
     @GetMapping("/sessions")
     fun sessions(authentication: Authentication?): List<ArchiveSessionItem> {
         val currentMember = currentMember(authentication)
-        return archiveRepository.findArchiveSessions(currentMember.clubId)
+        return archiveRepository.findArchiveSessions(currentMember)
     }
 
     @GetMapping("/sessions/{sessionId}")
@@ -144,8 +146,12 @@ class ArchiveController(
 
     private fun currentMember(authentication: Authentication?): CurrentMember {
         val email = authentication.emailOrNull() ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        return memberAccountRepository.findActiveMemberByEmail(email)
+        val member = memberAccountRepository.findActiveMemberByEmail(email)
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        if (!member.canBrowseMemberContent) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Member app access required")
+        }
+        return member
     }
 
     private fun parseSessionId(sessionId: String): UUID =

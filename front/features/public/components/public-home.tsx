@@ -2,7 +2,7 @@ import { Link } from "@/src/app/router-link";
 import type { PublicClubResponse, PublicSessionListItem } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, nonNegativeCount } from "@/shared/ui/readmates-display";
-import { PUBLIC_INTRODUCTION_FALLBACK, PUBLIC_TAGLINE_FALLBACK } from "./public-club-copy";
+import { PUBLIC_INTRODUCTION_FALLBACK, PUBLIC_MEMBERSHIP_NOTE, PUBLIC_TAGLINE_FALLBACK } from "./public-club-copy";
 
 type PublicHomeProps = {
   data: PublicClubResponse;
@@ -208,6 +208,9 @@ function MobilePublicHome({ data }: PublicHomeProps) {
         <p style={{ fontSize: 14.5, lineHeight: 1.7, color: "var(--text-2)", marginTop: 22, maxWidth: 320 }}>
           {about}
         </p>
+        <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text-2)", marginTop: 14, maxWidth: 340 }}>
+          {PUBLIC_MEMBERSHIP_NOTE}
+        </p>
       </section>
 
       <section style={{ padding: "4px 22px 28px" }}>
@@ -327,6 +330,9 @@ export default function PublicHome({ data }: PublicHomeProps) {
               </h1>
               <p className="body-lg" style={{ color: "var(--text-2)", marginTop: "28px", maxWidth: "520px" }}>
                 {about}
+              </p>
+              <p className="body" style={{ color: "var(--text-2)", marginTop: "16px", maxWidth: "560px" }}>
+                {PUBLIC_MEMBERSHIP_NOTE}
               </p>
               <div className="public-actions">
                 <Link to={latestHref} className="btn btn-primary btn-lg">

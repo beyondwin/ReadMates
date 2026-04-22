@@ -36,11 +36,7 @@ describe("InviteAcceptanceCard", () => {
     expect(screen.getByText("새멤버")).toBeInTheDocument();
     expect(screen.getByText("만료 2026.05.20")).toBeInTheDocument();
     expect(screen.getByText("초대 대상 Gmail 계정과 이름을 확인한 뒤 Google 로그인으로 수락해 주세요.")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "비밀번호 초대 수락은 종료되었습니다. 초대받은 Gmail 계정(member@example.com)으로 Google 로그인을 진행해 주세요.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Google로 초대 수락하면 바로 정식 멤버가 됩니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google?inviteToken=raw-token",

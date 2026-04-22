@@ -60,6 +60,8 @@ export function MobileCurrentSessionBoard({
   onSaveLongReview,
   onSaveOneLineReview,
   isSuspended,
+  isViewer,
+  canWrite,
 }: {
   session: CurrentSession;
   rsvp: CurrentSession["myRsvpStatus"];
@@ -89,6 +91,8 @@ export function MobileCurrentSessionBoard({
   onSaveLongReview: () => void;
   onSaveOneLineReview: () => void;
   isSuspended: boolean;
+  isViewer: boolean;
+  canWrite: boolean;
 }) {
   const tabs: Array<{ key: MobileSessionTab; label: string }> = [
     { key: "prep", label: "내 준비" },
@@ -145,9 +149,10 @@ export function MobileCurrentSessionBoard({
       </div>
 
       {isSuspended ? <MobileSuspendedMemberNotice /> : null}
+      {isViewer ? <MobileViewerMemberNotice /> : null}
 
       {mobileTab === "prep" ? (
-        <SuspendedFieldset disabled={isSuspended}>
+        <SuspendedFieldset disabled={!canWrite}>
           <MobilePrepSegment
             session={session}
             rsvp={rsvp}
@@ -166,12 +171,13 @@ export function MobileCurrentSessionBoard({
             questionSaveStatus={questionSaveStatus}
             onRsvpChange={onRsvpChange}
             onSaveCheckin={onSaveCheckin}
+            canWrite={canWrite}
           />
         </SuspendedFieldset>
       ) : null}
       {mobileTab === "board" ? <MobileBoardSegment session={session} /> : null}
       {mobileTab === "after" ? (
-        <SuspendedFieldset disabled={isSuspended}>
+        <SuspendedFieldset disabled={!canWrite}>
           <MobileRecordsSegment
             longReview={longReview}
             onLongReviewChange={onLongReviewChange}
@@ -181,6 +187,7 @@ export function MobileCurrentSessionBoard({
             oneLineReviewSaveStatus={oneLineReviewSaveStatus}
             onSaveLongReview={onSaveLongReview}
             onSaveOneLineReview={onSaveOneLineReview}
+            canWrite={canWrite}
           />
         </SuspendedFieldset>
       ) : null}
@@ -208,6 +215,19 @@ function MobileSuspendedMemberNotice() {
   );
 }
 
+function MobileViewerMemberNotice() {
+  return (
+    <section className="m-sec">
+      <div className="m-card-quiet" role="note">
+        <div className="eyebrow">둘러보기 멤버</div>
+        <p className="small" style={{ margin: "6px 0 0" }}>
+          전체 세션은 읽을 수 있어요. 참여와 피드백 문서는 정식 멤버에게 열립니다.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function MobilePrepSegment({
   session,
   rsvp,
@@ -226,6 +246,7 @@ function MobilePrepSegment({
   questionSaveStatus,
   onRsvpChange,
   onSaveCheckin,
+  canWrite,
 }: {
   session: CurrentSession;
   rsvp: CurrentSession["myRsvpStatus"];
@@ -244,6 +265,7 @@ function MobilePrepSegment({
   questionSaveStatus: SaveState;
   onRsvpChange: (status: RsvpUpdateStatus) => void;
   onSaveCheckin: () => void;
+  canWrite: boolean;
 }) {
   return (
     <>
@@ -261,6 +283,8 @@ function MobilePrepSegment({
                 key={option.status}
                 type="button"
                 className={`m-chip${rsvp === option.status ? " is-on" : ""}`}
+                disabled={!canWrite}
+                aria-disabled={!canWrite}
                 onClick={() => onRsvpChange(option.status)}
               >
                 {option.label}
@@ -296,6 +320,7 @@ function MobilePrepSegment({
             max={100}
             value={readingProgress}
             className="m-range"
+            disabled={!canWrite}
             onChange={(event) => onReadingProgressChange(Number(event.target.value))}
             style={{ marginTop: 14 }}
           />
@@ -304,13 +329,20 @@ function MobilePrepSegment({
             className="m-textarea"
             rows={3}
             value={checkinNote}
+            disabled={!canWrite}
             onChange={(event) => onCheckinNoteChange(event.target.value)}
             placeholder="멈춘 장면이나 떠오른 질문이 있다면 짧게 기록해 주세요."
             style={{ marginTop: 14 }}
           />
           <div className="rm-current-session-mobile__save-row">
             <SaveFeedback scope="checkin" status={checkinSaveStatus} />
-            <button type="button" className="btn btn-primary btn-sm" disabled={checkinSaveStatus === "saving"} onClick={onSaveCheckin}>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={!canWrite || checkinSaveStatus === "saving"}
+              aria-disabled={!canWrite || checkinSaveStatus === "saving"}
+              onClick={onSaveCheckin}
+            >
               체크인 저장
             </button>
           </div>
@@ -573,6 +605,7 @@ function MobileRecordsSegment({
   oneLineReviewSaveStatus,
   onSaveLongReview,
   onSaveOneLineReview,
+  canWrite,
 }: {
   longReview: string;
   onLongReviewChange: (value: string) => void;
@@ -582,6 +615,7 @@ function MobileRecordsSegment({
   oneLineReviewSaveStatus: SaveState;
   onSaveLongReview: () => void;
   onSaveOneLineReview: () => void;
+  canWrite: boolean;
 }) {
   return (
     <>
@@ -600,6 +634,7 @@ function MobileRecordsSegment({
             aria-label="한줄평 내용"
             className="m-input"
             value={oneLineReview}
+            disabled={!canWrite}
             onChange={(event) => onOneLineReviewChange(event.target.value)}
             placeholder="예: 떠난 자리에 남은 온기를 만지는 책."
           />
@@ -612,7 +647,8 @@ function MobileRecordsSegment({
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={oneLineReviewSaveStatus === "saving"}
+                disabled={!canWrite || oneLineReviewSaveStatus === "saving"}
+                aria-disabled={!canWrite || oneLineReviewSaveStatus === "saving"}
                 onClick={onSaveOneLineReview}
               >
                 한줄평 저장
@@ -638,6 +674,7 @@ function MobileRecordsSegment({
             className="m-textarea"
             rows={5}
             value={longReview}
+            disabled={!canWrite}
             onChange={(event) => onLongReviewChange(event.target.value)}
             placeholder="완독 후든, 모임 이후든, 시간이 흐른 뒤에라도 이 책에 대해 남기고 싶은 문장을 천천히 적어 주세요."
           />
@@ -647,7 +684,13 @@ function MobileRecordsSegment({
             </span>
             <div className="m-row" style={{ gap: 10, justifyContent: "flex-end" }}>
               <SaveFeedback scope="longReview" status={longReviewSaveStatus} />
-              <button type="button" className="btn btn-primary btn-sm" disabled={longReviewSaveStatus === "saving"} onClick={onSaveLongReview}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={!canWrite || longReviewSaveStatus === "saving"}
+                aria-disabled={!canWrite || longReviewSaveStatus === "saving"}
+                onClick={onSaveLongReview}
+              >
                 서평 저장
               </button>
             </div>

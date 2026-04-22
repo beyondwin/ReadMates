@@ -146,8 +146,68 @@ describe("SPA AppRouteLayout", () => {
       "아카이브",
       "내 공간",
     ]);
-    expect(within(tabs).queryByRole("link", { name: "세션 편집" })).not.toBeInTheDocument();
+    expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
+  });
+
+  it("keeps active hosts on host mobile chrome for archive routes", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(hostAuth));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        return Promise.resolve(
+          jsonResponse({
+            currentSession: {
+              sessionId: "session-6",
+            },
+          }),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/app/archive"]}>
+          <Routes>
+            <Route path="/app" element={<AppRouteLayout />}>
+              <Route path="archive" element={<main>archive child</main>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("archive child")).toBeInTheDocument();
+
+    const desktopNav = screen.getByRole("navigation", { name: "앱 내비게이션" });
+    expect(within(desktopNav).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
+
+    expect(screen.getAllByText("기록")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    await waitFor(() => {
+      expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
+        "오늘",
+        "세션",
+        "멤버",
+        "기록",
+      ]);
+    });
+    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/session-6/edit",
+    );
+    expect(within(tabs).queryByRole("link", { name: "아카이브" })).not.toBeInTheDocument();
   });
 
   it("keeps host edit disabled while the current session tab target is loading", async () => {
@@ -186,8 +246,8 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).queryByRole("link", { name: "세션 편집" })).not.toBeInTheDocument();
-    expect(within(tabs).getByText("세션 편집").closest("[aria-disabled='true']")).not.toBeNull();
+    expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
+    expect(within(tabs).getByText("세션").closest("[aria-disabled='true']")).not.toBeNull();
 
     currentSession.resolve(
       jsonResponse({
@@ -198,7 +258,7 @@ describe("SPA AppRouteLayout", () => {
     );
 
     await waitFor(() => {
-      expect(within(tabs).getByRole("link", { name: "세션 편집" })).toHaveAttribute(
+      expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
         "href",
         "/app/host/sessions/session-6/edit",
       );

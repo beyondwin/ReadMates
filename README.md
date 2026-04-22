@@ -11,9 +11,10 @@ This repository is prepared for public review. It documents the product, archite
 ReadMates is built for a small recurring book club.
 
 - Public visitors can read the club introduction, published sessions, and public records.
-- Invited members can sign in with Google, RSVP for the current session, submit reading progress, questions, short reviews, and long reviews.
-- Hosts can create invitations, approve or reject pending members, manage member status, create and edit sessions, confirm attendance, publish session records, and upload feedback documents.
-- Members who attended a session can read its feedback document. Non-attendees see a locked state.
+- Viewer members can sign in with Google without an invitation and browse private session records and current-session status in read-only mode.
+- Full members can accept an invitation link or be activated by a host, then RSVP for the current session, submit reading progress, questions, short reviews, and long reviews.
+- Hosts can create invitations, activate viewer members, manage member status, create and edit sessions, confirm attendance, publish session records, and upload feedback documents.
+- Members who attended a session can read its feedback document. Viewers and non-attendees see a locked state.
 
 The current app supports one club and one open current session at a time. Password login and password-reset endpoints are intentionally retired and return `410 Gone`; Google OAuth and local dev-login are the active login paths.
 
@@ -89,13 +90,21 @@ Session-cookie posture:
 - `Secure` in production: production sets `READMATES_AUTH_SESSION_COOKIE_SECURE=true` so cookies are sent only over HTTPS.
 - Session tokens are stored server-side as hashes in `auth_sessions`.
 
-Membership is invite-only at the product boundary:
+Membership is invite-only for participation, with browse-only access for uninvited Google users:
 
-- A host can create invitation links and optionally attach an invited user to the current session.
-- A Google user without an accepted invitation can enter a pending approval state.
-- A host can approve, reject, suspend, restore, deactivate, or remove members from the current session.
+- Guests can read only public home, club introduction, published sessions, and public records.
+- A Google user without an accepted invitation becomes a `VIEWER` member. Viewers can browse private session records and current-session status, but cannot RSVP, check in, submit questions or reviews, read feedback documents, or use host tools.
+- Invitation-link acceptance creates an `ACTIVE` full member immediately.
+- A host can activate a viewer into a full member, manage member status, and manage current-session participants.
 - `host` routes and APIs require an active host role.
-- `member` routes and APIs require an active or otherwise allowed member state, with write operations restricted to eligible current-session participants.
+- Member write APIs require an `ACTIVE` full member who is eligible for the current session.
+
+## 멤버십 접근 단계
+
+- 게스트: 로그인 없이 공개 홈, 공개 소개, 공개 기록만 볼 수 있습니다.
+- 둘러보기 멤버: 초대 없이 Google로 로그인한 계정입니다. 전체 비공개 세션 기록과 이번 세션 현황은 읽을 수 있지만, RSVP, 체크인, 질문, 서평 작성과 피드백 문서 열람은 제한됩니다.
+- 정식 멤버: 초대 링크를 수락했거나 호스트가 둘러보기 멤버를 전환한 계정입니다. 현재 세션 참여와 작성 기능을 사용할 수 있고, 참석한 회차의 피드백 문서를 읽을 수 있습니다.
+- 호스트: 정식 멤버 권한에 운영 권한이 추가된 계정입니다. 세션, 초대, 멤버 상태, 출석, 공개 기록, 피드백 문서를 관리합니다.
 
 Public APIs expose only published sessions that have explicitly been marked public. Member-only operational details such as current-session participation, feedback access, meeting data, and private notes stay behind authentication and authorization checks.
 
@@ -113,12 +122,14 @@ Public:
 Member app:
 
 - `/app`
+- `/app/pending`
 - `/app/session/current`
 - `/app/notes`
 - `/app/archive`
 - `/app/me`
 - `/app/sessions/:sessionId`
 - `/app/feedback/:sessionId`
+- `/app/feedback/:sessionId/print`
 
 Host app:
 
