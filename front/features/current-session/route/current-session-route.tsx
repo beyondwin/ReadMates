@@ -1,0 +1,196 @@
+import { useEffect } from "react";
+import { useLoaderData, useRevalidator, type ActionFunctionArgs } from "react-router-dom";
+import {
+  getCurrentSession,
+  saveCurrentSessionCheckin,
+  saveCurrentSessionLongReview,
+  saveCurrentSessionOneLineReview,
+  saveCurrentSessionQuestions,
+  updateCurrentSessionRsvp,
+} from "@/features/current-session/api/current-session-api";
+import type { RsvpStatus } from "@/features/current-session/api/current-session-contracts";
+import CurrentSession from "@/features/current-session/components/current-session";
+import { readmatesFetch } from "@/shared/api/client";
+import type { AuthMeResponse } from "@/shared/api/readmates";
+
+const READMATES_ROUTE_REFRESH_EVENT = "readmates:route-refresh";
+
+type CurrentSessionActionIntent = "rsvp" | "checkin" | "questions" | "longReview" | "oneLineReview";
+
+type CurrentSessionActionPayload = {
+  intent?: unknown;
+  status?: unknown;
+  readingProgress?: unknown;
+  note?: unknown;
+  questions?: unknown;
+  body?: unknown;
+  text?: unknown;
+};
+
+export type CurrentSessionRouteData = {
+  auth: AuthMeResponse;
+  current: Awaited<ReturnType<typeof getCurrentSession>>;
+};
+
+export async function currentSessionLoader(): Promise<CurrentSessionRouteData> {
+  const [auth, current] = await Promise.all([
+    readmatesFetch<AuthMeResponse>("/api/auth/me"),
+    getCurrentSession(),
+  ]);
+
+  return { auth, current };
+}
+
+function badRequest(message: string) {
+  return Response.json({ ok: false, message }, { status: 400 });
+}
+
+function isCurrentSessionActionIntent(intent: unknown): intent is CurrentSessionActionIntent {
+  return (
+    intent === "rsvp" ||
+    intent === "checkin" ||
+    intent === "questions" ||
+    intent === "longReview" ||
+    intent === "oneLineReview"
+  );
+}
+
+function isRsvpUpdateStatus(status: unknown): status is Exclude<RsvpStatus, "NO_RESPONSE"> {
+  return status === "GOING" || status === "MAYBE" || status === "DECLINED";
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function numberValue(value: unknown) {
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function questionPayload(value: unknown): Array<{ text: string }> | null {
+  if (Array.isArray(value)) {
+    const questions = value
+      .filter((question): question is { text: unknown } => typeof question === "object" && question !== null && "text" in question)
+      .map((question) => ({ text: stringValue(question.text) }));
+
+    return questions.length === value.length ? questions : null;
+  }
+
+  if (typeof value === "string") {
+    try {
+      return questionPayload(JSON.parse(value));
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+async function actionPayloadFromRequest(request: Request): Promise<CurrentSessionActionPayload> {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.includes("application/json")) {
+    return (await request.json()) as CurrentSessionActionPayload;
+  }
+
+  const formData = await request.formData();
+  return {
+    intent: formData.get("intent"),
+    status: formData.get("status"),
+    readingProgress: formData.get("readingProgress"),
+    note: formData.get("note"),
+    questions: formData.get("questions") ?? formData.getAll("question").map((question) => ({ text: question })),
+    body: formData.get("body"),
+    text: formData.get("text"),
+  };
+}
+
+export async function currentSessionAction({ request }: ActionFunctionArgs) {
+  const payload = await actionPayloadFromRequest(request);
+
+  if (!isCurrentSessionActionIntent(payload.intent)) {
+    return badRequest("Unknown current session action.");
+  }
+
+  if (payload.intent === "rsvp") {
+    if (!isRsvpUpdateStatus(payload.status)) {
+      return badRequest("Invalid RSVP status.");
+    }
+
+    await updateCurrentSessionRsvp(payload.status);
+    return Response.json({ ok: true });
+  }
+
+  if (payload.intent === "checkin") {
+    const readingProgress = numberValue(payload.readingProgress);
+    if (readingProgress === null) {
+      return badRequest("Invalid reading progress.");
+    }
+
+    await saveCurrentSessionCheckin(readingProgress, stringValue(payload.note));
+    return Response.json({ ok: true });
+  }
+
+  if (payload.intent === "questions") {
+    const questions = questionPayload(payload.questions);
+    if (questions === null) {
+      return badRequest("Invalid questions payload.");
+    }
+
+    await saveCurrentSessionQuestions(questions);
+    return Response.json({ ok: true });
+  }
+
+  if (payload.intent === "longReview") {
+    await saveCurrentSessionLongReview(stringValue(payload.body));
+    return Response.json({ ok: true });
+  }
+
+  await saveCurrentSessionOneLineReview(stringValue(payload.text));
+  return Response.json({ ok: true });
+}
+
+export function CurrentSessionRoute() {
+  const { auth, current } = useLoaderData() as CurrentSessionRouteData;
+  const revalidator = useRevalidator();
+
+  useEffect(() => {
+    const refresh = () => {
+      void revalidator.revalidate();
+    };
+
+    window.addEventListener(READMATES_ROUTE_REFRESH_EVENT, refresh);
+
+    return () => {
+      window.removeEventListener(READMATES_ROUTE_REFRESH_EVENT, refresh);
+    };
+  }, [revalidator]);
+
+  return <CurrentSession auth={auth} data={current} />;
+}
+
+export function CurrentSessionRouteError() {
+  return (
+    <main className="container">
+      <section className="surface" style={{ margin: "48px 0", padding: 28 }}>
+        <p className="eyebrow">불러오기 실패</p>
+        <h1 className="h2 editorial" style={{ margin: "8px 0 0" }}>
+          페이지를 불러오지 못했습니다.
+        </h1>
+        <p className="body" style={{ color: "var(--text-2)" }}>
+          네트워크 연결 또는 계정 권한을 확인한 뒤 새로고침해 주세요. 계속 실패하면 이전 화면으로 돌아가 다시 시도해 주세요.
+        </p>
+      </section>
+    </main>
+  );
+}

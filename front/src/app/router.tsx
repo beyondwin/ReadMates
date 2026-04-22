@@ -1,10 +1,15 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import {
+  CurrentSessionRoute,
+  CurrentSessionRouteError,
+  currentSessionAction,
+  currentSessionLoader,
+} from "@/features/current-session";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
 import AboutPage from "@/src/pages/about";
 import AppHomePage from "@/src/pages/app-home";
 import ArchiveRoutePage from "@/src/pages/archive";
-import CurrentSessionPage from "@/src/pages/current-session";
 import FeedbackDocumentRoutePage from "@/src/pages/feedback-document";
 import FeedbackDocumentPrintRoutePage from "@/src/pages/feedback-print";
 import HostPage from "@/src/pages/host-dashboard";
@@ -20,6 +25,7 @@ import PendingApprovalPage from "@/src/pages/pending-approval";
 import PublicHomePage from "@/src/pages/public-home";
 import PublicRecordsPage from "@/src/pages/public-records";
 import PublicSessionPage from "@/src/pages/public-session";
+import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import ResetPasswordPage from "@/src/pages/reset-password";
 
 export const routes: RouteObject[] = [
@@ -52,7 +58,14 @@ export const routes: RouteObject[] = [
     ),
     children: [
       { index: true, element: <AppHomePage /> },
-      { path: "session/current", element: <CurrentSessionPage /> },
+      {
+        path: "session/current",
+        element: <CurrentSessionRoute />,
+        loader: currentSessionLoader,
+        action: currentSessionAction,
+        errorElement: <CurrentSessionRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      },
       { path: "notes", element: <NotesPage /> },
       { path: "archive", element: <ArchiveRoutePage /> },
       { path: "me", element: <MyRoutePage /> },
