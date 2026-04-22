@@ -194,6 +194,17 @@ wc -l front/features/host/components/host-dashboard.tsx \
 
 Expected: output confirms the largest refactoring targets. Do not edit files in this step.
 
+Output:
+
+```text
+  1425 front/features/host/components/host-dashboard.tsx
+  1145 front/features/host/components/host-session-editor.tsx
+  1014 front/features/archive/components/archive-page.tsx
+   718 front/features/current-session/components/current-session.tsx
+   590 front/shared/api/readmates.ts
+  4892 total
+```
+
 ### Baseline Failures
 
 Captured on 2026-04-23 during Task 0 and resolved on rerun:
