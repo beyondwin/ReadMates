@@ -907,7 +907,7 @@ Update `docs/development/architecture.md` or a dedicated frontend architecture d
 Commit documentation and any final cleanup:
 
 ```bash
-git add docs/development/architecture.md front
+git add docs/development/architecture.md docs/superpowers/plans/2026-04-23-frontend-route-first-architecture-implementation-plan.md
 git commit -m "docs: update frontend architecture after route-first refactor"
 ```
 
@@ -917,7 +917,7 @@ Task 12 verification summary:
 
 - Unit/build checks passed: `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`.
 - Targeted e2e passed: `dev-login-session-flow.spec.ts` (2 passed), `public-auth-member-host.spec.ts` (2 passed), `responsive-navigation-chrome.spec.ts` (4 passed). No local backend/database blocker.
-- Boundary inspection: no `@/shared/api/readmates` matches remain; direct `fetch(` matches are limited to `front/features/auth/api/auth-api.ts`, which is an allowed feature API module; `components` imports remain only for `host` and `member-home` legacy presentation directories and related tests/routes because those features do not expose a `ui` public surface yet.
+- Boundary inspection: no `@/shared/api/readmates` matches remain; direct `fetch(` matches are limited to `front/features/auth/api/auth-api.ts`, which is an allowed feature API module; `components` imports remain only for `host` and `member-home` legacy presentation directories and related tests/routes because those features do not expose a `ui` public surface yet. `shared/ui` still has explicit legacy boundary exceptions for `mobile-header` importing `src/app/router-link` and `src/app/route-continuity`, plus `mobile-tab-bar`, `public-auth-action`, `public-footer`, and `top-nav` importing `src/app/router-link`; remove those test exceptions only after router-link and route-continuity are moved or injected outside the shared UI boundary.
 - Frontend architecture rules were added to `docs/development/architecture.md`.
 
 ## Implementation Notes
