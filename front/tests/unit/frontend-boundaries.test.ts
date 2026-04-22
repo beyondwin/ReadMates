@@ -124,20 +124,31 @@ function parseStaticImportSpecifiers(source: string) {
   );
   const specifiers: string[] = [];
 
-  for (const statement of sourceFile.statements) {
-    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-      specifiers.push(statement.moduleSpecifier.text);
-      continue;
+  function visit(node: ts.Node) {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      specifiers.push(node.moduleSpecifier.text);
     }
 
     if (
-      ts.isExportDeclaration(statement) &&
-      statement.moduleSpecifier !== undefined &&
-      ts.isStringLiteral(statement.moduleSpecifier)
+      ts.isExportDeclaration(node) &&
+      node.moduleSpecifier !== undefined &&
+      ts.isStringLiteral(node.moduleSpecifier)
     ) {
-      specifiers.push(statement.moduleSpecifier.text);
+      specifiers.push(node.moduleSpecifier.text);
     }
+
+    if (
+      ts.isImportTypeNode(node) &&
+      ts.isLiteralTypeNode(node.argument) &&
+      ts.isStringLiteral(node.argument.literal)
+    ) {
+      specifiers.push(node.argument.literal.text);
+    }
+
+    ts.forEachChild(node, visit);
   }
+
+  visit(sourceFile);
 
   return specifiers;
 }
@@ -354,6 +365,28 @@ describe("frontend architecture boundaries", () => {
       "@/features/reader/model",
       "@/shared/lib/reader-helper",
     ]);
+  });
+
+  it("collects TypeScript import-type specifiers so boundary checks can reject them", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/shared/api/readmates.ts",
+      displayPath: "front/shared/api/readmates.ts",
+      relativePath: "shared/api/readmates.ts",
+    };
+    const source = `
+      export type CurrentSessionCompatibility =
+        import("@/features/current-session/api/current-session-contracts").CurrentSessionResponse;
+    `;
+
+    const specifier = parseStaticImportSpecifiers(source)[0];
+    if (specifier === undefined) {
+      throw new Error("Expected import-type specifier to be collected.");
+    }
+    const importSpecifier = normalizeImportSpecifier(sourceFile, specifier);
+
+    expect(specifier).toBe("@/features/current-session/api/current-session-contracts");
+    expect(importSpecifier.projectPath).toBe("features/current-session/api/current-session-contracts");
+    expect(isSharedToFeaturePageOrAppImport(sourceFile, importSpecifier.projectPath)).toBe(true);
   });
 
   it("keeps shared, feature model, and feature UI dependencies inside their allowed boundaries", () => {

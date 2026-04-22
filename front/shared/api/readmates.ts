@@ -1,12 +1,11 @@
 export type MemberRole = "HOST" | "MEMBER";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
 export type ApprovalState = "ANONYMOUS" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "INACTIVE";
-export type SessionParticipationStatus =
-  import("@/features/current-session/api/current-session-contracts").SessionParticipationStatus;
+export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
 export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
 export type CurrentSessionPolicyResult = "APPLIED" | "NOT_APPLICABLE" | "DEFERRED";
-export type RsvpStatus = import("@/features/current-session/api/current-session-contracts").RsvpStatus;
-export type AttendanceStatus = import("@/features/current-session/api/current-session-contracts").AttendanceStatus;
+export type RsvpStatus = "NO_RESPONSE" | "GOING" | "MAYBE" | "DECLINED";
+export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionState = "DRAFT" | "OPEN" | "PUBLISHED" | "CLOSED";
 
 export type AuthMeResponse = {
@@ -116,25 +115,101 @@ export type InvitationErrorResponse = {
   message: string;
 };
 
-export type CurrentSessionResponse =
-  import("@/features/current-session/api/current-session-contracts").CurrentSessionResponse;
+export type CurrentSessionResponse = {
+  currentSession: null | {
+    sessionId: string;
+    sessionNumber: number;
+    title: string;
+    bookTitle: string;
+    bookAuthor: string;
+    bookLink: string | null;
+    bookImageUrl: string | null;
+    date: string;
+    startTime: string;
+    endTime: string;
+    locationLabel: string;
+    meetingUrl: string | null;
+    meetingPasscode: string | null;
+    questionDeadlineAt: string;
+    myRsvpStatus: RsvpStatus;
+    myCheckin: null | {
+      readingProgress: number;
+      note: string;
+    };
+    myQuestions: Array<{
+      priority: number;
+      text: string;
+      draftThought: string | null;
+      authorName: string;
+      authorShortName: string;
+    }>;
+    myOneLineReview: null | {
+      text: string;
+    };
+    myLongReview: null | {
+      body: string;
+    };
+    board: {
+      questions: Array<{
+        priority: number;
+        text: string;
+        draftThought: string | null;
+        authorName: string;
+        authorShortName: string;
+      }>;
+      checkins: Array<{
+        authorName: string;
+        authorShortName: string;
+        readingProgress: number;
+        note: string;
+      }>;
+      highlights: Array<{
+        text: string;
+        sortOrder: number;
+      }>;
+    };
+    attendees: Array<{
+      membershipId: string;
+      displayName: string;
+      shortName: string;
+      role: MemberRole;
+      rsvpStatus: RsvpStatus;
+      attendanceStatus: AttendanceStatus;
+      participationStatus?: SessionParticipationStatus;
+    }>;
+  };
+};
 
 export type DevLoginRequest = {
   email: string;
 };
 
-export type UpdateRsvpRequest = import("@/features/current-session/api/current-session-contracts").UpdateRsvpRequest;
+export type UpdateRsvpRequest = {
+  status: RsvpStatus;
+};
 
-export type UpdateRsvpResponse = import("@/features/current-session/api/current-session-contracts").UpdateRsvpResponse;
+export type UpdateRsvpResponse = {
+  status: RsvpStatus;
+};
 
-export type CheckinRequest = import("@/features/current-session/api/current-session-contracts").CheckinRequest;
+export type CheckinRequest = {
+  readingProgress: number;
+  note: string;
+};
 
-export type CheckinResponse = import("@/features/current-session/api/current-session-contracts").CheckinResponse;
+export type CheckinResponse = CheckinRequest;
 
-export type CreateQuestionRequest =
-  import("@/features/current-session/api/current-session-contracts").CreateQuestionRequest;
+export type CreateQuestionRequest = {
+  priority: number;
+  text: string;
+  draftThought?: string | null;
+};
 
-export type QuestionResponse = import("@/features/current-session/api/current-session-contracts").QuestionResponse;
+export type QuestionResponse = {
+  priority: number;
+  text: string;
+  draftThought: string | null;
+};
 
 export type ArchiveSessionItem = {
   sessionId: string;
