@@ -1,12 +1,8 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import { canUseMemberApp } from "@/shared/auth/member-app-access";
 import { useAuth } from "./auth-state";
-
-function canUseMemberApp(auth: AuthMeResponse) {
-  return auth.approvalState === "VIEWER" || auth.approvalState === "ACTIVE" || auth.approvalState === "SUSPENDED";
-}
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const state = useAuth();

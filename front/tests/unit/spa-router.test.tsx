@@ -173,6 +173,43 @@ describe("SPA router", () => {
     );
   });
 
+  it("redirects anonymous current session navigation without fetching current session data", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: false,
+            userId: null,
+            membershipId: null,
+            clubId: null,
+            email: null,
+            displayName: null,
+            shortName: null,
+            role: null,
+            membershipStatus: null,
+            approvalState: "ANONYMOUS",
+          }),
+        );
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
+  });
+
   it("renders the archive session list when viewer feedback documents are forbidden", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
