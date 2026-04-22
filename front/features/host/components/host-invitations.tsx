@@ -1,6 +1,5 @@
 "use client";
 
-import { Link } from "@/src/app/router-link";
 import { type CSSProperties, type FormEvent, type InvalidEvent, useRef, useState } from "react";
 import {
   createInvitation,
@@ -19,12 +18,44 @@ const statusLabels: Record<InvitationStatus, string> = {
   REVOKED: "취소됨",
 };
 
+const statusDetailLabels: Record<InvitationStatus, string> = {
+  PENDING: "수락 전입니다. 필요하면 취소하거나 새 링크를 발급하세요.",
+  ACCEPTED: "이미 사용된 초대입니다. 멤버 목록에서 상태를 확인하세요.",
+  EXPIRED: "만료된 링크입니다. 같은 대상에게 새 링크를 발급할 수 있습니다.",
+  REVOKED: "취소된 링크입니다. 더 이상 사용할 수 없습니다.",
+};
+
 type HostMessage = {
   kind: "alert" | "status";
   text: string;
 };
 
 type PendingRowAction = "revoke" | "reissue";
+
+function inviteStatusClass(status: InvitationStatus) {
+  if (status === "PENDING") {
+    return "badge badge-accent badge-dot";
+  }
+
+  if (status === "ACCEPTED") {
+    return "badge badge-ok badge-dot";
+  }
+
+  if (status === "EXPIRED") {
+    return "badge badge-warn badge-dot";
+  }
+
+  return "badge";
+}
+
+function inviteCounts(invitations: HostInvitationListItem[]) {
+  return {
+    pending: invitations.filter((invitation) => invitation.effectiveStatus === "PENDING").length,
+    used: invitations.filter((invitation) => invitation.effectiveStatus === "ACCEPTED").length,
+    expired: invitations.filter((invitation) => invitation.effectiveStatus === "EXPIRED").length,
+    revoked: invitations.filter((invitation) => invitation.effectiveStatus === "REVOKED").length,
+  };
+}
 
 export default function HostInvitations({ initialInvitations }: { initialInvitations: HostInvitationListItem[] }) {
   const [name, setName] = useState("");
@@ -42,6 +73,12 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
   const hasPendingRow = Object.keys(pendingRows).length > 0;
   const disableCreate = isCreating || hasPendingRow;
   const nameInvalid = nameTouched && name.trim().length === 0;
+  const counts = inviteCounts(invitations);
+  const shareHref = lastCreated?.acceptUrl
+    ? `mailto:${encodeURIComponent(lastCreated.email)}?subject=${encodeURIComponent("ReadMates 초대 링크")}&body=${encodeURIComponent(
+        `${lastCreated.name}님, ReadMates 초대 링크입니다.\n\n${lastCreated.acceptUrl}`,
+      )}`
+    : null;
 
   const showAlert = (text: string) => setMessage({ kind: "alert", text });
   const showStatus = (text: string) => setMessage({ kind: "status", text });
@@ -201,24 +238,59 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
     <main>
       <section className="page-header-compact">
         <div className="container">
-          <Link to="/app/host" className="btn btn-quiet btn-sm" style={{ marginLeft: "-10px", marginBottom: "10px" }}>
-            ← 운영 대시보드
-          </Link>
           <div className="eyebrow">운영 · 멤버 초대</div>
           <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-            멤버 초대
+            초대 파이프라인
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            초대받은 이름과 이메일을 확인하고, 멤버가 Google 계정으로 초대를 수락합니다.
+            초대 생성, 대기 링크, 사용됨, 만료/취소 상태를 같은 원장에서 확인합니다.
           </p>
         </div>
       </section>
 
       <section style={{ padding: "36px 0 80px" }}>
         <div className="container">
+          <section
+            className="rm-document-panel"
+            aria-label="초대 상태 요약"
+            style={{ padding: "18px 22px", marginBottom: 24 }}
+          >
+            <div className="eyebrow" style={{ marginBottom: 12 }}>
+              초대 상태
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <InviteCount label="대기" value={counts.pending} helper="아직 수락 전" tone={counts.pending > 0 ? "accent" : "default"} />
+              <InviteCount label="사용됨" value={counts.used} helper="수락 완료" tone="ok" />
+              <InviteCount label="만료" value={counts.expired} helper="새 링크 필요" tone={counts.expired > 0 ? "warn" : "default"} />
+              <InviteCount label="취소" value={counts.revoked} helper="사용 불가" tone="default" />
+            </div>
+          </section>
+
           <form className="surface" onSubmit={submit} style={{ padding: 24, marginBottom: 24 }}>
+            <div className="row-between" style={{ gap: 18, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 18 }}>
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
+                  초대 생성
+                </div>
+                <h2 className="h3 editorial" style={{ margin: 0 }}>
+                  이름과 이메일로 새 링크 만들기
+                </h2>
+                <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
+                  생성된 링크는 바로 복사하거나 메일로 공유할 수 있습니다.
+                </p>
+              </div>
+              <button className="btn btn-primary" type="submit" disabled={disableCreate}>
+                {isCreating ? "만드는 중..." : "초대 링크 만들기"}
+              </button>
+            </div>
             <div className="row" style={{ gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
-              <div style={{ minWidth: 180 }}>
+              <div style={{ minWidth: 180, flex: "1 1 180px" }}>
                 <label className="label" htmlFor="invite-name">
                   이름
                 </label>
@@ -239,10 +311,9 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                   autoComplete="name"
                   required
                   aria-invalid={nameInvalid ? "true" : undefined}
-                  style={{ maxWidth: 240 }}
                 />
               </div>
-              <div style={{ minWidth: 240 }}>
+              <div style={{ minWidth: 240, flex: "1 1 240px" }}>
                 <label className="label" htmlFor="invite-email">
                   초대 이메일
                 </label>
@@ -255,7 +326,6 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                   placeholder="member@example.com"
                   autoComplete="email"
                   required
-                  style={{ maxWidth: 360 }}
                 />
               </div>
               <label className="row" style={{ gap: 8, alignItems: "center", minHeight: 42 }}>
@@ -266,12 +336,9 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                 />
                 <span className="small">수락하면 이번 세션에도 추가</span>
               </label>
-              <button className="btn btn-primary" type="submit" disabled={disableCreate}>
-                초대 링크 만들기
-              </button>
             </div>
             {lastCreated?.acceptUrl ? (
-              <div style={{ borderTop: "1px solid var(--line-soft)", marginTop: 18, paddingTop: 16 }}>
+              <div className="surface-quiet" style={{ marginTop: 18, padding: 18 }}>
                 <label className="label" htmlFor="created-invite-url">
                   생성된 초대 링크
                 </label>
@@ -289,9 +356,17 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                     disabled={copyPending || isCreating || hasPendingRow}
                     onClick={() => void copyLastCreated()}
                   >
-                    초대 링크 복사
+                    {copyPending ? "복사 중..." : "초대 링크 복사"}
                   </button>
+                  {shareHref ? (
+                    <a className="btn btn-quiet" href={shareHref}>
+                      메일로 공유
+                    </a>
+                  ) : null}
                 </div>
+                <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
+                  이 URL은 생성 직후에만 표시됩니다. 나중에 다시 공유해야 하면 새 링크를 발급하세요.
+                </p>
               </div>
             ) : null}
             {message ? (
@@ -306,8 +381,16 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
           </form>
 
           <div className="surface" style={{ padding: 24 }}>
-            <div className="eyebrow" style={{ marginBottom: 12 }}>
-              Invitation list
+            <div className="row-between" style={{ gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>
+                  초대 목록
+                </div>
+                <h2 className="h3 editorial" style={{ margin: 0 }}>
+                  대기 · 사용 · 만료 기록
+                </h2>
+              </div>
+              <span className="badge">{invitations.length}개</span>
             </div>
             <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
               {invitations.length === 0 ? (
@@ -316,10 +399,20 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                 </p>
               ) : (
                 invitations.map((invitation) => (
-                  <div key={invitation.invitationId} className="row-between" style={{ gap: 16, flexWrap: "wrap" }}>
+                  <div
+                    key={invitation.invitationId}
+                    className="rm-ledger-row"
+                    style={{ padding: "16px 18px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 16 }}
+                  >
                     <div>
-                      <div className="body" style={{ fontSize: 14, fontWeight: 500 }}>
-                        {invitation.name}
+                      <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        <div className="body" style={{ fontSize: 14, fontWeight: 600 }}>
+                          {invitation.name}
+                        </div>
+                        <span className={inviteStatusClass(invitation.effectiveStatus)}>
+                          {statusLabels[invitation.effectiveStatus]}
+                        </span>
+                        {invitation.applyToCurrentSession ? <span className="badge">이번 세션 포함</span> : null}
                       </div>
                       <div className="small" style={{ marginTop: 2 }}>
                         {invitation.email}
@@ -327,6 +420,14 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                       <div className="tiny">
                         {statusLabels[invitation.effectiveStatus]} · 만료 {formatDateOnlyLabel(invitation.expiresAt)}
                       </div>
+                      <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
+                        {statusDetailLabels[invitation.effectiveStatus]}
+                      </div>
+                      {invitation.effectiveStatus === "PENDING" ? (
+                        <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
+                          기존 링크는 목록에서 다시 복사할 수 없습니다. 새 공유가 필요하면 새 링크 발급을 사용하세요.
+                        </div>
+                      ) : null}
                     </div>
                     <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
                       {invitation.canRevoke ? (
@@ -348,7 +449,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                           disabled={isCreating || Boolean(pendingRows[invitation.invitationId])}
                           onClick={() => void reissue(invitation)}
                         >
-                          새 링크 발급
+                          {pendingRows[invitation.invitationId] === "reissue" ? "발급 중..." : "새 링크 발급"}
                         </button>
                       ) : null}
                     </div>
@@ -360,5 +461,40 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
         </div>
       </section>
     </main>
+  );
+}
+
+function InviteCount({
+  label,
+  value,
+  helper,
+  tone,
+}: {
+  label: string;
+  value: number;
+  helper: string;
+  tone: "ok" | "warn" | "accent" | "default";
+}) {
+  const className =
+    tone === "ok"
+      ? "badge badge-ok badge-dot"
+      : tone === "warn"
+        ? "badge badge-warn badge-dot"
+        : tone === "accent"
+          ? "badge badge-accent badge-dot"
+          : "badge";
+
+  return (
+    <div className="surface-quiet" style={{ padding: "12px 14px" }}>
+      <div className="row-between" style={{ gap: 8 }}>
+        <span className="body" style={{ fontSize: 13, fontWeight: 600 }}>
+          {label}
+        </span>
+        <span className={className}>{value}</span>
+      </div>
+      <div className="tiny" style={{ marginTop: 4 }}>
+        {helper}
+      </div>
+    </div>
   );
 }

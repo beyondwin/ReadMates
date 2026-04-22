@@ -1,6 +1,7 @@
 "use client";
 
 import { Link } from "@/src/app/router-link";
+import { appFeedbackHref, type ReadmatesReturnState } from "@/src/app/route-continuity";
 import type { ChangeEventHandler, RefObject } from "react";
 
 type FeedbackDocumentUploadStatus = {
@@ -13,6 +14,7 @@ type HostSessionFeedbackUploadProps = {
   feedbackDocument: FeedbackDocumentUploadStatus;
   inputRef: RefObject<HTMLInputElement | null>;
   emptyMessage: string;
+  previewState?: ReadmatesReturnState;
   onUploadFeedbackDocument: ChangeEventHandler<HTMLInputElement>;
 };
 
@@ -21,13 +23,20 @@ export function HostSessionFeedbackUpload({
   feedbackDocument,
   inputRef,
   emptyMessage,
+  previewState,
   onUploadFeedbackDocument,
 }: HostSessionFeedbackUploadProps) {
   if (!sessionId) {
     return (
-      <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-        {emptyMessage}
-      </p>
+      <div className="surface-quiet" style={{ padding: "18px" }}>
+        <span className="badge">등록 불가</span>
+        <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0" }}>
+          {emptyMessage}
+        </p>
+        <p className="tiny" style={{ margin: "6px 0 0", color: "var(--text-3)" }}>
+          피드백 문서는 세션이 서버에 저장된 뒤 해당 세션 ID에 연결됩니다.
+        </p>
+      </div>
     );
   }
 
@@ -40,6 +49,9 @@ export function HostSessionFeedbackUpload({
       <div className="surface-quiet" style={{ padding: "22px", borderStyle: "dashed" }}>
         <div className="row-between" style={{ alignItems: "flex-start", gap: "18px", flexWrap: "wrap" }}>
           <div>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              피드백 문서 상태
+            </div>
             <span className={feedbackDocument.uploaded ? "badge badge-ok badge-dot" : "badge"}>
               {feedbackDocument.uploaded ? "업로드 완료" : "미등록"}
             </span>
@@ -52,7 +64,7 @@ export function HostSessionFeedbackUpload({
           </div>
           <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
             {feedbackDocument.uploaded ? (
-              <Link className="btn btn-quiet btn-sm" to={`/app/feedback/${sessionId}`}>
+              <Link className="btn btn-quiet btn-sm" to={appFeedbackHref(sessionId)} state={previewState}>
                 미리보기
               </Link>
             ) : null}

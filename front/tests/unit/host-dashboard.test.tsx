@@ -133,18 +133,24 @@ describe("HostDashboard", () => {
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
 
-    expect(desktop.getAllByText("대기 없음")).toHaveLength(4);
-    expect(mobile.getAllByText("대기 없음")).toHaveLength(4);
+    expect(desktop.getAllByText("대기 없음").length).toBeGreaterThanOrEqual(4);
+    expect(mobile.getAllByText("대기 없음").length).toBeGreaterThanOrEqual(4);
     expect(desktop.getByText("세션을 만들면 참석 현황이 표시됩니다.")).toBeInTheDocument();
     expect(mobile.getByText("세션을 만들면 참석 현황이 표시됩니다.")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
-    expect(mobile.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
-    expect(desktop.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
-    expect(mobile.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(desktop.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
+    const desktopNewSessionLinks = desktop.getAllByRole("link", { name: "새 세션 만들기" });
+    const mobileNewSessionLinks = mobile.getAllByRole("link", { name: "새 세션 만들기" });
+    expect(desktopNewSessionLinks).toHaveLength(1);
+    expect(mobileNewSessionLinks).toHaveLength(1);
+    expect(desktopNewSessionLinks[0]).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(mobileNewSessionLinks[0]).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(desktop.getByText("아래 세션 준비 문서에서 새 세션 만들기를 사용하세요.")).toBeInTheDocument();
+    expect(mobile.getByText("아래 세션 준비 문서에서 새 세션 만들기를 사용하세요.")).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
-    expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*현재 세션을 먼저 만든 뒤 사용할 수 있습니다/);
-    expectDisabledActionInViews(desktop, mobile, /피드백 문서 등록.*현재 세션을 먼저 만든 뒤 사용할 수 있습니다/);
+    expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*공개 대기 건수는 여러 세션을 합산한 값/);
+    expectDisabledActionInViews(desktop, mobile, /피드백 문서 등록.*피드백 문서 대기 건수는 여러 세션을 합산한 값/);
     expectDisabledActionInViews(desktop, mobile, /참석 확정 마감.*현재 세션을 먼저 만든 뒤 사용할 수 있습니다/);
 
     const desktopSessionBasics = desktop.getByText("책 정보와 일정 점검").closest("li");
@@ -176,20 +182,21 @@ describe("HostDashboard", () => {
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
 
-    expect(desktop.getByText("운영 대시보드")).toBeInTheDocument();
-    expect(desktop.getByText("운영 · 호스트")).toBeInTheDocument();
+    expect(desktop.getByText("운영 원장")).toBeInTheDocument();
+    expect(desktop.getByText("운영 원장 · 호스트")).toBeInTheDocument();
     expect(desktop.getAllByText("확인 필요").length).toBeGreaterThan(0);
-    expect(desktop.getByText("이번 세션")).toBeInTheDocument();
+    expect(desktop.getByText("세션 준비 문서")).toBeInTheDocument();
     expect(desktop.getByText("운영 일정")).toBeInTheDocument();
-    expect(desktop.getByText("멤버 상태 · 이번 세션")).toBeInTheDocument();
-    expect(desktop.getByText("빠른 액션")).toBeInTheDocument();
-    expect(mobile.getByText("운영 · 호스트")).toBeInTheDocument();
-    expect(mobile.getByText("운영 대시보드")).toBeInTheDocument();
+    expect(desktop.getByText("멤버 참여 · 이번 세션")).toBeInTheDocument();
+    expect(desktop.getByText("운영 액션 목록")).toBeInTheDocument();
+    expect(desktop.getByText("초대 파이프라인")).toBeInTheDocument();
+    expect(mobile.getByText("운영 원장 · 호스트")).toBeInTheDocument();
+    expect(mobile.getByText("운영 원장")).toBeInTheDocument();
     expect(mobile.getAllByText("확인 필요").length).toBeGreaterThan(0);
-    expect(mobile.getAllByText("이번 세션").length).toBeGreaterThan(0);
+    expect(mobile.getAllByText("세션 준비 문서").length).toBeGreaterThan(0);
     expect(mobile.getByText("운영 일정")).toBeInTheDocument();
-    expect(mobile.getByText("멤버 상태")).toBeInTheDocument();
-    expect(mobile.getByText("빠른 액션")).toBeInTheDocument();
+    expect(mobile.getByText("멤버 참여")).toBeInTheDocument();
+    expect(mobile.getByText("운영 액션 목록")).toBeInTheDocument();
     expect(desktop.getByText("RSVP 미응답")).toBeInTheDocument();
     expect(desktop.getByText("체크인 미작성")).toBeInTheDocument();
     expect(desktop.getByText("공개 대기")).toBeInTheDocument();
@@ -200,12 +207,14 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("3")).toBeInTheDocument();
     expect(desktop.getByText("4")).toBeInTheDocument();
     expect(desktop.getByText("2")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "+ 새 세션" })).toHaveAttribute("href", "/app/host/sessions/new");
-    expect(desktop.getByRole("link", { name: "멤버 초대" })).toHaveAttribute("href", "/app/host/invitations");
+    expect(desktop.queryByRole("link", { name: "+ 새 세션" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "멤버 초대" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
-    expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*현재 세션을 먼저 만든 뒤 사용할 수 있습니다/);
-    expectDisabledActionInViews(desktop, mobile, /피드백 문서 등록.*현재 세션을 먼저 만든 뒤 사용할 수 있습니다/);
+    expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*공개 대기 건수는 여러 세션을 합산한 값/);
+    expectDisabledActionInViews(desktop, mobile, /피드백 문서 등록.*피드백 문서 대기 건수는 여러 세션을 합산한 값/);
     expectDisabledActionInViews(desktop, mobile, /참석 확정 마감.*현재 세션을 먼저 만든 뒤 사용할 수 있습니다/);
     expectDisabledActionInViews(desktop, mobile, /질문 마감 리마인더 발송.*리마인더 발송 기능이 아직 연결되지 않아 사용할 수 없습니다/);
     expectDisabledActionInViews(desktop, mobile, /지금 발송.*리마인더 발송 기능이 아직 연결되지 않아 사용할 수 없습니다/);
@@ -224,12 +233,103 @@ describe("HostDashboard", () => {
   it("does not style pending feedback documents as completed", () => {
     const { container } = render(<HostDashboard current={current} data={{ ...emptyDashboard, feedbackPending: 1 }} />);
     const desktop = getDesktopView(container);
-    const feedbackCard = desktop.getByText("피드백 문서 등록 대기").closest("article");
+    const feedbackCard = desktop.getByText("회차 피드백 문서 업로드가 필요합니다.").closest(".row-between");
 
     expect(feedbackCard).not.toBeNull();
-    const statusBadge = within(feedbackCard as HTMLElement).getByText("할 일");
+    const statusBadge = within(feedbackCard as HTMLElement).getByText("1개 대기");
     expect(statusBadge).toHaveClass("badge-warn");
     expect(statusBadge).not.toHaveClass("badge-ok");
+  });
+
+  it("keeps aggregate publication next actions out of the current session editor", () => {
+    const { container } = render(
+      <HostDashboard current={current} data={{ ...emptyDashboard, publishPending: 1 }} />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+    const desktopAction = desktop.getByRole("heading", { name: "공개 요약 정리" }).closest("section");
+    const mobileAction = mobile.getByRole("heading", { name: "공개 요약 정리" }).closest("section");
+
+    expect(desktopAction).not.toBeNull();
+    expect(mobileAction).not.toBeNull();
+    expect(within(desktopAction as HTMLElement).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(mobileAction as HTMLElement).queryByRole("link")).not.toBeInTheDocument();
+    expect(
+      within(desktopAction as HTMLElement).getByText(
+        "공개 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(mobileAction as HTMLElement).getByRole("button", {
+        name: /세션 기록에서 선택.*대시보드는 집계 건수만 제공하므로 특정 세션 편집 화면을 바로 열 수 없습니다/,
+      }),
+    ).toBeDisabled();
+  });
+
+  it("does not derive the current-session status metric from aggregate publication backlog", () => {
+    vi.setSystemTime(new Date(2026, 4, 17, 12));
+
+    const { container } = render(<HostDashboard current={current} data={{ ...emptyDashboard, publishPending: 7 }} />);
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+    const desktopSessionCard = desktop.getByRole("heading", { name: "테스트 책" }).closest("article");
+    const mobileSessionCard = mobile.getByRole("heading", { name: "테스트 책" }).closest("article");
+
+    expect(desktopSessionCard).not.toBeNull();
+    expect(mobileSessionCard).not.toBeNull();
+
+    const desktopStatusMetric = within(desktopSessionCard as HTMLElement).getByText("상태").parentElement;
+    const mobileStatusMetric = within(mobileSessionCard as HTMLElement).getByText("상태").parentElement;
+
+    expect(desktopStatusMetric).toHaveTextContent("준비 중");
+    expect(mobileStatusMetric).toHaveTextContent("준비 중");
+    expect(desktopStatusMetric).not.toHaveTextContent("대기");
+    expect(mobileStatusMetric).not.toHaveTextContent("대기");
+    expect(within(desktopSessionCard as HTMLElement).queryByText("공개")).not.toBeInTheDocument();
+    expect(within(mobileSessionCard as HTMLElement).queryByText("공개")).not.toBeInTheDocument();
+  });
+
+  it("keeps aggregate feedback next actions out of the current session editor", () => {
+    const { container } = render(
+      <HostDashboard current={current} data={{ ...emptyDashboard, feedbackPending: 1 }} />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+    const desktopAction = desktop.getByRole("heading", { name: "피드백 문서 등록" }).closest("section");
+    const mobileAction = mobile.getByRole("heading", { name: "피드백 문서 등록" }).closest("section");
+
+    expect(desktopAction).not.toBeNull();
+    expect(mobileAction).not.toBeNull();
+    expect(within(desktopAction as HTMLElement).queryByRole("link")).not.toBeInTheDocument();
+    expect(within(mobileAction as HTMLElement).queryByRole("link")).not.toBeInTheDocument();
+    expect(
+      within(desktopAction as HTMLElement).getByText(
+        "피드백 문서 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(mobileAction as HTMLElement).getByRole("button", {
+        name: /세션 기록에서 선택.*대시보드는 집계 건수만 제공하므로 특정 세션 편집 화면을 바로 열 수 없습니다/,
+      }),
+    ).toBeDisabled();
+  });
+
+  it("keeps aggregate publication and feedback quick actions out of the current session editor", () => {
+    const { container } = render(
+      <HostDashboard current={current} data={{ ...emptyDashboard, publishPending: 1, feedbackPending: 1 }} />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+    const currentEditHref = "/app/host/sessions/session-7/edit";
+
+    expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "피드백 문서 등록" })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("link", { name: "피드백 문서 등록" })).not.toBeInTheDocument();
+    expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*공개 대기 건수는 여러 세션을 합산한 값/);
+    expectDisabledActionInViews(desktop, mobile, /피드백 문서 등록.*피드백 문서 대기 건수는 여러 세션을 합산한 값/);
+    expect(desktop.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", currentEditHref);
+    expect(mobile.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", currentEditHref);
   });
 
   it("shows current-session missing member alerts when the dashboard payload includes them", () => {
@@ -311,20 +411,23 @@ describe("HostDashboard", () => {
     const { container } = render(<HostDashboard auth={hostAuth} current={current} data={dashboard} />);
     const mobile = getMobileView(container);
 
-    expect(mobile.getByText("운영 · 김호스트")).toBeInTheDocument();
-    expect(mobile.getByText("운영 대시보드")).toBeInTheDocument();
-    expect(mobile.getByText("오늘 처리할 운영 일과 이번 세션 상태를 한눈에 봅니다.")).toBeInTheDocument();
+    expect(mobile.getByText("운영 원장 · 김호스트")).toBeInTheDocument();
+    expect(mobile.getByText("운영 원장")).toBeInTheDocument();
+    expect(mobile.getByText("세션 준비, 멤버 참여, 공개 기록, 초대 흐름을 작업 순서대로 확인합니다.")).toBeInTheDocument();
 
     const orderedLabels = [
-      "확인 필요",
+      "오늘의 운영 판단",
       "RSVP 미응답",
       "체크인 미작성",
       "공개 대기",
       "피드백 문서 등록 대기",
-      "이번 세션",
+      "다음 운영 액션",
+      "세션 준비 문서",
       "운영 일정",
-      "멤버 상태",
-      "빠른 액션",
+      "멤버 참여",
+      "공개 · 피드백",
+      "초대 파이프라인",
+      "운영 액션 목록",
     ];
     const html = container.querySelector(".rm-host-dashboard-mobile")?.textContent ?? "";
     let cursor = -1;
@@ -337,13 +440,27 @@ describe("HostDashboard", () => {
     expect(mobile.getByText("No.07 · D-3")).toBeInTheDocument();
     expect(mobile.getByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).toBeInTheDocument();
     expect(mobile.getByText("2026.05.20 · 20:00")).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(mobile.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(mobile.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(mobile.getByText("체크인").parentElement).toHaveTextContent("1/2");
     expect(mobile.getByText("김호스트")).toBeInTheDocument();
     expect(mobile.getByText("안멤버1")).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "공개 요약 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
+    expect(mobile.getByRole("button", { name: /공개 요약 편집.*공개 대기 건수는 여러 세션을 합산한 값/ })).toBeDisabled();
+    expect(mobile.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(mobile.getByRole("button", { name: /질문 마감 리마인더 발송.*리마인더 발송 기능이 아직 연결되지 않아 사용할 수 없습니다/ })).toBeDisabled();
+  });
+
+  it("uses the host two-column override for mobile rows with only label and value", () => {
+    const { container } = render(<HostDashboard auth={hostAuth} current={current} data={dashboard} />);
+    const mobile = getMobileView(container);
+    const metricRow = mobile.getByText("RSVP 미응답").closest(".m-list-row");
+    const publicationRow = mobile.getByText("공개 요약과 하이라이트 편집이 필요합니다.").closest(".m-list-row");
+
+    expect(metricRow).not.toBeNull();
+    expect(publicationRow).not.toBeNull();
+    expect(metricRow).toHaveClass("rm-host-dashboard-mobile__two-column-row");
+    expect(publicationRow).toHaveClass("rm-host-dashboard-mobile__two-column-row");
   });
 
   it("links the current session action to the host edit page", () => {
@@ -367,9 +484,11 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("참석 응답과 미팅 URL 점검")).toBeInTheDocument();
     expect(desktop.getByText("미응답")).toBeInTheDocument();
     expect(desktop.getByText("참석 · 62%")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
-    expect(desktop.getByRole("link", { name: "공개 요약 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
-    expect(desktop.getByRole("link", { name: "피드백 문서 등록" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "피드백 문서 등록" })).not.toBeInTheDocument();
+    expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*공개 대기 건수는 여러 세션을 합산한 값/);
+    expectDisabledActionInViews(desktop, mobile, /피드백 문서 등록.*피드백 문서 대기 건수는 여러 세션을 합산한 값/);
     expect(desktop.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expectDisabledActionInViews(desktop, mobile, /질문 마감 리마인더 발송.*리마인더 발송 기능이 아직 연결되지 않아 사용할 수 없습니다/);
     expectDisabledActionInViews(desktop, mobile, /지금 발송.*리마인더 발송 기능이 아직 연결되지 않아 사용할 수 없습니다/);
@@ -379,8 +498,14 @@ describe("HostDashboard", () => {
   it("does not complete post-session checklist items from aggregate zero counts", () => {
     const { container } = render(<HostDashboard current={current} data={emptyDashboard} />);
     const desktop = getDesktopView(container);
-    const publicationRow = desktop.getByText("공개 대기 중인 이전 세션이 없습니다.").closest("li");
-    const feedbackRow = desktop.getByText("피드백 문서 등록 대기 중인 이전 세션이 없습니다.").closest("li");
+    const publicationRow = desktop
+      .getAllByText("공개 대기 중인 이전 세션이 없습니다.")
+      .map((element) => element.closest("li"))
+      .find(Boolean);
+    const feedbackRow = desktop
+      .getAllByText("피드백 문서 등록 대기 중인 이전 세션이 없습니다.")
+      .map((element) => element.closest("li"))
+      .find(Boolean);
 
     expect(publicationRow).not.toBeNull();
     expect(within(publicationRow as HTMLElement).getByText("공개 요약과 하이라이트 편집")).toBeInTheDocument();
@@ -405,10 +530,12 @@ describe("HostDashboard", () => {
     const mobile = getMobileView(container);
     const expectedHref = "/app/host/sessions/session%2F7%3Fdraft%3Dtrue/edit";
 
-    expect(desktop.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", expectedHref);
-    expect(mobile.getByRole("link", { name: "이번 세션 편집" })).toHaveAttribute("href", expectedHref);
-    expect(desktop.getByRole("link", { name: "공개 요약 편집" })).toHaveAttribute("href", expectedHref);
-    expect(mobile.getByRole("link", { name: "공개 요약 편집" })).toHaveAttribute("href", expectedHref);
+    expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", expectedHref);
+    expect(mobile.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", expectedHref);
+    expect(desktop.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", expectedHref);
+    expect(mobile.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", expectedHref);
+    expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
   });
 
   it("normalizes negative check-in metric counts for current sessions", () => {

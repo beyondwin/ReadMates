@@ -153,7 +153,29 @@ describe("HostMembersPage", () => {
     expect(screen.getByRole("tab", { name: "초대" })).toBeInTheDocument();
     expect(screen.getByText("안멤버1")).toBeInTheDocument();
     expect(screen.getByText("active@example.com · 정식 멤버 · 이번 세션 참여 중")).toBeInTheDocument();
+    expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("둘러보기");
+    expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("활성");
+    expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("이번 세션");
+    expect(within(screen.getByText("안멤버1").closest("article") as HTMLElement).getByText("이번 세션 참여")).toBeInTheDocument();
+    expect(within(screen.getByText("새 멤버").closest("article") as HTMLElement).getByText("이번 세션 미포함")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members", expect.objectContaining({ cache: "no-store" }));
+  });
+
+  it("labels viewer members as browsing members instead of approval pending", async () => {
+    const user = userEvent.setup();
+    renderHostMembersPage();
+
+    const summary = await screen.findByLabelText("멤버 운영 요약");
+    expect(summary).toHaveTextContent("둘러보기");
+    expect(summary).toHaveTextContent("둘러보기 멤버");
+    expect(summary).not.toHaveTextContent("승인 대기");
+
+    await user.click(screen.getByRole("tab", { name: "둘러보기 멤버" }));
+    const viewerRow = within(screen.getByText("둘러보기 요청자").closest("article") as HTMLElement);
+
+    expect(viewerRow.getByText("둘러보기")).toBeInTheDocument();
+    expect(viewerRow.getByText("viewer@example.com · 둘러보기 멤버 · 요청일 2026.04.20")).toBeInTheDocument();
+    expect(screen.queryByText("승인 대기")).not.toBeInTheDocument();
   });
 
   it("renders viewer registration dates with app date formatting", async () => {

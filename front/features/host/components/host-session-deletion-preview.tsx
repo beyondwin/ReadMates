@@ -133,6 +133,12 @@ export function HostSessionDeletionPreviewDialog({
 
         {preview ? <DeletionPreviewCounts preview={preview} /> : null}
 
+        {preview && !preview.canDelete ? (
+          <p className="small" role="alert" style={{ color: "var(--danger)", margin: "18px 0 0" }}>
+            닫히거나 공개된 세션은 삭제할 수 없습니다. 기록 보존을 위해 위험 작업이 잠겨 있습니다.
+          </p>
+        ) : null}
+
         <div className="actions" style={{ marginTop: "22px", justifyContent: "flex-end" }}>
           <button
             ref={cancelButtonRef}
@@ -147,7 +153,7 @@ export function HostSessionDeletionPreviewDialog({
             ref={confirmButtonRef}
             className="btn btn-primary btn-sm"
             type="button"
-            disabled={!preview || previewLoading || submitting}
+            disabled={!preview || !preview.canDelete || previewLoading || submitting}
             onClick={onConfirm}
             style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
           >
