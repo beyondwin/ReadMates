@@ -193,7 +193,7 @@ function hostSessionEditorLoaderForTest() {
   return hostSessionEditorLoader({
     params: { sessionId: "session-7" },
     request: new Request("https://readmates.test/app/host/sessions/session-7/edit"),
-  } as Parameters<typeof hostSessionEditorLoader>[0]);
+  } as unknown as Parameters<typeof hostSessionEditorLoader>[0]);
 }
 
 describe("HostDashboard", () => {
