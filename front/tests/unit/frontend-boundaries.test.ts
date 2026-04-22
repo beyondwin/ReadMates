@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const sourceRoots = ["src", "features", "shared"];
 const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
-const featuresWithUiPublicSurface = new Set(["archive", "auth", "current-session", "feedback", "public"]);
+const featuresWithUiPublicSurface = collectFeaturesWithUiPublicSurface();
 const removedReadmatesApiCompatibilityPath = ["shared", "api", "readmates"].join("/");
 
 type BoundaryRuleId =
@@ -114,6 +114,17 @@ function collectSourceFiles(directory: string): SourceFile[] {
 
 function collectAllSourceFiles() {
   return sourceRoots.flatMap((root) => collectSourceFiles(path.join(projectRoot, root)));
+}
+
+function collectFeaturesWithUiPublicSurface() {
+  const featuresRoot = path.join(projectRoot, "features");
+  const entries = fs.readdirSync(featuresRoot, { withFileTypes: true });
+
+  return new Set(
+    entries
+      .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(featuresRoot, entry.name, "ui")))
+      .map((entry) => entry.name),
+  );
 }
 
 function parseStaticImportSpecifiers(source: string) {
