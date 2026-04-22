@@ -158,7 +158,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
     }
 
     setQuestionValidationMessage("");
-    setQuestionInputs((current) => [...current, createAddedQuestionInput(current.length)]);
+    setQuestionInputs((current) => [...current, createAddedQuestionInput(current.length, Date.now())]);
   };
 
   const removeQuestionInput = (index: number) => {

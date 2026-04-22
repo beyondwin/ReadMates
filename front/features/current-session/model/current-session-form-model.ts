@@ -2,9 +2,9 @@ export const MIN_QUESTION_INPUT_COUNT = 2;
 export const MAX_QUESTION_INPUT_COUNT = 5;
 
 export const QUESTION_FORM_VALIDATION_MESSAGES = {
-  maxQuestionCount: "최대 5개까지 작성할 수 있어요.",
-  minQuestionInputCount: "질문 입력칸은 최소 2개가 필요해요.",
-  minQuestionPayloadCount: "질문은 최소 2개 작성해 주세요.",
+  maxQuestionCount: `최대 ${MAX_QUESTION_INPUT_COUNT}개까지 작성할 수 있어요.`,
+  minQuestionInputCount: `질문 입력칸은 최소 ${MIN_QUESTION_INPUT_COUNT}개가 필요해요.`,
+  minQuestionPayloadCount: `질문은 최소 ${MIN_QUESTION_INPUT_COUNT}개 작성해 주세요.`,
 } as const;
 
 export type CurrentSessionQuestionRecord = {
@@ -51,7 +51,7 @@ export function getAddQuestionValidationMessage(inputs: readonly CurrentSessionQ
   return canAddQuestionInput(inputs) ? "" : QUESTION_FORM_VALIDATION_MESSAGES.maxQuestionCount;
 }
 
-export function createAddedQuestionInput(currentLength: number, createdAt = Date.now()): CurrentSessionQuestionInput {
+export function createAddedQuestionInput(currentLength: number, createdAt: number): CurrentSessionQuestionInput {
   return { clientId: `added-${createdAt}-${currentLength}`, text: "" };
 }
 

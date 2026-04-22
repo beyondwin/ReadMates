@@ -6,6 +6,8 @@ import {
   getAddQuestionValidationMessage,
   getQuestionPayloadValidationMessage,
   getRemoveQuestionValidationMessage,
+  MAX_QUESTION_INPUT_COUNT,
+  MIN_QUESTION_INPUT_COUNT,
   normalizeInitialQuestionInputs,
 } from "@/features/current-session/model/current-session-form-model";
 import {
@@ -18,27 +20,28 @@ import {
 } from "@/features/current-session/model/current-session-view-model";
 
 describe("current session form model", () => {
-  it("normalizes saved questions by priority, caps to five, and pads to two inputs", () => {
-    expect(
-      normalizeInitialQuestionInputs([
-        { priority: 3, text: "세 번째 질문" },
-        { priority: 1, text: "첫 번째 질문" },
-        { priority: 2, text: "두 번째 질문" },
-        { priority: 6, text: "여섯 번째 질문" },
-        { priority: 5, text: "다섯 번째 질문" },
-        { priority: 4, text: "네 번째 질문" },
-      ]),
-    ).toEqual([
-      { clientId: "saved-1", text: "첫 번째 질문" },
-      { clientId: "saved-2", text: "두 번째 질문" },
-      { clientId: "saved-3", text: "세 번째 질문" },
-      { clientId: "saved-4", text: "네 번째 질문" },
-      { clientId: "saved-5", text: "다섯 번째 질문" },
-    ]);
+  it("normalizes saved questions by priority, caps to max inputs, and pads to min inputs", () => {
+    const savedQuestions = Array.from({ length: MAX_QUESTION_INPUT_COUNT + 1 }, (_, index) => ({
+      priority: index + 1,
+      text: `${index + 1}번째 질문`,
+    })).reverse();
 
-    expect(normalizeInitialQuestionInputs([{ priority: 4, text: "저장된 질문" }])).toEqual([
-      { clientId: "saved-4", text: "저장된 질문" },
-      { clientId: "empty-2", text: "" },
+    expect(
+      normalizeInitialQuestionInputs(savedQuestions),
+    ).toEqual(
+      Array.from({ length: MAX_QUESTION_INPUT_COUNT }, (_, index) => ({
+        clientId: `saved-${index + 1}`,
+        text: `${index + 1}번째 질문`,
+      })),
+    );
+
+    const savedPriority = Math.max(1, MAX_QUESTION_INPUT_COUNT - 1);
+    expect(normalizeInitialQuestionInputs([{ priority: savedPriority, text: "저장된 질문" }])).toEqual([
+      { clientId: `saved-${savedPriority}`, text: "저장된 질문" },
+      ...Array.from({ length: MIN_QUESTION_INPUT_COUNT - 1 }, (_, index) => ({
+        clientId: `empty-${index + 2}`,
+        text: "",
+      })),
     ]);
   });
 
@@ -62,23 +65,30 @@ describe("current session form model", () => {
 
     expect(payload).toEqual([{ text: "첫 질문" }, { text: "둘째 질문" }]);
     expect(getQuestionPayloadValidationMessage(payload)).toBe("");
-    expect(getQuestionPayloadValidationMessage([{ text: "질문 하나" }])).toBe("질문은 최소 2개 작성해 주세요.");
+    const tooFewQuestions = Array.from({ length: MIN_QUESTION_INPUT_COUNT - 1 }, (_, index) => ({
+      text: `질문 ${index + 1}`,
+    }));
+    expect(getQuestionPayloadValidationMessage(tooFewQuestions)).toBe(
+      `질문은 최소 ${MIN_QUESTION_INPUT_COUNT}개 작성해 주세요.`,
+    );
   });
 
   it("returns min and max question input validation messages", () => {
-    const minimumInputs = [
-      { clientId: "q1", text: "첫 질문" },
-      { clientId: "q2", text: "둘째 질문" },
-    ];
-    const maximumInputs = [
-      ...minimumInputs,
-      { clientId: "q3", text: "셋째 질문" },
-      { clientId: "q4", text: "넷째 질문" },
-      { clientId: "q5", text: "다섯째 질문" },
-    ];
+    const minimumInputs = Array.from({ length: MIN_QUESTION_INPUT_COUNT }, (_, index) => ({
+      clientId: `q${index + 1}`,
+      text: `질문 ${index + 1}`,
+    }));
+    const maximumInputs = Array.from({ length: MAX_QUESTION_INPUT_COUNT }, (_, index) => ({
+      clientId: `q${index + 1}`,
+      text: `질문 ${index + 1}`,
+    }));
 
-    expect(getRemoveQuestionValidationMessage(minimumInputs)).toBe("질문 입력칸은 최소 2개가 필요해요.");
-    expect(getAddQuestionValidationMessage(maximumInputs)).toBe("최대 5개까지 작성할 수 있어요.");
+    expect(getRemoveQuestionValidationMessage(minimumInputs)).toBe(
+      `질문 입력칸은 최소 ${MIN_QUESTION_INPUT_COUNT}개가 필요해요.`,
+    );
+    expect(getAddQuestionValidationMessage(maximumInputs)).toBe(
+      `최대 ${MAX_QUESTION_INPUT_COUNT}개까지 작성할 수 있어요.`,
+    );
   });
 });
 
