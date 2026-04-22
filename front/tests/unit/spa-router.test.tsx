@@ -76,6 +76,20 @@ function expectNoArchiveChildDataFetch(fetchMock: ReturnType<typeof vi.fn>) {
   expect(childDataCalls).toEqual([]);
 }
 
+function isMemberHomeChildDataEndpoint(url: string) {
+  return (
+    url === "/api/bff/api/sessions/current" ||
+    url === "/api/bff/api/notes/feed" ||
+    url === "/api/bff/api/app/me"
+  );
+}
+
+function expectNoMemberHomeChildDataFetch(fetchMock: ReturnType<typeof vi.fn>) {
+  const childDataCalls = fetchMock.mock.calls.map(([input]) => input.toString()).filter(isMemberHomeChildDataEndpoint);
+
+  expect(childDataCalls).toEqual([]);
+}
+
 describe("SPA router", () => {
   it("renders the login route", () => {
     const router = createMemoryRouter(routes, { initialEntries: ["/login"] });
@@ -291,6 +305,54 @@ describe("SPA router", () => {
 
     expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
     expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
+  });
+
+  it("redirects anonymous member home navigation before child data fetches", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(anonymousAuth));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expectNoMemberHomeChildDataFetch(fetchMock);
+  });
+
+  it("blocks inactive member home navigation before child data fetches", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(inactiveAuth));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expectNoMemberHomeChildDataFetch(fetchMock);
   });
 
   it("renders the archive session list when viewer feedback documents are forbidden", async () => {
