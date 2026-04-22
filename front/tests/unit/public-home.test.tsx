@@ -87,6 +87,34 @@ describe("PublicHome", () => {
     expect(container.innerHTML).not.toContain("session-13");
   });
 
+  it("encodes public session links containing spaces and slashes", () => {
+    const { container } = render(
+      <PublicHome
+        data={{
+          ...publicClubFixture,
+          recentSessions: [
+            {
+              ...publicClubFixture.recentSessions[0],
+              sessionId: "session 6/slash",
+            },
+            {
+              ...publicClubFixture.recentSessions[1],
+              sessionId: "session 5/slash",
+            },
+          ],
+        }}
+      />,
+    );
+    const hrefs = Array.from(container.querySelectorAll("a")).map((link) => link.getAttribute("href"));
+
+    expect(screen.getByRole("link", { name: "최근 공개 기록 가난한 찰리의 연감 보기" })).toHaveAttribute(
+      "href",
+      "/sessions/session%206%2Fslash",
+    );
+    expect(hrefs).toContain("/sessions/session%205%2Fslash");
+    expect(hrefs).not.toContain("/sessions/session 6/slash");
+  });
+
   it("keeps the mobile hero peek before the latest-record feature in source order", () => {
     const { container } = render(<PublicHome data={publicClubFixture} />);
 
