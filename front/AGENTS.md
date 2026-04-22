@@ -2,6 +2,20 @@
 
 This package is a Vite React SPA with Cloudflare Pages Functions for BFF and OAuth proxy routes.
 
+## Implementation Architecture
+
+Frontend code should follow the route-first boundary described in `../docs/development/architecture.md`.
+
+- Route modules own loader/action behavior, API calls, model composition, route error/loading state, and UI prop assembly.
+- Feature code should be split by responsibility into `api`, `model`, `route`, and `ui` when a feature is touched.
+- `api` modules own feature-specific BFF request/response contracts.
+- `model` modules are pure calculation and mapping code. They must not import React, React Router, or API clients.
+- `ui` modules render from props and callbacks. They must not call `fetch`, import `shared/api`, import feature API modules, or import route modules.
+- New code must not depend on the removed `shared/api/readmates` compatibility module. Use feature-owned API modules or `shared/api` primitives.
+- Keep `src/app -> src/pages -> features -> shared` as the intended dependency direction.
+
+Known legacy exceptions are documented in `../docs/development/architecture.md`. Do not add new exceptions for route modules, feature boundaries, or shared UI imports without updating the architecture document and boundary tests.
+
 ## Design Context
 
 ### Users

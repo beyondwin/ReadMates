@@ -8,12 +8,17 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | --- | --- |
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트와 공개 릴리즈 점검 | [test-guide.md](test-guide.md) |
-| 제품/기술 구조 | [architecture.md](architecture.md) |
+| 제품/기술 구조와 frontend route-first 경계 | [architecture.md](architecture.md) |
 | 배포 문서 허브 | [../deploy/README.md](../deploy/README.md) |
 | Cloudflare Pages 배포 | [../deploy/cloudflare-pages.md](../deploy/cloudflare-pages.md) |
 | OCI backend 배포 | [../deploy/oci-backend.md](../deploy/oci-backend.md) |
 | 공개 저장소 보안 | [../deploy/security-public-repo.md](../deploy/security-public-repo.md) |
 | Release helper scripts | [../../scripts/README.md](../../scripts/README.md) |
+
+## 주요 구조 문서
+
+- 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
+- 프런트엔드 작업자는 [../../front/AGENTS.md](../../front/AGENTS.md)의 제품/디자인 컨텍스트와 구현 경계도 함께 확인합니다.
 
 ## 문서 경계
 
