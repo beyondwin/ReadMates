@@ -597,7 +597,7 @@ git commit -m "refactor: move current session ui behind feature boundary"
 - Create: `front/tests/unit/host-session-editor-model.test.ts`
 - Modify existing host tests
 
-- [ ] **Step 1: Extract host dashboard derived state**
+- [x] **Step 1: Extract host dashboard derived state**
 
 Move these calculations out of `host-dashboard.tsx`:
 
@@ -609,11 +609,11 @@ Move these calculations out of `host-dashboard.tsx`:
 - next operation action
 - checklist rows
 
-- [ ] **Step 2: Add host dashboard model tests**
+- [x] **Step 2: Add host dashboard model tests**
 
 Cover no-session, upcoming session, D-day, overdue session, pending publication, pending feedback, and missing member cases.
 
-- [ ] **Step 3: Extract host session editor model**
+- [x] **Step 3: Extract host session editor model**
 
 Move these editor-only calculations out of `host-session-editor.tsx` and `host-session-schedule.ts`:
 
@@ -623,11 +623,11 @@ Move these editor-only calculations out of `host-session-editor.tsx` and `host-s
 - feedback/publication state helpers
 - destructive action availability
 
-- [ ] **Step 4: Add editor model tests**
+- [x] **Step 4: Add editor model tests**
 
 Cover new session defaults, edit-session hydration, optional field trimming, deadline defaults, and invalid schedule handling.
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- host-dashboard-model.test.ts host-session-editor-model.test.ts host-dashboard.test.tsx host-session-editor.test.tsx frontend-boundaries.test.ts
@@ -636,7 +636,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 7**
+- [x] **Step 6: Commit Task 7**
 
 ```bash
 git add front/features/host front/tests/unit/host-dashboard-model.test.ts front/tests/unit/host-session-editor-model.test.ts front/tests/unit/host-dashboard.test.tsx front/tests/unit/host-session-editor.test.tsx
