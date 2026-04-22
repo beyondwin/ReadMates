@@ -1,11 +1,19 @@
 import userEvent from "@testing-library/user-event";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostDashboard from "@/features/host/components/host-dashboard";
-import type { AuthMeResponse, CurrentSessionResponse, HostDashboardResponse } from "@/shared/api/readmates";
+import HostDashboard, { type HostDashboardActions } from "@/features/host/components/host-dashboard";
+import {
+  hostDashboardLoader,
+  hostInvitationsLoader,
+  hostMembersLoader,
+  hostSessionEditorLoader,
+} from "@/features/host";
+import type { CurrentSessionResponse, HostDashboardResponse } from "@/features/host/api/host-contracts";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -35,6 +43,29 @@ const hostAuth: AuthMeResponse = {
   role: "HOST",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
+};
+
+const memberAuth: AuthMeResponse = {
+  ...hostAuth,
+  userId: "user-member",
+  membershipId: "membership-member",
+  email: "member@example.com",
+  displayName: "이멤버",
+  shortName: "멤",
+  role: "MEMBER",
+};
+
+const anonymousAuth: AuthMeResponse = {
+  authenticated: false,
+  userId: null,
+  membershipId: null,
+  clubId: null,
+  email: null,
+  displayName: null,
+  shortName: null,
+  role: null,
+  membershipStatus: null,
+  approvalState: "ANONYMOUS",
 };
 
 const current: CurrentSessionResponse = {
@@ -106,6 +137,19 @@ const current: CurrentSessionResponse = {
   },
 };
 
+const noopHostDashboardActions = {
+  updateCurrentSessionParticipation: vi.fn(async () => undefined),
+} satisfies HostDashboardActions;
+
+type HostDashboardProps = Parameters<typeof HostDashboard>[0];
+
+function HostDashboardForTest({
+  actions,
+  ...props
+}: Omit<HostDashboardProps, "actions"> & { actions?: HostDashboardActions }) {
+  return <HostDashboard {...props} actions={actions ?? noopHostDashboardActions} />;
+}
+
 function getDesktopView(container: HTMLElement) {
   const desktop = container.querySelector(".rm-host-dashboard-desktop");
   expect(desktop).not.toBeNull();
@@ -127,9 +171,64 @@ function expectDisabledActionInViews(
   expect(mobile.getByRole("button", { name })).toBeDisabled();
 }
 
+function authResponse(auth: AuthMeResponse) {
+  return new Response(JSON.stringify(auth), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function expectLoaderRedirect(runLoader: () => Promise<unknown>, location: string) {
+  try {
+    await runLoader();
+    throw new Error("Expected loader to redirect.");
+  } catch (error) {
+    expect(error).toBeInstanceOf(Response);
+    expect((error as Response).status).toBe(302);
+    expect((error as Response).headers.get("Location")).toBe(location);
+  }
+}
+
+function hostSessionEditorLoaderForTest() {
+  return hostSessionEditorLoader({
+    params: { sessionId: "session-7" },
+    request: new Request("https://readmates.test/app/host/sessions/session-7/edit"),
+  } as unknown as Parameters<typeof hostSessionEditorLoader>[0]);
+}
+
 describe("HostDashboard", () => {
+  it.each([
+    ["dashboard", () => hostDashboardLoader()],
+    ["members", () => hostMembersLoader()],
+    ["invitations", () => hostInvitationsLoader()],
+    ["session editor", hostSessionEditorLoaderForTest],
+  ])("redirects anonymous users before calling %s host endpoints", async (_name, runLoader) => {
+    const fetchMock = vi.fn().mockResolvedValue(authResponse(anonymousAuth));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expectLoaderRedirect(runLoader, "/login");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/bff/api/host/"))).toBe(false);
+  });
+
+  it.each([
+    ["dashboard", () => hostDashboardLoader()],
+    ["members", () => hostMembersLoader()],
+    ["invitations", () => hostInvitationsLoader()],
+    ["session editor", hostSessionEditorLoaderForTest],
+  ])("redirects non-host users before calling %s host endpoints", async (_name, runLoader) => {
+    const fetchMock = vi.fn().mockResolvedValue(authResponse(memberAuth));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expectLoaderRedirect(runLoader, "/app");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/bff/api/host/"))).toBe(false);
+  });
+
   it("shows no-session fallbacks when there is no current session and no pending work", () => {
-    const { container } = render(<HostDashboard current={{ currentSession: null }} data={emptyDashboard} />);
+    const { container } = render(<HostDashboardForTest current={{ currentSession: null }} data={emptyDashboard} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
 
@@ -163,7 +262,7 @@ describe("HostDashboard", () => {
 
   it("shows a member-status empty state when the current session has no attendees", () => {
     const { container } = render(
-      <HostDashboard
+      <HostDashboardForTest
         current={{
           currentSession: current.currentSession ? { ...current.currentSession, attendees: [] } : null,
         }}
@@ -178,7 +277,7 @@ describe("HostDashboard", () => {
   });
 
   it("renders API dashboard counts and the new session action", () => {
-    const { container } = render(<HostDashboard data={dashboard} />);
+    const { container } = render(<HostDashboardForTest data={dashboard} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
 
@@ -231,7 +330,7 @@ describe("HostDashboard", () => {
   });
 
   it("does not style pending feedback documents as completed", () => {
-    const { container } = render(<HostDashboard current={current} data={{ ...emptyDashboard, feedbackPending: 1 }} />);
+    const { container } = render(<HostDashboardForTest current={current} data={{ ...emptyDashboard, feedbackPending: 1 }} />);
     const desktop = getDesktopView(container);
     const feedbackCard = desktop.getByText("회차 피드백 문서 업로드가 필요합니다.").closest(".row-between");
 
@@ -243,7 +342,7 @@ describe("HostDashboard", () => {
 
   it("keeps aggregate publication next actions out of the current session editor", () => {
     const { container } = render(
-      <HostDashboard current={current} data={{ ...emptyDashboard, publishPending: 1 }} />,
+      <HostDashboardForTest current={current} data={{ ...emptyDashboard, publishPending: 1 }} />,
     );
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
@@ -269,7 +368,7 @@ describe("HostDashboard", () => {
   it("does not derive the current-session status metric from aggregate publication backlog", () => {
     vi.setSystemTime(new Date(2026, 4, 17, 12));
 
-    const { container } = render(<HostDashboard current={current} data={{ ...emptyDashboard, publishPending: 7 }} />);
+    const { container } = render(<HostDashboardForTest current={current} data={{ ...emptyDashboard, publishPending: 7 }} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
     const desktopSessionCard = desktop.getByRole("heading", { name: "테스트 책" }).closest("article");
@@ -291,7 +390,7 @@ describe("HostDashboard", () => {
 
   it("keeps aggregate feedback next actions out of the current session editor", () => {
     const { container } = render(
-      <HostDashboard current={current} data={{ ...emptyDashboard, feedbackPending: 1 }} />,
+      <HostDashboardForTest current={current} data={{ ...emptyDashboard, feedbackPending: 1 }} />,
     );
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
@@ -316,7 +415,7 @@ describe("HostDashboard", () => {
 
   it("keeps aggregate publication and feedback quick actions out of the current session editor", () => {
     const { container } = render(
-      <HostDashboard current={current} data={{ ...emptyDashboard, publishPending: 1, feedbackPending: 1 }} />,
+      <HostDashboardForTest current={current} data={{ ...emptyDashboard, publishPending: 1, feedbackPending: 1 }} />,
     );
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
@@ -334,7 +433,7 @@ describe("HostDashboard", () => {
 
   it("shows current-session missing member alerts when the dashboard payload includes them", () => {
     const { container } = render(
-      <HostDashboard
+      <HostDashboardForTest
         current={current}
         data={{
           ...dashboard,
@@ -357,58 +456,56 @@ describe("HostDashboard", () => {
 
   it("adds a missing member to the current session from the dashboard alert", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetchMock);
+    const actions = {
+      updateCurrentSessionParticipation: vi.fn(async () => undefined),
+    } satisfies HostDashboardActions;
     const { container } = render(
-      <HostDashboard
+      <HostDashboardForTest
         current={current}
         data={{
           ...dashboard,
           currentSessionMissingMemberCount: 1,
           currentSessionMissingMembers: [{ membershipId: "membership-new", displayName: "새 멤버", email: "new@example.com" }],
         }}
+        actions={actions}
       />,
     );
     const desktop = getDesktopView(container);
 
     await user.click(desktop.getByRole("button", { name: "이번 세션에 추가" }));
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/host/members/membership-new/current-session/add",
-      expect.objectContaining({ method: "POST" }),
-    );
+    expect(actions.updateCurrentSessionParticipation).toHaveBeenCalledWith("membership-new", "add");
     await waitFor(() => expect(screen.queryByText("새 멤버 1명이 현재 세션에 아직 없습니다.")).not.toBeInTheDocument());
   });
 
   it("marks a missing member for next session from the dashboard alert", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal("fetch", fetchMock);
+    const actions = {
+      updateCurrentSessionParticipation: vi.fn(async () => undefined),
+    } satisfies HostDashboardActions;
     const { container } = render(
-      <HostDashboard
+      <HostDashboardForTest
         current={current}
         data={{
           ...dashboard,
           currentSessionMissingMemberCount: 1,
           currentSessionMissingMembers: [{ membershipId: "membership-new", displayName: "새 멤버", email: "new@example.com" }],
         }}
+        actions={actions}
       />,
     );
     const desktop = getDesktopView(container);
 
     await user.click(desktop.getByRole("button", { name: "다음 세션부터" }));
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/host/members/membership-new/current-session/remove",
-      expect.objectContaining({ method: "POST" }),
-    );
+    expect(actions.updateCurrentSessionParticipation).toHaveBeenCalledWith("membership-new", "remove");
     await waitFor(() => expect(screen.queryByText("새 멤버 1명이 현재 세션에 아직 없습니다.")).not.toBeInTheDocument());
   });
 
   it("renders the mobile host operations flow in the baseline order", () => {
     vi.setSystemTime(new Date(2026, 4, 17, 12));
 
-    const { container } = render(<HostDashboard auth={hostAuth} current={current} data={dashboard} />);
+    const { container } = render(<HostDashboardForTest auth={hostAuth} current={current} data={dashboard} />);
     const mobile = getMobileView(container);
 
     expect(mobile.getByText("운영 원장 · 김호스트")).toBeInTheDocument();
@@ -452,7 +549,7 @@ describe("HostDashboard", () => {
   });
 
   it("uses the host two-column override for mobile rows with only label and value", () => {
-    const { container } = render(<HostDashboard auth={hostAuth} current={current} data={dashboard} />);
+    const { container } = render(<HostDashboardForTest auth={hostAuth} current={current} data={dashboard} />);
     const mobile = getMobileView(container);
     const metricRow = mobile.getByText("RSVP 미응답").closest(".m-list-row");
     const publicationRow = mobile.getByText("공개 요약과 하이라이트 편집이 필요합니다.").closest(".m-list-row");
@@ -466,7 +563,7 @@ describe("HostDashboard", () => {
   it("links the current session action to the host edit page", () => {
     vi.setSystemTime(new Date(2026, 4, 17, 12));
 
-    const { container } = render(<HostDashboard current={current} data={dashboard} />);
+    const { container } = render(<HostDashboardForTest current={current} data={dashboard} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
 
@@ -496,7 +593,7 @@ describe("HostDashboard", () => {
   });
 
   it("does not complete post-session checklist items from aggregate zero counts", () => {
-    const { container } = render(<HostDashboard current={current} data={emptyDashboard} />);
+    const { container } = render(<HostDashboardForTest current={current} data={emptyDashboard} />);
     const desktop = getDesktopView(container);
     const publicationRow = desktop
       .getAllByText("공개 대기 중인 이전 세션이 없습니다.")
@@ -525,7 +622,7 @@ describe("HostDashboard", () => {
       },
     };
 
-    const { container } = render(<HostDashboard current={encodedCurrent} data={dashboard} />);
+    const { container } = render(<HostDashboardForTest current={encodedCurrent} data={dashboard} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
     const expectedHref = "/app/host/sessions/session%2F7%3Fdraft%3Dtrue/edit";
@@ -539,7 +636,7 @@ describe("HostDashboard", () => {
   });
 
   it("normalizes negative check-in metric counts for current sessions", () => {
-    const { container } = render(<HostDashboard current={current} data={{ ...dashboard, checkinMissing: -1 }} />);
+    const { container } = render(<HostDashboardForTest current={current} data={{ ...dashboard, checkinMissing: -1 }} />);
     const desktop = getDesktopView(container);
 
     expect(screen.queryByText("-1명 미작성")).not.toBeInTheDocument();

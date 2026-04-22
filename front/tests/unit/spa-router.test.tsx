@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/src/app/auth-context";
 import { routes } from "@/src/app/router";
+import { currentSessionContractFixture } from "./api-contract-fixtures";
 
 afterEach(() => {
   cleanup();
@@ -14,6 +15,79 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
+const anonymousAuth = {
+  authenticated: false,
+  userId: null,
+  membershipId: null,
+  clubId: null,
+  email: null,
+  displayName: null,
+  shortName: null,
+  role: null,
+  membershipStatus: null,
+  approvalState: "ANONYMOUS",
+};
+
+const inactiveAuth = {
+  authenticated: true,
+  userId: "inactive-user",
+  membershipId: "inactive-membership",
+  clubId: "club-id",
+  email: "inactive@example.com",
+  displayName: "비활성 멤버",
+  shortName: "비활성",
+  role: "MEMBER",
+  membershipStatus: "INACTIVE",
+  approvalState: "INACTIVE",
+};
+
+function isArchiveChildDataEndpoint(url: string) {
+  return (
+    url === "/api/bff/api/archive/sessions" ||
+    url.startsWith("/api/bff/api/archive/sessions/") ||
+    (url.startsWith("/api/bff/api/sessions/") && url.endsWith("/feedback-document")) ||
+    url === "/api/bff/api/archive/me/questions" ||
+    url === "/api/bff/api/archive/me/reviews" ||
+    url === "/api/bff/api/feedback-documents/me" ||
+    url === "/api/bff/api/notes/sessions" ||
+    url.startsWith("/api/bff/api/notes/feed") ||
+    url === "/api/bff/api/app/me"
+  );
+}
+
+function expectNoArchiveChildDataFetch(fetchMock: ReturnType<typeof vi.fn>) {
+  const childDataCalls = fetchMock.mock.calls.map(([input]) => input.toString()).filter(isArchiveChildDataEndpoint);
+
+  expect(childDataCalls).toEqual([]);
+}
+
+function isMemberHomeChildDataEndpoint(url: string) {
+  return (
+    url === "/api/bff/api/sessions/current" ||
+    url === "/api/bff/api/notes/feed" ||
+    url === "/api/bff/api/app/me"
+  );
+}
+
+function expectNoMemberHomeChildDataFetch(fetchMock: ReturnType<typeof vi.fn>) {
+  const childDataCalls = fetchMock.mock.calls.map(([input]) => input.toString()).filter(isMemberHomeChildDataEndpoint);
+
+  expect(childDataCalls).toEqual([]);
 }
 
 describe("SPA router", () => {
@@ -113,6 +187,174 @@ describe("SPA router", () => {
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/app/pending", expect.anything());
   });
 
+  it("renders the current session route through its loader", async () => {
+    const auth = {
+      authenticated: true,
+      userId: "member-user",
+      membershipId: "member-membership",
+      clubId: "club-id",
+      email: "member@example.com",
+      displayName: "이멤버5",
+      shortName: "멤버",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+    };
+    const current = {
+      currentSession: currentSessionContractFixture.currentSession,
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(auth));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        return Promise.resolve(jsonResponse(current));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("redirects anonymous current session navigation without fetching current session data", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: false,
+            userId: null,
+            membershipId: null,
+            clubId: null,
+            email: null,
+            displayName: null,
+            shortName: null,
+            role: null,
+            membershipStatus: null,
+            approvalState: "ANONYMOUS",
+          }),
+        );
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
+  });
+
+  it("blocks disallowed authenticated current session navigation without fetching current session data", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "inactive-user",
+            membershipId: "inactive-membership",
+            clubId: "club-id",
+            email: "inactive@example.com",
+            displayName: "비활성 멤버",
+            shortName: "비활성",
+            role: "MEMBER",
+            membershipStatus: "INACTIVE",
+            approvalState: "INACTIVE",
+          }),
+        );
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
+  });
+
+  it("redirects anonymous member home navigation before child data fetches", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(anonymousAuth));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expectNoMemberHomeChildDataFetch(fetchMock);
+  });
+
+  it("blocks inactive member home navigation before child data fetches", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(inactiveAuth));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expectNoMemberHomeChildDataFetch(fetchMock);
+  });
+
   it("renders the archive session list when viewer feedback documents are forbidden", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
@@ -165,6 +407,7 @@ describe("SPA router", () => {
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/archive"] });
 
     render(
@@ -175,5 +418,67 @@ describe("SPA router", () => {
 
     expect(await screen.findAllByText("가난한 찰리의 연감")).not.toHaveLength(0);
     expect(screen.queryByRole("heading", { name: "페이지를 불러오지 못했습니다." })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["/app/archive"],
+    ["/app/notes"],
+    ["/app/me"],
+    ["/app/sessions/session-6"],
+    ["/app/feedback/session-6"],
+    ["/app/feedback/session-6/print"],
+  ])("redirects anonymous archive route navigation from %s before child data fetches", async (path) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(anonymousAuth));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: [path] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expectNoArchiveChildDataFetch(fetchMock);
+  });
+
+  it.each([
+    ["/app/archive"],
+    ["/app/notes"],
+    ["/app/me"],
+    ["/app/sessions/session-6"],
+    ["/app/feedback/session-6"],
+    ["/app/feedback/session-6/print"],
+  ])("blocks inactive archive route navigation from %s before child data fetches", async (path) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(inactiveAuth));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: [path] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expectNoArchiveChildDataFetch(fetchMock);
   });
 });

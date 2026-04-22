@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
 import { useAuth } from "@/src/app/auth-state";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   anonymousAuthMeContractFixture,
   authMeContractFixture,

@@ -2,7 +2,12 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import MemberHome from "@/features/member-home/components/member-home";
 import { attendanceSummaryFromMyPage } from "@/features/member-home/components/member-home-records-utils";
-import type { AuthMeResponse, CurrentSessionResponse, MyPageResponse, NoteFeedItem } from "@/shared/api/readmates";
+import type {
+  MemberHomeAuth as AuthMeResponse,
+  MemberHomeCurrentSessionResponse as CurrentSessionResponse,
+  MemberHomeMyPageResponse as MyPageResponse,
+  MemberHomeNoteFeedItem as NoteFeedItem,
+} from "@/features/member-home/api/member-home-contracts";
 
 afterEach(cleanup);
 

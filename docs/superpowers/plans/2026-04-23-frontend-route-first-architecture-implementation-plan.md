@@ -158,7 +158,7 @@ Enforced restrictions:
 
 **Files:** none expected.
 
-- [ ] **Step 1: Confirm dirty files**
+- [x] **Step 1: Confirm dirty files**
 
 Run:
 
@@ -168,7 +168,7 @@ git status --short --untracked-files=all
 
 Expected: unrelated dirty files may match the dirty worktree guardrails above. Do not clean or revert them.
 
-- [ ] **Step 2: Run frontend baseline checks**
+- [x] **Step 2: Run frontend baseline checks**
 
 Run:
 
@@ -180,7 +180,7 @@ pnpm --dir front build
 
 Expected: PASS. If a check fails before architecture edits, add a `Baseline Failures` section to this plan with command output summary and continue only after the user confirms whether to fix baseline failures first.
 
-- [ ] **Step 3: Record current large-file targets**
+- [x] **Step 3: Record current large-file targets**
 
 Run:
 
@@ -194,17 +194,36 @@ wc -l front/features/host/components/host-dashboard.tsx \
 
 Expected: output confirms the largest refactoring targets. Do not edit files in this step.
 
+Output:
+
+```text
+  1425 front/features/host/components/host-dashboard.tsx
+  1145 front/features/host/components/host-session-editor.tsx
+  1014 front/features/archive/components/archive-page.tsx
+   718 front/features/current-session/components/current-session.tsx
+   590 front/shared/api/readmates.ts
+  4892 total
+```
+
+### Baseline Failures
+
+Captured on 2026-04-23 during Task 0 and resolved on rerun:
+
+- Initial `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build` failures were caused by missing frontend dependencies in `front/node_modules`.
+- `pnpm --dir front install --frozen-lockfile` restored dependencies without lockfile changes.
+- After installing dependencies, `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build` all passed.
+
 ## Task 1: Add Frontend Dependency Boundary Test
 
 **Files:**
 
 - Create: `front/tests/unit/frontend-boundaries.test.ts`
 
-- [ ] **Step 1: Create recursive file collector**
+- [x] **Step 1: Create recursive file collector**
 
 Add a Vitest test that recursively reads `front/src`, `front/features`, and `front/shared` using Node `fs` and `path`. Keep it dependency-free; do not add a glob package.
 
-- [ ] **Step 2: Parse static import specifiers**
+- [x] **Step 2: Parse static import specifiers**
 
 Detect static imports with a conservative regex covering:
 
@@ -215,7 +234,7 @@ export ... from "..."
 
 This test is a boundary guard, not a TypeScript parser. It should prefer clear error messages over clever parsing.
 
-- [ ] **Step 3: Enforce shared restrictions**
+- [x] **Step 3: Enforce shared restrictions**
 
 Fail when any file under `front/shared` imports:
 
@@ -225,7 +244,7 @@ Fail when any file under `front/shared` imports:
 @/src/app/
 ```
 
-- [ ] **Step 4: Enforce feature-to-feature restrictions**
+- [x] **Step 4: Enforce feature-to-feature restrictions**
 
 Fail when a file under `front/features/<feature>` imports another feature directly:
 
@@ -235,7 +254,7 @@ Fail when a file under `front/features/<feature>` imports another feature direct
 
 Allow same-feature imports.
 
-- [ ] **Step 5: Enforce model restrictions**
+- [x] **Step 5: Enforce model restrictions**
 
 Fail when `front/features/*/model/*` imports:
 
@@ -247,7 +266,7 @@ react-router-dom
 @/features/*/api/
 ```
 
-- [ ] **Step 6: Enforce UI restrictions**
+- [x] **Step 6: Enforce UI restrictions**
 
 Fail when `front/features/*/ui/*` imports:
 
@@ -259,7 +278,7 @@ Fail when `front/features/*/ui/*` imports:
 
 Also scan UI source text for direct `fetch(` calls and fail with a message pointing to the route/API boundary.
 
-- [ ] **Step 7: Run the new focused test**
+- [x] **Step 7: Run the new focused test**
 
 Run:
 
@@ -269,7 +288,7 @@ pnpm --dir front test -- frontend-boundaries.test.ts
 
 Expected: PASS. If current code violates future-only `ui` restrictions because files still live under `components`, keep the test scoped to new `ui` directories until the relevant feature is moved.
 
-- [ ] **Step 8: Commit Task 1**
+- [x] **Step 8: Commit Task 1**
 
 Commit only the boundary test:
 
@@ -288,7 +307,7 @@ git commit -m "test: add frontend architecture boundaries"
 - Modify: `front/shared/api/readmates.ts`
 - Modify: `front/tests/unit/readmates-fetch.test.ts`
 
-- [ ] **Step 1: Move HTTP error model**
+- [x] **Step 1: Move HTTP error model**
 
 Create `front/shared/api/errors.ts` with:
 
@@ -298,11 +317,11 @@ Create `front/shared/api/errors.ts` with:
 
 Do not change user-visible redirect behavior yet.
 
-- [ ] **Step 2: Move response helpers**
+- [x] **Step 2: Move response helpers**
 
 Create `front/shared/api/response.ts` for JSON parsing and 204 handling.
 
-- [ ] **Step 3: Move fetch primitives**
+- [x] **Step 3: Move fetch primitives**
 
 Create `front/shared/api/client.ts` and move:
 
@@ -311,7 +330,7 @@ Create `front/shared/api/client.ts` and move:
 
 Keep signatures compatible.
 
-- [ ] **Step 4: Keep `readmates.ts` compatibility exports**
+- [x] **Step 4: Keep `readmates.ts` compatibility exports**
 
 Leave API contract types in `front/shared/api/readmates.ts` for now. Re-export fetch primitives from the new files so existing imports continue to work:
 
@@ -319,11 +338,11 @@ Leave API contract types in `front/shared/api/readmates.ts` for now. Re-export f
 export { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 ```
 
-- [ ] **Step 5: Update API tests**
+- [x] **Step 5: Update API tests**
 
 Update direct primitive assertions in `front/tests/unit/readmates-fetch.test.ts` to import from the new primitive module. Keep one compatibility assertion that importing from `readmates.ts` still works.
 
-- [ ] **Step 6: Run focused checks**
+- [x] **Step 6: Run focused checks**
 
 Run:
 
@@ -334,7 +353,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 git add front/shared/api front/tests/unit/readmates-fetch.test.ts
@@ -350,7 +369,7 @@ git commit -m "refactor: split frontend api primitives"
 - Modify: `front/shared/api/readmates.ts`
 - Modify: `front/tests/unit/current-session-actions.test.ts`
 
-- [ ] **Step 1: Move current-session contracts**
+- [x] **Step 1: Move current-session contracts**
 
 Move only current-session related types from `front/shared/api/readmates.ts` into `front/features/current-session/api/current-session-contracts.ts`:
 
@@ -367,7 +386,7 @@ Move only current-session related types from `front/shared/api/readmates.ts` int
 
 If a type is shared by host/archive too, keep a compatibility export from `readmates.ts` until those features are migrated.
 
-- [ ] **Step 2: Create current-session API client**
+- [x] **Step 2: Create current-session API client**
 
 Create `front/features/current-session/api/current-session-api.ts` with functions:
 
@@ -380,15 +399,15 @@ Create `front/features/current-session/api/current-session-api.ts` with function
 
 Use `readmatesFetch` or `readmatesFetchResponse` from `shared/api/client`.
 
-- [ ] **Step 3: Update existing action modules to delegate**
+- [x] **Step 3: Update existing action modules to delegate**
 
 Update current files under `front/features/current-session/actions/` to call the new API functions. This preserves existing component imports while moving endpoint knowledge into the new API layer.
 
-- [ ] **Step 4: Update tests**
+- [x] **Step 4: Update tests**
 
 Update `front/tests/unit/current-session-actions.test.ts` to assert endpoint behavior through the new API client or through compatibility action delegates.
 
-- [ ] **Step 5: Run focused checks**
+- [x] **Step 5: Run focused checks**
 
 ```bash
 pnpm --dir front test -- current-session-actions.test.ts readmates-fetch.test.ts frontend-boundaries.test.ts
@@ -397,7 +416,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add front/features/current-session front/shared/api/readmates.ts front/tests/unit/current-session-actions.test.ts
@@ -415,7 +434,7 @@ git commit -m "refactor: extract current session api"
 - Create or modify: `front/tests/unit/current-session-model.test.ts`
 - Modify: `front/tests/unit/current-session.test.tsx`
 
-- [ ] **Step 1: Extract form model**
+- [x] **Step 1: Extract form model**
 
 Move question form calculations into `current-session-form-model.ts`:
 
@@ -427,7 +446,7 @@ Move question form calculations into `current-session-form-model.ts`:
 
 Keep Korean copy identical.
 
-- [ ] **Step 2: Extract view model**
+- [x] **Step 2: Extract view model**
 
 Move read-only derived values into `current-session-view-model.ts`:
 
@@ -437,15 +456,15 @@ Move read-only derived values into `current-session-view-model.ts`:
 - feedback access state if currently embedded in panels
 - save status labels if reusable
 
-- [ ] **Step 3: Add model tests**
+- [x] **Step 3: Add model tests**
 
 Create focused tests for form validation and permission-derived UI state. These tests must not render React.
 
-- [ ] **Step 4: Replace inline logic in component**
+- [x] **Step 4: Replace inline logic in component**
 
 Update `current-session.tsx` to call model functions. Keep JSX structure and CSS classes unchanged.
 
-- [ ] **Step 5: Run focused checks**
+- [x] **Step 5: Run focused checks**
 
 ```bash
 pnpm --dir front test -- current-session-model.test.ts current-session.test.tsx current-session-actions.test.ts frontend-boundaries.test.ts
@@ -454,7 +473,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add front/features/current-session front/tests/unit/current-session-model.test.ts front/tests/unit/current-session.test.tsx
@@ -473,7 +492,7 @@ git commit -m "refactor: extract current session models"
 - Modify: `front/tests/unit/current-session.test.tsx`
 - Modify: `front/tests/unit/spa-router.test.tsx`
 
-- [ ] **Step 1: Create route loader**
+- [x] **Step 1: Create route loader**
 
 Create `currentSessionLoader` that loads:
 
@@ -482,27 +501,29 @@ Create `currentSessionLoader` that loads:
 
 The loader should return plain route data. Preserve the current loading/error behavior as closely as possible.
 
-- [ ] **Step 2: Create route component**
+- [x] **Step 2: Create route component**
 
 Create a route component that reads loader data and renders the existing current-session UI.
 
-- [ ] **Step 3: Introduce route action compatibility**
+- [x] **Step 3: Introduce route action compatibility**
 
 Add a route action shape for current-session mutations. Start with the simplest mutation path that does not require UI redesign. If full action conversion would make the task too large, keep existing action delegates and document the remaining action conversion as a checkbox inside this task before committing.
 
-- [ ] **Step 4: Wire router**
+- [ ] **Remaining action conversion:** Replace the current-session component's direct action delegates with React Router fetcher/Form submissions so route action revalidation owns all save flows.
+
+- [x] **Step 4: Wire router**
 
 Update `front/src/app/router.tsx` so `/app/session/current` uses the current-session route module. Keep route path unchanged.
 
-- [ ] **Step 5: Shrink page shell**
+- [x] **Step 5: Shrink page shell**
 
 Update `front/src/pages/current-session.tsx` to re-export or delegate to the route module. It should no longer contain direct data fetching.
 
-- [ ] **Step 6: Update tests**
+- [x] **Step 6: Update tests**
 
 Update router/page tests so they exercise loader-backed rendering. Preserve existing behavioral assertions.
 
-- [ ] **Step 7: Run checks**
+- [x] **Step 7: Run checks**
 
 ```bash
 pnpm --dir front test -- current-session.test.tsx current-session-actions.test.ts spa-router.test.tsx frontend-boundaries.test.ts
@@ -512,7 +533,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 ```bash
 git add front/features/current-session front/src/pages/current-session.tsx front/src/app/router.tsx front/tests/unit/current-session.test.tsx front/tests/unit/spa-router.test.tsx
@@ -528,11 +549,11 @@ git commit -m "refactor: route current session through loader"
 - Modify: `front/features/current-session/index.ts`
 - Modify imports in current-session tests and route files
 
-- [ ] **Step 1: Move files without changing behavior**
+- [x] **Step 1: Move files without changing behavior**
 
 Move current-session presentation files from `components` to `ui`. Keep compatibility exports if many imports still point to `components`.
 
-- [ ] **Step 2: Split board and empty state**
+- [x] **Step 2: Split board and empty state**
 
 Extract:
 
@@ -542,11 +563,11 @@ Extract:
 
 Keep CSS class names and markup behavior stable.
 
-- [ ] **Step 3: Make UI fetch-free**
+- [x] **Step 3: Make UI fetch-free**
 
 Ensure files under `front/features/current-session/ui` do not import shared API, feature API, or route modules. The boundary test must enforce this.
 
-- [ ] **Step 4: Run checks**
+- [x] **Step 4: Run checks**
 
 ```bash
 pnpm --dir front test -- current-session.test.tsx current-session-model.test.ts frontend-boundaries.test.ts
@@ -556,7 +577,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 6**
+- [x] **Step 5: Commit Task 6**
 
 ```bash
 git add front/features/current-session front/tests/unit/current-session.test.tsx
@@ -576,7 +597,7 @@ git commit -m "refactor: move current session ui behind feature boundary"
 - Create: `front/tests/unit/host-session-editor-model.test.ts`
 - Modify existing host tests
 
-- [ ] **Step 1: Extract host dashboard derived state**
+- [x] **Step 1: Extract host dashboard derived state**
 
 Move these calculations out of `host-dashboard.tsx`:
 
@@ -588,11 +609,11 @@ Move these calculations out of `host-dashboard.tsx`:
 - next operation action
 - checklist rows
 
-- [ ] **Step 2: Add host dashboard model tests**
+- [x] **Step 2: Add host dashboard model tests**
 
 Cover no-session, upcoming session, D-day, overdue session, pending publication, pending feedback, and missing member cases.
 
-- [ ] **Step 3: Extract host session editor model**
+- [x] **Step 3: Extract host session editor model**
 
 Move these editor-only calculations out of `host-session-editor.tsx` and `host-session-schedule.ts`:
 
@@ -602,11 +623,11 @@ Move these editor-only calculations out of `host-session-editor.tsx` and `host-s
 - feedback/publication state helpers
 - destructive action availability
 
-- [ ] **Step 4: Add editor model tests**
+- [x] **Step 4: Add editor model tests**
 
 Cover new session defaults, edit-session hydration, optional field trimming, deadline defaults, and invalid schedule handling.
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- host-dashboard-model.test.ts host-session-editor-model.test.ts host-dashboard.test.tsx host-session-editor.test.tsx frontend-boundaries.test.ts
@@ -615,7 +636,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 7**
+- [x] **Step 6: Commit Task 7**
 
 ```bash
 git add front/features/host front/tests/unit/host-dashboard-model.test.ts front/tests/unit/host-session-editor-model.test.ts front/tests/unit/host-dashboard.test.tsx front/tests/unit/host-session-editor.test.tsx
@@ -640,11 +661,11 @@ git commit -m "refactor: extract host feature models"
 - Modify: `front/src/app/router.tsx`
 - Modify host unit tests
 
-- [ ] **Step 1: Move host contracts**
+- [x] **Step 1: Move host contracts**
 
 Move host-specific contracts out of `front/shared/api/readmates.ts` into `host-contracts.ts`, leaving compatibility exports during migration.
 
-- [ ] **Step 2: Create host API client**
+- [x] **Step 2: Create host API client**
 
 Move host endpoint calls into `host-api.ts`:
 
@@ -657,15 +678,15 @@ Move host endpoint calls into `host-api.ts`:
 - members
 - invitations
 
-- [ ] **Step 3: Create route modules**
+- [x] **Step 3: Create route modules**
 
 Create route modules for host dashboard, session editor, members, and invitations. Route modules own loader/action calls and pass props/callbacks into UI.
 
-- [ ] **Step 4: Shrink page shells**
+- [x] **Step 4: Shrink page shells**
 
 Update `src/pages/host-*.tsx` files so they delegate to feature route modules and do not fetch directly.
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- host-dashboard.test.tsx host-session-editor.test.tsx host-members.test.tsx host-invitations.test.tsx frontend-boundaries.test.ts
@@ -675,7 +696,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 8**
+- [x] **Step 6: Commit Task 8**
 
 ```bash
 git add front/features/host front/src/pages/host-dashboard.tsx front/src/pages/host-session-editor.tsx front/src/pages/host-members.tsx front/src/pages/host-invitations.tsx front/src/app/router.tsx front/tests/unit
@@ -698,23 +719,23 @@ git commit -m "refactor: route host feature data through feature modules"
 - Modify: `front/src/pages/notes.tsx`
 - Modify archive unit tests
 
-- [ ] **Step 1: Move archive contracts and endpoint calls**
+- [x] **Step 1: Move archive contracts and endpoint calls**
 
 Move archive, member session, my page, feedback list, notes feed contracts and endpoint calls into archive feature API files.
 
-- [ ] **Step 2: Extract archive models**
+- [x] **Step 2: Extract archive models**
 
 Move filter, sort, attendance summary, notes session selection, and display label logic into model files.
 
-- [ ] **Step 3: Create route modules**
+- [x] **Step 3: Create route modules**
 
 Create route modules for archive list, member session detail, notes feed, and my page.
 
-- [ ] **Step 4: Move UI files**
+- [x] **Step 4: Move UI files**
 
 Move archive presentation components into `ui` after route/model boundaries are in place.
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- archive-page.test.tsx member-session-detail-page.test.tsx my-page.test.tsx notes-page.test.tsx notes-feed-page.test.tsx frontend-boundaries.test.ts
@@ -723,7 +744,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 9**
+- [x] **Step 6: Commit Task 9**
 
 ```bash
 git add front/features/archive front/src/pages/archive.tsx front/src/pages/member-session.tsx front/src/pages/my-page.tsx front/src/pages/notes.tsx front/tests/unit
@@ -759,19 +780,19 @@ git commit -m "refactor: route archive feature through feature modules"
   - `front/src/pages/feedback-document.tsx`
   - `front/src/pages/feedback-print.tsx`
 
-- [ ] **Step 1: Convert public routes**
+- [x] **Step 1: Convert public routes**
 
 Move public contracts, endpoint calls, display fallbacks, and route data loading into public feature modules.
 
-- [ ] **Step 2: Convert auth routes**
+- [x] **Step 2: Convert auth routes**
 
 Move invite preview, login/dev-login, reset-password gone state, pending approval loader, and logout helpers into auth feature modules. Keep OAuth redirect URLs unchanged.
 
-- [ ] **Step 3: Convert feedback routes**
+- [x] **Step 3: Convert feedback routes**
 
 Move feedback document contracts, endpoint calls, display model, and print route data into feedback feature modules.
 
-- [ ] **Step 4: Run checks**
+- [x] **Step 4: Run checks**
 
 ```bash
 pnpm --dir front test -- public-home.test.tsx public-club.test.tsx public-records-page.test.tsx public-session-page.test.tsx login-card.test.tsx invite-acceptance-card.test.tsx pending-approval.test.tsx feedback-document-page.test.tsx feedback-document-route.test.tsx frontend-boundaries.test.ts
@@ -780,7 +801,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 10**
+- [x] **Step 5: Commit Task 10**
 
 ```bash
 git add front/features/public front/features/auth front/features/feedback front/src/pages front/tests/unit
@@ -796,7 +817,7 @@ git commit -m "refactor: route remaining frontend features through feature modul
 - Modify imports across `front/src`, `front/features`, `front/shared`, `front/tests`
 - Modify: `front/tests/unit/frontend-boundaries.test.ts`
 
-- [ ] **Step 1: Find remaining compatibility imports**
+- [x] **Step 1: Find remaining compatibility imports**
 
 Run:
 
@@ -807,22 +828,22 @@ rg "useReadmatesData|requestReadmatesRouteRefresh|ReadmatesPageState" front/src 
 
 Expected: remaining uses are understood before editing.
 
-- [ ] **Step 2: Move remaining contracts**
+- [x] **Step 2: Move remaining contracts**
 
 Move remaining feature-specific contracts out of `shared/api/readmates.ts`. Keep only truly shared primitive types if any remain.
 
-- [ ] **Step 3: Remove compatibility route hook**
+- [x] **Step 3: Remove compatibility route hook**
 
 Remove `useReadmatesData` and `requestReadmatesRouteRefresh` once route loaders/actions cover all pages. If `ReadmatesPageState` is still useful as a pure loading/error view, move it to a shared route UI module without data-loading behavior.
 
-- [ ] **Step 4: Tighten boundary test**
+- [x] **Step 4: Tighten boundary test**
 
 Make the boundary test fail on old compatibility patterns:
 
 - feature route/page direct import from `shared/api/readmates` when feature API exists
 - `features/*/components` as a long-term public location if the feature has moved to `ui`
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- frontend-boundaries.test.ts readmates-fetch.test.ts spa-router.test.tsx
@@ -832,7 +853,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 11**
+- [x] **Step 6: Commit Task 11**
 
 ```bash
 git add front/shared/api/readmates.ts front/src front/features front/tests
@@ -843,7 +864,7 @@ git commit -m "refactor: remove frontend api compatibility layer"
 
 **Files:** none expected unless fixing issues discovered by checks.
 
-- [ ] **Step 1: Run all unit and build checks**
+- [x] **Step 1: Run all unit and build checks**
 
 ```bash
 pnpm --dir front lint
@@ -853,7 +874,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 2: Run targeted e2e flows**
+- [x] **Step 2: Run targeted e2e flows**
 
 Run the existing high-value flows:
 
@@ -865,7 +886,7 @@ pnpm --dir front test:e2e -- tests/e2e/responsive-navigation-chrome.spec.ts
 
 Expected: PASS. If local backend or database prerequisites are missing, document the blocker in the implementation summary.
 
-- [ ] **Step 3: Inspect final boundaries**
+- [x] **Step 3: Inspect final boundaries**
 
 Run:
 
@@ -877,20 +898,27 @@ rg "fetch\\(" front/features
 
 Expected: remaining matches are either tests, allowed route/API modules, or explicitly justified.
 
-- [ ] **Step 4: Update frontend architecture docs**
+- [x] **Step 4: Update frontend architecture docs**
 
 Update `docs/development/architecture.md` or a dedicated frontend architecture doc with the final route-first feature rules if the implementation changed any details from the spec.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 Commit documentation and any final cleanup:
 
 ```bash
-git add docs/development/architecture.md front
+git add docs/development/architecture.md docs/superpowers/plans/2026-04-23-frontend-route-first-architecture-implementation-plan.md
 git commit -m "docs: update frontend architecture after route-first refactor"
 ```
 
 Only commit if files changed.
+
+Task 12 verification summary:
+
+- Unit/build checks passed: `pnpm --dir front lint`; `pnpm --dir front test` passed but emitted React Router `No HydrateFallback element provided to render during initial hydration` stderr warnings in route tests; `pnpm --dir front build` passed but emitted Vite's chunk-size warning for the main minified JS bundle (647.00 kB, over the 600 kB threshold).
+- Targeted e2e passed: `dev-login-session-flow.spec.ts` (2 passed), `public-auth-member-host.spec.ts` (2 passed), `responsive-navigation-chrome.spec.ts` (4 passed). No local backend/database blocker.
+- Boundary inspection: no `@/shared/api/readmates` matches remain; the documented command `rg "fetch\\(" front/features` returned only `front/features/auth/api/auth-api.ts`, which is an allowed feature API module; `components` imports remain only for `host` and `member-home` legacy presentation directories and related tests/routes because those features do not expose a `ui` public surface yet. `shared/ui` still has explicit legacy boundary exceptions for `mobile-header` importing `src/app/router-link` and `src/app/route-continuity`, plus `mobile-tab-bar`, `public-auth-action`, `public-footer`, and `top-nav` importing `src/app/router-link`; remove those test exceptions only after router-link and route-continuity are moved or injected outside the shared UI boundary.
+- Frontend architecture rules were added to `docs/development/architecture.md`.
 
 ## Implementation Notes
 

@@ -1,28 +1,96 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedbackDocumentRoutePage from "@/src/pages/feedback-document";
 import FeedbackDocumentPrintRoutePage from "@/src/pages/feedback-print";
+import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
+import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
 
+const activeAuth = {
+  authenticated: true,
+  userId: "member-user",
+  membershipId: "member-membership",
+  clubId: "club-id",
+  email: "member@example.com",
+  displayName: "이멤버5",
+  shortName: "멤버",
+  role: "MEMBER",
+  membershipStatus: "ACTIVE",
+  approvalState: "ACTIVE",
+};
+
 function setupBffStatus(status: number) {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status })));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify(activeAuth), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      return Promise.resolve(new Response("", { status }));
+    }),
+  );
 }
 
 function setupBffJson(body: unknown) {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    ),
+    vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      return Promise.resolve(
+        new Response(JSON.stringify(url === "/api/bff/api/auth/me" ? activeAuth : body), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    }),
+  );
+}
+
+function setupBffAuth(body: unknown) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({ message: "unexpected request" }), { status: 404 }));
+    }),
   );
 }
 
@@ -30,17 +98,27 @@ function renderFeedbackRoute(
   path: string | { pathname: string; state?: unknown },
   printMode = false,
 ) {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route
-          path="/app/feedback/:sessionId"
-          element={printMode ? <FeedbackDocumentPrintRoutePage /> : <FeedbackDocumentRoutePage />}
-        />
-        <Route path="/app/feedback/:sessionId/print" element={<FeedbackDocumentPrintRoutePage />} />
-      </Routes>
-    </MemoryRouter>,
+  installRouterRequestShim();
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/feedback/:sessionId",
+        element: printMode ? <FeedbackDocumentPrintRoutePage /> : <FeedbackDocumentRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+      },
+      {
+        path: "/app/feedback/:sessionId/print",
+        element: <FeedbackDocumentPrintRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+      },
+      { path: "/login", element: <main><h1>읽는사이 멤버 입장</h1></main> },
+    ],
+    { initialEntries: [path] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 function LocationStateEcho() {
@@ -56,17 +134,72 @@ function LocationStateEcho() {
 }
 
 function renderFeedbackReturnFlow(path: string | { pathname: string; state?: unknown }) {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/app/feedback/:sessionId" element={<FeedbackDocumentRoutePage />} />
-        <Route path="/app/sessions/:sessionId" element={<LocationStateEcho />} />
-      </Routes>
-    </MemoryRouter>,
+  installRouterRequestShim();
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/feedback/:sessionId",
+        element: <FeedbackDocumentRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+      },
+      { path: "/app/sessions/:sessionId", element: <LocationStateEcho /> },
+    ],
+    { initialEntries: [path] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 describe("Feedback document routes", () => {
+  it("redirects anonymous users before fetching feedback document data", async () => {
+    setupBffAuth({
+      authenticated: false,
+      userId: null,
+      membershipId: null,
+      clubId: null,
+      email: null,
+      displayName: null,
+      shortName: null,
+      role: null,
+      membershipStatus: null,
+      approvalState: "ANONYMOUS",
+    });
+
+    renderFeedbackRoute("/app/feedback/session-1");
+
+    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      "/api/bff/api/sessions/session-1/feedback-document",
+      expect.anything(),
+    );
+  });
+
+  it("renders access denied for inactive users before fetching feedback document data", async () => {
+    setupBffAuth({
+      authenticated: true,
+      userId: "inactive-user",
+      membershipId: "inactive-membership",
+      clubId: "club-id",
+      email: "inactive@example.com",
+      displayName: "비활성 멤버",
+      shortName: "비활성",
+      role: "MEMBER",
+      membershipStatus: "INACTIVE",
+      approvalState: "INACTIVE",
+    });
+
+    renderFeedbackRoute("/app/feedback/session-1");
+
+    expect(
+      await screen.findByRole("heading", { name: "피드백 문서는 정식 멤버와 참석자에게만 열립니다." }),
+    ).toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      "/api/bff/api/sessions/session-1/feedback-document",
+      expect.anything(),
+    );
+  });
+
   it("renders access denied when the BFF rejects feedback document access", async () => {
     setupBffStatus(403);
 

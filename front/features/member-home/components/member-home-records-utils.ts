@@ -1,4 +1,4 @@
-import type { MyPageResponse } from "@/shared/api/readmates";
+import type { MemberHomeMyPageResponse as MyPageResponse } from "@/features/member-home/api/member-home-contracts";
 
 export type AttendanceSummary = {
   attended: number;

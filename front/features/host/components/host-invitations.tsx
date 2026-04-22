@@ -1,14 +1,12 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, type InvalidEvent, useRef, useState } from "react";
-import {
-  createInvitation,
-  listInvitations,
-  parseHostInvitationListResponse,
-  parseHostInvitationResponse,
-  revokeInvitation,
-} from "@/features/host/actions/invitations";
-import type { HostInvitationListItem, HostInvitationResponse, InvitationStatus } from "@/shared/api/readmates";
+import type {
+  CreateHostInvitationRequest,
+  HostInvitationListItem,
+  HostInvitationResponse,
+  InvitationStatus,
+} from "@/features/host/api/host-contracts";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 const statusLabels: Record<InvitationStatus, string> = {
@@ -31,6 +29,14 @@ type HostMessage = {
 };
 
 type PendingRowAction = "revoke" | "reissue";
+
+export type HostInvitationsActions = {
+  listInvitations: () => Promise<Response>;
+  createInvitation: (request: CreateHostInvitationRequest) => Promise<Response>;
+  revokeInvitation: (invitationId: string) => Promise<Response>;
+  parseInvitation: (response: Response) => Promise<HostInvitationResponse>;
+  parseInvitationList: (response: Response) => Promise<HostInvitationListItem[]>;
+};
 
 function inviteStatusClass(status: InvitationStatus) {
   if (status === "PENDING") {
@@ -57,7 +63,13 @@ function inviteCounts(invitations: HostInvitationListItem[]) {
   };
 }
 
-export default function HostInvitations({ initialInvitations }: { initialInvitations: HostInvitationListItem[] }) {
+export default function HostInvitations({
+  initialInvitations,
+  actions,
+}: {
+  initialInvitations: HostInvitationListItem[];
+  actions: HostInvitationsActions;
+}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [applyToCurrentSession, setApplyToCurrentSession] = useState(true);
@@ -108,13 +120,13 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
   };
 
   const refreshInvitations = async () => {
-    const response = await listInvitations();
+    const response = await actions.listInvitations();
     if (!response.ok) {
       showAlert("초대 목록 새로고침에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.");
       return false;
     }
 
-    setInvitations(await parseHostInvitationListResponse(response));
+    setInvitations(await actions.parseInvitationList(response));
     return true;
   };
 
@@ -139,7 +151,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
     setIsCreating(true);
 
     try {
-      const response = await createInvitation({
+      const response = await actions.createInvitation({
         email: trimmedEmail,
         name: trimmedName,
         applyToCurrentSession,
@@ -153,7 +165,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
         return;
       }
 
-      const created = await parseHostInvitationResponse(response);
+      const created = await actions.parseInvitation(response);
       if (requestId === lastCreatedRequestRef.current) {
         setLastCreated(created);
         await refreshInvitations();
@@ -199,7 +211,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
     setMessage(null);
     setRowPending(invitation.invitationId, "revoke");
     try {
-      const response = await revokeInvitation(invitation.invitationId);
+      const response = await actions.revokeInvitation(invitation.invitationId);
       if (!response.ok) {
         showAlert("초대 취소에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
         return;
@@ -228,7 +240,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
     const requestId = ++lastCreatedRequestRef.current;
 
     try {
-      const response = await createInvitation({
+      const response = await actions.createInvitation({
         email: invitation.email,
         name: invitation.name,
         applyToCurrentSession: invitation.applyToCurrentSession,
@@ -238,7 +250,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
         return;
       }
 
-      const created = await parseHostInvitationResponse(response);
+      const created = await actions.parseInvitation(response);
       if (requestId === lastCreatedRequestRef.current) {
         setLastCreated(created);
         await refreshInvitations();

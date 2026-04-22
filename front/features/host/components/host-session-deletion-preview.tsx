@@ -7,7 +7,7 @@ import {
   useEffect,
   useRef,
 } from "react";
-import type { HostSessionDeletionPreviewResponse } from "@/shared/api/readmates";
+import type { HostSessionDeletionPreviewResponse } from "@/features/host/api/host-contracts";
 
 type HostSessionDeletionPreviewDialogProps = {
   preview: HostSessionDeletionPreviewResponse | null;

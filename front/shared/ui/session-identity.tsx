@@ -1,4 +1,4 @@
-import type { SessionState } from "@/shared/api/readmates";
+import type { SessionState } from "@/shared/model/readmates-types";
 
 type SessionIdentityProps = {
   sessionNumber: number;

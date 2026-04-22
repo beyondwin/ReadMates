@@ -1,9 +1,5 @@
-import { readmatesFetchResponse } from "@/shared/api/readmates";
+import { saveCurrentSessionCheckin } from "@/features/current-session/api/current-session-api";
 
 export async function saveCheckin(readingProgress: number, note: string) {
-  return readmatesFetchResponse("/api/sessions/current/checkin", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ readingProgress, note }),
-  });
+  return saveCurrentSessionCheckin(readingProgress, note);
 }

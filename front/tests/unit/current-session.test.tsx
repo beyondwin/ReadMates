@@ -1,9 +1,20 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import CurrentSession from "@/features/current-session/components/current-session";
-import type { CurrentSessionAuth } from "@/features/current-session/components/current-session-types";
-import type { CurrentSessionResponse } from "@/shared/api/readmates";
+import { saveCheckin } from "@/features/current-session/actions/save-checkin";
+import { saveQuestions } from "@/features/current-session/actions/save-question";
+import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
+import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
+import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
+import type {
+  CurrentSessionAuth,
+  CurrentSessionInternalLinkProps,
+  CurrentSessionPageData,
+} from "@/features/current-session/ui/current-session-types";
+import { CurrentSessionRoute, currentSessionLoader } from "@/features/current-session";
+import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { currentSessionContractFixture } from "./api-contract-fixtures";
 
 afterEach(cleanup);
@@ -43,6 +54,55 @@ const viewerAuthFixture = {
   approvalState: "VIEWER",
 } satisfies CurrentSessionAuth;
 
+const routeAuthFixture = {
+  authenticated: true,
+  userId: "user-active-member",
+  membershipId: "membership-active-member",
+  clubId: "club-id",
+  email: "member@example.com",
+  displayName: "이멤버5",
+  shortName: "멤버",
+  role: "MEMBER",
+  membershipStatus: "ACTIVE",
+  approvalState: "ACTIVE",
+} satisfies AuthMeResponse;
+
+async function requireSuccessfulTestSave(responsePromise: Promise<Response>) {
+  const response = await responsePromise;
+
+  if (!response.ok) {
+    throw new Error("Current session save failed.");
+  }
+}
+
+const currentSessionTestActions = {
+  updateRsvp: (status) => requireSuccessfulTestSave(updateRsvp(status)),
+  saveCheckin: (readingProgress, note) => requireSuccessfulTestSave(saveCheckin(readingProgress, note)),
+  saveQuestions: (questions) => requireSuccessfulTestSave(saveQuestions(questions)),
+  saveLongReview: (body) => requireSuccessfulTestSave(saveLongReview(body)),
+  saveOneLineReview: (text) => requireSuccessfulTestSave(saveOneLineReview(text)),
+} satisfies CurrentSessionSaveActions;
+
+function TestInternalLink({ href, children, ...props }: CurrentSessionInternalLinkProps) {
+  return (
+    <a {...props} href={href}>
+      {children}
+    </a>
+  );
+}
+
+function CurrentSession({ auth, data }: { auth?: CurrentSessionAuth; data: CurrentSessionPageData }) {
+  return (
+    <CurrentSessionPage
+      auth={auth}
+      data={data}
+      actions={currentSessionTestActions}
+      internalLinkComponent={TestInternalLink}
+      onSaveSuccess={() => window.dispatchEvent(new Event("readmates:route-refresh"))}
+    />
+  );
+}
+
 function getDesktop(container: HTMLElement) {
   const desktop = container.querySelector(".rm-current-session-desktop");
 
@@ -64,7 +124,127 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
 describe("CurrentSession", () => {
+  it("loads auth and current session data through the route loader", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(routeAuthFixture));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        return Promise.resolve(jsonResponse(currentSessionData));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(currentSessionLoader()).resolves.toEqual({
+      auth: routeAuthFixture,
+      current: currentSessionData,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("renders the current session route from loader data", async () => {
+    installRouterRequestShim();
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/",
+          element: <CurrentSessionRoute />,
+          loader: () => ({ auth: routeAuthFixture, current: currentSessionData }),
+          hydrateFallbackElement: <div>세션을 불러오는 중</div>,
+        },
+      ],
+      { initialEntries: ["/"] },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "참석" }).length).toBeGreaterThan(0);
+  });
+
+  it("keeps current session content visible when a route refresh fails", async () => {
+    installRouterRequestShim();
+    let currentSessionRequests = 0;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(routeAuthFixture));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        currentSessionRequests += 1;
+
+        if (currentSessionRequests === 1) {
+          return Promise.resolve(jsonResponse(currentSessionData));
+        }
+
+        return Promise.resolve(jsonResponse({ message: "current session unavailable" }, 500));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/",
+          element: <CurrentSessionRoute />,
+          loader: currentSessionLoader,
+          errorElement: <div>route error</div>,
+          hydrateFallbackElement: <div>세션을 불러오는 중</div>,
+        },
+      ],
+      { initialEntries: ["/"] },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+
+    window.dispatchEvent(new Event("readmates:route-refresh"));
+
+    await waitFor(() => {
+      expect(currentSessionRequests).toBe(2);
+    });
+    expect(screen.queryByText("route error")).not.toBeInTheDocument();
+    expect(screen.getAllByText("테스트 책").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "참석" }).length).toBeGreaterThan(0);
+  });
+
   it("shows the empty state when there is no current session", () => {
     render(<CurrentSession data={{ currentSession: null }} />);
 
