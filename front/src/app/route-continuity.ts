@@ -219,7 +219,6 @@ function restoreReadmatesScroll(key: string, pathname: string, search: string) {
       return noopCleanup;
     }
 
-    window.sessionStorage.removeItem(key);
     let active = true;
     let animationFrameId: number | null = null;
     const timeoutIds: number[] = [];
@@ -229,6 +228,7 @@ function restoreReadmatesScroll(key: string, pathname: string, search: string) {
       }
 
       window.scrollTo({ top: stored.scrollY, behavior: "auto" });
+      window.sessionStorage.removeItem(key);
     };
 
     if (typeof window.requestAnimationFrame === "function") {

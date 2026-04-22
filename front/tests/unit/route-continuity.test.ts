@@ -94,4 +94,27 @@ describe("route continuity", () => {
 
     expect(scrollTo).not.toHaveBeenCalled();
   });
+
+  it("keeps the snapshot available when a development cleanup runs before restore", () => {
+    vi.useFakeTimers();
+    const scrollTo = setScrollToMock();
+    window.history.pushState({}, "", "/records");
+    window.sessionStorage.setItem(
+      PUBLIC_RECORDS_SCROLL_KEY,
+      JSON.stringify({
+        pathname: "/records",
+        search: "",
+        scrollY: 480,
+      }),
+    );
+
+    const firstCleanup = restoreReadmatesListScroll("/records", "");
+    firstCleanup();
+
+    restoreReadmatesListScroll("/records", "");
+    vi.advanceTimersByTime(1_500);
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 480, behavior: "auto" });
+    expect(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY)).toBeNull();
+  });
 });
