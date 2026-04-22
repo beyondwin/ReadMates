@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  getCurrentSession,
+  saveCurrentSessionCheckin,
+  saveCurrentSessionLongReview,
+  saveCurrentSessionOneLineReview,
+  saveCurrentSessionQuestions,
+  updateCurrentSessionRsvp,
+} from "@/features/current-session/api/current-session-api";
 import { saveCheckin } from "@/features/current-session/actions/save-checkin";
-import { saveQuestions } from "@/features/current-session/actions/save-question";
+import { saveQuestion, saveQuestions } from "@/features/current-session/actions/save-question";
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
 import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
 
@@ -31,15 +39,30 @@ function expectJsonRequest(
 }
 
 describe("current session actions", () => {
-  it("routes save actions through the centralized ReadMates fetch helper", async () => {
+  it("loads the current session through the feature API client", async () => {
+    const responseBody = { currentSession: null };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(responseBody));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getCurrentSession()).resolves.toEqual(responseBody);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current",
+      expect.objectContaining({
+        cache: "no-store",
+      }),
+    );
+  });
+
+  it("routes writes through the current session API client", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await saveCheckin(72, "chapter notes");
-    await saveQuestions([{ text: "first question" }, { text: "second question" }]);
-    await saveLongReview("long review");
-    await saveOneLineReview("one line");
-    await updateRsvp("GOING");
+    await saveCurrentSessionCheckin(72, "chapter notes");
+    await saveCurrentSessionQuestions([{ text: "first question" }, { text: "second question" }]);
+    await saveCurrentSessionLongReview("long review");
+    await saveCurrentSessionOneLineReview("one line");
+    await updateCurrentSessionRsvp("GOING");
 
     expectJsonRequest(fetchMock, 1, {
       path: "/api/bff/api/sessions/current/checkin",
@@ -62,6 +85,49 @@ describe("current session actions", () => {
       body: { text: "one line" },
     });
     expectJsonRequest(fetchMock, 5, {
+      path: "/api/bff/api/sessions/current/rsvp",
+      method: "PATCH",
+      body: { status: "GOING" },
+    });
+  });
+
+  it("routes save actions through the centralized ReadMates fetch helper", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await saveCheckin(72, "chapter notes");
+    await saveQuestion(1, "single question", "draft thought");
+    await saveQuestions([{ text: "first question" }, { text: "second question" }]);
+    await saveLongReview("long review");
+    await saveOneLineReview("one line");
+    await updateRsvp("GOING");
+
+    expectJsonRequest(fetchMock, 1, {
+      path: "/api/bff/api/sessions/current/checkin",
+      method: "PUT",
+      body: { readingProgress: 72, note: "chapter notes" },
+    });
+    expectJsonRequest(fetchMock, 2, {
+      path: "/api/bff/api/sessions/current/questions",
+      method: "POST",
+      body: { priority: 1, text: "single question", draftThought: "draft thought" },
+    });
+    expectJsonRequest(fetchMock, 3, {
+      path: "/api/bff/api/sessions/current/questions",
+      method: "PUT",
+      body: { questions: [{ text: "first question" }, { text: "second question" }] },
+    });
+    expectJsonRequest(fetchMock, 4, {
+      path: "/api/bff/api/sessions/current/reviews",
+      method: "POST",
+      body: { body: "long review" },
+    });
+    expectJsonRequest(fetchMock, 5, {
+      path: "/api/bff/api/sessions/current/one-line-reviews",
+      method: "POST",
+      body: { text: "one line" },
+    });
+    expectJsonRequest(fetchMock, 6, {
       path: "/api/bff/api/sessions/current/rsvp",
       method: "PATCH",
       body: { status: "GOING" },
