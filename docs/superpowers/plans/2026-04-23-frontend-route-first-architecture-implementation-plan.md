@@ -915,9 +915,9 @@ Only commit if files changed.
 
 Task 12 verification summary:
 
-- Unit/build checks passed: `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`.
+- Unit/build checks passed: `pnpm --dir front lint`; `pnpm --dir front test` passed but emitted React Router `No HydrateFallback element provided to render during initial hydration` stderr warnings in route tests; `pnpm --dir front build` passed but emitted Vite's chunk-size warning for the main minified JS bundle (647.00 kB, over the 600 kB threshold).
 - Targeted e2e passed: `dev-login-session-flow.spec.ts` (2 passed), `public-auth-member-host.spec.ts` (2 passed), `responsive-navigation-chrome.spec.ts` (4 passed). No local backend/database blocker.
-- Boundary inspection: no `@/shared/api/readmates` matches remain; direct `fetch(` matches are limited to `front/features/auth/api/auth-api.ts`, which is an allowed feature API module; `components` imports remain only for `host` and `member-home` legacy presentation directories and related tests/routes because those features do not expose a `ui` public surface yet. `shared/ui` still has explicit legacy boundary exceptions for `mobile-header` importing `src/app/router-link` and `src/app/route-continuity`, plus `mobile-tab-bar`, `public-auth-action`, `public-footer`, and `top-nav` importing `src/app/router-link`; remove those test exceptions only after router-link and route-continuity are moved or injected outside the shared UI boundary.
+- Boundary inspection: no `@/shared/api/readmates` matches remain; the documented command `rg "fetch\\(" front/features` returned only `front/features/auth/api/auth-api.ts`, which is an allowed feature API module; `components` imports remain only for `host` and `member-home` legacy presentation directories and related tests/routes because those features do not expose a `ui` public surface yet. `shared/ui` still has explicit legacy boundary exceptions for `mobile-header` importing `src/app/router-link` and `src/app/route-continuity`, plus `mobile-tab-bar`, `public-auth-action`, `public-footer`, and `top-nav` importing `src/app/router-link`; remove those test exceptions only after router-link and route-continuity are moved or injected outside the shared UI boundary.
 - Frontend architecture rules were added to `docs/development/architecture.md`.
 
 ## Implementation Notes
