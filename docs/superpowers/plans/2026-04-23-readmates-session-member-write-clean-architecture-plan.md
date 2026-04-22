@@ -179,7 +179,7 @@ Completion note: no baseline failure notes were added because the focused suite 
 - Create: `server/src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberWebConfig.kt`
 - Create: `server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt`
 
-- [ ] **Step 1: Write the argument resolver unit test**
+- [x] **Step 1: Write the argument resolver unit test**
 
 Create `server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt`:
 
@@ -262,7 +262,7 @@ class CurrentMemberArgumentResolverTest {
 }
 ```
 
-- [ ] **Step 2: Run the resolver test and verify it fails**
+- [x] **Step 2: Run the resolver test and verify it fails**
 
 Run:
 
@@ -272,7 +272,7 @@ Run:
 
 Expected: FAIL because `ResolveCurrentMemberUseCase` and `CurrentMemberArgumentResolver` do not exist.
 
-- [ ] **Step 3: Add the inbound and outbound ports**
+- [x] **Step 3: Add the inbound and outbound ports**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/port/in/ResolveCurrentMemberUseCase.kt`:
 
@@ -298,7 +298,7 @@ interface LoadCurrentMemberPort {
 }
 ```
 
-- [ ] **Step 4: Add the application service**
+- [x] **Step 4: Add the application service**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/service/ResolveCurrentMemberService.kt`:
 
@@ -319,7 +319,7 @@ class ResolveCurrentMemberService(
 }
 ```
 
-- [ ] **Step 5: Add the temporary persistence adapter**
+- [x] **Step 5: Add the temporary persistence adapter**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/out/persistence/JdbcCurrentMemberAdapter.kt`:
 
@@ -340,7 +340,7 @@ class JdbcCurrentMemberAdapter(
 }
 ```
 
-- [ ] **Step 6: Add the argument resolver**
+- [x] **Step 6: Add the argument resolver**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolver.kt`:
 
@@ -384,7 +384,7 @@ class CurrentMemberArgumentResolver(
 }
 ```
 
-- [ ] **Step 7: Register the argument resolver**
+- [x] **Step 7: Register the argument resolver**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberWebConfig.kt`:
 
@@ -406,7 +406,7 @@ class CurrentMemberWebConfig(
 }
 ```
 
-- [ ] **Step 8: Run the resolver test**
+- [x] **Step 8: Run the resolver test**
 
 Run:
 
@@ -416,7 +416,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Run:
 
