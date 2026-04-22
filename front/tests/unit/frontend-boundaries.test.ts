@@ -295,7 +295,9 @@ function isFeatureUiBoundaryImport(sourceFile: SourceFile, projectPath: string |
   return (
     isSharedApiImport(projectPath) ||
     isFeatureLayerImport(projectPath, "api") ||
-    isFeatureLayerImport(projectPath, "route")
+    isFeatureLayerImport(projectPath, "route") ||
+    projectPath.startsWith("src/pages/") ||
+    projectPath.startsWith("src/app/")
   );
 }
 

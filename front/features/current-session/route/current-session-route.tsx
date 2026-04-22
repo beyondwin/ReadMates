@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useLoaderData } from "react-router-dom";
-import CurrentSession from "@/features/current-session/components/current-session";
+import { saveCheckin } from "@/features/current-session/actions/save-checkin";
+import { saveQuestions } from "@/features/current-session/actions/save-question";
+import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
+import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
+import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
 import { loadCurrentSessionRouteData, type CurrentSessionRouteData } from "@/features/current-session/route/current-session-data";
+import { requestReadmatesRouteRefresh } from "@/src/pages/readmates-page-data";
 
 const READMATES_ROUTE_REFRESH_EVENT = "readmates:route-refresh";
+
+const currentSessionSaveActions = {
+  updateRsvp,
+  saveCheckin,
+  saveQuestions,
+  saveLongReview,
+  saveOneLineReview,
+} satisfies CurrentSessionSaveActions;
 
 export function CurrentSessionRoute() {
   const loaderData = useLoaderData() as CurrentSessionRouteData;
@@ -45,10 +58,24 @@ export function CurrentSessionRoute() {
 
   if (routeDataState.loaderData !== loaderData) {
     setRouteDataState({ loaderData, routeData: loaderData });
-    return <CurrentSession auth={loaderData.auth} data={loaderData.current} />;
+    return (
+      <CurrentSessionPage
+        auth={loaderData.auth}
+        data={loaderData.current}
+        actions={currentSessionSaveActions}
+        onSaveSuccess={requestReadmatesRouteRefresh}
+      />
+    );
   }
 
-  return <CurrentSession auth={routeDataState.routeData.auth} data={routeDataState.routeData.current} />;
+  return (
+    <CurrentSessionPage
+      auth={routeDataState.routeData.auth}
+      data={routeDataState.routeData.current}
+      actions={currentSessionSaveActions}
+      onSaveSuccess={requestReadmatesRouteRefresh}
+    />
+  );
 }
 
 export function CurrentSessionRouteError() {

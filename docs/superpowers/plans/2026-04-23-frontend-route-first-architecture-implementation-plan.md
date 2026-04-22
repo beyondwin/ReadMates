@@ -549,11 +549,11 @@ git commit -m "refactor: route current session through loader"
 - Modify: `front/features/current-session/index.ts`
 - Modify imports in current-session tests and route files
 
-- [ ] **Step 1: Move files without changing behavior**
+- [x] **Step 1: Move files without changing behavior**
 
 Move current-session presentation files from `components` to `ui`. Keep compatibility exports if many imports still point to `components`.
 
-- [ ] **Step 2: Split board and empty state**
+- [x] **Step 2: Split board and empty state**
 
 Extract:
 
@@ -563,11 +563,11 @@ Extract:
 
 Keep CSS class names and markup behavior stable.
 
-- [ ] **Step 3: Make UI fetch-free**
+- [x] **Step 3: Make UI fetch-free**
 
 Ensure files under `front/features/current-session/ui` do not import shared API, feature API, or route modules. The boundary test must enforce this.
 
-- [ ] **Step 4: Run checks**
+- [x] **Step 4: Run checks**
 
 ```bash
 pnpm --dir front test -- current-session.test.tsx current-session-model.test.ts frontend-boundaries.test.ts
@@ -577,7 +577,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 6**
+- [x] **Step 5: Commit Task 6**
 
 ```bash
 git add front/features/current-session front/tests/unit/current-session.test.tsx
