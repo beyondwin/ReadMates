@@ -25,6 +25,8 @@ Feature는 가능한 범위에서 `api`, `model`, `route`, `ui`로 나눕니다.
 
 `shared/api/readmates` compatibility module은 제거되었고, feature route/page는 feature-owned API contract 또는 `shared/api` primitive를 사용해야 합니다. `features/*/components`는 `ui`로 이동하지 않은 legacy presentation surface에만 남길 수 있습니다. `ui` directory가 있는 feature에서는 외부 source가 `features/<name>/components`를 public surface처럼 import하지 않습니다.
 
+이 경계는 `front/tests/unit/frontend-boundaries.test.ts`에서 일부 강제합니다. 테스트는 shared-to-app/page/feature import, feature 간 직접 import, feature `model/route/ui` layer import, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import를 확인합니다.
+
 ## 요청 흐름
 
 ```text

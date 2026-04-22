@@ -22,6 +22,14 @@ Unit test:
 pnpm --dir front test
 ```
 
+Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, 제거된 `shared/api/readmates` compatibility import, legacy boundary exception 사용 여부를 확인합니다.
+
+Frontend 경계만 빠르게 확인하려면 Vitest를 직접 실행합니다.
+
+```bash
+pnpm --dir front exec vitest run tests/unit/frontend-boundaries.test.ts
+```
+
 Production build:
 
 ```bash
