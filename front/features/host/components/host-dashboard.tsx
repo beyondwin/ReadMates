@@ -1,8 +1,9 @@
 import { Link } from "@/src/app/router-link";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { hostDashboardReturnTarget, readmatesReturnState } from "@/src/app/route-continuity";
-import type { AuthMeResponse, CurrentSessionResponse, HostDashboardResponse } from "@/shared/api/readmates";
-import { readmatesFetchResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
+import { submitHostMemberLifecycle } from "@/features/host/api/host-api";
+import type { HostDashboardResponse } from "@/features/host/api/host-contracts";
 import {
   getHostDashboardChecklist,
   getHostDashboardNextOperationAction,
@@ -71,8 +72,28 @@ const quickActions = [
 type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 type QuickActionIcon = (typeof quickActions)[number]["icon"];
 type MissingCurrentSessionMember = NonNullable<HostDashboardResponse["currentSessionMissingMembers"]>[number];
+export type HostDashboardMissingMemberAction = "add" | "remove";
+
+export type HostDashboardActions = {
+  updateCurrentSessionParticipation: (
+    membershipId: string,
+    action: HostDashboardMissingMemberAction,
+  ) => Promise<void>;
+};
 
 const newSessionHref = "/app/host/sessions/new";
+const defaultHostDashboardActions: HostDashboardActions = {
+  updateCurrentSessionParticipation: async (membershipId, action) => {
+    const response = await submitHostMemberLifecycle(
+      membershipId,
+      action === "add" ? "/current-session/add" : "/current-session/remove",
+    );
+
+    if (!response.ok) {
+      throw new Error("Current session member action failed");
+    }
+  },
+};
 
 function memberSessionState(session: CurrentSession, member: CurrentSession["attendees"][number]) {
   const rsvp = rsvpLabel(member.rsvpStatus);
@@ -138,10 +159,12 @@ export default function HostDashboard({
   auth,
   current,
   data,
+  actions = defaultHostDashboardActions,
 }: {
   auth?: AuthMeResponse;
   current?: CurrentSessionResponse;
   data: HostDashboardResponse;
+  actions?: HostDashboardActions;
 }) {
   const hostName = auth?.displayName ?? "호스트";
   const session = current?.currentSession ?? null;
@@ -189,7 +212,13 @@ export default function HostDashboard({
         <section style={{ padding: "36px 0 20px" }}>
           <div className="container">
             <SectionHeader eyebrow={HOST_DASHBOARD_LABELS.attention} title="운영 상태 요약" />
-            {missingMembers ? <MissingCurrentSessionMembersAlert alert={missingMembers} onResolved={resolveMissingMember} /> : null}
+            {missingMembers ? (
+              <MissingCurrentSessionMembersAlert
+                alert={missingMembers}
+                actions={actions}
+                onResolved={resolveMissingMember}
+              />
+            ) : null}
             <div className="rm-document-panel" style={{ padding: "8px 22px" }}>
               {hostAlertMetrics(data).map((alert) => (
                 <div
@@ -423,6 +452,7 @@ export default function HostDashboard({
         sessionSpecificEditHref={sessionSpecificEditHref}
         checklist={checklist}
         missingMembers={missingMembers}
+        actions={actions}
         onMissingMemberResolved={resolveMissingMember}
         phase={phase}
         nextAction={nextAction}
@@ -440,6 +470,7 @@ function MobileHostDashboard({
   sessionSpecificEditHref,
   checklist,
   missingMembers,
+  actions,
   onMissingMemberResolved,
   phase,
   nextAction,
@@ -452,6 +483,7 @@ function MobileHostDashboard({
   sessionSpecificEditHref: string | null;
   checklist: HostChecklistItem[];
   missingMembers: MissingCurrentSessionMembers | null;
+  actions: HostDashboardActions;
   onMissingMemberResolved: (membershipId: string) => void;
   phase: SessionPhase;
   nextAction: NextOperationAction;
@@ -477,7 +509,12 @@ function MobileHostDashboard({
           {HOST_DASHBOARD_LABELS.attention}
         </div>
         {missingMembers ? (
-          <MissingCurrentSessionMembersAlert alert={missingMembers} mobile onResolved={onMissingMemberResolved} />
+          <MissingCurrentSessionMembersAlert
+            alert={missingMembers}
+            mobile
+            actions={actions}
+            onResolved={onMissingMemberResolved}
+          />
         ) : null}
         <div className="m-list">
           {mobileAlerts.map((alert) => (
@@ -692,10 +729,12 @@ function MobileHostDashboard({
 function MissingCurrentSessionMembersAlert({
   alert,
   mobile = false,
+  actions,
   onResolved,
 }: {
   alert: MissingCurrentSessionMembers;
   mobile?: boolean;
+  actions: HostDashboardActions;
   onResolved: (membershipId: string) => void;
 }) {
   const [pendingActions, setPendingActions] = useState<Set<string>>(() => new Set());
@@ -712,12 +751,7 @@ function MissingCurrentSessionMembersAlert({
         background: "var(--warning-soft)",
         borderColor: "var(--warning-line)",
       } as CSSProperties);
-  const actionPath = {
-    add: "/current-session/add",
-    remove: "/current-session/remove",
-  } as const;
-
-  const submitAction = async (member: MissingCurrentSessionMember, action: keyof typeof actionPath) => {
+  const submitAction = async (member: MissingCurrentSessionMember, action: HostDashboardMissingMemberAction) => {
     const key = `${member.membershipId}:${action}`;
     if (pendingActions.has(key)) {
       return;
@@ -727,14 +761,7 @@ function MissingCurrentSessionMembersAlert({
     setMessage(null);
 
     try {
-      const response = await readmatesFetchResponse(
-        `/api/host/members/${encodeURIComponent(member.membershipId)}${actionPath[action]}`,
-        { method: "POST" },
-      );
-      if (!response.ok) {
-        throw new Error("Current session member action failed");
-      }
-
+      await actions.updateCurrentSessionParticipation(member.membershipId, action);
       onResolved(member.membershipId);
       setMessage({
         kind: "status",
