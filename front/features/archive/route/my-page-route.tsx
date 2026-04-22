@@ -1,6 +1,6 @@
 import { useLoaderData } from "react-router-dom";
 import { leaveMembership } from "@/features/archive/api/archive-api";
-import type { MyPageRouteData } from "@/features/archive/api/archive-api";
+import type { MyPageRouteData } from "@/features/archive/route/my-page-data";
 import type { LogoutControlComponent } from "@/features/archive/ui/my-page";
 import MyPage from "@/features/archive/ui/my-page";
 

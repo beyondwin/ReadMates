@@ -1,7 +1,19 @@
-import { loadMyPageRouteData, type MyPageRouteData } from "@/features/archive/api/archive-api";
-import type { MyPageResponse } from "@/features/archive/api/archive-contracts";
+import {
+  fetchMyArchiveQuestions,
+  fetchMyArchiveReviews,
+  fetchMyFeedbackDocuments,
+  fetchMyPage,
+} from "@/features/archive/api/archive-api";
+import type { FeedbackDocumentListItem, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
 import type { AuthMeResponse } from "@/shared/api/readmates";
+
+export type MyPageRouteData = {
+  data: MyPageResponse;
+  reports: FeedbackDocumentListItem[];
+  questionCount: number;
+  reviewCount: number;
+};
 
 function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
   return {
@@ -25,5 +37,12 @@ export async function myPageLoader(): Promise<MyPageRouteData> {
     return { data: inactiveMyPageData(access.auth), reports: [], questionCount: 0, reviewCount: 0 };
   }
 
-  return loadMyPageRouteData();
+  const [data, reports, questions, reviews] = await Promise.all([
+    fetchMyPage(),
+    fetchMyFeedbackDocuments(),
+    fetchMyArchiveQuestions(),
+    fetchMyArchiveReviews(),
+  ]);
+
+  return { data, reports, questionCount: questions.length, reviewCount: reviews.length };
 }
