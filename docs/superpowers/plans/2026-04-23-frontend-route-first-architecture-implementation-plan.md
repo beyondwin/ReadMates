@@ -719,23 +719,23 @@ git commit -m "refactor: route host feature data through feature modules"
 - Modify: `front/src/pages/notes.tsx`
 - Modify archive unit tests
 
-- [ ] **Step 1: Move archive contracts and endpoint calls**
+- [x] **Step 1: Move archive contracts and endpoint calls**
 
 Move archive, member session, my page, feedback list, notes feed contracts and endpoint calls into archive feature API files.
 
-- [ ] **Step 2: Extract archive models**
+- [x] **Step 2: Extract archive models**
 
 Move filter, sort, attendance summary, notes session selection, and display label logic into model files.
 
-- [ ] **Step 3: Create route modules**
+- [x] **Step 3: Create route modules**
 
 Create route modules for archive list, member session detail, notes feed, and my page.
 
-- [ ] **Step 4: Move UI files**
+- [x] **Step 4: Move UI files**
 
 Move archive presentation components into `ui` after route/model boundaries are in place.
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- archive-page.test.tsx member-session-detail-page.test.tsx my-page.test.tsx notes-page.test.tsx notes-feed-page.test.tsx frontend-boundaries.test.ts
@@ -744,7 +744,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 9**
+- [x] **Step 6: Commit Task 9**
 
 ```bash
 git add front/features/archive front/src/pages/archive.tsx front/src/pages/member-session.tsx front/src/pages/my-page.tsx front/src/pages/notes.tsx front/tests/unit

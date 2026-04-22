@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteFeedItem, NoteSessionItem } from "@/shared/api/readmates";
-import type { FeedFilter } from "@/features/archive/components/notes-feed-list";
+import type { FeedFilter } from "@/features/archive/model/notes-feed-model";
 import NotesPage from "@/src/pages/notes";
 
 const { notesFeedPageMock } = vi.hoisted(() => ({
@@ -18,7 +18,7 @@ type NotesFeedProps = {
   onFilterChange?: (filter: FeedFilter) => void;
 };
 
-vi.mock("@/features/archive/components/notes-feed-page", () => ({
+vi.mock("@/features/archive/ui/notes-feed-page", () => ({
   default: (props: NotesFeedProps) => {
     notesFeedPageMock(props);
     return <div data-testid="notes-feed">{props.selectedSessionId ?? "none"}</div>;

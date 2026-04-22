@@ -1,41 +1,6 @@
-import { useCallback } from "react";
-import MyPage from "@/features/archive/components/my-page";
-import type { FeedbackDocumentListItem, MyArchiveQuestionItem, MyArchiveReviewItem, MyPageResponse } from "@/shared/api/readmates";
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/readmates";
-import { useReadmatesData } from "./readmates-page-data";
-import { ReadmatesPageState } from "./readmates-page";
-
-async function loadMyFeedbackDocuments(): Promise<FeedbackDocumentListItem[]> {
-  const response = await readmatesFetchResponse("/api/feedback-documents/me");
-
-  if (response.status === 403) {
-    return [];
-  }
-
-  if (!response.ok) {
-    throw new Error(`ReadMates feedback documents fetch failed: ${response.status}`);
-  }
-
-  return response.json() as Promise<FeedbackDocumentListItem[]>;
-}
+import { LogoutButton } from "@/features/auth/components/logout-button";
+import { MyPageRoute } from "@/features/archive/route/my-page-route";
 
 export default function MyRoutePage() {
-  const state = useReadmatesData(
-    useCallback(async () => {
-      const [data, reports, questions, reviews] = await Promise.all([
-        readmatesFetch<MyPageResponse>("/api/app/me"),
-        loadMyFeedbackDocuments(),
-        readmatesFetch<MyArchiveQuestionItem[]>("/api/archive/me/questions"),
-        readmatesFetch<MyArchiveReviewItem[]>("/api/archive/me/reviews"),
-      ]);
-
-      return { data, reports, questionCount: questions.length, reviewCount: reviews.length };
-    }, []),
-  );
-
-  return (
-    <ReadmatesPageState state={state} loadingLabel="내 공간을 불러오는 중">
-      {(data) => <MyPage {...data} />}
-    </ReadmatesPageState>
-  );
+  return <MyPageRoute LogoutButtonComponent={LogoutButton} />;
 }
