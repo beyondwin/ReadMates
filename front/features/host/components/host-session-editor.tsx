@@ -12,15 +12,6 @@ import {
   type AttendanceStatus,
   type FeedbackDocumentResponse,
 } from "@/shared/api/readmates";
-import {
-  createHostSession,
-  deleteHostSession,
-  fetchHostSessionDeletionPreview,
-  saveHostSessionAttendance,
-  saveHostSessionPublication,
-  updateHostSession,
-  uploadHostSessionFeedbackDocument,
-} from "@/features/host/api/host-api";
 import type {
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
@@ -157,24 +148,14 @@ export type HostSessionEditorActions = {
   uploadFeedbackDocument: (sessionId: string, formData: FormData) => Promise<JsonResponse<FeedbackDocumentResponse>>;
 };
 
-const defaultHostSessionEditorActions: HostSessionEditorActions = {
-  loadDeletionPreview: fetchHostSessionDeletionPreview,
-  deleteSession: deleteHostSession,
-  saveSession: (sessionId, request) =>
-    sessionId === null ? createHostSession(request) : updateHostSession(sessionId, request),
-  savePublication: saveHostSessionPublication,
-  updateAttendance: saveHostSessionAttendance,
-  uploadFeedbackDocument: uploadHostSessionFeedbackDocument,
-};
-
 export default function HostSessionEditor({
   session,
   returnTarget = hostDashboardReturnTarget,
-  actions = defaultHostSessionEditorActions,
+  actions,
 }: {
   session?: HostSessionDetailResponse | null;
   returnTarget?: ReadmatesReturnTarget;
-  actions?: HostSessionEditorActions;
+  actions: HostSessionEditorActions;
 }) {
   const [formDefaults] = useState(() => hydrateHostSessionFormValues(session));
   const [title, setTitle] = useState(formDefaults.title);

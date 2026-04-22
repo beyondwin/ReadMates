@@ -1,4 +1,4 @@
-import { createBrowserRouter, useLocation, type RouteObject } from "react-router-dom";
+import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import {
   CurrentSessionRoute,
   CurrentSessionRouteError,
@@ -7,20 +7,20 @@ import {
   type InternalLinkComponent,
 } from "@/features/current-session";
 import {
-  EditHostSessionRoute,
-  HostDashboardRoute,
   HostInvitationsRoute,
   HostMembersRoute,
   HostRouteError,
-  NewHostSessionRoute,
   hostDashboardLoader,
   hostInvitationsLoader,
   hostMembersLoader,
   hostSessionEditorLoader,
 } from "@/features/host";
-import { useAuth } from "@/src/app/auth-state";
+import {
+  EditHostSessionRouteElement,
+  HostDashboardRouteElement,
+  NewHostSessionRouteElement,
+} from "@/src/app/host-route-elements";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
-import { hostDashboardReturnTarget, readReadmatesReturnTarget } from "@/src/app/route-continuity";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import AboutPage from "@/src/pages/about";
@@ -47,26 +47,6 @@ const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...
     </Link>
   );
 };
-
-function HostDashboardRouteElement() {
-  const authState = useAuth();
-
-  return <HostDashboardRoute auth={authState.status === "ready" ? authState.auth : undefined} />;
-}
-
-function NewHostSessionRouteElement() {
-  const location = useLocation();
-  const returnTarget = readReadmatesReturnTarget(location.state, hostDashboardReturnTarget);
-
-  return <NewHostSessionRoute returnTarget={returnTarget} />;
-}
-
-function EditHostSessionRouteElement() {
-  const location = useLocation();
-  const returnTarget = readReadmatesReturnTarget(location.state, hostDashboardReturnTarget);
-
-  return <EditHostSessionRoute returnTarget={returnTarget} />;
-}
 
 export const routes: RouteObject[] = [
   {

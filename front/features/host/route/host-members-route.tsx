@@ -1,21 +1,7 @@
 import { useLoaderData } from "react-router-dom";
-import {
-  fetchHostMembers,
-  submitHostMemberLifecycle,
-  submitHostViewerAction,
-} from "@/features/host/api/host-api";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
-import HostMembers, { type HostMembersActions } from "@/features/host/components/host-members";
-
-export function hostMembersLoader() {
-  return fetchHostMembers();
-}
-
-const hostMembersActions = {
-  loadMembers: fetchHostMembers,
-  submitLifecycle: submitHostMemberLifecycle,
-  submitViewerAction: submitHostViewerAction,
-} satisfies HostMembersActions;
+import HostMembers from "@/features/host/components/host-members";
+import { hostMembersActions } from "./host-members-data";
 
 export function HostMembersRoute() {
   const members = useLoaderData() as HostMemberListItem[];

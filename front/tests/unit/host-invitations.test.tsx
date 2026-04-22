@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostInvitations from "@/features/host/components/host-invitations";
+import HostInvitations, { type HostInvitationsActions } from "@/features/host/components/host-invitations";
 import type { HostInvitationListItem } from "@/features/host/api/host-contracts";
 
 const invitations: HostInvitationListItem[] = [
@@ -35,6 +35,33 @@ const invitations: HostInvitationListItem[] = [
   },
 ];
 
+const hostInvitationsTestActions = {
+  listInvitations: () => fetch("/api/bff/api/host/invitations", { cache: "no-store" }),
+  createInvitation: (request) =>
+    fetch("/api/bff/api/host/invitations", {
+      method: "POST",
+      headers: new Headers({ "Content-Type": "application/json" }),
+      body: JSON.stringify(request),
+      cache: "no-store",
+    }),
+  revokeInvitation: (invitationId) =>
+    fetch(`/api/bff/api/host/invitations/${encodeURIComponent(invitationId)}/revoke`, {
+      method: "POST",
+      cache: "no-store",
+    }),
+  parseInvitation: async (response) => response.json(),
+  parseInvitationList: async (response) => response.json(),
+} satisfies HostInvitationsActions;
+
+type HostInvitationsProps = Parameters<typeof HostInvitations>[0];
+
+function HostInvitationsForTest({
+  actions,
+  ...props
+}: Omit<HostInvitationsProps, "actions"> & { actions?: HostInvitationsActions }) {
+  return <HostInvitations {...props} actions={actions ?? hostInvitationsTestActions} />;
+}
+
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
@@ -48,12 +75,13 @@ function deferred<T>() {
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("HostInvitations", () => {
   it("renders invitation list statuses and actions", () => {
-    render(<HostInvitations initialInvitations={invitations} />);
+    render(<HostInvitationsForTest initialInvitations={invitations} />);
 
     expect(screen.getByText("초대 파이프라인")).toBeInTheDocument();
     expect(screen.getByText("초대 생성, 대기 링크, 사용됨, 만료/취소 상태를 같은 원장에서 확인합니다.")).toBeInTheDocument();
@@ -125,7 +153,7 @@ describe("HostInvitations", () => {
       configurable: true,
     });
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "새멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
@@ -179,7 +207,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "새멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
     await user.click(screen.getByLabelText("수락하면 이번 세션에도 추가"));
@@ -203,7 +231,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
 
@@ -219,7 +247,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "새멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
 
@@ -239,7 +267,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[invitations[0]]} />);
+    render(<HostInvitationsForTest initialInvitations={[invitations[0]]} />);
 
     const reissueButton = screen.getByRole("button", { name: "pending@example.com 새 링크 발급" });
     await user.click(reissueButton);
@@ -283,7 +311,7 @@ describe("HostInvitations", () => {
       configurable: true,
     });
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "새멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
@@ -322,7 +350,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "기존 멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "old@example.com");
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
@@ -370,7 +398,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "기존 멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "old@example.com");
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
@@ -421,7 +449,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[]} />);
+    render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "표시 멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "displayed@example.com");
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
@@ -482,7 +510,7 @@ describe("HostInvitations", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostInvitations initialInvitations={[revokedInvitation]} />);
+    render(<HostInvitationsForTest initialInvitations={[revokedInvitation]} />);
     await user.click(screen.getByRole("button", { name: "accepted@example.com 새 링크 발급" }));
 
     await waitFor(() => expect(screen.getByText("대기 · 만료 2026.05.25")).toBeInTheDocument());

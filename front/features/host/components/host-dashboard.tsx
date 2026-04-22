@@ -2,7 +2,6 @@ import { Link } from "@/src/app/router-link";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { hostDashboardReturnTarget, readmatesReturnState } from "@/src/app/route-continuity";
 import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
-import { submitHostMemberLifecycle } from "@/features/host/api/host-api";
 import type { HostDashboardResponse } from "@/features/host/api/host-contracts";
 import {
   getHostDashboardChecklist,
@@ -82,18 +81,6 @@ export type HostDashboardActions = {
 };
 
 const newSessionHref = "/app/host/sessions/new";
-const defaultHostDashboardActions: HostDashboardActions = {
-  updateCurrentSessionParticipation: async (membershipId, action) => {
-    const response = await submitHostMemberLifecycle(
-      membershipId,
-      action === "add" ? "/current-session/add" : "/current-session/remove",
-    );
-
-    if (!response.ok) {
-      throw new Error("Current session member action failed");
-    }
-  },
-};
 
 function memberSessionState(session: CurrentSession, member: CurrentSession["attendees"][number]) {
   const rsvp = rsvpLabel(member.rsvpStatus);
@@ -159,12 +146,12 @@ export default function HostDashboard({
   auth,
   current,
   data,
-  actions = defaultHostDashboardActions,
+  actions,
 }: {
   auth?: AuthMeResponse;
   current?: CurrentSessionResponse;
   data: HostDashboardResponse;
-  actions?: HostDashboardActions;
+  actions: HostDashboardActions;
 }) {
   const hostName = auth?.displayName ?? "호스트";
   const session = current?.currentSession ?? null;

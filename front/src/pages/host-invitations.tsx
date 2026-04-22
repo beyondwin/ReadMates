@@ -1,4 +1,1 @@
-export {
-  HostInvitationsRoute as default,
-  hostInvitationsLoader,
-} from "@/features/host";
+export { HostInvitationsRoute as default } from "@/features/host";

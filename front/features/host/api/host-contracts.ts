@@ -181,6 +181,8 @@ export type CreatedSessionResponse = {
   meetingUrl: string | null;
   meetingPasscode: string | null;
   date: string;
+  startTime: string;
+  endTime: string;
   questionDeadlineAt: string;
   state: SessionState;
 };

@@ -1,4 +1,1 @@
-export {
-  HostMembersRoute as default,
-  hostMembersLoader,
-} from "@/features/host";
+export { HostMembersRoute as default } from "@/features/host";

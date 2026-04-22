@@ -1,5 +1,1 @@
-export {
-  EditHostSessionRoute as default,
-  NewHostSessionRoute as NewHostSessionPage,
-  hostSessionEditorLoader,
-} from "@/features/host";
+export { EditHostSessionRoute as default } from "@/features/host";
