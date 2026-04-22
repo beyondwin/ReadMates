@@ -8,11 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  type AttendanceStatus,
-  type FeedbackDocumentResponse,
-} from "@/shared/api/readmates";
 import type {
+  AttendanceStatus,
+  FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
 } from "@/features/host/api/host-contracts";

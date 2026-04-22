@@ -4,8 +4,7 @@ import {
   submitHostMemberLifecycle,
 } from "@/features/host/api/host-api";
 import type { HostDashboardActions } from "@/features/host/components/host-dashboard";
-import type { HostDashboardResponse } from "@/features/host/api/host-contracts";
-import type { CurrentSessionResponse } from "@/shared/api/readmates";
+import type { CurrentSessionResponse, HostDashboardResponse } from "@/features/host/api/host-contracts";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 
 export type HostDashboardRouteData = {

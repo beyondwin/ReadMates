@@ -1,6 +1,9 @@
 import { Link } from "@/src/app/router-link";
 import { type CSSProperties, type ReactNode } from "react";
-import type { CurrentSessionResponse, NoteFeedItem } from "@/shared/api/readmates";
+import type {
+  MemberHomeCurrentSessionResponse as CurrentSessionResponse,
+  MemberHomeNoteFeedItem as NoteFeedItem,
+} from "@/features/member-home/api/member-home-contracts";
 import type { AttendanceSummary } from "@/features/member-home/components/member-home-records-utils";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { rsvpLabel } from "@/shared/ui/readmates-display";

@@ -11,13 +11,11 @@ import {
 } from "react";
 import type {
   CurrentSessionPolicy,
-  MembershipStatus,
-  SessionParticipationStatus,
-} from "@/shared/api/readmates";
-import type {
   HostMemberListItem,
+  MembershipStatus,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
+  SessionParticipationStatus,
   ViewerMember,
 } from "@/features/host/api/host-contracts";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";

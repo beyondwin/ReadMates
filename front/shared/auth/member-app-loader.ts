@@ -1,6 +1,6 @@
 import { redirect } from "react-router-dom";
 import { readmatesFetch } from "@/shared/api/client";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { canUseMemberApp } from "@/shared/auth/member-app-access";
 
 export type MemberAppAccess = {

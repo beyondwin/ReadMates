@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { anonymousAuth, AuthContext, type AuthState } from "@/src/app/auth-state";
 
 export function AuthProvider({ children }: PropsWithChildren) {

@@ -15,6 +15,7 @@ import { publicClubLoader, publicSessionLoader } from "@/features/public/route/p
 import { PublicRouteError } from "@/features/public/route/public-route-state";
 import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
+import { memberHomeLoader } from "@/features/member-home/route/member-home-data";
 import { memberSessionDetailLoader } from "@/features/archive/route/member-session-detail-data";
 import { myPageLoader } from "@/features/archive/route/my-page-data";
 import {
@@ -116,7 +117,13 @@ export const routes: RouteObject[] = [
       </RequireMemberApp>
     ),
     children: [
-      { index: true, element: <AppHomePage /> },
+      {
+        index: true,
+        element: <AppHomePage />,
+        loader: memberHomeLoader,
+        errorElement: <ArchiveRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
+      },
       {
         path: "session/current",
         element: <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,

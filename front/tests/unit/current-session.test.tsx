@@ -13,7 +13,8 @@ import type {
   CurrentSessionPageData,
 } from "@/features/current-session/ui/current-session-types";
 import { CurrentSessionRoute, currentSessionLoader } from "@/features/current-session";
-import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
+import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { currentSessionContractFixture } from "./api-contract-fixtures";
 
 afterEach(cleanup);

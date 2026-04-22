@@ -1,6 +1,5 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import LegacyInviteAcceptanceCard from "@/features/auth/components/invite-acceptance-card";
 import { InviteAcceptanceRouteContent } from "@/features/auth/route/invite-route";
 
 afterEach(() => {
@@ -54,7 +53,7 @@ describe("InviteAcceptanceRouteContent", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the legacy component shim loading invitation previews from the token prop", async () => {
+  it("loads invitation previews from the token prop", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       jsonResponse({
         clubName: "읽는사이",
@@ -68,7 +67,7 @@ describe("InviteAcceptanceRouteContent", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<LegacyInviteAcceptanceCard token="raw-token" />);
+    render(<InviteAcceptanceRouteContent token="raw-token" />);
 
     expect(await screen.findByText("member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(

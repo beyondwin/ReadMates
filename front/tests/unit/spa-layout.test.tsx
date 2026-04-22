@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
 import { AppRouteLayout } from "@/src/app/layouts";
 import { RequireMemberApp } from "@/src/app/route-guards";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 const hostAuth: AuthMeResponse = {
   authenticated: true,

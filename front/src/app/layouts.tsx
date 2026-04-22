@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
+import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import { useAuth } from "@/src/app/auth-state";
-import type { CurrentSessionResponse } from "@/shared/api/readmates";
-import { readmatesFetch } from "@/shared/api/readmates";
+import { readmatesFetch } from "@/shared/api/client";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";

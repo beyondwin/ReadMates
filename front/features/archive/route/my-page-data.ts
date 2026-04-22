@@ -6,7 +6,7 @@ import {
 } from "@/features/archive/api/archive-api";
 import type { FeedbackDocumentListItem, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 export type MyPageRouteData = {
   data: MyPageResponse;

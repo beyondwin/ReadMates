@@ -817,7 +817,7 @@ git commit -m "refactor: route remaining frontend features through feature modul
 - Modify imports across `front/src`, `front/features`, `front/shared`, `front/tests`
 - Modify: `front/tests/unit/frontend-boundaries.test.ts`
 
-- [ ] **Step 1: Find remaining compatibility imports**
+- [x] **Step 1: Find remaining compatibility imports**
 
 Run:
 
@@ -828,22 +828,22 @@ rg "useReadmatesData|requestReadmatesRouteRefresh|ReadmatesPageState" front/src 
 
 Expected: remaining uses are understood before editing.
 
-- [ ] **Step 2: Move remaining contracts**
+- [x] **Step 2: Move remaining contracts**
 
 Move remaining feature-specific contracts out of `shared/api/readmates.ts`. Keep only truly shared primitive types if any remain.
 
-- [ ] **Step 3: Remove compatibility route hook**
+- [x] **Step 3: Remove compatibility route hook**
 
 Remove `useReadmatesData` and `requestReadmatesRouteRefresh` once route loaders/actions cover all pages. If `ReadmatesPageState` is still useful as a pure loading/error view, move it to a shared route UI module without data-loading behavior.
 
-- [ ] **Step 4: Tighten boundary test**
+- [x] **Step 4: Tighten boundary test**
 
 Make the boundary test fail on old compatibility patterns:
 
 - feature route/page direct import from `shared/api/readmates` when feature API exists
 - `features/*/components` as a long-term public location if the feature has moved to `ui`
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- frontend-boundaries.test.ts readmates-fetch.test.ts spa-router.test.tsx
@@ -853,7 +853,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 11**
+- [x] **Step 6: Commit Task 11**
 
 ```bash
 git add front/shared/api/readmates.ts front/src front/features front/tests

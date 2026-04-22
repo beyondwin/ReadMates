@@ -1,8 +1,9 @@
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/readmates";
-import type { CurrentSessionResponse, FeedbackDocumentResponse } from "@/shared/api/readmates";
+import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 import type {
   CreatedSessionResponse,
   CreateHostInvitationRequest,
+  CurrentSessionResponse,
+  FeedbackDocumentResponse,
   HostAttendanceUpdate,
   HostDashboardResponse,
   HostInvitationListItem,

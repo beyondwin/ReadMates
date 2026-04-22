@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 import { isReadmatesApiError } from "@/shared/api/errors";
-import { readmatesFetchResponse as readmatesFetchResponseFromContractModule } from "@/shared/api/readmates";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -9,10 +8,6 @@ afterEach(() => {
 });
 
 describe("readmatesFetchResponse", () => {
-  it("keeps readmates.ts compatibility exports wired to the primitive client", () => {
-    expect(readmatesFetchResponseFromContractModule).toBe(readmatesFetchResponse);
-  });
-
   it("redirects to login and rejects when the BFF returns 401", async () => {
     const assignMock = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));

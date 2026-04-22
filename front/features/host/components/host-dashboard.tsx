@@ -1,8 +1,8 @@
 import { Link } from "@/src/app/router-link";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { hostDashboardReturnTarget, readmatesReturnState } from "@/src/app/route-continuity";
-import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
-import type { HostDashboardResponse } from "@/features/host/api/host-contracts";
+import type { CurrentSessionResponse, HostDashboardResponse } from "@/features/host/api/host-contracts";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   getHostDashboardChecklist,
   getHostDashboardNextOperationAction,
