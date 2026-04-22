@@ -436,7 +436,7 @@ git commit -m "feat: polish mobile workspace header"
 - Modify: `front/shared/styles/mobile.css`
 - Modify: `front/shared/ui/mobile-tab-bar.tsx`
 
-- [ ] **Step 1: Add `data-variant` to the mobile tab bar**
+- [x] **Step 1: Add `data-variant` to the mobile tab bar**
 
 In `front/shared/ui/mobile-tab-bar.tsx`, replace the opening `<nav>` with:
 
@@ -449,7 +449,7 @@ In `front/shared/ui/mobile-tab-bar.tsx`, replace the opening `<nav>` with:
 >
 ```
 
-- [ ] **Step 2: Replace the mobile header CSS block**
+- [x] **Step 2: Replace the mobile header CSS block**
 
 In `front/shared/styles/mobile.css`, replace the existing block from `/* Sticky header */` through `.m-hdr-link:active` with:
 
@@ -579,7 +579,7 @@ In `front/shared/styles/mobile.css`, replace the existing block from `/* Sticky 
 }
 ```
 
-- [ ] **Step 3: Replace the active tab CSS**
+- [x] **Step 3: Replace the active tab CSS**
 
 In `front/shared/styles/mobile.css`, replace the current `.m-tabbar`, `.m-tab`, `.m-tab[aria-current="page"]`, `.m-tab[aria-disabled="true"]`, `.m-tab[aria-current="page"]::before`, and `.m-tab-label` block with:
 
@@ -651,7 +651,7 @@ In `front/shared/styles/mobile.css`, replace the current `.m-tabbar`, `.m-tab`, 
 }
 ```
 
-- [ ] **Step 4: Run the focused unit test**
+- [x] **Step 4: Run the focused unit test**
 
 Run:
 
@@ -665,7 +665,7 @@ Expected:
 PASS  front/tests/unit/responsive-navigation.test.tsx
 ```
 
-- [ ] **Step 5: Commit the mobile CSS and tab variant**
+- [x] **Step 5: Commit the mobile CSS and tab variant**
 
 ```bash
 git add front/shared/styles/mobile.css front/shared/ui/mobile-tab-bar.tsx
