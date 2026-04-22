@@ -46,28 +46,28 @@ class GoogleLoginService(
         }
 
         return connectExistingEmailUser(googleSubjectId, normalizedEmail, profileImageUrl)
-            ?: createPendingGoogleMember(googleSubjectId, normalizedEmail, displayName, profileImageUrl)
+            ?: createViewerGoogleMember(googleSubjectId, normalizedEmail, displayName, profileImageUrl)
     }
 
-    private fun createPendingGoogleMember(
+    private fun createViewerGoogleMember(
         googleSubjectId: String,
         normalizedEmail: String,
         displayName: String?,
         profileImageUrl: String?,
     ): CurrentMember {
         return try {
-            memberAccountRepository.createPendingGoogleMember(
+            memberAccountRepository.createViewerGoogleMember(
                 googleSubjectId = googleSubjectId,
                 email = normalizedEmail,
                 displayName = displayName,
                 profileImageUrl = profileImageUrl,
             )
         } catch (exception: DuplicateKeyException) {
-            resolveDuplicatePendingGoogleMember(googleSubjectId, normalizedEmail, profileImageUrl, exception)
+            resolveDuplicateViewerGoogleMember(googleSubjectId, normalizedEmail, profileImageUrl, exception)
         }
     }
 
-    private fun resolveDuplicatePendingGoogleMember(
+    private fun resolveDuplicateViewerGoogleMember(
         googleSubjectId: String,
         normalizedEmail: String,
         profileImageUrl: String?,
@@ -104,7 +104,7 @@ class GoogleLoginService(
         if (!connected) {
             throw GoogleLoginException("Existing user is connected to a different Google account")
         }
-        return memberAccountRepository.findMemberByUserIdIncludingPending(userId)
+        return memberAccountRepository.findMemberByUserIdIncludingViewer(userId)
             ?: throw GoogleLoginException("Connected user has no membership")
     }
 }

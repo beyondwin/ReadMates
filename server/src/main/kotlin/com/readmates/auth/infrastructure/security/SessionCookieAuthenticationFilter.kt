@@ -33,8 +33,8 @@ class SessionCookieAuthenticationFilter(
                 ?.let { authenticatedMemberResolver.resolveByUserId(it.userId) }
 
             if (member != null) {
-                val roleAuthority = if (member.isPendingApproval) {
-                    "ROLE_PENDING_APPROVAL"
+                val roleAuthority = if (member.isViewer) {
+                    "ROLE_VIEWER"
                 } else {
                     "ROLE_${member.role}"
                 }

@@ -14,7 +14,7 @@ import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
 import java.util.UUID
 
-data class PendingApprovalMemberResponse(
+data class ViewerMemberResponse(
     val membershipId: String,
     val userId: String,
     val email: String,
@@ -29,7 +29,7 @@ data class PendingApprovalMemberResponse(
 class MemberApprovalService(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) {
-    fun listPending(host: CurrentMember): List<PendingApprovalMemberResponse> {
+    fun listViewers(host: CurrentMember): List<ViewerMemberResponse> {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         return jdbcTemplate.query(
@@ -47,16 +47,16 @@ class MemberApprovalService(
             join users on users.id = memberships.user_id
             where memberships.club_id = ?
               and memberships.role = 'MEMBER'
-              and memberships.status = 'PENDING_APPROVAL'
+              and memberships.status = 'VIEWER'
             order by memberships.created_at desc, memberships.id desc
             """.trimIndent(),
-            ::mapPendingApprovalMember,
+            ::mapViewerMember,
             host.clubId.dbString(),
         )
     }
 
     @Transactional
-    fun approve(host: CurrentMember, membershipId: UUID): PendingApprovalMemberResponse {
+    fun activateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -68,13 +68,13 @@ class MemberApprovalService(
             where id = ?
               and club_id = ?
               and role = 'MEMBER'
-              and status = 'PENDING_APPROVAL'
+              and status = 'VIEWER'
             """.trimIndent(),
             membershipId.dbString(),
             host.clubId.dbString(),
         )
         if (updated != 1) {
-            throw pendingApprovalNotFound()
+            throw viewerMemberNotFound()
         }
 
         addToCurrentOpenSession(jdbcTemplate, host.clubId, membershipId)
@@ -82,7 +82,7 @@ class MemberApprovalService(
     }
 
     @Transactional
-    fun reject(host: CurrentMember, membershipId: UUID): PendingApprovalMemberResponse {
+    fun deactivateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -93,13 +93,13 @@ class MemberApprovalService(
             where id = ?
               and club_id = ?
               and role = 'MEMBER'
-              and status = 'PENDING_APPROVAL'
+              and status = 'VIEWER'
             """.trimIndent(),
             membershipId.dbString(),
             host.clubId.dbString(),
         )
         if (updated != 1) {
-            throw pendingApprovalNotFound()
+            throw viewerMemberNotFound()
         }
 
         return findForHost(jdbcTemplate, host.clubId, membershipId)
@@ -108,8 +108,16 @@ class MemberApprovalService(
     private fun addToCurrentOpenSession(jdbcTemplate: JdbcTemplate, clubId: UUID, membershipId: UUID) {
         jdbcTemplate.update(
             """
-            insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
-            select ?, sessions.club_id, sessions.id, ?, 'NO_RESPONSE', 'UNKNOWN'
+            insert into session_participants (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              rsvp_status,
+              attendance_status,
+              participation_status
+            )
+            select ?, sessions.club_id, sessions.id, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE'
             from sessions
             where sessions.club_id = ?
               and sessions.state = 'OPEN'
@@ -118,6 +126,7 @@ class MemberApprovalService(
             on duplicate key update
               rsvp_status = session_participants.rsvp_status,
               attendance_status = session_participants.attendance_status,
+              participation_status = 'ACTIVE',
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
@@ -130,7 +139,7 @@ class MemberApprovalService(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         membershipId: UUID,
-    ): PendingApprovalMemberResponse =
+    ): ViewerMemberResponse =
         jdbcTemplate.query(
             """
             select
@@ -148,13 +157,13 @@ class MemberApprovalService(
               and memberships.club_id = ?
               and memberships.role = 'MEMBER'
             """.trimIndent(),
-            ::mapPendingApprovalMember,
+            ::mapViewerMember,
             membershipId.dbString(),
             clubId.dbString(),
-        ).firstOrNull() ?: throw pendingApprovalNotFound()
+        ).firstOrNull() ?: throw viewerMemberNotFound()
 
-    private fun mapPendingApprovalMember(resultSet: ResultSet, @Suppress("UNUSED_PARAMETER") rowNumber: Int) =
-        PendingApprovalMemberResponse(
+    private fun mapViewerMember(resultSet: ResultSet, @Suppress("UNUSED_PARAMETER") rowNumber: Int) =
+        ViewerMemberResponse(
             membershipId = resultSet.uuid("membership_id").toString(),
             userId = resultSet.uuid("user_id").toString(),
             email = resultSet.getString("email"),
@@ -171,8 +180,8 @@ class MemberApprovalService(
         }
     }
 
-    private fun pendingApprovalNotFound(): ResponseStatusException =
-        ResponseStatusException(HttpStatus.NOT_FOUND, "Pending approval member not found")
+    private fun viewerMemberNotFound(): ResponseStatusException =
+        ResponseStatusException(HttpStatus.NOT_FOUND, "Viewer member not found")
 
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateProvider.ifAvailable

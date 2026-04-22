@@ -29,11 +29,13 @@ export function AppRouteLayout() {
   const pathname = useLocation().pathname;
   const auth = state.status === "ready" ? state.auth : null;
   const isHostWorkspace = pathname.startsWith("/app/host");
+  const isHostRecordRoute = pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/");
   const isActiveHost = auth?.role === "HOST" && auth.approvalState === "ACTIVE";
-  const variant = isHostWorkspace ? "host" : "member";
+  const desktopVariant = isHostWorkspace ? "host" : "member";
+  const mobileVariant = isActiveHost && (isHostWorkspace || isHostRecordRoute) ? "host" : "member";
   const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
   const memberName = auth?.displayName ?? auth?.shortName ?? null;
-  const activeHostKey = isActiveHost && isHostWorkspace ? auth.membershipId : null;
+  const activeHostKey = isActiveHost && (isHostWorkspace || isHostRecordRoute) ? auth.membershipId : null;
   const [hostCurrentSession, setHostCurrentSession] = useState<{
     hostKey: string | null;
     sessionId: string | null;
@@ -74,10 +76,10 @@ export function AppRouteLayout() {
   return (
     <div className="app-shell">
       <div className="desktop-only">
-        <TopNav variant={variant} memberName={memberName} showHostEntry={showHostEntry} />
+        <TopNav variant={desktopVariant} memberName={memberName} showHostEntry={showHostEntry} />
       </div>
       <div className="mobile-only">
-        <MobileHeader variant={variant} showHostEntry={showHostEntry} />
+        <MobileHeader variant={mobileVariant} showHostEntry={showHostEntry} />
       </div>
       <div className="app-content">
         <Outlet />
@@ -86,7 +88,7 @@ export function AppRouteLayout() {
         <PublicFooter />
       </div>
       <div className="mobile-only">
-        <MobileTabBar variant={variant} currentSessionId={currentSessionId} />
+        <MobileTabBar variant={mobileVariant} currentSessionId={currentSessionId} />
       </div>
     </div>
   );

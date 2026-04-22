@@ -146,8 +146,8 @@ class FeedbackDocumentController(
 
     private fun readableFeedbackMember(authentication: Authentication?): CurrentMember {
         val member = currentMember(authentication)
-        if (member.isPendingApproval) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Feedback documents require approved membership")
+        if (member.isViewer) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Feedback documents require full membership")
         }
         return member
     }

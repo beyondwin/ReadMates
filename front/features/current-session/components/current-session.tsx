@@ -27,7 +27,11 @@ import type {
   SaveScope,
   SaveState,
 } from "@/features/current-session/components/current-session-types";
-import { SUSPENDED_MEMBER_NOTICE } from "@/features/current-session/components/current-session-types";
+import {
+  SUSPENDED_MEMBER_NOTICE,
+  VIEWER_MEMBER_NOTICE,
+  VIEWER_MEMBER_SHORT_NOTICE,
+} from "@/features/current-session/components/current-session-types";
 import { requestReadmatesRouteRefresh } from "@/src/pages/readmates-page-data";
 import type { CurrentSessionResponse } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
@@ -64,12 +68,12 @@ export default function CurrentSession({ auth, data }: { auth?: CurrentSessionAu
     <CurrentSessionBoard
       key={data.currentSession.sessionId}
       session={data.currentSession}
-      isSuspended={auth?.membershipStatus === "SUSPENDED"}
+      auth={auth}
     />
   );
 }
 
-function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession; isSuspended: boolean }) {
+function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?: CurrentSessionAuth }) {
   const [rsvp, setRsvp] = useState<CurrentSession["myRsvpStatus"]>(session.myRsvpStatus);
   const [readingProgress, setReadingProgress] = useState(session.myCheckin?.readingProgress ?? 0);
   const [checkinNote, setCheckinNote] = useState(session.myCheckin?.note ?? "");
@@ -81,6 +85,9 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   const [boardTab, setBoardTab] = useState<BoardTab>("questions");
   const [mobileTab, setMobileTab] = useState<MobileSessionTab>("prep");
   const writtenQuestionCount = questionInputs.filter((input) => input.text.trim()).length;
+  const isViewer = auth?.membershipStatus === "VIEWER";
+  const isSuspended = auth?.membershipStatus === "SUSPENDED";
+  const canWrite = auth ? auth.membershipStatus === "ACTIVE" && auth.approvalState === "ACTIVE" : true;
 
   const setSaveStatus = (scope: SaveScope, status: SaveState) => {
     setSaveStatuses((current) => ({ ...current, [scope]: status }));
@@ -90,7 +97,23 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
     setSaveStatuses((current) => (current[scope] === "idle" ? current : { ...current, [scope]: "idle" }));
   };
 
+  const blockReadOnlyWrite = () => {
+    if (canWrite) {
+      return false;
+    }
+
+    if (isViewer) {
+      setQuestionValidationMessage(VIEWER_MEMBER_NOTICE);
+    }
+
+    return true;
+  };
+
   const updateQuestionInput = (index: number, value: string) => {
+    if (!canWrite) {
+      return;
+    }
+
     resetSaveStatus("question");
     setQuestionValidationMessage("");
     setQuestionInputs((current) =>
@@ -99,7 +122,7 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   };
 
   const addQuestionInput = () => {
-    if (isSuspended) {
+    if (blockReadOnlyWrite()) {
       return;
     }
 
@@ -114,7 +137,7 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   };
 
   const removeQuestionInput = (index: number) => {
-    if (isSuspended) {
+    if (blockReadOnlyWrite()) {
       return;
     }
 
@@ -129,7 +152,7 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   };
 
   const handleSaveQuestions = () => {
-    if (isSuspended) {
+    if (blockReadOnlyWrite()) {
       return;
     }
 
@@ -163,7 +186,7 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   };
 
   const handleRsvp = (status: RsvpUpdateStatus) => {
-    if (isSuspended) {
+    if (blockReadOnlyWrite()) {
       return;
     }
 
@@ -184,27 +207,43 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   };
 
   const handleReadingProgressChange = (value: number) => {
+    if (!canWrite) {
+      return;
+    }
+
     resetSaveStatus("checkin");
     setReadingProgress(value);
   };
 
   const handleCheckinNoteChange = (value: string) => {
+    if (!canWrite) {
+      return;
+    }
+
     resetSaveStatus("checkin");
     setCheckinNote(value);
   };
 
   const handleLongReviewChange = (value: string) => {
+    if (!canWrite) {
+      return;
+    }
+
     resetSaveStatus("longReview");
     setLongReview(value);
   };
 
   const handleOneLineReviewChange = (value: string) => {
+    if (!canWrite) {
+      return;
+    }
+
     resetSaveStatus("oneLineReview");
     setOneLineReview(value);
   };
 
   const handleSaveCheckin = () => {
-    if (isSuspended) {
+    if (blockReadOnlyWrite()) {
       return;
     }
 
@@ -212,7 +251,7 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   };
 
   const handleSaveLongReview = () => {
-    if (isSuspended) {
+    if (blockReadOnlyWrite()) {
       return;
     }
 
@@ -220,7 +259,7 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
   };
 
   const handleSaveOneLineReview = () => {
-    if (isSuspended) {
+    if (blockReadOnlyWrite()) {
       return;
     }
 
@@ -258,6 +297,8 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
         onSaveLongReview={handleSaveLongReview}
         onSaveOneLineReview={handleSaveOneLineReview}
         isSuspended={isSuspended}
+        isViewer={isViewer}
+        canWrite={canWrite}
       />
 
       <main className="desktop-only rm-current-session-desktop">
@@ -298,10 +339,11 @@ function CurrentSessionBoard({ session, isSuspended }: { session: CurrentSession
             <div className="ws-grid">
               <fieldset
                 className="stack"
-                disabled={isSuspended}
+                disabled={!canWrite}
                 style={{ "--stack": "20px", border: 0, margin: 0, padding: 0, minWidth: 0 } as CSSProperties}
               >
                 {isSuspended ? <SuspendedMemberNotice /> : null}
+                {isViewer ? <ViewerMemberNotice /> : null}
 
                 <RsvpPanel rsvp={rsvp} onRsvp={handleRsvp} />
 
@@ -424,6 +466,22 @@ function SuspendedMemberNotice() {
     >
       <p className="small" style={{ margin: 0 }}>
         {SUSPENDED_MEMBER_NOTICE}
+      </p>
+    </div>
+  );
+}
+
+function ViewerMemberNotice() {
+  return (
+    <div className="surface-quiet" role="note" style={{ padding: "16px 18px" }}>
+      <p className="eyebrow" style={{ margin: 0 }}>
+        둘러보기 멤버
+      </p>
+      <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+        {VIEWER_MEMBER_SHORT_NOTICE}
+      </p>
+      <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
+        정식 멤버가 되면 RSVP와 질문 작성이 열립니다.
       </p>
     </div>
   );

@@ -32,7 +32,7 @@ test("host creates session seven and member sees current session", async ({ page
   await page.getByLabel("책 제목").fill("테스트 책");
   await page.getByLabel("저자").fill("테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: "변경 사항 저장" }).click();
+  await page.getByRole("button", { name: "새 세션 만들기" }).click();
 
   await expect(page).toHaveURL(/\/app\/session\/current/);
   await expect(page.getByRole("heading", { level: 1, name: "테스트 책" })).toBeVisible();
@@ -61,7 +61,7 @@ test("host invites a new member and invite page uses Google acceptance", async (
   await page.getByLabel("책 제목").fill("초대 테스트 책");
   await page.getByLabel("저자").fill("초대 테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: "변경 사항 저장" }).click();
+  await page.getByRole("button", { name: "새 세션 만들기" }).click();
   await expect(page).toHaveURL(/\/app\/session\/current/);
 
   await page.goto("/app/host/invitations");

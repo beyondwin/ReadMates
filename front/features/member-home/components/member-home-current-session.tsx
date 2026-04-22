@@ -151,9 +151,11 @@ export function MobileIcon({ name, size = 18, style }: { name: MobileIconName; s
 export function MobileCurrentSessionCard({
   session,
   isHost,
+  isViewer = false,
 }: {
   session: CurrentSession | null;
   isHost: boolean;
+  isViewer?: boolean;
 }) {
   if (!session) {
     return (
@@ -229,6 +231,14 @@ export function MobileCurrentSessionCard({
         <div className="tiny" style={{ color: "var(--text-3)", marginTop: 12 }}>
           참석 {attendance.attended}/{attendance.total} · 현재 RSVP {rsvpLabel(session.myRsvpStatus)}
         </div>
+        {isViewer ? (
+          <div className="m-card-quiet" role="note" style={{ marginTop: 12 }}>
+            <div className="eyebrow">둘러보기 멤버</div>
+            <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
+              정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
+            </p>
+          </div>
+        ) : null}
         <Link to="/app/session/current" className="btn btn-primary rm-member-session-card__primary">
           세션 열기 <MobileIcon name="arrow-right" size={14} />
         </Link>
@@ -250,7 +260,13 @@ export function MobileCurrentSessionCard({
   );
 }
 
-export function MobileTodayActions({ session }: { session: CurrentSession | null }) {
+export function MobileTodayActions({
+  session,
+  isViewer = false,
+}: {
+  session: CurrentSession | null;
+  isViewer?: boolean;
+}) {
   if (!session) {
     return (
       <section className="m-sec">
@@ -273,6 +289,35 @@ export function MobileTodayActions({ session }: { session: CurrentSession | null
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
   const meetingHref = meetingUrl ?? "/app/session/current";
   const meetingSub = session.meetingPasscode ?? session.locationLabel;
+
+  if (isViewer) {
+    return (
+      <section className="m-sec">
+        <div className="m-eyebrow-row">
+          <span className="eyebrow">오늘 할 일</span>
+          <span className="tiny mono" style={{ color: "var(--text-3)" }}>
+            읽기 전용
+          </span>
+        </div>
+        <div className="m-card-quiet" role="note" style={{ marginBottom: 10 }}>
+          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+            전체 세션은 볼 수 있어요. 정식 멤버가 되면 참여와 작성이 열립니다.
+          </p>
+        </div>
+        <div className="m-action-grid">
+          <MobileActionTile label="세션 읽기" sub="준비 보드 보기" href="/app/session/current" icon="01" />
+          <MobileActionTile label="공동 보드 보기" sub={`${session.board.questions.length}개 질문`} href="/app/session/current" icon="02" />
+          <MobileActionTile
+            label="모임 정보"
+            sub={meetingSub}
+            href={meetingHref}
+            icon="03"
+            external={Boolean(meetingUrl)}
+          />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="m-sec">

@@ -132,7 +132,7 @@ describe("MobileHeader route titles and actions", () => {
   it("renders host editor pages with a host back link", () => {
     renderAt("/app/host/sessions/session-6/edit", <MobileHeader variant="host" />);
 
-    expect(screen.getByText("세션 편집")).toBeInTheDocument();
+    expect(screen.getByText("세션")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
     expect(screen.getByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
   });
@@ -140,7 +140,7 @@ describe("MobileHeader route titles and actions", () => {
   it("renders the host new session route as the session editor title", () => {
     renderAt("/app/host/sessions/new", <MobileHeader variant="host" />);
 
-    expect(screen.getByText("세션 편집")).toBeInTheDocument();
+    expect(screen.getByText("세션")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
     expect(screen.getByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
   });
@@ -180,19 +180,19 @@ describe("MobileTabBar app tabs", () => {
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
-      "운영",
-      "세션 편집",
-      "멤버 초대",
-      "멤버 승인",
+      "오늘",
+      "세션",
+      "멤버",
+      "기록",
     ]);
-    expect(within(tabs).getByRole("link", { name: "운영" })).toHaveAttribute("href", "/app/host");
-    expect(within(tabs).getByRole("link", { name: "세션 편집" })).toHaveAttribute(
+    expect(within(tabs).getByRole("link", { name: "오늘" })).toHaveAttribute("href", "/app/host");
+    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
       "href",
       "/app/host/sessions/session-6/edit",
     );
-    expect(within(tabs).getByRole("link", { name: "멤버 초대" })).toHaveAttribute("href", "/app/host/invitations");
-    expect(within(tabs).getByRole("link", { name: "멤버 승인" })).toHaveAttribute("href", "/app/host/members");
-    expect(within(tabs).getByRole("link", { name: "세션 편집" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "멤버" })).toHaveAttribute("href", "/app/host/members");
+    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/archive");
+    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).queryByRole("link", { name: "이번 세션" })).not.toBeInTheDocument();
     expect(within(tabs).queryByRole("link", { name: "내 공간" })).not.toBeInTheDocument();
     expect(within(tabs).getAllByRole("link").map((tab) => tab.getAttribute("href"))).not.toContain(
@@ -204,37 +204,47 @@ describe("MobileTabBar app tabs", () => {
     renderAt("/app/host/sessions/session-6/edit", <MobileTabBar variant="host" currentSessionId="session-6" />);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).getByRole("link", { name: "운영" })).not.toHaveAttribute("aria-current");
-    expect(within(tabs).getByRole("link", { name: "세션 편집" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "오늘" })).not.toHaveAttribute("aria-current");
+    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("marks host invitation and approval tabs active on their routes", () => {
+  it("marks the host member tab active on invitation and member routes", () => {
     renderAt("/app/host/invitations", <MobileTabBar variant="host" currentSessionId={null} />);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).getByRole("link", { name: "멤버 초대" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "멤버" })).toHaveAttribute("href", "/app/host/members");
+    expect(within(tabs).getByRole("link", { name: "멤버" })).toHaveAttribute("aria-current", "page");
 
     cleanup();
     renderAt("/app/host/members", <MobileTabBar variant="host" currentSessionId={null} />);
 
     const approvalTabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(approvalTabs).getByRole("link", { name: "멤버 승인" })).toHaveAttribute("aria-current", "page");
+    expect(within(approvalTabs).getByRole("link", { name: "멤버" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("marks host records active on archive routes", () => {
+    renderAt("/app/archive", <MobileTabBar variant="host" currentSessionId="session-6" />);
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/archive");
+    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "오늘" })).not.toHaveAttribute("aria-current");
   });
 
   it("disables host edit while the current session lookup is loading", () => {
     renderAt("/app/host", <MobileTabBar variant="host" currentSessionId={undefined} />);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).queryByRole("link", { name: "세션 편집" })).not.toBeInTheDocument();
-    expect(within(tabs).getByText("세션 편집").closest("[aria-disabled='true']")).not.toBeNull();
-    expect(within(tabs).getByRole("link", { name: "운영" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
+    expect(within(tabs).getByText("세션").closest("[aria-disabled='true']")).not.toBeNull();
+    expect(within(tabs).getByRole("link", { name: "오늘" })).toHaveAttribute("aria-current", "page");
   });
 
   it("links host edit to new session when there is no current session", () => {
     renderAt("/app/host", <MobileTabBar variant="host" currentSessionId={null} />);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).getByRole("link", { name: "운영" })).toHaveAttribute("aria-current", "page");
-    expect(within(tabs).getByRole("link", { name: "세션 편집" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(within(tabs).getByRole("link", { name: "오늘" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute("href", "/app/host/sessions/new");
   });
 });

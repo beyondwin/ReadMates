@@ -59,7 +59,7 @@ class MemberAccountRepository(
             join memberships on memberships.user_id = users.id
             join clubs on clubs.id = memberships.club_id
             where users.id = ?
-              and memberships.status in ('ACTIVE', 'SUSPENDED', 'PENDING_APPROVAL')
+              and memberships.status in ('ACTIVE', 'SUSPENDED', 'VIEWER')
             order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
             limit 1
             """.trimIndent(),
@@ -86,7 +86,7 @@ class MemberAccountRepository(
             join memberships on memberships.user_id = users.id
             join clubs on clubs.id = memberships.club_id
             where users.google_subject_id = ?
-              and memberships.status in ('ACTIVE', 'SUSPENDED', 'PENDING_APPROVAL')
+              and memberships.status in ('ACTIVE', 'SUSPENDED', 'VIEWER')
             order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
             limit 1
             """.trimIndent(),
@@ -177,7 +177,7 @@ class MemberAccountRepository(
         return userId
     }
 
-    fun createPendingGoogleMember(
+    fun createViewerGoogleMember(
         googleSubjectId: String,
         email: String,
         displayName: String?,
@@ -219,7 +219,7 @@ class MemberAccountRepository(
               clubs.id,
               ?,
               'MEMBER',
-              'PENDING_APPROVAL',
+              'VIEWER',
               null
             from clubs
             where clubs.slug = 'reading-sai'
@@ -228,11 +228,11 @@ class MemberAccountRepository(
             userId.dbString(),
         )
 
-        return findMemberByUserIdIncludingPending(userId)
+        return findMemberByUserIdIncludingViewer(userId)
             ?: throw IllegalStateException("Created Google user has no membership")
     }
 
-    fun findMemberByUserIdIncludingPending(userId: UUID): CurrentMember? {
+    fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
@@ -249,7 +249,7 @@ class MemberAccountRepository(
             join memberships on memberships.user_id = users.id
             join clubs on clubs.id = memberships.club_id
             where users.id = ?
-              and memberships.status in ('ACTIVE', 'SUSPENDED', 'PENDING_APPROVAL')
+              and memberships.status in ('ACTIVE', 'SUSPENDED', 'VIEWER')
             order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
             limit 1
             """.trimIndent(),
@@ -377,7 +377,7 @@ class MemberAccountRepository(
             join memberships on memberships.user_id = users.id
             join clubs on clubs.id = memberships.club_id
             where lower(users.email) = ?
-              and memberships.status in ('ACTIVE', 'SUSPENDED', 'PENDING_APPROVAL')
+              and memberships.status in ('ACTIVE', 'SUSPENDED', 'VIEWER')
             order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
             limit 1
             """.trimIndent(),

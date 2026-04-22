@@ -32,7 +32,7 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
-class PendingApprovalSecurityTest(
+class ViewerSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
@@ -59,20 +59,55 @@ class PendingApprovalSecurityTest(
     }
 
     @Test
-    fun `pending approval can read auth me`() {
-        val cookie = pendingSessionCookie("pending.readonly")
+    fun `viewer can read auth me`() {
+        val cookie = viewerSessionCookie("viewer.readonly")
 
         mockMvc.get("/api/auth/me") {
             cookie(cookie)
         }.andExpect {
             status { isOk() }
-            jsonPath("$.approvalState") { value("PENDING_APPROVAL") }
+            jsonPath("$.approvalState") { value("VIEWER") }
         }
     }
 
     @Test
-    fun `pending approval cannot mutate current session`() {
-        val cookie = pendingSessionCookie("pending.write")
+    fun `viewer can read current session`() {
+        val cookie = viewerSessionCookie("viewer.current")
+
+        mockMvc.get("/api/sessions/current") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+        }
+    }
+
+    @Test
+    fun `viewer can read archive sessions`() {
+        val cookie = viewerSessionCookie("viewer.archive")
+
+        mockMvc.get("/api/archive/sessions") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+        }
+    }
+
+    @Test
+    fun `viewer can read member home`() {
+        val cookie = viewerSessionCookie("viewer.home")
+
+        mockMvc.get("/api/app/me") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.displayName") { value("Viewer Member") }
+            jsonPath("$.email") { exists() }
+        }
+    }
+
+    @Test
+    fun `viewer cannot mutate current session`() {
+        val cookie = viewerSessionCookie("viewer.write")
 
         mockMvc.post("/api/sessions/current/questions") {
             cookie(cookie)
@@ -84,8 +119,8 @@ class PendingApprovalSecurityTest(
     }
 
     @Test
-    fun `pending approval cannot read feedback document`() {
-        val cookie = pendingSessionCookie("pending.feedback")
+    fun `viewer cannot read feedback document`() {
+        val cookie = viewerSessionCookie("viewer.feedback")
 
         mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
             cookie(cookie)
@@ -95,8 +130,8 @@ class PendingApprovalSecurityTest(
     }
 
     @Test
-    fun `pending approval cannot access host api`() {
-        val cookie = pendingSessionCookie("pending.host")
+    fun `viewer cannot access host api`() {
+        val cookie = viewerSessionCookie("viewer.host")
 
         mockMvc.get("/api/host/dashboard") {
             cookie(cookie)
@@ -106,30 +141,30 @@ class PendingApprovalSecurityTest(
     }
 
     @Test
-    fun `feedback document controller rejects pending approval before readable lookup`() {
-        val email = pendingMemberEmail("pending.feedback.guard")
-        pendingSessionCookie(email)
+    fun `feedback document controller rejects viewer before readable lookup`() {
+        val email = viewerMemberEmail("viewer.feedback.guard")
+        viewerSessionCookie(email)
 
         val exception = assertThrows<ResponseStatusException> {
             feedbackDocumentController.feedbackDocument(
                 authentication = UsernamePasswordAuthenticationToken(
                     email,
                     null,
-                    listOf(SimpleGrantedAuthority("ROLE_PENDING_APPROVAL")),
+                    listOf(SimpleGrantedAuthority("ROLE_VIEWER")),
                 ),
                 sessionId = "00000000-0000-0000-0000-000000000301",
             )
         }
 
         assertEquals(HttpStatus.FORBIDDEN, exception.statusCode)
-        assertEquals("Feedback documents require approved membership", exception.reason)
+        assertEquals("Feedback documents require full membership", exception.reason)
     }
 
-    private fun pendingSessionCookie(emailPrefixOrAddress: String): Cookie {
+    private fun viewerSessionCookie(emailPrefixOrAddress: String): Cookie {
         val email = if (emailPrefixOrAddress.contains("@")) {
             emailPrefixOrAddress
         } else {
-            pendingMemberEmail(emailPrefixOrAddress)
+            viewerMemberEmail(emailPrefixOrAddress)
         }
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
@@ -137,10 +172,10 @@ class PendingApprovalSecurityTest(
         jdbcTemplate.update(
             """
             insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (?, ?, ?, 'Pending Approval', 'Pending', null, 'GOOGLE')
+            values (?, ?, ?, 'Viewer Member', 'Viewer', null, 'GOOGLE')
             """.trimIndent(),
             userId,
-            "google-pending-security-$userId",
+            "google-viewer-security-$userId",
             email,
         )
         createdUserIds += userId
@@ -148,7 +183,7 @@ class PendingApprovalSecurityTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'PENDING_APPROVAL', null)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null)
             """.trimIndent(),
             membershipId,
             userId,
@@ -157,14 +192,14 @@ class PendingApprovalSecurityTest(
 
         val issuedSession = authSessionService.issueSession(
             userId = userId,
-            userAgent = "PendingApprovalSecurityTest",
+            userAgent = "ViewerSecurityTest",
             ipAddress = "127.0.0.1",
         )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun pendingMemberEmail(prefix: String): String =
+    private fun viewerMemberEmail(prefix: String): String =
         "$prefix.${UUID.randomUUID()}@example.com"
 
     private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {

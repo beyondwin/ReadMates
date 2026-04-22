@@ -101,6 +101,24 @@ describe("HostSessionEditor", () => {
     });
   });
 
+  it("labels new session creation separately from current session editing", () => {
+    render(<HostSessionEditor session={null} />);
+
+    expect(screen.getByRole("heading", { name: "새 세션 만들기" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "새 세션 만들기" })).toBeVisible();
+    expect(screen.getByText("세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.")).toBeVisible();
+    expect(screen.queryByText("이번 세션 편집")).not.toBeInTheDocument();
+  });
+
+  it("labels existing open session as current session editing", () => {
+    render(<HostSessionEditor session={openSession} />);
+
+    expect(screen.getByRole("heading", { name: "이번 세션 편집" })).toBeVisible();
+    expect(screen.getByText("No.07")).toBeVisible();
+    expect(screen.getByText("이번 세션")).toBeVisible();
+    expect(screen.getByText("세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.")).toBeVisible();
+  });
+
   it("switches the mobile editor between basic, publish, attendance, and feedback document contexts", async () => {
     const user = userEvent.setup();
     const { container } = render(<HostSessionEditor session={session} />);
@@ -297,7 +315,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("모임 날짜"), "2026-05-20");
     await user.clear(screen.getByLabelText("시작 시간"));
     await user.type(screen.getByLabelText("시작 시간"), "19:30");
-    await user.click(screen.getByRole("button", { name: "변경 사항 저장" }));
+    await user.click(screen.getByRole("button", { name: "새 세션 만들기" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
@@ -343,7 +361,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("장소"), "성수 스터디룸");
     await user.type(screen.getByLabelText("미팅 URL"), "https://meet.google.com/readmates-custom");
     await user.type(screen.getByLabelText("Passcode · 선택"), "custom");
-    await user.click(screen.getByRole("button", { name: "변경 사항 저장" }));
+    await user.click(screen.getByRole("button", { name: "새 세션 만들기" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({

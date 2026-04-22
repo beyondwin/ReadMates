@@ -1,21 +1,29 @@
 import { expect, test } from "@playwright/test";
 import {
-  cleanupPendingGoogleUserFixtures,
-  createPendingGoogleUserFixture,
+  cleanupViewerGoogleUserFixtures,
+  cleanupGeneratedSessions,
+  createOpenSessionFixture,
   loginWithGoogleFixture,
 } from "./readmates-e2e-db";
-import { installPrintSpy, readPrintCallCount } from "./print-spy";
 
-const pendingEmail = "e2e.pending.google@example.com";
 const seededFeedbackSessionId = "00000000-0000-0000-0000-000000000301";
+const viewerEmails: string[] = [];
+
+function uniqueViewerEmail(label: string) {
+  return `e2e.viewer.${label}.${Date.now()}@example.com`;
+}
 
 test.beforeEach(() => {
-  cleanupPendingGoogleUserFixtures([pendingEmail]);
-  createPendingGoogleUserFixture(pendingEmail);
+  viewerEmails.length = 0;
+  cleanupGeneratedSessions();
+  createOpenSessionFixture();
 });
 
 test.afterEach(() => {
-  cleanupPendingGoogleUserFixtures([pendingEmail]);
+  if (viewerEmails.length > 0) {
+    cleanupViewerGoogleUserFixtures(viewerEmails);
+  }
+  cleanupGeneratedSessions();
 });
 
 test("anonymous user remains unauthorized for restricted APIs", async ({ page }) => {
@@ -44,8 +52,11 @@ test("anonymous user remains unauthorized for restricted APIs", async ({ page })
   expect(feedbackDocumentStatus).toBe(401);
 });
 
-test("pending Google user exposes pending approval API state", async ({ page }) => {
-  await loginWithGoogleFixture(page, pendingEmail);
+test("uninvited Google user exposes viewer API state", async ({ page }) => {
+  const viewerEmail = uniqueViewerEmail("api");
+  viewerEmails.push(viewerEmail);
+
+  await loginWithGoogleFixture(page, viewerEmail);
   await page.goto("/");
 
   const authMe = await page.evaluate(async () => {
@@ -57,46 +68,57 @@ test("pending Google user exposes pending approval API state", async ({ page }) 
   });
 
   expect(authMe.status).toBe(200);
-  expect(authMe.body.approvalState).toBe("PENDING_APPROVAL");
+  expect(authMe.body.membershipStatus).toBe("VIEWER");
+  expect(authMe.body.approvalState).toBe("VIEWER");
 
-  const pendingApp = await page.evaluate(async () => {
-    const response = await fetch("/api/bff/api/app/pending");
+  const viewerApp = await page.evaluate(async () => {
+    const response = await fetch("/api/bff/api/app/viewer");
     return {
       status: response.status,
       body: await response.json(),
     };
   });
 
-  expect(pendingApp.status).toBe(200);
-  expect(pendingApp.body.approvalState).toBe("PENDING_APPROVAL");
+  expect(viewerApp.status).toBe(200);
+  expect(viewerApp.body.approvalState).toBe("VIEWER");
 });
 
-test("new google user waits for host approval and cannot access restricted flows", async ({ page }) => {
-  await loginWithGoogleFixture(page, pendingEmail);
+test("uninvited google login becomes read-only viewer who can browse sessions", async ({ page }) => {
+  const viewerEmail = uniqueViewerEmail("browse");
+  viewerEmails.push(viewerEmail);
+
+  await loginWithGoogleFixture(page, viewerEmail);
   await page.goto("/app");
 
-  await expect(page).toHaveURL(/\/app\/pending/);
-  await expect(page.getByText("가입 승인 대기")).toBeVisible();
-  await expect(page.getByRole("heading", { name: /호스트 승인/ })).toBeVisible();
+  await expect(page).toHaveURL(/\/app\/?$/);
+  await expect(page.getByText("둘러보기 멤버").first()).toBeVisible();
   await expect(page.getByRole("link", { name: /PDF로 저장/ })).toHaveCount(0);
 
   await page.goto("/app/host");
-  await expect(page).toHaveURL(/\/app\/pending/);
+  await expect(page).toHaveURL(/\/app\/?$/);
 
   await page.goto("/app/host/sessions/new");
-  await expect(page).toHaveURL(/\/app\/pending/);
+  await expect(page).toHaveURL(/\/app\/?$/);
 
   const currentAuth = await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/auth/me", { cache: "no-store" });
     return response.json() as Promise<{ approvalState: string }>;
   });
-  expect(currentAuth.approvalState).toBe("PENDING_APPROVAL");
+  expect(currentAuth.approvalState).toBe("VIEWER");
 
-  const pendingAppStatus = await page.evaluate(async () => {
-    const response = await fetch("/api/bff/api/app/pending", { cache: "no-store" });
+  const viewerAppStatus = await page.evaluate(async () => {
+    const response = await fetch("/api/bff/api/app/viewer", { cache: "no-store" });
     return response.status;
   });
-  expect(pendingAppStatus).toBe(200);
+  expect(viewerAppStatus).toBe(200);
+
+  await page.goto("/app/archive");
+  await expect(page.getByRole("heading", { name: "기록 저장소" })).toBeVisible();
+  await expect(page.getByText("No.06").first()).toBeVisible();
+
+  await page.goto("/app/session/current");
+  await expect(page.getByText("정식 멤버가 되면 RSVP와 질문 작성이 열립니다.").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "참석" })).toBeDisabled();
 
   const hostDashboardStatus = await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/host/dashboard", { cache: "no-store" });
@@ -120,9 +142,6 @@ test("new google user waits for host approval and cannot access restricted flows
   }, seededFeedbackSessionId);
   expect(feedbackDocumentStatus).toBe(403);
 
-  await installPrintSpy(page);
-  await page.goto(`/app/feedback/${seededFeedbackSessionId}/print`);
-  await expect(page).toHaveURL(/\/app\/pending/);
-  await expect(page.getByRole("heading", { name: /호스트 승인/ })).toBeVisible();
-  await expect.poll(() => readPrintCallCount(page)).toBe(0);
+  await page.goto(`/app/feedback/${seededFeedbackSessionId}`);
+  await expect(page.getByRole("heading", { name: "피드백 문서는 정식 멤버와 참석자에게만 열립니다." })).toBeVisible();
 });

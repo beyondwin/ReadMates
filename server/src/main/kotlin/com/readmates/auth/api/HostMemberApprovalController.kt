@@ -27,21 +27,37 @@ class HostMemberApprovalController(
     fun members(authentication: Authentication?) =
         memberLifecycleService.listMembers(requireHost(authentication))
 
+    @GetMapping("/viewers")
+    fun viewers(authentication: Authentication?) =
+        memberApprovalService.listViewers(requireHost(authentication))
+
     @GetMapping("/pending-approvals")
     fun pending(authentication: Authentication?) =
-        memberApprovalService.listPending(requireHost(authentication))
+        memberApprovalService.listViewers(requireHost(authentication))
+
+    @PostMapping("/{membershipId}/activate")
+    fun activate(
+        authentication: Authentication?,
+        @PathVariable membershipId: UUID,
+    ) = memberApprovalService.activateViewer(requireHost(authentication), membershipId)
 
     @PostMapping("/{membershipId}/approve")
     fun approve(
         authentication: Authentication?,
         @PathVariable membershipId: UUID,
-    ) = memberApprovalService.approve(requireHost(authentication), membershipId)
+    ) = memberApprovalService.activateViewer(requireHost(authentication), membershipId)
+
+    @PostMapping("/{membershipId}/deactivate-viewer")
+    fun deactivateViewer(
+        authentication: Authentication?,
+        @PathVariable membershipId: UUID,
+    ) = memberApprovalService.deactivateViewer(requireHost(authentication), membershipId)
 
     @PostMapping("/{membershipId}/reject")
     fun reject(
         authentication: Authentication?,
         @PathVariable membershipId: UUID,
-    ) = memberApprovalService.reject(requireHost(authentication), membershipId)
+    ) = memberApprovalService.deactivateViewer(requireHost(authentication), membershipId)
 
     @PostMapping("/{membershipId}/suspend")
     fun suspend(

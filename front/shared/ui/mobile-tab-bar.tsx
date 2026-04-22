@@ -65,30 +65,30 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
     {
       key: "host",
       href: "/app/host",
-      label: READMATES_NAV_LABELS.host.operations,
+      label: "오늘",
       icon: "host",
       current: (pathname) => pathname === "/app/host",
     },
     {
       key: "host-edit",
       href: editHref,
-      label: READMATES_NAV_LABELS.host.sessionEditor,
+      label: "세션",
       icon: "edit",
       current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
     },
     {
-      key: "host-invitations",
-      href: "/app/host/invitations",
-      label: READMATES_NAV_LABELS.host.invitations,
-      icon: "invite",
-      current: (pathname) => pathname === "/app/host/invitations",
-    },
-    {
       key: "host-members",
       href: "/app/host/members",
-      label: READMATES_NAV_LABELS.host.memberApproval,
+      label: "멤버",
       icon: "approve",
-      current: (pathname) => pathname === "/app/host/members",
+      current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
+    },
+    {
+      key: "host-records",
+      href: "/app/archive",
+      label: "기록",
+      icon: "archive",
+      current: (pathname) => pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/"),
     },
   ];
 }

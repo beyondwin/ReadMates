@@ -146,6 +146,26 @@ describe("MemberHome", () => {
     expect(mobileView.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
   });
 
+  it("shows viewer members a read-only notice on member home", () => {
+    const viewerAuth: AuthMeResponse = {
+      ...auth,
+      membershipStatus: "VIEWER",
+      approvalState: "VIEWER",
+    };
+
+    const { container } = render(<MemberHome auth={viewerAuth} current={current} noteFeedItems={noteFeedItems} />);
+    const desktop = getDesktopView(container);
+    const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
+
+    expect(desktop.getByText("둘러보기 멤버")).toBeInTheDocument();
+    expect(desktop.getByText("전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.")).toBeInTheDocument();
+    expect(mobile.getAllByText("둘러보기 멤버").length).toBeGreaterThan(0);
+    expect(mobile.getAllByText("전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.").length).toBeGreaterThan(0);
+    expect(mobile.getByText("읽기 전용")).toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: /세션 읽기/ })).toHaveAttribute("href", "/app/session/current");
+    expect(mobile.queryByRole("link", { name: /질문 쓰기/ })).not.toBeInTheDocument();
+  });
+
   it("shows the next gathering prep card", () => {
     const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
     const desktop = getDesktopView(container);

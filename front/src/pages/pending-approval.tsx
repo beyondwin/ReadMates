@@ -1,38 +1,26 @@
-import { useCallback } from "react";
-import type { PendingApprovalAppResponse } from "@/shared/api/readmates";
-import { readmatesFetch } from "@/shared/api/readmates";
-import { useReadmatesData } from "./readmates-page-data";
-import { ReadmatesPageState } from "./readmates-page";
+import { Link } from "@/src/app/router-link";
 
 export default function PendingApprovalPage() {
-  const state = useReadmatesData(
-    useCallback(() => readmatesFetch<PendingApprovalAppResponse>("/api/app/pending"), []),
-  );
-
   return (
-    <ReadmatesPageState state={state}>
-      {(data) => (
-        <main className="app-content">
-          <section className="page-header-compact">
-            <div className="container">
-              <p className="eyebrow">가입 승인 대기</p>
-              <h1 className="h1 editorial">호스트 승인 후 모든 기능을 사용할 수 있습니다.</h1>
-              <p className="body" style={{ color: "var(--text-2)" }}>
-                승인 전에는 모임 정보를 읽을 수 있고, 질문 작성과 피드백 문서 열람은 제한됩니다.
-              </p>
-            </div>
-          </section>
-          {data.currentSession ? (
-            <section className="container" style={{ padding: "24px 0 72px" }}>
-              <p className="eyebrow">현재 모임 · {data.clubName}</p>
-              <h2 className="h2 editorial">{data.currentSession.bookTitle}</h2>
-              <p className="body">
-                {data.currentSession.date} · {data.currentSession.locationLabel}
-              </p>
-            </section>
-          ) : null}
-        </main>
-      )}
-    </ReadmatesPageState>
+    <main className="app-content">
+      <section className="page-header-compact">
+        <div className="container">
+          <p className="eyebrow">둘러보기 멤버</p>
+          <h1 className="h1 editorial">전체 세션은 읽을 수 있고, 참여는 정식 멤버에게 열립니다.</h1>
+          <p className="body" style={{ color: "var(--text-2)" }}>
+            초대 없이 Google로 로그인한 계정은 둘러보기 멤버로 시작합니다. 호스트가 정식 멤버로 전환하면 RSVP,
+            체크인, 질문, 서평 작성이 열립니다.
+          </p>
+          <div className="row" style={{ marginTop: 24, gap: 10, flexWrap: "wrap" }}>
+            <Link to="/app/archive" className="btn btn-primary">
+              전체 세션 둘러보기
+            </Link>
+            <Link to="/app/session/current" className="btn btn-ghost">
+              이번 세션 보기
+            </Link>
+          </div>
+        </div>
+      </section>
+    </main>
   );
 }

@@ -17,6 +17,7 @@ import {
   type HostSessionDetailResponse,
 } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
+import { SessionIdentity } from "@/shared/ui/session-identity";
 import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { HostSessionFeedbackUpload } from "./host-session-feedback-upload";
@@ -97,7 +98,7 @@ type AttendanceWriteState = {
   queuedStatus: AttendanceStatus | null;
 };
 
-export default function HostSessionEditor({ session }: { session?: HostSessionDetailResponse }) {
+export default function HostSessionEditor({ session }: { session?: HostSessionDetailResponse | null }) {
   const [title, setTitle] = useState(session?.title ?? "7회차 모임 · ");
   const [bookTitle, setBookTitle] = useState(session?.bookTitle ?? "");
   const [bookAuthor, setBookAuthor] = useState(session?.bookAuthor ?? "");
@@ -108,7 +109,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
   const [locationLabel, setLocationLabel] = useState(session?.locationLabel ?? "온라인");
   const [meetingUrl, setMeetingUrl] = useState(session?.meetingUrl ?? "");
   const [meetingPasscode, setMeetingPasscode] = useState(session?.meetingPasscode ?? "");
-  const [publicationMode, setPublicationMode] = useState<PublicationMode>(() => initialPublicationMode(session));
+  const [publicationMode, setPublicationMode] = useState<PublicationMode>(() => initialPublicationMode(session ?? undefined));
   const [summary, setSummary] = useState(session?.publication?.publicSummary ?? "");
   const [publicationActionInFlight, setPublicationActionInFlight] = useState<PublicationAction | null>(null);
   const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
@@ -135,6 +136,12 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
     session?.questionDeadlineAt && date === session.date
       ? questionDeadlineLabelFromIso(session.questionDeadlineAt)
       : questionDeadlineLabelFromSessionDate(date);
+  const isNewSession = session === null || session === undefined;
+  const editorTitle = isNewSession ? "새 세션 만들기" : "이번 세션 편집";
+  const primarySaveLabel = isNewSession ? "새 세션 만들기" : "변경 사항 저장";
+  const saveGuidance = isNewSession
+    ? "세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다."
+    : "세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.";
 
   const flash = (message: string) => {
     setToast(message);
@@ -227,7 +234,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
       meetingPasscode,
       date,
       startTime: time,
-    }, session);
+    }, session ?? undefined);
     const response = await readmatesFetchResponse(session ? `/api/host/sessions/${session.sessionId}` : "/api/host/sessions", {
       method: session ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -432,12 +439,28 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
               <Link to="/app/host" className="btn btn-quiet btn-sm" style={{ marginLeft: "-10px", marginBottom: "10px" }}>
                 ← 운영 대시보드
               </Link>
-              <div className="eyebrow">세션 편집 · {session ? `No.${session.sessionNumber}` : "새 세션"}</div>
+              <div className="eyebrow">{isNewSession ? "새 세션" : `현재 세션 · No.${session.sessionNumber}`}</div>
               <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-                {session ? session.title : "새 세션"}
+                {editorTitle}
               </h1>
-              <div className="small">
-                세션 정보, 공개 설정, 출석 확정, 피드백 문서를 한곳에서.
+              <div style={{ marginTop: "10px" }}>
+                {session ? (
+                  <SessionIdentity
+                    sessionNumber={session.sessionNumber}
+                    state={session.state}
+                    date={session.date}
+                    published={session.publication?.isPublic ?? false}
+                    feedbackDocumentAvailable={session.feedbackDocument.uploaded}
+                  />
+                ) : (
+                  <div className="rm-session-identity">
+                    <span className="rm-session-identity__chip">새 세션 초안</span>
+                    <span className="rm-session-identity__chip">비공개</span>
+                  </div>
+                )}
+              </div>
+              <div className="small" style={{ marginTop: "8px" }}>
+                {session ? `${session.title}의 정보, 공개 설정, 출석 확정, 피드백 문서를 한곳에서.` : "새 세션의 기본 정보를 등록합니다."}
               </div>
             </div>
             <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
@@ -445,7 +468,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                 초안 저장
               </button>
               <button className="btn btn-primary" type="submit" form="host-session-editor">
-                변경 사항 저장
+                {primarySaveLabel}
               </button>
             </div>
           </div>
@@ -813,7 +836,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                   저장 안내
                 </div>
                 <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-                  세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.
+                  {saveGuidance}
                 </p>
               </div>
 

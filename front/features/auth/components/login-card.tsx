@@ -60,10 +60,10 @@ export function LoginCard() {
 
   return (
     <section className="auth-card">
-      <p className="eyebrow">로그인</p>
-      <h1 className="h1 editorial">읽는사이 로그인</h1>
+      <p className="eyebrow">기존 멤버 로그인</p>
+      <h1 className="h1 editorial">Google로 읽는사이에 들어가기</h1>
       <p className="body" style={{ color: "var(--text-2)" }}>
-        Google 계정으로 로그인하면 기존 Gmail 회원 기록이 자동으로 연결됩니다.
+        <span>초대 없이 로그인하면 둘러보기 멤버로 시작합니다.</span> 초대 링크를 받았다면 링크에서 수락하면 바로 정식 멤버가 됩니다.
       </p>
       <a className="btn btn-primary btn-lg" href="/oauth2/authorization/google">
         Google로 계속하기

@@ -14,6 +14,12 @@ const devGoogleSubjects: Record<string, string> = {
   "member5@example.com": "readmates-dev-google-member-5",
 };
 
+type GoogleFixtureOptions = {
+  inviteToken?: string;
+  displayName?: string;
+  profileImageUrl?: string | null;
+};
+
 function sqlString(value: string) {
   return `'${value.replaceAll("'", "''")}'`;
 }
@@ -49,6 +55,14 @@ export function runMysql(sql: string) {
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
+}
+
+function displayNameForEmail(email: string) {
+  return email.split("@")[0] || "E2E Google User";
+}
+
+function googleSubjectForEmail(email: string) {
+  return devGoogleSubjects[email] ?? `readmates-e2e-google-${sha256Hex(email).slice(0, 24)}`;
 }
 
 function sqlEmailList(emails: string[]) {
@@ -126,8 +140,222 @@ where lower(email) in (${emailList});
 `);
 }
 
-export async function loginWithGoogleFixture(page: Page, email: string) {
+function ensureViewerGoogleUserFixture(email: string, options: GoogleFixtureOptions = {}) {
   const normalizedEmail = normalizeEmail(email);
+  const userId = randomUUID();
+  const membershipId = randomUUID();
+  const googleSubjectId = googleSubjectForEmail(normalizedEmail);
+  const displayName = options.displayName?.trim() || displayNameForEmail(normalizedEmail);
+  const shortName = displayName.slice(0, 50);
+  const profileImageUrl = options.profileImageUrl ?? null;
+
+  runMysql(`
+insert into users (
+  id,
+  google_subject_id,
+  email,
+  name,
+  short_name,
+  profile_image_url,
+  password_hash,
+  password_set_at,
+  auth_provider
+)
+select
+  ${sqlString(userId)},
+  ${sqlString(googleSubjectId)},
+  ${sqlString(normalizedEmail)},
+  ${sqlString(displayName)},
+  ${sqlString(shortName)},
+  ${profileImageUrl === null ? "null" : sqlString(profileImageUrl)},
+  null,
+  null,
+  'GOOGLE'
+where not exists (
+  select 1 from users where lower(email) = ${sqlString(normalizedEmail)}
+);
+
+update users
+set google_subject_id = coalesce(google_subject_id, ${sqlString(googleSubjectId)}),
+    password_hash = null,
+    password_set_at = null,
+    auth_provider = 'GOOGLE',
+    updated_at = utc_timestamp(6)
+where lower(email) = ${sqlString(normalizedEmail)};
+
+insert into memberships (
+  id,
+  club_id,
+  user_id,
+  role,
+  status,
+  joined_at
+)
+select
+  ${sqlString(membershipId)},
+  ${sqlString(clubId)},
+  users.id,
+  'MEMBER',
+  'VIEWER',
+  null
+from users
+where lower(users.email) = ${sqlString(normalizedEmail)}
+  and not exists (
+    select 1
+    from memberships
+    where memberships.club_id = ${sqlString(clubId)}
+      and memberships.user_id = users.id
+  );
+`);
+}
+
+function acceptGoogleInviteFixture(email: string, inviteToken: string, options: GoogleFixtureOptions = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  const tokenHash = sha256Hex(inviteToken);
+  const userId = randomUUID();
+  const membershipId = randomUUID();
+  const participantId = randomUUID();
+  const googleSubjectId = googleSubjectForEmail(normalizedEmail);
+  const displayName = options.displayName?.trim() || displayNameForEmail(normalizedEmail);
+  const shortName = displayName.slice(0, 50);
+  const profileImageUrl = options.profileImageUrl ?? null;
+
+  const result = runMysql(`
+insert into users (
+  id,
+  google_subject_id,
+  email,
+  name,
+  short_name,
+  profile_image_url,
+  password_hash,
+  password_set_at,
+  auth_provider
+)
+select
+  ${sqlString(userId)},
+  ${sqlString(googleSubjectId)},
+  ${sqlString(normalizedEmail)},
+  coalesce(
+    (
+      select invitations.invited_name
+      from invitations
+      where invitations.token_hash = ${sqlString(tokenHash)}
+        and lower(invitations.invited_email) = ${sqlString(normalizedEmail)}
+      limit 1
+    ),
+    ${sqlString(displayName)}
+  ),
+  left(coalesce(
+    (
+      select invitations.invited_name
+      from invitations
+      where invitations.token_hash = ${sqlString(tokenHash)}
+        and lower(invitations.invited_email) = ${sqlString(normalizedEmail)}
+      limit 1
+    ),
+    ${sqlString(shortName)}
+  ), 50),
+  ${profileImageUrl === null ? "null" : sqlString(profileImageUrl)},
+  null,
+  null,
+  'GOOGLE'
+where not exists (
+  select 1 from users where lower(email) = ${sqlString(normalizedEmail)}
+);
+
+update users
+set google_subject_id = coalesce(google_subject_id, ${sqlString(googleSubjectId)}),
+    password_hash = null,
+    password_set_at = null,
+    auth_provider = 'GOOGLE',
+    updated_at = utc_timestamp(6)
+where lower(email) = ${sqlString(normalizedEmail)};
+
+insert into memberships (
+  id,
+  club_id,
+  user_id,
+  role,
+  status,
+  joined_at
+)
+select
+  ${sqlString(membershipId)},
+  invitations.club_id,
+  users.id,
+  invitations.role,
+  'ACTIVE',
+  utc_timestamp(6)
+from invitations
+join users on lower(users.email) = lower(invitations.invited_email)
+where invitations.token_hash = ${sqlString(tokenHash)}
+  and lower(invitations.invited_email) = ${sqlString(normalizedEmail)}
+on duplicate key update
+  role = values(role),
+  status = 'ACTIVE',
+  joined_at = coalesce(joined_at, utc_timestamp(6)),
+  updated_at = utc_timestamp(6);
+
+update invitations
+join users on lower(users.email) = lower(invitations.invited_email)
+set invitations.status = 'ACCEPTED',
+    invitations.accepted_at = utc_timestamp(6),
+    invitations.accepted_user_id = users.id,
+    invitations.updated_at = utc_timestamp(6)
+where invitations.token_hash = ${sqlString(tokenHash)}
+  and lower(invitations.invited_email) = ${sqlString(normalizedEmail)}
+  and invitations.status = 'PENDING'
+  and invitations.expires_at >= utc_timestamp(6);
+
+insert into session_participants (
+  id,
+  club_id,
+  session_id,
+  membership_id,
+  rsvp_status,
+  attendance_status,
+  participation_status
+)
+select
+  ${sqlString(participantId)},
+  sessions.club_id,
+  sessions.id,
+  memberships.id,
+  'NO_RESPONSE',
+  'UNKNOWN',
+  'ACTIVE'
+from invitations
+join users on lower(users.email) = lower(invitations.invited_email)
+join memberships on memberships.user_id = users.id
+  and memberships.club_id = invitations.club_id
+join sessions on sessions.club_id = invitations.club_id
+  and sessions.state = 'OPEN'
+where invitations.token_hash = ${sqlString(tokenHash)}
+  and lower(invitations.invited_email) = ${sqlString(normalizedEmail)}
+  and invitations.apply_to_current_session = true
+on duplicate key update
+  participation_status = 'ACTIVE',
+  updated_at = utc_timestamp(6);
+
+select count(*)
+from invitations
+where token_hash = ${sqlString(tokenHash)}
+  and lower(invited_email) = ${sqlString(normalizedEmail)}
+  and status = 'ACCEPTED';
+`);
+
+  expect(result.trim().split(/\s+/).at(-1)).toBe("1");
+}
+
+export async function loginWithGoogleFixture(page: Page, email: string, options: GoogleFixtureOptions = {}) {
+  const normalizedEmail = normalizeEmail(email);
+  if (options.inviteToken) {
+    acceptGoogleInviteFixture(normalizedEmail, options.inviteToken, options);
+  } else {
+    ensureViewerGoogleUserFixture(normalizedEmail, options);
+  }
+
   const rawToken = `e2e.${randomBytes(32).toString("base64url")}`;
   const tokenHash = sha256Hex(rawToken);
   const sessionId = randomUUID();
@@ -282,11 +510,56 @@ where club_id = ${sqlString(clubId)}
   }
 }
 
-export function createPendingGoogleUserFixture(email: string) {
+export function createOpenSessionFixture() {
+  const sessionId = randomUUID();
+
+  runMysql(`
+insert into sessions (
+  id,
+  club_id,
+  number,
+  title,
+  book_title,
+  book_author,
+  book_translator,
+  book_link,
+  book_image_url,
+  session_date,
+  start_time,
+  end_time,
+  location_label,
+  meeting_url,
+  meeting_passcode,
+  question_deadline_at,
+  state
+)
+values (
+  ${sqlString(sessionId)},
+  ${sqlString(clubId)},
+  7,
+  '7회차 모임 · E2E 현재 세션',
+  'E2E 현재 세션 책',
+  '테스트 저자',
+  null,
+  null,
+  null,
+  '2026-05-20',
+  '20:00:00',
+  '22:00:00',
+  '온라인',
+  null,
+  null,
+  timestampadd(day, 14, utc_timestamp(6)),
+  'OPEN'
+);
+`);
+}
+
+export function createViewerGoogleUserFixture(email: string) {
   const normalizedEmail = normalizeEmail(email);
   const userId = randomUUID();
   const membershipId = randomUUID();
-  const googleSubjectId = `readmates-e2e-pending-${randomUUID()}`;
+  const googleSubjectId = `readmates-e2e-viewer-${randomUUID()}`;
 
   runMysql(`
 insert into users (
@@ -304,8 +577,8 @@ values (
   ${sqlString(userId)},
   ${sqlString(googleSubjectId)},
   ${sqlString(normalizedEmail)},
-  'E2E Pending Google',
-  'Pending',
+  'E2E Viewer Google',
+  'Viewer',
   null,
   null,
   null,
@@ -325,13 +598,13 @@ values (
   ${sqlString(clubId)},
   ${sqlString(userId)},
   'MEMBER',
-  'PENDING_APPROVAL',
+  'VIEWER',
   null
 );
 `);
 }
 
-export function cleanupPendingGoogleUserFixtures(emails: string[]) {
+export function cleanupViewerGoogleUserFixtures(emails: string[]) {
   const emailList = sqlEmailList(emails);
 
   runMysql(`
@@ -339,6 +612,13 @@ delete auth_sessions
 from auth_sessions
 join users on users.id = auth_sessions.user_id
 where lower(users.email) in (${emailList});
+
+delete session_participants
+from session_participants
+join memberships on memberships.id = session_participants.membership_id
+join users on users.id = memberships.user_id
+where session_participants.club_id = ${sqlString(clubId)}
+  and lower(users.email) in (${emailList});
 
 delete memberships
 from memberships

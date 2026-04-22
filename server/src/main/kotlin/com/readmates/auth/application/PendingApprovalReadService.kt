@@ -31,7 +31,7 @@ class PendingApprovalReadService(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) {
     fun get(member: CurrentMember): PendingApprovalAppResponse {
-        if (!member.isPendingApproval) {
+        if (!member.isViewer) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Pending approval required")
         }
 
@@ -65,7 +65,7 @@ class PendingApprovalReadService(
     private fun ResultSet.toPendingApprovalAppResponse(): PendingApprovalAppResponse {
         val sessionId = getString("session_id")
         return PendingApprovalAppResponse(
-            approvalState = "PENDING_APPROVAL",
+            approvalState = "VIEWER",
             clubName = getString("club_name"),
             currentSession = sessionId?.let {
                 PendingCurrentSessionResponse(

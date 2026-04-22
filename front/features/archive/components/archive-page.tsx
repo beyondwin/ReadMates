@@ -1,9 +1,10 @@
 "use client";
 
 import { type CSSProperties, useState } from "react";
-import type { ArchiveSessionItem, FeedbackDocumentListItem, MyArchiveQuestionItem, MyArchiveReviewItem } from "@/shared/api/readmates";
+import type { ArchiveSessionItem, FeedbackDocumentListItem, MyArchiveQuestionItem, MyArchiveReviewItem, SessionState } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { SessionIdentity } from "@/shared/ui/session-identity";
 
 export type ArchiveView = "sessions" | "reviews" | "questions" | "report";
 
@@ -17,6 +18,7 @@ type SessionRecord = {
   attendance: number;
   total: number;
   published: boolean;
+  state: SessionState;
 };
 
 type ReportActionIconName = "read" | "download";
@@ -49,6 +51,7 @@ function toSessionRecord(session: ArchiveSessionItem): SessionRecord {
     attendance: session.attendance,
     total: session.total,
     published: session.published,
+    state: session.state,
   };
 }
 
@@ -320,6 +323,16 @@ function ArchiveMobileSessions({ sessions }: { sessions: SessionRecord[] }) {
               <div className="tiny mono" style={{ color: "var(--text-3)" }}>
                 No.{String(session.number).padStart(2, "0")} · {formatDateOnlyLabel(session.date)}
               </div>
+              <div style={{ marginTop: 6 }}>
+                <SessionIdentity
+                  sessionNumber={session.number}
+                  state={session.state}
+                  date={session.date}
+                  published={session.published}
+                  feedbackDocumentAvailable={false}
+                  compact
+                />
+              </div>
               <div className="editorial" style={{ fontSize: 16, margin: "4px 0 2px", lineHeight: 1.3 }}>
                 {session.book}
               </div>
@@ -512,9 +525,14 @@ function ArchiveSessions({ sessions }: { sessions: SessionRecord[] }) {
                 }}
               >
                 <div>
-                  <div className="mono" style={{ fontSize: "13px", color: "var(--text-3)", letterSpacing: "0.05em" }}>
-                    No.{String(session.number).padStart(2, "0")}
-                  </div>
+                  <SessionIdentity
+                    sessionNumber={session.number}
+                    state={session.state}
+                    date={session.date}
+                    published={session.published}
+                    feedbackDocumentAvailable={false}
+                    compact
+                  />
                   <div className="tiny mono" style={{ color: "var(--text-4)", marginTop: "2px" }}>
                     {formatSessionMonthDayLabel(session.date)}
                   </div>

@@ -11,6 +11,8 @@ describe("LoginCard", () => {
   it("shows only the Google login action outside dev login mode", () => {
     render(<LoginCard />);
 
+    expect(screen.getByText("기존 멤버 로그인")).toBeVisible();
+    expect(screen.getByText("초대 없이 로그인하면 둘러보기 멤버로 시작합니다.")).toBeVisible();
     expect(screen.getByRole("link", { name: "Google로 계속하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",

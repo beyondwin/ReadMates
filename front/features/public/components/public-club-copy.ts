@@ -1,5 +1,7 @@
 export const PUBLIC_INTRODUCTION_FALLBACK = "공개 소개가 아직 준비되지 않았습니다.";
 export const PUBLIC_TAGLINE_FALLBACK = "공개 기록";
+export const PUBLIC_MEMBERSHIP_NOTE =
+  "읽는사이는 초대 기반 모임입니다. 공개 기록은 누구나 읽을 수 있고, 정식 멤버 참여는 초대 링크 또는 호스트 전환으로 열립니다.";
 
 export const STATIC_OPERATION_INTRO = {
   cadence: "호스트가 공지하는 날 · 20:00 – 22:00",

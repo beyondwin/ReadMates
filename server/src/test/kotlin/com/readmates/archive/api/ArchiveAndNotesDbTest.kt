@@ -1,6 +1,9 @@
 package com.readmates.archive.api
 
+import com.readmates.auth.application.AuthSessionService
 import com.readmates.support.MySqlTestContainer
+import jakarta.servlet.http.Cookie
+import org.junit.jupiter.api.AfterEach
 import org.hamcrest.Matchers.emptyOrNullString
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.everyItem
@@ -12,22 +15,46 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.auth.session-cookie-secure=false",
     ],
 )
 @AutoConfigureMockMvc
 class ArchiveAndNotesDbTest(
     @param:Autowired private val mockMvc: MockMvc,
+    @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val authSessionService: AuthSessionService,
 ) {
+    private val createdSessionParticipantIds = linkedSetOf<String>()
+    private val createdMembershipIds = linkedSetOf<String>()
+    private val createdUserIds = linkedSetOf<String>()
+
+    @AfterEach
+    fun cleanupCreatedRows() {
+        try {
+            deleteWhereIn("session_participants", "id", createdSessionParticipantIds)
+            deleteWhereIn("auth_sessions", "user_id", createdUserIds)
+            deleteWhereIn("memberships", "id", createdMembershipIds)
+            deleteWhereIn("memberships", "user_id", createdUserIds)
+            deleteWhereIn("users", "id", createdUserIds)
+        } finally {
+            createdSessionParticipantIds.clear()
+            createdMembershipIds.clear()
+            createdUserIds.clear()
+        }
+    }
+
     @Test
     fun `archive sessions are returned newest first from seeded sessions`() {
         mockMvc.get("/api/archive/sessions") {
@@ -39,9 +66,94 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$[0].sessionNumber") { value(6) }
                 jsonPath("$[0].bookTitle") { value("가난한 찰리의 연감") }
                 jsonPath("$[0].bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
+                jsonPath("$[0].state") { value("PUBLISHED") }
                 jsonPath("$[5].sessionNumber") { value(1) }
                 jsonPath("$[5].bookTitle") { value("팩트풀니스") }
             }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
+            INSERT_VIEWER_DRAFT_SESSION_SQL,
+            INSERT_VIEWER_OPEN_SESSION_SQL,
+            INSERT_VIEWER_CLOSED_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `viewer can list and read non draft sessions but cannot read feedback document`() {
+        val cookie = viewerSessionCookie("viewer.archive.${UUID.randomUUID()}@example.com")
+        val viewerMembershipId = createdMembershipIds.last()
+        insertViewerSessionParticipant(
+            membershipId = viewerMembershipId,
+            sessionId = "00000000-0000-0000-0000-000000000306",
+        )
+
+        mockMvc.get("/api/archive/sessions") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[*].sessionNumber") { value(hasItems(998, 997, 6)) }
+            jsonPath("$[?(@.sessionNumber == 998)].state") { value(hasItem("OPEN")) }
+            jsonPath("$[?(@.sessionNumber == 997)].state") { value(hasItem("CLOSED")) }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(999))) }
+        }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009992") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionNumber") { value(998) }
+            jsonPath("$.state") { value("OPEN") }
+            jsonPath("$.attendance") { value(0) }
+            jsonPath("$.total") { value(0) }
+        }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009993") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionNumber") { value(997) }
+            jsonPath("$.state") { value("CLOSED") }
+            jsonPath("$.attendance") { value(0) }
+            jsonPath("$.total") { value(0) }
+        }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000301") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionNumber") { value(1) }
+            jsonPath("$.state") { value("PUBLISHED") }
+        }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009991") {
+            cookie(cookie)
+        }.andExpect {
+            status { isNotFound() }
+        }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.myAttendanceStatus") { value("ATTENDED") }
+            jsonPath("$.feedbackDocument.available") { value(true) }
+            jsonPath("$.feedbackDocument.readable") { value(false) }
+        }
+
+        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+            cookie(cookie)
+        }.andExpect {
+            status { isForbidden() }
+        }
     }
 
     @Test
@@ -234,6 +346,7 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
+                jsonPath("$.state") { value("PUBLISHED") }
                 jsonPath("$.clubQuestions[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
@@ -335,6 +448,141 @@ class ArchiveAndNotesDbTest(
     }
 
     companion object {
+        private const val CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL = """
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-000000009991',
+              '00000000-0000-0000-0000-000000009992',
+              '00000000-0000-0000-0000-000000009993'
+            );
+        """
+
+        private const val INSERT_VIEWER_DRAFT_SESSION_SQL = """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              book_translator,
+              book_link,
+              book_image_url,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              meeting_url,
+              meeting_passcode,
+              question_deadline_at,
+              state
+            )
+            select
+              '00000000-0000-0000-0000-000000009991',
+              clubs.id,
+              999,
+              '숨겨진 초안 세션',
+              '숨겨진 초안 책',
+              '숨겨진 저자',
+              null,
+              null,
+              null,
+              '2030-04-01',
+              '19:00:00',
+              '21:00:00',
+              '온라인',
+              null,
+              null,
+              '2030-03-31 14:59:00.000000',
+              'DRAFT'
+            from clubs
+            where clubs.id = '00000000-0000-0000-0000-000000000001';
+        """
+
+        private const val INSERT_VIEWER_OPEN_SESSION_SQL = """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              book_translator,
+              book_link,
+              book_image_url,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              meeting_url,
+              meeting_passcode,
+              question_deadline_at,
+              state
+            )
+            select
+              '00000000-0000-0000-0000-000000009992',
+              clubs.id,
+              998,
+              '998회차 · 공개 진행 세션',
+              '공개 진행 책',
+              '공개 진행 저자',
+              null,
+              null,
+              null,
+              '2030-03-01',
+              '19:00:00',
+              '21:00:00',
+              '온라인',
+              null,
+              null,
+              '2030-02-28 14:59:00.000000',
+              'OPEN'
+            from clubs
+            where clubs.id = '00000000-0000-0000-0000-000000000001';
+        """
+
+        private const val INSERT_VIEWER_CLOSED_SESSION_SQL = """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              book_translator,
+              book_link,
+              book_image_url,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              meeting_url,
+              meeting_passcode,
+              question_deadline_at,
+              state
+            )
+            select
+              '00000000-0000-0000-0000-000000009993',
+              clubs.id,
+              997,
+              '997회차 · 공개 종료 세션',
+              '공개 종료 책',
+              '공개 종료 저자',
+              null,
+              null,
+              null,
+              '2030-02-01',
+              '19:00:00',
+              '21:00:00',
+              '온라인',
+              null,
+              null,
+              '2030-01-31 14:59:00.000000',
+              'CLOSED'
+            from clubs
+            where clubs.id = '00000000-0000-0000-0000-000000000001';
+        """
+
         private const val MARK_MEMBER1_LEFT_SQL = """
             update memberships
             join users on users.id = memberships.user_id
@@ -643,5 +891,77 @@ class ArchiveAndNotesDbTest(
         fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
             MySqlTestContainer.registerDatasourceProperties(registry)
         }
+    }
+
+    private fun viewerSessionCookie(email: String): Cookie {
+        val userId = UUID.randomUUID().toString()
+        val membershipId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
+            values (?, ?, ?, 'Viewer Archive', 'Viewer', null, 'GOOGLE')
+            """.trimIndent(),
+            userId,
+            "google-viewer-archive-$userId",
+            email,
+        )
+        createdUserIds += userId
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null)
+            """.trimIndent(),
+            membershipId,
+            userId,
+        )
+        createdMembershipIds += membershipId
+        val issuedSession = authSessionService.issueSession(
+            userId = userId,
+            userAgent = "ArchiveAndNotesDbTest",
+            ipAddress = "127.0.0.1",
+        )
+        return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
+    }
+
+    private fun insertViewerSessionParticipant(membershipId: String, sessionId: String) {
+        val participantId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              rsvp_status,
+              attendance_status,
+              participation_status
+            )
+            values (
+              ?,
+              '00000000-0000-0000-0000-000000000001',
+              ?,
+              ?,
+              'GOING',
+              'ATTENDED',
+              'ACTIVE'
+            )
+            """.trimIndent(),
+            participantId,
+            sessionId,
+            membershipId,
+        )
+        createdSessionParticipantIds += participantId
+    }
+
+    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+        if (values.isEmpty()) {
+            return
+        }
+
+        val placeholders = values.joinToString(", ") { "?" }
+        jdbcTemplate.update(
+            "delete from $tableName where $columnName in ($placeholders)",
+            *values.toTypedArray(),
+        )
     }
 }

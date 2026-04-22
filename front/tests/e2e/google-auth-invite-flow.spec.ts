@@ -1,27 +1,37 @@
 import { expect, test } from "@playwright/test";
-import { cleanupInvitedMembers, loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
+import {
+  cleanupGeneratedSessions,
+  createOpenSessionFixture,
+  loginWithGoogleFixture,
+  resetSeedGoogleLogins,
+} from "./readmates-e2e-db";
 
 test.describe.configure({ mode: "serial" });
 
 const invitedEmail = "e2e.google.invited@example.com";
 const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 
-function resetGoogleInviteFlowState() {
-  cleanupInvitedMembers([invitedEmail]);
+function cleanupGoogleInviteFlowState() {
+  cleanupGeneratedSessions([invitedEmail]);
   resetSeedGoogleLogins(["host@example.com"]);
 }
 
+function inviteTokenFromUrl(inviteUrl: string) {
+  return new URL(inviteUrl, appOrigin).pathname.split("/").pop() ?? "";
+}
+
 function expectedGoogleInviteHref(inviteUrl: string) {
-  const token = new URL(inviteUrl, appOrigin).pathname.split("/").pop() ?? "";
+  const token = inviteTokenFromUrl(inviteUrl);
   return `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}`;
 }
 
 test.beforeEach(() => {
-  resetGoogleInviteFlowState();
+  cleanupGoogleInviteFlowState();
+  createOpenSessionFixture();
 });
 
 test.afterEach(() => {
-  resetGoogleInviteFlowState();
+  cleanupGoogleInviteFlowState();
 });
 
 test("host creates invite and member is directed to Google acceptance", async ({ context, page }) => {
@@ -62,4 +72,16 @@ test("host creates invite and member is directed to Google acceptance", async ({
   await expect(page.getByLabel("비밀번호", { exact: true })).toHaveCount(0);
   await expect(page.getByLabel("비밀번호 확인", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "초대 수락" })).toHaveCount(0);
+
+  await loginWithGoogleFixture(page, invitedEmail, { inviteToken: inviteTokenFromUrl(inviteUrl) });
+  await page.goto("/app/session/current");
+  await expect(page.getByRole("button", { name: "참석" })).toBeEnabled();
+  await expect(page.getByText("둘러보기 멤버")).toHaveCount(0);
+
+  const authMe = await page.evaluate(async () => {
+    const response = await fetch("/api/bff/api/auth/me", { cache: "no-store" });
+    return response.json() as Promise<{ membershipStatus: string; approvalState: string }>;
+  });
+  expect(authMe.membershipStatus).toBe("ACTIVE");
+  expect(authMe.approvalState).toBe("ACTIVE");
 });

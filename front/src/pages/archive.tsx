@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import ArchivePage, { type ArchiveView } from "@/features/archive/components/archive-page";
 import type { ArchiveSessionItem, FeedbackDocumentListItem, MyArchiveQuestionItem, MyArchiveReviewItem } from "@/shared/api/readmates";
-import { readmatesFetch } from "@/shared/api/readmates";
+import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/readmates";
 import { useReadmatesData } from "./readmates-page-data";
 import { ReadmatesPageState } from "./readmates-page";
 
@@ -14,6 +14,20 @@ function archiveViewFromSearchParam(value: string | null): ArchiveView {
   return "sessions";
 }
 
+async function loadMyFeedbackDocuments(): Promise<FeedbackDocumentListItem[]> {
+  const response = await readmatesFetchResponse("/api/feedback-documents/me");
+
+  if (response.status === 403) {
+    return [];
+  }
+
+  if (!response.ok) {
+    throw new Error(`ReadMates feedback documents fetch failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<FeedbackDocumentListItem[]>;
+}
+
 export default function ArchiveRoutePage() {
   const [searchParams] = useSearchParams();
   const initialView = archiveViewFromSearchParam(searchParams.get("view"));
@@ -23,7 +37,7 @@ export default function ArchiveRoutePage() {
         readmatesFetch<ArchiveSessionItem[]>("/api/archive/sessions"),
         readmatesFetch<MyArchiveQuestionItem[]>("/api/archive/me/questions"),
         readmatesFetch<MyArchiveReviewItem[]>("/api/archive/me/reviews"),
-        readmatesFetch<FeedbackDocumentListItem[]>("/api/feedback-documents/me"),
+        loadMyFeedbackDocuments(),
       ]);
 
       return { sessions, questions, reviews, reports };
