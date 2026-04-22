@@ -223,6 +223,7 @@ export type ArchiveSessionItem = {
   total: number;
   published: boolean;
   state: SessionState;
+  feedbackDocument?: MemberArchiveFeedbackDocumentStatus;
 };
 
 export type MemberArchiveHighlightItem = {
@@ -437,6 +438,9 @@ export type MyPageResponse = {
   displayName: string;
   shortName: string;
   email: string;
+  role: MemberRole;
+  membershipStatus: MembershipStatus;
+  clubName: string | null;
   joinedAt: string;
   sessionCount: number;
   totalSessionCount: number;

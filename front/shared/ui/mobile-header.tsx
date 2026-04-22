@@ -1,6 +1,15 @@
 "use client";
 
 import { useLocation } from "react-router-dom";
+import {
+  archiveReportReturnTarget,
+  archiveSessionsReturnTarget,
+  publicRecordsReturnTarget,
+  readPublicReadmatesReturnTarget,
+  readReadmatesReturnTarget,
+  readmatesReturnState,
+  type ReadmatesReturnState,
+} from "@/src/app/route-continuity";
 import { Link } from "@/src/app/router-link";
 import { usePublicAuthAction, type PublicAuthAction } from "./public-auth-action-state";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
@@ -21,6 +30,10 @@ function publicTitle(pathname: string) {
     return "클럽 소개";
   }
 
+  if (pathname === "/records") {
+    return READMATES_NAV_LABELS.public.publicRecords;
+  }
+
   if (pathname.startsWith("/sessions/")) {
     return READMATES_NAV_LABELS.public.publicRecords;
   }
@@ -29,8 +42,15 @@ function publicTitle(pathname: string) {
 }
 
 function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string) {
-  if (variant === "host" && (pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/"))) {
+  if (
+    variant === "host" &&
+    (pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"))
+  ) {
     return "기록";
+  }
+
+  if (pathname.startsWith("/app/feedback/")) {
+    return "피드백 문서";
   }
 
   if (pathname.startsWith("/app/host/sessions/new")) {
@@ -72,17 +92,36 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
   return variant === "host" ? READMATES_NAV_LABELS.host.operations : "읽는사이";
 }
 
-function appBackHref(pathname: string) {
+type AppBackTarget = {
+  href: string;
+  state?: ReadmatesReturnState;
+};
+
+function appBackTarget(pathname: string, state: unknown): AppBackTarget | null {
   if (pathname === "/app/notes") {
-    return "/app";
+    return { href: "/app" };
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {
-    return "/app/host";
+    return { href: "/app/host" };
+  }
+
+  if (pathname.startsWith("/app/feedback/") && pathname.endsWith("/print")) {
+    const sourceTarget = readReadmatesReturnTarget(state, archiveReportReturnTarget);
+    return {
+      href: pathname.replace(/\/print$/, ""),
+      state: readmatesReturnState(sourceTarget),
+    };
+  }
+
+  if (pathname.startsWith("/app/feedback/")) {
+    const target = readReadmatesReturnTarget(state, archiveReportReturnTarget);
+    return { href: target.href, state: target.state };
   }
 
   if (pathname.startsWith("/app/sessions/")) {
-    return "/app/archive";
+    const target = readReadmatesReturnTarget(state, archiveSessionsReturnTarget);
+    return { href: target.href, state: target.state };
   }
 
   return null;
@@ -90,24 +129,24 @@ function appBackHref(pathname: string) {
 
 function HeaderShell({
   title,
-  backHref,
+  backTarget,
   rightAction,
 }: {
   title: string;
-  backHref?: string | null;
+  backTarget?: AppBackTarget | null;
   rightAction?: PublicAuthAction | null;
 }) {
   return (
     <header className="m-hdr">
-      <div style={{ width: 56, display: "flex" }}>
-        {backHref ? (
-          <Link to={backHref} className="m-hdr-link" aria-label="뒤로">
+      <div className="m-hdr-side">
+        {backTarget ? (
+          <Link to={backTarget.href} state={backTarget.state} className="m-hdr-link" aria-label="뒤로">
             뒤로
           </Link>
         ) : null}
       </div>
       <div className="m-hdr-title">{title}</div>
-      <div style={{ minWidth: 56, display: "flex", justifyContent: "flex-end" }}>
+      <div className="m-hdr-side m-hdr-side--right">
         {rightAction ? (
           <Link to={rightAction.href} className="m-hdr-link">
             {rightAction.label}
@@ -119,14 +158,18 @@ function HeaderShell({
 }
 
 function GuestMobileHeader() {
-  const pathname = useLocation().pathname;
+  const location = useLocation();
+  const pathname = location.pathname;
   const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login });
   const isEntryRoute = pathname === "/login" || pathname.startsWith("/invite/");
+  const publicSessionReturnTarget = pathname.startsWith("/sessions/")
+    ? readPublicReadmatesReturnTarget(location.state, publicRecordsReturnTarget)
+    : null;
 
   return (
     <HeaderShell
       title={publicTitle(pathname)}
-      backHref={isEntryRoute ? "/" : null}
+      backTarget={isEntryRoute ? { href: "/" } : publicSessionReturnTarget}
       rightAction={isEntryRoute ? null : authAction}
     />
   );
@@ -134,11 +177,11 @@ function GuestMobileHeader() {
 
 function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHostEntry: boolean): PublicAuthAction | null {
   if (variant === "host") {
-    return { href: "/app", label: READMATES_WORKSPACE_LABELS.memberWorkspace };
+    return { href: "/app", label: READMATES_WORKSPACE_LABELS.memberWorkspaceReturn };
   }
 
   if (showHostEntry) {
-    return { href: "/app/host", label: READMATES_NAV_LABELS.host.operations };
+    return { href: "/app/host", label: READMATES_WORKSPACE_LABELS.hostWorkspace };
   }
 
   return null;
@@ -151,12 +194,13 @@ function AppMobileHeader({
   variant: Exclude<MobileHeaderVariant, "guest">;
   showHostEntry?: boolean;
 }) {
-  const pathname = useLocation().pathname;
+  const location = useLocation();
+  const pathname = location.pathname;
 
   return (
     <HeaderShell
       title={appTitle(variant, pathname)}
-      backHref={appBackHref(pathname)}
+      backTarget={appBackTarget(pathname, location.state)}
       rightAction={appRightAction(variant, showHostEntry)}
     />
   );

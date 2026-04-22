@@ -1,10 +1,12 @@
 import { Link } from "@/src/app/router-link";
 import type { PublicClubResponse, PublicSessionListItem } from "@/shared/api/readmates";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
-import { PublicGuestOnlyLink } from "@/shared/ui/public-auth-action";
+import { BookCover } from "@/shared/ui/book-cover";
+import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public-auth-action";
 import { displayText, formatDateLabel, nonNegativeCount } from "@/shared/ui/readmates-display";
 import {
   PUBLIC_INTRODUCTION_FALLBACK,
+  PUBLIC_MEMBERSHIP_NOTE,
   PUBLIC_TAGLINE_FALLBACK,
   STATIC_OPERATION_INTRO,
 } from "./public-club-copy";
@@ -22,6 +24,9 @@ function sessionDisplay(session: PublicSessionListItem) {
     title: displayText(session.bookTitle, "도서 제목 미정"),
     author: displayText(session.bookAuthor, "저자 미상"),
     date: formatDateLabel(session.date),
+    summary: displayText(session.summary, "공개 요약이 아직 준비되지 않았습니다."),
+    highlightCount: nonNegativeCount(session.highlightCount),
+    oneLinerCount: nonNegativeCount(session.oneLinerCount),
   };
 }
 
@@ -29,30 +34,60 @@ function PublicRecordLink({ session }: { session: PublicSessionListItem }) {
   const display = sessionDisplay(session);
 
   return (
-    <Link to={sessionHref(session)} className="public-record-link">
-      <span className="mono" style={{ fontSize: "13px", color: "var(--text-3)", letterSpacing: "0.05em" }}>
-        No.{session.sessionNumber}
-      </span>
-      <span>
-        <span className="editorial" style={{ display: "block", fontSize: "19px" }}>
-          {display.title}
-        </span>
-        <span className="small" style={{ display: "block", marginTop: "4px" }}>
+    <Link to={sessionHref(session)} className="rm-record-row public-archive-row">
+      <span className="mono tiny public-archive-row__number">No.{session.sessionNumber}</span>
+      <span className="public-archive-row__main">
+        <span className="editorial public-archive-row__title">{display.title}</span>
+        <span className="small public-archive-row__meta">
           {display.author} · {display.date}
         </span>
       </span>
-      <span className="row" style={{ gap: "16px", color: "var(--text-3)", justifySelf: "end" }}>
-        <span className="badge">공개</span>
-        <span aria-hidden>→</span>
+      <span className="public-archive-row__counts">
+        <span>하이라이트 {display.highlightCount}</span>
+        <span>한줄평 {display.oneLinerCount}</span>
       </span>
+    </Link>
+  );
+}
+
+function LatestRecordPanel({ session }: { session: PublicSessionListItem | null }) {
+  if (!session) {
+    return (
+      <div className="rm-empty-state public-empty-record">
+        <div className="eyebrow">공개 기록</div>
+        <div className="h3 editorial" style={{ marginTop: 10 }}>
+          아직 발행된 공개 기록이 없습니다
+        </div>
+        <p className="body" style={{ margin: "12px 0 0" }}>
+          공개 가능한 모임 기록이 정리되면 이곳에서 먼저 확인할 수 있습니다.
+        </p>
+      </div>
+    );
+  }
+
+  const display = sessionDisplay(session);
+
+  return (
+    <Link to={sessionHref(session)} className="rm-document-panel public-club-latest">
+      <BookCover title={display.title} author={display.author} imageUrl={session.bookImageUrl} width={88} />
+      <div>
+        <div className="eyebrow">최근 공개 기록 · No.{session.sessionNumber}</div>
+        <div className="h3 editorial" style={{ marginTop: 8 }}>
+          {display.title}
+        </div>
+        <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
+          {display.author} · {display.date}
+        </p>
+        <p className="body" style={{ margin: "14px 0 0", color: "var(--text-2)" }}>
+          {display.summary}
+        </p>
+      </div>
     </Link>
   );
 }
 
 export default function PublicClub({ data }: PublicClubProps) {
   const latestSession = data.recentSessions[0] ?? null;
-  const latestHref = latestSession ? sessionHref(latestSession) : "/about";
-  const latestLabel = latestSession ? "공개 기록 보기" : "소개로 돌아가기";
   const clubName = displayText(data.clubName, "읽는사이");
   const tagline = displayText(data.tagline, PUBLIC_TAGLINE_FALLBACK);
   const about = displayText(data.about, PUBLIC_INTRODUCTION_FALLBACK);
@@ -60,126 +95,126 @@ export default function PublicClub({ data }: PublicClubProps) {
   const overviewItems = [
     ["시작", STATIC_OPERATION_INTRO.startedAt],
     ["운영 리듬", STATIC_OPERATION_INTRO.cadence],
-    ["멤버", `${memberCount}명`],
+    ["멤버 정원", `${memberCount}명 소규모 초대제`],
     ["호스트", `${STATIC_OPERATION_INTRO.hostName} · ${STATIC_OPERATION_INTRO.hostSince}~`],
     ["기록 방식", STATIC_OPERATION_INTRO.recording],
   ];
+  const rules = [
+    ["준비", "모임 전 질문 2~3개를 준비하고 우선순위를 남깁니다."],
+    ["대화", "정답을 맞히기보다 서로의 해석이 어디서 갈라지는지 듣습니다."],
+    ["기록", "공개 가능한 요약, 하이라이트, 한줄평만 외부 기록으로 발행합니다."],
+    ["경계", "참여, 피드백 문서, 개인 노트는 정식 멤버 공간에만 남깁니다."],
+  ];
 
   return (
-    <main className="page-frame">
-      <section className="page-header">
-        <div className="container public-grid-2" style={{ alignItems: "flex-end" }}>
+    <main className="page-frame public-club">
+      <section className="page-header public-club-header">
+        <div className="container public-grid-2" style={{ alignItems: "end" }}>
           <div>
-            <div className="eyebrow" style={{ marginBottom: "16px" }}>
+            <div className="eyebrow" style={{ marginBottom: 16 }}>
               {clubName} · {tagline}
             </div>
             <h1 className="h1 editorial" style={{ margin: 0 }}>
               {clubName}
             </h1>
-            <p className="body-lg" style={{ color: "var(--text-2)", marginTop: "16px", maxWidth: "520px" }}>
+            <p className="body-lg" style={{ color: "var(--text-2)", marginTop: 16, maxWidth: 560 }}>
               {about}
             </p>
           </div>
 
-          <div className="surface-quiet" style={{ padding: "24px" }} aria-label="클럽 운영 정보">
-            <dl
-              style={{
-                display: "grid",
-                gridTemplateColumns: "auto 1fr",
-                columnGap: "16px",
-                rowGap: "8px",
-                margin: 0,
-              }}
-            >
+          <aside className="rm-document-panel public-club-overview" aria-label="클럽 운영 정보">
+            <dl>
               {overviewItems.map(([label, value]) => (
-                <div key={label} style={{ display: "contents" }}>
+                <div key={label}>
                   <dt className="eyebrow">{label}</dt>
-                  <dd style={{ margin: 0 }}>{value}</dd>
+                  <dd>{value}</dd>
                 </div>
               ))}
             </dl>
-            <hr className="divider-soft" style={{ margin: "18px 0" }} />
-            <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
-              <PublicGuestOnlyLink
-                action={{ href: "/login", label: "초대 수락 / 로그인" }}
-                className="btn btn-primary btn-sm"
-              />
-              <Link to={latestHref} className="btn btn-ghost btn-sm">
-                {latestLabel}
-              </Link>
-            </div>
-          </div>
+          </aside>
         </div>
       </section>
 
-      <section style={{ padding: "56px 0" }}>
+      <section className="public-section">
         <div className="container public-grid-2">
           <div>
-            <div className="eyebrow" style={{ marginBottom: "10px" }}>
-              호스트 안내
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              규칙과 cadence
             </div>
-            <h2 className="h2 editorial" style={{ margin: "0 0 16px" }}>
-              호스트의 글
+            <h2 className="h2 editorial" style={{ margin: 0 }}>
+              작게 읽고, 분명하게 남깁니다
             </h2>
-            <div className="surface" style={{ padding: "28px" }}>
-              <div className="row" style={{ gap: "12px" }}>
-                <AvatarChip
-                  name={STATIC_OPERATION_INTRO.hostName}
-                  label={STATIC_OPERATION_INTRO.hostName}
-                  size={32}
-                />
-                <div>
-                  <div className="h4 editorial">{STATIC_OPERATION_INTRO.hostName}</div>
-                  <div className="tiny">호스트 · {STATIC_OPERATION_INTRO.hostSince}~</div>
-                </div>
-              </div>
-              <p className="body" style={{ color: "var(--text-2)", marginTop: "16px" }}>
-                {STATIC_OPERATION_INTRO.hostNote}
-              </p>
-              <div className="rule" style={{ marginTop: "20px" }}>
-                <span>운영 안내</span>
-              </div>
-            </div>
           </div>
-
-          <div>
-            <div className="eyebrow" style={{ marginBottom: "10px" }}>
-              운영 원칙
-            </div>
-            <h2 className="h2 editorial" style={{ margin: "0 0 16px" }}>
-              우리가 소중히 여기는 것
-            </h2>
-            <div className="public-record-list">
-              {[
-                "서로의 문장과 해석을 존중합니다.",
-                "누가 옳은지보다 어떤 생각이 떠올랐는지에 집중합니다.",
-                "말하기만큼 잘 듣는 것을 중요하게 생각합니다.",
-              ].map((principle, index) => (
-                <div
-                  key={principle}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "40px 1fr",
-                    padding: "18px 0",
-                    borderTop: "1px solid var(--line-soft)",
-                  }}
-                >
-                  <span className="mono tiny">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="body editorial" style={{ fontSize: "17px" }}>
-                    {principle}
-                  </span>
-                </div>
-              ))}
-            </div>
+          <div className="public-ledger-list">
+            {rules.map(([label, body], index) => (
+              <div className="rm-ledger-row public-ledger-row" key={label}>
+                <span className="mono tiny">{String(index + 1).padStart(2, "0")}</span>
+                <span className="eyebrow">{label}</span>
+                <span className="body editorial">{body}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="public-records" style={{ padding: "40px 0 100px" }}>
+      <section className="public-section public-section--subtle">
+        <div className="container public-grid-2">
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              호스트 안내
+            </div>
+            <h2 className="h2 editorial" style={{ margin: 0 }}>
+              호스트의 글
+            </h2>
+          </div>
+          <div className="rm-document-panel public-host-note">
+            <div className="row" style={{ gap: 12 }}>
+              <AvatarChip name={STATIC_OPERATION_INTRO.hostName} label={STATIC_OPERATION_INTRO.hostName} size={32} />
+              <div>
+                <div className="h4 editorial">{STATIC_OPERATION_INTRO.hostName}</div>
+                <div className="tiny">호스트 · {STATIC_OPERATION_INTRO.hostSince}~</div>
+              </div>
+            </div>
+            <p className="body" style={{ color: "var(--text-2)", marginTop: 16 }}>
+              {STATIC_OPERATION_INTRO.hostNote}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="public-section">
+        <div className="container public-grid-2">
+          <div>
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              멤버십
+            </div>
+            <h2 className="h2 editorial" style={{ margin: 0 }}>
+              초대받은 사람만 참여할 수 있습니다
+            </h2>
+            <p className="body" style={{ marginTop: 14, color: "var(--text-2)" }}>
+              {PUBLIC_MEMBERSHIP_NOTE}
+            </p>
+            <div className="public-actions">
+              <PublicGuestOnlyActions>
+                <Link to="/login" className="btn btn-primary">
+                  기존 멤버 로그인
+                </Link>
+                <PublicInviteGuidance />
+              </PublicGuestOnlyActions>
+            </div>
+            <p className="tiny" style={{ margin: "14px 0 0", color: "var(--text-3)" }}>
+              초대받은 독자는 호스트가 보낸 초대 링크에서 수락 절차를 시작합니다.
+            </p>
+          </div>
+          <LatestRecordPanel session={latestSession} />
+        </div>
+      </section>
+
+      <section id="public-records" className="public-section">
         <div className="container">
-          <div className="row-between" style={{ alignItems: "flex-end", marginBottom: "20px" }}>
+          <div className="row-between public-section-head">
             <div>
-              <div className="eyebrow" style={{ marginBottom: "8px" }}>
+              <div className="eyebrow" style={{ marginBottom: 8 }}>
                 공개 기록
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
@@ -196,8 +231,14 @@ export default function PublicClub({ data }: PublicClubProps) {
               ))}
             </div>
           ) : (
-            <div className="surface" style={{ padding: "28px" }}>
-              공개된 모임 기록이 없습니다.
+            <div className="rm-empty-state public-empty-record">
+              <div className="eyebrow">공개 기록</div>
+              <div className="h3 editorial" style={{ marginTop: 10 }}>
+                아직 발행된 공개 기록이 없습니다
+              </div>
+              <p className="body" style={{ margin: "12px 0 0" }}>
+                기록이 없다는 상태도 의도적으로 보관합니다. 발행된 모임이 생기면 이 색인에 추가됩니다.
+              </p>
             </div>
           )}
         </div>

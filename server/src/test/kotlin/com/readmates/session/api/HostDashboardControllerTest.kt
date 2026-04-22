@@ -192,6 +192,38 @@ class HostDashboardControllerTest(
     }
 
     @Test
+    fun `dashboard feedback pending ignores removed attended participants`() {
+        val sessionId = createSessionSeven()
+        val attendees = findFirstTwoSessionAttendees(UUID.fromString(sessionId))
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set participation_status = 'REMOVED',
+                attendance_status = 'ATTENDED'
+            where session_id = ?
+              and membership_id = ?
+            """.trimIndent(),
+            sessionId,
+            attendees.first.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'CLOSED'
+            where id = ?
+            """.trimIndent(),
+            sessionId,
+        )
+
+        mockMvc.get("/api/host/dashboard") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.feedbackPending") { value(0) }
+        }
+    }
+
+    @Test
     fun `dashboard current session metrics exclude removed participants`() {
         val sessionId = createSessionSeven()
         val attendees = findFirstThreeSessionAttendees(UUID.fromString(sessionId))
@@ -425,6 +457,49 @@ class HostDashboardControllerTest(
         )
         assertEquals("ATTENDED", attendanceStatuses["first_status"])
         assertEquals("ABSENT", attendanceStatuses["second_status"])
+    }
+
+    @Test
+    fun `host cannot confirm attendance for removed participants`() {
+        val sessionId = createSessionSeven()
+        val attendees = findFirstTwoSessionAttendees(UUID.fromString(sessionId))
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set participation_status = 'REMOVED',
+                attendance_status = 'UNKNOWN'
+            where session_id = ?
+              and membership_id = ?
+            """.trimIndent(),
+            sessionId,
+            attendees.first.toString(),
+        )
+
+        mockMvc.post("/api/host/sessions/$sessionId/attendance") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                [
+                  { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED" }
+                ]
+                """.trimIndent()
+        }.andExpect {
+            status { isNotFound() }
+        }
+
+        val attendanceStatus = jdbcTemplate.queryForObject(
+            """
+            select attendance_status
+            from session_participants
+            where session_id = ?
+              and membership_id = ?
+            """.trimIndent(),
+            String::class.java,
+            sessionId,
+            attendees.first.toString(),
+        )
+        assertEquals("UNKNOWN", attendanceStatus)
     }
 
     @Test

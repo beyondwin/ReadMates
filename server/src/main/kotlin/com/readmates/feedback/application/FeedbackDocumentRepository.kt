@@ -68,6 +68,7 @@ class FeedbackDocumentRepository(
               join sessions on sessions.id = session_feedback_documents.session_id
                 and sessions.club_id = session_feedback_documents.club_id
               where session_feedback_documents.club_id = ?
+                and sessions.state in ('CLOSED', 'PUBLISHED')
             ) ranked_documents
             where document_rank = 1
             order by session_number desc
@@ -96,6 +97,8 @@ class FeedbackDocumentRepository(
                 and session_participants.membership_id = ?
               where session_feedback_documents.club_id = ?
                 and session_participants.attendance_status = 'ATTENDED'
+                and session_participants.participation_status = 'ACTIVE'
+                and sessions.state in ('CLOSED', 'PUBLISHED')
             ) ranked_documents
             where document_rank = 1
             order by session_number desc
@@ -200,6 +203,7 @@ class FeedbackDocumentRepository(
             from sessions
             where id = ?
               and club_id = ?
+              and state in ('CLOSED', 'PUBLISHED')
             """.trimIndent(),
             { resultSet, _ -> resultSet.toSessionMetadata() },
             sessionId.dbString(),
@@ -229,6 +233,7 @@ class FeedbackDocumentRepository(
               and session_id = ?
               and membership_id = ?
               and attendance_status = 'ATTENDED'
+              and participation_status = 'ACTIVE'
             """.trimIndent(),
             Int::class.java,
             member.clubId.dbString(),

@@ -1,10 +1,11 @@
 import { useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import MemberSessionDetailPage, {
   MemberSessionDetailUnavailablePage,
 } from "@/features/archive/components/member-session-detail-page";
 import type { MemberArchiveSessionDetailResponse } from "@/shared/api/readmates";
 import { readmatesFetchResponse } from "@/shared/api/readmates";
+import { archiveSessionsReturnTarget, readReadmatesReturnTarget } from "@/src/app/route-continuity";
 import { useReadmatesData } from "./readmates-page-data";
 import { ReadmatesPageState } from "./readmates-page";
 
@@ -24,13 +25,21 @@ async function loadMemberSession(sessionId: string) {
 
 export default function MemberSessionDetailRoutePage() {
   const sessionId = useParams().sessionId;
+  const location = useLocation();
+  const returnTarget = readReadmatesReturnTarget(location.state, archiveSessionsReturnTarget);
   const state = useReadmatesData(
     useCallback(() => (sessionId ? loadMemberSession(sessionId) : Promise.resolve(null)), [sessionId]),
   );
 
   return (
     <ReadmatesPageState state={state}>
-      {(session) => (session ? <MemberSessionDetailPage session={session} /> : <MemberSessionDetailUnavailablePage />)}
+      {(session) =>
+        session ? (
+          <MemberSessionDetailPage session={session} returnTarget={returnTarget} />
+        ) : (
+          <MemberSessionDetailUnavailablePage returnTarget={returnTarget} />
+        )
+      }
     </ReadmatesPageState>
   );
 }

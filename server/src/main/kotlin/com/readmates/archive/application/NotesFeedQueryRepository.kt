@@ -30,6 +30,14 @@ class NotesFeedQueryRepository(
                 from questions
                 where questions.club_id = sessions.club_id
                   and questions.session_id = sessions.id
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = questions.session_id
+                      and session_participants.club_id = questions.club_id
+                      and session_participants.membership_id = questions.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
               ) as question_count,
               (
                 select count(*)
@@ -37,18 +45,45 @@ class NotesFeedQueryRepository(
                 where one_line_reviews.club_id = sessions.club_id
                   and one_line_reviews.session_id = sessions.id
                   and one_line_reviews.visibility = 'PUBLIC'
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = one_line_reviews.session_id
+                      and session_participants.club_id = one_line_reviews.club_id
+                      and session_participants.membership_id = one_line_reviews.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
               ) as one_liner_count,
               (
                 select count(*)
                 from highlights
                 where highlights.club_id = sessions.club_id
                   and highlights.session_id = sessions.id
+                  and (
+                    highlights.membership_id is null
+                    or exists (
+                      select 1
+                      from session_participants
+                      where session_participants.session_id = highlights.session_id
+                        and session_participants.club_id = highlights.club_id
+                        and session_participants.membership_id = highlights.membership_id
+                        and session_participants.participation_status = 'ACTIVE'
+                    )
+                  )
               ) as highlight_count,
               (
                 select count(*)
                 from reading_checkins
                 where reading_checkins.club_id = sessions.club_id
                   and reading_checkins.session_id = sessions.id
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = reading_checkins.session_id
+                      and session_participants.club_id = reading_checkins.club_id
+                      and session_participants.membership_id = reading_checkins.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
               ) as checkin_count
             from sessions
             where sessions.club_id = ?
@@ -102,6 +137,10 @@ class NotesFeedQueryRepository(
               join memberships on memberships.id = questions.membership_id
                 and memberships.club_id = questions.club_id
               join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = questions.session_id
+                and session_participants.club_id = questions.club_id
+                and session_participants.membership_id = questions.membership_id
+                and session_participants.participation_status = 'ACTIVE'
               where questions.club_id = ?
                 and sessions.state = 'PUBLISHED'
 
@@ -125,6 +164,10 @@ class NotesFeedQueryRepository(
               join memberships on memberships.id = one_line_reviews.membership_id
                 and memberships.club_id = one_line_reviews.club_id
               join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = one_line_reviews.session_id
+                and session_participants.club_id = one_line_reviews.club_id
+                and session_participants.membership_id = one_line_reviews.membership_id
+                and session_participants.participation_status = 'ACTIVE'
               where one_line_reviews.club_id = ?
                 and one_line_reviews.visibility = 'PUBLIC'
                 and sessions.state = 'PUBLISHED'
@@ -149,6 +192,10 @@ class NotesFeedQueryRepository(
               join memberships on memberships.id = reading_checkins.membership_id
                 and memberships.club_id = reading_checkins.club_id
               join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = reading_checkins.session_id
+                and session_participants.club_id = reading_checkins.club_id
+                and session_participants.membership_id = reading_checkins.membership_id
+                and session_participants.participation_status = 'ACTIVE'
               where reading_checkins.club_id = ?
                 and sessions.state = 'PUBLISHED'
 
@@ -172,8 +219,15 @@ class NotesFeedQueryRepository(
               left join memberships on memberships.id = highlights.membership_id
                 and memberships.club_id = highlights.club_id
               left join users on users.id = memberships.user_id
+              left join session_participants on session_participants.session_id = highlights.session_id
+                and session_participants.club_id = highlights.club_id
+                and session_participants.membership_id = highlights.membership_id
               where highlights.club_id = ?
                 and sessions.state = 'PUBLISHED'
+                and (
+                  highlights.membership_id is null
+                  or session_participants.participation_status = 'ACTIVE'
+                )
             ) feed_items
             order by
               created_at desc,
@@ -217,6 +271,10 @@ class NotesFeedQueryRepository(
               join memberships on memberships.id = questions.membership_id
                 and memberships.club_id = questions.club_id
               join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = questions.session_id
+                and session_participants.club_id = questions.club_id
+                and session_participants.membership_id = questions.membership_id
+                and session_participants.participation_status = 'ACTIVE'
               where questions.club_id = ?
                 and sessions.id = ?
                 and sessions.state = 'PUBLISHED'
@@ -241,6 +299,10 @@ class NotesFeedQueryRepository(
               join memberships on memberships.id = one_line_reviews.membership_id
                 and memberships.club_id = one_line_reviews.club_id
               join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = one_line_reviews.session_id
+                and session_participants.club_id = one_line_reviews.club_id
+                and session_participants.membership_id = one_line_reviews.membership_id
+                and session_participants.participation_status = 'ACTIVE'
               where one_line_reviews.club_id = ?
                 and sessions.id = ?
                 and one_line_reviews.visibility = 'PUBLIC'
@@ -266,6 +328,10 @@ class NotesFeedQueryRepository(
               join memberships on memberships.id = reading_checkins.membership_id
                 and memberships.club_id = reading_checkins.club_id
               join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = reading_checkins.session_id
+                and session_participants.club_id = reading_checkins.club_id
+                and session_participants.membership_id = reading_checkins.membership_id
+                and session_participants.participation_status = 'ACTIVE'
               where reading_checkins.club_id = ?
                 and sessions.id = ?
                 and sessions.state = 'PUBLISHED'
@@ -290,9 +356,16 @@ class NotesFeedQueryRepository(
               left join memberships on memberships.id = highlights.membership_id
                 and memberships.club_id = highlights.club_id
               left join users on users.id = memberships.user_id
+              left join session_participants on session_participants.session_id = highlights.session_id
+                and session_participants.club_id = highlights.club_id
+                and session_participants.membership_id = highlights.membership_id
               where highlights.club_id = ?
                 and sessions.id = ?
                 and sessions.state = 'PUBLISHED'
+                and (
+                  highlights.membership_id is null
+                  or session_participants.participation_status = 'ACTIVE'
+                )
             ) feed_items
             order by
               created_at desc,

@@ -1,10 +1,11 @@
 import { useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import FeedbackDocumentPage, {
   FeedbackDocumentUnavailablePage,
 } from "@/features/feedback/components/feedback-document-page";
 import type { FeedbackDocumentResponse } from "@/shared/api/readmates";
 import { readmatesFetchResponse } from "@/shared/api/readmates";
+import { archiveReportReturnTarget, readReadmatesReturnTarget } from "@/src/app/route-continuity";
 import { useReadmatesData } from "./readmates-page-data";
 import { ReadmatesPageState } from "./readmates-page";
 
@@ -32,6 +33,8 @@ async function loadFeedbackDocument(sessionId: string): Promise<FeedbackLoadResu
 
 export default function FeedbackDocumentRoutePage({ printMode = false }: { printMode?: boolean }) {
   const sessionId = useParams().sessionId;
+  const location = useLocation();
+  const returnTarget = readReadmatesReturnTarget(location.state, archiveReportReturnTarget);
   const state = useReadmatesData(
     useCallback(() => {
       if (!sessionId) {
@@ -45,9 +48,9 @@ export default function FeedbackDocumentRoutePage({ printMode = false }: { print
     <ReadmatesPageState state={state}>
       {(result) =>
         result.status === "ready" ? (
-          <FeedbackDocumentPage document={result.document} printMode={printMode} />
+          <FeedbackDocumentPage document={result.document} printMode={printMode} returnTarget={returnTarget} />
         ) : (
-          <FeedbackDocumentUnavailablePage reason={result.reason} printMode={printMode} />
+          <FeedbackDocumentUnavailablePage reason={result.reason} printMode={printMode} returnTarget={returnTarget} />
         )
       }
     </ReadmatesPageState>

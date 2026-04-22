@@ -2,7 +2,7 @@
 
 import { useLocation } from "react-router-dom";
 import { Link } from "@/src/app/router-link";
-import { READMATES_NAV_LABELS } from "./readmates-copy";
+import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS } from "./readmates-copy";
 
 export type MobileTabBarVariant = "member" | "host";
 
@@ -17,6 +17,7 @@ type TabLink = {
   key: string;
   href: string | null;
   label: string;
+  pendingLabel?: string;
   icon: TabIconName;
   current: (pathname: string) => boolean;
 };
@@ -42,7 +43,8 @@ const memberTabs: TabLink[] = [
     href: "/app/archive",
     label: READMATES_NAV_LABELS.member.archive,
     icon: "archive",
-    current: (pathname) => pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/"),
+    current: (pathname) =>
+      pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
   },
   {
     key: "me",
@@ -65,30 +67,32 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
     {
       key: "host",
       href: "/app/host",
-      label: "오늘",
+      label: READMATES_MOBILE_TAB_LABELS.hostToday,
       icon: "host",
       current: (pathname) => pathname === "/app/host",
     },
     {
       key: "host-edit",
       href: editHref,
-      label: "세션",
+      label: READMATES_MOBILE_TAB_LABELS.hostSession,
+      pendingLabel: currentSessionId === undefined ? READMATES_MOBILE_TAB_LABELS.hostSessionPending : undefined,
       icon: "edit",
       current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
     },
     {
       key: "host-members",
       href: "/app/host/members",
-      label: "멤버",
+      label: READMATES_MOBILE_TAB_LABELS.hostMembers,
       icon: "approve",
       current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
     },
     {
       key: "host-records",
       href: "/app/archive",
-      label: "기록",
+      label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
-      current: (pathname) => pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/"),
+      current: (pathname) =>
+        pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
     },
   ];
 }
@@ -189,9 +193,18 @@ export function MobileTabBar({ variant, currentSessionId }: MobileTabBarProps) {
             <span className="m-tab-label">{tab.label}</span>
           </Link>
         ) : (
-          <span key={tab.key} className="m-tab" aria-disabled="true">
+          <span
+            key={tab.key}
+            className="m-tab is-pending"
+            aria-disabled="true"
+            aria-current={tab.current(pathname) ? "page" : undefined}
+            aria-label={`${tab.label} 불러오는 중`}
+          >
             <TabIcon name={tab.icon} />
-            <span className="m-tab-label">{tab.label}</span>
+            <span className="m-tab-label" aria-hidden="true">
+              {tab.pendingLabel ?? tab.label}
+            </span>
+            <span className="rm-sr-only">{tab.label} 불러오는 중</span>
           </span>
         ),
       )}

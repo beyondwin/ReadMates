@@ -1,8 +1,11 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import NotesFeedPage from "@/features/archive/components/notes-feed-page";
 import { resolveSelectedSession } from "@/features/archive/components/notes-session-filter-utils";
+import { feedFilterFromSearchParam } from "@/features/archive/components/notes-feed-filter-utils";
+import type { FeedFilter } from "@/features/archive/components/notes-feed-list";
 import type { NoteFeedItem, NoteSessionItem } from "@/shared/api/readmates";
 
 afterEach(cleanup);
@@ -165,24 +168,87 @@ const otherSessionItem: NoteFeedItem = {
   text: "팩트풀니스 질문은 선택된 세션 밖의 기록입니다.",
 };
 
-function renderNotesFeedPage({
-  renderItems = selectedItems,
-  renderNoteSessions = noteSessions,
-  selectedSessionId = selectedSession.sessionId,
-  renderSelectedSession = selectedSession,
-}: {
+type NotesFeedPageRenderOptions = {
   renderItems?: NoteFeedItem[];
   renderNoteSessions?: NoteSessionItem[];
   selectedSessionId?: string | null;
   renderSelectedSession?: NoteSessionItem | null;
-} = {}) {
-  return render(
+  initialFilter?: FeedFilter;
+  onFilterChange?: (filter: FeedFilter) => void;
+};
+
+function notesFeedPageElement({
+  renderItems = selectedItems,
+  renderNoteSessions = noteSessions,
+  selectedSessionId = selectedSession.sessionId,
+  renderSelectedSession = selectedSession,
+  initialFilter,
+  onFilterChange,
+}: NotesFeedPageRenderOptions = {}) {
+  return (
     <NotesFeedPage
       items={renderItems}
       noteSessions={renderNoteSessions}
       selectedSessionId={selectedSessionId}
       selectedSession={renderSelectedSession}
-    />,
+      initialFilter={initialFilter}
+      onFilterChange={onFilterChange}
+    />
+  );
+}
+
+function renderNotesFeedPage(options: NotesFeedPageRenderOptions = {}) {
+  return render(notesFeedPageElement(options));
+}
+
+function LocationProbe() {
+  const location = useLocation();
+
+  return <output aria-label="current route">{`${location.pathname}${location.search}`}</output>;
+}
+
+function NotesFilterUrlHarness() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filter = feedFilterFromSearchParam(searchParams.get("filter"));
+  const handleFilterChange = (nextFilter: FeedFilter) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+
+      if (nextFilter === "all") {
+        next.delete("filter");
+      } else {
+        next.set("filter", nextFilter);
+      }
+
+      return next;
+    }, { replace: true });
+  };
+
+  return (
+    <>
+      <LocationProbe />
+      {notesFeedPageElement({ initialFilter: filter, onFilterChange: handleFilterChange })}
+    </>
+  );
+}
+
+function renderNotesFeedPageInRouter({
+  initialEntry = "/app/notes?sessionId=session-6",
+  ...options
+}: NotesFeedPageRenderOptions & { initialEntry?: string } = {}) {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <LocationProbe />
+      {notesFeedPageElement(options)}
+    </MemoryRouter>,
+  );
+}
+
+function renderNotesFilterUrlHarness(initialEntry = "/app/notes?sessionId=session-6") {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <NotesFilterUrlHarness />
+    </MemoryRouter>,
   );
 }
 
@@ -207,7 +273,8 @@ describe("NotesFeedPage", () => {
     renderNotesFeedPage();
 
     expect(screen.getByRole("heading", { name: "가난한 찰리의 연감" })).toBeInTheDocument();
-    expect(screen.getByText("No.06 · 2026.04.15")).toBeInTheDocument();
+    expect(screen.getAllByText("No.06 · 2026.04.15").length).toBeGreaterThan(0);
+    expect(screen.getByText("세션을 먼저 고르고, 질문·서평·하이라이트를 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
     expect(screen.getByText("질문 4")).toBeInTheDocument();
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
     expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
@@ -224,6 +291,45 @@ describe("NotesFeedPage", () => {
     expect(selectedLink).toHaveAttribute("aria-current", "page");
     expect(selectedLink).toHaveTextContent("선택됨");
     expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 17");
+  });
+
+  it("uses router navigation for desktop and mobile session filter links", async () => {
+    const user = userEvent.setup();
+    const { container } = renderNotesFeedPageInRouter();
+
+    expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6");
+
+    await user.click(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" }));
+
+    expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-9");
+
+    const picker = container.querySelector('[aria-label="최근 세션"]');
+
+    expect(picker).not.toBeNull();
+
+    await user.click(within(picker as HTMLElement).getByRole("link", { name: "No.08 도둑맞은 집중력 세션 보기" }));
+
+    expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-8");
+  });
+
+  it("keeps the active note filter in the URL and session-picker links", async () => {
+    const user = userEvent.setup();
+    const { container } = renderNotesFilterUrlHarness();
+
+    await user.click(screen.getByRole("button", { name: "하이라이트" }));
+
+    expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=highlights");
+    expect(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" })).toHaveAttribute(
+      "href",
+      "/app/notes?sessionId=session-9&filter=highlights",
+    );
+
+    const picker = container.querySelector('[aria-label="최근 세션"]');
+    expect(picker).not.toBeNull();
+    expect(within(picker as HTMLElement).getByRole("link", { name: "No.08 도둑맞은 집중력 세션 보기" })).toHaveAttribute(
+      "href",
+      "/app/notes?sessionId=session-8&filter=highlights",
+    );
   });
 
   it("filters the desktop session rail by book title and No.06-style labels", async () => {

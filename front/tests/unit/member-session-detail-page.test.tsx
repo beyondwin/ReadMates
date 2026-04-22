@@ -1,10 +1,16 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import MemberSessionDetailPage from "@/features/archive/components/member-session-detail-page";
 import type { MemberArchiveSessionDetailResponse } from "@/shared/api/readmates";
+import MemberSessionDetailRoutePage from "@/src/pages/member-session";
 import { archiveSessionDetailContractFixture } from "./api-contract-fixtures";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 const readableSession: MemberArchiveSessionDetailResponse = archiveSessionDetailContractFixture;
 
@@ -24,6 +30,27 @@ function getMobile(container: HTMLElement) {
   return within(mobile as HTMLElement);
 }
 
+function LocationStateEcho() {
+  const location = useLocation();
+  const state = location.state as {
+    readmatesReturnTo?: string;
+    readmatesReturnLabel?: string;
+    readmatesReturnState?: {
+      readmatesReturnTo?: string;
+      readmatesReturnLabel?: string;
+    };
+  } | null;
+
+  return (
+    <main>
+      <div data-testid="return-to">{state?.readmatesReturnTo ?? ""}</div>
+      <div data-testid="return-label">{state?.readmatesReturnLabel ?? ""}</div>
+      <div data-testid="nested-return-to">{state?.readmatesReturnState?.readmatesReturnTo ?? ""}</div>
+      <div data-testid="nested-return-label">{state?.readmatesReturnState?.readmatesReturnLabel ?? ""}</div>
+    </main>
+  );
+}
+
 describe("MemberSessionDetailPage", () => {
   it("renders readable feedback actions without the public guest CTA", () => {
     const { container } = renderDetail();
@@ -34,6 +61,7 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(desktop.getByText("아카이브 세션 · No.01 · 2025.11.26")).toBeInTheDocument();
     expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "아카이브로" })).toHaveAttribute("href", "/app/archive?view=sessions");
     expect(desktop.getByRole("link", { name: "요약" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "클럽 기록" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "내 기록" })).toBeInTheDocument();
@@ -60,6 +88,102 @@ describe("MemberSessionDetailPage", () => {
     }
   });
 
+  it("uses archive route state for the visible return target", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(readableSession), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const { container } = render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/app/sessions/session-1",
+            state: {
+              readmatesReturnTo: "/app/archive?view=reviews",
+              readmatesReturnLabel: "아카이브로",
+            },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/app/sessions/:sessionId" element={<MemberSessionDetailRoutePage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText("팩트풀니스")).length).toBeGreaterThan(0);
+    expect(getDesktop(container).getByRole("link", { name: "아카이브로" })).toHaveAttribute(
+      "href",
+      "/app/archive?view=reviews",
+    );
+  });
+
+  it("passes session-detail return state to feedback actions while preserving archive return state", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(readableSession), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const { container } = render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/app/sessions/session-1",
+            state: {
+              readmatesReturnTo: "/app/archive?view=reviews",
+              readmatesReturnLabel: "아카이브로",
+            },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/app/sessions/:sessionId" element={<MemberSessionDetailRoutePage />} />
+          <Route path="/app/feedback/:sessionId" element={<LocationStateEcho />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect((await screen.findAllByText("팩트풀니스")).length).toBeGreaterThan(0);
+
+    await user.click(getDesktop(container).getByRole("link", { name: "피드백 문서 열기" }));
+
+    expect(screen.getByTestId("return-to")).toHaveTextContent(
+      "/app/sessions/00000000-0000-0000-0000-000000000301#feedback",
+    );
+    expect(screen.getByTestId("return-label")).toHaveTextContent("세션으로 돌아가기");
+    expect(screen.getByTestId("nested-return-to")).toHaveTextContent("/app/archive?view=reviews");
+    expect(screen.getByTestId("nested-return-label")).toHaveTextContent("아카이브로");
+  });
+
+  it("encodes feedback document links from session details", () => {
+    const { container } = renderDetail({
+      ...readableSession,
+      sessionId: "session 1/slash",
+    });
+    const desktop = getDesktop(container);
+
+    expect(desktop.getByRole("link", { name: "피드백 문서 열기" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session%201%2Fslash",
+    );
+    expect(desktop.getByRole("link", { name: "PDF 저장" })).toHaveAttribute(
+      "href",
+      "/app/feedback/session%201%2Fslash/print",
+    );
+  });
+
   it("shows locked feedback copy for non-attendees without feedback document links", () => {
     const { container } = renderDetail({
       ...readableSession,
@@ -78,10 +202,19 @@ describe("MemberSessionDetailPage", () => {
     expect(screen.queryByRole("link", { name: "PDF 저장" })).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/app/feedback/00000000-0000-0000-0000-000000000301"]')).toBeNull();
     expect(container.querySelector('a[href="/app/feedback/00000000-0000-0000-0000-000000000301/print"]')).toBeNull();
+
+    const lockedBadges = Array.from(container.querySelectorAll(".badge")).filter((badge) => badge.textContent === "피드백 잠김");
+    expect(lockedBadges).toHaveLength(2);
+    lockedBadges.forEach((badge) => {
+      expect(badge).toHaveClass("badge-locked");
+      expect(badge).not.toHaveClass("badge-readonly");
+    });
+    expect(container.querySelectorAll(".rm-locked-state")).toHaveLength(2);
+    expect(container.querySelector(".surface-quiet.rm-state--locked")).toHaveTextContent("피드백 잠김");
   });
 
   it("shows missing feedback copy when no feedback document is available", () => {
-    renderDetail({
+    const { container } = renderDetail({
       ...readableSession,
       feedbackDocument: {
         available: false,
@@ -93,6 +226,15 @@ describe("MemberSessionDetailPage", () => {
     });
 
     expect(screen.getAllByText("아직 등록된 피드백 문서가 없습니다.").length).toBeGreaterThan(0);
+
+    const readonlyBadges = Array.from(container.querySelectorAll(".badge")).filter((badge) => badge.textContent === "피드백 없음");
+    expect(readonlyBadges).toHaveLength(2);
+    readonlyBadges.forEach((badge) => {
+      expect(badge).toHaveClass("badge-readonly");
+      expect(badge).not.toHaveClass("badge-locked");
+    });
+    expect(container.querySelectorAll(".rm-empty-state.rm-state--readonly")).toHaveLength(2);
+    expect(container.querySelector(".surface-quiet.rm-state--readonly")).toHaveTextContent("피드백 없음");
   });
 
   it("shows an empty my-records state when the member has not written records", () => {

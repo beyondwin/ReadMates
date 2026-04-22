@@ -59,9 +59,19 @@ describe("CurrentSession", () => {
 
     expect(screen.getByText("아직 열린 세션이 없습니다")).toBeInTheDocument();
     expect(
-      screen.getByText("호스트가 새 세션을 등록하면 RSVP, 읽기 체크인, 질문 작성이 열립니다."),
+      screen.getByText("새 세션이 등록되면 RSVP, 읽기 체크인, 토론 질문, 한줄평 작업대가 열립니다."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/6회차는 종료되었습니다/)).not.toBeInTheDocument();
+  });
+
+  it("shows the no-session create action only for hosts", () => {
+    const { rerender } = render(<CurrentSession auth={activeMemberAuthFixture} data={{ currentSession: null }} />);
+
+    expect(screen.queryByRole("link", { name: "새 세션 만들기" })).not.toBeInTheDocument();
+
+    rerender(<CurrentSession auth={{ ...activeMemberAuthFixture, role: "HOST" }} data={{ currentSession: null }} />);
+
+    expect(screen.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
   });
 
   it("shows RSVP, check-in, and question sections", () => {
@@ -69,8 +79,12 @@ describe("CurrentSession", () => {
     const desktop = getDesktop(container);
 
     expect(within(desktop).getAllByText("RSVP").length).toBeGreaterThan(0);
-    expect(within(desktop).getByText("읽기 체크인")).toBeInTheDocument();
+    expect(within(desktop).getByText("출석과 RSVP")).toBeInTheDocument();
+    expect(within(desktop).getByText("읽기 기록")).toBeInTheDocument();
+    expect(within(desktop).getAllByText("읽기 체크인").length).toBeGreaterThan(0);
+    expect(within(desktop).getByText("토론 질문")).toBeInTheDocument();
     expect(within(desktop).getByText("질문 작성")).toBeInTheDocument();
+    expect(within(desktop).getByText("피드백 문서 접근")).toBeInTheDocument();
     expect(within(desktop).queryByText("Question")).not.toBeInTheDocument();
     expect(within(desktop).getByText("테스트 책")).toBeInTheDocument();
     expect(within(desktop).getByText(/테스트 저자/)).toBeInTheDocument();
@@ -112,8 +126,7 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
   });
 
-  it("renders viewer members as read-only on current session", async () => {
-    const user = userEvent.setup();
+  it("renders viewer members as read-only on current session", () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -121,18 +134,42 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     expect(desktopScope.getByText("둘러보기 멤버")).toBeVisible();
-    expect(desktopScope.getByText("정식 멤버가 되면 RSVP와 질문 작성이 열립니다.")).toBeVisible();
-    expect(desktopScope.getByRole("button", { name: "참석" })).toBeDisabled();
-    expect(desktopScope.getByRole("button", { name: "체크인 저장" })).toBeDisabled();
-    expect(desktopScope.getByRole("button", { name: "질문 저장" })).toBeDisabled();
-    expect(desktopScope.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
-    expect(desktopScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
-
-    await user.click(desktopScope.getByRole("button", { name: "체크인 저장" }));
-    await user.click(desktopScope.getByRole("button", { name: "질문 저장" }));
-    await user.click(desktopScope.getByRole("button", { name: "서평 저장" }));
-
+    expect(desktopScope.getByText("기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다")).toBeVisible();
+    expect(
+      desktopScope.getByText(
+        "둘러보기 멤버는 RSVP, 체크인, 질문, 서평 저장을 할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.",
+      ),
+    ).toBeVisible();
+    expect(desktopScope.getByText("보존된 읽기 기록")).toBeVisible();
+    expect(desktopScope.getByText("보존된 질문")).toBeVisible();
+    expect(desktopScope.getAllByText("보존된 서평").length).toBeGreaterThan(0);
+    expect(desktopScope.getAllByText("피드백 문서 접근").length).toBeGreaterThan(0);
+    expect(desktopScope.getByText("API에서 온 내 체크인")).toBeVisible();
+    expect(desktopScope.getByText("API에서 온 내 질문")).toBeVisible();
+    expect(desktopScope.getByText("API에서 온 장문 서평")).toBeVisible();
+    expect(desktopScope.queryByRole("button", { name: "참석" })).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("button", { name: "체크인 저장" })).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("button", { name: "서평 저장" })).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("slider")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps host context available without removing member prep controls", () => {
+    const { container } = render(
+      <CurrentSession auth={{ ...activeMemberAuthFixture, role: "HOST" }} data={currentSessionData} />,
+    );
+    const desktopScope = within(getDesktop(container));
+
+    expect(desktopScope.getByRole("button", { name: "참석" })).toBeInTheDocument();
+    expect(desktopScope.getByRole("button", { name: "체크인 저장" })).toBeInTheDocument();
+    expect(desktopScope.getByText("호스트 맥락")).toBeInTheDocument();
+    expect(desktopScope.getByRole("link", { name: "세션 운영으로" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/session-7/edit",
+    );
   });
 
   it("mirrors viewer read-only controls on mobile current session", async () => {
@@ -145,17 +182,27 @@ describe("CurrentSession", () => {
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     expect(mobileScope.getByText("둘러보기 멤버")).toBeVisible();
-    expect(mobileScope.getByText("전체 세션은 읽을 수 있어요. 참여와 피드백 문서는 정식 멤버에게 열립니다.")).toBeVisible();
-    expect(mobileScope.getByRole("button", { name: "참석" })).toBeDisabled();
-    expect(mobileScope.getByRole("button", { name: "체크인 저장" })).toBeDisabled();
-    expect(mobileScope.getByRole("button", { name: "질문 저장" })).toBeDisabled();
+    expect(
+      mobileScope.getByText("전체 세션은 읽을 수 있어요. RSVP, 체크인, 질문, 서평 저장은 정식 멤버에게 열립니다."),
+    ).toBeVisible();
+    expect(mobileScope.getByText("기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다")).toBeVisible();
+    expect(mobileScope.getByText("보존된 읽기 기록")).toBeVisible();
+    expect(mobileScope.getByText("API에서 온 내 체크인")).toBeVisible();
+    expect(mobileScope.queryByRole("button", { name: "참석" })).not.toBeInTheDocument();
+    expect(mobileScope.queryByRole("button", { name: "체크인 저장" })).not.toBeInTheDocument();
+    expect(mobileScope.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
+    expect(mobileScope.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(mobileScope.queryByRole("slider")).not.toBeInTheDocument();
 
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
 
-    expect(mobileScope.getByRole("button", { name: "한줄평 저장" })).toBeDisabled();
-    expect(mobileScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
+    expect(mobileScope.getByText("내 기록은 읽기 전용입니다")).toBeVisible();
+    expect(mobileScope.getByText("API에서 온 한줄평")).toBeVisible();
+    expect(mobileScope.getByText("API에서 온 장문 서평")).toBeVisible();
+    expect(mobileScope.queryByRole("button", { name: "한줄평 저장" })).not.toBeInTheDocument();
+    expect(mobileScope.queryByRole("button", { name: "서평 저장" })).not.toBeInTheDocument();
+    expect(mobileScope.queryByRole("textbox")).not.toBeInTheDocument();
 
-    await user.click(mobileScope.getByRole("button", { name: "서평 저장" }));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -523,6 +570,9 @@ describe("CurrentSession", () => {
     const { container } = render(<CurrentSession data={currentSessionData} />);
     const desktopScope = within(getDesktop(container));
 
+    await user.click(desktopScope.getByRole("button", { name: "참석" }));
+    expect(await desktopScope.findByText("RSVP 저장됨")).toBeInTheDocument();
+
     await user.click(desktopScope.getByRole("button", { name: "체크인 저장" }));
     expect(await desktopScope.findByText("체크인 저장됨")).toBeInTheDocument();
 
@@ -535,6 +585,13 @@ describe("CurrentSession", () => {
     await user.click(desktopScope.getByRole("button", { name: "한줄평 저장" }));
     expect(await desktopScope.findByText("한줄평 저장됨")).toBeInTheDocument();
 
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current/rsvp",
+      expect.objectContaining({
+        body: JSON.stringify({ status: "GOING" }),
+        method: "PATCH",
+      }),
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/sessions/current/reviews",
       expect.objectContaining({
@@ -549,6 +606,33 @@ describe("CurrentSession", () => {
         method: "POST",
       }),
     );
+  });
+
+  it("restores the previous RSVP state when saving RSVP fails", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    const refreshMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    window.addEventListener("readmates:route-refresh", refreshMock);
+
+    const { container } = render(<CurrentSession data={currentSessionData} />);
+    const desktopScope = within(getDesktop(container));
+
+    expect(desktopScope.getByText("현재 상태: 미응답")).toBeInTheDocument();
+
+    await user.click(desktopScope.getByRole("button", { name: "참석" }));
+
+    expect(await desktopScope.findByText("RSVP 저장 실패 · 다시 시도해 주세요")).toBeInTheDocument();
+    expect(desktopScope.getByText("현재 상태: 미응답")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current/rsvp",
+      expect.objectContaining({
+        body: JSON.stringify({ status: "GOING" }),
+        method: "PATCH",
+      }),
+    );
+    expect(refreshMock).not.toHaveBeenCalled();
+    window.removeEventListener("readmates:route-refresh", refreshMock);
   });
 
   it("refreshes the shared board data after saving prep items", async () => {

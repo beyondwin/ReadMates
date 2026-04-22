@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import NotesFeedPage from "@/features/archive/components/notes-feed-page";
+import { feedFilterFromSearchParam } from "@/features/archive/components/notes-feed-filter-utils";
+import type { FeedFilter } from "@/features/archive/components/notes-feed-list";
 import type { NoteFeedItem, NoteSessionItem } from "@/shared/api/readmates";
 import { readmatesFetch } from "@/shared/api/readmates";
 import { useReadmatesData } from "./readmates-page-data";
@@ -19,8 +21,28 @@ function selectNoteSession(noteSessions: NoteSessionItem[], requestedSessionId: 
 }
 
 export default function NotesPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedSessionId = searchParams.get("sessionId");
+  const initialFilter = feedFilterFromSearchParam(searchParams.get("filter"));
+  const handleFilterChange = useCallback(
+    (filter: FeedFilter) => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+
+          if (filter === "all") {
+            next.delete("filter");
+          } else {
+            next.set("filter", filter);
+          }
+
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const state = useReadmatesData(
     useCallback(async () => {
       const noteSessions = await readmatesFetch<NoteSessionItem[]>("/api/notes/sessions");
@@ -41,6 +63,8 @@ export default function NotesPage() {
           noteSessions={data.noteSessions}
           selectedSessionId={data.selectedSession?.sessionId ?? null}
           selectedSession={data.selectedSession}
+          initialFilter={initialFilter}
+          onFilterChange={handleFilterChange}
         />
       )}
     </ReadmatesPageState>

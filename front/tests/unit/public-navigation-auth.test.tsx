@@ -1,8 +1,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PublicRouteLayout } from "@/src/app/layouts";
+import { Link } from "@/src/app/router-link";
+import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public-auth-action";
 import { PublicMobileHeader } from "@/shared/ui/public-mobile-header";
+import { PublicFooter } from "@/shared/ui/public-footer";
 import { TopNav } from "@/shared/ui/top-nav";
 
 const authenticatedMember = {
@@ -52,7 +56,7 @@ describe("public navigation auth state", () => {
 
     renderAt("/", <TopNav />);
 
-    const appLink = await screen.findByRole("link", { name: "내 공간" });
+    const appLink = await screen.findByRole("link", { name: "멤버 화면" });
     expect(appLink).toHaveAttribute("href", "/app");
     expect(screen.queryByRole("link", { name: "로그인" })).not.toBeInTheDocument();
   });
@@ -71,7 +75,59 @@ describe("public navigation auth state", () => {
 
     renderAt("/", <PublicMobileHeader />);
 
-    const appLink = await screen.findByRole("link", { name: "내 공간" });
+    const appLink = await screen.findByRole("link", { name: "멤버 화면" });
     expect(appLink).toHaveAttribute("href", "/app");
+  });
+
+  it("keeps footer member actions route-safe for guests", async () => {
+    mockAuthMe(false);
+
+    renderAt("/", <PublicFooter />);
+
+    const loginLink = await screen.findByRole("link", { name: "기존 멤버 로그인" });
+    expect(loginLink).toHaveAttribute("href", "/login");
+    const inviteCta = screen.getByRole("button", { name: /초대 수락하기/ });
+    expect(inviteCta).toBeDisabled();
+    expect(inviteCta).toHaveAttribute("aria-disabled", "true");
+    expect(inviteCta).toHaveTextContent("초대 메일의 개인 링크에서만 열립니다.");
+    expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+  });
+
+  it("hides footer guest login actions when mounted for authenticated app users", () => {
+    mockAuthMe(true);
+
+    renderAt("/app", <PublicFooter showGuestMemberActions={false} />);
+
+    expect(screen.queryByRole("link", { name: "기존 멤버 로그인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("초대 메일의 개인 링크에서만 열립니다.")).not.toBeInTheDocument();
+  });
+
+  it("does not duplicate guest member actions in the full public route shell", async () => {
+    mockAuthMe(false);
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route element={<PublicRouteLayout />}>
+            <Route
+              path="/"
+              element={
+                <main>
+                  <PublicGuestOnlyActions>
+                    <Link to="/login">기존 멤버 로그인</Link>
+                    <PublicInviteGuidance />
+                  </PublicGuestOnlyActions>
+                </main>
+              }
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findAllByRole("link", { name: "기존 멤버 로그인" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /초대 수락하기/ })).toHaveLength(1);
   });
 });

@@ -94,7 +94,7 @@ class PublicController(
 
         return jdbcTemplate.query(
             """
-            select sessions.id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
+            select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
                    public_session_publications.public_summary
             from sessions
             join public_session_publications on public_session_publications.session_id = sessions.id
@@ -112,8 +112,8 @@ class PublicController(
                     bookImageUrl = rs.getString("book_image_url"),
                     date = rs.getObject("session_date", LocalDate::class.java).toString(),
                     summary = rs.getString("public_summary"),
-                    highlights = publicHighlights(jdbcTemplate, id),
-                    oneLiners = publicOneLiners(jdbcTemplate, id),
+                    highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), id),
+                    oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), id),
                 )
             },
             id.dbString(),
@@ -163,13 +163,34 @@ class PublicController(
                    (
                      select count(*)
                      from highlights
-                     where highlights.session_id = sessions.id
+                     where highlights.club_id = sessions.club_id
+                       and highlights.session_id = sessions.id
+                       and (
+                         highlights.membership_id is null
+                         or exists (
+                           select 1
+                           from session_participants
+                           where session_participants.session_id = highlights.session_id
+                             and session_participants.club_id = highlights.club_id
+                             and session_participants.membership_id = highlights.membership_id
+                             and session_participants.participation_status = 'ACTIVE'
+                         )
+                       )
                    ) as highlight_count,
                    (
                      select count(*)
                      from one_line_reviews
-                     where one_line_reviews.session_id = sessions.id
+                     where one_line_reviews.club_id = sessions.club_id
+                       and one_line_reviews.session_id = sessions.id
                        and one_line_reviews.visibility = 'PUBLIC'
+                       and exists (
+                         select 1
+                         from session_participants
+                         where session_participants.session_id = one_line_reviews.session_id
+                           and session_participants.club_id = one_line_reviews.club_id
+                           and session_participants.membership_id = one_line_reviews.membership_id
+                           and session_participants.participation_status = 'ACTIVE'
+                       )
                    ) as one_liner_count
             from sessions
             join public_session_publications on public_session_publications.session_id = sessions.id
@@ -196,14 +217,28 @@ class PublicController(
             clubId.dbString(),
         )
 
-    private fun publicHighlights(jdbcTemplate: JdbcTemplate, sessionId: UUID): List<String> =
+    private fun publicHighlights(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<String> =
         jdbcTemplate.query(
-            "select text from highlights where session_id = ? order by sort_order",
+            """
+            select highlights.text
+            from highlights
+            left join session_participants on session_participants.session_id = highlights.session_id
+              and session_participants.club_id = highlights.club_id
+              and session_participants.membership_id = highlights.membership_id
+            where highlights.club_id = ?
+              and highlights.session_id = ?
+              and (
+                highlights.membership_id is null
+                or session_participants.participation_status = 'ACTIVE'
+              )
+            order by highlights.sort_order
+            """.trimIndent(),
             { rs, _ -> rs.getString("text") },
+            clubId.dbString(),
             sessionId.dbString(),
         )
 
-    private fun publicOneLiners(jdbcTemplate: JdbcTemplate, sessionId: UUID): List<PublicOneLiner> =
+    private fun publicOneLiners(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicOneLiner> =
         jdbcTemplate.query(
             """
             select
@@ -214,7 +249,12 @@ class PublicController(
             join memberships on memberships.id = one_line_reviews.membership_id
               and memberships.club_id = one_line_reviews.club_id
             join users on users.id = memberships.user_id
-            where one_line_reviews.session_id = ?
+            join session_participants on session_participants.session_id = one_line_reviews.session_id
+              and session_participants.club_id = one_line_reviews.club_id
+              and session_participants.membership_id = one_line_reviews.membership_id
+              and session_participants.participation_status = 'ACTIVE'
+            where one_line_reviews.club_id = ?
+              and one_line_reviews.session_id = ?
               and one_line_reviews.visibility = 'PUBLIC'
             order by one_line_reviews.created_at, users.name
             """.trimIndent(),
@@ -225,6 +265,7 @@ class PublicController(
                     text = rs.getString("text"),
                 )
             },
+            clubId.dbString(),
             sessionId.dbString(),
         )
 

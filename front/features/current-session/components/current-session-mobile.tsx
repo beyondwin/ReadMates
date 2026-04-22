@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon, SaveFeedback } from "@/features/current-session/components/current-session-primitives";
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/components/current-session-question-editor";
+import { Link } from "@/src/app/router-link";
 import type {
   BoardCheckin,
   BoardHighlight,
@@ -53,6 +54,7 @@ export function MobileCurrentSessionBoard({
   questionSaveStatus,
   longReviewSaveStatus,
   oneLineReviewSaveStatus,
+  rsvpSaveStatus,
   onRsvpChange,
   mobileTab,
   onMobileTabChange,
@@ -61,6 +63,7 @@ export function MobileCurrentSessionBoard({
   onSaveOneLineReview,
   isSuspended,
   isViewer,
+  isHost,
   canWrite,
 }: {
   session: CurrentSession;
@@ -84,6 +87,7 @@ export function MobileCurrentSessionBoard({
   questionSaveStatus: SaveState;
   longReviewSaveStatus: SaveState;
   oneLineReviewSaveStatus: SaveState;
+  rsvpSaveStatus: SaveState;
   onRsvpChange: (status: RsvpUpdateStatus) => void;
   mobileTab: MobileSessionTab;
   onMobileTabChange: (tab: MobileSessionTab) => void;
@@ -92,6 +96,7 @@ export function MobileCurrentSessionBoard({
   onSaveOneLineReview: () => void;
   isSuspended: boolean;
   isViewer: boolean;
+  isHost: boolean;
   canWrite: boolean;
 }) {
   const tabs: Array<{ key: MobileSessionTab; label: string }> = [
@@ -130,6 +135,11 @@ export function MobileCurrentSessionBoard({
             ) : null}
           </a>
         ) : null}
+        {isHost ? (
+          <Link to={`/app/host/sessions/${session.sessionId}/edit`} className="rm-current-session-mobile__host-link">
+            세션 운영으로
+          </Link>
+        ) : null}
       </section>
 
       <div className="rm-current-session-mobile__seg-wrap">
@@ -151,7 +161,16 @@ export function MobileCurrentSessionBoard({
       {isSuspended ? <MobileSuspendedMemberNotice /> : null}
       {isViewer ? <MobileViewerMemberNotice /> : null}
 
-      {mobileTab === "prep" ? (
+      {mobileTab === "prep" && isViewer ? (
+        <MobileViewerPrepSegment
+          session={session}
+          rsvp={rsvp}
+          readingProgress={readingProgress}
+          checkinNote={checkinNote}
+          writtenQuestionCount={writtenQuestionCount}
+        />
+      ) : null}
+      {mobileTab === "prep" && !isViewer ? (
         <SuspendedFieldset disabled={!canWrite}>
           <MobilePrepSegment
             session={session}
@@ -169,6 +188,7 @@ export function MobileCurrentSessionBoard({
             writtenQuestionCount={writtenQuestionCount}
             checkinSaveStatus={checkinSaveStatus}
             questionSaveStatus={questionSaveStatus}
+            rsvpSaveStatus={rsvpSaveStatus}
             onRsvpChange={onRsvpChange}
             onSaveCheckin={onSaveCheckin}
             canWrite={canWrite}
@@ -176,7 +196,10 @@ export function MobileCurrentSessionBoard({
         </SuspendedFieldset>
       ) : null}
       {mobileTab === "board" ? <MobileBoardSegment session={session} /> : null}
-      {mobileTab === "after" ? (
+      {mobileTab === "after" && isViewer ? (
+        <MobileViewerRecordsSegment longReview={longReview} oneLineReview={oneLineReview} />
+      ) : null}
+      {mobileTab === "after" && !isViewer ? (
         <SuspendedFieldset disabled={!canWrite}>
           <MobileRecordsSegment
             longReview={longReview}
@@ -221,10 +244,73 @@ function MobileViewerMemberNotice() {
       <div className="m-card-quiet" role="note">
         <div className="eyebrow">둘러보기 멤버</div>
         <p className="small" style={{ margin: "6px 0 0" }}>
-          전체 세션은 읽을 수 있어요. 참여와 피드백 문서는 정식 멤버에게 열립니다.
+          전체 세션은 읽을 수 있어요. RSVP, 체크인, 질문, 서평 저장은 정식 멤버에게 열립니다.
         </p>
       </div>
     </section>
+  );
+}
+
+function MobileViewerPrepSegment({
+  session,
+  rsvp,
+  readingProgress,
+  checkinNote,
+  writtenQuestionCount,
+}: {
+  session: CurrentSession;
+  rsvp: CurrentSession["myRsvpStatus"];
+  readingProgress: number;
+  checkinNote: string;
+  writtenQuestionCount: number;
+}) {
+  return (
+    <>
+      <section className="m-sec">
+        <div className="m-card">
+          <div className="eyebrow">읽기 전용 세션 상세</div>
+          <div className="h4 editorial" style={{ marginTop: 6 }}>
+            기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다
+          </div>
+          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+            둘러보기 멤버는 쓰기 기능 없이 기존 기록과 공동 보드를 확인합니다.
+          </p>
+          <div className="rm-current-session-mobile__meta-grid" style={{ marginTop: 14 }}>
+            <MobileReadOnlyStat label="RSVP" value={rsvpLabel(rsvp)} />
+            <MobileReadOnlyStat label="읽기 기록" value={`${readingProgress}%`} />
+            <MobileReadOnlyStat label="토론 질문" value={`${writtenQuestionCount}/5`} />
+            <MobileReadOnlyStat label="피드백 문서" value="정식 멤버 전환 후" />
+          </div>
+        </div>
+      </section>
+
+      <section className="m-sec">
+        <div className="m-card-quiet">
+          <div className="eyebrow">보존된 읽기 기록</div>
+          <div className="h4 editorial" style={{ marginTop: 6 }}>
+            {readingProgress}%
+          </div>
+          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+            {checkinNote.trim() || "아직 남긴 체크인 메모가 없습니다."}
+          </p>
+        </div>
+      </section>
+
+      <MobilePrepMeta session={session} rsvp={rsvp} readingProgress={readingProgress} writtenQuestionCount={writtenQuestionCount} />
+    </>
+  );
+}
+
+function MobileReadOnlyStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="m-card-quiet">
+      <div className="tiny mono" style={{ color: "var(--text-3)", marginBottom: 6 }}>
+        {label}
+      </div>
+      <div className="body" style={{ fontSize: 14, fontWeight: 500 }}>
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -244,6 +330,7 @@ function MobilePrepSegment({
   writtenQuestionCount,
   checkinSaveStatus,
   questionSaveStatus,
+  rsvpSaveStatus,
   onRsvpChange,
   onSaveCheckin,
   canWrite,
@@ -263,6 +350,7 @@ function MobilePrepSegment({
   writtenQuestionCount: number;
   checkinSaveStatus: SaveState;
   questionSaveStatus: SaveState;
+  rsvpSaveStatus: SaveState;
   onRsvpChange: (status: RsvpUpdateStatus) => void;
   onSaveCheckin: () => void;
   canWrite: boolean;
@@ -283,16 +371,19 @@ function MobilePrepSegment({
                 key={option.status}
                 type="button"
                 className={`m-chip${rsvp === option.status ? " is-on" : ""}`}
-                disabled={!canWrite}
-                aria-disabled={!canWrite}
+                disabled={!canWrite || rsvpSaveStatus === "saving"}
+                aria-disabled={!canWrite || rsvpSaveStatus === "saving"}
                 onClick={() => onRsvpChange(option.status)}
               >
                 {option.label}
               </button>
             ))}
           </div>
-          <div className="tiny" style={{ color: "var(--text-3)", marginTop: 12 }}>
-            {rsvpLabel(rsvp)} · 질문 제출 마감 {formatDeadlineLabel(session.questionDeadlineAt)}
+          <div className="rm-current-session-mobile__save-row">
+            <div className="tiny" style={{ color: "var(--text-3)" }}>
+              현재 {rsvpLabel(rsvp)} · 질문 제출 마감 {formatDeadlineLabel(session.questionDeadlineAt)}
+            </div>
+            <SaveFeedback scope="rsvp" status={rsvpSaveStatus} />
           </div>
         </div>
       </section>
@@ -313,8 +404,11 @@ function MobilePrepSegment({
               다른 멤버에게도 보여요
             </span>
           </div>
+          <label className="label" htmlFor="mobile-checkin-progress" style={{ marginTop: 12 }}>
+            읽기 진행률
+          </label>
           <input
-            aria-label="읽기 진행률"
+            id="mobile-checkin-progress"
             type="range"
             min={0}
             max={100}
@@ -324,8 +418,14 @@ function MobilePrepSegment({
             onChange={(event) => onReadingProgressChange(Number(event.target.value))}
             style={{ marginTop: 14 }}
           />
+          <label className="label" htmlFor="mobile-checkin-note" style={{ marginTop: 14 }}>
+            체크인 메모
+          </label>
+          <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+            다른 멤버에게 보이는 짧은 읽기 기록입니다.
+          </p>
           <textarea
-            aria-label="체크인 메모"
+            id="mobile-checkin-note"
             className="m-textarea"
             rows={3}
             value={checkinNote}
@@ -451,7 +551,7 @@ function MobilePrepMeta({
         </div>
         <div className="rm-current-session-mobile__member-list">
           {attendees.map((member) => (
-            <div key={member.membershipId} className="m-row-between" style={{ opacity: member.rsvpStatus === "NO_RESPONSE" ? 0.55 : 1 }}>
+            <div key={member.membershipId} className="m-row-between">
               <span className="m-row" style={{ gap: 10 }}>
                 <AvatarChip name={member.displayName} fallbackInitial={member.shortName} label={member.displayName} rsvpStatus={member.rsvpStatus} size={24} />
                 <span className="body" style={{ fontSize: 13.5 }}>
@@ -630,8 +730,14 @@ function MobileRecordsSegment({
             </div>
             <span className="badge">언제든</span>
           </div>
+          <label className="label" htmlFor="mobile-one-line-review">
+            한줄평 내용
+          </label>
+          <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+            모임 뒤 공개 기록에 남길 수 있는 한 문장입니다.
+          </p>
           <input
-            aria-label="한줄평 내용"
+            id="mobile-one-line-review"
             className="m-input"
             value={oneLineReview}
             disabled={!canWrite}
@@ -669,8 +775,14 @@ function MobileRecordsSegment({
             </div>
             <span className="badge">언제든</span>
           </div>
+          <label className="label" htmlFor="mobile-long-review">
+            서평 내용
+          </label>
+          <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+            긴 기록은 아카이브에서 이어 쓸 수 있습니다.
+          </p>
           <textarea
-            aria-label="서평 내용"
+            id="mobile-long-review"
             className="m-textarea"
             rows={5}
             value={longReview}
@@ -695,6 +807,62 @@ function MobileRecordsSegment({
               </button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="m-sec">
+        <div className={canWrite ? "m-card-quiet" : "m-card-quiet rm-locked-state"} role="note">
+          <div className="eyebrow">피드백 문서 접근</div>
+          <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
+            {canWrite
+              ? "세션 후 호스트가 피드백 문서를 업로드하면 참석자에게 열립니다."
+              : "둘러보기 멤버는 피드백 문서를 읽을 수 없습니다."}
+          </p>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function MobileViewerRecordsSegment({ longReview, oneLineReview }: { longReview: string; oneLineReview: string }) {
+  return (
+    <>
+      <section className="m-sec">
+        <div className="m-card">
+          <div className="eyebrow">보존된 서평</div>
+          <div className="h4 editorial" style={{ marginTop: 6 }}>
+            내 기록은 읽기 전용입니다
+          </div>
+          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+            정식 멤버가 되면 한줄평과 서평을 새로 저장하거나 이어 쓸 수 있습니다.
+          </p>
+        </div>
+      </section>
+
+      <section className="m-sec">
+        <div className="m-card-quiet">
+          <div className="eyebrow">한줄평</div>
+          <p className="small editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+            {oneLineReview.trim() || "아직 남긴 한줄평이 없습니다."}
+          </p>
+        </div>
+      </section>
+
+      <section className="m-sec">
+        <div className="m-card-quiet">
+          <div className="eyebrow">서평</div>
+          <p className="small editorial" style={{ color: "var(--text)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
+            {longReview.trim() || "아직 남긴 서평이 없습니다."}
+          </p>
+        </div>
+      </section>
+
+      <section className="m-sec">
+        <div className="m-card-quiet rm-locked-state" role="note">
+          <div className="eyebrow">피드백 문서 접근</div>
+          <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
+            피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 업로드 여부와 접근 제한만 확인할 수 있어요.
+          </p>
         </div>
       </section>
     </>

@@ -5,9 +5,9 @@ import PublicSession from "@/features/public/components/public-session";
 import type { PublicSessionDetailResponse } from "@/shared/api/readmates";
 import PublicSessionPage from "@/src/pages/public-session";
 
-function renderPublicSessionRoute(sessionId: string) {
+function renderPublicSessionRoute(sessionId: string, state?: Record<string, string>) {
   render(
-    <MemoryRouter initialEntries={[`/sessions/${sessionId}`]}>
+    <MemoryRouter initialEntries={[state ? { pathname: `/sessions/${sessionId}`, state } : `/sessions/${sessionId}`]}>
       <Routes>
         <Route path="/sessions/:sessionId" element={<PublicSessionPage />} />
       </Routes>
@@ -56,6 +56,39 @@ describe("PublicSessionPage", () => {
     );
   });
 
+  it("uses public records as the direct-link return target and accepts source route state", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            sessionId: "session-1",
+            sessionNumber: 1,
+            bookTitle: "팩트풀니스",
+            bookAuthor: "한스 로슬링",
+            bookImageUrl: null,
+            date: "2025-11-26",
+            summary: "데이터로 세상을 더 정확하게 보는 태도를 이야기했습니다.",
+            highlights: [],
+            oneLiners: [],
+          } satisfies PublicSessionDetailResponse),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    renderPublicSessionRoute("session-1", {
+      readmatesReturnTo: "/records",
+      readmatesReturnLabel: "공개 기록 색인",
+    });
+
+    expect(await screen.findByRole("link", { name: "← 공개 기록 색인" })).toHaveAttribute("href", "/records");
+    expect(screen.getAllByRole("link", { name: "공개 기록 색인" }).at(-1)).toHaveAttribute("href", "/records");
+  });
+
   it("renders a missing state for missing public sessions", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 404 })));
 
@@ -100,7 +133,13 @@ describe("PublicSession", () => {
       "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
     );
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "로그인 / 초대 수락" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "기존 멤버 로그인" })).toHaveAttribute("href", "/login");
+    const inviteCta = screen.getByRole("button", { name: /초대 수락하기/ });
+    expect(inviteCta).toBeDisabled();
+    expect(inviteCta).toHaveAttribute("aria-disabled", "true");
+    expect(inviteCta).toHaveTextContent("초대 메일의 개인 링크에서만 열립니다.");
+    expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /공개 기록 색인/ }).at(-1)).toHaveAttribute("href", "/records");
     expect(screen.getByText("김호스트")).toBeInTheDocument();
     expect(screen.getByText("김")).toBeInTheDocument();
     expect(screen.queryByText("우")).not.toBeInTheDocument();

@@ -4,6 +4,8 @@ import type { FeedbackDocumentListItem, MyPageResponse } from "@/shared/api/read
 import { readmatesFetchResponse } from "@/shared/api/readmates";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { appFeedbackHref, readmatesReturnState } from "@/src/app/route-continuity";
+import { Link } from "@/src/app/router-link";
 
 const notifications = [
   { label: "다음 모임 7일 전 리마인더", sub: "책·일정·미팅 URL" },
@@ -19,6 +21,36 @@ type MyPageProps = {
   questionCount: number;
 };
 
+function membershipIdentityLabel(data: MyPageResponse) {
+  if (data.role === "HOST" && data.membershipStatus === "ACTIVE") {
+    return "호스트";
+  }
+
+  switch (data.membershipStatus) {
+    case "ACTIVE":
+      return "정식 멤버";
+    case "VIEWER":
+      return "둘러보기 멤버";
+    case "SUSPENDED":
+      return "일시 정지 멤버";
+    case "INVITED":
+      return "초대 대기";
+    case "LEFT":
+      return "탈퇴한 멤버";
+    case "INACTIVE":
+      return "비활성 멤버";
+  }
+}
+
+function clubDisplayName(data: MyPageResponse) {
+  return data.clubName?.trim() || "클럽 정보 없음";
+}
+
+function membershipJoinedLine(data: MyPageResponse) {
+  const joinedMonth = formatJoinedMonth(data.joinedAt);
+  return joinedMonth === "합류 전" ? `${membershipIdentityLabel(data)} · 합류 전` : `${membershipIdentityLabel(data)} · ${joinedMonth} 합류`;
+}
+
 export default function MyPage({ data, reports, reviewCount, questionCount }: MyPageProps) {
   return (
     <main className="rm-my-page">
@@ -26,7 +58,7 @@ export default function MyPage({ data, reports, reviewCount, questionCount }: My
         <MyDesktop data={data} reports={reports} reviewCount={reviewCount} questionCount={questionCount} />
       </div>
       <div className="mobile-only">
-        <MyMobile data={data} reviewCount={reviewCount} questionCount={questionCount} />
+        <MyMobile data={data} reports={reports} reviewCount={reviewCount} questionCount={questionCount} />
       </div>
     </main>
   );
@@ -54,7 +86,7 @@ function MyDesktop({
             내 공간
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            피드백 문서와 계정 설정을 한곳에서.
+            멤버 정체성, 참석, 내가 쓴 기록, 계정 경계를 확인합니다.
           </p>
         </div>
       </section>
@@ -64,6 +96,7 @@ function MyDesktop({
           <div className="stack" style={{ "--stack": "44px" } as CSSProperties}>
             <AccountSection data={data} />
             <RhythmSection data={data} reviewCount={reviewCount} questionCount={questionCount} />
+            <WritingSection reviewCount={reviewCount} questionCount={questionCount} />
             <FeedbackReports reports={reports} />
           </div>
 
@@ -80,10 +113,12 @@ function MyDesktop({
 
 function MyMobile({
   data,
+  reports,
   reviewCount,
   questionCount,
 }: {
   data: MyPageResponse;
+  reports: FeedbackDocumentListItem[];
   reviewCount: number;
   questionCount: number;
 }) {
@@ -121,6 +156,12 @@ function MyMobile({
         </div>
       </section>
 
+      <MobileFeedbackReports reports={reports} />
+
+      <section className="m-sec">
+        <MobileWritingSection reviewCount={reviewCount} questionCount={questionCount} />
+      </section>
+
       <section className="m-sec">
         <div className="eyebrow" style={{ marginBottom: 10 }}>
           클럽
@@ -132,9 +173,9 @@ function MyMobile({
             </span>
             <div>
               <div className="body" style={{ fontSize: 14, fontWeight: 500 }}>
-                읽는사이
+                {clubDisplayName(data)}
               </div>
-              <div className="tiny">멤버 · {formatJoinedMonth(data.joinedAt)} 합류</div>
+              <div className="tiny">{membershipJoinedLine(data)}</div>
             </div>
             <span aria-hidden style={{ color: "var(--text-3)" }}>
               ›
@@ -145,7 +186,7 @@ function MyMobile({
 
       <section className="m-sec">
         <div className="eyebrow" style={{ marginBottom: 10 }}>
-          설정
+          읽기 전용 설정
         </div>
         <div className="m-list">
           {[
@@ -183,6 +224,66 @@ function MyMobile({
         </LogoutButton>
       </section>
     </div>
+  );
+}
+
+function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
+  const myPageReturnState = readmatesReturnState({ href: "/app/me", label: "내 공간으로 돌아가기" });
+
+  return (
+    <section className="m-sec">
+      <div className="m-row-between" style={{ marginBottom: 10, alignItems: "center" }}>
+        <div className="eyebrow">피드백 문서</div>
+        <Link className="m-chip" to="/app/archive?view=report" style={{ height: 30, padding: "0 12px" }}>
+          전체 보기
+        </Link>
+      </div>
+      {reports.length === 0 ? (
+        <div className="m-card-quiet">
+          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+            아직 열람 가능한 피드백 문서가 없습니다.
+          </p>
+        </div>
+      ) : (
+        <div className="m-list">
+          {reports.map((report) => (
+            <div key={report.sessionId} className="m-list-row" style={{ gridTemplateColumns: "32px minmax(0, 1fr) auto" }}>
+              <span aria-hidden style={{ color: "var(--accent)", fontSize: 18 }}>
+                <Icon name="notes" size={18} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div className="body" style={{ fontSize: 14 }}>
+                  {report.bookTitle}
+                </div>
+                <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                  No.{String(report.sessionNumber).padStart(2, "0")} · {formatDateOnlyLabel(report.date)}
+                </div>
+              </div>
+              <div className="m-row" style={{ gap: 4 }}>
+                <Link
+                  className="btn btn-quiet btn-sm"
+                  to={appFeedbackHref(report.sessionId)}
+                  state={myPageReturnState}
+                  aria-label={feedbackReportActionLabel(report, "읽기")}
+                  title={feedbackReportActionLabel(report, "읽기")}
+                >
+                  <Icon name="arrow-up-right" size={12} />
+                </Link>
+                <Link
+                  className="btn btn-quiet btn-sm"
+                  to={appFeedbackHref(report.sessionId, true)}
+                  state={myPageReturnState}
+                  aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+                  title={feedbackReportActionLabel(report, "PDF로 저장")}
+                >
+                  <Icon name="download" size={13} />
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -270,7 +371,7 @@ function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
 function AccountSection({ data }: { data: MyPageResponse }) {
   return (
     <section>
-      <SectionHeader eyebrow="프로필" title="계정" />
+      <SectionHeader eyebrow="멤버 정체성" title="계정" />
       <div className="surface" style={{ padding: "26px" }}>
         <div className="row" style={{ gap: "16px" }}>
           <AvatarChip name={data.displayName} fallbackInitial={data.shortName} label={data.displayName} size={52} />
@@ -302,8 +403,8 @@ function AccountSection({ data }: { data: MyPageResponse }) {
           }}
         >
           {[
-            ["역할", "멤버"],
-            ["클럽", "읽는사이"],
+            ["멤버 상태", membershipIdentityLabel(data)],
+            ["클럽", clubDisplayName(data)],
             ["합류", formatJoinedMonth(data.joinedAt)],
             ["참석 회차", `${data.sessionCount}회 참석`],
           ].map(([label, value]) => (
@@ -396,9 +497,19 @@ function RhythmSection({
 }
 
 function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
+  const myPageReturnState = readmatesReturnState({ href: "/app/me", label: "내 공간으로 돌아가기" });
+
   return (
     <section>
-      <SectionHeader eyebrow="기록" title="피드백 문서" right={<a className="btn btn-quiet btn-sm" href="/app/archive">전체 보기</a>} />
+      <SectionHeader
+        eyebrow="기록"
+        title="피드백 문서"
+        right={
+          <Link className="btn btn-quiet btn-sm" to="/app/archive?view=report">
+            전체 보기
+          </Link>
+        }
+      />
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
         {reports.length === 0 ? (
           <div className="surface-quiet" style={{ padding: "22px" }}>
@@ -428,12 +539,24 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
               </h3>
               <div className="tiny">{formatDateOnlyLabel(report.date)} · PDF</div>
             </div>
-            <a className="btn btn-quiet btn-sm" href={`/app/feedback/${report.sessionId}`} aria-label="읽기" title="읽기">
+            <Link
+              className="btn btn-quiet btn-sm"
+              to={appFeedbackHref(report.sessionId)}
+              state={myPageReturnState}
+              aria-label={feedbackReportActionLabel(report, "읽기")}
+              title={feedbackReportActionLabel(report, "읽기")}
+            >
               <Icon name="arrow-up-right" size={12} />
-            </a>
-            <a className="btn btn-quiet btn-sm" href={`/app/feedback/${report.sessionId}/print`} aria-label="PDF로 저장" title="PDF로 저장">
+            </Link>
+            <Link
+              className="btn btn-quiet btn-sm"
+              to={appFeedbackHref(report.sessionId, true)}
+              state={myPageReturnState}
+              aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+              title={feedbackReportActionLabel(report, "PDF로 저장")}
+            >
               <Icon name="download" size={13} />
-            </a>
+            </Link>
           </article>
         ))}
       </div>
@@ -441,10 +564,66 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
   );
 }
 
+function WritingSection({ reviewCount, questionCount }: { reviewCount: number; questionCount: number }) {
+  return (
+    <section>
+      <SectionHeader eyebrow="내 글" title="내가 남긴 문장" />
+      <div style={{ padding: "4px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "18px" }}>
+          <WritingCountCard label="질문" value={questionCount} body="모임 전에 꺼낸 질문과 초안" href="/app/archive?view=questions" />
+          <WritingCountCard label="서평" value={reviewCount} body="한줄평과 장문 서평" href="/app/archive?view=reviews" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WritingCountCard({ label, value, body, href }: { label: string; value: number; body: string; href: string }) {
+  return (
+    <Link to={href} style={{ display: "block", padding: "18px 20px", background: "var(--bg-sub)", borderRadius: "var(--r-2)" }}>
+      <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+        {label}
+      </div>
+      <div className="editorial" style={{ fontSize: 30, lineHeight: 1, marginTop: 8 }}>
+        {value}
+        <span className="tiny mono" style={{ marginLeft: 4, color: "var(--text-3)" }}>
+          개
+        </span>
+      </div>
+      <p className="small" style={{ margin: "10px 0 0", color: "var(--text-2)" }}>
+        {body}
+      </p>
+    </Link>
+  );
+}
+
+function MobileWritingSection({ reviewCount, questionCount }: { reviewCount: number; questionCount: number }) {
+  return (
+    <div className="m-card-quiet">
+      <div className="eyebrow">내 글</div>
+      <div className="m-row" style={{ gap: 10, marginTop: 12 }}>
+        <Link to="/app/archive?view=questions" className="m-chip" style={{ height: 34, padding: "0 12px" }}>
+          질문 {questionCount}
+        </Link>
+        <Link to="/app/archive?view=reviews" className="m-chip" style={{ height: 34, padding: "0 12px" }}>
+          서평 {reviewCount}
+        </Link>
+      </div>
+      <p className="small" style={{ color: "var(--text-2)", margin: "12px 0 0" }}>
+        내가 남긴 질문과 서평은 아카이브의 보존 기록으로 이어집니다.
+      </p>
+    </div>
+  );
+}
+
+function feedbackReportActionLabel(report: FeedbackDocumentListItem, action: "읽기" | "PDF로 저장") {
+  return `No.${String(report.sessionNumber).padStart(2, "0")} ${report.bookTitle} · ${report.title} ${action}`;
+}
+
 function NotificationsSection() {
   return (
     <section>
-      <SectionHeader eyebrow="알림 설정" title="알림" />
+      <SectionHeader eyebrow="읽기 전용 설정" title="알림" />
       <div className="surface" style={{ padding: "6px" }}>
         {notifications.map((notification, index) => (
           <div
@@ -493,7 +672,7 @@ function PreferencesSection({ data }: { data: MyPageResponse }) {
 
   return (
     <section>
-      <SectionHeader eyebrow="설정" title="개인 설정" />
+      <SectionHeader eyebrow="읽기 전용 설정" title="개인 설정" />
       <div className="surface" style={{ padding: "4px" }}>
         {preferences.map((preference, index) => (
           <div
@@ -559,7 +738,7 @@ function DangerZone({ variant = "desktop" }: { variant?: "desktop" | "mobile" })
   return (
     <section className={isMobile ? "m-card-quiet" : "surface-quiet"} style={{ padding: isMobile ? "18px" : "22px" }}>
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
-        계정 관리
+        계정 경계
       </div>
       <div className={isMobile ? "m-row-between" : "row-between"} style={{ gap: "16px", alignItems: "flex-start" }}>
         <div className="small" style={{ color: "var(--text-2)" }}>
@@ -612,6 +791,10 @@ function KeyValue({ label, value }: { label: string; value: string }) {
 const JOINED_MONTH_PATTERN = /^(\d{4})-(\d{2})$/;
 
 function formatJoinedMonth(joinedAt: string) {
+  if (!joinedAt.trim()) {
+    return "합류 전";
+  }
+
   const monthMatch = JOINED_MONTH_PATTERN.exec(joinedAt.trim());
   if (monthMatch) {
     const [, year, month] = monthMatch;

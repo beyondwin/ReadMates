@@ -14,6 +14,13 @@ import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { SessionIdentity } from "@/shared/ui/session-identity";
+import {
+  appFeedbackHref,
+  appSessionHref,
+  archiveSessionsReturnTarget,
+  readmatesReturnState,
+  type ReadmatesReturnTarget,
+} from "@/src/app/route-continuity";
 
 const segmentLinks = [
   { key: "summary", desktopLabel: "요약", mobileLabel: "요약" },
@@ -50,6 +57,64 @@ function feedbackStatusText(feedbackDocument: MemberArchiveFeedbackDocumentStatu
   return "피드백 공개";
 }
 
+function feedbackAccessCopy(feedback: MemberArchiveFeedbackDocumentStatus) {
+  if (!feedback.available) {
+    return "호스트가 문서를 등록하면 참석 기록과 함께 열람 가능 여부가 표시됩니다.";
+  }
+
+  if (!feedback.readable) {
+    return "피드백 문서는 정식 멤버 중 이 회차 참석자로 확인된 계정에만 열립니다.";
+  }
+
+  return "이 회차 참석 기록이 확인되어 문서를 열람할 수 있습니다.";
+}
+
+function feedbackBadgeClass(feedbackDocument: MemberArchiveFeedbackDocumentStatus) {
+  if (!feedbackDocument.available) {
+    return "badge badge-readonly badge-dot";
+  }
+
+  if (!feedbackDocument.readable) {
+    return "badge badge-locked badge-dot";
+  }
+
+  return "badge badge-ok badge-dot";
+}
+
+function feedbackDocumentCardClassName({
+  feedback,
+  compact,
+  mobile,
+}: {
+  feedback: MemberArchiveFeedbackDocumentStatus;
+  compact: boolean;
+  mobile: boolean;
+}) {
+  const baseClassName = mobile ? "m-card" : compact ? "surface-quiet" : "surface";
+
+  if (!feedback.available) {
+    return `${baseClassName} rm-empty-state rm-state rm-state--readonly`;
+  }
+
+  if (!feedback.readable) {
+    return `${baseClassName} rm-locked-state`;
+  }
+
+  return baseClassName;
+}
+
+function feedbackRailCardClassName(feedbackDocument: MemberArchiveFeedbackDocumentStatus) {
+  if (!feedbackDocument.available) {
+    return "surface-quiet rm-state rm-state--readonly";
+  }
+
+  if (!feedbackDocument.readable) {
+    return "surface-quiet rm-state rm-state--locked";
+  }
+
+  return "surface-quiet";
+}
+
 function hasClubRecords(session: MemberArchiveSessionDetailResponse) {
   return (
     session.publicHighlights.length > 0 ||
@@ -68,27 +133,37 @@ function hasMyRecords(session: MemberArchiveSessionDetailResponse) {
   );
 }
 
-export default function MemberSessionDetailPage({ session }: { session: MemberArchiveSessionDetailResponse }) {
+export default function MemberSessionDetailPage({
+  session,
+  returnTarget = archiveSessionsReturnTarget,
+}: {
+  session: MemberArchiveSessionDetailResponse;
+  returnTarget?: ReadmatesReturnTarget;
+}) {
   return (
     <main className="rm-member-session-detail-page">
       <div className="desktop-only">
-        <MemberSessionDetailDesktop session={session} />
+        <MemberSessionDetailDesktop session={session} returnTarget={returnTarget} />
       </div>
       <div className="mobile-only">
-        <MemberSessionDetailMobile session={session} />
+        <MemberSessionDetailMobile session={session} returnTarget={returnTarget} />
       </div>
     </main>
   );
 }
 
-export function MemberSessionDetailUnavailablePage() {
+export function MemberSessionDetailUnavailablePage({
+  returnTarget = archiveSessionsReturnTarget,
+}: {
+  returnTarget?: ReadmatesReturnTarget;
+}) {
   return (
     <main className="rm-member-session-detail-page">
       <div className="desktop-only">
         <section className="page-header-compact">
           <div className="container">
-            <Link to="/app/archive" className="btn btn-quiet btn-sm">
-              아카이브로
+            <Link to={returnTarget.href} className="btn btn-quiet btn-sm">
+              {returnTarget.label}
             </Link>
             <div className="surface-quiet" style={{ padding: 28, marginTop: 20 }}>
               <p className="eyebrow" style={{ margin: 0 }}>
@@ -125,7 +200,13 @@ export function MemberSessionDetailUnavailablePage() {
   );
 }
 
-function MemberSessionDetailDesktop({ session }: { session: MemberArchiveSessionDetailResponse }) {
+function MemberSessionDetailDesktop({
+  session,
+  returnTarget,
+}: {
+  session: MemberArchiveSessionDetailResponse;
+  returnTarget: ReadmatesReturnTarget;
+}) {
   const date = formatDateOnlyLabel(session.date);
 
   return (
@@ -133,8 +214,8 @@ function MemberSessionDetailDesktop({ session }: { session: MemberArchiveSession
       <section className="page-header-compact">
         <div className="container">
           <div className="row-between" style={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Link to="/app/archive" className="btn btn-quiet btn-sm">
-              아카이브로
+            <Link to={returnTarget.href} className="btn btn-quiet btn-sm">
+              {returnTarget.label}
             </Link>
             <nav className="row" style={{ gap: 6, flexWrap: "wrap" }} aria-label="세션 상세 섹션">
               {segmentLinks.map((link) => (
@@ -186,9 +267,7 @@ function MemberSessionDetailDesktop({ session }: { session: MemberArchiveSession
                   참석 {session.attendance}/{session.total}
                 </span>
                 <span className="badge">{session.locationLabel}</span>
-                <span className={`badge ${session.feedbackDocument.readable ? "badge-ok badge-dot" : ""}`}>
-                  {feedbackStatusText(session.feedbackDocument)}
-                </span>
+                <span className={feedbackBadgeClass(session.feedbackDocument)}>{feedbackStatusText(session.feedbackDocument)}</span>
               </div>
             </div>
           </div>
@@ -216,7 +295,7 @@ function MemberSessionDetailDesktop({ session }: { session: MemberArchiveSession
               </DesktopSection>
 
               <DesktopSection id="feedback" eyebrow="피드백 문서" title="피드백 문서">
-                <FeedbackDocumentCard session={session} />
+                <FeedbackDocumentCard session={session} returnTarget={returnTarget} />
               </DesktopSection>
             </div>
 
@@ -237,7 +316,13 @@ function MemberSessionDetailDesktop({ session }: { session: MemberArchiveSession
   );
 }
 
-function MemberSessionDetailMobile({ session }: { session: MemberArchiveSessionDetailResponse }) {
+function MemberSessionDetailMobile({
+  session,
+  returnTarget,
+}: {
+  session: MemberArchiveSessionDetailResponse;
+  returnTarget: ReadmatesReturnTarget;
+}) {
   const date = formatDateOnlyLabel(session.date);
 
   return (
@@ -282,7 +367,7 @@ function MemberSessionDetailMobile({ session }: { session: MemberArchiveSessionD
               <span className="badge">
                 참석 {session.attendance}/{session.total}
               </span>
-              <span className="badge">{feedbackStatusText(session.feedbackDocument)}</span>
+              <span className={feedbackBadgeClass(session.feedbackDocument)}>{feedbackStatusText(session.feedbackDocument)}</span>
             </div>
           </div>
         </div>
@@ -315,7 +400,7 @@ function MemberSessionDetailMobile({ session }: { session: MemberArchiveSessionD
 
       <section id="mobile-feedback" className="m-sec">
         <MobileSectionTitle title="피드백 문서" />
-        <FeedbackDocumentCard session={session} mobile />
+        <FeedbackDocumentCard session={session} returnTarget={returnTarget} mobile />
       </section>
     </div>
   );
@@ -468,7 +553,7 @@ function HighlightsList({
   }
 
   return (
-    <div className={mobile ? "stack" : "surface"} style={mobile ? ({ "--stack": "10px" } as CSSProperties) : { padding: 22 }}>
+    <div className={mobile ? "stack" : "stack"} style={mobile ? ({ "--stack": "10px" } as CSSProperties) : ({ "--stack": "0px" } as CSSProperties)}>
       {highlights.map((highlight) => (
         <blockquote
           key={`${highlight.sortOrder}-${highlight.text}`}
@@ -503,9 +588,9 @@ function QuestionList({ questions, mobile = false }: { questions: MemberArchiveQ
           }
         >
           <div className="tiny mono" style={{ color: "var(--accent)" }}>
-            Q{question.priority} · {question.authorName}
+            저장된 질문 Q{question.priority} · {question.authorName}
           </div>
-          <h4 className="body editorial" style={{ fontSize: mobile ? 15 : 16, margin: "6px 0 0" }}>
+          <h4 className="body editorial" style={{ fontSize: mobile ? 15 : 17, margin: "6px 0 0", lineHeight: 1.58 }}>
             {question.text}
           </h4>
           {question.draftThought ? (
@@ -641,7 +726,7 @@ function ReviewList({
       {oneLineReview ? (
         <article className={mobile ? "m-card-quiet" : "surface-quiet"} style={mobile ? undefined : { padding: "16px 18px" }}>
           <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-            한줄평
+            저장된 한줄평
           </div>
           <p className="body editorial" style={{ fontSize: mobile ? 15 : 16, margin: "6px 0 0" }}>
             {oneLineReview.text}
@@ -651,7 +736,7 @@ function ReviewList({
       {longReview ? (
         <article className={mobile ? "m-card" : "surface"} style={mobile ? undefined : { padding: "18px" }}>
           <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-            장문 서평
+            저장된 장문 서평
           </div>
           <p className="body" style={{ margin: "6px 0 0", color: "var(--text-2)", whiteSpace: "pre-wrap" }}>
             {longReview.body}
@@ -664,22 +749,35 @@ function ReviewList({
 
 function FeedbackDocumentCard({
   session,
+  returnTarget,
   compact = false,
   mobile = false,
 }: {
   session: MemberArchiveSessionDetailResponse;
+  returnTarget: ReadmatesReturnTarget;
   compact?: boolean;
   mobile?: boolean;
 }) {
   const feedback = session.feedbackDocument;
-  const className = mobile ? "m-card" : compact ? "surface-quiet" : "surface";
+  const className = feedbackDocumentCardClassName({ feedback, compact, mobile });
   const style = mobile ? undefined : { padding: compact ? 18 : 22 };
+  const feedbackReturnTarget: ReadmatesReturnTarget = {
+    href: appSessionHref(session.sessionId, mobile ? "mobile-feedback" : "feedback"),
+    label: "세션으로 돌아가기",
+    state: readmatesReturnState(returnTarget),
+  };
+  const feedbackReturnState = readmatesReturnState(feedbackReturnTarget);
 
   if (!feedback.available) {
     return (
       <article className={className} style={style}>
         <FeedbackCardTitle feedback={feedback} compact={compact} />
-        <EmptyText message="아직 등록된 피드백 문서가 없습니다." />
+        <p className="small" style={{ margin: "12px 0 0", color: "var(--text-2)" }}>
+          아직 등록된 피드백 문서가 없습니다.
+        </p>
+        <p className="tiny" style={{ margin: "6px 0 0", color: "var(--text-3)" }}>
+          {feedbackAccessCopy(feedback)}
+        </p>
       </article>
     );
   }
@@ -688,7 +786,12 @@ function FeedbackDocumentCard({
     return (
       <article className={className} style={style}>
         <FeedbackCardTitle feedback={feedback} compact={compact} />
-        <EmptyText message="피드백 문서는 정식 멤버와 참석자에게만 열립니다." />
+        <p className="small" style={{ margin: "12px 0 0", color: "var(--text-2)" }}>
+          피드백 문서는 정식 멤버와 참석자에게만 열립니다.
+        </p>
+        <p className="tiny" style={{ margin: "6px 0 0", color: "var(--text-3)" }}>
+          {feedbackAccessCopy(feedback)}
+        </p>
       </article>
     );
   }
@@ -696,11 +799,14 @@ function FeedbackDocumentCard({
   return (
     <article className={className} style={style}>
       <FeedbackCardTitle feedback={feedback} compact={compact} />
+      <p className="tiny" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
+        {feedbackAccessCopy(feedback)}
+      </p>
       <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: compact ? 12 : 16 }}>
-        <Link to={`/app/feedback/${session.sessionId}`} className="btn btn-ghost btn-sm">
+        <Link to={appFeedbackHref(session.sessionId)} state={feedbackReturnState} className="btn btn-ghost btn-sm">
           피드백 문서 열기
         </Link>
-        <Link to={`/app/feedback/${session.sessionId}/print`} className="btn btn-quiet btn-sm">
+        <Link to={appFeedbackHref(session.sessionId, true)} state={feedbackReturnState} className="btn btn-quiet btn-sm">
           PDF 저장
         </Link>
       </div>
@@ -742,7 +848,7 @@ function RailCard({ title, value }: { title: string; value: string }) {
 
 function FeedbackRailCard({ feedback }: { feedback: MemberArchiveFeedbackDocumentStatus }) {
   return (
-    <article className="surface-quiet" style={{ padding: 18 }}>
+    <article className={feedbackRailCardClassName(feedback)} style={{ padding: 18 }}>
       <div className="tiny mono" style={{ color: "var(--text-3)" }}>
         피드백
       </div>

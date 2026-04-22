@@ -1,10 +1,25 @@
 "use client";
 
-import { type CSSProperties, useState } from "react";
-import type { ArchiveSessionItem, FeedbackDocumentListItem, MyArchiveQuestionItem, MyArchiveReviewItem, SessionState } from "@/shared/api/readmates";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import type {
+  ArchiveSessionItem,
+  FeedbackDocumentListItem,
+  MemberArchiveFeedbackDocumentStatus,
+  MyArchiveQuestionItem,
+  MyArchiveReviewItem,
+  SessionState,
+} from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { SessionIdentity } from "@/shared/ui/session-identity";
+import { Link } from "@/src/app/router-link";
+import {
+  appFeedbackHref,
+  appSessionHref,
+  archiveViewHref,
+  readmatesReturnState,
+  restoreReadmatesArchiveScroll,
+} from "@/src/app/route-continuity";
 
 export type ArchiveView = "sessions" | "reviews" | "questions" | "report";
 
@@ -18,6 +33,7 @@ type SessionRecord = {
   attendance: number;
   total: number;
   published: boolean;
+  feedbackDocument: MemberArchiveFeedbackDocumentStatus;
   state: SessionState;
 };
 
@@ -40,7 +56,24 @@ const mobileArchiveTabs: Array<{ key: ArchiveView; label: string }> = [
 const UNKNOWN_SESSION_YEAR_LABEL = "미정";
 const SESSION_YEAR_GROUP_PATTERN = /^(\d{4})(?:-(\d{2})(?:-(\d{2})(?:(?:T|\s).*)?)?)?$/;
 
-function toSessionRecord(session: ArchiveSessionItem): SessionRecord {
+function feedbackDocumentStatusFromList(
+  session: ArchiveSessionItem,
+  fallbackReadableReportAvailable: boolean,
+): MemberArchiveFeedbackDocumentStatus {
+  if (session.feedbackDocument) {
+    return session.feedbackDocument;
+  }
+
+  return {
+    available: fallbackReadableReportAvailable,
+    readable: fallbackReadableReportAvailable,
+    lockedReason: fallbackReadableReportAvailable ? null : "NOT_AVAILABLE",
+    title: fallbackReadableReportAvailable ? `독서모임 ${session.sessionNumber}차 피드백` : null,
+    uploadedAt: null,
+  };
+}
+
+function toSessionRecord(session: ArchiveSessionItem, fallbackReadableReportAvailable: boolean): SessionRecord {
   return {
     id: session.sessionId,
     number: session.sessionNumber,
@@ -51,16 +84,93 @@ function toSessionRecord(session: ArchiveSessionItem): SessionRecord {
     attendance: session.attendance,
     total: session.total,
     published: session.published,
+    feedbackDocument: feedbackDocumentStatusFromList(session, fallbackReadableReportAvailable),
     state: session.state,
   };
 }
 
-function appSessionHref(sessionId: string, hash?: string) {
-  return `/app/sessions/${encodeURIComponent(sessionId)}${hash ? `#${hash}` : ""}`;
-}
-
 function formatSessionMonthDayLabel(date: string) {
   return formatDateOnlyLabel(date).replace(/^\d{4}\./, "");
+}
+
+function archiveReturnState(view: ArchiveView, label = "아카이브로") {
+  return readmatesReturnState({ href: archiveViewHref(view), label });
+}
+
+function feedbackReportActionLabel(report: FeedbackDocumentListItem, action: "읽기" | "PDF로 저장") {
+  return `No.${String(report.sessionNumber).padStart(2, "0")} ${report.bookTitle} · ${report.title} ${action}`;
+}
+
+function publicationLabel(published: boolean) {
+  return published ? "공개 기록" : "비공개 기록";
+}
+
+function feedbackArchiveLabel(feedbackDocument: MemberArchiveFeedbackDocumentStatus) {
+  if (!feedbackDocument.available) {
+    return "피드백 문서 없음";
+  }
+
+  if (!feedbackDocument.readable) {
+    return "피드백 잠김";
+  }
+
+  return "피드백 문서 있음";
+}
+
+function feedbackArchiveDescription(feedbackDocument: MemberArchiveFeedbackDocumentStatus) {
+  if (!feedbackDocument.available) {
+    return "등록된 피드백 문서가 없습니다.";
+  }
+
+  if (!feedbackDocument.readable) {
+    return "등록된 피드백 문서가 있지만 이 계정에는 열람 권한이 없습니다.";
+  }
+
+  return "피드백 문서를 열람할 수 있습니다.";
+}
+
+function feedbackArchiveBadgeClass(feedbackDocument: MemberArchiveFeedbackDocumentStatus) {
+  if (!feedbackDocument.available) {
+    return "badge badge-readonly badge-dot";
+  }
+
+  if (!feedbackDocument.readable) {
+    return "badge badge-locked badge-dot";
+  }
+
+  return "badge badge-ok badge-dot";
+}
+
+function selectedArchiveSectionMeta(view: ArchiveView) {
+  if (view === "reviews") {
+    return {
+      eyebrow: "SAVED REVIEWS",
+      title: "내 서평",
+      body: "회차별로 흩어진 감상을 한 권의 발췌 노트처럼 모았습니다.",
+    };
+  }
+
+  if (view === "questions") {
+    return {
+      eyebrow: "SAVED QUESTIONS",
+      title: "내 질문",
+      body: "모임 전에 남겼던 질문과 초안을 다시 읽을 수 있는 질문장입니다.",
+    };
+  }
+
+  if (view === "report") {
+    return {
+      eyebrow: "FEEDBACK DOCUMENTS",
+      title: "피드백 문서",
+      body: "참석한 회차의 운영 피드백 문서를 보존 문서로 열람합니다.",
+    };
+  }
+
+  return {
+    eyebrow: "SESSION RECORDS",
+    title: "세션 기록",
+    body: "지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.",
+  };
 }
 
 function isValidSessionYearGroupDate(year: string, month?: string, day?: string, rawDate?: string) {
@@ -148,22 +258,45 @@ export default function ArchivePage({
   reviews,
   reports,
   initialView = "sessions",
+  onViewChange,
+  routePathname,
+  routeSearch,
 }: {
   sessions: ArchiveSessionItem[];
   questions: MyArchiveQuestionItem[];
   reviews: MyArchiveReviewItem[];
   reports: FeedbackDocumentListItem[];
   initialView?: ArchiveView;
+  onViewChange?: (view: ArchiveView) => void;
+  routePathname?: string;
+  routeSearch?: string;
 }) {
-  const [view, setView] = useState<ArchiveView>(initialView);
-  const archiveSessions = sessions.map(toSessionRecord);
+  const [fallbackView, setFallbackView] = useState<ArchiveView>(initialView);
+  const view = onViewChange ? initialView : fallbackView;
+  const feedbackSessionIds = new Set(reports.map((report) => report.sessionId));
+  const archiveSessions = sessions.map((session) => toSessionRecord(session, feedbackSessionIds.has(session.sessionId)));
+  const archivePathname = routePathname ?? (typeof window === "undefined" ? "" : window.location.pathname);
+  const archiveSearch = routeSearch ?? (typeof window === "undefined" ? "" : window.location.search);
+
+  useEffect(() => {
+    return restoreReadmatesArchiveScroll(archivePathname, archiveSearch);
+  }, [archivePathname, archiveSearch, sessions.length, questions.length, reviews.length, reports.length]);
+
+  const handleViewChange = (nextView: ArchiveView) => {
+    if (onViewChange) {
+      onViewChange(nextView);
+      return;
+    }
+
+    setFallbackView(nextView);
+  };
 
   return (
     <main className="rm-archive-page">
       <div className="desktop-only">
         <ArchiveDesktop
           view={view}
-          setView={setView}
+          setView={handleViewChange}
           sessions={archiveSessions}
           questions={questions}
           reviews={reviews}
@@ -173,7 +306,7 @@ export default function ArchivePage({
       <div className="mobile-only">
         <ArchiveMobile
           view={view}
-          setView={setView}
+          setView={handleViewChange}
           sessions={archiveSessions}
           questions={questions}
           reviews={reviews}
@@ -242,10 +375,12 @@ function ArchiveDesktop({
 
       <section style={{ padding: "40px 0 80px" }}>
         <div className="container">
-          {view === "sessions" ? <ArchiveSessions sessions={sessions} /> : null}
-          {view === "reviews" ? <ArchiveReviews reviews={reviews} /> : null}
-          {view === "questions" ? <ArchiveQuestions questions={questions} /> : null}
-          {view === "report" ? <ArchiveReports reports={reports} /> : null}
+          <ArchiveSelectedSection view={view}>
+            {view === "sessions" ? <ArchiveSessions sessions={sessions} /> : null}
+            {view === "reviews" ? <ArchiveReviews reviews={reviews} /> : null}
+            {view === "questions" ? <ArchiveQuestions questions={questions} /> : null}
+            {view === "report" ? <ArchiveReports reports={reports} /> : null}
+          </ArchiveSelectedSection>
         </div>
       </section>
     </>
@@ -294,11 +429,73 @@ function ArchiveMobile({
         ))}
       </div>
 
+      <MobileArchiveSectionIntro view={view} />
       {view === "sessions" ? <ArchiveMobileSessions sessions={sessions} /> : null}
       {view === "reviews" ? <ArchiveMobileReviews reviews={reviews} /> : null}
       {view === "questions" ? <ArchiveMobileQuestions questions={questions} /> : null}
       {view === "report" ? <ArchiveMobileReports reports={reports} /> : null}
     </div>
+  );
+}
+
+function ArchiveSelectedSection({ view, children }: { view: ArchiveView; children: ReactNode }) {
+  const meta = selectedArchiveSectionMeta(view);
+
+  return (
+    <section
+      aria-labelledby={`archive-${view}-heading`}
+      style={{
+        padding: "30px 0 36px",
+        borderTop: "1px solid var(--line)",
+        borderBottom: "1px solid var(--line)",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+          gap: "20px",
+          alignItems: "end",
+          paddingBottom: "22px",
+          borderBottom: "1px solid var(--line)",
+          marginBottom: "8px",
+        }}
+      >
+        <div>
+          <p className="eyebrow" style={{ margin: 0 }}>
+            {meta.eyebrow}
+          </p>
+          <h2 id={`archive-${view}-heading`} className="h2 editorial" style={{ margin: "6px 0 0" }}>
+            {meta.title}
+          </h2>
+          <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0", maxWidth: 560 }}>
+            {meta.body}
+          </p>
+        </div>
+        <span className="tiny mono" style={{ color: "var(--text-3)" }}>
+          / preserved record
+        </span>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function MobileArchiveSectionIntro({ view }: { view: ArchiveView }) {
+  const meta = selectedArchiveSectionMeta(view);
+
+  return (
+    <section style={{ padding: "8px 18px 14px" }}>
+      <div className="m-card-quiet" style={{ padding: "14px 16px" }}>
+        <div className="eyebrow">{meta.eyebrow}</div>
+        <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
+          {meta.title}
+        </h2>
+        <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
+          {meta.body}
+        </p>
+      </div>
+    </section>
   );
 }
 
@@ -311,9 +508,10 @@ function ArchiveMobileSessions({ sessions }: { sessions: SessionRecord[] }) {
     <section className="m-sec">
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
         {sessions.map((session) => (
-          <a
+          <Link
             key={session.id}
-            href={appSessionHref(session.id)}
+            to={appSessionHref(session.id)}
+            state={archiveReturnState("sessions")}
             className="rm-archive-session-card m-card"
             style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr)", gap: 14, width: "100%" }}
             aria-label={`No.${session.number} ${session.book} 열기`}
@@ -329,7 +527,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: SessionRecord[] }) {
                   state={session.state}
                   date={session.date}
                   published={session.published}
-                  feedbackDocumentAvailable={false}
+                  feedbackDocumentAvailable={session.feedbackDocument.available}
                   compact
                 />
               </div>
@@ -343,11 +541,19 @@ function ArchiveMobileSessions({ sessions }: { sessions: SessionRecord[] }) {
                 <span className="badge">
                   참석 {session.attendance}/{session.total}
                 </span>
-                {session.published ? <span className="badge badge-ok badge-dot">공개</span> : null}
-                <span className="badge">문서</span>
+                <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
+                  {publicationLabel(session.published)}
+                </span>
+                <span
+                  className={feedbackArchiveBadgeClass(session.feedbackDocument)}
+                  title={feedbackArchiveDescription(session.feedbackDocument)}
+                  aria-label={feedbackArchiveDescription(session.feedbackDocument)}
+                >
+                  {feedbackArchiveLabel(session.feedbackDocument)}
+                </span>
               </div>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
     </section>
@@ -363,9 +569,10 @@ function ArchiveMobileReviews({ reviews }: { reviews: MyArchiveReviewItem[] }) {
     <section className="m-sec">
       <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
         {reviews.map((review) => (
-          <a
+          <Link
             key={`${review.sessionId}-${review.kind}`}
-            href={appSessionHref(review.sessionId, "mobile-my-records")}
+            to={appSessionHref(review.sessionId, "mobile-my-records")}
+            state={archiveReturnState("reviews")}
             className="m-card"
             style={{ display: "block" }}
             aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
@@ -384,7 +591,7 @@ function ArchiveMobileReviews({ reviews }: { reviews: MyArchiveReviewItem[] }) {
                 ›
               </span>
             </div>
-          </a>
+          </Link>
         ))}
       </div>
     </section>
@@ -400,9 +607,10 @@ function ArchiveMobileQuestions({ questions }: { questions: MyArchiveQuestionIte
     <section className="m-sec">
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
         {questions.map((question) => (
-          <a
+          <Link
             key={`${question.sessionId}-${question.priority}-${question.text}`}
-            href={appSessionHref(question.sessionId, "mobile-my-records")}
+            to={appSessionHref(question.sessionId, "mobile-my-records")}
+            state={archiveReturnState("questions")}
             className="m-card-quiet"
             style={{ display: "block" }}
             aria-label={`Q${question.priority} ${question.bookTitle} 세션으로`}
@@ -418,7 +626,7 @@ function ArchiveMobileQuestions({ questions }: { questions: MyArchiveQuestionIte
                 {question.draftThought}
               </div>
             ) : null}
-          </a>
+          </Link>
         ))}
       </div>
     </section>
@@ -441,26 +649,36 @@ function ArchiveMobileReports({ reports }: { reports: FeedbackDocumentListItem[]
               <span aria-hidden style={{ color: "var(--accent)", fontSize: 20 }}>
                 ▤
               </span>
-              <div style={{ minWidth: 0 }}>
-                <div className="body" style={{ fontSize: 14 }}>
-                  {label}
-                </div>
-                <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-                  No.{String(report.sessionNumber).padStart(2, "0")} · {report.title}
-                </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="body" style={{ fontSize: 14 }}>
+                {label}
               </div>
+              <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                No.{String(report.sessionNumber).padStart(2, "0")} · {report.title}
+              </div>
+              <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
+                {formatDateOnlyLabel(report.uploadedAt)} 등록 · 열람 가능
+              </div>
+            </div>
               <div className="m-row" style={{ gap: 4 }}>
-                <a className="btn btn-quiet btn-sm" href={`/app/feedback/${report.sessionId}`} aria-label="읽기" title="읽기">
-                  <ReportActionIcon name="read" />
-                </a>
-                <a
+                <Link
                   className="btn btn-quiet btn-sm"
-                  href={`/app/feedback/${report.sessionId}/print`}
-                  aria-label="PDF로 저장"
-                  title="PDF로 저장"
+                  to={appFeedbackHref(report.sessionId)}
+                  state={archiveReturnState("report", "아카이브로 돌아가기")}
+                  aria-label={feedbackReportActionLabel(report, "읽기")}
+                  title={feedbackReportActionLabel(report, "읽기")}
+                >
+                  <ReportActionIcon name="read" />
+                </Link>
+                <Link
+                  className="btn btn-quiet btn-sm"
+                  to={appFeedbackHref(report.sessionId, true)}
+                  state={archiveReturnState("report", "아카이브로 돌아가기")}
+                  aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+                  title={feedbackReportActionLabel(report, "PDF로 저장")}
                 >
                   <ReportActionIcon name="download" />
-                </a>
+                </Link>
               </div>
             </div>
           );
@@ -512,15 +730,15 @@ function ArchiveSessions({ sessions }: { sessions: SessionRecord[] }) {
             </span>
           </div>
           <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-            {group.list.map((session, index) => (
+            {group.list.map((session) => (
               <article
                 key={session.id}
+                className="rm-record-row"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "90px minmax(0, 1fr) minmax(190px, auto) auto",
+                gridTemplateColumns: "90px minmax(0, 1fr) minmax(190px, auto) auto",
                   gap: "28px",
                   padding: "28px 0",
-                  borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
                   alignItems: "center",
                 }}
               >
@@ -530,27 +748,38 @@ function ArchiveSessions({ sessions }: { sessions: SessionRecord[] }) {
                     state={session.state}
                     date={session.date}
                     published={session.published}
-                    feedbackDocumentAvailable={false}
+                    feedbackDocumentAvailable={session.feedbackDocument.available}
                     compact
                   />
                   <div className="tiny mono" style={{ color: "var(--text-4)", marginTop: "2px" }}>
                     {formatSessionMonthDayLabel(session.date)}
                   </div>
                 </div>
-                <div>
-                  <h3 className="editorial" style={{ fontSize: "19px", margin: 0 }}>
-                    {session.book}
-                  </h3>
-                  <div className="small" style={{ marginTop: "4px" }}>
-                    {session.author}
+                <div style={{ display: "grid", gridTemplateColumns: "46px minmax(0, 1fr)", gap: "14px", alignItems: "center" }}>
+                  <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={46} />
+                  <div style={{ minWidth: 0 }}>
+                    <h3 className="editorial" style={{ fontSize: "19px", margin: 0 }}>
+                      {session.book}
+                    </h3>
+                    <div className="small" style={{ marginTop: "4px" }}>
+                      {session.author}
+                    </div>
                   </div>
                 </div>
                 <div className="row" style={{ gap: "10px", flexWrap: "wrap" }}>
                   <span className="badge">
                     참석 {session.attendance}/{session.total}
                   </span>
-                  {session.published ? <span className="badge badge-ok badge-dot">공개</span> : null}
-                  <span className="badge">문서</span>
+                  <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
+                    {publicationLabel(session.published)}
+                  </span>
+                  <span
+                    className={feedbackArchiveBadgeClass(session.feedbackDocument)}
+                    title={feedbackArchiveDescription(session.feedbackDocument)}
+                    aria-label={feedbackArchiveDescription(session.feedbackDocument)}
+                  >
+                    {feedbackArchiveLabel(session.feedbackDocument)}
+                  </span>
                 </div>
                 <SessionAction session={session} />
               </article>
@@ -566,9 +795,14 @@ function SessionAction({ session }: { session: SessionRecord }) {
   const sessionLabel = `No.${session.number} ${session.book}`;
 
   return (
-    <a className="btn btn-ghost btn-sm" href={appSessionHref(session.id)} aria-label={`${sessionLabel} 열기`}>
-      열기 →
-    </a>
+    <Link
+      className="rm-archive-session-action"
+      to={appSessionHref(session.id)}
+      state={archiveReturnState("sessions")}
+      aria-label={`${sessionLabel} 열기`}
+    >
+      <span aria-hidden>→</span>
+    </Link>
   );
 }
 
@@ -578,27 +812,28 @@ function ArchiveReviews({ reviews }: { reviews: MyArchiveReviewItem[] }) {
   }
 
   return (
-    <div className="grid-2">
+    <div className="grid-2" style={{ marginTop: "22px" }}>
       {reviews.map((review) => (
-        <article key={`${review.sessionId}-${review.kind}`} className="surface" style={{ padding: "28px" }}>
-          <div className="eyebrow">서평 · {formatDateOnlyLabel(review.date)}</div>
+        <article key={`${review.sessionId}-${review.kind}`} className="rm-document-panel" style={{ padding: "28px" }}>
+          <div className="eyebrow">저장된 발췌 · {formatDateOnlyLabel(review.date)}</div>
           <h2 className="h3 editorial" style={{ margin: "10px 0 0" }}>
             {review.bookTitle}
           </h2>
-          <p className="body" style={{ color: "var(--text-2)", margin: "12px 0 0" }}>
+          <p className="quote editorial" style={{ margin: "16px 0 0" }}>
             {review.text}
           </p>
           <div className="rule" style={{ marginTop: "16px" }}>
             <span className="mono">
               No.{String(review.sessionNumber).padStart(2, "0")} · {review.kind === "ONE_LINE_REVIEW" ? "한줄평" : "장문 서평"}
             </span>
-            <a
+            <Link
               className="btn btn-ghost btn-sm"
-              href={appSessionHref(review.sessionId, "my-records")}
+              to={appSessionHref(review.sessionId, "my-records")}
+              state={archiveReturnState("reviews")}
               aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
             >
               세션으로 →
-            </a>
+            </Link>
           </div>
         </article>
       ))}
@@ -612,11 +847,12 @@ function ArchiveQuestions({ questions }: { questions: MyArchiveQuestionItem[] })
   }
 
   return (
-    <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
+    <div className="stack" style={{ "--stack": "0px", marginTop: "16px" } as CSSProperties}>
       {questions.map((question, index) => (
-        <a
+        <Link
           key={`${question.sessionId}-${question.priority}-${question.text}`}
-          href={appSessionHref(question.sessionId, "my-records")}
+          to={appSessionHref(question.sessionId, "my-records")}
+          state={archiveReturnState("questions")}
           aria-label={`Q${question.priority} ${question.bookTitle} 세션으로`}
           style={{
             display: "block",
@@ -626,13 +862,13 @@ function ArchiveQuestions({ questions }: { questions: MyArchiveQuestionItem[] })
         >
           <div className="row-between" style={{ marginBottom: "8px" }}>
             <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-              Q{question.priority} · {formatDateOnlyLabel(question.date)}
+              저장된 질문 Q{question.priority} · {formatDateOnlyLabel(question.date)}
             </span>
             <span className="tiny mono">
               No.{String(question.sessionNumber).padStart(2, "0")} · {question.bookTitle}
             </span>
           </div>
-          <h2 className="body editorial" style={{ fontSize: "17px", margin: 0 }}>
+          <h2 className="body editorial" style={{ fontSize: "18px", margin: 0, lineHeight: 1.58 }}>
             {question.text}
           </h2>
           {question.draftThought ? (
@@ -640,7 +876,7 @@ function ArchiveQuestions({ questions }: { questions: MyArchiveQuestionItem[] })
               {question.draftThought}
             </p>
           ) : null}
-        </a>
+        </Link>
       ))}
     </div>
   );
@@ -652,7 +888,7 @@ function ArchiveReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
   }
 
   return (
-    <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
+    <div className="stack" style={{ "--stack": "0px", marginTop: "10px" } as CSSProperties}>
       {reports.map((report, index) => (
           <article
             key={report.sessionId}
@@ -695,17 +931,24 @@ function ArchiveReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
                 {formatDateOnlyLabel(report.uploadedAt)} 등록
               </div>
             </div>
-            <a className="btn btn-ghost btn-sm" href={`/app/feedback/${report.sessionId}`} aria-label="읽기" title="읽기">
+            <Link
+              className="btn btn-ghost btn-sm"
+              to={appFeedbackHref(report.sessionId)}
+              state={archiveReturnState("report", "아카이브로 돌아가기")}
+              aria-label={feedbackReportActionLabel(report, "읽기")}
+              title={feedbackReportActionLabel(report, "읽기")}
+            >
               <ReportActionIcon name="read" />
-            </a>
-            <a
+            </Link>
+            <Link
               className="btn btn-quiet btn-sm"
-              href={`/app/feedback/${report.sessionId}/print`}
-              aria-label="PDF로 저장"
-              title="PDF로 저장"
+              to={appFeedbackHref(report.sessionId, true)}
+              state={archiveReturnState("report", "아카이브로 돌아가기")}
+              aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+              title={feedbackReportActionLabel(report, "PDF로 저장")}
             >
               <ReportActionIcon name="download" />
-            </a>
+            </Link>
           </article>
       ))}
     </div>
@@ -714,7 +957,7 @@ function ArchiveReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="surface-quiet" style={{ padding: "28px" }}>
+    <div className="rm-empty-state" style={{ padding: "28px" }}>
       <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
         {message}
       </p>

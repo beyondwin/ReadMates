@@ -4,7 +4,7 @@ import { useAuth } from "@/src/app/auth-state";
 import type { CurrentSessionResponse, MyPageResponse, NoteFeedItem } from "@/shared/api/readmates";
 import { readmatesFetch } from "@/shared/api/readmates";
 import { useReadmatesData } from "./readmates-page-data";
-import { ReadmatesPageState } from "./readmates-page";
+import { ReadmatesPageState, ReadmatesRouteLoading } from "./readmates-page";
 
 type AppHomeData = {
   current: CurrentSessionResponse;
@@ -30,7 +30,7 @@ export default function AppHomePage() {
   );
 
   if (authState.status !== "ready") {
-    return <main className="container">불러오는 중</main>;
+    return <ReadmatesRouteLoading variant="member" />;
   }
 
   return (

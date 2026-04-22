@@ -102,6 +102,9 @@ class ViewerSecurityTest(
             status { isOk() }
             jsonPath("$.displayName") { value("Viewer Member") }
             jsonPath("$.email") { exists() }
+            jsonPath("$.role") { value("MEMBER") }
+            jsonPath("$.membershipStatus") { value("VIEWER") }
+            jsonPath("$.clubName") { value("읽는사이") }
         }
     }
 

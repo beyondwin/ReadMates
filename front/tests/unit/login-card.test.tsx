@@ -11,9 +11,10 @@ describe("LoginCard", () => {
   it("shows only the Google login action outside dev login mode", () => {
     render(<LoginCard />);
 
-    expect(screen.getByText("기존 멤버 로그인")).toBeVisible();
-    expect(screen.getByText("초대 없이 로그인하면 둘러보기 멤버로 시작합니다.")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Google로 계속하기" })).toHaveAttribute(
+    expect(screen.getByText("Private reading room")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "읽는사이 멤버 입장" })).toBeVisible();
+    expect(screen.getByText(/초대받은 사람과 기존 멤버가 같은 Google 계정으로 들어오는 조용한 클럽 공간입니다/)).toBeVisible();
+    expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
     );
@@ -29,8 +30,8 @@ describe("LoginCard", () => {
 
     render(<LoginCard />);
 
-    expect(screen.getByRole("link", { name: "Google로 계속하기" })).toBeInTheDocument();
-    expect(screen.queryByText("로컬 테스트")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toBeInTheDocument();
+    expect(screen.queryByText("Local development only")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "김호스트 · 호스트" })).not.toBeInTheDocument();
   });
 
@@ -39,7 +40,10 @@ describe("LoginCard", () => {
 
     render(<LoginCard />);
 
-    expect(screen.getByRole("link", { name: "Google로 계속하기" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toBeInTheDocument();
+    expect(screen.getByText("Local development only")).toBeInTheDocument();
+    expect(screen.getByText("프로덕션 제외")).toBeInTheDocument();
+    expect(screen.getByText(/실제 멤버 로그인은 위 Google OAuth 경로를 사용합니다/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "김호스트 · 호스트" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "안멤버1" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "최멤버2" })).toBeInTheDocument();

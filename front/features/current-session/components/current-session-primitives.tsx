@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { SaveScope, SaveState } from "@/features/current-session/components/current-session-types";
 
 const saveScopeLabels: Record<SaveScope, string> = {
+  rsvp: "RSVP",
   checkin: "체크인",
   question: "질문",
   longReview: "서평",

@@ -1,5 +1,6 @@
 import { type CSSProperties } from "react";
 import { Icon, SaveFeedback } from "@/features/current-session/components/current-session-primitives";
+import { Link } from "@/src/app/router-link";
 import type {
   BoardCheckin,
   BoardHighlight,
@@ -10,7 +11,7 @@ import type {
 } from "@/features/current-session/components/current-session-types";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
-import { formatDateLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+import { formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 
 const rsvpOptions: Array<{ status: RsvpUpdateStatus; label: string }> = [
   { status: "GOING", label: "참석" },
@@ -28,9 +29,11 @@ function activeAttendees(session: CurrentSession) {
 
 export function RsvpPanel({
   rsvp,
+  saveStatus,
   onRsvp,
 }: {
   rsvp: CurrentSession["myRsvpStatus"];
+  saveStatus: SaveState;
   onRsvp: (status: RsvpUpdateStatus) => void;
 }) {
   return (
@@ -51,6 +54,7 @@ export function RsvpPanel({
           <button
             key={option.status}
             type="button"
+            disabled={saveStatus === "saving"}
             onClick={() => onRsvp(option.status)}
             style={{
               height: "40px",
@@ -66,6 +70,12 @@ export function RsvpPanel({
             {option.label}
           </button>
         ))}
+      </div>
+      <div className="row-between" style={{ marginTop: "12px", gap: "12px" }}>
+        <p className="marginalia" style={{ margin: 0 }}>
+          현재 상태: {rsvpLabel(rsvp)}
+        </p>
+        <SaveFeedback scope="rsvp" status={saveStatus} />
       </div>
     </section>
   );
@@ -86,6 +96,9 @@ export function CheckinPanel({
   onCheckinNoteChange: (value: string) => void;
   onSave: () => void;
 }) {
+  const progressId = "desktop-checkin-progress";
+  const noteId = "desktop-checkin-note";
+
   return (
     <section className="surface" style={{ padding: "28px" }}>
       <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "16px" }}>
@@ -101,8 +114,11 @@ export function CheckinPanel({
           {readingProgress}%
         </div>
       </div>
+      <label className="label" htmlFor={progressId}>
+        읽기 진행률
+      </label>
       <input
-        aria-label="읽기 진행률"
+        id={progressId}
         type="range"
         min={0}
         max={100}
@@ -110,14 +126,19 @@ export function CheckinPanel({
         onChange={(event) => onReadingProgressChange(Number(event.target.value))}
         style={{ width: "100%", accentColor: "var(--accent)" }}
       />
+      <label className="label" htmlFor={noteId} style={{ marginTop: "14px" }}>
+        체크인 메모
+      </label>
+      <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+        멈춘 장면이나 함께 묻고 싶은 지점을 짧게 남겨 주세요.
+      </p>
       <textarea
-        aria-label="체크인 메모"
+        id={noteId}
         className="textarea"
         rows={3}
         value={checkinNote}
         onChange={(event) => onCheckinNoteChange(event.target.value)}
         placeholder="멈춘 장면이나 떠오른 질문이 있다면 짧게 기록해 주세요."
-        style={{ marginTop: "14px" }}
       />
       <div className="row-between" style={{ marginTop: "12px" }}>
         <p className="marginalia" style={{ margin: 0 }}>
@@ -145,6 +166,8 @@ export function OneLineReviewPanel({
   onChange: (value: string) => void;
   onSave: () => void;
 }) {
+  const reviewId = "desktop-one-line-review";
+
   return (
     <section className="surface" style={{ padding: "24px" }}>
       <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "14px" }}>
@@ -156,8 +179,14 @@ export function OneLineReviewPanel({
         </div>
         <span className="badge">언제든 작성 가능</span>
       </div>
+      <label className="label" htmlFor={reviewId}>
+        한줄평 내용
+      </label>
+      <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+        모임 뒤 공개 기록에 남길 수 있는 한 문장입니다.
+      </p>
       <input
-        aria-label="한줄평 내용"
+        id={reviewId}
         className="input"
         value={oneLineReview}
         onChange={(event) => onChange(event.target.value)}
@@ -189,6 +218,8 @@ export function LongReviewPanel({
   onChange: (value: string) => void;
   onSave: () => void;
 }) {
+  const reviewId = "desktop-long-review";
+
   return (
     <section className="surface" style={{ padding: "28px" }}>
       <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "14px" }}>
@@ -200,8 +231,14 @@ export function LongReviewPanel({
         </div>
         <span className="badge">언제든 작성 가능</span>
       </div>
+      <label className="label" htmlFor={reviewId}>
+        서평 내용
+      </label>
+      <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
+        긴 기록은 아카이브에서 다시 이어 쓸 수 있습니다.
+      </p>
       <textarea
-        aria-label="서평 내용"
+        id={reviewId}
         className="textarea"
         rows={4}
         value={longReview}
@@ -227,15 +264,19 @@ export function MyStatusCard({
   rsvp,
   readingProgress,
   writtenQuestionCount,
+  hasOneLineReview,
 }: {
   rsvp: CurrentSession["myRsvpStatus"];
   readingProgress: number;
   writtenQuestionCount: number;
+  hasOneLineReview: boolean;
 }) {
   const items = [
     { label: "RSVP", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
-    { label: "읽기", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress >= 100 },
+    { label: "읽기 체크인", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress > 0 },
     { label: "질문", value: `${writtenQuestionCount}/5`, ok: writtenQuestionCount >= 2 },
+    { label: "한줄평", value: hasOneLineReview ? "작성 완료" : "기록 전", ok: hasOneLineReview },
+    { label: "피드백 문서", value: "세션 후", ok: false },
   ];
 
   return (
@@ -293,6 +334,8 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
         </dd>
         <dt className="eyebrow">장소</dt>
         <dd style={{ margin: 0 }}>{session.locationLabel}</dd>
+        <dt className="eyebrow">질문 마감</dt>
+        <dd style={{ margin: 0 }}>{formatDeadlineLabel(session.questionDeadlineAt)}</dd>
         {meetingUrl ? (
           <>
             <dt className="eyebrow">모임 링크</dt>
@@ -322,6 +365,48 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
   );
 }
 
+export function FeedbackAccessPanel({ isViewer }: { isViewer: boolean }) {
+  return (
+    <section className={isViewer ? "rm-locked-state" : "surface-quiet"} style={{ padding: "22px" }}>
+      <div className="eyebrow" style={{ marginBottom: "10px" }}>
+        피드백 문서 접근
+      </div>
+      <div className="body editorial" style={{ fontSize: "17px" }}>
+        {isViewer ? "정식 멤버에게 열립니다" : "참석한 세션의 피드백 문서를 보존합니다"}
+      </div>
+      <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+        {isViewer
+          ? "둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다."
+          : "이번 세션 피드백은 모임 이후 호스트가 업로드하면 참석자 기준으로 열립니다."}
+      </p>
+      {isViewer ? null : (
+        <Link to="/app/archive?view=report" className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
+          보존된 피드백 보기
+        </Link>
+      )}
+    </section>
+  );
+}
+
+export function HostContextPanel({ sessionId }: { sessionId: string }) {
+  return (
+    <section className="surface-quiet" style={{ padding: "22px" }}>
+      <div className="eyebrow" style={{ marginBottom: "10px" }}>
+        호스트 맥락
+      </div>
+      <div className="body editorial" style={{ fontSize: "17px" }}>
+        멤버 준비를 유지한 채 운영 문서로 이동
+      </div>
+      <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+        이 화면에서는 멤버로 RSVP, 체크인, 질문, 서평을 남기고, 운영 화면에서 세션 정보와 참석 확정을 관리합니다.
+      </p>
+      <Link to={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
+        세션 운영으로
+      </Link>
+    </section>
+  );
+}
+
 export function RosterList({ session }: { session: CurrentSession }) {
   const attendees = activeAttendees(session);
 
@@ -334,11 +419,7 @@ export function RosterList({ session }: { session: CurrentSession }) {
       </div>
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
         {attendees.map((member) => (
-          <div
-            key={member.membershipId}
-            className="row-between"
-            style={{ opacity: member.rsvpStatus === "NO_RESPONSE" ? 0.55 : 1 }}
-          >
+          <div key={member.membershipId} className="row-between">
             <span className="row" style={{ gap: "10px" }}>
               <AvatarChip name={member.displayName} fallbackInitial={member.shortName} label={member.displayName} rsvpStatus={member.rsvpStatus} size={24} />
               <span className="body" style={{ fontSize: "13.5px" }}>

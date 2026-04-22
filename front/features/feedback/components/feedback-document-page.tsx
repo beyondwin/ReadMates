@@ -2,18 +2,34 @@
 
 import { useEffect, useRef, type CSSProperties } from "react";
 import type { FeedbackDocumentResponse } from "@/shared/api/readmates";
+import {
+  appFeedbackHref,
+  archiveReportReturnTarget,
+  readmatesReturnState,
+  type ReadmatesReturnTarget,
+} from "@/src/app/route-continuity";
+import { Link } from "@/src/app/router-link";
 
 type FeedbackDocumentPageProps = {
   document: FeedbackDocumentResponse;
   printMode?: boolean;
+  returnTarget?: ReadmatesReturnTarget;
 };
 
 type FeedbackDocumentUnavailablePageProps = {
   reason: "forbidden" | "missing";
   printMode?: boolean;
+  returnTarget?: ReadmatesReturnTarget;
 };
 
-export default function FeedbackDocumentPage({ document, printMode = false }: FeedbackDocumentPageProps) {
+export default function FeedbackDocumentPage({
+  document,
+  printMode = false,
+  returnTarget = archiveReportReturnTarget,
+}: FeedbackDocumentPageProps) {
+  const feedbackHref = appFeedbackHref(document.sessionId);
+  const returnState = readmatesReturnState(returnTarget);
+
   return (
     <main className={`rm-feedback-document-page${printMode ? " rm-feedback-document-page--print" : ""}`}>
       {printMode ? <PrintOnFirstRender /> : null}
@@ -31,21 +47,27 @@ export default function FeedbackDocumentPage({ document, printMode = false }: Fe
               <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
                 {document.subtitle}
               </p>
+              <p className="tiny mono" style={{ color: "var(--text-3)", margin: "8px 0 0" }}>
+                보존 문서 · 참석자 열람본
+              </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>
+              <Link className="btn btn-quiet btn-sm" to={returnTarget.href} state={returnTarget.state}>
+                {returnTarget.label}
+              </Link>
               {printMode ? (
                 <>
                   <button type="button" className="btn btn-ghost btn-sm" onClick={() => globalThis.print()}>
                     인쇄
                   </button>
-                  <a className="btn btn-quiet btn-sm" href={`/app/feedback/${document.sessionId}`}>
+                  <Link className="btn btn-quiet btn-sm" to={feedbackHref} state={returnState}>
                     문서로 돌아가기
-                  </a>
+                  </Link>
                 </>
               ) : (
-                <a className="btn btn-ghost btn-sm" href={`/app/feedback/${document.sessionId}/print`}>
+                <Link className="btn btn-ghost btn-sm" to={appFeedbackHref(document.sessionId, true)} state={returnState}>
                   PDF로 저장
-                </a>
+                </Link>
               )}
             </div>
           </div>
@@ -83,6 +105,7 @@ function PrintOnFirstRender() {
 export function FeedbackDocumentUnavailablePage({
   reason,
   printMode = false,
+  returnTarget = archiveReportReturnTarget,
 }: FeedbackDocumentUnavailablePageProps) {
   const copy =
     reason === "forbidden"
@@ -102,7 +125,7 @@ export function FeedbackDocumentUnavailablePage({
       <FeedbackDocumentStyles />
       <section className="page-header-compact">
         <div className="container">
-          <div className="stack" style={{ "--stack": "14px", maxWidth: 720 } as CSSProperties}>
+          <div className="rm-feedback-locked-document stack" style={{ "--stack": "14px", maxWidth: 720 } as CSSProperties}>
             <p className="eyebrow" style={{ margin: 0 }}>
               {copy.eyebrow}
             </p>
@@ -112,10 +135,18 @@ export function FeedbackDocumentUnavailablePage({
             <p className="body" style={{ color: "var(--text-2)", margin: 0, maxWidth: 560 }}>
               {copy.body}
             </p>
+            <div className={reason === "forbidden" ? "rm-locked-state" : "rm-empty-state"} role="note" style={{ padding: "18px 20px" }}>
+              <div className="eyebrow">열람 규칙</div>
+              <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
+                {reason === "forbidden"
+                  ? "정식 멤버이며 해당 회차 참석 기록이 있는 계정만 문서 본문과 PDF 저장을 사용할 수 있습니다."
+                  : "문서가 등록되지 않은 회차는 본문과 PDF 저장 버튼을 표시하지 않습니다."}
+              </p>
+            </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-              <a className="btn btn-ghost btn-sm" href="/app/archive">
-                아카이브로 돌아가기
-              </a>
+              <Link className="btn btn-ghost btn-sm" to={returnTarget.href} state={returnTarget.state}>
+                {returnTarget.label}
+              </Link>
             </div>
           </div>
         </div>
@@ -130,7 +161,7 @@ function DocumentMeta({ document }: { document: FeedbackDocumentResponse }) {
   }
 
   return (
-    <section className="surface" style={{ padding: 24 }}>
+    <section className="surface rm-feedback-document-meta" style={{ padding: 24 }}>
       <div
         style={{
           display: "grid",
@@ -157,7 +188,7 @@ function ObserverNotes({ notes }: { notes: string[] }) {
   }
 
   return (
-    <section className="surface-quiet" style={{ padding: 26 }}>
+    <section className="surface-quiet rm-feedback-observer-notes" style={{ padding: 26 }}>
       <div className="eyebrow" style={{ marginBottom: 14 }}>
         관찰 메모
       </div>
@@ -178,7 +209,7 @@ function ParticipantSections({ participants }: { participants: FeedbackDocumentR
       {participants.map((participant) => (
         <section
           key={`${participant.number}-${participant.name}`}
-          className="surface"
+          className="surface rm-feedback-participant-document"
           style={{ padding: 30 }}
         >
           <div className="row-between" style={{ alignItems: "flex-start", gap: 18, flexWrap: "wrap" }}>
@@ -325,6 +356,35 @@ function FeedbackDocumentStyles() {
         display: grid;
         grid-template-columns: max-content minmax(0, 1fr);
         gap: 10px 22px;
+      }
+
+      .rm-feedback-document-meta {
+        border-top: 3px solid var(--text);
+      }
+
+      .rm-feedback-observer-notes,
+      .rm-feedback-participant-document {
+        border-radius: var(--r-2);
+      }
+
+      .rm-feedback-participant-document {
+        position: relative;
+      }
+
+      .rm-feedback-participant-document::before {
+        content: "";
+        position: absolute;
+        top: 18px;
+        bottom: 18px;
+        left: 0;
+        width: 3px;
+        background: var(--line-strong);
+      }
+
+      .rm-feedback-locked-document {
+        padding: 26px 0;
+        border-top: 3px solid var(--text);
+        border-bottom: 1px solid var(--line);
       }
 
       @media (max-width: 560px) {

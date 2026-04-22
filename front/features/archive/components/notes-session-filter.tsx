@@ -4,9 +4,17 @@ import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefO
 import type { NoteSessionItem } from "@/shared/api/readmates";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { noteSessionNumberLabel, sessionBookTitle } from "@/features/archive/components/notes-session-filter-utils";
+import type { FeedFilter } from "@/features/archive/components/notes-feed-list";
+import { Link } from "@/src/app/router-link";
 
-function sessionHref(session: NoteSessionItem) {
-  return `/app/notes?sessionId=${encodeURIComponent(session.sessionId)}`;
+function sessionHref(session: NoteSessionItem, filter: FeedFilter) {
+  const params = new URLSearchParams({ sessionId: session.sessionId });
+
+  if (filter !== "all") {
+    params.set("filter", filter);
+  }
+
+  return `/app/notes?${params.toString()}`;
 }
 
 function sessionRecordSummary(session: NoteSessionItem) {
@@ -81,11 +89,13 @@ export function SelectedSessionHeader({ session }: { session: NoteSessionItem | 
 export function SessionRail({
   noteSessions,
   selectedSessionId,
+  filter,
   query,
   onQueryChange,
 }: {
   noteSessions: NoteSessionItem[];
   selectedSessionId: string | null;
+  filter: FeedFilter;
   query: string;
   onQueryChange: (query: string) => void;
 }) {
@@ -144,7 +154,13 @@ export function SessionRail({
         {noteSessions.length === 0 ? <SelectorEmptyState /> : null}
         {noteSessions.length > 0 && filteredSessions.length === 0 ? <SelectorSearchEmptyState /> : null}
         {filteredSessions.map((session, index) => (
-          <SessionRow key={session.sessionId} session={session} selected={session.sessionId === selectedSessionId} showStrongTopBorder={index === 0} />
+          <SessionRow
+            key={session.sessionId}
+            session={session}
+            selected={session.sessionId === selectedSessionId}
+            filter={filter}
+            showStrongTopBorder={index === 0}
+          />
         ))}
       </div>
     </div>
@@ -170,17 +186,19 @@ function SelectorSearchEmptyState() {
 function SessionRow({
   session,
   selected,
+  filter,
   showStrongTopBorder = false,
   onClick,
 }: {
   session: NoteSessionItem;
   selected: boolean;
+  filter: FeedFilter;
   showStrongTopBorder?: boolean;
   onClick?: () => void;
 }) {
   return (
-    <a
-      href={sessionHref(session)}
+    <Link
+      to={sessionHref(session, filter)}
       aria-current={selected ? "page" : undefined}
       aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 세션 보기`}
       onClick={onClick}
@@ -208,18 +226,20 @@ function SessionRow({
       <div className="tiny" style={{ marginTop: "2px" }}>
         {formatDateOnlyLabel(session.date)} · {sessionRecordSummary(session)}
       </div>
-    </a>
+    </Link>
   );
 }
 
 export function MobileSessionPicker({
   noteSessions,
   selectedSessionId,
+  filter,
   onOpenAll,
   allSessionsButtonRef,
 }: {
   noteSessions: NoteSessionItem[];
   selectedSessionId: string | null;
+  filter: FeedFilter;
   onOpenAll: () => void;
   allSessionsButtonRef: RefObject<HTMLButtonElement | null>;
 }) {
@@ -241,9 +261,9 @@ export function MobileSessionPicker({
             const selected = session.sessionId === selectedSessionId;
 
             return (
-              <a
+              <Link
                 key={session.sessionId}
-                href={sessionHref(session)}
+                to={sessionHref(session, filter)}
                 aria-current={selected ? "page" : undefined}
                 aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 세션 보기`}
                 style={{
@@ -266,7 +286,7 @@ export function MobileSessionPicker({
                 <div className="tiny" style={{ marginTop: "2px" }}>
                   {formatDateOnlyLabel(session.date)} · {sessionRecordSummary(session)}
                 </div>
-              </a>
+              </Link>
             );
           })}
         </div>
@@ -278,6 +298,7 @@ export function MobileSessionPicker({
 export function MobileSessionSheet({
   noteSessions,
   selectedSessionId,
+  filter,
   query,
   onQueryChange,
   onClose,
@@ -285,6 +306,7 @@ export function MobileSessionSheet({
 }: {
   noteSessions: NoteSessionItem[];
   selectedSessionId: string | null;
+  filter: FeedFilter;
   query: string;
   onQueryChange: (query: string) => void;
   onClose: () => void;
@@ -416,6 +438,7 @@ export function MobileSessionSheet({
                 key={session.sessionId}
                 session={session}
                 selected={session.sessionId === selectedSessionId}
+                filter={filter}
                 showStrongTopBorder={index === 0}
                 onClick={onClose}
               />

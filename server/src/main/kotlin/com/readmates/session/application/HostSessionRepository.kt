@@ -243,6 +243,7 @@ class HostSessionRepository(
                 where session_participants.club_id = sessions.club_id
                   and session_participants.session_id = sessions.id
                   and session_participants.attendance_status = 'ATTENDED'
+                  and session_participants.participation_status = 'ACTIVE'
               )
               and not exists (
                 select 1
@@ -479,6 +480,7 @@ class HostSessionRepository(
                 where session_id = ?
                   and club_id = ?
                   and membership_id = ?
+                  and participation_status = 'ACTIVE'
                 """.trimIndent(),
                 entry.attendanceStatus,
                 sessionId.dbString(),
