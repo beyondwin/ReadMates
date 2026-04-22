@@ -474,4 +474,44 @@ describe("frontend architecture boundaries", () => {
 
     expect(violations, violations.join("\n")).toEqual([]);
   });
+
+  it("keeps host presentation components free of API-backed defaults", () => {
+    const hostPresentationComponents = [
+      "features/host/components/host-dashboard.tsx",
+      "features/host/components/host-session-editor.tsx",
+      "features/host/components/host-members.tsx",
+      "features/host/components/host-invitations.tsx",
+    ];
+
+    for (const relativePath of hostPresentationComponents) {
+      const absolutePath = path.join(projectRoot, relativePath);
+      const source = fs.readFileSync(absolutePath, "utf8");
+      const specifiers = parseStaticImportSpecifiers(source);
+
+      expect(specifiers, `${relativePath} must not import host API helpers`).not.toContain(
+        "@/features/host/api/host-api",
+      );
+      expect(source, `${relativePath} must not call fetch directly`).not.toMatch(/\bfetch\s*\(/);
+    }
+  });
+
+  it("keeps host route TSX modules render-only for Fast Refresh", () => {
+    const hostRouteComponents = [
+      "features/host/route/host-dashboard-route.tsx",
+      "features/host/route/host-session-editor-route.tsx",
+      "features/host/route/host-members-route.tsx",
+      "features/host/route/host-invitations-route.tsx",
+    ];
+
+    for (const relativePath of hostRouteComponents) {
+      const source = fs.readFileSync(path.join(projectRoot, relativePath), "utf8");
+
+      expect(source, `${relativePath} must not export loaders from TSX modules`).not.toMatch(
+        /export\s+(?:async\s+)?function\s+\w*Loader\b/,
+      );
+      expect(source, `${relativePath} must not export action bundles from TSX modules`).not.toMatch(
+        /export\s+const\s+\w*Actions\b/,
+      );
+    }
+  });
 });

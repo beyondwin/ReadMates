@@ -2,9 +2,11 @@ import userEvent from "@testing-library/user-event";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostMembers from "@/features/host/components/host-members";
-import HostMembersPage, { hostMembersLoader } from "@/src/pages/host-members";
+import HostMembers, { type HostMembersActions } from "@/features/host/components/host-members";
+import { hostMembersLoader } from "@/features/host";
+import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
+import type { AuthMeResponse } from "@/shared/api/readmates";
 
 const members: HostMemberListItem[] = [
   {
@@ -99,6 +101,34 @@ const members: HostMemberListItem[] = [
   },
 ];
 
+const activeHostAuth: AuthMeResponse = {
+  authenticated: true,
+  userId: "user-host",
+  membershipId: "membership-host",
+  clubId: "club-1",
+  email: "host@example.com",
+  displayName: "김호스트",
+  shortName: "호",
+  role: "HOST",
+  membershipStatus: "ACTIVE",
+  approvalState: "ACTIVE",
+};
+
+const noopHostMembersActions = {
+  loadMembers: vi.fn(async () => []),
+  submitLifecycle: vi.fn(async () => lifecycleResponse(members[0])),
+  submitViewerAction: vi.fn(async () => members[0]),
+} satisfies HostMembersActions;
+
+type HostMembersProps = Parameters<typeof HostMembers>[0];
+
+function HostMembersForTest({
+  actions,
+  ...props
+}: Omit<HostMembersProps, "actions"> & { actions?: HostMembersActions }) {
+  return <HostMembers {...props} actions={actions ?? noopHostMembersActions} />;
+}
+
 function lifecycleResponse(member: HostMemberListItem) {
   return new Response(JSON.stringify({ member, currentSessionPolicyResult: "APPLIED" }), {
     status: 200,
@@ -108,6 +138,13 @@ function lifecycleResponse(member: HostMemberListItem) {
 
 function memberListResponse(items: HostMemberListItem[]) {
   return new Response(JSON.stringify(items), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function authResponse(auth: AuthMeResponse) {
+  return new Response(JSON.stringify(auth), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
@@ -141,6 +178,7 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
   installRouterRequestShim();
   const fetchMock = vi
     .fn()
+    .mockResolvedValueOnce(authResponse(activeHostAuth))
     .mockResolvedValueOnce(memberListResponse(initialMembers));
 
   for (const response of extraResponses) {
@@ -166,6 +204,7 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -249,11 +288,11 @@ describe("HostMembersPage", () => {
       displayName: "갱신 멤버",
       email: "updated@example.com",
     } satisfies HostMemberListItem;
-    const { rerender } = render(<HostMembers initialMembers={[members[0]]} />);
+    const { rerender } = render(<HostMembersForTest initialMembers={[members[0]]} />);
 
     expect(screen.getByText("안멤버1")).toBeInTheDocument();
 
-    rerender(<HostMembers initialMembers={[replacement]} />);
+    rerender(<HostMembersForTest initialMembers={[replacement]} />);
 
     expect(screen.queryByText("안멤버1")).not.toBeInTheDocument();
     expect(screen.getByText("갱신 멤버")).toBeInTheDocument();
@@ -315,10 +354,10 @@ describe("HostMembersPage", () => {
     expect(secondRow.getByRole("button", { name: "둘러보기 해제" })).toBeDisabled();
     expect(secondRow.getByRole("button", { name: "둘러보기 해제" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(secondRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(2);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     await user.click(firstRow.getByRole("button", { name: "둘러보기 해제" }));
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     firstApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
     secondApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -377,12 +416,12 @@ describe("HostMembersPage", () => {
 
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       "/api/bff/api/host/members/membership-pending/activate",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/members",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -422,14 +461,14 @@ describe("HostMembersPage", () => {
         name: "정식 멤버로 전환",
       }),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
 
     await user.click(
       within(screen.getByText("두번째 둘러보기").closest("article") as HTMLElement).getByRole("button", {
         name: "정식 멤버로 전환",
       }),
     );
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
 
     latestRefresh.resolve(memberListResponse([]));
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
@@ -461,12 +500,12 @@ describe("HostMembersPage", () => {
 
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       "/api/bff/api/host/members/membership-pending/deactivate-viewer",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/members",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -490,7 +529,7 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/members",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -628,12 +667,12 @@ describe("HostMembersPage", () => {
     await user.click(within(row as HTMLElement).getByRole("button", { name: "이번 세션 추가" }));
 
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       "/api/bff/api/host/members/membership-active/current-session/remove",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/members/membership-not-session/current-session/add",
       expect.objectContaining({ method: "POST" }),
     );
@@ -665,7 +704,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(3);
 
     await user.click(activeRow.getByRole("button", { name: "정지" }));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
 
     await act(async () => {
       removal.resolve(lifecycleResponse(removed));

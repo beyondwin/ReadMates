@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostSessionEditor from "@/features/host/components/host-session-editor";
+import HostSessionEditor, { type HostSessionEditorActions } from "@/features/host/components/host-session-editor";
 import {
   buildHostSessionRequest,
   defaultSessionDateFrom,
@@ -19,6 +19,64 @@ import {
 } from "./api-contract-fixtures";
 
 const retiredPersonalFeedbackReportLabel = ["개인 피드백", "리포트"].join(" ");
+
+const jsonHeaders = () => new Headers({ "Content-Type": "application/json" });
+
+const hostSessionEditorTestActions = {
+  loadDeletionPreview: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
+      method: "GET",
+      headers: jsonHeaders(),
+      cache: "no-store",
+    }) as Promise<Response & { json(): Promise<HostSessionDeletionPreviewResponse> }>,
+  deleteSession: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+      headers: jsonHeaders(),
+      cache: "no-store",
+    }),
+  saveSession: (sessionId, request) =>
+    fetch(
+      sessionId === null
+        ? "/api/bff/api/host/sessions"
+        : `/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: sessionId === null ? "POST" : "PATCH",
+        headers: jsonHeaders(),
+        body: JSON.stringify(request),
+        cache: "no-store",
+      },
+    ),
+  savePublication: (sessionId, request) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/publication`, {
+      method: "PUT",
+      headers: jsonHeaders(),
+      body: JSON.stringify(request),
+      cache: "no-store",
+    }),
+  updateAttendance: (sessionId, attendance) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify(attendance),
+      cache: "no-store",
+    }),
+  uploadFeedbackDocument: (sessionId, formData) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/feedback-document`, {
+      method: "POST",
+      body: formData,
+      cache: "no-store",
+    }) as Promise<Response & { json(): Promise<FeedbackDocumentResponse> }>,
+} satisfies HostSessionEditorActions;
+
+type HostSessionEditorProps = Parameters<typeof HostSessionEditor>[0];
+
+function HostSessionEditorForTest({
+  actions,
+  ...props
+}: Omit<HostSessionEditorProps, "actions"> & { actions?: HostSessionEditorActions }) {
+  return <HostSessionEditor {...props} actions={actions ?? hostSessionEditorTestActions} />;
+}
 
 type DeferredFetchResponse = {
   ok: boolean;
@@ -66,6 +124,7 @@ const deletionPreview: HostSessionDeletionPreviewResponse = {
 
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
   vi.useRealTimers();
   vi.unstubAllGlobals();
 });
@@ -104,7 +163,7 @@ describe("HostSessionEditor", () => {
   });
 
   it("labels new session creation separately from current session editing", () => {
-    render(<HostSessionEditor session={null} />);
+    render(<HostSessionEditorForTest session={null} />);
 
     expect(screen.getByRole("heading", { name: "새 세션 만들기" })).toBeVisible();
     expect(screen.getByRole("link", { name: "운영으로" })).toHaveAttribute("href", "/app/host");
@@ -115,7 +174,7 @@ describe("HostSessionEditor", () => {
   });
 
   it("labels existing open session as current session editing", () => {
-    render(<HostSessionEditor session={openSession} />);
+    render(<HostSessionEditorForTest session={openSession} />);
 
     expect(screen.getByRole("heading", { name: "이번 세션 편집" })).toBeVisible();
     expect(screen.getByText("No.07")).toBeVisible();
@@ -125,7 +184,7 @@ describe("HostSessionEditor", () => {
 
   it("switches the mobile editor between basic, publish, attendance, and feedback document contexts", async () => {
     const user = userEvent.setup();
-    const { container } = render(<HostSessionEditor session={session} />);
+    const { container } = render(<HostSessionEditorForTest session={session} />);
 
     const segments = screen.getByTestId("host-editor-mobile-segments");
     const basic = screen.getByRole("tab", { name: "기본" });
@@ -169,7 +228,7 @@ describe("HostSessionEditor", () => {
 
   it("supports keyboard selection in the mobile editor tablist", async () => {
     const user = userEvent.setup();
-    render(<HostSessionEditor session={session} />);
+    render(<HostSessionEditorForTest session={session} />);
 
     const basic = screen.getByRole("tab", { name: "기본" });
     const publish = screen.getByRole("tab", { name: "공개" });
@@ -194,7 +253,7 @@ describe("HostSessionEditor", () => {
   });
 
   it("shows a new-session empty message instead of static attendance and feedback document controls", () => {
-    render(<HostSessionEditor />);
+    render(<HostSessionEditorForTest />);
 
     expect(screen.getAllByText("세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.")).toHaveLength(2);
     expect(screen.queryByText("HTML 파일을 드래그하거나 클릭해 업로드")).not.toBeInTheDocument();
@@ -207,7 +266,7 @@ describe("HostSessionEditor", () => {
   it("automatically derives the question deadline from the selected meeting date", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 21, 12));
-    render(<HostSessionEditor />);
+    render(<HostSessionEditorForTest />);
     vi.useRealTimers();
 
     const user = userEvent.setup();
@@ -227,7 +286,7 @@ describe("HostSessionEditor", () => {
   });
 
   it("renders attendance and the session feedback document from the host session detail API payload", () => {
-    render(<HostSessionEditor session={session} />);
+    render(<HostSessionEditorForTest session={session} />);
 
     expect(screen.getAllByText("김호스트")).not.toHaveLength(0);
     expect(screen.getByText("피드백 문서")).toBeInTheDocument();
@@ -246,7 +305,7 @@ describe("HostSessionEditor", () => {
   });
 
   it("shows persisted book and neutral meeting fields", () => {
-    render(<HostSessionEditor session={session} />);
+    render(<HostSessionEditorForTest session={session} />);
 
     expect(screen.getByLabelText("책 링크")).toHaveValue("https://example.com/books/factfulness");
     expect(screen.getByLabelText("책 이미지 URL")).toHaveValue(
@@ -261,7 +320,7 @@ describe("HostSessionEditor", () => {
 
   it("shows existing-session empty states when attendees are empty and no feedback document is uploaded", () => {
     render(
-      <HostSessionEditor
+      <HostSessionEditorForTest
         session={{
           ...session,
           attendees: [],
@@ -294,7 +353,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
+    render(<HostSessionEditorForTest session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
 
     const input = screen.getByLabelText("피드백 문서 파일") as HTMLInputElement;
     const file = new File(["# 독서모임 1차 피드백"], "local-draft.md", { type: "text/markdown" });
@@ -321,7 +380,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
+    render(<HostSessionEditorForTest session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
 
     const file = new File(["# 독서모임 1차 피드백"], "retry.md", { type: "text/markdown" });
     await user.upload(screen.getByLabelText("피드백 문서 파일"), file);
@@ -336,7 +395,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("location", location);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor />);
+    render(<HostSessionEditorForTest />);
 
     await user.clear(screen.getByLabelText("세션 제목"));
     await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
@@ -377,7 +436,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("location", location);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor />);
+    render(<HostSessionEditorForTest />);
 
     await user.clear(screen.getByLabelText("세션 제목"));
     await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 커스텀 책");
@@ -427,7 +486,7 @@ describe("HostSessionEditor", () => {
       startTime: "19:15",
     };
 
-    render(<HostSessionEditor session={editedSession} />);
+    render(<HostSessionEditorForTest session={editedSession} />);
 
     expect(screen.getByLabelText("시작 시간")).toHaveValue("19:15");
 
@@ -463,7 +522,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("location", location);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={session} />);
+    render(<HostSessionEditorForTest session={session} />);
 
     await user.clear(screen.getByLabelText("책 이미지 URL"));
     await user.clear(screen.getByLabelText("Passcode · 선택"));
@@ -492,7 +551,7 @@ describe("HostSessionEditor", () => {
 
   it("initializes publication summary and mode from the host session detail payload", () => {
     render(
-      <HostSessionEditor
+      <HostSessionEditorForTest
         session={{
           ...session,
           publication: {
@@ -515,7 +574,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("location", location);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+    render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
     await user.type(screen.getByLabelText("공개 요약"), "초안으로 남길 공개 요약입니다.");
     await user.click(screen.getByRole("button", { name: "요약 초안 저장" }));
@@ -542,7 +601,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("location", location);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+    render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
     await user.type(screen.getByLabelText("공개 요약"), "공개 페이지에 보여줄 요약입니다.");
     await user.click(screen.getByRole("button", { name: "공개 기록 발행" }));
@@ -563,7 +622,7 @@ describe("HostSessionEditor", () => {
   });
 
   it("disables publication actions for unsaved new sessions and explains why", () => {
-    render(<HostSessionEditor />);
+    render(<HostSessionEditorForTest />);
 
     expect(screen.getByRole("button", { name: "요약 초안 저장" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "공개 기록 발행" })).toBeDisabled();
@@ -576,7 +635,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+    render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
     await user.click(screen.getByRole("button", { name: "요약 초안 저장" }));
 
@@ -589,7 +648,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+    render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
     await user.type(screen.getByLabelText("공개 요약"), "저장 실패를 확인할 공개 요약입니다.");
     await user.click(screen.getByRole("button", { name: "공개 기록 발행" }));
@@ -603,7 +662,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={session} />);
+    render(<HostSessionEditorForTest session={session} />);
 
     const absentToggle = screen.getByRole("button", { name: "이멤버5 불참" });
     expect(absentToggle).toHaveAttribute("aria-pressed", "false");
@@ -623,7 +682,7 @@ describe("HostSessionEditor", () => {
 
   it("shows removed participants in a separate collapsed attendance section", () => {
     render(
-      <HostSessionEditor
+      <HostSessionEditorForTest
         session={{
           ...session,
           attendees: [
@@ -656,7 +715,7 @@ describe("HostSessionEditor", () => {
     const user = userEvent.setup();
 
     render(
-      <HostSessionEditor
+      <HostSessionEditorForTest
         session={{
           ...session,
           attendees: session.attendees.map((attendee) =>
@@ -711,7 +770,7 @@ describe("HostSessionEditor", () => {
     const user = userEvent.setup();
 
     render(
-      <HostSessionEditor
+      <HostSessionEditorForTest
         session={{
           ...session,
           attendees: session.attendees.map((attendee) =>
@@ -765,7 +824,7 @@ describe("HostSessionEditor", () => {
     const user = userEvent.setup();
 
     render(
-      <HostSessionEditor
+      <HostSessionEditorForTest
         session={{
           ...session,
           attendees: session.attendees.map((attendee) =>
@@ -814,7 +873,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={session} />);
+    render(<HostSessionEditorForTest session={session} />);
 
     await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
     await waitFor(() =>
@@ -851,7 +910,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("location", location);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={openSession} />);
+    render(<HostSessionEditorForTest session={openSession} />);
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
 
@@ -891,7 +950,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={openSession} />);
+    render(<HostSessionEditorForTest session={openSession} />);
 
     const trigger = screen.getByRole("button", { name: "세션 삭제" });
     await user.click(trigger);
@@ -922,13 +981,13 @@ describe("HostSessionEditor", () => {
   });
 
   it("does not show the delete action on the new-session editor", () => {
-    render(<HostSessionEditor />);
+    render(<HostSessionEditorForTest />);
 
     expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
   });
 
   it("disables delete action for non-open sessions", () => {
-    render(<HostSessionEditor session={session} />);
+    render(<HostSessionEditorForTest session={session} />);
 
     expect(screen.getByRole("button", { name: "세션 삭제" })).toBeDisabled();
   });
@@ -938,7 +997,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={openSession} />);
+    render(<HostSessionEditorForTest session={openSession} />);
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
 
@@ -959,7 +1018,7 @@ describe("HostSessionEditor", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
-    render(<HostSessionEditor session={openSession} />);
+    render(<HostSessionEditorForTest session={openSession} />);
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
     await screen.findByText("참석 대상");

@@ -1,4 +1,1 @@
-export {
-  HostDashboardRoute as default,
-  hostDashboardLoader,
-} from "@/features/host";
+export { HostDashboardRoute as default } from "@/features/host";

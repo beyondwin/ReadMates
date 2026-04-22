@@ -1,41 +1,7 @@
 import { useLoaderData } from "react-router-dom";
-import {
-  fetchHostCurrentSession,
-  fetchHostDashboard,
-  submitHostMemberLifecycle,
-} from "@/features/host/api/host-api";
-import HostDashboard, {
-  type HostDashboardActions,
-} from "@/features/host/components/host-dashboard";
-import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
-import type { HostDashboardResponse } from "@/features/host/api/host-contracts";
-
-export type HostDashboardRouteData = {
-  current: CurrentSessionResponse;
-  data: HostDashboardResponse;
-};
-
-export async function hostDashboardLoader(): Promise<HostDashboardRouteData> {
-  const [current, data] = await Promise.all([
-    fetchHostCurrentSession(),
-    fetchHostDashboard(),
-  ]);
-
-  return { current, data };
-}
-
-const hostDashboardActions = {
-  updateCurrentSessionParticipation: async (membershipId, action) => {
-    const response = await submitHostMemberLifecycle(
-      membershipId,
-      action === "add" ? "/current-session/add" : "/current-session/remove",
-    );
-
-    if (!response.ok) {
-      throw new Error("Current session member action failed");
-    }
-  },
-} satisfies HostDashboardActions;
+import HostDashboard from "@/features/host/components/host-dashboard";
+import type { AuthMeResponse } from "@/shared/api/readmates";
+import { hostDashboardActions, type HostDashboardRouteData } from "./host-dashboard-data";
 
 export function HostDashboardRoute({ auth }: { auth?: AuthMeResponse }) {
   const loaderData = useLoaderData() as HostDashboardRouteData;

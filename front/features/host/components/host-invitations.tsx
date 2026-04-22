@@ -1,13 +1,6 @@
 "use client";
 
 import { type CSSProperties, type FormEvent, type InvalidEvent, useRef, useState } from "react";
-import {
-  createHostInvitation,
-  listHostInvitationsResponse,
-  parseHostInvitationListResponse,
-  parseHostInvitationResponse,
-  revokeHostInvitation,
-} from "@/features/host/api/host-api";
 import type {
   CreateHostInvitationRequest,
   HostInvitationListItem,
@@ -45,14 +38,6 @@ export type HostInvitationsActions = {
   parseInvitationList: (response: Response) => Promise<HostInvitationListItem[]>;
 };
 
-const defaultHostInvitationsActions: HostInvitationsActions = {
-  listInvitations: listHostInvitationsResponse,
-  createInvitation: createHostInvitation,
-  revokeInvitation: revokeHostInvitation,
-  parseInvitation: parseHostInvitationResponse,
-  parseInvitationList: parseHostInvitationListResponse,
-};
-
 function inviteStatusClass(status: InvitationStatus) {
   if (status === "PENDING") {
     return "badge badge-accent badge-dot";
@@ -80,10 +65,10 @@ function inviteCounts(invitations: HostInvitationListItem[]) {
 
 export default function HostInvitations({
   initialInvitations,
-  actions = defaultHostInvitationsActions,
+  actions,
 }: {
   initialInvitations: HostInvitationListItem[];
-  actions?: HostInvitationsActions;
+  actions: HostInvitationsActions;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

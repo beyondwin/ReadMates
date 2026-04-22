@@ -11,17 +11,15 @@ import {
 } from "react";
 import type {
   CurrentSessionPolicy,
-  MemberLifecycleRequest,
-  MemberLifecycleResponse,
   MembershipStatus,
   SessionParticipationStatus,
 } from "@/shared/api/readmates";
-import {
-  fetchHostMembers,
-  submitHostMemberLifecycle,
-  submitHostViewerAction,
-} from "@/features/host/api/host-api";
-import type { HostMemberListItem, ViewerMember } from "@/features/host/api/host-contracts";
+import type {
+  HostMemberListItem,
+  MemberLifecycleRequest,
+  MemberLifecycleResponse,
+  ViewerMember,
+} from "@/features/host/api/host-contracts";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 type HostMemberLifecyclePath = "/suspend" | "/deactivate" | "/restore" | "/current-session/add" | "/current-session/remove";
@@ -41,7 +39,7 @@ export type HostMembersActions = {
 
 type HostMembersProps = {
   initialMembers: HostMemberListItem[];
-  actions?: HostMembersActions;
+  actions: HostMembersActions;
 };
 
 type MemberRowsState = {
@@ -52,12 +50,6 @@ type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) 
 type MemberTab = "active" | "viewer" | "suspended" | "inactive" | "invitations";
 type LifecycleDialog = null | { action: "suspend" | "deactivate"; member: HostMemberListItem };
 type ViewerAction = HostViewerAction;
-
-const defaultHostMembersActions: HostMembersActions = {
-  loadMembers: fetchHostMembers,
-  submitLifecycle: submitHostMemberLifecycle,
-  submitViewerAction: submitHostViewerAction,
-};
 
 const tabs: Array<{ key: MemberTab; label: string }> = [
   { key: "active", label: "활성 멤버" },
@@ -275,7 +267,7 @@ function isMembershipPending(membershipId: string, pendingActions: Set<string>) 
   return false;
 }
 
-export default function HostMembers({ initialMembers, actions = defaultHostMembersActions }: HostMembersProps) {
+export default function HostMembers({ initialMembers, actions }: HostMembersProps) {
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
     source: initialMembers,
     members: initialMembers,
