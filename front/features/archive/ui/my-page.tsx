@@ -1,7 +1,6 @@
 import { type CSSProperties, type ReactNode, useState } from "react";
 import type { FeedbackDocumentListItem, MyPageProfile } from "@/features/archive/model/archive-model";
 import {
-  appFeedbackHref,
   attendanceSummary,
   clubDisplayName,
   feedbackReportActionLabel,
@@ -9,9 +8,9 @@ import {
   identityLine,
   membershipIdentityLabel,
   membershipJoinedLine,
-  readmatesReturnState,
 } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
+import { appFeedbackHref, readmatesReturnState } from "@/features/archive/ui/archive-route-continuity";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 

@@ -484,6 +484,23 @@ describe("MyPage", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "member-user",
+            membershipId: "member-membership",
+            clubId: "club-id",
+            email: "member@example.com",
+            displayName: "이멤버5",
+            shortName: "멤버",
+            role: "MEMBER",
+            membershipStatus: "ACTIVE",
+            approvalState: "ACTIVE",
+          }),
+        );
+      }
+
       if (url === "/api/bff/api/app/me") {
         return Promise.resolve(jsonResponse(data));
       }

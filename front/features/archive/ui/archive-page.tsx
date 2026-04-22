@@ -10,11 +10,8 @@ import type {
   FeedbackDocumentListItem,
 } from "@/features/archive/model/archive-model";
 import {
-  appFeedbackHref,
-  appSessionHref,
   archiveSummary,
   archiveTabs,
-  archiveViewHref,
   feedbackArchiveBadgeClass,
   feedbackArchiveDescription,
   feedbackArchiveLabel,
@@ -23,11 +20,16 @@ import {
   groupArchiveSessionsByYear,
   mobileArchiveTabs,
   publicationLabel,
-  readmatesReturnState,
-  restoreReadmatesArchiveScroll,
   selectedArchiveSectionMeta,
   toArchiveSessionRecords,
 } from "@/features/archive/model/archive-model";
+import {
+  appFeedbackHref,
+  appSessionHref,
+  archiveViewHref,
+  readmatesReturnState,
+  restoreReadmatesArchiveScroll,
+} from "@/features/archive/ui/archive-route-continuity";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { SessionIdentity } from "@/shared/ui/session-identity";

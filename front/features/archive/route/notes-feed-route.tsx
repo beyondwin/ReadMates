@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useLoaderData, useSearchParams } from "react-router-dom";
-import type { NotesFeedRouteData } from "@/features/archive/api/archive-api";
+import type { NotesFeedRouteData } from "@/features/archive/route/notes-feed-data";
 import { feedFilterFromSearchParam, type FeedFilter } from "@/features/archive/model/notes-feed-model";
 import NotesFeedPage from "@/features/archive/ui/notes-feed-page";
 

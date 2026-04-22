@@ -2,7 +2,7 @@ import { useLoaderData, useLocation } from "react-router-dom";
 import {
   archiveSessionsReturnTarget,
   readReadmatesReturnTarget,
-} from "@/features/archive/model/archive-model";
+} from "@/features/archive/ui/archive-route-continuity";
 import type { MemberSessionDetailRouteData } from "@/features/archive/route/member-session-detail-data";
 import MemberSessionDetailPage, {
   MemberSessionDetailUnavailablePage,
