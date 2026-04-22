@@ -492,7 +492,7 @@ git commit -m "refactor: extract current session models"
 - Modify: `front/tests/unit/current-session.test.tsx`
 - Modify: `front/tests/unit/spa-router.test.tsx`
 
-- [ ] **Step 1: Create route loader**
+- [x] **Step 1: Create route loader**
 
 Create `currentSessionLoader` that loads:
 
@@ -501,27 +501,29 @@ Create `currentSessionLoader` that loads:
 
 The loader should return plain route data. Preserve the current loading/error behavior as closely as possible.
 
-- [ ] **Step 2: Create route component**
+- [x] **Step 2: Create route component**
 
 Create a route component that reads loader data and renders the existing current-session UI.
 
-- [ ] **Step 3: Introduce route action compatibility**
+- [x] **Step 3: Introduce route action compatibility**
 
 Add a route action shape for current-session mutations. Start with the simplest mutation path that does not require UI redesign. If full action conversion would make the task too large, keep existing action delegates and document the remaining action conversion as a checkbox inside this task before committing.
 
-- [ ] **Step 4: Wire router**
+- [ ] **Remaining action conversion:** Replace the current-session component's direct action delegates with React Router fetcher/Form submissions so route action revalidation owns all save flows.
+
+- [x] **Step 4: Wire router**
 
 Update `front/src/app/router.tsx` so `/app/session/current` uses the current-session route module. Keep route path unchanged.
 
-- [ ] **Step 5: Shrink page shell**
+- [x] **Step 5: Shrink page shell**
 
 Update `front/src/pages/current-session.tsx` to re-export or delegate to the route module. It should no longer contain direct data fetching.
 
-- [ ] **Step 6: Update tests**
+- [x] **Step 6: Update tests**
 
 Update router/page tests so they exercise loader-backed rendering. Preserve existing behavioral assertions.
 
-- [ ] **Step 7: Run checks**
+- [x] **Step 7: Run checks**
 
 ```bash
 pnpm --dir front test -- current-session.test.tsx current-session-actions.test.ts spa-router.test.tsx frontend-boundaries.test.ts
@@ -531,7 +533,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 ```bash
 git add front/features/current-session front/src/pages/current-session.tsx front/src/app/router.tsx front/tests/unit/current-session.test.tsx front/tests/unit/spa-router.test.tsx

@@ -3,6 +3,7 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/src/app/auth-context";
 import { routes } from "@/src/app/router";
+import { currentSessionContractFixture } from "./api-contract-fixtures";
 
 afterEach(() => {
   cleanup();
@@ -14,6 +15,19 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
 }
 
 describe("SPA router", () => {
@@ -111,6 +125,52 @@ describe("SPA router", () => {
     expect(screen.getByRole("link", { name: "전체 세션 둘러보기" })).toHaveAttribute("href", "/app/archive");
     expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute("href", "/app/session/current");
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/app/pending", expect.anything());
+  });
+
+  it("renders the current session route through its loader", async () => {
+    const auth = {
+      authenticated: true,
+      userId: "member-user",
+      membershipId: "member-membership",
+      clubId: "club-id",
+      email: "member@example.com",
+      displayName: "이멤버5",
+      shortName: "멤버",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+    };
+    const current = {
+      currentSession: currentSessionContractFixture.currentSession,
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(auth));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        return Promise.resolve(jsonResponse(current));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it("renders the archive session list when viewer feedback documents are forbidden", async () => {
