@@ -180,7 +180,12 @@ export function MobileTabBar({ variant, currentSessionId }: MobileTabBarProps) {
   const tabs = variant === "host" ? hostTabs(currentSessionId) : memberTabs;
 
   return (
-    <nav className="m-tabbar" aria-label="앱 탭" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+    <nav
+      className="m-tabbar"
+      data-variant={variant}
+      aria-label="앱 탭"
+      style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+    >
       {tabs.map((tab) =>
         tab.href ? (
           <Link
