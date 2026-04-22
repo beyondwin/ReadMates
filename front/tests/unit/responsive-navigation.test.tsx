@@ -142,6 +142,32 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.queryByRole("link", { name: "멤버 화면" })).not.toBeInTheDocument();
   });
 
+  it("keeps invite entry mobile chrome focused on accepting the invitation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ authenticated: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    renderAt("/invite/sample-token", <MobileHeader variant="guest" />);
+
+    expect(screen.getByText("로그인")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/");
+    expect(screen.queryByRole("link", { name: "멤버 화면" })).not.toBeInTheDocument();
+  });
+
+  it("renders member mobile home chrome without host clutter by default", () => {
+    renderAt("/app", <MobileHeader variant="member" />);
+
+    expect(screen.getByText("읽는사이")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
+  });
+
   it("renders member notes as a secondary mobile page with a back link", () => {
     renderAt("/app/notes", <MobileHeader variant="member" />);
 
@@ -171,6 +197,14 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.getByText("세션")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+  });
+
+  it("keeps host record routes in host mobile chrome with member return", () => {
+    renderAt("/app/archive", <MobileHeader variant="host" />);
+
+    expect(screen.getByText("기록")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+    expect(screen.queryByRole("link", { name: "뒤로" })).not.toBeInTheDocument();
   });
 
   it("uses stable mobile feedback titles and source-aware back links", () => {
