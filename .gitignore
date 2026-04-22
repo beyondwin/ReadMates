@@ -21,4 +21,3 @@ deploy/cloudflare/.deploy-hook.env
 .gstack/
 .tmp
 .idea
-docs/superpowers
