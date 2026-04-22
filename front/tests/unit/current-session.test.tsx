@@ -2,8 +2,12 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import CurrentSession from "@/features/current-session/components/current-session";
-import type { CurrentSessionAuth } from "@/features/current-session/components/current-session-types";
+import { saveCheckin } from "@/features/current-session/actions/save-checkin";
+import { saveQuestions } from "@/features/current-session/actions/save-question";
+import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
+import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
+import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
+import type { CurrentSessionAuth, CurrentSessionPageData } from "@/features/current-session/ui/current-session-types";
 import { CurrentSessionRoute, currentSessionLoader } from "@/features/current-session";
 import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
 import { currentSessionContractFixture } from "./api-contract-fixtures";
@@ -57,6 +61,25 @@ const routeAuthFixture = {
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
 } satisfies AuthMeResponse;
+
+const currentSessionTestActions = {
+  updateRsvp,
+  saveCheckin,
+  saveQuestions,
+  saveLongReview,
+  saveOneLineReview,
+} satisfies CurrentSessionSaveActions;
+
+function CurrentSession({ auth, data }: { auth?: CurrentSessionAuth; data: CurrentSessionPageData }) {
+  return (
+    <CurrentSessionPage
+      auth={auth}
+      data={data}
+      actions={currentSessionTestActions}
+      onSaveSuccess={() => window.dispatchEvent(new Event("readmates:route-refresh"))}
+    />
+  );
+}
 
 function getDesktop(container: HTMLElement) {
   const desktop = container.querySelector(".rm-current-session-desktop");

@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { SaveScope, SaveState } from "@/features/current-session/components/current-session-types";
+import type { SaveScope, SaveState } from "@/features/current-session/ui/current-session-types";
 import { getCurrentSessionSaveStatusLabel } from "@/features/current-session/model/current-session-view-model";
 
 export function SaveFeedback({ scope, status }: { scope: SaveScope; status: SaveState }) {

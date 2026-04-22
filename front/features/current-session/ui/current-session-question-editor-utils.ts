@@ -1,4 +1,4 @@
-import type { QuestionInput } from "@/features/current-session/components/current-session-question-editor";
+import type { QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
 import {
   normalizeInitialQuestionInputs,
   type CurrentSessionQuestionRecord,

@@ -1,7 +1,6 @@
 import type { KeyboardEvent, ReactNode } from "react";
-import { Icon, SaveFeedback } from "@/features/current-session/components/current-session-primitives";
-import { QuestionEditor, type QuestionInput } from "@/features/current-session/components/current-session-question-editor";
-import { Link } from "@/src/app/router-link";
+import { Icon, SaveFeedback } from "@/features/current-session/ui/current-session-primitives";
+import { QuestionEditor, type QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
 import {
   MAX_QUESTION_INPUT_COUNT,
   MIN_QUESTION_INPUT_COUNT,
@@ -13,7 +12,7 @@ import type {
   CurrentSession,
   RsvpUpdateStatus,
   SaveState,
-} from "@/features/current-session/components/current-session-types";
+} from "@/features/current-session/ui/current-session-types";
 import type { getCurrentSessionMemberNotice } from "@/features/current-session/model/current-session-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
@@ -176,9 +175,9 @@ export function MobileCurrentSessionBoard({
           </a>
         ) : null}
         {isHost ? (
-          <Link to={`/app/host/sessions/${session.sessionId}/edit`} className="rm-current-session-mobile__host-link">
+          <a href={`/app/host/sessions/${session.sessionId}/edit`} className="rm-current-session-mobile__host-link">
             세션 운영으로
-          </Link>
+          </a>
         ) : null}
       </section>
 

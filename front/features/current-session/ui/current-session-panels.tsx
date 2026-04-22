@@ -1,6 +1,5 @@
 import { type CSSProperties } from "react";
-import { Icon, SaveFeedback } from "@/features/current-session/components/current-session-primitives";
-import { Link } from "@/src/app/router-link";
+import { Icon, SaveFeedback } from "@/features/current-session/ui/current-session-primitives";
 import type {
   BoardCheckin,
   BoardHighlight,
@@ -8,7 +7,7 @@ import type {
   CurrentSession,
   RsvpUpdateStatus,
   SaveState,
-} from "@/features/current-session/components/current-session-types";
+} from "@/features/current-session/ui/current-session-types";
 import {
   MAX_QUESTION_INPUT_COUNT,
   MIN_QUESTION_INPUT_COUNT,
@@ -389,9 +388,9 @@ export function FeedbackAccessPanel({ isViewer }: { isViewer: boolean }) {
         {feedbackAccess.body}
       </p>
       {feedbackAccess.canOpenArchive ? (
-        <Link to="/app/archive?view=report" className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
+        <a href="/app/archive?view=report" className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
           보존된 피드백 보기
-        </Link>
+        </a>
       ) : null}
     </section>
   );
@@ -409,9 +408,9 @@ export function HostContextPanel({ sessionId }: { sessionId: string }) {
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
         이 화면에서는 멤버로 RSVP, 체크인, 질문, 서평을 남기고, 운영 화면에서 세션 정보와 참석 확정을 관리합니다.
       </p>
-      <Link to={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
+      <a href={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
         세션 운영으로
-      </Link>
+      </a>
     </section>
   );
 }

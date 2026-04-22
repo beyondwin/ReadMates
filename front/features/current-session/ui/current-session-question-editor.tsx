@@ -1,6 +1,6 @@
 import { type CSSProperties } from "react";
-import { SaveFeedback } from "@/features/current-session/components/current-session-primitives";
-import type { SaveState } from "@/features/current-session/components/current-session-types";
+import { SaveFeedback } from "@/features/current-session/ui/current-session-primitives";
+import type { SaveState } from "@/features/current-session/ui/current-session-types";
 import {
   MAX_QUESTION_INPUT_COUNT,
   MIN_QUESTION_INPUT_COUNT,

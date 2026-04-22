@@ -1,13 +1,9 @@
 "use client";
 
 import { type CSSProperties, type KeyboardEvent, useState } from "react";
-import { saveCheckin } from "@/features/current-session/actions/save-checkin";
-import { saveQuestions } from "@/features/current-session/actions/save-question";
-import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
-import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
-import { MobileCurrentSessionBoard, type MobileSessionTab } from "@/features/current-session/components/current-session-mobile";
-import { QuestionEditor, type QuestionInput } from "@/features/current-session/components/current-session-question-editor";
-import { initialQuestionInputs } from "@/features/current-session/components/current-session-question-editor-utils";
+import { MobileCurrentSessionBoard, type MobileSessionTab } from "@/features/current-session/ui/current-session-mobile";
+import { QuestionEditor, type QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
+import { initialQuestionInputs } from "@/features/current-session/ui/current-session-question-editor-utils";
 import {
   BoardCheckins,
   BoardHighlights,
@@ -21,19 +17,21 @@ import {
   RosterList,
   RsvpPanel,
   SessionMeta,
-} from "@/features/current-session/components/current-session-panels";
+} from "@/features/current-session/ui/current-session-panels";
 import type {
   CurrentSessionAuth,
   CurrentSession,
+  CurrentSessionPageData,
   RsvpUpdateStatus,
   SaveScope,
   SaveState,
-} from "@/features/current-session/components/current-session-types";
+} from "@/features/current-session/ui/current-session-types";
 import {
   buildQuestionPayload,
   countWrittenQuestions,
   createAddedQuestionInput,
   getAddQuestionValidationMessage,
+  type CurrentSessionQuestionPayloadItem,
   getQuestionPayloadValidationMessage,
   getRemoveQuestionValidationMessage,
 } from "@/features/current-session/model/current-session-form-model";
@@ -44,9 +42,6 @@ import {
   getCurrentSessionMemberNotice,
   type CurrentSessionBoardTab,
 } from "@/features/current-session/model/current-session-view-model";
-import { requestReadmatesRouteRefresh } from "@/src/pages/readmates-page-data";
-import { Link } from "@/src/app/router-link";
-import type { CurrentSessionResponse } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateLabel, formatDeadlineLabel, formatSessionKicker, rsvpLabel } from "@/shared/ui/readmates-display";
 
@@ -58,32 +53,32 @@ const emptySaveStatuses: Record<SaveScope, SaveState> = {
   oneLineReview: "idle",
 };
 
-export default function CurrentSession({ auth, data }: { auth?: CurrentSessionAuth; data: CurrentSessionResponse }) {
+export type CurrentSessionSaveActions = {
+  updateRsvp: (status: RsvpUpdateStatus) => Promise<Response>;
+  saveCheckin: (readingProgress: number, note: string) => Promise<Response>;
+  saveQuestions: (questions: CurrentSessionQuestionPayloadItem[]) => Promise<Response>;
+  saveLongReview: (body: string) => Promise<Response>;
+  saveOneLineReview: (text: string) => Promise<Response>;
+};
+
+type CurrentSessionPageProps = {
+  auth?: CurrentSessionAuth;
+  data: CurrentSessionPageData;
+  actions?: CurrentSessionSaveActions;
+  onSaveSuccess?: () => void;
+};
+
+const noopSaveActions: CurrentSessionSaveActions = {
+  updateRsvp: () => Promise.resolve(new Response(null, { status: 204 })),
+  saveCheckin: () => Promise.resolve(new Response(null, { status: 204 })),
+  saveQuestions: () => Promise.resolve(new Response(null, { status: 204 })),
+  saveLongReview: () => Promise.resolve(new Response(null, { status: 204 })),
+  saveOneLineReview: () => Promise.resolve(new Response(null, { status: 204 })),
+};
+
+export function CurrentSessionPage({ auth, data, actions = noopSaveActions, onSaveSuccess }: CurrentSessionPageProps) {
   if (data.currentSession === null) {
-    return (
-      <main>
-        <section className="page-header-compact" style={{ padding: "48px 0" }}>
-          <div className="container">
-            <div className="rm-empty-state" style={{ padding: "34px" }}>
-              <p className="eyebrow" style={{ margin: 0 }}>
-                현재 세션 작업대
-              </p>
-              <h1 className="h1 editorial" style={{ margin: "8px 0 4px" }}>
-                아직 열린 세션이 없습니다
-              </h1>
-              <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                새 세션이 등록되면 RSVP, 읽기 체크인, 토론 질문, 한줄평 작업대가 열립니다.
-              </p>
-              {auth?.role === "HOST" ? (
-                <Link to="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
-                  새 세션 만들기
-                </Link>
-              ) : null}
-            </div>
-          </div>
-        </section>
-      </main>
-    );
+    return <CurrentSessionEmpty auth={auth} />;
   }
 
   return (
@@ -91,11 +86,52 @@ export default function CurrentSession({ auth, data }: { auth?: CurrentSessionAu
       key={data.currentSession.sessionId}
       session={data.currentSession}
       auth={auth}
+      actions={actions}
+      onSaveSuccess={onSaveSuccess}
     />
   );
 }
 
-function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?: CurrentSessionAuth }) {
+export default CurrentSessionPage;
+
+export function CurrentSessionEmpty({ auth }: { auth?: CurrentSessionAuth }) {
+  return (
+    <main>
+      <section className="page-header-compact" style={{ padding: "48px 0" }}>
+        <div className="container">
+          <div className="rm-empty-state" style={{ padding: "34px" }}>
+            <p className="eyebrow" style={{ margin: 0 }}>
+              현재 세션 작업대
+            </p>
+            <h1 className="h1 editorial" style={{ margin: "8px 0 4px" }}>
+              아직 열린 세션이 없습니다
+            </h1>
+            <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+              새 세션이 등록되면 RSVP, 읽기 체크인, 토론 질문, 한줄평 작업대가 열립니다.
+            </p>
+            {auth?.role === "HOST" ? (
+              <a href="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
+                새 세션 만들기
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+export function CurrentSessionBoard({
+  session,
+  auth,
+  actions,
+  onSaveSuccess,
+}: {
+  session: CurrentSession;
+  auth?: CurrentSessionAuth;
+  actions: CurrentSessionSaveActions;
+  onSaveSuccess?: () => void;
+}) {
   const [rsvp, setRsvp] = useState<CurrentSession["myRsvpStatus"]>(session.myRsvpStatus);
   const [readingProgress, setReadingProgress] = useState(session.myCheckin?.readingProgress ?? 0);
   const [checkinNote, setCheckinNote] = useState(session.myCheckin?.note ?? "");
@@ -192,7 +228,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
     }
 
     setQuestionValidationMessage("");
-    void runSave("question", () => saveQuestions(validQuestionPayload));
+    void runSave("question", () => actions.saveQuestions(validQuestionPayload));
   };
 
   const runSave = async (scope: SaveScope, operation: () => Promise<Response>) => {
@@ -206,7 +242,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       }
 
       setSaveStatus(scope, "saved");
-      requestReadmatesRouteRefresh();
+      onSaveSuccess?.();
     } catch {
       setSaveStatus(scope, "error");
     }
@@ -220,13 +256,13 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
     const previousRsvp = rsvp;
     setRsvp(status);
     setSaveStatus("rsvp", "saving");
-    void updateRsvp(status)
+    void actions.updateRsvp(status)
       .then((response) => {
         if (!response.ok) {
           throw new Error("rsvp update failed");
         }
         setSaveStatus("rsvp", "saved");
-        requestReadmatesRouteRefresh();
+        onSaveSuccess?.();
       })
       .catch(() => {
         setRsvp(previousRsvp);
@@ -314,7 +350,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       return;
     }
 
-    void runSave("checkin", () => saveCheckin(readingProgress, checkinNote));
+    void runSave("checkin", () => actions.saveCheckin(readingProgress, checkinNote));
   };
 
   const handleSaveLongReview = () => {
@@ -322,7 +358,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       return;
     }
 
-    void runSave("longReview", () => saveLongReview(longReview));
+    void runSave("longReview", () => actions.saveLongReview(longReview));
   };
 
   const handleSaveOneLineReview = () => {
@@ -330,7 +366,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       return;
     }
 
-    void runSave("oneLineReview", () => saveOneLineReview(oneLineReview));
+    void runSave("oneLineReview", () => actions.saveOneLineReview(oneLineReview));
   };
 
   return (
