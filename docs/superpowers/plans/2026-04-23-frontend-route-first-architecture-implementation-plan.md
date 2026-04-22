@@ -369,7 +369,7 @@ git commit -m "refactor: split frontend api primitives"
 - Modify: `front/shared/api/readmates.ts`
 - Modify: `front/tests/unit/current-session-actions.test.ts`
 
-- [ ] **Step 1: Move current-session contracts**
+- [x] **Step 1: Move current-session contracts**
 
 Move only current-session related types from `front/shared/api/readmates.ts` into `front/features/current-session/api/current-session-contracts.ts`:
 
@@ -386,7 +386,7 @@ Move only current-session related types from `front/shared/api/readmates.ts` int
 
 If a type is shared by host/archive too, keep a compatibility export from `readmates.ts` until those features are migrated.
 
-- [ ] **Step 2: Create current-session API client**
+- [x] **Step 2: Create current-session API client**
 
 Create `front/features/current-session/api/current-session-api.ts` with functions:
 
@@ -399,15 +399,15 @@ Create `front/features/current-session/api/current-session-api.ts` with function
 
 Use `readmatesFetch` or `readmatesFetchResponse` from `shared/api/client`.
 
-- [ ] **Step 3: Update existing action modules to delegate**
+- [x] **Step 3: Update existing action modules to delegate**
 
 Update current files under `front/features/current-session/actions/` to call the new API functions. This preserves existing component imports while moving endpoint knowledge into the new API layer.
 
-- [ ] **Step 4: Update tests**
+- [x] **Step 4: Update tests**
 
 Update `front/tests/unit/current-session-actions.test.ts` to assert endpoint behavior through the new API client or through compatibility action delegates.
 
-- [ ] **Step 5: Run focused checks**
+- [x] **Step 5: Run focused checks**
 
 ```bash
 pnpm --dir front test -- current-session-actions.test.ts readmates-fetch.test.ts frontend-boundaries.test.ts
@@ -416,7 +416,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add front/features/current-session front/shared/api/readmates.ts front/tests/unit/current-session-actions.test.ts
