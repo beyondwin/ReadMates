@@ -10,5 +10,9 @@ export default function AboutPage() {
     useCallback(() => readmatesFetch<PublicClubResponse>("/api/public/club"), []),
   );
 
-  return <ReadmatesPageState state={state}>{(data) => <PublicClub data={data} />}</ReadmatesPageState>;
+  return (
+    <ReadmatesPageState state={state} loadingLabel="클럽 소개를 불러오는 중">
+      {(data) => <PublicClub data={data} />}
+    </ReadmatesPageState>
+  );
 }

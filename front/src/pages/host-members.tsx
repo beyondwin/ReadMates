@@ -22,7 +22,9 @@ export default function HostMembersPage() {
         </div>
       </section>
       <section className="container" style={{ padding: "24px 0 72px" }}>
-        <ReadmatesPageState state={state}>{(members) => <HostMembers initialMembers={members} />}</ReadmatesPageState>
+        <ReadmatesPageState state={state} loadingLabel="멤버 목록을 불러오는 중">
+          {(members) => <HostMembers initialMembers={members} />}
+        </ReadmatesPageState>
       </section>
     </main>
   );

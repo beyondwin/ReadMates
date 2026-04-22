@@ -135,7 +135,7 @@ describe("AuthProvider", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
-  it("keeps guarded routes in a loading state while auth is unresolved", async () => {
+  it("keeps guarded routes in a specific loading state while auth is unresolved", async () => {
     const deferred = createDeferred<Response>();
     vi.stubGlobal("fetch", vi.fn().mockReturnValue(deferred.promise));
 
@@ -145,7 +145,8 @@ describe("AuthProvider", () => {
       </RequireAuth>,
     );
 
-    expect(screen.getByText("불러오는 중")).toBeInTheDocument();
+    expect(screen.getByText("로그인 상태를 확인하는 중")).toBeInTheDocument();
+    expect(screen.queryByText("화면을 불러오는 중")).not.toBeInTheDocument();
 
     deferred.resolve(authResponse(activeMemberAuth));
 
@@ -154,6 +155,42 @@ describe("AuthProvider", () => {
 });
 
 describe("route guards", () => {
+  it("keeps member app routes in a specific loading state while auth is unresolved", async () => {
+    const deferred = createDeferred<Response>();
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(deferred.promise));
+
+    renderGuard(
+      <RequireMemberApp>
+        <main>member app boundary</main>
+      </RequireMemberApp>,
+    );
+
+    expect(screen.getByText("멤버 화면을 확인하는 중")).toBeInTheDocument();
+    expect(screen.queryByText("화면을 불러오는 중")).not.toBeInTheDocument();
+
+    deferred.resolve(authResponse(activeMemberAuth));
+
+    expect(await screen.findByText("member app boundary")).toBeInTheDocument();
+  });
+
+  it("keeps host routes in a specific loading state while auth is unresolved", async () => {
+    const deferred = createDeferred<Response>();
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(deferred.promise));
+
+    renderGuard(
+      <RequireHost>
+        <main>host app boundary</main>
+      </RequireHost>,
+    );
+
+    expect(screen.getByText("호스트 권한을 확인하는 중")).toBeInTheDocument();
+    expect(screen.queryByText("화면을 불러오는 중")).not.toBeInTheDocument();
+
+    deferred.resolve(authResponse(activeHostAuth));
+
+    expect(await screen.findByText("host app boundary")).toBeInTheDocument();
+  });
+
   it("redirects anonymous guarded routes to login", async () => {
     mockAuthFetch(anonymousAuth);
 

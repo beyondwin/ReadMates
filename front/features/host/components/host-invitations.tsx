@@ -72,6 +72,18 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
 
   const hasPendingRow = Object.keys(pendingRows).length > 0;
   const disableCreate = isCreating || hasPendingRow;
+  const createDisabledReason = isCreating
+    ? "초대 링크를 만드는 중입니다."
+    : hasPendingRow
+      ? "목록 작업이 끝난 뒤 새 초대 링크를 만들 수 있습니다."
+      : null;
+  const copyDisabledReason = copyPending
+    ? "초대 링크를 복사하는 중입니다."
+    : isCreating
+      ? "초대 링크 생성이 끝난 뒤 복사할 수 있습니다."
+      : hasPendingRow
+        ? "목록 작업이 끝난 뒤 생성된 링크를 복사할 수 있습니다."
+        : null;
   const nameInvalid = nameTouched && name.trim().length === 0;
   const counts = inviteCounts(invitations);
   const shareHref = lastCreated?.acceptUrl
@@ -98,7 +110,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
   const refreshInvitations = async () => {
     const response = await listInvitations();
     if (!response.ok) {
-      showAlert("초대 목록 새로고침에 실패했습니다.");
+      showAlert("초대 목록 새로고침에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.");
       return false;
     }
 
@@ -133,7 +145,11 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
         applyToCurrentSession,
       });
       if (!response.ok) {
-        showAlert(response.status === 409 ? "이미 활성 멤버인 이메일입니다." : "초대 생성에 실패했습니다.");
+        showAlert(
+          response.status === 409
+            ? "이미 활성 멤버인 이메일입니다. 멤버 목록에서 상태를 확인해 주세요."
+            : "초대 생성에 실패했습니다. 이메일과 이름을 확인한 뒤 다시 시도해 주세요.",
+        );
         return;
       }
 
@@ -146,7 +162,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
         setNameTouched(false);
       }
     } catch {
-      showAlert("초대 생성에 실패했습니다.");
+      showAlert("초대 생성에 실패했습니다. 이메일과 이름을 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setIsCreating(false);
     }
@@ -169,7 +185,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
       await navigator.clipboard.writeText(lastCreated.acceptUrl);
       showStatus("초대 링크를 복사했습니다.");
     } catch {
-      showAlert("초대 링크 복사에 실패했습니다.");
+      showAlert("초대 링크 복사에 실패했습니다. 브라우저 권한을 허용하거나 URL을 직접 선택해 복사해 주세요.");
     } finally {
       setCopyPending(false);
     }
@@ -185,14 +201,14 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
     try {
       const response = await revokeInvitation(invitation.invitationId);
       if (!response.ok) {
-        showAlert("초대 취소에 실패했습니다.");
+        showAlert("초대 취소에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
         return;
       }
 
       setLastCreated((current) => (current?.invitationId === invitation.invitationId ? null : current));
       await refreshInvitations();
     } catch {
-      showAlert("초대 취소에 실패했습니다.");
+      showAlert("초대 취소에 실패했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
     } finally {
       setRowPending(invitation.invitationId, null);
     }
@@ -218,7 +234,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
         applyToCurrentSession: invitation.applyToCurrentSession,
       });
       if (!response.ok) {
-        showAlert("새 링크 발급에 실패했습니다.");
+        showAlert("새 링크 발급에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요.");
         return;
       }
 
@@ -228,7 +244,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
         await refreshInvitations();
       }
     } catch {
-      showAlert("새 링크 발급에 실패했습니다.");
+      showAlert("새 링크 발급에 실패했습니다. 대상 이메일을 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setRowPending(invitation.invitationId, null);
     }
@@ -285,10 +301,20 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                   생성된 링크는 바로 복사하거나 메일로 공유할 수 있습니다.
                 </p>
               </div>
-              <button className="btn btn-primary" type="submit" disabled={disableCreate}>
-                {isCreating ? "만드는 중..." : "초대 링크 만들기"}
+              <button
+                className="btn btn-primary"
+                type="submit"
+                disabled={disableCreate}
+                aria-describedby={createDisabledReason ? "invite-create-disabled-reason" : undefined}
+              >
+                {isCreating ? "초대 링크를 만드는 중" : "초대 링크 만들기"}
               </button>
             </div>
+            {createDisabledReason ? (
+              <p id="invite-create-disabled-reason" className="tiny" style={{ margin: "-8px 0 12px", color: "var(--text-3)" }}>
+                {createDisabledReason}
+              </p>
+            ) : null}
             <div className="row" style={{ gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
               <div style={{ minWidth: 180, flex: "1 1 180px" }}>
                 <label className="label" htmlFor="invite-name">
@@ -354,9 +380,10 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                     className="btn btn-ghost"
                     type="button"
                     disabled={copyPending || isCreating || hasPendingRow}
+                    aria-describedby={copyDisabledReason ? "invite-copy-disabled-reason" : undefined}
                     onClick={() => void copyLastCreated()}
                   >
-                    {copyPending ? "복사 중..." : "초대 링크 복사"}
+                    {copyPending ? "복사하는 중" : "초대 링크 복사"}
                   </button>
                   {shareHref ? (
                     <a className="btn btn-quiet" href={shareHref}>
@@ -367,6 +394,11 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                 <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
                   이 URL은 생성 직후에만 표시됩니다. 나중에 다시 공유해야 하면 새 링크를 발급하세요.
                 </p>
+                {copyDisabledReason ? (
+                  <p id="invite-copy-disabled-reason" className="tiny" style={{ margin: "4px 0 0", color: "var(--text-3)" }}>
+                    {copyDisabledReason}
+                  </p>
+                ) : null}
               </div>
             ) : null}
             {message ? (
@@ -449,7 +481,7 @@ export default function HostInvitations({ initialInvitations }: { initialInvitat
                           disabled={isCreating || Boolean(pendingRows[invitation.invitationId])}
                           onClick={() => void reissue(invitation)}
                         >
-                          {pendingRows[invitation.invitationId] === "reissue" ? "발급 중..." : "새 링크 발급"}
+                          {pendingRows[invitation.invitationId] === "reissue" ? "새 링크 발급 중" : "새 링크 발급"}
                         </button>
                       ) : null}
                     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, type ReactNode, useEffect, useState } from "react";
 import type {
   ArchiveSessionItem,
   FeedbackDocumentListItem,
@@ -55,6 +55,42 @@ const mobileArchiveTabs: Array<{ key: ArchiveView; label: string }> = [
 
 const UNKNOWN_SESSION_YEAR_LABEL = "미정";
 const SESSION_YEAR_GROUP_PATTERN = /^(\d{4})(?:-(\d{2})(?:-(\d{2})(?:(?:T|\s).*)?)?)?$/;
+
+function moveArchiveTabFocus(nextView: ArchiveView, targetPrefix: "desktop" | "mobile") {
+  globalThis.setTimeout(() => {
+    document.getElementById(`archive-${targetPrefix}-tab-${nextView}`)?.focus();
+  }, 0);
+}
+
+function handleArchiveTabKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  view: ArchiveView,
+  setView: (view: ArchiveView) => void,
+  targetPrefix: "desktop" | "mobile",
+) {
+  const keys = archiveTabs.map((tab) => tab.key);
+  const currentIndex = keys.indexOf(view);
+  const lastIndex = keys.length - 1;
+  const nextIndex =
+    event.key === "ArrowRight"
+      ? (currentIndex + 1) % keys.length
+      : event.key === "ArrowLeft"
+        ? (currentIndex - 1 + keys.length) % keys.length
+        : event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? lastIndex
+            : -1;
+
+  if (nextIndex < 0) {
+    return;
+  }
+
+  event.preventDefault();
+  const nextView = keys[nextIndex];
+  setView(nextView);
+  moveArchiveTabFocus(nextView, targetPrefix);
+}
 
 function feedbackDocumentStatusFromList(
   session: ArchiveSessionItem,
@@ -348,10 +384,16 @@ function ArchiveDesktop({
                 지난 모임과 내가 쓴 문장들을 회고합니다. 속도감보다 축적감.
               </p>
             </div>
-            <div className="row" style={{ gap: "6px", flexWrap: "wrap" }} aria-label="아카이브 탭">
+            <div
+              className="row"
+              style={{ gap: "6px", flexWrap: "wrap" }}
+              aria-label="아카이브 탭"
+              onKeyDown={(event) => handleArchiveTabKeyDown(event, view, setView, "desktop")}
+            >
               {archiveTabs.map((tab) => (
                 <button
                   key={tab.key}
+                  id={`archive-desktop-tab-${tab.key}`}
                   type="button"
                   aria-pressed={view === tab.key}
                   onClick={() => setView(tab.key)}
@@ -414,10 +456,16 @@ function ArchiveMobile({
         </div>
       </section>
 
-      <div className="m-hscroll" style={{ padding: "0 18px 6px" }} aria-label="아카이브 모바일 탭">
+      <div
+        className="m-hscroll"
+        style={{ padding: "0 18px 6px" }}
+        aria-label="아카이브 모바일 탭"
+        onKeyDown={(event) => handleArchiveTabKeyDown(event, view, setView, "mobile")}
+      >
         {mobileArchiveTabs.map((tab) => (
           <button
             key={tab.key}
+            id={`archive-mobile-tab-${tab.key}`}
             type="button"
             aria-pressed={view === tab.key}
             onClick={() => setView(tab.key)}

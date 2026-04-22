@@ -11,7 +11,7 @@ const saveScopeLabels: Record<SaveScope, string> = {
 
 function saveFeedbackLabel(scope: SaveScope, status: SaveState) {
   if (status === "saving") {
-    return `${saveScopeLabels[scope]} 저장 중...`;
+    return `${saveScopeLabels[scope]} 변경사항을 저장하는 중`;
   }
 
   if (status === "saved") {

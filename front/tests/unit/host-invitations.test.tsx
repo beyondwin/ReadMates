@@ -227,6 +227,8 @@ describe("HostInvitations", () => {
     await user.click(submitButton);
 
     expect(submitButton).toBeDisabled();
+    expect(submitButton).toHaveTextContent("초대 링크를 만드는 중");
+    expect(screen.getByText("초대 링크를 만드는 중입니다.")).toBeInTheDocument();
     await user.click(submitButton);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -243,6 +245,8 @@ describe("HostInvitations", () => {
     await user.click(reissueButton);
 
     expect(reissueButton).toBeDisabled();
+    expect(reissueButton).toHaveTextContent("새 링크 발급 중");
+    expect(screen.getByText("목록 작업이 끝난 뒤 새 초대 링크를 만들 수 있습니다.")).toBeInTheDocument();
     await user.click(reissueButton);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

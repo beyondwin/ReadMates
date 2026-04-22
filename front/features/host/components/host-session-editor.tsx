@@ -3,6 +3,7 @@ import {
   type ChangeEvent,
   type CSSProperties,
   type FormEvent,
+  type KeyboardEvent,
   type ReactNode,
   useRef,
   useState,
@@ -83,6 +84,41 @@ function mobileEditorSectionConfig(section: MobileEditorSection) {
   return mobileEditorSections.find((item) => item.key === section) ?? mobileEditorSections[0];
 }
 
+function focusMobileEditorSection(section: MobileEditorSection) {
+  globalThis.setTimeout(() => {
+    document.getElementById(mobileEditorSectionConfig(section).tabId)?.focus();
+  }, 0);
+}
+
+function handleMobileEditorSectionKeyDown(
+  event: KeyboardEvent<HTMLDivElement>,
+  activeSection: MobileEditorSection,
+  onSectionChange: (section: MobileEditorSection) => void,
+) {
+  const keys = mobileEditorSections.map((section) => section.key);
+  const currentIndex = keys.indexOf(activeSection);
+  const lastIndex = keys.length - 1;
+  const nextIndex =
+    event.key === "ArrowRight"
+      ? (currentIndex + 1) % keys.length
+      : event.key === "ArrowLeft"
+        ? (currentIndex - 1 + keys.length) % keys.length
+        : event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? lastIndex
+            : -1;
+
+  if (nextIndex < 0) {
+    return;
+  }
+
+  event.preventDefault();
+  const nextSection = keys[nextIndex];
+  onSectionChange(nextSection);
+  focusMobileEditorSection(nextSection);
+}
+
 function initialPublicationMode(session?: HostSessionDetailResponse): PublicationMode {
   if (!session?.publication) {
     return "internal";
@@ -151,7 +187,7 @@ export default function HostSessionEditor({
   const isNewSession = session === null || session === undefined;
   const editorTitle = isNewSession ? "새 세션 만들기" : "이번 세션 편집";
   const primarySaveLabel = isNewSession ? "새 세션 만들기" : "변경 사항 저장";
-  const saveButtonLabel = saveState === "saving" ? "저장 중..." : primarySaveLabel;
+  const saveButtonLabel = saveState === "saving" ? "변경사항을 저장하는 중" : primarySaveLabel;
   const saveGuidance = isNewSession
     ? "세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다."
     : "세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.";
@@ -175,7 +211,7 @@ export default function HostSessionEditor({
     if (status === 409) {
       return "이미 닫히거나 공개된 세션은 삭제할 수 없습니다.";
     }
-    return "세션 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.";
+    return "세션 삭제에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
   };
 
   const closeDeleteModal = () => {
@@ -274,10 +310,10 @@ export default function HostSessionEditor({
       }
 
       setSaveState("error");
-      flash("저장에 실패했습니다");
+      flash("저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요");
     } catch {
       setSaveState("error");
-      flash("저장에 실패했습니다");
+      flash("저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
     }
   };
 
@@ -317,7 +353,7 @@ export default function HostSessionEditor({
           message:
             response.status === 400
               ? "공개 요약을 입력한 뒤 저장해주세요."
-              : "공개 설정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.",
+              : "공개 설정 저장에 실패했습니다. 요약 내용을 확인한 뒤 다시 시도해 주세요.",
         });
         return;
       }
@@ -331,7 +367,7 @@ export default function HostSessionEditor({
     } catch {
       setPublicationFeedback({
         tone: "error",
-        message: "공개 설정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.",
+        message: "공개 설정 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
       });
     } finally {
       setPublicationActionInFlight(null);
@@ -398,12 +434,12 @@ export default function HostSessionEditor({
           }
         } else if (currentWriteState.queuedStatus === null) {
           rollbackToCommittedStatus();
-          flash("출석 저장에 실패했습니다");
+          flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
         }
       } catch {
         if (currentWriteState.queuedStatus === null) {
           rollbackToCommittedStatus();
-          flash("출석 저장에 실패했습니다");
+          flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
         }
       } finally {
         const nextStatus = currentWriteState.queuedStatus;
@@ -444,7 +480,7 @@ export default function HostSessionEditor({
       });
 
       if (!response.ok) {
-        flash("피드백 문서 업로드에 실패했습니다");
+        flash("피드백 문서 업로드에 실패했습니다. 파일 형식과 권한을 확인해 주세요");
         return;
       }
 
@@ -456,7 +492,7 @@ export default function HostSessionEditor({
       });
       flash("피드백 문서가 업로드되었습니다");
     } catch {
-      flash("피드백 문서 업로드에 실패했습니다");
+      flash("피드백 문서 업로드에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
     } finally {
       input.value = "";
     }
@@ -532,6 +568,9 @@ export default function HostSessionEditor({
           role="tablist"
           aria-label="호스트 편집 섹션"
           data-testid="host-editor-mobile-segments"
+          onKeyDown={(event) =>
+            handleMobileEditorSectionKeyDown(event, activeMobileSection, setActiveMobileSection)
+          }
           style={{ padding: 0, gap: 6 }}
         >
           {mobileEditorSections.map((section) => {
@@ -546,6 +585,7 @@ export default function HostSessionEditor({
                 className={`m-chip${selected ? " is-on" : ""}`}
                 aria-selected={selected}
                 aria-controls={section.panelIds.join(" ")}
+                tabIndex={selected ? 0 : -1}
                 onClick={() => setActiveMobileSection(section.key)}
                 style={{ height: 34, padding: "0 14px" }}
               >
@@ -820,7 +860,7 @@ export default function HostSessionEditor({
                     aria-describedby={!session ? "publication-disabled-reason" : undefined}
                     onClick={() => void savePublication("draft")}
                   >
-                    {publicationActionInFlight === "draft" ? "저장 중..." : "요약 초안 저장"}
+                    {publicationActionInFlight === "draft" ? "변경사항을 저장하는 중" : "요약 초안 저장"}
                   </button>
                   <button
                     type="button"
@@ -829,7 +869,7 @@ export default function HostSessionEditor({
                     aria-describedby={!session ? "publication-disabled-reason" : undefined}
                     onClick={() => void savePublication("public")}
                   >
-                    {publicationActionInFlight === "public" ? "발행 중..." : "공개 기록 발행"}
+                    {publicationActionInFlight === "public" ? "공개 기록을 발행하는 중" : "공개 기록 발행"}
                   </button>
                 </div>
                 {publicationFeedback ? (
@@ -1029,7 +1069,7 @@ function DocumentStatePanel({
     },
     {
       label: "기본 정보",
-      value: saveState === "saving" ? "저장 중" : saveState === "error" ? "저장 실패" : session ? "저장됨" : "저장 전",
+      value: saveState === "saving" ? "기본 정보 저장 중" : saveState === "error" ? "저장 실패" : session ? "저장됨" : "저장 전",
       className: saveState === "error" ? "badge badge-warn badge-dot" : saveState === "saving" ? "badge badge-accent badge-dot" : "badge",
     },
     {

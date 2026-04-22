@@ -89,7 +89,7 @@ export default function PendingApprovalPage() {
   const state = useAuth();
 
   if (state.status === "loading") {
-    return <ReadmatesRouteLoading variant="auth" />;
+    return <ReadmatesRouteLoading label="계정 승인 상태를 확인하는 중" variant="auth" />;
   }
 
   const copy = copyForAuth(state.auth);

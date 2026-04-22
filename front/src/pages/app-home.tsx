@@ -30,11 +30,11 @@ export default function AppHomePage() {
   );
 
   if (authState.status !== "ready") {
-    return <ReadmatesRouteLoading variant="member" />;
+    return <ReadmatesRouteLoading label="계정 상태를 확인하는 중" variant="member" />;
   }
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="멤버 홈을 불러오는 중">
       {(data) => (
         <MemberHome
           auth={authState.auth}

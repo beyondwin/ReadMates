@@ -89,7 +89,7 @@ function LoadingSkeleton({ variant }: { variant: ReadmatesLoadingVariant }) {
 }
 
 function ReadmatesRouteLoadingFrame({
-  label = "불러오는 중",
+  label = "화면을 불러오는 중",
   variant,
 }: {
   label?: string;
@@ -122,7 +122,7 @@ function ReadmatesRouteLoadingInRouter({ label, variant }: { label?: string; var
 }
 
 export function ReadmatesRouteLoading({
-  label = "불러오는 중",
+  label = "화면을 불러오는 중",
   variant,
 }: {
   label?: string;
@@ -139,7 +139,7 @@ export function ReadmatesRouteLoading({
 
 export function ReadmatesPageState<T>({
   state,
-  loadingLabel = "불러오는 중",
+  loadingLabel = "화면을 불러오는 중",
   loadingVariant,
   children,
 }: {
@@ -161,7 +161,7 @@ export function ReadmatesPageState<T>({
             페이지를 불러오지 못했습니다.
           </h1>
           <p className="body" style={{ color: "var(--text-2)" }}>
-            잠시 후 다시 시도해 주세요.
+            네트워크 연결 또는 계정 권한을 확인한 뒤 새로고침해 주세요. 계속 실패하면 이전 화면으로 돌아가 다시 시도해 주세요.
           </p>
         </section>
       </main>

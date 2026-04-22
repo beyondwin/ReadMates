@@ -45,7 +45,7 @@ export default function FeedbackDocumentRoutePage({ printMode = false }: { print
   );
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="피드백 문서를 불러오는 중">
       {(result) =>
         result.status === "ready" ? (
           <FeedbackDocumentPage document={result.document} printMode={printMode} returnTarget={returnTarget} />

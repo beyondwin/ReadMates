@@ -75,7 +75,7 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
           setPreviewState({
             token,
             preview: null,
-            error: "초대 링크를 찾을 수 없습니다.",
+            error: "초대 링크를 찾을 수 없습니다. 주소를 다시 확인하거나 호스트에게 새 링크를 요청해 주세요.",
             isLoading: false,
           });
           return;
@@ -96,7 +96,7 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
           setPreviewState({
             token,
             preview: null,
-            error: "초대 정보를 불러오지 못했습니다.",
+            error: "초대 정보를 불러오지 못했습니다. 네트워크 연결을 확인한 뒤 새로고침해 주세요.",
             isLoading: false,
           });
         }
@@ -133,6 +133,10 @@ export default function InviteAcceptanceCard({ token }: { token: string }) {
           {copy ? (
             <p className="body auth-card__lede">
               {copy.body}
+            </p>
+          ) : isLoading ? (
+            <p className="body auth-card__lede" role="status" aria-live="polite">
+              초대를 확인하는 중입니다. 이전 초대 정보는 지우고 새 링크 상태를 확인하고 있어요.
             </p>
           ) : null}
           {error ? (

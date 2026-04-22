@@ -1024,7 +1024,7 @@ function MissingCurrentSessionMembersAlert({
         text: action === "add" ? "이번 세션에 추가했습니다." : "다음 세션부터 참여하도록 표시했습니다.",
       });
     } catch {
-      setMessage({ kind: "alert", text: "멤버 세션 상태 업데이트에 실패했습니다." });
+      setMessage({ kind: "alert", text: "멤버 세션 상태 업데이트에 실패했습니다. 목록을 확인한 뒤 다시 시도해 주세요." });
     } finally {
       setPendingActions((current) => {
         const next = new Set(current);

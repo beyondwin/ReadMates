@@ -11,7 +11,7 @@ export default function HostInvitationsPage() {
   );
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="초대 목록을 불러오는 중">
       {(invitations) => <HostInvitations initialInvitations={invitations} />}
     </ReadmatesPageState>
   );

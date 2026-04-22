@@ -56,7 +56,7 @@ export default function NotesPage() {
   );
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="클럽 노트를 불러오는 중">
       {(data) => (
         <NotesFeedPage
           items={data.items}

@@ -143,7 +143,7 @@ export default function PublicRecordsPage() {
   const state = useReadmatesData(useCallback(() => readmatesFetch<PublicClubResponse>("/api/public/club"), []));
 
   return (
-    <ReadmatesPageState state={state} loadingVariant="public">
+    <ReadmatesPageState state={state} loadingLabel="공개 기록을 불러오는 중" loadingVariant="public">
       {(data) => <PublicRecordsContent data={data} routePathname={location.pathname} routeSearch={location.search} />}
     </ReadmatesPageState>
   );
