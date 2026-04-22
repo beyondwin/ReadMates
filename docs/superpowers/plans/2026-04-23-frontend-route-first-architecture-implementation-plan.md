@@ -307,7 +307,7 @@ git commit -m "test: add frontend architecture boundaries"
 - Modify: `front/shared/api/readmates.ts`
 - Modify: `front/tests/unit/readmates-fetch.test.ts`
 
-- [ ] **Step 1: Move HTTP error model**
+- [x] **Step 1: Move HTTP error model**
 
 Create `front/shared/api/errors.ts` with:
 
@@ -317,11 +317,11 @@ Create `front/shared/api/errors.ts` with:
 
 Do not change user-visible redirect behavior yet.
 
-- [ ] **Step 2: Move response helpers**
+- [x] **Step 2: Move response helpers**
 
 Create `front/shared/api/response.ts` for JSON parsing and 204 handling.
 
-- [ ] **Step 3: Move fetch primitives**
+- [x] **Step 3: Move fetch primitives**
 
 Create `front/shared/api/client.ts` and move:
 
@@ -330,7 +330,7 @@ Create `front/shared/api/client.ts` and move:
 
 Keep signatures compatible.
 
-- [ ] **Step 4: Keep `readmates.ts` compatibility exports**
+- [x] **Step 4: Keep `readmates.ts` compatibility exports**
 
 Leave API contract types in `front/shared/api/readmates.ts` for now. Re-export fetch primitives from the new files so existing imports continue to work:
 
@@ -338,11 +338,11 @@ Leave API contract types in `front/shared/api/readmates.ts` for now. Re-export f
 export { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 ```
 
-- [ ] **Step 5: Update API tests**
+- [x] **Step 5: Update API tests**
 
 Update direct primitive assertions in `front/tests/unit/readmates-fetch.test.ts` to import from the new primitive module. Keep one compatibility assertion that importing from `readmates.ts` still works.
 
-- [ ] **Step 6: Run focused checks**
+- [x] **Step 6: Run focused checks**
 
 Run:
 
@@ -353,7 +353,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 git add front/shared/api front/tests/unit/readmates-fetch.test.ts
