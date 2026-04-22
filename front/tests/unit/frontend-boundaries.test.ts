@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const sourceRoots = ["src", "features", "shared"];
 const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
-const staticImportExportPattern = /^\s*(?:import|export)\s+(?:type\s+)?[\s\S]*?\s+from\s+["']([^"']+)["']/gm;
 
 type BoundaryRuleId = "shared-boundary" | "feature-to-feature" | "feature-model" | "feature-ui";
 
@@ -115,12 +115,28 @@ function collectAllSourceFiles() {
 }
 
 function parseStaticImportSpecifiers(source: string) {
+  const sourceFile = ts.createSourceFile(
+    "frontend-boundary-source.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TSX,
+  );
   const specifiers: string[] = [];
-  let match: RegExpExecArray | null;
 
-  staticImportExportPattern.lastIndex = 0;
-  while ((match = staticImportExportPattern.exec(source)) !== null) {
-    specifiers.push(match[1]);
+  for (const statement of sourceFile.statements) {
+    if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
+      specifiers.push(statement.moduleSpecifier.text);
+      continue;
+    }
+
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.moduleSpecifier !== undefined &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      specifiers.push(statement.moduleSpecifier.text);
+    }
   }
 
   return specifiers;
@@ -323,6 +339,23 @@ function addFeatureToFeatureViolation(
 }
 
 describe("frontend architecture boundaries", () => {
+  it("parses static side-effect, value, type, and export-from specifiers without crossing statements", () => {
+    const source = `
+      import "@/styles/global.css";
+      const shouldNotBeCollected = "from \\"@/crossed/line\\"";
+      import { normalImport } from "@/features/reader/normal-import";
+      import type { ReaderModel } from "@/features/reader/model";
+      export { readerHelper } from "@/shared/lib/reader-helper";
+    `;
+
+    expect(parseStaticImportSpecifiers(source)).toEqual([
+      "@/styles/global.css",
+      "@/features/reader/normal-import",
+      "@/features/reader/model",
+      "@/shared/lib/reader-helper",
+    ]);
+  });
+
   it("keeps shared, feature model, and feature UI dependencies inside their allowed boundaries", () => {
     assertLegacyBoundaryExceptionsAreUnique();
 
