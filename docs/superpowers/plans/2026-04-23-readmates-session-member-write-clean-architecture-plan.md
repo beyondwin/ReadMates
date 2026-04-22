@@ -1981,7 +1981,7 @@ Expected: commit succeeds if code changed. If Step 3 did not change files, skip 
 - Create: `server/src/test/kotlin/com/readmates/architecture/SessionCleanArchitectureBoundaryTest.kt`
 - Modify: `server/build.gradle.kts`
 
-- [ ] **Step 1: Add ArchUnit dependency**
+- [x] **Step 1: Add ArchUnit dependency**
 
 Modify `server/build.gradle.kts` test dependencies:
 
@@ -1989,7 +1989,7 @@ Modify `server/build.gradle.kts` test dependencies:
 testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
 ```
 
-- [ ] **Step 2: Create boundary test**
+- [x] **Step 2: Create boundary test**
 
 Create `server/src/test/kotlin/com/readmates/architecture/SessionCleanArchitectureBoundaryTest.kt`:
 
@@ -2048,7 +2048,7 @@ class SessionCleanArchitectureBoundaryTest {
 }
 ```
 
-- [ ] **Step 3: Run boundary test and verify it passes**
+- [x] **Step 3: Run boundary test and verify it passes**
 
 Run:
 
@@ -2058,7 +2058,7 @@ Run:
 
 Expected: PASS. If it fails because a temporary bridge still references moved web DTOs from application, move those DTO-compatible models into `session.application.model` and update the bridge before committing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 
