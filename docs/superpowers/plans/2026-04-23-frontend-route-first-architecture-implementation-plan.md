@@ -158,7 +158,7 @@ Enforced restrictions:
 
 **Files:** none expected.
 
-- [ ] **Step 1: Confirm dirty files**
+- [x] **Step 1: Confirm dirty files**
 
 Run:
 
@@ -168,7 +168,7 @@ git status --short --untracked-files=all
 
 Expected: unrelated dirty files may match the dirty worktree guardrails above. Do not clean or revert them.
 
-- [ ] **Step 2: Run frontend baseline checks**
+- [x] **Step 2: Run frontend baseline checks**
 
 Run:
 
@@ -180,7 +180,7 @@ pnpm --dir front build
 
 Expected: PASS. If a check fails before architecture edits, add a `Baseline Failures` section to this plan with command output summary and continue only after the user confirms whether to fix baseline failures first.
 
-- [ ] **Step 3: Record current large-file targets**
+- [x] **Step 3: Record current large-file targets**
 
 Run:
 
@@ -196,11 +196,11 @@ Expected: output confirms the largest refactoring targets. Do not edit files in 
 
 ### Baseline Failures
 
-Captured on 2026-04-23 during Task 0:
+Captured on 2026-04-23 during Task 0 and resolved on rerun:
 
-- `pnpm --dir front lint`: failed before linting because `eslint` was not found. pnpm reported `front/node_modules` is missing.
-- `pnpm --dir front test`: failed before running tests because `vitest` was not found. pnpm reported `front/node_modules` is missing.
-- `pnpm --dir front build`: failed before building because `vite` was not found. pnpm reported `front/node_modules` is missing.
+- Initial `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build` failures were caused by missing frontend dependencies in `front/node_modules`.
+- `pnpm --dir front install --frozen-lockfile` restored dependencies without lockfile changes.
+- After installing dependencies, `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build` all passed.
 
 ## Task 1: Add Frontend Dependency Boundary Test
 
