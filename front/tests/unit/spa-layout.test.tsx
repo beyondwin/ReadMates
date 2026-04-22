@@ -359,7 +359,7 @@ describe("SPA AppRouteLayout", () => {
       </AuthProvider>,
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent("불러오는 중");
+    expect(screen.getByRole("status")).toHaveTextContent("멤버 화면을 확인하는 중");
     expect(document.querySelector(".rm-route-loading--member")).toBeInTheDocument();
     expect(document.querySelector(".rm-loading-member-desk")).toBeInTheDocument();
     expect(screen.queryByText("member child")).not.toBeInTheDocument();
