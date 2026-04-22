@@ -96,8 +96,12 @@ describe("MobileHeader route titles and actions", () => {
 
     const sides = container.querySelectorAll(".m-hdr-side");
     expect(sides).toHaveLength(2);
-    expect(container.querySelector(".m-hdr-side--right")).toHaveTextContent("멤버 화면으로");
+    expect(container.querySelector(".m-hdr-side--right")).toHaveTextContent(/^멤버$/);
+    expect(screen.getByText("호스트")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveTextContent(/^오늘$/);
+    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveTextContent(/^멤버$/);
   });
 
   it("renders the public session mobile title and authenticated entry action", async () => {
@@ -180,7 +184,9 @@ describe("MobileHeader route titles and actions", () => {
     renderAt("/app", <MobileHeader variant="member" showHostEntry />);
 
     expect(screen.getByText("읽는사이")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
+    const hostEntry = screen.getByRole("link", { name: "호스트 화면" });
+    expect(hostEntry).toHaveAttribute("href", "/app/host");
+    expect(hostEntry).toHaveTextContent(/^운영$/);
   });
 
   it("renders host editor pages with a host back link", () => {
@@ -188,7 +194,9 @@ describe("MobileHeader route titles and actions", () => {
 
     expect(screen.getByText("세션")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
-    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+    const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
+    expect(memberReturn).toHaveAttribute("href", "/app");
+    expect(memberReturn).toHaveTextContent(/^멤버$/);
   });
 
   it("renders the host new session route as the session editor title", () => {
@@ -196,14 +204,18 @@ describe("MobileHeader route titles and actions", () => {
 
     expect(screen.getByText("세션")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
-    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+    const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
+    expect(memberReturn).toHaveAttribute("href", "/app");
+    expect(memberReturn).toHaveTextContent(/^멤버$/);
   });
 
   it("keeps host record routes in host mobile chrome with member return", () => {
     renderAt("/app/archive", <MobileHeader variant="host" />);
 
     expect(screen.getByText("기록")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+    const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
+    expect(memberReturn).toHaveAttribute("href", "/app");
+    expect(memberReturn).toHaveTextContent(/^멤버$/);
     expect(screen.queryByRole("link", { name: "뒤로" })).not.toBeInTheDocument();
   });
 
