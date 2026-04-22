@@ -1,3 +1,1 @@
-export function logout() {
-  return fetch("/api/bff/api/auth/logout", { method: "POST" });
-}
+export { logout } from "@/features/auth/api/auth-api";

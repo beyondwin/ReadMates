@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedbackDocumentPage, {
   FeedbackDocumentUnavailablePage,
-} from "@/features/feedback/components/feedback-document-page";
+} from "@/features/feedback/ui/feedback-document-page";
 import { feedbackDocumentContractFixture } from "./api-contract-fixtures";
 
 afterEach(() => {

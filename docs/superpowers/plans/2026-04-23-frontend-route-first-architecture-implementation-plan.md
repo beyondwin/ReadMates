@@ -780,19 +780,19 @@ git commit -m "refactor: route archive feature through feature modules"
   - `front/src/pages/feedback-document.tsx`
   - `front/src/pages/feedback-print.tsx`
 
-- [ ] **Step 1: Convert public routes**
+- [x] **Step 1: Convert public routes**
 
 Move public contracts, endpoint calls, display fallbacks, and route data loading into public feature modules.
 
-- [ ] **Step 2: Convert auth routes**
+- [x] **Step 2: Convert auth routes**
 
 Move invite preview, login/dev-login, reset-password gone state, pending approval loader, and logout helpers into auth feature modules. Keep OAuth redirect URLs unchanged.
 
-- [ ] **Step 3: Convert feedback routes**
+- [x] **Step 3: Convert feedback routes**
 
 Move feedback document contracts, endpoint calls, display model, and print route data into feedback feature modules.
 
-- [ ] **Step 4: Run checks**
+- [x] **Step 4: Run checks**
 
 ```bash
 pnpm --dir front test -- public-home.test.tsx public-club.test.tsx public-records-page.test.tsx public-session-page.test.tsx login-card.test.tsx invite-acceptance-card.test.tsx pending-approval.test.tsx feedback-document-page.test.tsx feedback-document-route.test.tsx frontend-boundaries.test.ts
@@ -801,7 +801,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 10**
+- [x] **Step 5: Commit Task 10**
 
 ```bash
 git add front/features/public front/features/auth front/features/feedback front/src/pages front/tests/unit

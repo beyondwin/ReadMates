@@ -1,9 +1,24 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedbackDocumentRoutePage from "@/src/pages/feedback-document";
 import FeedbackDocumentPrintRoutePage from "@/src/pages/feedback-print";
+import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
+import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
 
 afterEach(() => {
   cleanup();
@@ -30,17 +45,26 @@ function renderFeedbackRoute(
   path: string | { pathname: string; state?: unknown },
   printMode = false,
 ) {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route
-          path="/app/feedback/:sessionId"
-          element={printMode ? <FeedbackDocumentPrintRoutePage /> : <FeedbackDocumentRoutePage />}
-        />
-        <Route path="/app/feedback/:sessionId/print" element={<FeedbackDocumentPrintRoutePage />} />
-      </Routes>
-    </MemoryRouter>,
+  installRouterRequestShim();
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/feedback/:sessionId",
+        element: printMode ? <FeedbackDocumentPrintRoutePage /> : <FeedbackDocumentRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+      },
+      {
+        path: "/app/feedback/:sessionId/print",
+        element: <FeedbackDocumentPrintRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+      },
+    ],
+    { initialEntries: [path] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 function LocationStateEcho() {
@@ -56,14 +80,21 @@ function LocationStateEcho() {
 }
 
 function renderFeedbackReturnFlow(path: string | { pathname: string; state?: unknown }) {
-  render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/app/feedback/:sessionId" element={<FeedbackDocumentRoutePage />} />
-        <Route path="/app/sessions/:sessionId" element={<LocationStateEcho />} />
-      </Routes>
-    </MemoryRouter>,
+  installRouterRequestShim();
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/feedback/:sessionId",
+        element: <FeedbackDocumentRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+      },
+      { path: "/app/sessions/:sessionId", element: <LocationStateEcho /> },
+    ],
+    { initialEntries: [path] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 describe("Feedback document routes", () => {

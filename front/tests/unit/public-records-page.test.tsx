@@ -1,10 +1,25 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PublicRecordsPage from "@/src/pages/public-records";
+import { publicClubLoader } from "@/features/public/route/public-route-data";
+import { PublicRouteError } from "@/features/public/route/public-route-state";
 
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
 
 function LocationStateEcho() {
   const location = useLocation();
@@ -19,15 +34,22 @@ function LocationStateEcho() {
 }
 
 function renderRecordsRoute() {
-  render(
-    <MemoryRouter initialEntries={["/records"]}>
-      <Routes>
-        <Route path="/records" element={<PublicRecordsPage />} />
-        <Route path="/sessions/:sessionId" element={<LocationStateEcho />} />
-        <Route path="/about" element={<main>about target</main>} />
-      </Routes>
-    </MemoryRouter>,
+  installRouterRequestShim();
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/records",
+        element: <PublicRecordsPage />,
+        loader: publicClubLoader,
+        errorElement: <PublicRouteError />,
+      },
+      { path: "/sessions/:sessionId", element: <LocationStateEcho /> },
+      { path: "/about", element: <main>about target</main> },
+    ],
+    { initialEntries: ["/records"] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 afterEach(() => {

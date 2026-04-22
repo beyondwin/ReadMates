@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import PublicHome from "@/features/public/components/public-home";
-import type { PublicClubResponse } from "@/shared/api/readmates";
+import PublicHome from "@/features/public/ui/public-home";
+import type { PublicClubResponse } from "@/features/public/api/public-contracts";
 
 afterEach(cleanup);
 
