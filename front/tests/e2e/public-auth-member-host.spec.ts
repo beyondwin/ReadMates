@@ -28,17 +28,17 @@ test.afterEach(() => {
 
 test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("세상을 읽는 시간.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "읽는사이", level: 1 })).toBeVisible();
 
   await page.goto("/login");
-  await expect(page.getByRole("link", { name: "Google로 계속하기" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Google로 멤버 공간 열기" })).toBeVisible();
   await expect(page.getByLabel("비밀번호", { exact: true })).toHaveCount(0);
 
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app/host");
   await expect(
-    page.locator("main.rm-host-dashboard-desktop").getByRole("heading", { name: "운영 대시보드" }),
+    page.locator("main.rm-host-dashboard-desktop").getByRole("heading", { name: "운영 원장" }),
   ).toBeVisible();
 
   await installPrintSpy(page);

@@ -1,6 +1,4 @@
 "use client";
-
-import { Link } from "@/src/app/router-link";
 import {
   type ChangeEvent,
   type CSSProperties,
@@ -18,6 +16,12 @@ import {
 } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
 import { SessionIdentity } from "@/shared/ui/session-identity";
+import {
+  hostDashboardReturnTarget,
+  readmatesReturnState,
+  type ReadmatesReturnTarget,
+} from "@/src/app/route-continuity";
+import { Link } from "@/src/app/router-link";
 import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { HostSessionFeedbackUpload } from "./host-session-feedback-upload";
@@ -41,6 +45,7 @@ const operationOrder = [
 type MobileEditorSection = "basic" | "publish" | "attendance" | "report";
 type PublicationMode = "internal" | "draft" | "public";
 type PublicationAction = "draft" | "public";
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 type PublicationFeedback = {
   tone: "success" | "error";
@@ -98,7 +103,13 @@ type AttendanceWriteState = {
   queuedStatus: AttendanceStatus | null;
 };
 
-export default function HostSessionEditor({ session }: { session?: HostSessionDetailResponse | null }) {
+export default function HostSessionEditor({
+  session,
+  returnTarget = hostDashboardReturnTarget,
+}: {
+  session?: HostSessionDetailResponse | null;
+  returnTarget?: ReadmatesReturnTarget;
+}) {
   const [title, setTitle] = useState(session?.title ?? "7회차 모임 · ");
   const [bookTitle, setBookTitle] = useState(session?.bookTitle ?? "");
   const [bookAuthor, setBookAuthor] = useState(session?.bookAuthor ?? "");
@@ -113,6 +124,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
   const [summary, setSummary] = useState(session?.publication?.publicSummary ?? "");
   const [publicationActionInFlight, setPublicationActionInFlight] = useState<PublicationAction | null>(null);
   const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [activeMobileSection, setActiveMobileSection] = useState<MobileEditorSection>("basic");
   const [attendanceStatuses, setAttendanceStatuses] =
     useState<Record<string, AttendanceStatus>>(() => initialAttendanceStatuses(session?.attendees));
@@ -139,9 +151,17 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
   const isNewSession = session === null || session === undefined;
   const editorTitle = isNewSession ? "새 세션 만들기" : "이번 세션 편집";
   const primarySaveLabel = isNewSession ? "새 세션 만들기" : "변경 사항 저장";
+  const saveButtonLabel = saveState === "saving" ? "저장 중..." : primarySaveLabel;
   const saveGuidance = isNewSession
     ? "세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다."
     : "세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.";
+  const feedbackPreviewState = session
+    ? readmatesReturnState({
+        href: `/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`,
+        label: "세션 편집으로",
+        state: readmatesReturnState(returnTarget),
+      })
+    : undefined;
 
   const flash = (message: string) => {
     setToast(message);
@@ -223,6 +243,11 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (saveState === "saving") {
+      return;
+    }
+
+    setSaveState("saving");
     const payload = buildHostSessionRequest({
       title,
       bookTitle,
@@ -235,18 +260,25 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
       date,
       startTime: time,
     }, session ?? undefined);
-    const response = await readmatesFetchResponse(session ? `/api/host/sessions/${session.sessionId}` : "/api/host/sessions", {
-      method: session ? "PATCH" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const response = await readmatesFetchResponse(session ? `/api/host/sessions/${session.sessionId}` : "/api/host/sessions", {
+        method: session ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    if (response.ok) {
-      globalThis.location.href = "/app/session/current";
-      return;
+      if (response.ok) {
+        setSaveState("saved");
+        globalThis.location.href = "/app/session/current";
+        return;
+      }
+
+      setSaveState("error");
+      flash("저장에 실패했습니다");
+    } catch {
+      setSaveState("error");
+      flash("저장에 실패했습니다");
     }
-
-    flash("저장에 실패했습니다");
   };
 
   const savePublication = async (action: PublicationAction) => {
@@ -435,11 +467,11 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
       <section className="page-header-compact">
         <div className="container">
           <div className="row-between" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
-            <div>
-              <Link to="/app/host" className="btn btn-quiet btn-sm" style={{ marginLeft: "-10px", marginBottom: "10px" }}>
-                ← 운영 대시보드
-              </Link>
-              <div className="eyebrow">{isNewSession ? "새 세션" : `현재 세션 · No.${session.sessionNumber}`}</div>
+              <div>
+                <Link to={returnTarget.href} state={returnTarget.state} className="btn btn-quiet btn-sm" style={{ marginBottom: 14 }}>
+                  {returnTarget.label}
+                </Link>
+              <div className="eyebrow">세션 운영 문서 · {isNewSession ? "새 세션" : `No.${session.sessionNumber}`}</div>
               <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
                 {editorTitle}
               </h1>
@@ -460,15 +492,34 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                 )}
               </div>
               <div className="small" style={{ marginTop: "8px" }}>
-                {session ? `${session.title}의 정보, 공개 설정, 출석 확정, 피드백 문서를 한곳에서.` : "새 세션의 기본 정보를 등록합니다."}
+                {session
+                  ? `${session.title}의 책, 일정, 링크, 출석, 공개 설정, 피드백 문서를 한 문서에서 관리합니다.`
+                  : "새 세션의 책, 일정, 장소, 링크를 먼저 등록합니다."}
+              </div>
+              <div
+                className="tiny"
+                id="host-session-save-state"
+                role={saveState === "idle" ? undefined : saveState === "error" ? "alert" : "status"}
+                style={{ marginTop: "8px", color: saveState === "error" ? "var(--danger)" : "var(--text-3)" }}
+              >
+                {saveState === "saving"
+                  ? "기본 정보를 저장하고 있습니다."
+                  : saveState === "saved"
+                    ? "저장되었습니다. 현재 세션으로 이동합니다."
+                    : saveState === "error"
+                      ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
+                      : "기본 정보 저장, 공개 발행, 피드백 문서 업로드는 각각 별도로 처리됩니다."}
               </div>
             </div>
             <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
-              <button className="btn btn-ghost" type="button" onClick={() => flash("초안이 저장되었습니다")}>
-                초안 저장
-              </button>
-              <button className="btn btn-primary" type="submit" form="host-session-editor">
-                {primarySaveLabel}
+              <button
+                className="btn btn-primary"
+                type="submit"
+                form="host-session-editor"
+                disabled={saveState === "saving"}
+                aria-describedby="host-session-save-state"
+              >
+                {saveButtonLabel}
               </button>
             </div>
           </div>
@@ -515,8 +566,8 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
               style={{ "--stack": "28px" } as CSSProperties}
             >
               <Panel
-                eyebrow="기본 정보"
-                title="기본 정보"
+                eyebrow="책 · 세션 identity"
+                title="책과 세션 이름"
                 mobileSection="basic"
                 panelId="host-editor-panel-basic-info"
                 activeMobileSection={activeMobileSection}
@@ -594,8 +645,8 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
               </Panel>
 
               <Panel
-                eyebrow="일정"
-                title="일정"
+                eyebrow="일정 · 장소 · 링크"
+                title="일정과 참여 링크"
                 mobileSection="basic"
                 panelId="host-editor-panel-basic-schedule"
                 activeMobileSection={activeMobileSection}
@@ -678,13 +729,13 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                   </div>
                 </div>
                 <div className="marginalia" style={{ marginTop: "12px" }}>
-                  ※ 일정 변경 시 멤버에게 이메일 안내가 자동 발송됩니다.
+                  일정과 링크는 저장 즉시 멤버 홈과 현재 세션 화면에 반영됩니다. 자동 안내 발송은 아직 연결되지 않았습니다.
                 </div>
               </Panel>
 
               <Panel
-                eyebrow="공개 설정 · 민감"
-                title="공개 설정"
+                eyebrow="공개 · 발행 controls"
+                title="공개 기록 발행"
                 tone="warn"
                 mobileSection="publish"
                 panelId="host-editor-panel-publish"
@@ -733,7 +784,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                     </div>
                   </div>
                   {!session ? (
-                    <div className="marginalia">
+                    <div id="publication-disabled-reason" className="marginalia">
                       세션을 만든 뒤 공개 요약 초안 저장과 공개 기록 발행을 사용할 수 있습니다.
                     </div>
                   ) : null}
@@ -766,6 +817,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                     type="button"
                     className="btn btn-ghost"
                     disabled={!session || publicationActionInFlight !== null}
+                    aria-describedby={!session ? "publication-disabled-reason" : undefined}
                     onClick={() => void savePublication("draft")}
                   >
                     {publicationActionInFlight === "draft" ? "저장 중..." : "요약 초안 저장"}
@@ -774,6 +826,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                     type="button"
                     className="btn btn-primary"
                     disabled={!session || publicationActionInFlight !== null}
+                    aria-describedby={!session ? "publication-disabled-reason" : undefined}
                     onClick={() => void savePublication("public")}
                   >
                     {publicationActionInFlight === "public" ? "발행 중..." : "공개 기록 발행"}
@@ -797,8 +850,8 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
               </Panel>
 
               <Panel
-                eyebrow="출석 확정"
-                title="출석 확정"
+                eyebrow="참석 roster"
+                title="출석 확정 roster"
                 mobileSection="attendance"
                 panelId="host-editor-panel-attendance"
                 activeMobileSection={activeMobileSection}
@@ -814,7 +867,7 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
 
               <Panel
                 eyebrow="피드백 문서 · 민감"
-                title="회차 피드백 문서"
+                title="피드백 문서"
                 tone="warn"
                 mobileSection="report"
                 panelId="host-editor-panel-report"
@@ -825,12 +878,20 @@ export default function HostSessionEditor({ session }: { session?: HostSessionDe
                   feedbackDocument={{ uploaded: feedbackDocument.uploaded, fileName: feedbackDocument.fileName }}
                   inputRef={feedbackDocumentInputRef}
                   emptyMessage={emptyManagementMessage}
+                  previewState={feedbackPreviewState}
                   onUploadFeedbackDocument={uploadFeedbackDocument}
                 />
               </Panel>
             </form>
 
             <aside className="stack rm-host-session-editor__aside" style={{ "--stack": "20px" } as CSSProperties}>
+              <DocumentStatePanel
+                session={session}
+                saveState={saveState}
+                publicationMode={publicationMode}
+                feedbackDocumentUploaded={feedbackDocument.uploaded}
+              />
+
               <div className="surface" style={{ padding: "22px" }}>
                 <div className="eyebrow" style={{ marginBottom: "10px" }}>
                   저장 안내
@@ -961,4 +1022,98 @@ function Panel({
       {children}
     </section>
   );
+}
+
+function DocumentStatePanel({
+  session,
+  saveState,
+  publicationMode,
+  feedbackDocumentUploaded,
+}: {
+  session?: HostSessionDetailResponse | null;
+  saveState: SaveState;
+  publicationMode: PublicationMode;
+  feedbackDocumentUploaded: boolean;
+}) {
+  const rows = [
+    {
+      label: "문서 상태",
+      value: session ? sessionStateLabel(session.state) : "새 세션 초안",
+      className: sessionStateBadgeClass(session?.state),
+    },
+    {
+      label: "기본 정보",
+      value: saveState === "saving" ? "저장 중" : saveState === "error" ? "저장 실패" : session ? "저장됨" : "저장 전",
+      className: saveState === "error" ? "badge badge-warn badge-dot" : saveState === "saving" ? "badge badge-accent badge-dot" : "badge",
+    },
+    {
+      label: "공개 기록",
+      value: publicationMode === "public" ? "발행됨" : publicationMode === "draft" ? "초안 저장" : "미공개",
+      className: publicationMode === "public" ? "badge badge-ok badge-dot" : publicationMode === "draft" ? "badge badge-accent badge-dot" : "badge",
+    },
+    {
+      label: "피드백",
+      value: feedbackDocumentUploaded ? "문서 등록" : "미등록",
+      className: feedbackDocumentUploaded ? "badge badge-ok badge-dot" : "badge",
+    },
+    {
+      label: "참석 roster",
+      value: session ? `${session.attendees.length}명` : "세션 저장 후",
+      className: session?.attendees.length ? "badge badge-ok badge-dot" : "badge",
+    },
+  ];
+
+  return (
+    <div className="rm-document-panel" style={{ padding: "22px" }}>
+      <div className="eyebrow" style={{ marginBottom: "10px" }}>
+        문서 상태
+      </div>
+      <div className="stack" style={{ "--stack": "9px" } as CSSProperties}>
+        {rows.map((row) => (
+          <div key={row.label} className="row-between" style={{ gap: 12 }}>
+            <span className="small" style={{ color: "var(--text-2)" }}>
+              {row.label}
+            </span>
+            <span className={row.className}>{row.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function sessionStateLabel(state?: HostSessionDetailResponse["state"]) {
+  if (state === "OPEN") {
+    return "열림";
+  }
+
+  if (state === "PUBLISHED") {
+    return "공개됨";
+  }
+
+  if (state === "CLOSED") {
+    return "닫힘";
+  }
+
+  if (state === "DRAFT") {
+    return "초안";
+  }
+
+  return "저장 전";
+}
+
+function sessionStateBadgeClass(state?: HostSessionDetailResponse["state"]) {
+  if (state === "OPEN") {
+    return "badge badge-accent badge-dot";
+  }
+
+  if (state === "PUBLISHED") {
+    return "badge badge-ok badge-dot";
+  }
+
+  if (state === "CLOSED") {
+    return "badge badge-warn badge-dot";
+  }
+
+  return "badge";
 }

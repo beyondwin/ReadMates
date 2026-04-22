@@ -55,11 +55,13 @@ describe("HostInvitations", () => {
   it("renders invitation list statuses and actions", () => {
     render(<HostInvitations initialInvitations={invitations} />);
 
-    expect(screen.getByText("멤버 초대")).toBeInTheDocument();
+    expect(screen.getByText("초대 파이프라인")).toBeInTheDocument();
+    expect(screen.getByText("초대 생성, 대기 링크, 사용됨, 만료/취소 상태를 같은 원장에서 확인합니다.")).toBeInTheDocument();
     expect(screen.getByText("pending@example.com")).toBeInTheDocument();
     expect(screen.getByText("대기 멤버")).toBeInTheDocument();
     expect(screen.getByText("accepted@example.com")).toBeInTheDocument();
     expect(screen.getByText("수락 멤버")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
     expect(screen.getByText("대기 · 만료 2026.05.20")).toBeInTheDocument();
     expect(screen.getByText("수락됨 · 만료 2026.05.20")).toBeInTheDocument();
     expect(screen.getByLabelText("수락하면 이번 세션에도 추가")).toBeChecked();
@@ -129,6 +131,10 @@ describe("HostInvitations", () => {
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
 
     await waitFor(() => expect(screen.getByDisplayValue("http://localhost:3000/invite/raw-token")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "메일로 공유" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("mailto:new%40example.com"),
+    );
     await user.click(screen.getByRole("button", { name: "초대 링크 복사" }));
 
     expect(fetchMock).toHaveBeenCalledWith(

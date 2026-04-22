@@ -55,6 +55,15 @@ const currentSessionLabels: Record<SessionParticipationStatus, string> = {
   REMOVED: "이번 세션 제외됨",
 };
 
+const statusBadgeLabels: Record<MembershipStatus, string> = {
+  INVITED: "초대됨",
+  VIEWER: "둘러보기",
+  ACTIVE: "활성",
+  SUSPENDED: "정지",
+  LEFT: "탈퇴",
+  INACTIVE: "비활성",
+};
+
 function memberMeta(member: HostMemberListItem) {
   const sessionLabel = member.currentSessionParticipationStatus
     ? currentSessionLabels[member.currentSessionParticipationStatus]
@@ -69,6 +78,48 @@ function requestMeta(member: HostMemberListItem) {
 function joinedMeta(member: HostMemberListItem) {
   const joined = member.joinedAt ? `참여 ${formatDateOnlyLabel(member.joinedAt)}` : `요청 ${formatDateOnlyLabel(member.createdAt)}`;
   return `${member.email} · ${statusLabels[member.status]} · ${joined}`;
+}
+
+function statusBadgeClass(status: MembershipStatus) {
+  if (status === "ACTIVE") {
+    return "badge badge-ok badge-dot";
+  }
+
+  if (status === "VIEWER" || status === "INVITED") {
+    return "badge badge-accent badge-dot";
+  }
+
+  if (status === "SUSPENDED") {
+    return "badge badge-warn badge-dot";
+  }
+
+  return "badge";
+}
+
+function currentSessionBadge(member: HostMemberListItem) {
+  if (member.currentSessionParticipationStatus === "ACTIVE") {
+    return { label: "이번 세션 참여", className: "badge badge-ok badge-dot" };
+  }
+
+  if (member.currentSessionParticipationStatus === "REMOVED") {
+    return { label: "이번 세션 제외", className: "badge badge-warn badge-dot" };
+  }
+
+  return { label: "이번 세션 미포함", className: "badge" };
+}
+
+function disabledCurrentSessionReason(member: HostMemberListItem, isParticipating: boolean) {
+  if (isParticipating) {
+    return member.role === "HOST"
+      ? "호스트는 현재 세션에서 제외할 수 없습니다."
+      : "이 멤버는 현재 정책상 이번 세션에서 제외할 수 없습니다.";
+  }
+
+  if (member.status !== "ACTIVE") {
+    return "정식 활성 멤버만 이번 세션에 추가할 수 있습니다.";
+  }
+
+  return "현재 세션이 없거나 이미 다음 세션부터 반영되도록 처리되었습니다.";
 }
 
 function actionKey(member: HostMemberListItem, action: string) {
@@ -121,6 +172,14 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
     [members],
   );
   const viewerMembers = useMemo(() => members.filter((member) => member.status === "VIEWER"), [members]);
+  const currentSessionParticipants = useMemo(
+    () => activeMembers.filter((member) => member.currentSessionParticipationStatus === "ACTIVE"),
+    [activeMembers],
+  );
+  const activeMembersOutsideCurrentSession = useMemo(
+    () => activeMembers.filter((member) => member.currentSessionParticipationStatus !== "ACTIVE"),
+    [activeMembers],
+  );
 
   const openDialog = (nextDialog: Exclude<LifecycleDialog, null>, trigger: HTMLElement) => {
     dialogTriggerRef.current = trigger;
@@ -239,6 +298,34 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
 
   return (
     <div className="stack" style={{ "--stack": "18px" } as CSSProperties}>
+      <section
+        className="rm-document-panel"
+        aria-label="멤버 운영 요약"
+        style={{ padding: "18px 22px" }}
+      >
+        <div className="eyebrow" style={{ marginBottom: 12 }}>
+          멤버 상태 원장
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(128px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <MemberCount label="둘러보기" value={viewerMembers.length} helper="둘러보기 멤버" tone={viewerMembers.length > 0 ? "accent" : "default"} />
+          <MemberCount label="활성" value={activeMembers.length} helper="정식 멤버" tone="ok" />
+          <MemberCount label="이번 세션" value={currentSessionParticipants.length} helper="참여 중" tone="ok" />
+          <MemberCount
+            label="미포함"
+            value={activeMembersOutsideCurrentSession.length}
+            helper="활성 중 미참여"
+            tone={activeMembersOutsideCurrentSession.length > 0 ? "warn" : "default"}
+          />
+          <MemberCount label="정지" value={suspendedMembers.length} helper="쓰기 제한" tone={suspendedMembers.length > 0 ? "warn" : "default"} />
+        </div>
+      </section>
+
       <div
         role="tablist"
         aria-label="멤버 관리"
@@ -283,6 +370,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
           <MemberList
             members={activeMembers}
             emptyText="활성 멤버가 없습니다."
+            sectionDescription="정식 멤버입니다. 이번 세션 참여 여부와 정지/탈퇴 처리를 함께 관리합니다."
             renderMeta={memberMeta}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
@@ -316,6 +404,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
           <MemberList
             members={viewerMembers}
             emptyText="둘러보기 멤버가 없습니다."
+            sectionDescription="Google로 들어온 둘러보기 멤버입니다. 정식 멤버로 승인하거나 둘러보기 상태를 해제합니다."
             renderMeta={requestMeta}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
@@ -348,6 +437,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
           <MemberList
             members={suspendedMembers}
             emptyText="정지된 멤버가 없습니다."
+            sectionDescription="정지된 멤버는 기록은 보존되지만 새 RSVP, 질문, 체크인, 리뷰 작성이 제한됩니다."
             renderMeta={joinedMeta}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
@@ -380,6 +470,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
           <MemberList
             members={inactiveMembers}
             emptyText="탈퇴 또는 비활성 멤버가 없습니다."
+            sectionDescription="탈퇴/비활성 멤버의 과거 기록은 보존되고 새 참여는 열리지 않습니다."
             renderMeta={joinedMeta}
             renderActions={() => <span className="badge">기록 보존</span>}
           />
@@ -435,33 +526,48 @@ function CurrentSessionAction({
   const enabled = isParticipating ? member.canRemoveFromCurrentSession : member.canAddToCurrentSession;
   const label = isParticipating ? "이번 세션 제외" : "이번 세션 추가";
   const rowPending = isMembershipPending(member.membershipId, pendingActions);
+  const reasonId = `current-session-action-reason-${member.membershipId}`;
+  const reason = !enabled ? disabledCurrentSessionReason(member, isParticipating) : null;
 
   return (
-    <button
-      className="btn btn-ghost btn-sm"
-      type="button"
-      disabled={!enabled || rowPending}
-      onClick={() => void onSubmit(member, path)}
-    >
-      {label}
-    </button>
+    <span style={{ display: "inline-grid", gap: 4, justifyItems: "end" }}>
+      <button
+        className="btn btn-ghost btn-sm"
+        type="button"
+        disabled={!enabled || rowPending}
+        aria-describedby={reason ? reasonId : undefined}
+        onClick={() => void onSubmit(member, path)}
+      >
+        {label}
+      </button>
+      {reason ? (
+        <span id={reasonId} className="tiny" style={{ maxWidth: 180, color: "var(--text-3)", textAlign: "right" }}>
+          {reason}
+        </span>
+      ) : null}
+    </span>
   );
 }
 
 function MemberList({
   members,
   emptyText,
+  sectionDescription,
   renderMeta,
   renderActions,
 }: {
   members: HostMemberListItem[];
   emptyText: string;
+  sectionDescription: string;
   renderMeta: (member: HostMemberListItem) => string;
   renderActions: (member: HostMemberListItem) => ReactNode;
 }) {
   if (members.length === 0) {
     return (
       <div className="surface" style={{ padding: 28 }}>
+        <p className="small" style={{ color: "var(--text-2)", margin: "0 0 10px" }}>
+          {sectionDescription}
+        </p>
         <p className="body" style={{ margin: 0 }}>
           {emptyText}
         </p>
@@ -471,6 +577,9 @@ function MemberList({
 
   return (
     <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
+      <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+        {sectionDescription}
+      </p>
       {members.map((member) => (
         <article key={member.membershipId} className="surface" style={{ padding: "18px 22px" }}>
           <div className="row-between" style={{ alignItems: "center", gap: 18, flexWrap: "wrap" }}>
@@ -479,6 +588,8 @@ function MemberList({
                 <h2 className="h4 editorial" style={{ margin: 0 }}>
                   {member.displayName}
                 </h2>
+                <span className={statusBadgeClass(member.status)}>{statusBadgeLabels[member.status]}</span>
+                <span className={currentSessionBadge(member).className}>{currentSessionBadge(member).label}</span>
                 {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
               </div>
               <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>
@@ -491,6 +602,41 @@ function MemberList({
           </div>
         </article>
       ))}
+    </div>
+  );
+}
+
+function MemberCount({
+  label,
+  value,
+  helper,
+  tone,
+}: {
+  label: string;
+  value: number;
+  helper: string;
+  tone: "ok" | "warn" | "accent" | "default";
+}) {
+  const className =
+    tone === "ok"
+      ? "badge badge-ok badge-dot"
+      : tone === "warn"
+        ? "badge badge-warn badge-dot"
+        : tone === "accent"
+          ? "badge badge-accent badge-dot"
+          : "badge";
+
+  return (
+    <div className="surface-quiet" style={{ padding: "12px 14px" }}>
+      <div className="row-between" style={{ gap: 8 }}>
+        <span className="body" style={{ fontSize: "13px", fontWeight: 600 }}>
+          {label}
+        </span>
+        <span className={className}>{value}</span>
+      </div>
+      <div className="tiny" style={{ marginTop: 4 }}>
+        {helper}
+      </div>
     </div>
   );
 }

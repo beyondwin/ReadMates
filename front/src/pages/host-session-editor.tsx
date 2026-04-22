@@ -1,17 +1,23 @@
 import { useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import HostSessionEditor from "@/features/host/components/host-session-editor";
 import type { HostSessionDetailResponse } from "@/shared/api/readmates";
 import { readmatesFetch } from "@/shared/api/readmates";
+import { hostDashboardReturnTarget, readReadmatesReturnTarget } from "@/src/app/route-continuity";
 import { useReadmatesData } from "./readmates-page-data";
 import { ReadmatesPageState } from "./readmates-page";
 
 export function NewHostSessionPage() {
-  return <HostSessionEditor />;
+  const location = useLocation();
+  const returnTarget = readReadmatesReturnTarget(location.state, hostDashboardReturnTarget);
+
+  return <HostSessionEditor returnTarget={returnTarget} />;
 }
 
 export default function EditHostSessionPage() {
   const sessionId = useParams().sessionId;
+  const location = useLocation();
+  const returnTarget = readReadmatesReturnTarget(location.state, hostDashboardReturnTarget);
   const state = useReadmatesData(
     useCallback(() => {
       if (!sessionId) {
@@ -21,5 +27,5 @@ export default function EditHostSessionPage() {
     }, [sessionId]),
   );
 
-  return <ReadmatesPageState state={state}>{(session) => <HostSessionEditor session={session} />}</ReadmatesPageState>;
+  return <ReadmatesPageState state={state}>{(session) => <HostSessionEditor session={session} returnTarget={returnTarget} />}</ReadmatesPageState>;
 }
