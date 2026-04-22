@@ -11,6 +11,7 @@ import { saveCheckin } from "@/features/current-session/actions/save-checkin";
 import { saveQuestion, saveQuestions } from "@/features/current-session/actions/save-question";
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
 import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
+import { currentSessionAction } from "@/features/current-session/route/current-session-route";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -143,5 +144,29 @@ describe("current session actions", () => {
     await expect(saveCheckin(10, "expired")).rejects.toThrow("ReadMates session expired");
 
     expect(assignMock).toHaveBeenCalledWith("/login");
+  });
+
+  it.each([
+    ["rsvp", { intent: "rsvp", status: "GOING" }],
+    ["checkin", { intent: "checkin", readingProgress: 35, note: "blocked" }],
+    ["questions", { intent: "questions", questions: [{ text: "blocked question" }] }],
+    ["longReview", { intent: "longReview", body: "blocked review" }],
+    ["oneLineReview", { intent: "oneLineReview", text: "blocked line" }],
+  ])("returns failed backend responses from the %s route action", async (_intent, payload) => {
+    const failureBody = { code: "CURRENT_SESSION_WRITE_REJECTED", message: "Cannot write current session data." };
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(failureBody, { status: 409 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = new Request("https://readmates.test/app/session/current", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await currentSessionAction({ request } as Parameters<typeof currentSessionAction>[0]);
+
+    expect(result).toBeInstanceOf(Response);
+    const response = result as Response;
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual(failureBody);
   });
 });

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLoaderData, useRevalidator, type ActionFunctionArgs } from "react-router-dom";
+import { redirect, useLoaderData, useRevalidator, type ActionFunctionArgs } from "react-router-dom";
 import {
   getCurrentSession,
   saveCurrentSessionCheckin,
@@ -12,6 +12,7 @@ import type { RsvpStatus } from "@/features/current-session/api/current-session-
 import CurrentSession from "@/features/current-session/components/current-session";
 import { readmatesFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/api/readmates";
+import { canUseMemberApp } from "@/shared/auth/member-app-access";
 
 const READMATES_ROUTE_REFRESH_EVENT = "readmates:route-refresh";
 
@@ -33,16 +34,31 @@ export type CurrentSessionRouteData = {
 };
 
 export async function currentSessionLoader(): Promise<CurrentSessionRouteData> {
-  const [auth, current] = await Promise.all([
-    readmatesFetch<AuthMeResponse>("/api/auth/me"),
-    getCurrentSession(),
-  ]);
+  const auth = await readmatesFetch<AuthMeResponse>("/api/auth/me");
+
+  if (!auth.authenticated) {
+    throw redirect("/login");
+  }
+
+  if (!canUseMemberApp(auth)) {
+    return { auth, current: { currentSession: null } };
+  }
+
+  const current = await getCurrentSession();
 
   return { auth, current };
 }
 
 function badRequest(message: string) {
   return Response.json({ ok: false, message }, { status: 400 });
+}
+
+function mutationResponse(response: Response) {
+  if (!response.ok) {
+    return response;
+  }
+
+  return Response.json({ ok: true });
 }
 
 function isCurrentSessionActionIntent(intent: unknown): intent is CurrentSessionActionIntent {
@@ -127,8 +143,8 @@ export async function currentSessionAction({ request }: ActionFunctionArgs) {
       return badRequest("Invalid RSVP status.");
     }
 
-    await updateCurrentSessionRsvp(payload.status);
-    return Response.json({ ok: true });
+    const response = await updateCurrentSessionRsvp(payload.status);
+    return mutationResponse(response);
   }
 
   if (payload.intent === "checkin") {
@@ -137,8 +153,8 @@ export async function currentSessionAction({ request }: ActionFunctionArgs) {
       return badRequest("Invalid reading progress.");
     }
 
-    await saveCurrentSessionCheckin(readingProgress, stringValue(payload.note));
-    return Response.json({ ok: true });
+    const response = await saveCurrentSessionCheckin(readingProgress, stringValue(payload.note));
+    return mutationResponse(response);
   }
 
   if (payload.intent === "questions") {
@@ -147,17 +163,17 @@ export async function currentSessionAction({ request }: ActionFunctionArgs) {
       return badRequest("Invalid questions payload.");
     }
 
-    await saveCurrentSessionQuestions(questions);
-    return Response.json({ ok: true });
+    const response = await saveCurrentSessionQuestions(questions);
+    return mutationResponse(response);
   }
 
   if (payload.intent === "longReview") {
-    await saveCurrentSessionLongReview(stringValue(payload.body));
-    return Response.json({ ok: true });
+    const response = await saveCurrentSessionLongReview(stringValue(payload.body));
+    return mutationResponse(response);
   }
 
-  await saveCurrentSessionOneLineReview(stringValue(payload.text));
-  return Response.json({ ok: true });
+  const response = await saveCurrentSessionOneLineReview(stringValue(payload.text));
+  return mutationResponse(response);
 }
 
 export function CurrentSessionRoute() {

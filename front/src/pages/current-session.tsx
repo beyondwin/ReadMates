@@ -1,6 +1,1 @@
-export {
-  CurrentSessionRouteError,
-  currentSessionAction,
-  currentSessionLoader,
-  CurrentSessionRoute as default,
-} from "@/features/current-session";
+export { CurrentSessionRoute as default } from "@/features/current-session";
