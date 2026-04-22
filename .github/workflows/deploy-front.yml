@@ -3,20 +3,41 @@ name: Deploy Front
 on:
   workflow_dispatch:
 
-permissions: {}
+permissions:
+  contents: read
+  deployments: write
 
 jobs:
   deploy:
-    name: Trigger Cloudflare Pages
+    name: Deploy Cloudflare Pages
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front
     steps:
-      - name: Trigger deploy hook
-        run: |
-          if [ -z "${CLOUDFLARE_PAGES_DEPLOY_HOOK_URL:-}" ]; then
-            echo "::error::Missing CLOUDFLARE_PAGES_DEPLOY_HOOK_URL repository secret."
-            exit 1
-          fi
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-          curl --fail --silent --show-error --request POST "$CLOUDFLARE_PAGES_DEPLOY_HOOK_URL"
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+
+      - name: Set up pnpm
+        run: npm install --global pnpm@10.33.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Deploy to Cloudflare Pages
+        run: |
+          npx --yes wrangler@4.84.1 pages deploy dist \
+            --project-name readmates \
+            --branch main \
+            --commit-dirty=false
         env:
-          CLOUDFLARE_PAGES_DEPLOY_HOOK_URL: ${{ secrets.CLOUDFLARE_PAGES_DEPLOY_HOOK_URL }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
