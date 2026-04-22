@@ -10,7 +10,6 @@ import type {
   NoteFeedItem,
   NoteSessionItem,
 } from "@/features/archive/api/archive-contracts";
-import { selectNoteSession } from "@/features/archive/model/notes-feed-model";
 
 export type ArchiveListRouteData = {
   sessions: ArchiveSessionItem[];
@@ -24,12 +23,6 @@ export type MyPageRouteData = {
   reports: FeedbackDocumentListItem[];
   questionCount: number;
   reviewCount: number;
-};
-
-export type NotesFeedRouteData = {
-  noteSessions: NoteSessionItem[];
-  selectedSession: NoteSessionItem | null;
-  items: NoteFeedItem[];
 };
 
 function jsonRequest(init: Omit<RequestInit, "headers" | "body">, body: unknown): RequestInit {
@@ -112,14 +105,6 @@ export async function loadMyPageRouteData(): Promise<MyPageRouteData> {
   ]);
 
   return { data, reports, questionCount: questions.length, reviewCount: reviews.length };
-}
-
-export async function loadNotesFeedRouteData(requestedSessionId: string | null): Promise<NotesFeedRouteData> {
-  const noteSessions = await fetchNoteSessions();
-  const selectedSession = selectNoteSession(noteSessions, requestedSessionId);
-  const items = selectedSession ? await fetchNotesFeed(selectedSession.sessionId) : [];
-
-  return { noteSessions, selectedSession, items };
 }
 
 export async function leaveMembership(currentSessionPolicy: CurrentSessionPolicy = "APPLY_NOW") {

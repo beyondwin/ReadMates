@@ -106,12 +106,39 @@ describe("MemberSessionDetailPage", () => {
     installRouterRequestShim();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(readableSession), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      ),
+      vi.fn((input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url === "/api/bff/api/auth/me") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                authenticated: true,
+                userId: "member-user",
+                membershipId: "member-membership",
+                clubId: "club-id",
+                email: "member@example.com",
+                displayName: "이멤버5",
+                shortName: "멤버",
+                role: "MEMBER",
+                membershipStatus: "ACTIVE",
+                approvalState: "ACTIVE",
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+
+        return Promise.resolve(
+          new Response(JSON.stringify(readableSession), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
     );
 
     const router = createMemoryRouter(
@@ -148,12 +175,39 @@ describe("MemberSessionDetailPage", () => {
     installRouterRequestShim();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify(readableSession), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }),
-      ),
+      vi.fn((input: RequestInfo | URL) => {
+        const url = input.toString();
+
+        if (url === "/api/bff/api/auth/me") {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                authenticated: true,
+                userId: "member-user",
+                membershipId: "member-membership",
+                clubId: "club-id",
+                email: "member@example.com",
+                displayName: "이멤버5",
+                shortName: "멤버",
+                role: "MEMBER",
+                membershipStatus: "ACTIVE",
+                approvalState: "ACTIVE",
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+
+        return Promise.resolve(
+          new Response(JSON.stringify(readableSession), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }),
     );
 
     const router = createMemoryRouter(

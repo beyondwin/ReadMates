@@ -5,7 +5,7 @@ import {
   useLocation,
   type LinkProps as RouterLinkProps,
 } from "react-router-dom";
-import { rememberReadmatesArchiveScroll } from "@/features/archive/model/archive-model";
+import { rememberReadmatesArchiveScroll } from "@/features/archive/ui/archive-route-continuity";
 
 type ArchiveLinkProps = Omit<RouterLinkProps, "to"> & {
   to: string;

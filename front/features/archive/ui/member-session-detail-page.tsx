@@ -7,12 +7,8 @@ import type {
   MemberArchiveOneLinerItem,
   MemberArchiveQuestionItem,
   MemberArchiveSessionDetailResponse,
-  ReadmatesReturnTarget,
 } from "@/features/archive/model/archive-model";
 import {
-  appFeedbackHref,
-  appSessionHref,
-  archiveSessionsReturnTarget,
   attendanceText,
   feedbackAccessCopy,
   feedbackBadgeClass,
@@ -22,10 +18,16 @@ import {
   hasClubRecords,
   hasMyRecords,
   myRecordSummary,
-  readmatesReturnState,
   sessionNo,
 } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
+import {
+  appFeedbackHref,
+  appSessionHref,
+  archiveSessionsReturnTarget,
+  readmatesReturnState,
+  type ReadmatesReturnTarget,
+} from "@/features/archive/ui/archive-route-continuity";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
