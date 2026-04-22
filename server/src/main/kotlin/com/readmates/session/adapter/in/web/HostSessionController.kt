@@ -1,16 +1,16 @@
-package com.readmates.session.api
+package com.readmates.session.adapter.`in`.web
 
-import com.readmates.auth.application.MemberAccountRepository
-import com.readmates.session.application.SessionRepository
+import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.UpdateHostSessionCommand
+import com.readmates.session.application.port.`in`.ManageHostSessionUseCase
 import com.readmates.shared.security.CurrentMember
-import com.readmates.shared.security.emailOrNull
 import jakarta.validation.Valid
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -69,6 +69,23 @@ data class HostSessionRequest(
     fun effectiveStartTime(): String = startTime ?: "20:00"
 
     fun effectiveEndTime(): String = endTime ?: "22:00"
+
+    fun toCommand(host: CurrentMember): HostSessionCommand =
+        HostSessionCommand(
+            host = host,
+            title = title,
+            bookTitle = bookTitle,
+            bookAuthor = bookAuthor,
+            bookLink = bookLink,
+            bookImageUrl = bookImageUrl,
+            date = date,
+            startTime = startTime,
+            endTime = endTime,
+            questionDeadlineAt = questionDeadlineAt,
+            locationLabel = locationLabel,
+            meetingUrl = meetingUrl,
+            meetingPasscode = meetingPasscode,
+        )
 }
 
 private fun isHttpsUrlOrBlank(value: String?): Boolean {
@@ -87,46 +104,45 @@ private fun isHttpsUrlOrBlank(value: String?): Boolean {
 @RestController
 @RequestMapping("/api/host/sessions")
 class HostSessionController(
-    private val memberAccountRepository: MemberAccountRepository,
-    private val sessionRepository: SessionRepository,
+    private val manageHostSessionUseCase: ManageHostSessionUseCase,
 ) {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
-        authentication: Authentication?,
         @Valid @RequestBody request: HostSessionRequest,
-    ) = sessionRepository.createOpenSession(currentMember(authentication), request)
+        member: CurrentMember,
+    ) = manageHostSessionUseCase.create(request.toCommand(member))
 
     @GetMapping("/{sessionId}")
     fun detail(
-        authentication: Authentication?,
+        member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = sessionRepository.findHostSession(currentMember(authentication), parseHostSessionId(sessionId))
+    ) = manageHostSessionUseCase.detail(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @PatchMapping("/{sessionId}")
     fun update(
-        authentication: Authentication?,
         @PathVariable sessionId: String,
         @Valid @RequestBody request: HostSessionRequest,
-    ) = sessionRepository.updateHostSession(currentMember(authentication), parseHostSessionId(sessionId), request)
+        member: CurrentMember,
+    ) = manageHostSessionUseCase.update(
+        UpdateHostSessionCommand(
+            host = member,
+            sessionId = parseHostSessionId(sessionId),
+            session = request.toCommand(member),
+        ),
+    )
 
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
-        authentication: Authentication?,
+        member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = sessionRepository.previewOpenSessionDeletion(currentMember(authentication), parseHostSessionId(sessionId))
+    ) = manageHostSessionUseCase.deletionPreview(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @DeleteMapping("/{sessionId}")
     fun delete(
-        authentication: Authentication?,
+        member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = sessionRepository.deleteOpenHostSession(currentMember(authentication), parseHostSessionId(sessionId))
-
-    private fun currentMember(authentication: Authentication?): CurrentMember {
-        val email = authentication.emailOrNull() ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        return memberAccountRepository.findActiveMemberByEmail(email)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-    }
+    ) = manageHostSessionUseCase.delete(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 }
 
 internal fun parseHostSessionId(sessionId: String): UUID =
