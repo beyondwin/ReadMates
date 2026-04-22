@@ -859,7 +859,7 @@ git commit -m "test: verify polished mobile chrome in app shell"
 - Read: `docs/development/test-guide.md`
 - No source edits expected.
 
-- [ ] **Step 1: Run lint**
+- [x] **Step 1: Run lint**
 
 Run:
 
@@ -875,7 +875,7 @@ eslint .
 
 and exit code `0`.
 
-- [ ] **Step 2: Run unit tests**
+- [x] **Step 2: Run unit tests**
 
 Run:
 
@@ -892,7 +892,7 @@ Tests       ... passed
 
 and exit code `0`.
 
-- [ ] **Step 3: Build the frontend**
+- [x] **Step 3: Build the frontend**
 
 Run:
 
@@ -909,7 +909,7 @@ vite build
 
 and exit code `0`.
 
-- [ ] **Step 4: Run focused E2E**
+- [x] **Step 4: Run focused E2E**
 
 Run:
 
@@ -923,7 +923,7 @@ Expected:
 4 passed
 ```
 
-- [ ] **Step 5: Inspect mobile routes in browser**
+- [x] **Step 5: Inspect mobile routes in browser**
 
 Use Playwright or the existing browse tool at these viewport sizes:
 
@@ -956,7 +956,7 @@ Expected visual result:
 - Member home content has visible top and side breathing room.
 - Bottom tab does not cover the final content.
 
-- [ ] **Step 6: Commit verification evidence if screenshots are saved**
+- [x] **Step 6: Commit verification evidence if screenshots are saved**
 
 If screenshots or evidence files are intentionally saved under `.tmp`, do not commit them. If a project-owned docs evidence file is added, commit it with:
 
@@ -966,6 +966,15 @@ git commit -m "docs: record mobile chrome verification"
 ```
 
 If no docs evidence file is created, do not make a verification-only commit.
+
+Task 6 verification evidence:
+
+- `pnpm --dir front lint`: PASS.
+- `pnpm --dir front test`: PASS, 43 files and 407 tests.
+- `pnpm --dir front build`: PASS, with the existing Vite chunk-size warning for `index-BqbUMHp2.js`.
+- `pnpm --dir front test:e2e -- front/tests/e2e/responsive-navigation-chrome.spec.ts`: PASS, 4 Playwright tests.
+- Mobile visual QA: PASS across 360x812, 390x844, and 430x932 for `/app`, `/app/session/current`, `/app/notes`, `/app/me`, `/app/host`, `/app/host/sessions/new`, `/app/host/members`, and `/app/archive`.
+- Temporary screenshots and contact sheets were saved under `front/.tmp/task6-mobile-chrome-visual-qa/` and intentionally not committed.
 
 ---
 
