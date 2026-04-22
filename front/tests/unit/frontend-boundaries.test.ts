@@ -8,7 +8,7 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const sourceRoots = ["src", "features", "shared"];
 const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
 
-type BoundaryRuleId = "shared-boundary" | "feature-to-feature" | "feature-model" | "feature-ui";
+type BoundaryRuleId = "shared-boundary" | "feature-to-feature" | "feature-model" | "feature-route" | "feature-ui";
 
 const legacyBoundaryExceptions = [
   {
@@ -202,6 +202,10 @@ function isFeatureUiFile(relativePath: string) {
   return /^features\/[^/]+\/ui\//.test(relativePath);
 }
 
+function isFeatureRouteFile(relativePath: string) {
+  return /^features\/[^/]+\/route\//.test(relativePath);
+}
+
 function legacyExceptionKey(sourcePath: string, importPath: string, ruleId: BoundaryRuleId) {
   return `${sourcePath} -> ${importPath} [${ruleId}]`;
 }
@@ -301,6 +305,14 @@ function isFeatureUiBoundaryImport(sourceFile: SourceFile, projectPath: string |
   );
 }
 
+function isFeatureRouteBoundaryImport(sourceFile: SourceFile, projectPath: string | null) {
+  if (!isFeatureRouteFile(sourceFile.relativePath) || projectPath === null) {
+    return false;
+  }
+
+  return projectPath.startsWith("src/pages/") || projectPath.startsWith("src/app/");
+}
+
 function getDifferentImportedFeatureName(sourceFile: SourceFile, projectPath: string | null) {
   if (projectPath === null) {
     return null;
@@ -391,7 +403,7 @@ describe("frontend architecture boundaries", () => {
     expect(isSharedToFeaturePageOrAppImport(sourceFile, importSpecifier.projectPath)).toBe(true);
   });
 
-  it("keeps shared, feature model, and feature UI dependencies inside their allowed boundaries", () => {
+  it("keeps shared, feature route, feature model, and feature UI dependencies inside their allowed boundaries", () => {
     assertLegacyBoundaryExceptionsAreUnique();
 
     const violations: string[] = [];
@@ -436,6 +448,17 @@ describe("frontend architecture boundaries", () => {
             importSpecifier,
             "feature-ui",
             "feature UI files must receive data and callbacks from route/API boundaries.",
+          );
+        }
+
+        if (isFeatureRouteBoundaryImport(sourceFile, importSpecifier.projectPath)) {
+          addImportViolation(
+            violations,
+            consumedLegacyExceptions,
+            sourceFile,
+            importSpecifier,
+            "feature-route",
+            "feature route files must receive app/page dependencies from app route composition.",
           );
         }
       }

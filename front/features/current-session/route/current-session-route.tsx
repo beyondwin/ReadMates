@@ -5,20 +5,47 @@ import { saveQuestions } from "@/features/current-session/actions/save-question"
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
 import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
 import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
+import type { CurrentSessionInternalLinkProps, InternalLinkComponent } from "@/features/current-session/ui/current-session-types";
 import { loadCurrentSessionRouteData, type CurrentSessionRouteData } from "@/features/current-session/route/current-session-data";
-import { requestReadmatesRouteRefresh } from "@/src/pages/readmates-page-data";
 
 const READMATES_ROUTE_REFRESH_EVENT = "readmates:route-refresh";
 
+function requestCurrentSessionRouteRefresh() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(READMATES_ROUTE_REFRESH_EVENT));
+  }
+}
+
+function AnchorInternalLink({ href, children, ...props }: CurrentSessionInternalLinkProps) {
+  return (
+    <a {...props} href={href}>
+      {children}
+    </a>
+  );
+}
+
+async function requireSuccessfulSave(responsePromise: Promise<Response>, message: string) {
+  const response = await responsePromise;
+
+  if (!response.ok) {
+    throw new Error(message);
+  }
+}
+
 const currentSessionSaveActions = {
-  updateRsvp,
-  saveCheckin,
-  saveQuestions,
-  saveLongReview,
-  saveOneLineReview,
+  updateRsvp: (status) => requireSuccessfulSave(updateRsvp(status), "RSVP update failed"),
+  saveCheckin: (readingProgress, note) =>
+    requireSuccessfulSave(saveCheckin(readingProgress, note), "Checkin save failed"),
+  saveQuestions: (questions) => requireSuccessfulSave(saveQuestions(questions), "Questions save failed"),
+  saveLongReview: (body) => requireSuccessfulSave(saveLongReview(body), "Long review save failed"),
+  saveOneLineReview: (text) => requireSuccessfulSave(saveOneLineReview(text), "One-line review save failed"),
 } satisfies CurrentSessionSaveActions;
 
-export function CurrentSessionRoute() {
+export function CurrentSessionRoute({
+  internalLinkComponent = AnchorInternalLink,
+}: {
+  internalLinkComponent?: InternalLinkComponent;
+}) {
   const loaderData = useLoaderData() as CurrentSessionRouteData;
   const [routeDataState, setRouteDataState] = useState(() => ({
     loaderData,
@@ -63,7 +90,8 @@ export function CurrentSessionRoute() {
         auth={loaderData.auth}
         data={loaderData.current}
         actions={currentSessionSaveActions}
-        onSaveSuccess={requestReadmatesRouteRefresh}
+        internalLinkComponent={internalLinkComponent}
+        onSaveSuccess={requestCurrentSessionRouteRefresh}
       />
     );
   }
@@ -73,7 +101,8 @@ export function CurrentSessionRoute() {
       auth={routeDataState.routeData.auth}
       data={routeDataState.routeData.current}
       actions={currentSessionSaveActions}
-      onSaveSuccess={requestReadmatesRouteRefresh}
+      internalLinkComponent={internalLinkComponent}
+      onSaveSuccess={requestCurrentSessionRouteRefresh}
     />
   );
 }

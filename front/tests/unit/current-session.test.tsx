@@ -7,7 +7,11 @@ import { saveQuestions } from "@/features/current-session/actions/save-question"
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
 import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
 import { CurrentSessionPage, type CurrentSessionSaveActions } from "@/features/current-session/ui/current-session-page";
-import type { CurrentSessionAuth, CurrentSessionPageData } from "@/features/current-session/ui/current-session-types";
+import type {
+  CurrentSessionAuth,
+  CurrentSessionInternalLinkProps,
+  CurrentSessionPageData,
+} from "@/features/current-session/ui/current-session-types";
 import { CurrentSessionRoute, currentSessionLoader } from "@/features/current-session";
 import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
 import { currentSessionContractFixture } from "./api-contract-fixtures";
@@ -62,13 +66,29 @@ const routeAuthFixture = {
   approvalState: "ACTIVE",
 } satisfies AuthMeResponse;
 
+async function requireSuccessfulTestSave(responsePromise: Promise<Response>) {
+  const response = await responsePromise;
+
+  if (!response.ok) {
+    throw new Error("Current session save failed.");
+  }
+}
+
 const currentSessionTestActions = {
-  updateRsvp,
-  saveCheckin,
-  saveQuestions,
-  saveLongReview,
-  saveOneLineReview,
+  updateRsvp: (status) => requireSuccessfulTestSave(updateRsvp(status)),
+  saveCheckin: (readingProgress, note) => requireSuccessfulTestSave(saveCheckin(readingProgress, note)),
+  saveQuestions: (questions) => requireSuccessfulTestSave(saveQuestions(questions)),
+  saveLongReview: (body) => requireSuccessfulTestSave(saveLongReview(body)),
+  saveOneLineReview: (text) => requireSuccessfulTestSave(saveOneLineReview(text)),
 } satisfies CurrentSessionSaveActions;
+
+function TestInternalLink({ href, children, ...props }: CurrentSessionInternalLinkProps) {
+  return (
+    <a {...props} href={href}>
+      {children}
+    </a>
+  );
+}
 
 function CurrentSession({ auth, data }: { auth?: CurrentSessionAuth; data: CurrentSessionPageData }) {
   return (
@@ -76,6 +96,7 @@ function CurrentSession({ auth, data }: { auth?: CurrentSessionAuth; data: Curre
       auth={auth}
       data={data}
       actions={currentSessionTestActions}
+      internalLinkComponent={TestInternalLink}
       onSaveSuccess={() => window.dispatchEvent(new Event("readmates:route-refresh"))}
     />
   );
