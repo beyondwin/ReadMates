@@ -24,7 +24,7 @@ function isDevLoginEnabled() {
   );
 }
 
-export function LoginRoute() {
+export function LoginRouteContent() {
   const loginAsDevAccount = useCallback(async (email: string) => {
     const response = await submitDevLogin(email);
 
@@ -36,12 +36,18 @@ export function LoginRoute() {
   }, []);
 
   return (
+    <LoginCard
+      devAccounts={devAccounts}
+      showDevLogin={isDevLoginEnabled()}
+      onDevLogin={loginAsDevAccount}
+    />
+  );
+}
+
+export function LoginRoute() {
+  return (
     <main className="auth-shell container">
-      <LoginCard
-        devAccounts={devAccounts}
-        showDevLogin={isDevLoginEnabled()}
-        onDevLogin={loginAsDevAccount}
-      />
+      <LoginRouteContent />
     </main>
   );
 }

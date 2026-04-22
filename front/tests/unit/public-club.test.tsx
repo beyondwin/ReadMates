@@ -75,6 +75,27 @@ describe("PublicClub", () => {
     expect(container).not.toHaveTextContent("Latest");
   });
 
+  it("encodes public club session links containing spaces and slashes", () => {
+    render(
+      <PublicClub
+        data={{
+          ...publicClubFixture,
+          recentSessions: [
+            {
+              ...publicClubFixture.recentSessions[0],
+              sessionId: "session 6/slash",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole("link", { name: /가난한 찰리의 연감/ }).at(-1)).toHaveAttribute(
+      "href",
+      "/sessions/session%206%2Fslash",
+    );
+  });
+
   it("renders a neutral public introduction fallback when API about is blank", () => {
     const { container } = render(<PublicClub data={{ ...publicClubFixture, about: "   " }} />);
 

@@ -11,7 +11,7 @@ type PublicClubProps = {
 };
 
 function sessionHref(session: PublicSessionListItemView) {
-  return `/sessions/${session.sessionId}`;
+  return `/sessions/${encodeURIComponent(session.sessionId)}`;
 }
 
 function sessionDisplay(session: PublicSessionListItemView) {

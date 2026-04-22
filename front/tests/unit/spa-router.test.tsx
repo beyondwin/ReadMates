@@ -60,6 +60,7 @@ function isArchiveChildDataEndpoint(url: string) {
   return (
     url === "/api/bff/api/archive/sessions" ||
     url.startsWith("/api/bff/api/archive/sessions/") ||
+    (url.startsWith("/api/bff/api/sessions/") && url.endsWith("/feedback-document")) ||
     url === "/api/bff/api/archive/me/questions" ||
     url === "/api/bff/api/archive/me/reviews" ||
     url === "/api/bff/api/feedback-documents/me" ||
@@ -362,6 +363,8 @@ describe("SPA router", () => {
     ["/app/notes"],
     ["/app/me"],
     ["/app/sessions/session-6"],
+    ["/app/feedback/session-6"],
+    ["/app/feedback/session-6/print"],
   ])("redirects anonymous archive route navigation from %s before child data fetches", async (path) => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
@@ -391,6 +394,8 @@ describe("SPA router", () => {
     ["/app/notes"],
     ["/app/me"],
     ["/app/sessions/session-6"],
+    ["/app/feedback/session-6"],
+    ["/app/feedback/session-6/print"],
   ])("blocks inactive archive route navigation from %s before child data fetches", async (path) => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
