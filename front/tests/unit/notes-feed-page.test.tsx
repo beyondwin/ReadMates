@@ -2,11 +2,13 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
-import NotesFeedPage from "@/features/archive/components/notes-feed-page";
-import { resolveSelectedSession } from "@/features/archive/components/notes-session-filter-utils";
-import { feedFilterFromSearchParam } from "@/features/archive/components/notes-feed-filter-utils";
-import type { FeedFilter } from "@/features/archive/components/notes-feed-list";
-import type { NoteFeedItem, NoteSessionItem } from "@/shared/api/readmates";
+import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
+import {
+  feedFilterFromSearchParam,
+  resolveSelectedSession,
+  type FeedFilter,
+} from "@/features/archive/model/notes-feed-model";
+import NotesFeedPage from "@/features/archive/ui/notes-feed-page";
 
 afterEach(cleanup);
 

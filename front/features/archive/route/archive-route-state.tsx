@@ -1,7 +1,4 @@
-import type { ReactNode } from "react";
-import type { ArchiveRouteDataState } from "@/features/archive/route/archive-route-data-state";
-
-function ArchiveRouteLoading({ label }: { label: string }) {
+export function ArchiveRouteLoading({ label }: { label: string }) {
   return (
     <main className="rm-route-loading rm-route-loading--member">
       <div className="container rm-route-loading__inner">
@@ -13,7 +10,7 @@ function ArchiveRouteLoading({ label }: { label: string }) {
   );
 }
 
-function ArchiveRouteError() {
+export function ArchiveRouteError() {
   return (
     <main className="container">
       <section className="surface" style={{ margin: "48px 0", padding: 28 }}>
@@ -27,24 +24,4 @@ function ArchiveRouteError() {
       </section>
     </main>
   );
-}
-
-export function ArchiveRouteState<T>({
-  state,
-  loadingLabel,
-  children,
-}: {
-  state: ArchiveRouteDataState<T>;
-  loadingLabel: string;
-  children: (data: T) => ReactNode;
-}) {
-  if (state.status === "loading") {
-    return <ArchiveRouteLoading label={loadingLabel} />;
-  }
-
-  if (state.status === "error") {
-    return <ArchiveRouteError />;
-  }
-
-  return <>{children(state.data)}</>;
 }

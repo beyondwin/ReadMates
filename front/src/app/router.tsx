@@ -6,6 +6,17 @@ import {
   currentSessionLoader,
   type InternalLinkComponent,
 } from "@/features/current-session";
+import { archiveListLoader } from "@/features/archive/route/archive-list-data";
+import {
+  ArchiveRouteError,
+  ArchiveRouteLoading,
+} from "@/features/archive/route/archive-route-state";
+import { memberSessionDetailLoader } from "@/features/archive/route/member-session-detail-data";
+import { myPageLoader } from "@/features/archive/route/my-page-data";
+import {
+  notesFeedLoader,
+  notesFeedShouldRevalidate,
+} from "@/features/archive/route/notes-feed-data";
 import {
   HostInvitationsRoute,
   HostMembersRoute,
@@ -86,10 +97,35 @@ export const routes: RouteObject[] = [
         errorElement: <CurrentSessionRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
       },
-      { path: "notes", element: <NotesPage /> },
-      { path: "archive", element: <ArchiveRoutePage /> },
-      { path: "me", element: <MyRoutePage /> },
-      { path: "sessions/:sessionId", element: <MemberSessionDetailRoutePage /> },
+      {
+        path: "notes",
+        element: <NotesPage />,
+        loader: notesFeedLoader,
+        shouldRevalidate: notesFeedShouldRevalidate,
+        errorElement: <ArchiveRouteError />,
+        hydrateFallbackElement: <ArchiveRouteLoading label="클럽 노트를 불러오는 중" />,
+      },
+      {
+        path: "archive",
+        element: <ArchiveRoutePage />,
+        loader: archiveListLoader,
+        errorElement: <ArchiveRouteError />,
+        hydrateFallbackElement: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
+      },
+      {
+        path: "me",
+        element: <MyRoutePage />,
+        loader: myPageLoader,
+        errorElement: <ArchiveRouteError />,
+        hydrateFallbackElement: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,
+      },
+      {
+        path: "sessions/:sessionId",
+        element: <MemberSessionDetailRoutePage />,
+        loader: memberSessionDetailLoader,
+        errorElement: <ArchiveRouteError />,
+        hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+      },
       { path: "feedback/:sessionId", element: <FeedbackDocumentRoutePage /> },
       { path: "feedback/:sessionId/print", element: <FeedbackDocumentPrintRoutePage /> },
     ],

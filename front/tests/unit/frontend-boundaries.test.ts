@@ -12,13 +12,6 @@ type BoundaryRuleId = "shared-boundary" | "feature-to-feature" | "feature-model"
 
 const legacyBoundaryExceptions = [
   {
-    sourcePath: "features/archive/components/my-page.tsx",
-    importPath: "features/auth/components/logout-button",
-    ruleId: "feature-to-feature",
-    reason: "Archive page still renders the auth logout control directly.",
-    removeWhen: "Archive route owns logout via its route/app boundary.",
-  },
-  {
     sourcePath: "shared/ui/mobile-header.tsx",
     importPath: "src/app/route-continuity",
     ruleId: "shared-boundary",

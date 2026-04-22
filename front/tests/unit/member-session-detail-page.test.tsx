@@ -1,9 +1,10 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import MemberSessionDetailPage from "@/features/archive/components/member-session-detail-page";
-import type { MemberArchiveSessionDetailResponse } from "@/shared/api/readmates";
+import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
+import { memberSessionDetailLoader } from "@/features/archive/route/member-session-detail-data";
+import MemberSessionDetailPage from "@/features/archive/ui/member-session-detail-page";
 import MemberSessionDetailRoutePage from "@/src/pages/member-session";
 import { archiveSessionDetailContractFixture } from "./api-contract-fixtures";
 
@@ -13,6 +14,19 @@ afterEach(() => {
 });
 
 const readableSession: MemberArchiveSessionDetailResponse = archiveSessionDetailContractFixture;
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
 
 function renderDetail(session: MemberArchiveSessionDetailResponse = readableSession) {
   return render(<MemberSessionDetailPage session={session} />);
@@ -89,6 +103,7 @@ describe("MemberSessionDetailPage", () => {
   });
 
   it("uses archive route state for the visible return target", async () => {
+    installRouterRequestShim();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -99,9 +114,16 @@ describe("MemberSessionDetailPage", () => {
       ),
     );
 
-    const { container } = render(
-      <MemoryRouter
-        initialEntries={[
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/app/sessions/:sessionId",
+          element: <MemberSessionDetailRoutePage />,
+          loader: memberSessionDetailLoader,
+        },
+      ],
+      {
+        initialEntries: [
           {
             pathname: "/app/sessions/session-1",
             state: {
@@ -109,13 +131,10 @@ describe("MemberSessionDetailPage", () => {
               readmatesReturnLabel: "아카이브로",
             },
           },
-        ]}
-      >
-        <Routes>
-          <Route path="/app/sessions/:sessionId" element={<MemberSessionDetailRoutePage />} />
-        </Routes>
-      </MemoryRouter>,
+        ],
+      },
     );
+    const { container } = render(<RouterProvider router={router} />);
 
     expect((await screen.findAllByText("팩트풀니스")).length).toBeGreaterThan(0);
     expect(getDesktop(container).getByRole("link", { name: "아카이브로" })).toHaveAttribute(
@@ -126,6 +145,7 @@ describe("MemberSessionDetailPage", () => {
 
   it("passes session-detail return state to feedback actions while preserving archive return state", async () => {
     const user = userEvent.setup();
+    installRouterRequestShim();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -136,9 +156,17 @@ describe("MemberSessionDetailPage", () => {
       ),
     );
 
-    const { container } = render(
-      <MemoryRouter
-        initialEntries={[
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/app/sessions/:sessionId",
+          element: <MemberSessionDetailRoutePage />,
+          loader: memberSessionDetailLoader,
+        },
+        { path: "/app/feedback/:sessionId", element: <LocationStateEcho /> },
+      ],
+      {
+        initialEntries: [
           {
             pathname: "/app/sessions/session-1",
             state: {
@@ -146,14 +174,10 @@ describe("MemberSessionDetailPage", () => {
               readmatesReturnLabel: "아카이브로",
             },
           },
-        ]}
-      >
-        <Routes>
-          <Route path="/app/sessions/:sessionId" element={<MemberSessionDetailRoutePage />} />
-          <Route path="/app/feedback/:sessionId" element={<LocationStateEcho />} />
-        </Routes>
-      </MemoryRouter>,
+        ],
+      },
     );
+    const { container } = render(<RouterProvider router={router} />);
 
     expect((await screen.findAllByText("팩트풀니스")).length).toBeGreaterThan(0);
 

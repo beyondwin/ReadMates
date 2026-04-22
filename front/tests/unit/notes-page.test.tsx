@@ -1,8 +1,9 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { NoteFeedItem, NoteSessionItem } from "@/shared/api/readmates";
+import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
 import type { FeedFilter } from "@/features/archive/model/notes-feed-model";
+import { notesFeedLoader } from "@/features/archive/route/notes-feed-data";
 import NotesPage from "@/src/pages/notes";
 
 const { notesFeedPageMock } = vi.hoisted(() => ({
@@ -81,6 +82,19 @@ function jsonResponse(body: unknown) {
   });
 }
 
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
 function mockNotesBff({
   sessions = noteSessions,
   feed = feedItems,
@@ -107,6 +121,7 @@ function mockNotesBff({
 }
 
 function renderNotesPage(sessionId?: string, filter?: string) {
+  installRouterRequestShim();
   const params = new URLSearchParams();
 
   if (sessionId) {
@@ -119,11 +134,18 @@ function renderNotesPage(sessionId?: string, filter?: string) {
 
   const search = params.toString();
 
-  render(
-    <MemoryRouter initialEntries={[`/app/notes${search ? `?${search}` : ""}`]}>
-      <NotesPage />
-    </MemoryRouter>,
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/notes",
+        element: <NotesPage />,
+        loader: notesFeedLoader,
+      },
+    ],
+    { initialEntries: [`/app/notes${search ? `?${search}` : ""}`] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 async function latestNotesProps() {

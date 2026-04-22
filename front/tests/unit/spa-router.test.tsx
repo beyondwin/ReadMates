@@ -299,6 +299,7 @@ describe("SPA router", () => {
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/archive"] });
 
     render(
