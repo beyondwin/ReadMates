@@ -11,7 +11,7 @@ import { saveCheckin } from "@/features/current-session/actions/save-checkin";
 import { saveQuestion, saveQuestions } from "@/features/current-session/actions/save-question";
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
 import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
-import { currentSessionAction } from "@/features/current-session/route/current-session-route";
+import { currentSessionAction } from "@/features/current-session/route/current-session-data";
 
 afterEach(() => {
   vi.unstubAllGlobals();

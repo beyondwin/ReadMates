@@ -210,6 +210,43 @@ describe("SPA router", () => {
     expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
   });
 
+  it("blocks disallowed authenticated current session navigation without fetching current session data", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "inactive-user",
+            membershipId: "inactive-membership",
+            clubId: "club-id",
+            email: "inactive@example.com",
+            displayName: "비활성 멤버",
+            shortName: "비활성",
+            role: "MEMBER",
+            membershipStatus: "INACTIVE",
+            approvalState: "INACTIVE",
+          }),
+        );
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
+  });
+
   it("renders the archive session list when viewer feedback documents are forbidden", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
