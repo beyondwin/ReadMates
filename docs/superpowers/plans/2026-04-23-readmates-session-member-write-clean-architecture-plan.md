@@ -869,7 +869,7 @@ Expected: commit succeeds.
   - `server/src/test/kotlin/com/readmates/note/api/QuestionControllerTest.kt`
   - `server/src/test/kotlin/com/readmates/note/api/ReviewControllerTest.kt`
 
-- [ ] **Step 1: Move controller files**
+- [x] **Step 1: Move controller files**
 
 Run:
 
@@ -888,7 +888,7 @@ git mv server/src/main/kotlin/com/readmates/note/api/ReviewController.kt \
 
 Expected: files are moved.
 
-- [ ] **Step 2: Replace `RsvpController` content**
+- [x] **Step 2: Replace `RsvpController` content**
 
 Edit `server/src/main/kotlin/com/readmates/session/adapter/in/web/RsvpController.kt`:
 
@@ -933,7 +933,7 @@ class RsvpController(
 }
 ```
 
-- [ ] **Step 3: Replace `CheckinController` content**
+- [x] **Step 3: Replace `CheckinController` content**
 
 Edit `server/src/main/kotlin/com/readmates/note/adapter/in/web/CheckinController.kt`:
 
@@ -981,7 +981,7 @@ class CheckinController(
 }
 ```
 
-- [ ] **Step 4: Replace `QuestionController` content**
+- [x] **Step 4: Replace `QuestionController` content**
 
 Edit `server/src/main/kotlin/com/readmates/note/adapter/in/web/QuestionController.kt`:
 
@@ -1064,7 +1064,7 @@ class QuestionController(
 }
 ```
 
-- [ ] **Step 5: Replace `ReviewController` content**
+- [x] **Step 5: Replace `ReviewController` content**
 
 Edit `server/src/main/kotlin/com/readmates/note/adapter/in/web/ReviewController.kt`:
 
@@ -1120,7 +1120,7 @@ class ReviewController(
 }
 ```
 
-- [ ] **Step 6: Update test package declarations**
+- [x] **Step 6: Update test package declarations**
 
 Edit these test files so their package declarations match moved controllers:
 
@@ -1140,7 +1140,7 @@ for `CheckinControllerTest.kt`, `QuestionControllerTest.kt`, and `ReviewControll
 
 Do not move DB integration tests in this task; their package can remain as-is because they hit HTTP routes through MockMvc.
 
-- [ ] **Step 7: Run member write controller tests**
+- [x] **Step 7: Run member write controller tests**
 
 Run:
 
@@ -1155,7 +1155,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 Run:
 
