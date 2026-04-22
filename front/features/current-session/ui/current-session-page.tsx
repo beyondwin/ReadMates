@@ -21,7 +21,9 @@ import {
 import type {
   CurrentSessionAuth,
   CurrentSession,
+  CurrentSessionInternalLinkProps,
   CurrentSessionPageData,
+  InternalLinkComponent,
   RsvpUpdateStatus,
   SaveScope,
   SaveState,
@@ -54,31 +56,32 @@ const emptySaveStatuses: Record<SaveScope, SaveState> = {
 };
 
 export type CurrentSessionSaveActions = {
-  updateRsvp: (status: RsvpUpdateStatus) => Promise<Response>;
-  saveCheckin: (readingProgress: number, note: string) => Promise<Response>;
-  saveQuestions: (questions: CurrentSessionQuestionPayloadItem[]) => Promise<Response>;
-  saveLongReview: (body: string) => Promise<Response>;
-  saveOneLineReview: (text: string) => Promise<Response>;
+  updateRsvp: (status: RsvpUpdateStatus) => Promise<void>;
+  saveCheckin: (readingProgress: number, note: string) => Promise<void>;
+  saveQuestions: (questions: CurrentSessionQuestionPayloadItem[]) => Promise<void>;
+  saveLongReview: (body: string) => Promise<void>;
+  saveOneLineReview: (text: string) => Promise<void>;
 };
+
+function AnchorInternalLink({ href, children, ...props }: CurrentSessionInternalLinkProps) {
+  return (
+    <a {...props} href={href}>
+      {children}
+    </a>
+  );
+}
 
 type CurrentSessionPageProps = {
   auth?: CurrentSessionAuth;
   data: CurrentSessionPageData;
-  actions?: CurrentSessionSaveActions;
+  actions: CurrentSessionSaveActions;
+  internalLinkComponent: InternalLinkComponent;
   onSaveSuccess?: () => void;
 };
 
-const noopSaveActions: CurrentSessionSaveActions = {
-  updateRsvp: () => Promise.resolve(new Response(null, { status: 204 })),
-  saveCheckin: () => Promise.resolve(new Response(null, { status: 204 })),
-  saveQuestions: () => Promise.resolve(new Response(null, { status: 204 })),
-  saveLongReview: () => Promise.resolve(new Response(null, { status: 204 })),
-  saveOneLineReview: () => Promise.resolve(new Response(null, { status: 204 })),
-};
-
-export function CurrentSessionPage({ auth, data, actions = noopSaveActions, onSaveSuccess }: CurrentSessionPageProps) {
+export function CurrentSessionPage({ auth, data, actions, internalLinkComponent, onSaveSuccess }: CurrentSessionPageProps) {
   if (data.currentSession === null) {
-    return <CurrentSessionEmpty auth={auth} />;
+    return <CurrentSessionEmpty auth={auth} internalLinkComponent={internalLinkComponent} />;
   }
 
   return (
@@ -87,6 +90,7 @@ export function CurrentSessionPage({ auth, data, actions = noopSaveActions, onSa
       session={data.currentSession}
       auth={auth}
       actions={actions}
+      internalLinkComponent={internalLinkComponent}
       onSaveSuccess={onSaveSuccess}
     />
   );
@@ -94,7 +98,13 @@ export function CurrentSessionPage({ auth, data, actions = noopSaveActions, onSa
 
 export default CurrentSessionPage;
 
-export function CurrentSessionEmpty({ auth }: { auth?: CurrentSessionAuth }) {
+export function CurrentSessionEmpty({
+  auth,
+  internalLinkComponent: InternalLink = AnchorInternalLink,
+}: {
+  auth?: CurrentSessionAuth;
+  internalLinkComponent?: InternalLinkComponent;
+}) {
   return (
     <main>
       <section className="page-header-compact" style={{ padding: "48px 0" }}>
@@ -110,9 +120,9 @@ export function CurrentSessionEmpty({ auth }: { auth?: CurrentSessionAuth }) {
               새 세션이 등록되면 RSVP, 읽기 체크인, 토론 질문, 한줄평 작업대가 열립니다.
             </p>
             {auth?.role === "HOST" ? (
-              <a href="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
+              <InternalLink href="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
                 새 세션 만들기
-              </a>
+              </InternalLink>
             ) : null}
           </div>
         </div>
@@ -125,11 +135,13 @@ export function CurrentSessionBoard({
   session,
   auth,
   actions,
+  internalLinkComponent = AnchorInternalLink,
   onSaveSuccess,
 }: {
   session: CurrentSession;
   auth?: CurrentSessionAuth;
   actions: CurrentSessionSaveActions;
+  internalLinkComponent?: InternalLinkComponent;
   onSaveSuccess?: () => void;
 }) {
   const [rsvp, setRsvp] = useState<CurrentSession["myRsvpStatus"]>(session.myRsvpStatus);
@@ -231,16 +243,11 @@ export function CurrentSessionBoard({
     void runSave("question", () => actions.saveQuestions(validQuestionPayload));
   };
 
-  const runSave = async (scope: SaveScope, operation: () => Promise<Response>) => {
+  const runSave = async (scope: SaveScope, operation: () => Promise<void>) => {
     setSaveStatus(scope, "saving");
 
     try {
-      const response = await operation();
-
-      if (!response.ok) {
-        throw new Error(`${scope} save failed`);
-      }
-
+      await operation();
       setSaveStatus(scope, "saved");
       onSaveSuccess?.();
     } catch {
@@ -257,10 +264,7 @@ export function CurrentSessionBoard({
     setRsvp(status);
     setSaveStatus("rsvp", "saving");
     void actions.updateRsvp(status)
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error("rsvp update failed");
-        }
+      .then(() => {
         setSaveStatus("rsvp", "saved");
         onSaveSuccess?.();
       })
@@ -404,6 +408,7 @@ export function CurrentSessionBoard({
         memberNotice={memberNotice}
         isHost={isHost}
         canWrite={canWrite}
+        internalLinkComponent={internalLinkComponent}
       />
 
       <main className="desktop-only rm-current-session-desktop">
@@ -532,9 +537,9 @@ export function CurrentSessionBoard({
 
                 <SessionMeta session={session} />
 
-                <FeedbackAccessPanel isViewer={isViewer} />
+                <FeedbackAccessPanel isViewer={isViewer} internalLinkComponent={internalLinkComponent} />
 
-                {isHost ? <HostContextPanel sessionId={session.sessionId} /> : null}
+                {isHost ? <HostContextPanel sessionId={session.sessionId} internalLinkComponent={internalLinkComponent} /> : null}
 
                 <RosterList session={session} />
               </aside>

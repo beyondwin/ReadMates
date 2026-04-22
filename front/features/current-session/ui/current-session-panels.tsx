@@ -5,6 +5,8 @@ import type {
   BoardHighlight,
   BoardQuestion,
   CurrentSession,
+  CurrentSessionInternalLinkProps,
+  InternalLinkComponent,
   RsvpUpdateStatus,
   SaveState,
 } from "@/features/current-session/ui/current-session-types";
@@ -22,6 +24,14 @@ const rsvpOptions: Array<{ status: RsvpUpdateStatus; label: string }> = [
   { status: "MAYBE", label: "아직 미정" },
   { status: "DECLINED", label: "불참" },
 ];
+
+function AnchorInternalLink({ href, children, ...props }: CurrentSessionInternalLinkProps) {
+  return (
+    <a {...props} href={href}>
+      {children}
+    </a>
+  );
+}
 
 function goingCount(session: CurrentSession) {
   return activeAttendees(session).filter((attendee) => attendee.rsvpStatus === "GOING").length;
@@ -373,7 +383,13 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
   );
 }
 
-export function FeedbackAccessPanel({ isViewer }: { isViewer: boolean }) {
+export function FeedbackAccessPanel({
+  isViewer,
+  internalLinkComponent: InternalLink = AnchorInternalLink,
+}: {
+  isViewer: boolean;
+  internalLinkComponent?: InternalLinkComponent;
+}) {
   const feedbackAccess = getCurrentSessionFeedbackAccessState(isViewer);
 
   return (
@@ -388,15 +404,21 @@ export function FeedbackAccessPanel({ isViewer }: { isViewer: boolean }) {
         {feedbackAccess.body}
       </p>
       {feedbackAccess.canOpenArchive ? (
-        <a href="/app/archive?view=report" className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
+        <InternalLink href="/app/archive?view=report" className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
           보존된 피드백 보기
-        </a>
+        </InternalLink>
       ) : null}
     </section>
   );
 }
 
-export function HostContextPanel({ sessionId }: { sessionId: string }) {
+export function HostContextPanel({
+  sessionId,
+  internalLinkComponent: InternalLink = AnchorInternalLink,
+}: {
+  sessionId: string;
+  internalLinkComponent?: InternalLinkComponent;
+}) {
   return (
     <section className="surface-quiet" style={{ padding: "22px" }}>
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
@@ -408,9 +430,9 @@ export function HostContextPanel({ sessionId }: { sessionId: string }) {
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
         이 화면에서는 멤버로 RSVP, 체크인, 질문, 서평을 남기고, 운영 화면에서 세션 정보와 참석 확정을 관리합니다.
       </p>
-      <a href={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
+      <InternalLink href={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
         세션 운영으로
-      </a>
+      </InternalLink>
     </section>
   );
 }

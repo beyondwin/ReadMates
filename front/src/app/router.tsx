@@ -4,9 +4,11 @@ import {
   CurrentSessionRouteError,
   currentSessionAction,
   currentSessionLoader,
+  type InternalLinkComponent,
 } from "@/features/current-session";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
+import { Link } from "@/src/app/router-link";
 import AboutPage from "@/src/pages/about";
 import AppHomePage from "@/src/pages/app-home";
 import ArchiveRoutePage from "@/src/pages/archive";
@@ -27,6 +29,14 @@ import PublicRecordsPage from "@/src/pages/public-records";
 import PublicSessionPage from "@/src/pages/public-session";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import ResetPasswordPage from "@/src/pages/reset-password";
+
+const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...props }) => {
+  return (
+    <Link {...props} to={href}>
+      {children}
+    </Link>
+  );
+};
 
 export const routes: RouteObject[] = [
   {
@@ -60,7 +70,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <AppHomePage /> },
       {
         path: "session/current",
-        element: <CurrentSessionRoute />,
+        element: <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
         loader: currentSessionLoader,
         action: currentSessionAction,
         errorElement: <CurrentSessionRouteError />,

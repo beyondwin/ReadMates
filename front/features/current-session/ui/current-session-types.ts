@@ -1,3 +1,5 @@
+import type { CSSProperties, ReactNode } from "react";
+
 export {
   SUSPENDED_MEMBER_NOTICE,
   VIEWER_MEMBER_NOTICE,
@@ -88,3 +90,12 @@ export type BoardCheckin = CurrentSession["board"]["checkins"][number];
 export type BoardHighlight = CurrentSession["board"]["highlights"][number];
 export type SaveScope = "rsvp" | "checkin" | "question" | "longReview" | "oneLineReview";
 export type SaveState = "idle" | "saving" | "saved" | "error";
+
+export type CurrentSessionInternalLinkProps = {
+  href: string;
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+};
+
+export type InternalLinkComponent = (props: CurrentSessionInternalLinkProps) => ReactNode;
