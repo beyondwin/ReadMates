@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useLoaderData, useLocation, useSearchParams } from "react-router-dom";
-import type { ArchiveListRouteData } from "@/features/archive/api/archive-api";
 import { archiveViewFromSearchParam, type ArchiveView } from "@/features/archive/model/archive-model";
+import type { ArchiveListRouteData } from "@/features/archive/route/archive-list-data";
 import ArchivePage from "@/features/archive/ui/archive-page";
 
 export function ArchiveListRoute() {
