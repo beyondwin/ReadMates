@@ -8,8 +8,8 @@ import {
   hostMembersLoader,
   hostSessionEditorLoader,
 } from "@/features/host";
-import type { HostDashboardResponse } from "@/features/host/api/host-contracts";
-import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
+import type { CurrentSessionResponse, HostDashboardResponse } from "@/features/host/api/host-contracts";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 afterEach(() => {
   cleanup();

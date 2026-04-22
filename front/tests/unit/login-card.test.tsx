@@ -1,6 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import LegacyLoginCard, { LoginCard as NamedLegacyLoginCard } from "@/features/auth/components/login-card";
 import { LoginRoute } from "@/features/auth/route/login-route";
 
 afterEach(() => {
@@ -53,25 +52,4 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("button", { name: "이멤버5" })).toBeInTheDocument();
   });
 
-  it("keeps the legacy component shim wired to dev login behavior", () => {
-    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
-
-    render(<LegacyLoginCard />);
-
-    expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toHaveAttribute(
-      "href",
-      "/oauth2/authorization/google",
-    );
-    expect(screen.getByText("Local development only")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "김호스트 · 호스트" })).toBeInTheDocument();
-  });
-
-  it("keeps the legacy named export wired to dev login behavior", () => {
-    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
-
-    render(<NamedLegacyLoginCard />);
-
-    expect(screen.getByText("Local development only")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "김호스트 · 호스트" })).toBeInTheDocument();
-  });
 });

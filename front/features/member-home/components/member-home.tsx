@@ -18,7 +18,12 @@ import {
   type AttendanceSummary,
 } from "@/features/member-home/components/member-home-records-utils";
 import { PrepCard } from "@/features/member-home/components/prep-card";
-import type { AuthMeResponse, CurrentSessionResponse, MyPageResponse, NoteFeedItem } from "@/shared/api/readmates";
+import type {
+  MemberHomeAuth as AuthMeResponse,
+  MemberHomeCurrentSessionResponse as CurrentSessionResponse,
+  MemberHomeMyPageResponse as MyPageResponse,
+  MemberHomeNoteFeedItem as NoteFeedItem,
+} from "@/features/member-home/api/member-home-contracts";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
 
 const quickLinks = [

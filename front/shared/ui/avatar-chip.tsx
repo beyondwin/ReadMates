@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { RsvpStatus } from "@/shared/api/readmates";
+import type { RsvpStatus } from "@/shared/model/readmates-types";
 import { avatarInitial } from "@/shared/ui/avatar-chip-utils";
 import { displayText } from "@/shared/ui/readmates-display";
 

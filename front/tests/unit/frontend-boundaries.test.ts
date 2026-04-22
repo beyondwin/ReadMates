@@ -7,8 +7,17 @@ import { describe, expect, it } from "vitest";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const sourceRoots = ["src", "features", "shared"];
 const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
+const featuresWithUiPublicSurface = new Set(["archive", "auth", "current-session", "feedback", "public"]);
+const removedReadmatesApiCompatibilityPath = ["shared", "api", "readmates"].join("/");
 
-type BoundaryRuleId = "shared-boundary" | "feature-to-feature" | "feature-model" | "feature-route" | "feature-ui";
+type BoundaryRuleId =
+  | "shared-boundary"
+  | "feature-to-feature"
+  | "feature-model"
+  | "feature-route"
+  | "feature-ui"
+  | "readmates-api-compat"
+  | "feature-components-public";
 
 const legacyBoundaryExceptions = [
   {
@@ -199,6 +208,18 @@ function isFeatureRouteFile(relativePath: string) {
   return /^features\/[^/]+\/route\//.test(relativePath);
 }
 
+function isFeatureRouteOrPageFile(relativePath: string) {
+  return isFeatureRouteFile(relativePath) || /^src\/pages\//.test(relativePath);
+}
+
+function getImportedFeatureComponentsName(projectPath: string | null) {
+  return projectPath === null ? null : /^features\/([^/]+)\/components(?:\/|$)/.exec(projectPath)?.[1] ?? null;
+}
+
+function isLegacyReadmatesApiImport(projectPath: string | null) {
+  return projectPath === removedReadmatesApiCompatibilityPath;
+}
+
 function legacyExceptionKey(sourcePath: string, importPath: string, ruleId: BoundaryRuleId) {
   return `${sourcePath} -> ${importPath} [${ruleId}]`;
 }
@@ -376,9 +397,9 @@ describe("frontend architecture boundaries", () => {
 
   it("collects TypeScript import-type specifiers so boundary checks can reject them", () => {
     const sourceFile: SourceFile = {
-      absolutePath: "/unused/shared/api/readmates.ts",
-      displayPath: "front/shared/api/readmates.ts",
-      relativePath: "shared/api/readmates.ts",
+      absolutePath: "/unused/shared/auth/member-app-loader.ts",
+      displayPath: "front/shared/auth/member-app-loader.ts",
+      relativePath: "shared/auth/member-app-loader.ts",
     };
     const source = `
       export type CurrentSessionCompatibility =
@@ -452,6 +473,29 @@ describe("frontend architecture boundaries", () => {
             importSpecifier,
             "feature-route",
             "feature route files must receive app/page dependencies from app route composition.",
+          );
+        }
+
+        if (isFeatureRouteOrPageFile(sourceFile.relativePath) && isLegacyReadmatesApiImport(importSpecifier.projectPath)) {
+          addImportViolation(
+            violations,
+            consumedLegacyExceptions,
+            sourceFile,
+            importSpecifier,
+            "readmates-api-compat",
+            "feature route/page files must import feature-owned API contracts instead of the removed shared readmates compatibility module.",
+          );
+        }
+
+        const importedComponentsFeature = getImportedFeatureComponentsName(importSpecifier.projectPath);
+        if (importedComponentsFeature !== null && featuresWithUiPublicSurface.has(importedComponentsFeature)) {
+          addImportViolation(
+            violations,
+            consumedLegacyExceptions,
+            sourceFile,
+            importSpecifier,
+            "feature-components-public",
+            `features/${importedComponentsFeature}/ui is the public presentation surface; do not import features/${importedComponentsFeature}/components.`,
           );
         }
       }

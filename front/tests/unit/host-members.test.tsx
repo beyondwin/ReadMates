@@ -6,7 +6,7 @@ import HostMembers, { type HostMembersActions } from "@/features/host/components
 import { hostMembersLoader } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 const members: HostMemberListItem[] = [
   {

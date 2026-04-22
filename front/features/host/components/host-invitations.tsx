@@ -5,8 +5,8 @@ import type {
   CreateHostInvitationRequest,
   HostInvitationListItem,
   HostInvitationResponse,
+  InvitationStatus,
 } from "@/features/host/api/host-contracts";
-import type { InvitationStatus } from "@/shared/api/readmates";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 const statusLabels: Record<InvitationStatus, string> = {

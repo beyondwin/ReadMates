@@ -1,9 +1,7 @@
-import type {
-  AuthMeResponse,
-  CurrentSessionResponse,
-  FeedbackDocumentResponse,
-  MemberArchiveSessionDetailResponse,
-} from "@/shared/api/readmates";
+import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
+import type { FeedbackDocumentResponse } from "@/features/feedback/api/feedback-contracts";
+import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type {
   HostInvitationListItem,
   HostMemberListItem,

@@ -9,7 +9,7 @@ import {
 } from "@/features/current-session/api/current-session-api";
 import type { RsvpStatus } from "@/features/current-session/api/current-session-contracts";
 import { readmatesFetch } from "@/shared/api/client";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { canUseMemberApp } from "@/shared/auth/member-app-access";
 
 type CurrentSessionActionIntent = "rsvp" | "checkin" | "questions" | "longReview" | "oneLineReview";
