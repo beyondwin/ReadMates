@@ -1,0 +1,9 @@
+spring:
+  flyway:
+    locations: classpath:db/mysql/migration,classpath:db/mysql/dev
+
+readmates:
+  bff-secret-required: false
+  dev:
+    login-enabled: true
+    google-oauth-auto-member-enabled: false

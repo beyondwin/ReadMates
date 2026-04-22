@@ -1,0 +1,357 @@
+import { execFileSync } from "node:child_process";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { expect, type Page } from "@playwright/test";
+
+const clubId = "00000000-0000-0000-0000-000000000001";
+const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
+
+const devGoogleSubjects: Record<string, string> = {
+  "host@example.com": "readmates-dev-google-host",
+  "member1@example.com": "readmates-dev-google-member-1",
+  "member2@example.com": "readmates-dev-google-member-2",
+  "member3@example.com": "readmates-dev-google-member-3",
+  "member4@example.com": "readmates-dev-google-member-4",
+  "member5@example.com": "readmates-dev-google-member-5",
+};
+
+function sqlString(value: string) {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+export function runMysql(sql: string) {
+  const dbPassword = process.env.READMATES_E2E_DB_PASSWORD ?? process.env.MYSQL_PWD ?? "readmates";
+
+  return execFileSync(
+    "mysql",
+    [
+      "--protocol=TCP",
+      "-h",
+      process.env.READMATES_E2E_DB_HOST ?? "127.0.0.1",
+      "-P",
+      process.env.READMATES_E2E_DB_PORT ?? "3306",
+      "-u",
+      process.env.READMATES_E2E_DB_USER ?? "readmates",
+      process.env.READMATES_E2E_DB_NAME ?? "readmates_e2e",
+      "--batch",
+      "--raw",
+      "--execute",
+      sql,
+    ],
+    {
+      env: {
+        ...process.env,
+        MYSQL_PWD: dbPassword,
+      },
+      stdio: "pipe",
+    },
+  ).toString("utf8");
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function sqlEmailList(emails: string[]) {
+  return emails.map(normalizeEmail).map(sqlString).join(", ");
+}
+
+export function setMembershipStatus(email: string, status: "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE") {
+  runMysql(`
+update memberships
+join users on users.id = memberships.user_id
+set memberships.status = ${sqlString(status)},
+    memberships.updated_at = utc_timestamp(6)
+where lower(users.email) = ${sqlString(normalizeEmail(email))}
+  and memberships.club_id = ${sqlString(clubId)};
+`);
+}
+
+export function setCurrentSessionParticipation(email: string, status: "ACTIVE" | "REMOVED") {
+  runMysql(`
+update session_participants
+join memberships on memberships.id = session_participants.membership_id
+join users on users.id = memberships.user_id
+join sessions on sessions.id = session_participants.session_id
+  and sessions.club_id = session_participants.club_id
+set session_participants.participation_status = ${sqlString(status)},
+    session_participants.updated_at = utc_timestamp(6)
+where lower(users.email) = ${sqlString(normalizeEmail(email))}
+  and sessions.club_id = ${sqlString(clubId)}
+  and sessions.state = 'OPEN';
+`);
+}
+
+function sha256Hex(value: string) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function seedGoogleSubjectCase(emails: string[]) {
+  const cases = emails
+    .map(normalizeEmail)
+    .map((email) => {
+      const subject = devGoogleSubjects[email];
+      if (!subject) {
+        return null;
+      }
+      return `when ${sqlString(email)} then ${sqlString(subject)}`;
+    })
+    .filter(Boolean)
+    .join("\n      ");
+
+  return cases
+    ? `case lower(email)
+      ${cases}
+      else coalesce(google_subject_id, concat('readmates-e2e-google-', replace(uuid(), '-', '')))
+    end`
+    : "coalesce(google_subject_id, concat('readmates-e2e-google-', replace(uuid(), '-', '')))";
+}
+
+export function resetSeedGoogleLogins(emails: string[]) {
+  const emailList = sqlEmailList(emails);
+
+  runMysql(`
+delete auth_sessions
+from auth_sessions
+join users on users.id = auth_sessions.user_id
+where lower(users.email) in (${emailList})
+  and auth_sessions.user_agent = 'readmates-e2e';
+
+update users
+set google_subject_id = ${seedGoogleSubjectCase(emails)},
+    password_hash = null,
+    password_set_at = null,
+    auth_provider = 'GOOGLE',
+    updated_at = utc_timestamp(6)
+where lower(email) in (${emailList});
+`);
+}
+
+export async function loginWithGoogleFixture(page: Page, email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  const rawToken = `e2e.${randomBytes(32).toString("base64url")}`;
+  const tokenHash = sha256Hex(rawToken);
+  const sessionId = randomUUID();
+
+  const result = runMysql(`
+insert into auth_sessions (
+  id,
+  user_id,
+  session_token_hash,
+  created_at,
+  last_seen_at,
+  expires_at,
+  user_agent,
+  ip_hash
+)
+select
+  ${sqlString(sessionId)},
+  users.id,
+  ${sqlString(tokenHash)},
+  utc_timestamp(6),
+  utc_timestamp(6),
+  timestampadd(day, 14, utc_timestamp(6)),
+  'readmates-e2e',
+  null
+from users
+where lower(users.email) = ${sqlString(normalizedEmail)};
+
+select row_count();
+`);
+
+  expect(result.trim().split(/\s+/).at(-1)).toBe("1");
+  await page.context().addCookies([
+    {
+      name: "readmates_session",
+      value: rawToken,
+      url: appOrigin,
+      httpOnly: true,
+      sameSite: "Lax",
+      expires: Math.floor(Date.now() / 1000) + 14 * 24 * 60 * 60,
+    },
+  ]);
+}
+
+export function cleanupInvitedMembers(emails: string[]) {
+  const emailList = sqlEmailList(emails);
+
+  runMysql(`
+delete auth_sessions
+from auth_sessions
+join users on users.id = auth_sessions.user_id
+where lower(users.email) in (${emailList});
+
+delete from invitations
+where club_id = ${sqlString(clubId)}
+  and lower(invited_email) in (${emailList});
+
+delete session_participants
+from session_participants
+join memberships on memberships.id = session_participants.membership_id
+join users on users.id = memberships.user_id
+where session_participants.club_id = ${sqlString(clubId)}
+  and lower(users.email) in (${emailList});
+
+delete memberships
+from memberships
+join users on users.id = memberships.user_id
+where memberships.club_id = ${sqlString(clubId)}
+  and lower(users.email) in (${emailList});
+
+delete from users
+where lower(email) in (${emailList})
+  and not exists (
+    select 1
+    from memberships
+    where memberships.user_id = users.id
+  );
+`);
+}
+
+export function cleanupGeneratedSessions(invitedEmails: string[] = []) {
+  runMysql(`
+delete from feedback_reports
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from session_feedback_documents
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from public_session_publications
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from highlights
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from one_line_reviews
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from long_reviews
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from questions
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from reading_checkins
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from session_participants
+where session_id in (
+  select id from sessions
+  where club_id = ${sqlString(clubId)}
+    and number >= 7
+);
+
+delete from sessions
+where club_id = ${sqlString(clubId)}
+  and number >= 7;
+`);
+
+  if (invitedEmails.length > 0) {
+    cleanupInvitedMembers(invitedEmails);
+  }
+}
+
+export function createPendingGoogleUserFixture(email: string) {
+  const normalizedEmail = normalizeEmail(email);
+  const userId = randomUUID();
+  const membershipId = randomUUID();
+  const googleSubjectId = `readmates-e2e-pending-${randomUUID()}`;
+
+  runMysql(`
+insert into users (
+  id,
+  google_subject_id,
+  email,
+  name,
+  short_name,
+  profile_image_url,
+  password_hash,
+  password_set_at,
+  auth_provider
+)
+values (
+  ${sqlString(userId)},
+  ${sqlString(googleSubjectId)},
+  ${sqlString(normalizedEmail)},
+  'E2E Pending Google',
+  'Pending',
+  null,
+  null,
+  null,
+  'GOOGLE'
+);
+
+insert into memberships (
+  id,
+  club_id,
+  user_id,
+  role,
+  status,
+  joined_at
+)
+values (
+  ${sqlString(membershipId)},
+  ${sqlString(clubId)},
+  ${sqlString(userId)},
+  'MEMBER',
+  'PENDING_APPROVAL',
+  null
+);
+`);
+}
+
+export function cleanupPendingGoogleUserFixtures(emails: string[]) {
+  const emailList = sqlEmailList(emails);
+
+  runMysql(`
+delete auth_sessions
+from auth_sessions
+join users on users.id = auth_sessions.user_id
+where lower(users.email) in (${emailList});
+
+delete memberships
+from memberships
+join users on users.id = memberships.user_id
+where memberships.club_id = ${sqlString(clubId)}
+  and lower(users.email) in (${emailList});
+
+delete from users
+where lower(email) in (${emailList})
+  and not exists (
+    select 1
+    from memberships
+    where memberships.user_id = users.id
+  );
+`);
+}

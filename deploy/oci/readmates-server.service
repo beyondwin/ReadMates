@@ -1,0 +1,25 @@
+[Unit]
+Description=ReadMates Spring Boot API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=readmates
+WorkingDirectory=/opt/readmates
+EnvironmentFile=/etc/readmates/readmates.env
+ExecStart=/usr/bin/java -jar /opt/readmates/readmates-server.jar
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/readmates
+CapabilityBoundingSet=
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,923 @@
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import HostSessionEditor from "@/features/host/components/host-session-editor";
+import {
+  buildHostSessionRequest,
+  defaultSessionDateFrom,
+} from "@/features/host/components/host-session-schedule";
+import type {
+  FeedbackDocumentResponse,
+  HostSessionDeletionPreviewResponse,
+  HostSessionDetailResponse,
+} from "@/shared/api/readmates";
+import {
+  feedbackDocumentContractFixture,
+  hostSessionDetailContractFixture,
+} from "./api-contract-fixtures";
+
+const retiredPersonalFeedbackReportLabel = ["개인 피드백", "리포트"].join(" ");
+
+type DeferredFetchResponse = {
+  ok: boolean;
+};
+
+function deferredFetchResponse() {
+  let resolve!: (response: DeferredFetchResponse) => void;
+  const promise = new Promise<DeferredFetchResponse>((resolver) => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
+
+const session: HostSessionDetailResponse = hostSessionDetailContractFixture;
+
+const openSession: HostSessionDetailResponse = {
+  ...session,
+  sessionId: "open-session-7",
+  sessionNumber: 7,
+  title: "7회차 모임 · 테스트 책",
+  bookTitle: "테스트 책",
+  state: "OPEN",
+};
+
+const deletionPreview: HostSessionDeletionPreviewResponse = {
+  sessionId: "open-session-7",
+  sessionNumber: 7,
+  title: "7회차 모임 · 테스트 책",
+  state: "OPEN",
+  canDelete: true,
+  counts: {
+    participants: 6,
+    rsvpResponses: 2,
+    questions: 4,
+    checkins: 3,
+    oneLineReviews: 1,
+    longReviews: 1,
+    highlights: 0,
+    publications: 0,
+    feedbackReports: 7,
+    feedbackDocuments: 8,
+  },
+};
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe("HostSessionEditor", () => {
+  it("calculates the default session date as the next third Wednesday", () => {
+    expect(defaultSessionDateFrom(new Date(2026, 3, 21))).toBe("2026-05-20");
+    expect(defaultSessionDateFrom(new Date(2026, 4, 20))).toBe("2026-05-20");
+    expect(defaultSessionDateFrom(new Date(2026, 4, 21))).toBe("2026-06-17");
+    expect(defaultSessionDateFrom(new Date(2026, 11, 17))).toBe("2027-01-20");
+  });
+
+  it("builds host session payloads without changing deadline semantics", () => {
+    const values = {
+      title: "7회차 모임 · 새 책",
+      bookTitle: "새 책",
+      bookAuthor: "새 저자",
+      bookLink: "https://example.com/books/new-book",
+      bookImageUrl: "https://example.com/covers/new-book.jpg",
+      locationLabel: "온라인",
+      meetingUrl: "https://meet.google.com/readmates-new",
+      meetingPasscode: "new",
+      date: "2026-05-20",
+      startTime: "20:00",
+    };
+
+    expect(buildHostSessionRequest(values)).toEqual({
+      ...values,
+      questionDeadlineAt: "2026-05-19T23:59:00+09:00",
+    });
+    expect(buildHostSessionRequest(values, { date: "2026-05-20" })).toEqual(values);
+    expect(buildHostSessionRequest(values, { date: "2026-05-13" })).toEqual({
+      ...values,
+      questionDeadlineAt: "2026-05-19T23:59:00+09:00",
+    });
+  });
+
+  it("switches the mobile editor between basic, publish, attendance, and feedback document contexts", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<HostSessionEditor session={session} />);
+
+    const segments = screen.getByTestId("host-editor-mobile-segments");
+    const basic = screen.getByRole("tab", { name: "기본" });
+    const publish = screen.getByRole("tab", { name: "공개" });
+    const attendance = screen.getByRole("tab", { name: "출석" });
+    const report = screen.getByRole("tab", { name: "문서" });
+    const basicPanels = Array.from(container.querySelectorAll('[data-mobile-editor-section="basic"]'));
+    const publishPanel = container.querySelector('[data-mobile-editor-section="publish"]');
+
+    expect(segments).toHaveAttribute("role", "tablist");
+    expect(Array.from(segments.querySelectorAll('[role="tab"]')).map((button) => button.textContent)).toEqual([
+      "기본",
+      "공개",
+      "출석",
+      "문서",
+    ]);
+    expect(basic).toHaveAttribute("aria-selected", "true");
+    expect(basic).toHaveAttribute("aria-controls", "host-editor-panel-basic-info host-editor-panel-basic-schedule");
+    expect(basicPanels).toHaveLength(2);
+    basicPanels.forEach((panel) => {
+      expect(panel).toHaveAttribute("role", "tabpanel");
+      expect(panel).toHaveAttribute("aria-labelledby", "host-editor-tab-basic");
+      expect(panel).toHaveClass("is-mobile-active");
+    });
+    expect(basicPanels.map((panel) => panel.id)).toEqual(["host-editor-panel-basic-info", "host-editor-panel-basic-schedule"]);
+    expect(publishPanel).not.toHaveClass("is-mobile-active");
+
+    await user.click(publish);
+    expect(publish).toHaveAttribute("aria-selected", "true");
+    basicPanels.forEach((panel) => expect(panel).not.toHaveClass("is-mobile-active"));
+    expect(publishPanel).toHaveClass("is-mobile-active");
+
+    await user.click(attendance);
+    expect(attendance).toHaveAttribute("aria-selected", "true");
+    expect(container.querySelector('[data-mobile-editor-section="attendance"]')).toHaveClass("is-mobile-active");
+
+    await user.click(report);
+    expect(report).toHaveAttribute("aria-selected", "true");
+    expect(container.querySelector('[data-mobile-editor-section="report"]')).toHaveClass("is-mobile-active");
+  });
+
+  it("shows a new-session empty message instead of static attendance and feedback document controls", () => {
+    render(<HostSessionEditor />);
+
+    expect(screen.getAllByText("세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.")).toHaveLength(2);
+    expect(screen.queryByText("HTML 파일을 드래그하거나 클릭해 업로드")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "파일 선택" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "에디터에서 작성" })).not.toBeInTheDocument();
+    expect(screen.queryByText("이멤버14")).not.toBeInTheDocument();
+    expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
+  });
+
+  it("automatically derives the question deadline from the selected meeting date", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 21, 12));
+    render(<HostSessionEditor />);
+    vi.useRealTimers();
+
+    const user = userEvent.setup();
+    expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-05-20");
+    expect(screen.getByLabelText("시작 시간")).toHaveValue("20:00");
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("05-19 23:59까지 질문 제출");
+
+    await user.clear(screen.getByLabelText("시작 시간"));
+    await user.type(screen.getByLabelText("시작 시간"), "18:45");
+
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("05-19 23:59까지 질문 제출");
+
+    await user.clear(screen.getByLabelText("모임 날짜"));
+    await user.type(screen.getByLabelText("모임 날짜"), "2026-01-01");
+
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("12-31 23:59까지 질문 제출");
+  });
+
+  it("renders attendance and the session feedback document from the host session detail API payload", () => {
+    render(<HostSessionEditor session={session} />);
+
+    expect(screen.getAllByText("김호스트")).not.toHaveLength(0);
+    expect(screen.getByText("회차 피드백 문서")).toBeInTheDocument();
+    expect(screen.getByLabelText("피드백 문서 파일")).toHaveAttribute("accept", ".md,.txt");
+    expect(screen.getByText("업로드 완료")).toBeInTheDocument();
+    expect(screen.getByText("251126 1차.md")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "미리보기" })).toHaveAttribute("href", "/app/feedback/session-1");
+    expect(screen.getByRole("button", { name: "교체" })).toBeInTheDocument();
+    expect(screen.queryByText(`${retiredPersonalFeedbackReportLabel} (HTML)`)).not.toBeInTheDocument();
+    expect(screen.queryByText("HTML 파일을 드래그하거나 클릭해 업로드")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "김호스트 리포트 열기 준비중" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이멤버5 리포트 업로드 준비중" })).not.toBeInTheDocument();
+    expect(screen.queryByText("이멤버14")).not.toBeInTheDocument();
+    expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
+  });
+
+  it("shows persisted book and neutral meeting fields", () => {
+    render(<HostSessionEditor session={session} />);
+
+    expect(screen.getByLabelText("책 링크")).toHaveValue("https://example.com/books/factfulness");
+    expect(screen.getByLabelText("책 이미지 URL")).toHaveValue(
+      "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
+    );
+    expect(screen.getByRole("img", { name: "팩트풀니스 표지" })).toBeInTheDocument();
+    expect(screen.getByLabelText("장소")).toHaveValue("온라인");
+    expect(screen.getByLabelText("미팅 URL")).toHaveValue("https://meet.google.com/readmates-factfulness");
+    expect(screen.getByLabelText("Passcode · 선택")).toHaveValue("fact");
+    expect(screen.queryByLabelText("장소 / 미팅 링크")).not.toBeInTheDocument();
+  });
+
+  it("shows existing-session empty states when attendees are empty and no feedback document is uploaded", () => {
+    render(
+      <HostSessionEditor
+        session={{
+          ...session,
+          attendees: [],
+          feedbackDocument: {
+            uploaded: false,
+            fileName: null,
+            uploadedAt: null,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("아직 참석 대상자가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("미등록")).toBeInTheDocument();
+    expect(screen.queryByText("등록된 리포트 대상자가 없습니다.")).not.toBeInTheDocument();
+  });
+
+  it("uploads the selected feedback document and updates status from the backend response", async () => {
+    const uploaded: FeedbackDocumentResponse = {
+      ...feedbackDocumentContractFixture,
+      subtitle: "팩트풀니스",
+      fileName: "server-normalized-feedback.md",
+      uploadedAt: "2026-04-20T12:00:00Z",
+      metadata: [],
+      observerNotes: [],
+      participants: [],
+    };
+    const json = vi.fn().mockResolvedValue(uploaded);
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
+
+    const input = screen.getByLabelText("피드백 문서 파일") as HTMLInputElement;
+    const file = new File(["# 독서모임 1차 피드백"], "local-draft.md", { type: "text/markdown" });
+    await user.upload(input, file);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/feedback-document", expect.objectContaining({
+      cache: "no-store",
+      method: "POST",
+      body: expect.any(FormData),
+    }));
+
+    const body = fetchMock.mock.calls[0]?.[1]?.body;
+    expect(body).toBeInstanceOf(FormData);
+    expect((body as FormData).get("file")).toBe(file);
+    await waitFor(() => expect(screen.getByText("server-normalized-feedback.md")).toBeInTheDocument());
+    expect(json).toHaveBeenCalled();
+    expect(screen.queryByText("local-draft.md")).not.toBeInTheDocument();
+    expect(input.value).toBe("");
+  });
+
+  it("shows the upload failure toast when the feedback document request rejects", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network failed"));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
+
+    const file = new File(["# 독서모임 1차 피드백"], "retry.md", { type: "text/markdown" });
+    await user.upload(screen.getByLabelText("피드백 문서 파일"), file);
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("피드백 문서 업로드에 실패했습니다"));
+  });
+
+  it("posts a new session through the BFF and redirects to current session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor />);
+
+    await user.clear(screen.getByLabelText("세션 제목"));
+    await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
+    await user.type(screen.getByLabelText("책 제목"), "새 책");
+    await user.type(screen.getByLabelText("저자"), "새 저자");
+    await user.clear(screen.getByLabelText("모임 날짜"));
+    await user.type(screen.getByLabelText("모임 날짜"), "2026-05-20");
+    await user.clear(screen.getByLabelText("시작 시간"));
+    await user.type(screen.getByLabelText("시작 시간"), "19:30");
+    await user.click(screen.getByRole("button", { name: "변경 사항 저장" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify({
+          title: "7회차 모임 · 새 책",
+          bookTitle: "새 책",
+          bookAuthor: "새 저자",
+          bookLink: "https://product.kyobobook.co.kr/detail/S000001947832",
+          bookImageUrl: "",
+          locationLabel: "온라인",
+          meetingUrl: "",
+          meetingPasscode: "",
+          date: "2026-05-20",
+          startTime: "19:30",
+          questionDeadlineAt: "2026-05-19T23:59:00+09:00",
+        }),
+      })),
+    );
+    expect(location.href).toBe("/app/session/current");
+  });
+
+  it("posts custom book and meeting fields from the new-session editor", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor />);
+
+    await user.clear(screen.getByLabelText("세션 제목"));
+    await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 커스텀 책");
+    await user.type(screen.getByLabelText("책 제목"), "커스텀 책");
+    await user.type(screen.getByLabelText("저자"), "커스텀 저자");
+    await user.clear(screen.getByLabelText("책 링크"));
+    await user.type(screen.getByLabelText("책 링크"), "https://example.com/books/custom-book");
+    await user.type(screen.getByLabelText("책 이미지 URL"), "https://example.com/covers/custom-book.jpg");
+    await user.clear(screen.getByLabelText("모임 날짜"));
+    await user.type(screen.getByLabelText("모임 날짜"), "2026-05-20");
+    await user.clear(screen.getByLabelText("장소"));
+    await user.type(screen.getByLabelText("장소"), "성수 스터디룸");
+    await user.type(screen.getByLabelText("미팅 URL"), "https://meet.google.com/readmates-custom");
+    await user.type(screen.getByLabelText("Passcode · 선택"), "custom");
+    await user.click(screen.getByRole("button", { name: "변경 사항 저장" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify({
+          title: "7회차 모임 · 커스텀 책",
+          bookTitle: "커스텀 책",
+          bookAuthor: "커스텀 저자",
+          bookLink: "https://example.com/books/custom-book",
+          bookImageUrl: "https://example.com/covers/custom-book.jpg",
+          locationLabel: "성수 스터디룸",
+          meetingUrl: "https://meet.google.com/readmates-custom",
+          meetingPasscode: "custom",
+          date: "2026-05-20",
+          startTime: "20:00",
+          questionDeadlineAt: "2026-05-19T23:59:00+09:00",
+        }),
+      })),
+    );
+    expect(location.href).toBe("/app/session/current");
+  });
+
+  it("patches the existing session with the persisted non-default start time when editing", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+    const editedSession = {
+      ...session,
+      startTime: "19:15",
+    };
+
+    render(<HostSessionEditor session={editedSession} />);
+
+    expect(screen.getByLabelText("시작 시간")).toHaveValue("19:15");
+
+    await user.clear(screen.getByLabelText("세션 제목"));
+    await user.type(screen.getByLabelText("세션 제목"), "6회차 모임 · 수정");
+    await user.click(screen.getByRole("button", { name: "변경 사항 저장" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1", expect.objectContaining({
+        cache: "no-store",
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "6회차 모임 · 수정",
+          bookTitle: "팩트풀니스",
+          bookAuthor: "한스 로슬링",
+          bookLink: "https://example.com/books/factfulness",
+          bookImageUrl: "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
+          locationLabel: "온라인",
+          meetingUrl: "https://meet.google.com/readmates-factfulness",
+          meetingPasscode: "fact",
+          date: "2025-11-26",
+          startTime: "19:15",
+        }),
+      })),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.anything());
+  });
+
+  it("patches cleared optional book and meeting fields as empty strings", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={session} />);
+
+    await user.clear(screen.getByLabelText("책 이미지 URL"));
+    await user.clear(screen.getByLabelText("Passcode · 선택"));
+    await user.click(screen.getByRole("button", { name: "변경 사항 저장" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1", expect.objectContaining({
+        cache: "no-store",
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "1회차 모임 · 팩트풀니스",
+          bookTitle: "팩트풀니스",
+          bookAuthor: "한스 로슬링",
+          bookLink: "https://example.com/books/factfulness",
+          bookImageUrl: "",
+          locationLabel: "온라인",
+          meetingUrl: "https://meet.google.com/readmates-factfulness",
+          meetingPasscode: "",
+          date: "2025-11-26",
+          startTime: "20:00",
+        }),
+      })),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.anything());
+  });
+
+  it("initializes publication summary and mode from the host session detail payload", () => {
+    render(
+      <HostSessionEditor
+        session={{
+          ...session,
+          publication: {
+            publicSummary: "저장된 공개 요약입니다.",
+            isPublic: false,
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("공개 요약")).toHaveValue("저장된 공개 요약입니다.");
+    expect(screen.getByText("공개 요약을 서버에 초안으로 저장").parentElement).toHaveAttribute("aria-current", "step");
+    expect(screen.queryByText("요약만 공개")).not.toBeInTheDocument();
+  });
+
+  it("saves a publication summary draft through the publication API without redirecting", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+
+    await user.type(screen.getByLabelText("공개 요약"), "초안으로 남길 공개 요약입니다.");
+    await user.click(screen.getByRole("button", { name: "요약 초안 저장" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/publication", expect.objectContaining({
+        cache: "no-store",
+        method: "PUT",
+        body: JSON.stringify({
+          publicSummary: "초안으로 남길 공개 요약입니다.",
+          isPublic: false,
+        }),
+      })),
+    );
+    expect(location.href).toBe("");
+    expect(await screen.findByRole("status")).toHaveTextContent("요약 초안을 저장했습니다.");
+    expect(screen.getByText("공개 요약을 서버에 초안으로 저장").parentElement).toHaveAttribute("aria-current", "step");
+  });
+
+  it("publishes a public record through the publication API without redirecting", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+
+    await user.type(screen.getByLabelText("공개 요약"), "공개 페이지에 보여줄 요약입니다.");
+    await user.click(screen.getByRole("button", { name: "공개 기록 발행" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/publication", expect.objectContaining({
+        cache: "no-store",
+        method: "PUT",
+        body: JSON.stringify({
+          publicSummary: "공개 페이지에 보여줄 요약입니다.",
+          isPublic: true,
+        }),
+      })),
+    );
+    expect(location.href).toBe("");
+    expect(await screen.findByRole("status")).toHaveTextContent("공개 기록을 발행했습니다.");
+    expect(screen.getByText("공개 클럽 페이지에 노출").parentElement).toHaveAttribute("aria-current", "step");
+  });
+
+  it("disables publication actions for unsaved new sessions and explains why", () => {
+    render(<HostSessionEditor />);
+
+    expect(screen.getByRole("button", { name: "요약 초안 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "공개 기록 발행" })).toBeDisabled();
+    expect(screen.getByText("세션을 만든 뒤 공개 요약 초안 저장과 공개 기록 발행을 사용할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "내부 공개" })).not.toBeInTheDocument();
+  });
+
+  it("shows publication validation feedback inside the publication section without sending a request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+
+    await user.click(screen.getByRole("button", { name: "요약 초안 저장" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("공개 요약을 입력한 뒤 저장해주세요.");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows publication API failure feedback inside the publication section", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={{ ...session, publication: null }} />);
+
+    await user.type(screen.getByLabelText("공개 요약"), "저장 실패를 확인할 공개 요약입니다.");
+    await user.click(screen.getByRole("button", { name: "공개 기록 발행" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("alert")).toHaveTextContent("공개 설정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+  });
+
+  it("persists attendance toggles for the edited session and updates selected state", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={session} />);
+
+    const absentToggle = screen.getByRole("button", { name: "이멤버5 불참" });
+    expect(absentToggle).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(absentToggle);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ABSENT" }]),
+      })),
+    );
+    expect(absentToggle).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("shows removed participants in a separate collapsed attendance section", () => {
+    render(
+      <HostSessionEditor
+        session={{
+          ...session,
+          attendees: [
+            ...session.attendees,
+            {
+              membershipId: "membership-removed",
+              displayName: "제외된 멤버",
+              shortName: "제외",
+              rsvpStatus: "GOING",
+              attendanceStatus: "UNKNOWN",
+              participationStatus: "REMOVED",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("제외된 멤버")).not.toBeInTheDocument();
+    expect(screen.getAllByText("제외된 참가자 1명").length).toBeGreaterThan(0);
+  });
+
+  it("serializes and coalesces attendance writes so stale success cannot overtake the latest desired status", async () => {
+    const firstAttendanceSave = deferredFetchResponse();
+    const secondAttendanceSave = deferredFetchResponse();
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstAttendanceSave.promise)
+      .mockReturnValueOnce(secondAttendanceSave.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <HostSessionEditor
+        session={{
+          ...session,
+          attendees: session.attendees.map((attendee) =>
+            attendee.membershipId === "membership-suhan"
+              ? { ...attendee, attendanceStatus: "UNKNOWN" }
+              : attendee,
+          ),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "이멤버5 참석" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ATTENDED" }]),
+      })),
+    );
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true");
+
+    firstAttendanceSave.resolve({ ok: true });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ABSENT" }]),
+      })),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    secondAttendanceSave.resolve({ ok: true });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("rolls back to a successful in-flight attendance commit when the queued write fails", async () => {
+    const firstAttendanceSave = deferredFetchResponse();
+    const secondAttendanceSave = deferredFetchResponse();
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstAttendanceSave.promise)
+      .mockReturnValueOnce(secondAttendanceSave.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <HostSessionEditor
+        session={{
+          ...session,
+          attendees: session.attendees.map((attendee) =>
+            attendee.membershipId === "membership-suhan"
+              ? { ...attendee, attendanceStatus: "UNKNOWN" }
+              : attendee,
+          ),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "이멤버5 참석" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ATTENDED" }]),
+      })),
+    );
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true");
+
+    firstAttendanceSave.resolve({ ok: true });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ABSENT" }]),
+      })),
+    );
+
+    secondAttendanceSave.resolve({ ok: false });
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("출석 저장에 실패했습니다"));
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("rolls back to the last committed attendance status when the latest coalesced write fails", async () => {
+    const firstAttendanceSave = deferredFetchResponse();
+    const secondAttendanceSave = deferredFetchResponse();
+    const fetchMock = vi
+      .fn()
+      .mockReturnValueOnce(firstAttendanceSave.promise)
+      .mockReturnValueOnce(secondAttendanceSave.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(
+      <HostSessionEditor
+        session={{
+          ...session,
+          attendees: session.attendees.map((attendee) =>
+            attendee.membershipId === "membership-suhan"
+              ? { ...attendee, attendanceStatus: "UNKNOWN" }
+              : attendee,
+          ),
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "이멤버5 참석" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ATTENDED" }]),
+      })),
+    );
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true");
+
+    firstAttendanceSave.resolve({ ok: false });
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ABSENT" }]),
+      })),
+    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    secondAttendanceSave.resolve({ ok: false });
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("출석 저장에 실패했습니다"));
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("rolls back an optimistic attendance update when the save request rejects", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network failed"));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={session} />);
+
+    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+        body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ABSENT" }]),
+      })),
+    );
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("출석 저장에 실패했습니다"));
+    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("previews and deletes an open session from the danger modal", async () => {
+    const location = { href: "" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue(deletionPreview),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          sessionId: "open-session-7",
+          sessionNumber: 7,
+          deleted: true,
+          counts: deletionPreview.counts,
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={openSession} />);
+
+    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    expect(dialog).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7/deletion-preview", expect.objectContaining({
+        cache: "no-store",
+        method: "GET",
+      })),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("참석 대상")).toBeInTheDocument();
+    expect(screen.getByText("6명")).toBeInTheDocument();
+    expect(screen.getByText("질문")).toBeInTheDocument();
+    expect(screen.getByText("4개")).toBeInTheDocument();
+    expect(screen.getByText("레거시 개인 피드백")).toBeInTheDocument();
+    expect(screen.getByText("7개")).toBeInTheDocument();
+    expect(screen.queryByText(retiredPersonalFeedbackReportLabel)).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7", expect.objectContaining({
+        cache: "no-store",
+        method: "DELETE",
+      })),
+    );
+    expect(location.href).toBe("/app/host/sessions/new");
+  });
+
+  it("keeps keyboard focus inside the delete modal and restores focus when Escape closes", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: vi.fn().mockResolvedValue(deletionPreview),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={openSession} />);
+
+    const trigger = screen.getByRole("button", { name: "세션 삭제" });
+    await user.click(trigger);
+
+    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    const cancelButton = within(dialog).getByRole("button", { name: "취소" });
+    await waitFor(() => expect(cancelButton).toHaveFocus());
+
+    await screen.findByText("참석 대상");
+    const confirmButton = within(dialog).getByRole("button", { name: "세션 삭제" });
+    expect(confirmButton).toBeEnabled();
+
+    await user.tab();
+    expect(confirmButton).toHaveFocus();
+    await user.tab();
+    expect(cancelButton).toHaveFocus();
+    await user.tab({ shift: true });
+    expect(confirmButton).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "이 세션을 삭제할까요?" })).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7", expect.objectContaining({
+      method: "DELETE",
+    }));
+  });
+
+  it("does not show the delete action on the new-session editor", () => {
+    render(<HostSessionEditor />);
+
+    expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
+  });
+
+  it("disables delete action for non-open sessions", () => {
+    render(<HostSessionEditor session={session} />);
+
+    expect(screen.getByRole("button", { name: "세션 삭제" })).toBeDisabled();
+  });
+
+  it("shows a preview failure message and does not send delete", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 409 });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={openSession} />);
+
+    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+
+    expect(await screen.findByText("이미 닫히거나 공개된 세션은 삭제할 수 없습니다.")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    expect(within(dialog).getByRole("button", { name: "세션 삭제" })).toBeDisabled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the modal open when delete fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue(deletionPreview),
+      })
+      .mockResolvedValueOnce({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditor session={openSession} />);
+
+    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+    await screen.findByText("참석 대상");
+    const dialog = screen.getByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+
+    expect(await screen.findByText("세션 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.")).toBeInTheDocument();
+    expect(dialog).toBeInTheDocument();
+  });
+});
