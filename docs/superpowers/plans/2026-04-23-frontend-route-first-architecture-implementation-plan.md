@@ -864,7 +864,7 @@ git commit -m "refactor: remove frontend api compatibility layer"
 
 **Files:** none expected unless fixing issues discovered by checks.
 
-- [ ] **Step 1: Run all unit and build checks**
+- [x] **Step 1: Run all unit and build checks**
 
 ```bash
 pnpm --dir front lint
@@ -874,7 +874,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 2: Run targeted e2e flows**
+- [x] **Step 2: Run targeted e2e flows**
 
 Run the existing high-value flows:
 
@@ -886,7 +886,7 @@ pnpm --dir front test:e2e -- tests/e2e/responsive-navigation-chrome.spec.ts
 
 Expected: PASS. If local backend or database prerequisites are missing, document the blocker in the implementation summary.
 
-- [ ] **Step 3: Inspect final boundaries**
+- [x] **Step 3: Inspect final boundaries**
 
 Run:
 
@@ -898,11 +898,11 @@ rg "fetch\\(" front/features
 
 Expected: remaining matches are either tests, allowed route/API modules, or explicitly justified.
 
-- [ ] **Step 4: Update frontend architecture docs**
+- [x] **Step 4: Update frontend architecture docs**
 
 Update `docs/development/architecture.md` or a dedicated frontend architecture doc with the final route-first feature rules if the implementation changed any details from the spec.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 Commit documentation and any final cleanup:
 
@@ -912,6 +912,13 @@ git commit -m "docs: update frontend architecture after route-first refactor"
 ```
 
 Only commit if files changed.
+
+Task 12 verification summary:
+
+- Unit/build checks passed: `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`.
+- Targeted e2e passed: `dev-login-session-flow.spec.ts` (2 passed), `public-auth-member-host.spec.ts` (2 passed), `responsive-navigation-chrome.spec.ts` (4 passed). No local backend/database blocker.
+- Boundary inspection: no `@/shared/api/readmates` matches remain; direct `fetch(` matches are limited to `front/features/auth/api/auth-api.ts`, which is an allowed feature API module; `components` imports remain only for `host` and `member-home` legacy presentation directories and related tests/routes because those features do not expose a `ui` public surface yet.
+- Frontend architecture rules were added to `docs/development/architecture.md`.
 
 ## Implementation Notes
 
