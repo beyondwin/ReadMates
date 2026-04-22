@@ -165,6 +165,32 @@ describe("HostSessionEditor", () => {
     expect(container.querySelector('[data-mobile-editor-section="report"]')).toHaveClass("is-mobile-active");
   });
 
+  it("supports keyboard selection in the mobile editor tablist", async () => {
+    const user = userEvent.setup();
+    render(<HostSessionEditor session={session} />);
+
+    const basic = screen.getByRole("tab", { name: "기본" });
+    const publish = screen.getByRole("tab", { name: "공개" });
+    const report = screen.getByRole("tab", { name: "문서" });
+
+    basic.focus();
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(publish).toHaveFocus());
+    expect(publish).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{End}");
+    await waitFor(() => expect(report).toHaveFocus());
+    expect(report).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{Home}");
+    await waitFor(() => expect(basic).toHaveFocus());
+    expect(basic).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{ArrowLeft}");
+    await waitFor(() => expect(report).toHaveFocus());
+    expect(report).toHaveAttribute("aria-selected", "true");
+  });
+
   it("shows a new-session empty message instead of static attendance and feedback document controls", () => {
     render(<HostSessionEditor />);
 
@@ -567,7 +593,7 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "공개 기록 발행" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("alert")).toHaveTextContent("공개 설정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("공개 설정 저장에 실패했습니다. 요약 내용을 확인한 뒤 다시 시도해 주세요.");
   });
 
   it("persists attendance toggles for the edited session and updates selected state", async () => {
@@ -938,7 +964,7 @@ describe("HostSessionEditor", () => {
     const dialog = screen.getByRole("dialog", { name: "이 세션을 삭제할까요?" });
     await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
 
-    expect(await screen.findByText("세션 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.")).toBeInTheDocument();
+    expect(await screen.findByText("세션 삭제에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
     expect(dialog).toBeInTheDocument();
   });
 });

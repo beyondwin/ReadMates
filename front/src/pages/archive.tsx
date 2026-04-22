@@ -52,7 +52,7 @@ export default function ArchiveRoutePage() {
   );
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="아카이브를 불러오는 중">
       {(data) => (
         <ArchivePage
           {...data}

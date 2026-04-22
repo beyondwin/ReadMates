@@ -20,7 +20,7 @@ export default function HostPage() {
   );
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="운영 원장을 불러오는 중">
       {(data) => (
         <HostDashboard
           auth={authState.status === "ready" ? authState.auth : undefined}

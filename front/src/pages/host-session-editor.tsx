@@ -27,5 +27,9 @@ export default function EditHostSessionPage() {
     }, [sessionId]),
   );
 
-  return <ReadmatesPageState state={state}>{(session) => <HostSessionEditor session={session} returnTarget={returnTarget} />}</ReadmatesPageState>;
+  return (
+    <ReadmatesPageState state={state} loadingLabel="세션 편집 정보를 불러오는 중">
+      {(session) => <HostSessionEditor session={session} returnTarget={returnTarget} />}
+    </ReadmatesPageState>
+  );
 }

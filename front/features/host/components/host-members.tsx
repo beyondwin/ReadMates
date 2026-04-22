@@ -2,6 +2,7 @@ import { Link } from "@/src/app/router-link";
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useEffect,
   useMemo,
@@ -54,6 +55,8 @@ const currentSessionLabels: Record<SessionParticipationStatus, string> = {
   ACTIVE: "이번 세션 참여 중",
   REMOVED: "이번 세션 제외됨",
 };
+
+const memberActionPendingReason = "멤버 상태 업데이트를 처리하는 중입니다.";
 
 const statusBadgeLabels: Record<MembershipStatus, string> = {
   INVITED: "초대됨",
@@ -108,6 +111,41 @@ function currentSessionBadge(member: HostMemberListItem) {
   return { label: "이번 세션 미포함", className: "badge" };
 }
 
+function focusMemberTab(tab: MemberTab) {
+  globalThis.setTimeout(() => {
+    document.getElementById(`host-members-tab-${tab}`)?.focus();
+  }, 0);
+}
+
+function handleMemberTabKeyDown(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  activeTab: MemberTab,
+  onTabChange: (tab: MemberTab) => void,
+) {
+  const keys = tabs.map((tab) => tab.key);
+  const currentIndex = keys.indexOf(activeTab);
+  const lastIndex = keys.length - 1;
+  const nextIndex =
+    event.key === "ArrowRight"
+      ? (currentIndex + 1) % keys.length
+      : event.key === "ArrowLeft"
+        ? (currentIndex - 1 + keys.length) % keys.length
+        : event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? lastIndex
+            : -1;
+
+  if (nextIndex < 0) {
+    return;
+  }
+
+  event.preventDefault();
+  const nextTab = keys[nextIndex];
+  onTabChange(nextTab);
+  focusMemberTab(nextTab);
+}
+
 function disabledCurrentSessionReason(member: HostMemberListItem, isParticipating: boolean) {
   if (isParticipating) {
     return member.role === "HOST"
@@ -120,6 +158,82 @@ function disabledCurrentSessionReason(member: HostMemberListItem, isParticipatin
   }
 
   return "현재 세션이 없거나 이미 다음 세션부터 반영되도록 처리되었습니다.";
+}
+
+function disabledSuspendReason(member: HostMemberListItem, rowPending: boolean) {
+  if (rowPending) {
+    return memberActionPendingReason;
+  }
+
+  if (member.canSuspend) {
+    return null;
+  }
+
+  if (member.role === "HOST") {
+    return "호스트는 정지할 수 없습니다.";
+  }
+
+  if (member.status !== "ACTIVE") {
+    return "정식 활성 멤버만 정지할 수 있습니다.";
+  }
+
+  return "이 멤버는 현재 정책상 정지할 수 없습니다.";
+}
+
+function disabledDeactivateReason(member: HostMemberListItem, rowPending: boolean) {
+  if (rowPending) {
+    return memberActionPendingReason;
+  }
+
+  if (member.canDeactivate) {
+    return null;
+  }
+
+  if (member.role === "HOST") {
+    return "호스트는 탈퇴 처리할 수 없습니다.";
+  }
+
+  if (member.status === "LEFT" || member.status === "INACTIVE") {
+    return "이미 탈퇴/비활성 처리된 멤버입니다.";
+  }
+
+  return "이 멤버는 현재 정책상 탈퇴 처리할 수 없습니다.";
+}
+
+function disabledViewerActivationReason(rowPending: boolean) {
+  return rowPending ? memberActionPendingReason : null;
+}
+
+function disabledViewerDeactivateReason(member: HostMemberListItem, rowPending: boolean) {
+  if (rowPending) {
+    return memberActionPendingReason;
+  }
+
+  if (member.canDeactivate) {
+    return null;
+  }
+
+  if (member.role === "HOST") {
+    return "호스트는 둘러보기 해제할 수 없습니다.";
+  }
+
+  return "이 멤버는 현재 정책상 둘러보기 해제할 수 없습니다.";
+}
+
+function disabledRestoreReason(member: HostMemberListItem, rowPending: boolean) {
+  if (rowPending) {
+    return memberActionPendingReason;
+  }
+
+  if (member.canRestore) {
+    return null;
+  }
+
+  if (member.status !== "SUSPENDED") {
+    return "정지된 멤버만 복구할 수 있습니다.";
+  }
+
+  return "이 멤버는 현재 정책상 복구할 수 없습니다.";
 }
 
 function actionKey(member: HostMemberListItem, action: string) {
@@ -246,7 +360,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
       );
       setMessage({ kind: "status", text: "멤버 상태를 업데이트했습니다." });
     } catch {
-      setMessage({ kind: "alert", text: "멤버 상태 업데이트에 실패했습니다." });
+      setMessage({ kind: "alert", text: "멤버 상태 업데이트에 실패했습니다. 멤버 상태를 확인한 뒤 다시 시도해 주세요." });
     } finally {
       setActionPending(key, false);
     }
@@ -274,12 +388,15 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
       try {
         await refreshMembers();
       } catch {
-        setMessage({ kind: "alert", text: "처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다." });
+        setMessage({ kind: "alert", text: "처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요." });
       }
     } catch {
       setMessage({
         kind: "alert",
-        text: action === "activate" ? "정식 멤버 전환에 실패했습니다." : "둘러보기 해제에 실패했습니다.",
+        text:
+          action === "activate"
+            ? "정식 멤버 전환에 실패했습니다. 요청 상태를 확인한 뒤 다시 시도해 주세요."
+            : "둘러보기 해제에 실패했습니다. 요청 상태를 확인한 뒤 다시 시도해 주세요.",
       });
     } finally {
       setActionPending(key, false);
@@ -330,6 +447,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
         role="tablist"
         aria-label="멤버 관리"
         className="surface"
+        onKeyDown={(event) => handleMemberTabKeyDown(event, activeTab, setActiveTab)}
         style={{ padding: 6, display: "flex", flexWrap: "wrap", gap: 6 }}
       >
         {tabs.map((tab) => {
@@ -343,6 +461,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
               aria-controls={`host-members-panel-${tab.key}`}
               id={`host-members-tab-${tab.key}`}
               className={`btn btn-sm ${selected ? "btn-primary" : "btn-quiet"}`}
+              tabIndex={selected ? 0 : -1}
               onClick={() => setActiveTab(tab.key)}
             >
               {tab.label}
@@ -374,25 +493,27 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
             renderMeta={memberMeta}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
+              const suspendReason = disabledSuspendReason(member, rowPending);
+              const deactivateReason = disabledDeactivateReason(member, rowPending);
 
               return (
                 <>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    type="button"
+                  <MemberActionButton
+                    action="suspend"
+                    member={member}
+                    label="정지"
                     disabled={!member.canSuspend || rowPending}
+                    reason={suspendReason}
                     onClick={(event) => openDialog({ action: "suspend", member }, event.currentTarget)}
-                  >
-                    정지
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    type="button"
+                  />
+                  <MemberActionButton
+                    action="deactivate"
+                    member={member}
+                    label="탈퇴 처리"
                     disabled={!member.canDeactivate || rowPending}
+                    reason={deactivateReason}
                     onClick={(event) => openDialog({ action: "deactivate", member }, event.currentTarget)}
-                  >
-                    탈퇴 처리
-                  </button>
+                  />
                   <CurrentSessionAction member={member} pendingActions={pendingActions} onSubmit={submitLifecycle} />
                 </>
               );
@@ -408,25 +529,28 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
             renderMeta={requestMeta}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
+              const activateReason = disabledViewerActivationReason(rowPending);
+              const deactivateReason = disabledViewerDeactivateReason(member, rowPending);
 
               return (
                 <>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    type="button"
+                  <MemberActionButton
+                    action="activate-viewer"
+                    member={member}
+                    label="정식 멤버로 전환"
+                    tone="primary"
                     disabled={rowPending}
+                    reason={activateReason}
                     onClick={() => void submitViewerAction(member, "activate")}
-                  >
-                    정식 멤버로 전환
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    type="button"
+                  />
+                  <MemberActionButton
+                    action="deactivate-viewer"
+                    member={member}
+                    label="둘러보기 해제"
                     disabled={!member.canDeactivate || rowPending}
+                    reason={deactivateReason}
                     onClick={() => void submitViewerAction(member, "deactivate-viewer")}
-                  >
-                    둘러보기 해제
-                  </button>
+                  />
                 </>
               );
             }}
@@ -441,25 +565,28 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
             renderMeta={joinedMeta}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
+              const restoreReason = disabledRestoreReason(member, rowPending);
+              const deactivateReason = disabledDeactivateReason(member, rowPending);
 
               return (
                 <>
-                  <button
-                    className="btn btn-primary btn-sm"
-                    type="button"
+                  <MemberActionButton
+                    action="restore"
+                    member={member}
+                    label="복구"
+                    tone="primary"
                     disabled={!member.canRestore || rowPending}
+                    reason={restoreReason}
                     onClick={() => void submitLifecycle(member, "/restore")}
-                  >
-                    복구
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    type="button"
+                  />
+                  <MemberActionButton
+                    action="deactivate"
+                    member={member}
+                    label="탈퇴 처리"
                     disabled={!member.canDeactivate || rowPending}
+                    reason={deactivateReason}
                     onClick={(event) => openDialog({ action: "deactivate", member }, event.currentTarget)}
-                  >
-                    탈퇴 처리
-                  </button>
+                  />
                 </>
               );
             }}
@@ -512,6 +639,45 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
   );
 }
 
+function MemberActionButton({
+  action,
+  member,
+  label,
+  tone = "ghost",
+  disabled,
+  reason,
+  onClick,
+}: {
+  action: string;
+  member: HostMemberListItem;
+  label: string;
+  tone?: "ghost" | "primary";
+  disabled: boolean;
+  reason: string | null;
+  onClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+}) {
+  const reasonId = `host-member-${action}-reason-${member.membershipId}`;
+
+  return (
+    <span style={{ display: "inline-grid", gap: 4, justifyItems: "end" }}>
+      <button
+        className={`btn ${tone === "primary" ? "btn-primary" : "btn-ghost"} btn-sm`}
+        type="button"
+        disabled={disabled}
+        aria-describedby={reason ? reasonId : undefined}
+        onClick={onClick}
+      >
+        {label}
+      </button>
+      {reason ? (
+        <span id={reasonId} className="tiny" style={{ maxWidth: 180, color: "var(--text-3)", textAlign: "right" }}>
+          {reason}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function CurrentSessionAction({
   member,
   pendingActions,
@@ -527,7 +693,7 @@ function CurrentSessionAction({
   const label = isParticipating ? "이번 세션 제외" : "이번 세션 추가";
   const rowPending = isMembershipPending(member.membershipId, pendingActions);
   const reasonId = `current-session-action-reason-${member.membershipId}`;
-  const reason = !enabled ? disabledCurrentSessionReason(member, isParticipating) : null;
+  const reason = rowPending ? memberActionPendingReason : !enabled ? disabledCurrentSessionReason(member, isParticipating) : null;
 
   return (
     <span style={{ display: "inline-grid", gap: 4, justifyItems: "end" }}>

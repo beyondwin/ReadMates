@@ -36,7 +36,7 @@ export default function PublicSessionPage() {
   );
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="공개 세션 기록을 불러오는 중">
       {(session) =>
         session ? (
           <PublicSession session={session} returnTarget={returnTarget} />

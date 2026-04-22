@@ -32,7 +32,7 @@ export default function MemberSessionDetailRoutePage() {
   );
 
   return (
-    <ReadmatesPageState state={state}>
+    <ReadmatesPageState state={state} loadingLabel="지난 세션 기록을 불러오는 중">
       {(session) =>
         session ? (
           <MemberSessionDetailPage session={session} returnTarget={returnTarget} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, type KeyboardEvent, useState } from "react";
 import { saveCheckin } from "@/features/current-session/actions/save-checkin";
 import { saveQuestions } from "@/features/current-session/actions/save-question";
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
@@ -41,6 +41,12 @@ import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateLabel, formatDeadlineLabel, formatSessionKicker, rsvpLabel } from "@/shared/ui/readmates-display";
 
 type BoardTab = "questions" | "checkins" | "highlights";
+
+const boardTabs: Array<{ key: BoardTab; label: (session: CurrentSession) => string }> = [
+  { key: "questions", label: (session) => `질문 · ${session.board.questions.length}` },
+  { key: "checkins", label: (session) => `읽기 흔적 · ${session.board.checkins.length}` },
+  { key: "highlights", label: (session) => `하이라이트 · ${session.board.highlights.length}` },
+];
 
 const emptySaveStatuses: Record<SaveScope, SaveState> = {
   rsvp: "idle",
@@ -224,6 +230,37 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
 
   const handleBoardTab = (tab: BoardTab) => {
     setBoardTab(tab);
+  };
+
+  const focusBoardTab = (tab: BoardTab) => {
+    globalThis.setTimeout(() => {
+      document.getElementById(`current-session-board-tab-${tab}`)?.focus();
+    }, 0);
+  };
+
+  const handleBoardTabKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const keys = boardTabs.map((tab) => tab.key);
+    const currentIndex = keys.indexOf(boardTab);
+    const lastIndex = keys.length - 1;
+    const nextIndex =
+      event.key === "ArrowRight"
+        ? (currentIndex + 1) % keys.length
+        : event.key === "ArrowLeft"
+          ? (currentIndex - 1 + keys.length) % keys.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? lastIndex
+              : -1;
+
+    if (nextIndex < 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const nextTab = keys[nextIndex];
+    setBoardTab(nextTab);
+    focusBoardTab(nextTab);
   };
 
   const handleMobileTab = (tab: MobileSessionTab) => {
@@ -475,6 +512,8 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
               </div>
               <div
                 className="row"
+                aria-label="공동 보드"
+                onKeyDown={handleBoardTabKeyDown}
                 style={{
                   gap: "4px",
                   background: "var(--bg)",
@@ -485,16 +524,13 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
                   justifyContent: "flex-end",
                 }}
               >
-                {[
-                  { key: "questions", label: `질문 · ${session.board.questions.length}` },
-                  { key: "checkins", label: `읽기 흔적 · ${session.board.checkins.length}` },
-                  { key: "highlights", label: `하이라이트 · ${session.board.highlights.length}` },
-                ].map((tab) => (
+                {boardTabs.map((tab) => (
                   <button
                     key={tab.key}
+                    id={`current-session-board-tab-${tab.key}`}
                     type="button"
                     aria-pressed={boardTab === tab.key}
-                    onClick={() => handleBoardTab(tab.key as BoardTab)}
+                    onClick={() => handleBoardTab(tab.key)}
                     style={{
                       height: "30px",
                       padding: "0 14px",
@@ -505,7 +541,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
                       fontWeight: boardTab === tab.key ? 500 : 400,
                     }}
                   >
-                    {tab.label}
+                    {tab.label(session)}
                   </button>
                 ))}
               </div>

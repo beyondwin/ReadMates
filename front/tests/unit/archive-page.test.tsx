@@ -420,6 +420,28 @@ describe("ArchivePage", () => {
     expect(scoped.queryByText("feedback-6-suhan.html")).not.toBeInTheDocument();
   });
 
+  it("moves archive tab selection with keyboard arrow keys", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+    );
+    const desktop = getDesktop(container);
+
+    const sessionTab = desktop.getByRole("button", { name: "세션" });
+    sessionTab.focus();
+    expect(sessionTab).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}");
+
+    expect(desktop.getByRole("button", { name: "내 서평" })).toHaveAttribute("aria-pressed", "true");
+    expect(desktop.getByRole("button", { name: "내 서평" })).toHaveFocus();
+
+    await user.keyboard("{End}");
+
+    expect(desktop.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
+    expect(desktop.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
+  });
+
   it("uses contextual session actions only for available app session routes", () => {
     const { container } = render(
       <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,

@@ -178,6 +178,34 @@ describe("HostMembersPage", () => {
     expect(screen.queryByText("승인 대기")).not.toBeInTheDocument();
   });
 
+  it("supports keyboard selection in the member management tablist", async () => {
+    const user = userEvent.setup();
+    renderHostMembersPage();
+
+    const activeTab = await screen.findByRole("tab", { name: "활성 멤버" });
+    const viewerTab = screen.getByRole("tab", { name: "둘러보기 멤버" });
+    const invitationsTab = screen.getByRole("tab", { name: "초대" });
+
+    activeTab.focus();
+    await user.keyboard("{ArrowRight}");
+    await waitFor(() => expect(viewerTab).toHaveFocus());
+    expect(viewerTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("둘러보기 요청자")).toBeInTheDocument();
+
+    await user.keyboard("{End}");
+    await waitFor(() => expect(invitationsTab).toHaveFocus());
+    expect(invitationsTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("초대 링크 관리")).toBeInTheDocument();
+
+    await user.keyboard("{Home}");
+    await waitFor(() => expect(activeTab).toHaveFocus());
+    expect(activeTab).toHaveAttribute("aria-selected", "true");
+
+    await user.keyboard("{ArrowLeft}");
+    await waitFor(() => expect(invitationsTab).toHaveFocus());
+    expect(invitationsTab).toHaveAttribute("aria-selected", "true");
+  });
+
   it("renders viewer registration dates with app date formatting", async () => {
     const user = userEvent.setup();
     renderHostMembersPage();
@@ -244,7 +272,10 @@ describe("HostMembersPage", () => {
     await user.click(firstRow.getByRole("button", { name: "정식 멤버로 전환" }));
 
     expect(firstRow.getByRole("button", { name: "정식 멤버로 전환" })).toBeDisabled();
+    expect(firstRow.getByRole("button", { name: "정식 멤버로 전환" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(firstRow.getByRole("button", { name: "둘러보기 해제" })).toBeDisabled();
+    expect(firstRow.getByRole("button", { name: "둘러보기 해제" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(firstRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(2);
     expect(secondRow.getByRole("button", { name: "정식 멤버로 전환" })).toBeEnabled();
     expect(secondRow.getByRole("button", { name: "둘러보기 해제" })).toBeEnabled();
 
@@ -253,7 +284,10 @@ describe("HostMembersPage", () => {
     expect(firstRow.getByRole("button", { name: "정식 멤버로 전환" })).toBeDisabled();
     expect(firstRow.getByRole("button", { name: "둘러보기 해제" })).toBeDisabled();
     expect(secondRow.getByRole("button", { name: "정식 멤버로 전환" })).toBeDisabled();
+    expect(secondRow.getByRole("button", { name: "정식 멤버로 전환" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(secondRow.getByRole("button", { name: "둘러보기 해제" })).toBeDisabled();
+    expect(secondRow.getByRole("button", { name: "둘러보기 해제" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(secondRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(2);
     expect(fetchMock).toHaveBeenCalledTimes(3);
 
     await user.click(firstRow.getByRole("button", { name: "둘러보기 해제" }));
@@ -262,6 +296,37 @@ describe("HostMembersPage", () => {
     firstApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
     secondApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
+  });
+
+  it("explains disabled viewer and suspended actions from capability flags", async () => {
+    const user = userEvent.setup();
+    const lockedViewer = {
+      ...members[1],
+      canDeactivate: false,
+    } satisfies HostMemberListItem;
+    const lockedSuspended = {
+      ...members[2],
+      canRestore: false,
+    } satisfies HostMemberListItem;
+    renderHostMembersPage([], [lockedViewer, lockedSuspended]);
+
+    await user.click(await screen.findByRole("tab", { name: "둘러보기 멤버" }));
+    const viewerRow = within(screen.getByText("둘러보기 요청자").closest("article") as HTMLElement);
+    const activateButton = viewerRow.getByRole("button", { name: "정식 멤버로 전환" });
+    const deactivateButton = viewerRow.getByRole("button", { name: "둘러보기 해제" });
+
+    expect(activateButton).toBeEnabled();
+    expect(deactivateButton).toBeDisabled();
+    expect(deactivateButton).toHaveAccessibleDescription("이 멤버는 현재 정책상 둘러보기 해제할 수 없습니다.");
+    expect(viewerRow.getByText("이 멤버는 현재 정책상 둘러보기 해제할 수 없습니다.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "정지됨" }));
+    const suspendedRow = within(screen.getByText("정지 멤버").closest("article") as HTMLElement);
+    const restoreButton = suspendedRow.getByRole("button", { name: "복구" });
+
+    expect(restoreButton).toBeDisabled();
+    expect(restoreButton).toHaveAccessibleDescription("이 멤버는 현재 정책상 복구할 수 없습니다.");
+    expect(suspendedRow.getByText("이 멤버는 현재 정책상 복구할 수 없습니다.")).toBeInTheDocument();
   });
 
   it("refreshes the hub after activating a viewer member", async () => {
@@ -395,7 +460,7 @@ describe("HostMembersPage", () => {
     await user.click(screen.getByRole("button", { name: "정식 멤버로 전환" }));
 
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
-    expect(screen.getByText("처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다.")).toBeInTheDocument();
+    expect(screen.getByText("처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
@@ -421,6 +486,35 @@ describe("HostMembersPage", () => {
     expect(dialog).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "이번 세션부터 바로 정지" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "다음 세션부터 정지" })).toBeInTheDocument();
+  });
+
+  it("explains disabled suspend and deactivate actions from capability flags", async () => {
+    const hostMember = {
+      ...members[0],
+      membershipId: "membership-host",
+      userId: "user-host",
+      email: "host@example.com",
+      displayName: "호스트 멤버",
+      shortName: "호",
+      role: "HOST",
+      canSuspend: false,
+      canDeactivate: false,
+      canRemoveFromCurrentSession: false,
+    } satisfies HostMemberListItem;
+    renderHostMembersPage([], [hostMember]);
+
+    const row = (await screen.findByText("호스트 멤버")).closest("article");
+    expect(row).not.toBeNull();
+    const hostRow = within(row as HTMLElement);
+    const suspendButton = hostRow.getByRole("button", { name: "정지" });
+    const deactivateButton = hostRow.getByRole("button", { name: "탈퇴 처리" });
+
+    expect(suspendButton).toBeDisabled();
+    expect(suspendButton).toHaveAccessibleDescription("호스트는 정지할 수 없습니다.");
+    expect(hostRow.getByText("호스트는 정지할 수 없습니다.")).toBeInTheDocument();
+    expect(deactivateButton).toBeDisabled();
+    expect(deactivateButton).toHaveAccessibleDescription("호스트는 탈퇴 처리할 수 없습니다.");
+    expect(hostRow.getByText("호스트는 탈퇴 처리할 수 없습니다.")).toBeInTheDocument();
   });
 
   it("manages lifecycle dialog focus and returns focus after Escape", async () => {
@@ -472,15 +566,26 @@ describe("HostMembersPage", () => {
   it("restores suspended members", async () => {
     const user = userEvent.setup();
     const restored = { ...members[2], status: "ACTIVE", canRestore: false, canSuspend: true } satisfies HostMemberListItem;
-    const fetchMock = renderHostMembersPage([lifecycleResponse(restored)]);
+    const restore = deferred<Response>();
+    const fetchMock = renderHostMembersPage([restore.promise]);
 
     await user.click(await screen.findByRole("tab", { name: "정지됨" }));
-    await user.click(screen.getByRole("button", { name: "복구" }));
+    const suspendedRow = within(screen.getByText("정지 멤버").closest("article") as HTMLElement);
+    await user.click(suspendedRow.getByRole("button", { name: "복구" }));
 
     expect(fetchMock).toHaveBeenLastCalledWith(
       "/api/bff/api/host/members/membership-suspended/restore",
       expect.objectContaining({ method: "POST" }),
     );
+    expect(suspendedRow.getByRole("button", { name: "복구" })).toBeDisabled();
+    expect(suspendedRow.getByRole("button", { name: "복구" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(suspendedRow.getByRole("button", { name: "탈퇴 처리" })).toBeDisabled();
+    expect(suspendedRow.getByRole("button", { name: "탈퇴 처리" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+
+    await act(async () => {
+      restore.resolve(lifecycleResponse(restored));
+      await restore.promise;
+    });
   });
 
   it("adds and removes members from the current session", async () => {
@@ -527,6 +632,10 @@ describe("HostMembersPage", () => {
     expect(activeRow.getByRole("button", { name: "정지" })).toBeDisabled();
     expect(activeRow.getByRole("button", { name: "탈퇴 처리" })).toBeDisabled();
     expect(activeRow.getByRole("button", { name: "이번 세션 제외" })).toBeDisabled();
+    expect(activeRow.getByRole("button", { name: "정지" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(activeRow.getByRole("button", { name: "탈퇴 처리" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(activeRow.getByRole("button", { name: "이번 세션 제외" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(activeRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(3);
 
     await user.click(activeRow.getByRole("button", { name: "정지" }));
     expect(fetchMock).toHaveBeenCalledTimes(2);

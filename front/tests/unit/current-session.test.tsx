@@ -53,6 +53,17 @@ function getDesktop(container: HTMLElement) {
   return desktop;
 }
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
+}
+
 describe("CurrentSession", () => {
   it("shows the empty state when there is no current session", () => {
     render(<CurrentSession data={{ currentSession: null }} />);
@@ -353,6 +364,27 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByText("API에서 온 하이라이트")).toBeInTheDocument();
   });
 
+  it("moves the shared board tabs with keyboard arrow keys", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<CurrentSession data={currentSessionData} />);
+    const desktopScope = within(getDesktop(container));
+
+    const questionTab = desktopScope.getByRole("button", { name: /질문 · 1/ });
+    questionTab.focus();
+    expect(questionTab).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}");
+
+    expect(desktopScope.getByRole("button", { name: /읽기 흔적 · 1/ })).toHaveAttribute("aria-pressed", "true");
+    expect(desktopScope.getByRole("button", { name: /읽기 흔적 · 1/ })).toHaveFocus();
+    expect(desktopScope.getByText("API에서 온 체크인")).toBeInTheDocument();
+
+    await user.keyboard("{End}");
+
+    expect(desktopScope.getByRole("button", { name: /하이라이트 · 1/ })).toHaveAttribute("aria-pressed", "true");
+    expect(desktopScope.getByText("API에서 온 하이라이트")).toBeInTheDocument();
+  });
+
   it("splits the mobile member session into prep, shared board, and records segments", async () => {
     const user = userEvent.setup();
 
@@ -382,6 +414,29 @@ describe("CurrentSession", () => {
     expect(mobileScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
     expect(mobileScope.getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("API에서 온 한줄평");
     expect(mobileScope.queryByText("API에서 온 체크인")).not.toBeInTheDocument();
+  });
+
+  it("moves the mobile session segments with keyboard arrow keys", async () => {
+    const user = userEvent.setup();
+
+    render(<CurrentSession data={currentSessionData} />);
+
+    const mobileScope = within(await screen.findByTestId("current-session-mobile"));
+    const prepTab = mobileScope.getByRole("button", { name: "내 준비" });
+
+    prepTab.focus();
+    expect(prepTab).toHaveFocus();
+
+    await user.keyboard("{ArrowRight}");
+
+    expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "true");
+    expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveFocus();
+    expect(mobileScope.getByText("API에서 온 질문")).toBeInTheDocument();
+
+    await user.keyboard("{End}");
+
+    expect(mobileScope.getByRole("button", { name: "내 기록" })).toHaveAttribute("aria-pressed", "true");
+    expect(mobileScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
   });
 
   it("preserves mobile save actions and feedback across session segments", async () => {
@@ -606,6 +661,24 @@ describe("CurrentSession", () => {
         method: "POST",
       }),
     );
+  });
+
+  it("uses specific pending feedback while saving prep changes", async () => {
+    const user = userEvent.setup();
+    const checkinSave = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn().mockReturnValue(checkinSave.promise));
+
+    const { container } = render(<CurrentSession data={currentSessionData} />);
+    const desktopScope = within(getDesktop(container));
+
+    await user.click(desktopScope.getByRole("button", { name: "체크인 저장" }));
+
+    expect(await desktopScope.findByText("체크인 변경사항을 저장하는 중")).toBeInTheDocument();
+    expect(desktopScope.getByRole("button", { name: "체크인 저장" })).toBeDisabled();
+
+    checkinSave.resolve(new Response(null, { status: 204 }));
+
+    expect(await desktopScope.findByText("체크인 저장됨")).toBeInTheDocument();
   });
 
   it("restores the previous RSVP state when saving RSVP fails", async () => {

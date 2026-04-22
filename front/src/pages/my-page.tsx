@@ -33,5 +33,9 @@ export default function MyRoutePage() {
     }, []),
   );
 
-  return <ReadmatesPageState state={state}>{(data) => <MyPage {...data} />}</ReadmatesPageState>;
+  return (
+    <ReadmatesPageState state={state} loadingLabel="내 공간을 불러오는 중">
+      {(data) => <MyPage {...data} />}
+    </ReadmatesPageState>
+  );
 }

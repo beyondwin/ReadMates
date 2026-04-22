@@ -17,5 +17,9 @@ export default function CurrentSessionPage() {
     }, []),
   );
 
-  return <ReadmatesPageState state={state}>{(data) => <CurrentSession auth={data.auth} data={data.current} />}</ReadmatesPageState>;
+  return (
+    <ReadmatesPageState state={state} loadingLabel="세션을 불러오는 중">
+      {(data) => <CurrentSession auth={data.auth} data={data.current} />}
+    </ReadmatesPageState>
+  );
 }

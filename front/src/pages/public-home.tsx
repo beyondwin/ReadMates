@@ -10,5 +10,9 @@ export default function PublicHomePage() {
     useCallback(() => readmatesFetch<PublicClubResponse>("/api/public/club"), []),
   );
 
-  return <ReadmatesPageState state={state}>{(data) => <PublicHome data={data} />}</ReadmatesPageState>;
+  return (
+    <ReadmatesPageState state={state} loadingLabel="공개 홈을 불러오는 중">
+      {(data) => <PublicHome data={data} />}
+    </ReadmatesPageState>
+  );
 }

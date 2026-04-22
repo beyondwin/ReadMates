@@ -141,6 +141,7 @@ describe("InviteAcceptanceCard", () => {
     await waitFor(() => expect(screen.queryByText("old-member@example.com")).not.toBeInTheDocument());
     expect(screen.queryByRole("link", { name: "Google로 초대 수락" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "초대장을 확인하는 중입니다." })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("초대를 확인하는 중입니다.");
 
     resolveSecondPreview(
       jsonResponse({

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { Icon, SaveFeedback } from "@/features/current-session/components/current-session-primitives";
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/components/current-session-question-editor";
 import { Link } from "@/src/app/router-link";
@@ -23,6 +23,42 @@ const rsvpOptions: Array<{ status: RsvpUpdateStatus; label: string }> = [
   { status: "MAYBE", label: "아직 미정" },
   { status: "DECLINED", label: "불참" },
 ];
+
+function focusMobileSessionTab(tab: MobileSessionTab) {
+  globalThis.setTimeout(() => {
+    document.getElementById(`mobile-session-tab-${tab}`)?.focus();
+  }, 0);
+}
+
+function handleMobileSessionTabKeyDown(
+  event: KeyboardEvent<HTMLDivElement>,
+  activeTab: MobileSessionTab,
+  onMobileTabChange: (tab: MobileSessionTab) => void,
+  tabs: Array<{ key: MobileSessionTab; label: string }>,
+) {
+  const keys = tabs.map((tab) => tab.key);
+  const currentIndex = keys.indexOf(activeTab);
+  const lastIndex = keys.length - 1;
+  const nextIndex =
+    event.key === "ArrowRight"
+      ? (currentIndex + 1) % keys.length
+      : event.key === "ArrowLeft"
+        ? (currentIndex - 1 + keys.length) % keys.length
+        : event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? lastIndex
+            : -1;
+
+  if (nextIndex < 0) {
+    return;
+  }
+
+  event.preventDefault();
+  const nextTab = keys[nextIndex];
+  onMobileTabChange(nextTab);
+  focusMobileSessionTab(nextTab);
+}
 
 function goingCount(session: CurrentSession) {
   return activeAttendees(session).filter((attendee) => attendee.rsvpStatus === "GOING").length;
@@ -143,10 +179,15 @@ export function MobileCurrentSessionBoard({
       </section>
 
       <div className="rm-current-session-mobile__seg-wrap">
-        <div className="m-seg" aria-label="세션 보기">
+        <div
+          className="m-seg"
+          aria-label="세션 보기"
+          onKeyDown={(event) => handleMobileSessionTabKeyDown(event, mobileTab, onMobileTabChange, tabs)}
+        >
           {tabs.map((tab) => (
             <button
               key={tab.key}
+              id={`mobile-session-tab-${tab.key}`}
               type="button"
               className="m-seg-btn"
               aria-pressed={mobileTab === tab.key}
