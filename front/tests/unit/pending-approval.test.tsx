@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import PendingApprovalPage from "@/src/pages/pending-approval";
 import { AuthContext } from "@/src/app/auth-state";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 const viewerAuth: AuthMeResponse = {
   authenticated: true,

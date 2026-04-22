@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import PublicClub from "@/features/public/components/public-club";
-import type { PublicClubResponse } from "@/shared/api/readmates";
+import PublicClub from "@/features/public/ui/public-club";
+import type { PublicClubResponse } from "@/features/public/api/public-contracts";
 
 afterEach(() => {
   cleanup();
@@ -73,6 +73,27 @@ describe("PublicClub", () => {
     expect(container).not.toHaveTextContent("Sessions");
     expect(container).not.toHaveTextContent("Books");
     expect(container).not.toHaveTextContent("Latest");
+  });
+
+  it("encodes public club session links containing spaces and slashes", () => {
+    render(
+      <PublicClub
+        data={{
+          ...publicClubFixture,
+          recentSessions: [
+            {
+              ...publicClubFixture.recentSessions[0],
+              sessionId: "session 6/slash",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getAllByRole("link", { name: /가난한 찰리의 연감/ }).at(-1)).toHaveAttribute(
+      "href",
+      "/sessions/session%206%2Fslash",
+    );
   });
 
   it("renders a neutral public introduction fallback when API about is blank", () => {

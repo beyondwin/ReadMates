@@ -1,4 +1,4 @@
-import type { AttendanceStatus, RsvpStatus } from "@/shared/api/readmates";
+import type { AttendanceStatus, RsvpStatus } from "@/shared/model/readmates-types";
 
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DATE_PREFIX_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?=[T\s])/;

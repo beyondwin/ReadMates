@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import InviteAcceptanceCard from "@/features/auth/components/invite-acceptance-card";
+import { InviteAcceptanceRouteContent } from "@/features/auth/route/invite-route";
 
 afterEach(() => {
   cleanup();
@@ -15,7 +15,7 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-describe("InviteAcceptanceCard", () => {
+describe("InviteAcceptanceRouteContent", () => {
   it("shows pending invitation details after the legacy password endpoint is gone", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       jsonResponse({
@@ -30,7 +30,7 @@ describe("InviteAcceptanceCard", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<InviteAcceptanceCard token="raw-token" />);
+    render(<InviteAcceptanceRouteContent token="raw-token" />);
 
     expect(await screen.findByText("member@example.com")).toBeInTheDocument();
     expect(screen.getByText("읽는사이")).toBeInTheDocument();
@@ -53,6 +53,30 @@ describe("InviteAcceptanceCard", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("loads invitation previews from the token prop", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({
+        clubName: "읽는사이",
+        email: "member@example.com",
+        name: "새멤버",
+        emailHint: "me****@example.com",
+        status: "PENDING",
+        expiresAt: "2026-05-20T12:00:00Z",
+        canAccept: true,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InviteAcceptanceRouteContent token="raw-token" />);
+
+    expect(await screen.findByText("member@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?inviteToken=raw-token",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("renders expired invitation state", async () => {
     vi.stubGlobal(
       "fetch",
@@ -71,7 +95,7 @@ describe("InviteAcceptanceCard", () => {
         ),
     );
 
-    render(<InviteAcceptanceCard token="raw-token" />);
+    render(<InviteAcceptanceRouteContent token="raw-token" />);
 
     expect(await screen.findByText("초대가 만료되었습니다.")).toBeInTheDocument();
     expect(screen.getByText("만료되어 수락 불가")).toBeInTheDocument();
@@ -98,7 +122,7 @@ describe("InviteAcceptanceCard", () => {
         ),
     );
 
-    render(<InviteAcceptanceCard token="accepted-token" />);
+    render(<InviteAcceptanceRouteContent token="accepted-token" />);
 
     expect(await screen.findByText("이미 사용된 초대입니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "로그인하기" })).toHaveAttribute("href", "/login");
@@ -127,7 +151,7 @@ describe("InviteAcceptanceCard", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
 
-    const { rerender } = render(<InviteAcceptanceCard token="old-token" />);
+    const { rerender } = render(<InviteAcceptanceRouteContent token="old-token" />);
 
     expect(await screen.findByText("old-member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
@@ -135,7 +159,7 @@ describe("InviteAcceptanceCard", () => {
       "/oauth2/authorization/google?inviteToken=old-token",
     );
 
-    rerender(<InviteAcceptanceCard token="new-token" />);
+    rerender(<InviteAcceptanceRouteContent token="new-token" />);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText("old-member@example.com")).not.toBeInTheDocument());

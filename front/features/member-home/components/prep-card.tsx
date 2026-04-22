@@ -1,5 +1,5 @@
 import { Link } from "@/src/app/router-link";
-import type { CurrentSessionResponse } from "@/shared/api/readmates";
+import type { MemberHomeCurrentSessionResponse as CurrentSessionResponse } from "@/features/member-home/api/member-home-contracts";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";

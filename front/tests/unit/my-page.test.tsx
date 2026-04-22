@@ -1,9 +1,11 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import type { CSSProperties, ReactNode } from "react";
+import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import MyPage from "@/features/archive/components/my-page";
-import type { FeedbackDocumentListItem, MyPageResponse } from "@/shared/api/readmates";
+import type { FeedbackDocumentListItem, MyPageResponse } from "@/features/archive/api/archive-contracts";
+import { myPageLoader } from "@/features/archive/route/my-page-data";
+import MyPage from "@/features/archive/ui/my-page";
 import MyRoutePage from "@/src/pages/my-page";
 
 afterEach(() => {
@@ -12,6 +14,57 @@ afterEach(() => {
 });
 
 type MyPageProps = Parameters<typeof MyPage>[0];
+
+function TestLogoutButton({
+  className,
+  style,
+  children,
+}: {
+  className?: string;
+  style?: CSSProperties;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={className}
+      style={style}
+      onClick={async () => {
+        const response = await fetch("/api/bff/api/auth/logout", { method: "POST" });
+
+        if (response.ok) {
+          globalThis.location.href = "/login";
+        }
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
+async function testLeaveMembership() {
+  const response = await fetch("/api/bff/api/me/membership/leave", {
+    method: "POST",
+    body: JSON.stringify({ currentSessionPolicy: "APPLY_NOW" }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Leave membership failed");
+  }
+}
 
 const data: MyPageResponse = {
   displayName: "김호스트",
@@ -53,6 +106,8 @@ function renderMyPage(overrides: Partial<MyPageProps> = {}) {
     reports,
     reviewCount: 3,
     questionCount: 7,
+    LogoutButtonComponent: TestLogoutButton,
+    onLeaveMembership: testLeaveMembership,
     ...overrides,
   };
 
@@ -184,7 +239,19 @@ describe("MyPage", () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/app/me"]}>
         <Routes>
-          <Route path="/app/me" element={<MyPage data={data} reports={reports} reviewCount={3} questionCount={7} />} />
+          <Route
+            path="/app/me"
+            element={
+              <MyPage
+                data={data}
+                reports={reports}
+                reviewCount={3}
+                questionCount={7}
+                LogoutButtonComponent={TestLogoutButton}
+                onLeaveMembership={testLeaveMembership}
+              />
+            }
+          />
           <Route path="/app/feedback/:sessionId" element={<LocationStateEcho />} />
         </Routes>
       </MemoryRouter>,
@@ -413,8 +480,26 @@ describe("MyPage", () => {
   });
 
   it("renders my page with an empty feedback list when viewer feedback documents are forbidden", async () => {
+    installRouterRequestShim();
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "member-user",
+            membershipId: "member-membership",
+            clubId: "club-id",
+            email: "member@example.com",
+            displayName: "이멤버5",
+            shortName: "멤버",
+            role: "MEMBER",
+            membershipStatus: "ACTIVE",
+            approvalState: "ACTIVE",
+          }),
+        );
+      }
 
       if (url === "/api/bff/api/app/me") {
         return Promise.resolve(jsonResponse(data));
@@ -432,13 +517,17 @@ describe("MyPage", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(
-      <MemoryRouter initialEntries={["/app/me"]}>
-        <Routes>
-          <Route path="/app/me" element={<MyRoutePage />} />
-        </Routes>
-      </MemoryRouter>,
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/app/me",
+          element: <MyRoutePage />,
+          loader: myPageLoader,
+        },
+      ],
+      { initialEntries: ["/app/me"] },
     );
+    render(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { level: 1, name: "내 공간" })).toBeInTheDocument();
     expect(screen.getAllByText("아직 열람 가능한 피드백 문서가 없습니다.")).toHaveLength(2);

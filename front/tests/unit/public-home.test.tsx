@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import PublicHome from "@/features/public/components/public-home";
-import type { PublicClubResponse } from "@/shared/api/readmates";
+import PublicHome from "@/features/public/ui/public-home";
+import type { PublicClubResponse } from "@/features/public/api/public-contracts";
 
 afterEach(cleanup);
 
@@ -85,6 +85,34 @@ describe("PublicHome", () => {
     );
     expect(container.innerHTML).not.toContain("물고기는 존재하지 않는다");
     expect(container.innerHTML).not.toContain("session-13");
+  });
+
+  it("encodes public session links containing spaces and slashes", () => {
+    const { container } = render(
+      <PublicHome
+        data={{
+          ...publicClubFixture,
+          recentSessions: [
+            {
+              ...publicClubFixture.recentSessions[0],
+              sessionId: "session 6/slash",
+            },
+            {
+              ...publicClubFixture.recentSessions[1],
+              sessionId: "session 5/slash",
+            },
+          ],
+        }}
+      />,
+    );
+    const hrefs = Array.from(container.querySelectorAll("a")).map((link) => link.getAttribute("href"));
+
+    expect(screen.getByRole("link", { name: "최근 공개 기록 가난한 찰리의 연감 보기" })).toHaveAttribute(
+      "href",
+      "/sessions/session%206%2Fslash",
+    );
+    expect(hrefs).toContain("/sessions/session%205%2Fslash");
+    expect(hrefs).not.toContain("/sessions/session 6/slash");
   });
 
   it("keeps the mobile hero peek before the latest-record feature in source order", () => {

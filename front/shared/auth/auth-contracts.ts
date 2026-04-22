@@ -1,0 +1,16 @@
+export type MemberRole = "HOST" | "MEMBER";
+export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
+export type ApprovalState = "ANONYMOUS" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "INACTIVE";
+
+export type AuthMeResponse = {
+  authenticated: boolean;
+  userId: string | null;
+  membershipId: string | null;
+  clubId: string | null;
+  email: string | null;
+  displayName: string | null;
+  shortName: string | null;
+  role: MemberRole | null;
+  membershipStatus: MembershipStatus | null;
+  approvalState: ApprovalState;
+};

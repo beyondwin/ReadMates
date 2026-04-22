@@ -1,18 +1,40 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import PublicSession from "@/features/public/components/public-session";
-import type { PublicSessionDetailResponse } from "@/shared/api/readmates";
+import PublicSession from "@/features/public/ui/public-session";
+import type { PublicSessionDetailResponse } from "@/features/public/api/public-contracts";
 import PublicSessionPage from "@/src/pages/public-session";
+import { publicSessionLoader } from "@/features/public/route/public-route-data";
+import { PublicRouteError } from "@/features/public/route/public-route-state";
+
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
 
 function renderPublicSessionRoute(sessionId: string, state?: Record<string, string>) {
-  render(
-    <MemoryRouter initialEntries={[state ? { pathname: `/sessions/${sessionId}`, state } : `/sessions/${sessionId}`]}>
-      <Routes>
-        <Route path="/sessions/:sessionId" element={<PublicSessionPage />} />
-      </Routes>
-    </MemoryRouter>,
+  installRouterRequestShim();
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/sessions/:sessionId",
+        element: <PublicSessionPage />,
+        loader: publicSessionLoader,
+        errorElement: <PublicRouteError />,
+      },
+    ],
+    { initialEntries: [state ? { pathname: `/sessions/${sessionId}`, state } : `/sessions/${sessionId}`] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 describe("PublicSessionPage", () => {

@@ -1,14 +1,14 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { type ComponentProps, type ComponentType } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import ArchivePage from "@/features/archive/components/archive-page";
+import ArchivePage from "@/features/archive/ui/archive-page";
 import type {
   ArchiveSessionItem,
+  FeedbackDocumentListItem,
   MyArchiveQuestionItem,
   MyArchiveReviewItem,
-} from "@/shared/api/readmates";
+} from "@/features/archive/api/archive-contracts";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 
@@ -19,22 +19,6 @@ afterEach(() => {
   Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
   window.history.pushState({}, "", "/");
 });
-
-type FeedbackDocumentListItem = {
-  sessionId: string;
-  sessionNumber: number;
-  title: string;
-  bookTitle: string;
-  date: string;
-  fileName: string;
-  uploadedAt: string;
-};
-
-type FutureArchivePageProps = Omit<ComponentProps<typeof ArchivePage>, "reports"> & {
-  reports: FeedbackDocumentListItem[];
-};
-
-const FutureArchivePage = ArchivePage as unknown as ComponentType<FutureArchivePageProps>;
 
 const seededSessions: ArchiveSessionItem[] = [
   {
@@ -194,7 +178,7 @@ function ArchiveSearchParamHarness() {
       <button type="button" onClick={() => setSearchParams({ view: "report" })}>
         search report
       </button>
-      <FutureArchivePage
+      <ArchivePage
         sessions={seededSessions}
         questions={seededQuestions}
         reviews={seededReviews}
@@ -223,7 +207,7 @@ function LocationStateEcho() {
 describe("ArchivePage", () => {
   it("shows the record storage title and session archive controls", () => {
     const { container } = render(
-      <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
     );
     const desktop = getDesktop(container);
 
@@ -255,7 +239,7 @@ describe("ArchivePage", () => {
     };
 
     const { container } = render(
-      <FutureArchivePage sessions={[lockedSession]} questions={[]} reviews={[]} reports={[]} />,
+      <ArchivePage sessions={[lockedSession]} questions={[]} reviews={[]} reports={[]} />,
     );
     const desktop = getDesktop(container);
     const mobile = within(container.querySelector(".rm-archive-mobile") as HTMLElement);
@@ -282,7 +266,7 @@ describe("ArchivePage", () => {
       state: "CLOSED",
     };
     const validRender = render(
-      <FutureArchivePage sessions={[seededSessions[0]]} questions={[]} reviews={[]} reports={[]} />,
+      <ArchivePage sessions={[seededSessions[0]]} questions={[]} reviews={[]} reports={[]} />,
     );
 
     expect(getDesktop(validRender.container).getByText("04.15")).toBeInTheDocument();
@@ -290,7 +274,7 @@ describe("ArchivePage", () => {
     validRender.unmount();
 
     const fallbackRender = render(
-      <FutureArchivePage
+      <ArchivePage
         sessions={[sessionWithMissingDate]}
         questions={[]}
         reviews={[]}
@@ -317,7 +301,7 @@ describe("ArchivePage", () => {
     };
 
     const { container } = render(
-      <FutureArchivePage
+      <ArchivePage
         sessions={[seededSessions[0], sessionWithMissingDate]}
         questions={[]}
         reviews={[]}
@@ -337,7 +321,7 @@ describe("ArchivePage", () => {
 
   it("renders the standalone-aligned mobile archive shell", () => {
     const { container } = render(
-      <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
     );
 
     const mobile = container.querySelector(".rm-archive-mobile");
@@ -376,7 +360,7 @@ describe("ArchivePage", () => {
   it("switches mobile archive tabs using Korean chip labels", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
     );
 
     const mobile = container.querySelector(".rm-archive-mobile") as HTMLElement;
@@ -423,7 +407,7 @@ describe("ArchivePage", () => {
   it("moves archive tab selection with keyboard arrow keys", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
     );
     const desktop = getDesktop(container);
 
@@ -444,7 +428,7 @@ describe("ArchivePage", () => {
 
   it("uses contextual session actions only for available app session routes", () => {
     const { container } = render(
-      <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
     );
     const desktop = getDesktop(container);
 
@@ -468,7 +452,7 @@ describe("ArchivePage", () => {
     setScrollY(720);
     const desktopRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
-        <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+        <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
       </MemoryRouter>,
     );
 
@@ -482,7 +466,7 @@ describe("ArchivePage", () => {
 
     const mobileRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
-        <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+        <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
       </MemoryRouter>,
     );
     const mobile = within(mobileRender.container.querySelector(".rm-archive-mobile") as HTMLElement);
@@ -497,7 +481,7 @@ describe("ArchivePage", () => {
 
     const feedbackRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=report"]}>
-        <FutureArchivePage
+        <ArchivePage
           sessions={seededSessions}
           questions={seededQuestions}
           reviews={seededReviews}
@@ -517,7 +501,7 @@ describe("ArchivePage", () => {
 
     const printRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=report"]}>
-        <FutureArchivePage
+        <ArchivePage
           sessions={seededSessions}
           questions={seededQuestions}
           reviews={seededReviews}
@@ -548,7 +532,7 @@ describe("ArchivePage", () => {
     };
 
     const { container } = render(
-      <FutureArchivePage sessions={[unpublishedArchiveSession]} questions={[]} reviews={[]} reports={[]} />,
+      <ArchivePage sessions={[unpublishedArchiveSession]} questions={[]} reviews={[]} reports={[]} />,
     );
     const desktop = getDesktop(container);
     const mobile = within(container.querySelector(".rm-archive-mobile") as HTMLElement);
@@ -573,7 +557,7 @@ describe("ArchivePage", () => {
     const user = userEvent.setup();
 
     const { container } = render(
-      <FutureArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
     );
     const desktop = getDesktop(container);
 
@@ -614,7 +598,7 @@ describe("ArchivePage", () => {
 
   it("uses contextual icon-only labels when multiple feedback reports are listed", () => {
     const { container } = render(
-      <FutureArchivePage
+      <ArchivePage
         sessions={[]}
         questions={[]}
         reviews={[]}
@@ -658,7 +642,7 @@ describe("ArchivePage", () => {
           <Route
             path="/app/archive"
             element={
-              <FutureArchivePage
+              <ArchivePage
                 sessions={seededSessions}
                 questions={seededQuestions}
                 reviews={seededReviews}
@@ -680,7 +664,7 @@ describe("ArchivePage", () => {
 
   it("can open directly with the feedback document tab selected", () => {
     const { container } = render(
-      <FutureArchivePage
+      <ArchivePage
         sessions={seededSessions}
         questions={seededQuestions}
         reviews={seededReviews}
@@ -725,7 +709,7 @@ describe("ArchivePage", () => {
     window.history.pushState({}, "", "/app/archive?view=sessions");
 
     render(
-      <FutureArchivePage
+      <ArchivePage
         sessions={seededSessions}
         questions={seededQuestions}
         reviews={seededReviews}
@@ -795,7 +779,7 @@ describe("ArchivePage", () => {
     ];
 
     const { container } = render(
-      <FutureArchivePage
+      <ArchivePage
         sessions={sessionsWithEncodedId}
         questions={questionsWithEncodedId}
         reviews={reviewsWithEncodedId}
@@ -826,7 +810,7 @@ describe("ArchivePage", () => {
   it("renders empty states instead of fallback samples", async () => {
     const user = userEvent.setup();
 
-    const { container } = render(<FutureArchivePage sessions={[]} questions={[]} reviews={[]} reports={[]} />);
+    const { container } = render(<ArchivePage sessions={[]} questions={[]} reviews={[]} reports={[]} />);
     const desktop = getDesktop(container);
 
     expect(desktop.getByText("아직 저장된 모임 기록이 없습니다.")).toBeInTheDocument();
@@ -844,7 +828,7 @@ describe("ArchivePage", () => {
 
   it("renders mobile empty states with mobile card/list primitives", async () => {
     const user = userEvent.setup();
-    const { container } = render(<FutureArchivePage sessions={[]} questions={[]} reviews={[]} reports={[]} />);
+    const { container } = render(<ArchivePage sessions={[]} questions={[]} reviews={[]} reports={[]} />);
 
     const mobile = container.querySelector(".rm-archive-mobile") as HTMLElement;
     expect(mobile).not.toBeNull();

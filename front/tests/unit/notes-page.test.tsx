@@ -1,8 +1,9 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { NoteFeedItem, NoteSessionItem } from "@/shared/api/readmates";
-import type { FeedFilter } from "@/features/archive/components/notes-feed-list";
+import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
+import type { FeedFilter } from "@/features/archive/model/notes-feed-model";
+import { notesFeedLoader } from "@/features/archive/route/notes-feed-data";
 import NotesPage from "@/src/pages/notes";
 
 const { notesFeedPageMock } = vi.hoisted(() => ({
@@ -18,7 +19,7 @@ type NotesFeedProps = {
   onFilterChange?: (filter: FeedFilter) => void;
 };
 
-vi.mock("@/features/archive/components/notes-feed-page", () => ({
+vi.mock("@/features/archive/ui/notes-feed-page", () => ({
   default: (props: NotesFeedProps) => {
     notesFeedPageMock(props);
     return <div data-testid="notes-feed">{props.selectedSessionId ?? "none"}</div>;
@@ -81,6 +82,19 @@ function jsonResponse(body: unknown) {
   });
 }
 
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
 function mockNotesBff({
   sessions = noteSessions,
   feed = feedItems,
@@ -92,6 +106,23 @@ function mockNotesBff({
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "member-user",
+            membershipId: "member-membership",
+            clubId: "club-id",
+            email: "member@example.com",
+            displayName: "이멤버5",
+            shortName: "멤버",
+            role: "MEMBER",
+            membershipStatus: "ACTIVE",
+            approvalState: "ACTIVE",
+          }),
+        );
+      }
 
       if (url === "/api/bff/api/notes/sessions") {
         return Promise.resolve(jsonResponse(sessions));
@@ -107,6 +138,7 @@ function mockNotesBff({
 }
 
 function renderNotesPage(sessionId?: string, filter?: string) {
+  installRouterRequestShim();
   const params = new URLSearchParams();
 
   if (sessionId) {
@@ -119,11 +151,18 @@ function renderNotesPage(sessionId?: string, filter?: string) {
 
   const search = params.toString();
 
-  render(
-    <MemoryRouter initialEntries={[`/app/notes${search ? `?${search}` : ""}`]}>
-      <NotesPage />
-    </MemoryRouter>,
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/notes",
+        element: <NotesPage />,
+        loader: notesFeedLoader,
+      },
+    ],
+    { initialEntries: [`/app/notes${search ? `?${search}` : ""}`] },
   );
+
+  render(<RouterProvider router={router} />);
 }
 
 async function latestNotesProps() {
@@ -153,9 +192,8 @@ describe("NotesPage", () => {
       onFilterChange: expect.any(Function),
     });
     expect(screen.getByTestId("notes-feed")).toHaveTextContent("session-6");
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/bff/api/notes/sessions", expect.any(Object));
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      2,
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/bff/api/notes/feed?sessionId=session-6",
       expect.any(Object),
     );
@@ -167,9 +205,8 @@ describe("NotesPage", () => {
     renderNotesPage();
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/bff/api/notes/sessions", expect.any(Object));
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      2,
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/bff/api/notes/feed?sessionId=session-6",
       expect.any(Object),
     );
@@ -198,9 +235,8 @@ describe("NotesPage", () => {
     renderNotesPage("missing-session");
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/bff/api/notes/sessions", expect.any(Object));
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      2,
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/bff/api/notes/feed?sessionId=session-6",
       expect.any(Object),
     );
@@ -229,9 +265,8 @@ describe("NotesPage", () => {
     renderNotesPage();
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/bff/api/notes/sessions", expect.any(Object));
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      2,
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/bff/api/notes/feed?sessionId=session-7",
       expect.any(Object),
     );
@@ -251,7 +286,7 @@ describe("NotesPage", () => {
     renderNotesPage();
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
     expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
     expect(props).toEqual({
       items: [],

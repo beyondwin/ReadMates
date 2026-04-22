@@ -8,13 +8,27 @@ import {
   useRef,
   useState,
 } from "react";
+import type {
+  AttendanceStatus,
+  FeedbackDocumentResponse,
+  HostSessionDeletionPreviewResponse,
+  HostSessionDetailResponse,
+} from "@/features/host/api/host-contracts";
 import {
-  readmatesFetchResponse,
-  type AttendanceStatus,
-  type FeedbackDocumentResponse,
-  type HostSessionDeletionPreviewResponse,
-  type HostSessionDetailResponse,
-} from "@/shared/api/readmates";
+  buildHostSessionRequest,
+  buildPublicationRequest,
+  getDestructiveActionAvailability,
+  hydrateHostSessionFormValues,
+  initialAttendanceStatuses,
+  initialFeedbackDocumentStatus,
+  initialPublicationMode,
+  initialPublicationSummary,
+  questionDeadlineLabelForForm,
+  type HostSessionPublicationAction,
+  type HostSessionPublicationMode,
+  type HostSessionPublicationRequest,
+  type HostSessionRequest,
+} from "@/features/host/model/host-session-editor-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { SessionIdentity } from "@/shared/ui/session-identity";
 import {
@@ -26,15 +40,8 @@ import { Link } from "@/src/app/router-link";
 import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { HostSessionFeedbackUpload } from "./host-session-feedback-upload";
-import {
-  buildHostSessionRequest,
-  defaultSessionDateFrom,
-  questionDeadlineLabelFromIso,
-  questionDeadlineLabelFromSessionDate,
-} from "./host-session-schedule";
 
 const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
-const defaultBookLink = "https://product.kyobobook.co.kr/detail/S000001947832";
 
 const operationOrder = [
   "기본 정보 → 일정 확정",
@@ -44,8 +51,8 @@ const operationOrder = [
 ];
 
 type MobileEditorSection = "basic" | "publish" | "attendance" | "report";
-type PublicationMode = "internal" | "draft" | "public";
-type PublicationAction = "draft" | "public";
+type PublicationMode = HostSessionPublicationMode;
+type PublicationAction = HostSessionPublicationAction;
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type PublicationFeedback = {
@@ -119,45 +126,48 @@ function handleMobileEditorSectionKeyDown(
   focusMobileEditorSection(nextSection);
 }
 
-function initialPublicationMode(session?: HostSessionDetailResponse): PublicationMode {
-  if (!session?.publication) {
-    return "internal";
-  }
-
-  return session.publication.isPublic ? "public" : "draft";
-}
-
-function initialAttendanceStatuses(
-  attendees?: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
-): Record<string, AttendanceStatus> {
-  return Object.fromEntries((attendees ?? []).map((attendee) => [attendee.membershipId, attendee.attendanceStatus]));
-}
-
 type AttendanceWriteState = {
   inFlight: boolean;
   inFlightStatus: AttendanceStatus | null;
   queuedStatus: AttendanceStatus | null;
 };
 
+type JsonResponse<T> = Response & { json(): Promise<T> };
+
+export type HostSessionEditorActions = {
+  loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
+  deleteSession: (sessionId: string) => Promise<Response>;
+  saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
+  savePublication: (sessionId: string, request: HostSessionPublicationRequest) => Promise<Response>;
+  updateAttendance: (
+    sessionId: string,
+    attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
+  ) => Promise<Response>;
+  uploadFeedbackDocument: (sessionId: string, formData: FormData) => Promise<JsonResponse<FeedbackDocumentResponse>>;
+};
+
 export default function HostSessionEditor({
   session,
   returnTarget = hostDashboardReturnTarget,
+  actions,
 }: {
   session?: HostSessionDetailResponse | null;
   returnTarget?: ReadmatesReturnTarget;
+  actions: HostSessionEditorActions;
 }) {
-  const [title, setTitle] = useState(session?.title ?? "7회차 모임 · ");
-  const [bookTitle, setBookTitle] = useState(session?.bookTitle ?? "");
-  const [bookAuthor, setBookAuthor] = useState(session?.bookAuthor ?? "");
-  const [bookLink, setBookLink] = useState(session ? (session.bookLink ?? "") : defaultBookLink);
-  const [bookImageUrl, setBookImageUrl] = useState(session?.bookImageUrl ?? "");
-  const [date, setDate] = useState(() => session?.date ?? defaultSessionDateFrom(new Date()));
-  const [time, setTime] = useState(session?.startTime ?? "20:00");
-  const [locationLabel, setLocationLabel] = useState(session?.locationLabel ?? "온라인");
-  const [meetingUrl, setMeetingUrl] = useState(session?.meetingUrl ?? "");
-  const [meetingPasscode, setMeetingPasscode] = useState(session?.meetingPasscode ?? "");
-  const [publicationMode, setPublicationMode] = useState<PublicationMode>(() => initialPublicationMode(session ?? undefined));
-  const [summary, setSummary] = useState(session?.publication?.publicSummary ?? "");
+  const [formDefaults] = useState(() => hydrateHostSessionFormValues(session));
+  const [title, setTitle] = useState(formDefaults.title);
+  const [bookTitle, setBookTitle] = useState(formDefaults.bookTitle);
+  const [bookAuthor, setBookAuthor] = useState(formDefaults.bookAuthor);
+  const [bookLink, setBookLink] = useState(formDefaults.bookLink);
+  const [bookImageUrl, setBookImageUrl] = useState(formDefaults.bookImageUrl);
+  const [date, setDate] = useState(formDefaults.date);
+  const [time, setTime] = useState(formDefaults.startTime);
+  const [locationLabel, setLocationLabel] = useState(formDefaults.locationLabel);
+  const [meetingUrl, setMeetingUrl] = useState(formDefaults.meetingUrl);
+  const [meetingPasscode, setMeetingPasscode] = useState(formDefaults.meetingPasscode);
+  const [publicationMode, setPublicationMode] = useState<PublicationMode>(() => initialPublicationMode(session));
+  const [summary, setSummary] = useState(() => initialPublicationSummary(session));
   const [publicationActionInFlight, setPublicationActionInFlight] = useState<PublicationAction | null>(null);
   const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -165,7 +175,7 @@ export default function HostSessionEditor({
   const [attendanceStatuses, setAttendanceStatuses] =
     useState<Record<string, AttendanceStatus>>(() => initialAttendanceStatuses(session?.attendees));
   const [feedbackDocument, setFeedbackDocument] = useState(
-    () => session?.feedbackDocument ?? { uploaded: false, fileName: null, uploadedAt: null },
+    () => initialFeedbackDocumentStatus(session),
   );
   const [toast, setToast] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -180,10 +190,7 @@ export default function HostSessionEditor({
     initialAttendanceStatuses(session?.attendees),
   );
   const attendanceWriteStatesRef = useRef<Record<string, AttendanceWriteState>>({});
-  const deadline =
-    session?.questionDeadlineAt && date === session.date
-      ? questionDeadlineLabelFromIso(session.questionDeadlineAt)
-      : questionDeadlineLabelFromSessionDate(date);
+  const deadline = questionDeadlineLabelForForm(session, date);
   const isNewSession = session === null || session === undefined;
   const editorTitle = isNewSession ? "새 세션 만들기" : "이번 세션 편집";
   const primarySaveLabel = isNewSession ? "새 세션 만들기" : "변경 사항 저장";
@@ -198,6 +205,7 @@ export default function HostSessionEditor({
         state: readmatesReturnState(returnTarget),
       })
     : undefined;
+  const destructiveActionAvailability = getDestructiveActionAvailability(session);
 
   const flash = (message: string) => {
     setToast(message);
@@ -223,7 +231,7 @@ export default function HostSessionEditor({
   };
 
   const openDeleteModal = async () => {
-    if (!session || session.state !== "OPEN") {
+    if (!session || !destructiveActionAvailability.canDelete) {
       return;
     }
 
@@ -234,9 +242,7 @@ export default function HostSessionEditor({
     setDeletePreviewLoading(true);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/deletion-preview`, {
-        method: "GET",
-      });
+      const response = await actions.loadDeletionPreview(session.sessionId);
 
       if (!response.ok) {
         setDeleteError(deletionErrorMessage(response.status));
@@ -260,9 +266,7 @@ export default function HostSessionEditor({
     setDeleteSubmitting(true);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}`, {
-        method: "DELETE",
-      });
+      const response = await actions.deleteSession(session.sessionId);
 
       if (!response.ok) {
         setDeleteError(deletionErrorMessage(response.status));
@@ -297,11 +301,7 @@ export default function HostSessionEditor({
       startTime: time,
     }, session ?? undefined);
     try {
-      const response = await readmatesFetchResponse(session ? `/api/host/sessions/${session.sessionId}` : "/api/host/sessions", {
-        method: session ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await actions.saveSession(session?.sessionId ?? null, payload);
 
       if (response.ok) {
         setSaveState("saved");
@@ -322,9 +322,9 @@ export default function HostSessionEditor({
       return;
     }
 
-    const publicSummary = summary.trim();
+    const publicationRequest = buildPublicationRequest(summary, action);
 
-    if (!publicSummary) {
+    if (!publicationRequest) {
       setPublicationFeedback({
         tone: "error",
         message: "공개 요약을 입력한 뒤 저장해주세요.",
@@ -332,20 +332,11 @@ export default function HostSessionEditor({
       return;
     }
 
-    const isPublic = action === "public";
-
     setPublicationActionInFlight(action);
     setPublicationFeedback(null);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/publication`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          publicSummary,
-          isPublic,
-        }),
-      });
+      const response = await actions.savePublication(session.sessionId, publicationRequest);
 
       if (!response.ok) {
         setPublicationFeedback({
@@ -358,11 +349,11 @@ export default function HostSessionEditor({
         return;
       }
 
-      setSummary(publicSummary);
-      setPublicationMode(isPublic ? "public" : "draft");
+      setSummary(publicationRequest.publicSummary);
+      setPublicationMode(publicationRequest.isPublic ? "public" : "draft");
       setPublicationFeedback({
         tone: "success",
-        message: isPublic ? "공개 기록을 발행했습니다." : "요약 초안을 저장했습니다.",
+        message: publicationRequest.isPublic ? "공개 기록을 발행했습니다." : "요약 초안을 저장했습니다.",
       });
     } catch {
       setPublicationFeedback({
@@ -418,11 +409,7 @@ export default function HostSessionEditor({
       };
 
       try {
-        const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/attendance`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([{ membershipId, attendanceStatus: status }]),
-        });
+        const response = await actions.updateAttendance(session.sessionId, [{ membershipId, attendanceStatus: status }]);
 
         writeSucceeded = response.ok;
 
@@ -474,10 +461,7 @@ export default function HostSessionEditor({
     formData.append("file", file);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/feedback-document`, {
-        method: "POST",
-        body: formData,
-      });
+      const response = await actions.uploadFeedbackDocument(session.sessionId, formData);
 
       if (!response.ok) {
         flash("피드백 문서 업로드에 실패했습니다. 파일 형식과 권한을 확인해 주세요");
@@ -963,16 +947,14 @@ export default function HostSessionEditor({
                     ref={deleteTriggerRef}
                     className="btn btn-ghost btn-sm u-w-full"
                     type="button"
-                    disabled={session.state !== "OPEN"}
+                    disabled={!destructiveActionAvailability.canDelete}
                     onClick={openDeleteModal}
                     style={{ justifyContent: "flex-start", color: "var(--danger)" }}
                   >
                     세션 삭제
                   </button>
                   <div className="tiny" style={{ marginTop: "8px" }}>
-                    {session.state === "OPEN"
-                      ? "세션과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다."
-                      : "닫히거나 공개된 세션은 삭제할 수 없습니다."}
+                    {destructiveActionAvailability.guidance}
                   </div>
                 </div>
               ) : null}

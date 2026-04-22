@@ -12,17 +12,32 @@ import {
 import type {
   CurrentSessionPolicy,
   HostMemberListItem,
+  MembershipStatus,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
-  MembershipStatus,
   SessionParticipationStatus,
   ViewerMember,
-} from "@/shared/api/readmates";
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/readmates";
+} from "@/features/host/api/host-contracts";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+
+type HostMemberLifecyclePath = "/suspend" | "/deactivate" | "/restore" | "/current-session/add" | "/current-session/remove";
+type HostViewerAction = "activate" | "deactivate-viewer";
+
+type JsonResponse<T> = Response & { json(): Promise<T> };
+
+export type HostMembersActions = {
+  loadMembers: () => Promise<HostMemberListItem[]>;
+  submitLifecycle: (
+    membershipId: string,
+    path: HostMemberLifecyclePath,
+    body?: MemberLifecycleRequest,
+  ) => Promise<JsonResponse<MemberLifecycleResponse>>;
+  submitViewerAction: (membershipId: string, action: HostViewerAction) => Promise<ViewerMember>;
+};
 
 type HostMembersProps = {
   initialMembers: HostMemberListItem[];
+  actions: HostMembersActions;
 };
 
 type MemberRowsState = {
@@ -32,7 +47,7 @@ type MemberRowsState = {
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
 type MemberTab = "active" | "viewer" | "suspended" | "inactive" | "invitations";
 type LifecycleDialog = null | { action: "suspend" | "deactivate"; member: HostMemberListItem };
-type ViewerAction = "activate" | "deactivate-viewer";
+type ViewerAction = HostViewerAction;
 
 const tabs: Array<{ key: MemberTab; label: string }> = [
   { key: "active", label: "활성 멤버" },
@@ -250,11 +265,7 @@ function isMembershipPending(membershipId: string, pendingActions: Set<string>) 
   return false;
 }
 
-function encodeMembershipId(member: HostMemberListItem) {
-  return encodeURIComponent(member.membershipId);
-}
-
-export default function HostMembers({ initialMembers }: HostMembersProps) {
+export default function HostMembers({ initialMembers, actions }: HostMembersProps) {
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
     source: initialMembers,
     members: initialMembers,
@@ -325,7 +336,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
     refreshRequestIdRef.current = requestId;
 
     try {
-      const nextMembers = await readmatesFetch<HostMemberListItem[]>("/api/host/members");
+      const nextMembers = await actions.loadMembers();
       if (requestId === refreshRequestIdRef.current) {
         setMembers(nextMembers);
       }
@@ -336,7 +347,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
     }
   };
 
-  async function submitLifecycle(member: HostMemberListItem, path: string, body?: MemberLifecycleRequest) {
+  async function submitLifecycle(member: HostMemberListItem, path: HostMemberLifecyclePath, body?: MemberLifecycleRequest) {
     const key = actionKey(member, path);
     if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
       return;
@@ -346,10 +357,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
     setMessage(null);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/members/${encodeMembershipId(member)}${path}`, {
-        method: "POST",
-        body: body ? JSON.stringify(body) : undefined,
-      });
+      const response = await actions.submitLifecycle(member.membershipId, path, body);
       if (!response.ok) {
         throw new Error("Member lifecycle update failed");
       }
@@ -378,9 +386,7 @@ export default function HostMembers({ initialMembers }: HostMembersProps) {
       action === "activate" ? "정식 멤버로 전환했습니다." : "둘러보기 멤버를 해제했습니다.";
 
     try {
-      await readmatesFetch<ViewerMember>(`/api/host/members/${encodeMembershipId(member)}/${action}`, {
-        method: "POST",
-      });
+      await actions.submitViewerAction(member.membershipId, action);
 
       setMembers((current) => current.filter((item) => item.membershipId !== member.membershipId));
       setMessage({ kind: "status", text: successMessage });
@@ -685,10 +691,10 @@ function CurrentSessionAction({
 }: {
   member: HostMemberListItem;
   pendingActions: Set<string>;
-  onSubmit: (member: HostMemberListItem, path: string) => Promise<void>;
+  onSubmit: (member: HostMemberListItem, path: HostMemberLifecyclePath) => Promise<void>;
 }) {
   const isParticipating = member.currentSessionParticipationStatus === "ACTIVE";
-  const path = isParticipating ? "/current-session/remove" : "/current-session/add";
+  const path: HostMemberLifecyclePath = isParticipating ? "/current-session/remove" : "/current-session/add";
   const enabled = isParticipating ? member.canRemoveFromCurrentSession : member.canAddToCurrentSession;
   const label = isParticipating ? "이번 세션 제외" : "이번 세션 추가";
   const rowPending = isMembershipPending(member.membershipId, pendingActions);

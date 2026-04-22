@@ -1,15 +1,15 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LoginCard } from "@/features/auth/components/login-card";
+import { LoginRoute } from "@/features/auth/route/login-route";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
 });
 
-describe("LoginCard", () => {
+describe("LoginRoute", () => {
   it("shows only the Google login action outside dev login mode", () => {
-    render(<LoginCard />);
+    render(<LoginRoute />);
 
     expect(screen.getByText("Private reading room")).toBeVisible();
     expect(screen.getByRole("heading", { name: "읽는사이 멤버 입장" })).toBeVisible();
@@ -28,7 +28,7 @@ describe("LoginCard", () => {
     vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
     vi.stubEnv("NEXT_PUBLIC_ENABLE_DEV_LOGIN", "true");
 
-    render(<LoginCard />);
+    render(<LoginRoute />);
 
     expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toBeInTheDocument();
     expect(screen.queryByText("Local development only")).not.toBeInTheDocument();
@@ -38,7 +38,7 @@ describe("LoginCard", () => {
   it("shows seeded existing-user shortcuts in dev login mode", () => {
     vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
 
-    render(<LoginCard />);
+    render(<LoginRoute />);
 
     expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toBeInTheDocument();
     expect(screen.getByText("Local development only")).toBeInTheDocument();
@@ -51,4 +51,5 @@ describe("LoginCard", () => {
     expect(screen.getByRole("button", { name: "송멤버4" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이멤버5" })).toBeInTheDocument();
   });
+
 });

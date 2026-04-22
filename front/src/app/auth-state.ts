@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { AuthMeResponse } from "@/shared/api/readmates";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 export type AuthState = { status: "loading" } | { status: "ready"; auth: AuthMeResponse };
 
