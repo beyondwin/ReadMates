@@ -1,12 +1,14 @@
 # 공개 저장소 보안
 
-ReadMates 저장소는 공개 GitHub 저장소로 publish해도 안전해야 합니다. 운영 secret, 실제 멤버 신원, provider 상태 파일은 Git이 추적하는 파일에 들어가면 안 됩니다.
+ReadMates 저장소는 공개 GitHub 저장소로 전환하거나 공개 릴리즈 후보를 별도 저장소에 옮겨도 안전해야 합니다. 운영 secret, 실제 멤버 신원, provider 상태 파일은 Git이 추적하는 파일에 들어가면 안 됩니다.
 
 ## 공개 방식
 
-기본 전략은 기존 private 저장소를 그대로 public으로 전환하는 것이 아니라, 검토된 파일만 복사한 clean public release를 만드는 것입니다. 공개 후보에는 제품 소스, 공개 배포 문서, placeholder 기반 예시만 포함하고 private 작업 이력, 로컬 산출물, provider 상태, 실제 secret은 포함하지 않습니다.
+기본 전략은 기존 private 저장소를 그대로 public으로 전환하는 것이 아니라, 검토된 파일만 복사한 clean 공개 릴리즈 후보를 만드는 것입니다. 공개 릴리즈 후보에는 제품 소스, 공개 배포/개발 문서, placeholder 기반 예시만 포함하고 private 작업 이력, 로컬 산출물, provider 상태, 실제 secret은 포함하지 않습니다.
 
-공개 후보에 포함하는 주요 경로:
+`scripts/build-public-release-candidate.sh`는 `.tmp/public-release-candidate`를 만들 뿐 GitHub에 게시하거나 저장소 공개 설정을 바꾸지 않습니다. `scripts/public-release-check.sh`는 후보 또는 현재 tree를 검사할 뿐 secret rotation, commit 생성, 원격 push를 수행하지 않습니다.
+
+공개 릴리즈 후보에 포함하는 주요 경로:
 
 - `.github/workflows/ci.yml`
 - `.gitignore`
@@ -17,9 +19,10 @@ ReadMates 저장소는 공개 GitHub 저장소로 publish해도 안전해야 합
 - `server/`
 - `deploy/oci/`
 - `docs/deploy/`
-- 공개 릴리스 검증용 `scripts/`
+- `docs/development/`
+- 공개 릴리즈 검증용 `scripts/`
 
-공개 후보에서 제외하는 주요 경로:
+공개 릴리즈 후보에서 제외하는 주요 경로:
 
 - `.git/`
 - `.env`, `.env.*`, 단 `.env.example`은 예외
@@ -105,24 +108,24 @@ deploy/oci/*.state
 
 ## 공개 전 scan
 
-반복 가능한 검증은 `scripts/public-release-check.sh`를 사용합니다. 공개 후보를 만든 뒤 후보 디렉터리를 먼저 검사합니다.
+반복 가능한 검증은 `scripts/public-release-check.sh`를 사용합니다. 공개 릴리즈 후보를 만든 뒤 후보 디렉터리를 먼저 검사합니다.
 
 ```bash
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
-필요하면 현재 private 작업 트리도 검사할 수 있습니다.
+필요하면 현재 private 작업 tree도 검사할 수 있습니다.
 
 ```bash
 ./scripts/public-release-check.sh
 ```
 
-현재 트리 검사는 `git ls-files` 기준으로 금지 경로와 tracked symlink를 확인하고, 공개 후보 검사는 `find` 기준으로 후보 디렉터리 전체의 금지 경로와 symlink를 확인합니다. 두 모드 모두 private key, OCI OCID, GitHub token, OpenAI/API key 형태의 token, 실제처럼 보이는 DB/BFF/OAuth secret 할당, Gmail 주소, private club domain, 로컬 workstation path를 찾습니다.
+현재 tree 검사는 `git ls-files` 기준으로 금지 경로와 tracked symlink를 확인하고, 공개 릴리즈 후보 검사는 `find` 기준으로 후보 디렉터리 전체의 금지 경로와 symlink를 확인합니다. 두 모드 모두 private key, OCI OCID, GitHub token, OpenAI/API key 형태의 token, 실제처럼 보이는 DB/BFF/OAuth secret 할당, Gmail 주소, private club domain, 로컬 workstation path를 찾습니다.
 
-`gitleaks`가 설치되어 있으면 스크립트가 `.gitleaks.toml` 설정으로 `gitleaks dir <path>`를 실행합니다. 공개 후보에는 root `.gitleaks.toml`도 포함됩니다. 설치된 구버전 `gitleaks`가 `dir` subcommand를 지원하지 않으면 compatibility fallback으로 `gitleaks detect --source <path>`를 실행하고 downgrade 메시지를 출력합니다. `gitleaks`가 없으면 명확한 fallback 메시지를 출력하고 targeted path/content scan만 실행합니다. Fallback scan 통과는 전문적이거나 완전한 secret scan 통과와 같지 않으며, 로컬 반복 전에 명백한 실수를 막는 최소 안전장치로만 봅니다.
+`gitleaks`가 설치되어 있으면 스크립트가 `.gitleaks.toml` 설정으로 `gitleaks dir <path>`를 실행합니다. 공개 릴리즈 후보에는 root `.gitleaks.toml`도 포함됩니다. 설치된 구버전 `gitleaks`가 `dir` subcommand를 지원하지 않으면 compatibility fallback으로 `gitleaks detect --source <path>`를 실행하고 downgrade 메시지를 출력합니다. `gitleaks`가 없으면 명확한 fallback 메시지를 출력하고 targeted path/content scan만 실행합니다. Fallback scan 통과는 전문적이거나 완전한 secret scan 통과와 같지 않으며, 로컬 반복 전에 명백한 실수를 막는 최소 안전장치로만 봅니다.
 
-현재 private 트리에는 공개 후보에서 제외되는 private planning 문서가 포함됩니다. 이 문서들은 risk example이나 과거 로컬 path를 의도적으로 기록할 수 있으므로, publish 판단은 clean public release candidate scan 결과를 기준으로 합니다.
+현재 private tree에는 공개 릴리즈 후보에서 제외되는 private planning 문서가 포함될 수 있습니다. 이 문서들은 risk example이나 과거 로컬 path를 의도적으로 기록할 수 있으므로, 공개 판단은 clean 공개 릴리즈 후보 scan 결과를 기준으로 합니다.
 
 ## 공개 전 secret rotation
 
