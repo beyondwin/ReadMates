@@ -1,0 +1,941 @@
+"use client";
+
+import { Link } from "@/src/app/router-link";
+import {
+  type ChangeEvent,
+  type CSSProperties,
+  type FormEvent,
+  type ReactNode,
+  useRef,
+  useState,
+} from "react";
+import {
+  readmatesFetchResponse,
+  type AttendanceStatus,
+  type FeedbackDocumentResponse,
+  type HostSessionDeletionPreviewResponse,
+  type HostSessionDetailResponse,
+} from "@/shared/api/readmates";
+import { BookCover } from "@/shared/ui/book-cover";
+import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
+import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
+import { HostSessionFeedbackUpload } from "./host-session-feedback-upload";
+import {
+  buildHostSessionRequest,
+  defaultSessionDateFrom,
+  questionDeadlineLabelFromIso,
+  questionDeadlineLabelFromSessionDate,
+} from "./host-session-schedule";
+
+const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
+const defaultBookLink = "https://product.kyobobook.co.kr/detail/S000001947832";
+
+const operationOrder = [
+  "기본 정보 → 일정 확정",
+  "모임 종료 후 출석 확정",
+  "공개 요약 작성 → 공개 설정",
+  "회차 피드백 문서 등록",
+];
+
+type MobileEditorSection = "basic" | "publish" | "attendance" | "report";
+type PublicationMode = "internal" | "draft" | "public";
+type PublicationAction = "draft" | "public";
+
+type PublicationFeedback = {
+  tone: "success" | "error";
+  message: string;
+};
+
+const mobileEditorSections: { key: MobileEditorSection; label: string; tabId: string; panelIds: string[] }[] = [
+  {
+    key: "basic",
+    label: "기본",
+    tabId: "host-editor-tab-basic",
+    panelIds: ["host-editor-panel-basic-info", "host-editor-panel-basic-schedule"],
+  },
+  {
+    key: "publish",
+    label: "공개",
+    tabId: "host-editor-tab-publish",
+    panelIds: ["host-editor-panel-publish"],
+  },
+  {
+    key: "attendance",
+    label: "출석",
+    tabId: "host-editor-tab-attendance",
+    panelIds: ["host-editor-panel-attendance"],
+  },
+  {
+    key: "report",
+    label: "문서",
+    tabId: "host-editor-tab-report",
+    panelIds: ["host-editor-panel-report"],
+  },
+];
+
+function mobileEditorSectionConfig(section: MobileEditorSection) {
+  return mobileEditorSections.find((item) => item.key === section) ?? mobileEditorSections[0];
+}
+
+function initialPublicationMode(session?: HostSessionDetailResponse): PublicationMode {
+  if (!session?.publication) {
+    return "internal";
+  }
+
+  return session.publication.isPublic ? "public" : "draft";
+}
+
+function initialAttendanceStatuses(
+  attendees?: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
+): Record<string, AttendanceStatus> {
+  return Object.fromEntries((attendees ?? []).map((attendee) => [attendee.membershipId, attendee.attendanceStatus]));
+}
+
+type AttendanceWriteState = {
+  inFlight: boolean;
+  inFlightStatus: AttendanceStatus | null;
+  queuedStatus: AttendanceStatus | null;
+};
+
+export default function HostSessionEditor({ session }: { session?: HostSessionDetailResponse }) {
+  const [title, setTitle] = useState(session?.title ?? "7회차 모임 · ");
+  const [bookTitle, setBookTitle] = useState(session?.bookTitle ?? "");
+  const [bookAuthor, setBookAuthor] = useState(session?.bookAuthor ?? "");
+  const [bookLink, setBookLink] = useState(session ? (session.bookLink ?? "") : defaultBookLink);
+  const [bookImageUrl, setBookImageUrl] = useState(session?.bookImageUrl ?? "");
+  const [date, setDate] = useState(() => session?.date ?? defaultSessionDateFrom(new Date()));
+  const [time, setTime] = useState(session?.startTime ?? "20:00");
+  const [locationLabel, setLocationLabel] = useState(session?.locationLabel ?? "온라인");
+  const [meetingUrl, setMeetingUrl] = useState(session?.meetingUrl ?? "");
+  const [meetingPasscode, setMeetingPasscode] = useState(session?.meetingPasscode ?? "");
+  const [publicationMode, setPublicationMode] = useState<PublicationMode>(() => initialPublicationMode(session));
+  const [summary, setSummary] = useState(session?.publication?.publicSummary ?? "");
+  const [publicationActionInFlight, setPublicationActionInFlight] = useState<PublicationAction | null>(null);
+  const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
+  const [activeMobileSection, setActiveMobileSection] = useState<MobileEditorSection>("basic");
+  const [attendanceStatuses, setAttendanceStatuses] =
+    useState<Record<string, AttendanceStatus>>(() => initialAttendanceStatuses(session?.attendees));
+  const [feedbackDocument, setFeedbackDocument] = useState(
+    () => session?.feedbackDocument ?? { uploaded: false, fileName: null, uploadedAt: null },
+  );
+  const [toast, setToast] = useState<string | null>(null);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deletePreview, setDeletePreview] = useState<HostSessionDeletionPreviewResponse | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deletePreviewLoading, setDeletePreviewLoading] = useState(false);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const feedbackDocumentInputRef = useRef<HTMLInputElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
+  const deleteRestoreFocusRef = useRef<HTMLElement | null>(null);
+  const committedAttendanceStatusesRef = useRef<Record<string, AttendanceStatus>>(
+    initialAttendanceStatuses(session?.attendees),
+  );
+  const attendanceWriteStatesRef = useRef<Record<string, AttendanceWriteState>>({});
+  const deadline =
+    session?.questionDeadlineAt && date === session.date
+      ? questionDeadlineLabelFromIso(session.questionDeadlineAt)
+      : questionDeadlineLabelFromSessionDate(date);
+
+  const flash = (message: string) => {
+    setToast(message);
+    window.setTimeout(() => setToast(null), 1600);
+  };
+
+  const deletionErrorMessage = (status?: number) => {
+    if (status === 404) {
+      return "세션을 찾을 수 없습니다.";
+    }
+    if (status === 409) {
+      return "이미 닫히거나 공개된 세션은 삭제할 수 없습니다.";
+    }
+    return "세션 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.";
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteSubmitting) {
+      return;
+    }
+
+    setDeleteModalOpen(false);
+  };
+
+  const openDeleteModal = async () => {
+    if (!session || session.state !== "OPEN") {
+      return;
+    }
+
+    deleteRestoreFocusRef.current = deleteTriggerRef.current;
+    setDeleteModalOpen(true);
+    setDeletePreview(null);
+    setDeleteError(null);
+    setDeletePreviewLoading(true);
+
+    try {
+      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/deletion-preview`, {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        setDeleteError(deletionErrorMessage(response.status));
+        return;
+      }
+
+      setDeletePreview((await response.json()) as HostSessionDeletionPreviewResponse);
+    } catch {
+      setDeleteError(deletionErrorMessage());
+    } finally {
+      setDeletePreviewLoading(false);
+    }
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!session || !deletePreview || deleteSubmitting) {
+      return;
+    }
+
+    setDeleteError(null);
+    setDeleteSubmitting(true);
+
+    try {
+      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        setDeleteError(deletionErrorMessage(response.status));
+        return;
+      }
+
+      globalThis.location.href = "/app/host/sessions/new";
+    } catch {
+      setDeleteError(deletionErrorMessage());
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const payload = buildHostSessionRequest({
+      title,
+      bookTitle,
+      bookAuthor,
+      bookLink,
+      bookImageUrl,
+      locationLabel,
+      meetingUrl,
+      meetingPasscode,
+      date,
+      startTime: time,
+    }, session);
+    const response = await readmatesFetchResponse(session ? `/api/host/sessions/${session.sessionId}` : "/api/host/sessions", {
+      method: session ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      globalThis.location.href = "/app/session/current";
+      return;
+    }
+
+    flash("저장에 실패했습니다");
+  };
+
+  const savePublication = async (action: PublicationAction) => {
+    if (!session || publicationActionInFlight) {
+      return;
+    }
+
+    const publicSummary = summary.trim();
+
+    if (!publicSummary) {
+      setPublicationFeedback({
+        tone: "error",
+        message: "공개 요약을 입력한 뒤 저장해주세요.",
+      });
+      return;
+    }
+
+    const isPublic = action === "public";
+
+    setPublicationActionInFlight(action);
+    setPublicationFeedback(null);
+
+    try {
+      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/publication`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicSummary,
+          isPublic,
+        }),
+      });
+
+      if (!response.ok) {
+        setPublicationFeedback({
+          tone: "error",
+          message:
+            response.status === 400
+              ? "공개 요약을 입력한 뒤 저장해주세요."
+              : "공개 설정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.",
+        });
+        return;
+      }
+
+      setSummary(publicSummary);
+      setPublicationMode(isPublic ? "public" : "draft");
+      setPublicationFeedback({
+        tone: "success",
+        message: isPublic ? "공개 기록을 발행했습니다." : "요약 초안을 저장했습니다.",
+      });
+    } catch {
+      setPublicationFeedback({
+        tone: "error",
+        message: "공개 설정 저장에 실패했습니다. 잠시 후 다시 시도해주세요.",
+      });
+    } finally {
+      setPublicationActionInFlight(null);
+    }
+  };
+
+  const updateAttendance = async (membershipId: string, attendanceStatus: AttendanceStatus) => {
+    if (!session) {
+      return;
+    }
+
+    setAttendanceStatuses((current) => ({ ...current, [membershipId]: attendanceStatus }));
+
+    const writeState = attendanceWriteStatesRef.current[membershipId] ?? {
+      inFlight: false,
+      inFlightStatus: null,
+      queuedStatus: null,
+    };
+    attendanceWriteStatesRef.current[membershipId] = writeState;
+
+    if (writeState.inFlight) {
+      writeState.queuedStatus = writeState.inFlightStatus === attendanceStatus ? null : attendanceStatus;
+      return;
+    }
+
+    const sendAttendanceWrite = async (status: AttendanceStatus) => {
+      const currentWriteState = attendanceWriteStatesRef.current[membershipId] ?? {
+        inFlight: false,
+        inFlightStatus: null,
+        queuedStatus: null,
+      };
+      attendanceWriteStatesRef.current[membershipId] = currentWriteState;
+      currentWriteState.inFlight = true;
+      currentWriteState.inFlightStatus = status;
+
+      let writeSucceeded = false;
+
+      const rollbackToCommittedStatus = () => {
+        const committedStatus = committedAttendanceStatusesRef.current[membershipId] ?? "UNKNOWN";
+
+        setAttendanceStatuses((current) => {
+          if (currentWriteState.queuedStatus !== null) {
+            return current;
+          }
+
+          return { ...current, [membershipId]: committedStatus };
+        });
+      };
+
+      try {
+        const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/attendance`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify([{ membershipId, attendanceStatus: status }]),
+        });
+
+        writeSucceeded = response.ok;
+
+        if (response.ok) {
+          committedAttendanceStatusesRef.current[membershipId] = status;
+
+          if (currentWriteState.queuedStatus === null || currentWriteState.queuedStatus === status) {
+            currentWriteState.queuedStatus = null;
+          }
+        } else if (currentWriteState.queuedStatus === null) {
+          rollbackToCommittedStatus();
+          flash("출석 저장에 실패했습니다");
+        }
+      } catch {
+        if (currentWriteState.queuedStatus === null) {
+          rollbackToCommittedStatus();
+          flash("출석 저장에 실패했습니다");
+        }
+      } finally {
+        const nextStatus = currentWriteState.queuedStatus;
+        currentWriteState.inFlight = false;
+        currentWriteState.inFlightStatus = null;
+        currentWriteState.queuedStatus = null;
+
+        if (nextStatus !== null) {
+          void sendAttendanceWrite(nextStatus);
+        } else if (!writeSucceeded) {
+          delete attendanceWriteStatesRef.current[membershipId];
+        }
+      }
+    };
+
+    void sendAttendanceWrite(attendanceStatus);
+  };
+
+  const uploadFeedbackDocument = async (event: ChangeEvent<HTMLInputElement>) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!session) {
+      input.value = "";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/feedback-document`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        flash("피드백 문서 업로드에 실패했습니다");
+        return;
+      }
+
+      const uploaded = (await response.json()) as FeedbackDocumentResponse;
+      setFeedbackDocument({
+        uploaded: true,
+        fileName: uploaded.fileName,
+        uploadedAt: uploaded.uploadedAt,
+      });
+      flash("피드백 문서가 업로드되었습니다");
+    } catch {
+      flash("피드백 문서 업로드에 실패했습니다");
+    } finally {
+      input.value = "";
+    }
+  };
+
+  return (
+    <main className="rm-host-session-editor">
+      <section className="page-header-compact">
+        <div className="container">
+          <div className="row-between" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div>
+              <Link to="/app/host" className="btn btn-quiet btn-sm" style={{ marginLeft: "-10px", marginBottom: "10px" }}>
+                ← 운영 대시보드
+              </Link>
+              <div className="eyebrow">세션 편집 · {session ? `No.${session.sessionNumber}` : "새 세션"}</div>
+              <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
+                {session ? session.title : "새 세션"}
+              </h1>
+              <div className="small">
+                세션 정보, 공개 설정, 출석 확정, 피드백 문서를 한곳에서.
+              </div>
+            </div>
+            <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
+              <button className="btn btn-ghost" type="button" onClick={() => flash("초안이 저장되었습니다")}>
+                초안 저장
+              </button>
+              <button className="btn btn-primary" type="submit" form="host-session-editor">
+                변경 사항 저장
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="mobile-only rm-host-session-editor__segments">
+        <div
+          className="m-hscroll"
+          role="tablist"
+          aria-label="호스트 편집 섹션"
+          data-testid="host-editor-mobile-segments"
+          style={{ padding: 0, gap: 6 }}
+        >
+          {mobileEditorSections.map((section) => {
+            const selected = activeMobileSection === section.key;
+
+            return (
+              <button
+                key={section.key}
+                id={section.tabId}
+                type="button"
+                role="tab"
+                className={`m-chip${selected ? " is-on" : ""}`}
+                aria-selected={selected}
+                aria-controls={section.panelIds.join(" ")}
+                onClick={() => setActiveMobileSection(section.key)}
+                style={{ height: 34, padding: "0 14px" }}
+              >
+                {section.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <section className="rm-host-session-editor__content">
+        <div className="container">
+          <div className="rm-host-session-editor__layout">
+            <form
+              id="host-session-editor"
+              onSubmit={handleSubmit}
+              className="stack"
+              style={{ "--stack": "28px" } as CSSProperties}
+            >
+              <Panel
+                eyebrow="기본 정보"
+                title="기본 정보"
+                mobileSection="basic"
+                panelId="host-editor-panel-basic-info"
+                activeMobileSection={activeMobileSection}
+              >
+                <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
+                  <div>
+                    <label className="label" htmlFor="session-title">
+                      세션 제목
+                    </label>
+                    <input
+                      id="session-title"
+                      className="input"
+                      value={title}
+                      onChange={(event) => setTitle(event.target.value)}
+                    />
+                  </div>
+                  <div className="grid-2">
+                    <div>
+                      <label className="label" htmlFor="book-title">
+                        책 제목
+                      </label>
+                      <input
+                        id="book-title"
+                        className="input"
+                        value={bookTitle}
+                        onChange={(event) => setBookTitle(event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="book-author">
+                        저자
+                      </label>
+                      <input
+                        id="book-author"
+                        className="input"
+                        value={bookAuthor}
+                        onChange={(event) => setBookAuthor(event.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "18px", alignItems: "end" }}>
+                    <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
+                      <div>
+                        <label className="label" htmlFor="book-link">
+                          책 링크
+                        </label>
+                        <input
+                          id="book-link"
+                          className="input"
+                          value={bookLink}
+                          onChange={(event) => setBookLink(event.target.value)}
+                          placeholder="https://product.kyobobook.co.kr/..."
+                        />
+                        <div className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
+                          교보·알라딘·예스24·출판사 페이지 등 어디든 괜찮아요. 공개/멤버 페이지에 “책 정보 보기”로
+                          노출돼요.
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label" htmlFor="book-image-url">
+                          책 이미지 URL
+                        </label>
+                        <input
+                          id="book-image-url"
+                          className="input"
+                          value={bookImageUrl}
+                          onChange={(event) => setBookImageUrl(event.target.value)}
+                          placeholder="https://image.example.com/book-cover.jpg"
+                        />
+                      </div>
+                    </div>
+                    <BookCover title={bookTitle} author={bookAuthor} imageUrl={bookImageUrl} width={96} />
+                  </div>
+                </div>
+              </Panel>
+
+              <Panel
+                eyebrow="일정"
+                title="일정"
+                mobileSection="basic"
+                panelId="host-editor-panel-basic-schedule"
+                activeMobileSection={activeMobileSection}
+              >
+                <div className="grid-3">
+                  <div>
+                    <label className="label" htmlFor="session-date">
+                      모임 날짜
+                    </label>
+                    <input
+                      id="session-date"
+                      className="input"
+                      type="date"
+                      value={date}
+                      onChange={(event) => setDate(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="session-time">
+                      시작 시간
+                    </label>
+                    <input
+                      id="session-time"
+                      className="input"
+                      type="time"
+                      value={time}
+                      onChange={(event) => setTime(event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="question-deadline">
+                      질문 제출 마감
+                    </label>
+                    <input
+                      id="question-deadline"
+                      className="input"
+                      value={deadline}
+                      readOnly
+                    />
+                  </div>
+                </div>
+                <div style={{ marginTop: "14px" }}>
+                  <label className="label" htmlFor="session-location">
+                    장소
+                  </label>
+                  <input
+                    id="session-location"
+                    className="input"
+                    value={locationLabel}
+                    onChange={(event) => setLocationLabel(event.target.value)}
+                  />
+                </div>
+                <div className="grid-2" style={{ marginTop: "14px" }}>
+                  <div>
+                    <label className="label" htmlFor="meeting-url">
+                      미팅 URL
+                    </label>
+                    <input
+                      id="meeting-url"
+                      className="input"
+                      value={meetingUrl}
+                      onChange={(event) => setMeetingUrl(event.target.value)}
+                      placeholder="https://meet.google.com/..."
+                    />
+                    <div className="tiny" style={{ marginTop: "6px" }}>
+                      저장 즉시 멤버의 홈과 세션 화면에 링크가 노출됩니다.
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="meeting-passcode">
+                      Passcode · 선택
+                    </label>
+                    <input
+                      id="meeting-passcode"
+                      className="input"
+                      value={meetingPasscode}
+                      onChange={(event) => setMeetingPasscode(event.target.value)}
+                      placeholder="선택 사항"
+                    />
+                  </div>
+                </div>
+                <div className="marginalia" style={{ marginTop: "12px" }}>
+                  ※ 일정 변경 시 멤버에게 이메일 안내가 자동 발송됩니다.
+                </div>
+              </Panel>
+
+              <Panel
+                eyebrow="공개 설정 · 민감"
+                title="공개 설정"
+                tone="warn"
+                mobileSection="publish"
+                panelId="host-editor-panel-publish"
+                activeMobileSection={activeMobileSection}
+              >
+                <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
+                  <div>
+                    <label className="label">공개 상태</label>
+                    <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
+                      {[
+                        { key: "internal", label: "내부 공개", description: "공개 기록이 저장되지 않은 기본 상태" },
+                        { key: "draft", label: "요약 초안 저장", description: "공개 요약을 서버에 초안으로 저장" },
+                        { key: "public", label: "공개 기록 발행", description: "공개 클럽 페이지에 노출" },
+                      ].map((option) => {
+                        const selected = publicationMode === option.key;
+
+                        return (
+                          <div
+                            key={option.key}
+                            aria-current={selected ? "step" : undefined}
+                            style={{
+                              padding: "10px 14px",
+                              borderRadius: "8px",
+                              textAlign: "left",
+                              border: `1px solid ${selected ? "var(--accent)" : "var(--line)"}`,
+                              background: selected ? "var(--accent-soft)" : "var(--bg)",
+                              minWidth: "170px",
+                            }}
+                          >
+                            <div
+                              className="body"
+                              style={{
+                                fontSize: "13.5px",
+                                fontWeight: 500,
+                                color: selected ? "var(--accent)" : "var(--text)",
+                              }}
+                            >
+                              {option.label}
+                            </div>
+                            <div className="tiny" style={{ color: "var(--text-3)" }}>
+                              {option.description}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {!session ? (
+                    <div className="marginalia">
+                      세션을 만든 뒤 공개 요약 초안 저장과 공개 기록 발행을 사용할 수 있습니다.
+                    </div>
+                  ) : null}
+                </div>
+                <hr className="divider-soft" style={{ margin: "20px 0" }} />
+                <div>
+                  <label className="label" htmlFor="public-summary">
+                    공개 요약
+                  </label>
+                  <textarea
+                    id="public-summary"
+                    className="textarea"
+                    rows={3}
+                    value={summary}
+                    onChange={(event) => {
+                      setSummary(event.target.value);
+                      if (publicationFeedback?.tone === "error") {
+                        setPublicationFeedback(null);
+                      }
+                    }}
+                    placeholder="모임의 분위기와 대화의 결을 2~3문장으로 짧게."
+                    aria-describedby="publication-summary-help publication-feedback"
+                  />
+                  <div id="publication-summary-help" className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
+                    요약 초안은 공개 페이지에 노출되지 않고, 공개 기록 발행 후에만 노출됩니다.
+                  </div>
+                </div>
+                <div className="row" style={{ gap: "8px", flexWrap: "wrap", marginTop: "16px" }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={!session || publicationActionInFlight !== null}
+                    onClick={() => void savePublication("draft")}
+                  >
+                    {publicationActionInFlight === "draft" ? "저장 중..." : "요약 초안 저장"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={!session || publicationActionInFlight !== null}
+                    onClick={() => void savePublication("public")}
+                  >
+                    {publicationActionInFlight === "public" ? "발행 중..." : "공개 기록 발행"}
+                  </button>
+                </div>
+                {publicationFeedback ? (
+                  <div
+                    id="publication-feedback"
+                    role={publicationFeedback.tone === "error" ? "alert" : "status"}
+                    className={publicationFeedback.tone === "error" ? "marginalia" : "small"}
+                    style={{
+                      marginTop: "12px",
+                      color: publicationFeedback.tone === "error" ? "var(--danger)" : "var(--accent)",
+                    }}
+                  >
+                    {publicationFeedback.message}
+                  </div>
+                ) : (
+                  <div id="publication-feedback" />
+                )}
+              </Panel>
+
+              <Panel
+                eyebrow="출석 확정"
+                title="출석 확정"
+                mobileSection="attendance"
+                panelId="host-editor-panel-attendance"
+                activeMobileSection={activeMobileSection}
+              >
+                <HostSessionAttendanceEditor
+                  hasSession={Boolean(session)}
+                  attendees={session?.attendees}
+                  attendanceStatuses={attendanceStatuses}
+                  emptyMessage={emptyManagementMessage}
+                  onUpdateAttendance={updateAttendance}
+                />
+              </Panel>
+
+              <Panel
+                eyebrow="피드백 문서 · 민감"
+                title="회차 피드백 문서"
+                tone="warn"
+                mobileSection="report"
+                panelId="host-editor-panel-report"
+                activeMobileSection={activeMobileSection}
+              >
+                <HostSessionFeedbackUpload
+                  sessionId={session?.sessionId}
+                  feedbackDocument={{ uploaded: feedbackDocument.uploaded, fileName: feedbackDocument.fileName }}
+                  inputRef={feedbackDocumentInputRef}
+                  emptyMessage={emptyManagementMessage}
+                  onUploadFeedbackDocument={uploadFeedbackDocument}
+                />
+              </Panel>
+            </form>
+
+            <aside className="stack rm-host-session-editor__aside" style={{ "--stack": "20px" } as CSSProperties}>
+              <div className="surface" style={{ padding: "22px" }}>
+                <div className="eyebrow" style={{ marginBottom: "10px" }}>
+                  저장 안내
+                </div>
+                <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
+                  세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.
+                </p>
+              </div>
+
+              <div className="surface-quiet" style={{ padding: "22px" }}>
+                <div className="eyebrow" style={{ marginBottom: "10px" }}>
+                  운영 순서
+                </div>
+                <ol className="small" style={{ margin: 0, paddingLeft: "16px" }}>
+                  {operationOrder.map((item) => (
+                    <li key={item} style={{ marginBottom: "6px" }}>
+                      {item}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {session ? (
+                <div className="surface" style={{ padding: "22px" }}>
+                  <div className="eyebrow" style={{ marginBottom: "10px" }}>
+                    위험 작업
+                  </div>
+                  <button
+                    ref={deleteTriggerRef}
+                    className="btn btn-ghost btn-sm u-w-full"
+                    type="button"
+                    disabled={session.state !== "OPEN"}
+                    onClick={openDeleteModal}
+                    style={{ justifyContent: "flex-start", color: "var(--danger)" }}
+                  >
+                    세션 삭제
+                  </button>
+                  <div className="tiny" style={{ marginTop: "8px" }}>
+                    {session.state === "OPEN"
+                      ? "세션과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다."
+                      : "닫히거나 공개된 세션은 삭제할 수 없습니다."}
+                  </div>
+                </div>
+              ) : null}
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      {deleteModalOpen ? (
+        <HostSessionDeletionPreviewDialog
+          preview={deletePreview}
+          previewLoading={deletePreviewLoading}
+          error={deleteError}
+          submitting={deleteSubmitting}
+          restoreFocusRef={deleteRestoreFocusRef}
+          onClose={closeDeleteModal}
+          onConfirm={confirmDeleteSession}
+        />
+      ) : null}
+
+      {toast ? (
+        <div
+          role="status"
+          style={{
+            position: "fixed",
+            bottom: "30px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "var(--ink-900)",
+            color: "var(--paper-50)",
+            padding: "10px 18px",
+            borderRadius: "999px",
+            fontSize: "13px",
+            zIndex: 60,
+          }}
+        >
+          ✓ {toast}
+        </div>
+      ) : null}
+    </main>
+  );
+}
+
+function Panel({
+  eyebrow,
+  title,
+  children,
+  tone,
+  mobileSection,
+  panelId,
+  activeMobileSection,
+}: {
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+  tone?: "warn";
+  mobileSection: MobileEditorSection;
+  panelId: string;
+  activeMobileSection: MobileEditorSection;
+}) {
+  const warn = tone === "warn";
+  const isMobileActive = mobileSection === activeMobileSection;
+  const sectionConfig = mobileEditorSectionConfig(mobileSection);
+
+  return (
+    <section
+      id={panelId}
+      role="tabpanel"
+      aria-labelledby={sectionConfig.tabId}
+      className={`surface rm-host-session-editor__section${isMobileActive ? " is-mobile-active" : ""}`}
+      data-mobile-editor-section={mobileSection}
+      style={{
+        padding: "28px",
+        borderColor: warn ? "color-mix(in oklch, var(--warn), var(--line) 70%)" : "var(--line)",
+      }}
+    >
+      <div className="row-between" style={{ marginBottom: "18px" }}>
+        <div>
+          <div className="eyebrow" style={{ color: warn ? "var(--warn)" : "var(--text-3)" }}>
+            {eyebrow}
+          </div>
+          <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
+            {title}
+          </h2>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}

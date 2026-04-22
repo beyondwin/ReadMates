@@ -1,0 +1,4 @@
+/api/bff/* /api/bff/:splat 200
+/oauth2/authorization/* /oauth2/authorization/:splat 200
+/login/oauth2/code/* /login/oauth2/code/:splat 200
+/* /index.html 200

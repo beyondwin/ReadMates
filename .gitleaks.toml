@@ -1,0 +1,51 @@
+title = "ReadMates public release secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "readmates-private-key-block"
+description = "Private key block material must not be committed"
+regex = '''-----BEGIN (?:[A-Z0-9]+ )?PRIVATE KEY-----'''
+keywords = ["PRIVATE KEY"]
+
+[[rules]]
+id = "readmates-oci-ocid"
+description = "OCI resource identifiers are deployment-specific and private"
+regex = '''ocid1[.][a-z0-9][a-z0-9._-]{16,}'''
+keywords = ["ocid1."]
+
+[[rules]]
+id = "readmates-github-token"
+description = "GitHub personal access and app tokens must not be committed"
+regex = '''(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})'''
+keywords = ["ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"]
+
+[[rules]]
+id = "readmates-openai-or-api-key"
+description = "OpenAI, Google API, and generic API key values must not be committed"
+regex = '''(?i)(?:\bsk-[A-Za-z0-9][A-Za-z0-9_-]{20,}\b|\bAIza[0-9A-Za-z_-]{20,}\b|\b(?:OPENAI_API_KEY|API_KEY|GOOGLE_API_KEY)[[:space:]]*[:=][[:space:]]*["']?[A-Za-z0-9_-]{24,})'''
+keywords = ["sk-", "AIza", "OPENAI_API_KEY", "API_KEY", "GOOGLE_API_KEY"]
+
+[[rules]]
+id = "readmates-real-secret-assignment"
+description = "Real-looking deployment secret assignments must not be committed"
+regex = '''(?i)(?:^|[^A-Za-z0-9_$/{.-])(?:READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|client[_-]?secret|oauth[_-]?client[_-]?secret)[[:space:]]*[:=][[:space:]]*["']?[^[:space:]"'<>`]{16,}'''
+keywords = ["READMATES_BFF_SECRET", "readmates.bff-secret", "BFF_SECRET", "SPRING_DATASOURCE_PASSWORD", "spring.datasource.password", "MYSQL_ADMIN_PASS", "APP_DB_PASS", "GOOGLE_CLIENT_SECRET", "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET", "client_secret", "client-secret", "oauth_client_secret", "oauth-client-secret"]
+
+[[allowlists]]
+description = "Documented placeholders and local/test-only secrets"
+regexTarget = "match"
+regexes = [
+  '''(?i)<(?:db-password|secret|shared-secret|shared-bff-secret|same-secret-as-cloudflare|same-shared-secret|google-oauth-client-secret|pages-function-secret)>''',
+  '''(?i)<(?:same-pages-function-secret)>''',
+  '''(?i)\$\{(?:READMATES_BFF_SECRET|BFF_SECRET|APP_DB_PASS|MYSQL_ADMIN_PASS|GOOGLE_CLIENT_SECRET|SPRING_DATASOURCE_PASSWORD|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET)(?::[^}]*)?\}''',
+  '''(?i)\b(?:local-dev-secret|e2e-secret|test-secret|test-bff-secret|wrong-secret)\b''',
+  '''(?i)\b(?:host|member[0-9]+|new[.]member)@example[.]com\b'''
+]
+
+[[allowlists]]
+description = "Secret scanning config contains scanner regexes, not credentials"
+paths = [
+  '''^\.gitleaks\.toml$'''
+]

@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: readmates-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: readmates-root
+      MYSQL_DATABASE: readmates
+      MYSQL_USER: readmates
+      MYSQL_PASSWORD: readmates
+    ports:
+      - "3306:3306"
+    volumes:
+      - readmates-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -ureadmates -preadmates --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  readmates-mysql-data:

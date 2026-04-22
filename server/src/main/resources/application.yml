@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: readmates-server
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/readmates?serverTimezone=UTC}
+    username: ${SPRING_DATASOURCE_USERNAME:readmates}
+    password: ${SPRING_DATASOURCE_PASSWORD:readmates}
+    hikari:
+      connection-init-sql: set time_zone = '+00:00'
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: ${READMATES_FLYWAY_LOCATIONS:classpath:db/mysql/migration}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+readmates:
+  app-base-url: ${READMATES_APP_BASE_URL:http://localhost:3000}
+  bff-secret-required: ${READMATES_BFF_SECRET_REQUIRED:true}
