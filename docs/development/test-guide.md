@@ -69,6 +69,19 @@ pnpm --dir front test:e2e
 
 Backend test suite에는 MySQL 기반 repository/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
+Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `SessionCleanArchitectureBoundaryTest`는 전환된 session/note web adapter가 legacy repository, `JdbcTemplate`, persistence adapter에 직접 의존하지 않는지 확인합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
+
+```bash
+./server/gradlew -p server test \
+  --tests com.readmates.auth.adapter.in.security.CurrentMemberArgumentResolverTest \
+  --tests com.readmates.architecture.SessionCleanArchitectureBoundaryTest \
+  --tests com.readmates.session.application.service.SessionMemberWriteServiceTest \
+  --tests com.readmates.session.api.CurrentSessionControllerDbTest \
+  --tests com.readmates.session.api.HostSessionControllerDbTest \
+  --tests com.readmates.session.api.HostDashboardControllerTest \
+  --tests com.readmates.note.api.MemberActionControllerDbTest
+```
+
 ## 공개 릴리즈 후보 점검
 
 공개 저장소로 낼 수 있는 후보 tree를 만들고 검사합니다.
