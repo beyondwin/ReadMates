@@ -1,9 +1,10 @@
 import userEvent from "@testing-library/user-event";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HostMembers from "@/features/host/components/host-members";
-import HostMembersPage from "@/src/pages/host-members";
-import type { HostMemberListItem } from "@/shared/api/readmates";
+import HostMembersPage, { hostMembersLoader } from "@/src/pages/host-members";
+import type { HostMemberListItem } from "@/features/host/api/host-contracts";
 
 const members: HostMemberListItem[] = [
   {
@@ -123,7 +124,21 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
 function renderHostMembersPage(extraResponses: Array<Response | Promise<Response>> = [], initialMembers = members) {
+  installRouterRequestShim();
   const fetchMock = vi
     .fn()
     .mockResolvedValueOnce(memberListResponse(initialMembers));
@@ -133,7 +148,19 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
   }
 
   vi.stubGlobal("fetch", fetchMock);
-  render(<HostMembersPage />);
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/host/members",
+        element: <HostMembersPage />,
+        loader: hostMembersLoader,
+        hydrateFallbackElement: <div>멤버 목록을 불러오는 중</div>,
+      },
+    ],
+    { initialEntries: ["/app/host/members"] },
+  );
+
+  render(<RouterProvider router={router} />);
   return fetchMock;
 }
 

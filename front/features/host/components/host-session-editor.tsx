@@ -9,12 +9,22 @@ import {
   useState,
 } from "react";
 import {
-  readmatesFetchResponse,
   type AttendanceStatus,
   type FeedbackDocumentResponse,
-  type HostSessionDeletionPreviewResponse,
-  type HostSessionDetailResponse,
 } from "@/shared/api/readmates";
+import {
+  createHostSession,
+  deleteHostSession,
+  fetchHostSessionDeletionPreview,
+  saveHostSessionAttendance,
+  saveHostSessionPublication,
+  updateHostSession,
+  uploadHostSessionFeedbackDocument,
+} from "@/features/host/api/host-api";
+import type {
+  HostSessionDeletionPreviewResponse,
+  HostSessionDetailResponse,
+} from "@/features/host/api/host-contracts";
 import {
   buildHostSessionRequest,
   buildPublicationRequest,
@@ -27,6 +37,8 @@ import {
   questionDeadlineLabelForForm,
   type HostSessionPublicationAction,
   type HostSessionPublicationMode,
+  type HostSessionPublicationRequest,
+  type HostSessionRequest,
 } from "@/features/host/model/host-session-editor-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { SessionIdentity } from "@/shared/ui/session-identity";
@@ -131,12 +143,38 @@ type AttendanceWriteState = {
   queuedStatus: AttendanceStatus | null;
 };
 
+type JsonResponse<T> = Response & { json(): Promise<T> };
+
+export type HostSessionEditorActions = {
+  loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
+  deleteSession: (sessionId: string) => Promise<Response>;
+  saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
+  savePublication: (sessionId: string, request: HostSessionPublicationRequest) => Promise<Response>;
+  updateAttendance: (
+    sessionId: string,
+    attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
+  ) => Promise<Response>;
+  uploadFeedbackDocument: (sessionId: string, formData: FormData) => Promise<JsonResponse<FeedbackDocumentResponse>>;
+};
+
+const defaultHostSessionEditorActions: HostSessionEditorActions = {
+  loadDeletionPreview: fetchHostSessionDeletionPreview,
+  deleteSession: deleteHostSession,
+  saveSession: (sessionId, request) =>
+    sessionId === null ? createHostSession(request) : updateHostSession(sessionId, request),
+  savePublication: saveHostSessionPublication,
+  updateAttendance: saveHostSessionAttendance,
+  uploadFeedbackDocument: uploadHostSessionFeedbackDocument,
+};
+
 export default function HostSessionEditor({
   session,
   returnTarget = hostDashboardReturnTarget,
+  actions = defaultHostSessionEditorActions,
 }: {
   session?: HostSessionDetailResponse | null;
   returnTarget?: ReadmatesReturnTarget;
+  actions?: HostSessionEditorActions;
 }) {
   const [formDefaults] = useState(() => hydrateHostSessionFormValues(session));
   const [title, setTitle] = useState(formDefaults.title);
@@ -225,9 +263,7 @@ export default function HostSessionEditor({
     setDeletePreviewLoading(true);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/deletion-preview`, {
-        method: "GET",
-      });
+      const response = await actions.loadDeletionPreview(session.sessionId);
 
       if (!response.ok) {
         setDeleteError(deletionErrorMessage(response.status));
@@ -251,9 +287,7 @@ export default function HostSessionEditor({
     setDeleteSubmitting(true);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}`, {
-        method: "DELETE",
-      });
+      const response = await actions.deleteSession(session.sessionId);
 
       if (!response.ok) {
         setDeleteError(deletionErrorMessage(response.status));
@@ -288,11 +322,7 @@ export default function HostSessionEditor({
       startTime: time,
     }, session ?? undefined);
     try {
-      const response = await readmatesFetchResponse(session ? `/api/host/sessions/${session.sessionId}` : "/api/host/sessions", {
-        method: session ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await actions.saveSession(session?.sessionId ?? null, payload);
 
       if (response.ok) {
         setSaveState("saved");
@@ -327,11 +357,7 @@ export default function HostSessionEditor({
     setPublicationFeedback(null);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/publication`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(publicationRequest),
-      });
+      const response = await actions.savePublication(session.sessionId, publicationRequest);
 
       if (!response.ok) {
         setPublicationFeedback({
@@ -404,11 +430,7 @@ export default function HostSessionEditor({
       };
 
       try {
-        const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/attendance`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([{ membershipId, attendanceStatus: status }]),
-        });
+        const response = await actions.updateAttendance(session.sessionId, [{ membershipId, attendanceStatus: status }]);
 
         writeSucceeded = response.ok;
 
@@ -460,10 +482,7 @@ export default function HostSessionEditor({
     formData.append("file", file);
 
     try {
-      const response = await readmatesFetchResponse(`/api/host/sessions/${session.sessionId}/feedback-document`, {
-        method: "POST",
-        body: formData,
-      });
+      const response = await actions.uploadFeedbackDocument(session.sessionId, formData);
 
       if (!response.ok) {
         flash("피드백 문서 업로드에 실패했습니다. 파일 형식과 권한을 확인해 주세요");

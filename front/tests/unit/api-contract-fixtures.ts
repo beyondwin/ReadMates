@@ -2,12 +2,14 @@ import type {
   AuthMeResponse,
   CurrentSessionResponse,
   FeedbackDocumentResponse,
+  MemberArchiveSessionDetailResponse,
+} from "@/shared/api/readmates";
+import type {
   HostInvitationListItem,
   HostMemberListItem,
   HostSessionDetailResponse,
   HostSessionPublication,
-  MemberArchiveSessionDetailResponse,
-} from "@/shared/api/readmates";
+} from "@/features/host/api/host-contracts";
 
 export const authMeContractFixture = {
   authenticated: true,

@@ -661,11 +661,11 @@ git commit -m "refactor: extract host feature models"
 - Modify: `front/src/app/router.tsx`
 - Modify host unit tests
 
-- [ ] **Step 1: Move host contracts**
+- [x] **Step 1: Move host contracts**
 
 Move host-specific contracts out of `front/shared/api/readmates.ts` into `host-contracts.ts`, leaving compatibility exports during migration.
 
-- [ ] **Step 2: Create host API client**
+- [x] **Step 2: Create host API client**
 
 Move host endpoint calls into `host-api.ts`:
 
@@ -678,15 +678,15 @@ Move host endpoint calls into `host-api.ts`:
 - members
 - invitations
 
-- [ ] **Step 3: Create route modules**
+- [x] **Step 3: Create route modules**
 
 Create route modules for host dashboard, session editor, members, and invitations. Route modules own loader/action calls and pass props/callbacks into UI.
 
-- [ ] **Step 4: Shrink page shells**
+- [x] **Step 4: Shrink page shells**
 
 Update `src/pages/host-*.tsx` files so they delegate to feature route modules and do not fetch directly.
 
-- [ ] **Step 5: Run checks**
+- [x] **Step 5: Run checks**
 
 ```bash
 pnpm --dir front test -- host-dashboard.test.tsx host-session-editor.test.tsx host-members.test.tsx host-invitations.test.tsx frontend-boundaries.test.ts
@@ -696,7 +696,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 8**
+- [x] **Step 6: Commit Task 8**
 
 ```bash
 git add front/features/host front/src/pages/host-dashboard.tsx front/src/pages/host-session-editor.tsx front/src/pages/host-members.tsx front/src/pages/host-invitations.tsx front/src/app/router.tsx front/tests/unit

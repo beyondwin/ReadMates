@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HostInvitations from "@/features/host/components/host-invitations";
-import type { HostInvitationListItem } from "@/shared/api/readmates";
+import type { HostInvitationListItem } from "@/features/host/api/host-contracts";
 
 const invitations: HostInvitationListItem[] = [
   {

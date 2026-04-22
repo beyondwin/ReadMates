@@ -2,7 +2,8 @@ import userEvent from "@testing-library/user-event";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HostDashboard from "@/features/host/components/host-dashboard";
-import type { AuthMeResponse, CurrentSessionResponse, HostDashboardResponse } from "@/shared/api/readmates";
+import type { HostDashboardResponse } from "@/features/host/api/host-contracts";
+import type { AuthMeResponse, CurrentSessionResponse } from "@/shared/api/readmates";
 
 afterEach(() => {
   cleanup();

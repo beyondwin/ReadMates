@@ -8,9 +8,11 @@ import {
 } from "@/features/host/components/host-session-schedule";
 import type {
   FeedbackDocumentResponse,
+} from "@/shared/api/readmates";
+import type {
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
-} from "@/shared/api/readmates";
+} from "@/features/host/api/host-contracts";
 import {
   feedbackDocumentContractFixture,
   hostSessionDetailContractFixture,

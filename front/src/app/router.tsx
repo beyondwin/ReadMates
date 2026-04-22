@@ -1,4 +1,4 @@
-import { createBrowserRouter, type RouteObject } from "react-router-dom";
+import { createBrowserRouter, useLocation, type RouteObject } from "react-router-dom";
 import {
   CurrentSessionRoute,
   CurrentSessionRouteError,
@@ -6,7 +6,21 @@ import {
   currentSessionLoader,
   type InternalLinkComponent,
 } from "@/features/current-session";
+import {
+  EditHostSessionRoute,
+  HostDashboardRoute,
+  HostInvitationsRoute,
+  HostMembersRoute,
+  HostRouteError,
+  NewHostSessionRoute,
+  hostDashboardLoader,
+  hostInvitationsLoader,
+  hostMembersLoader,
+  hostSessionEditorLoader,
+} from "@/features/host";
+import { useAuth } from "@/src/app/auth-state";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
+import { hostDashboardReturnTarget, readReadmatesReturnTarget } from "@/src/app/route-continuity";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import AboutPage from "@/src/pages/about";
@@ -14,10 +28,6 @@ import AppHomePage from "@/src/pages/app-home";
 import ArchiveRoutePage from "@/src/pages/archive";
 import FeedbackDocumentRoutePage from "@/src/pages/feedback-document";
 import FeedbackDocumentPrintRoutePage from "@/src/pages/feedback-print";
-import HostPage from "@/src/pages/host-dashboard";
-import HostInvitationsPage from "@/src/pages/host-invitations";
-import HostMembersPage from "@/src/pages/host-members";
-import EditHostSessionPage, { NewHostSessionPage } from "@/src/pages/host-session-editor";
 import InvitePage from "@/src/pages/invite";
 import LoginPage from "@/src/pages/login";
 import MemberSessionDetailRoutePage from "@/src/pages/member-session";
@@ -37,6 +47,26 @@ const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...
     </Link>
   );
 };
+
+function HostDashboardRouteElement() {
+  const authState = useAuth();
+
+  return <HostDashboardRoute auth={authState.status === "ready" ? authState.auth : undefined} />;
+}
+
+function NewHostSessionRouteElement() {
+  const location = useLocation();
+  const returnTarget = readReadmatesReturnTarget(location.state, hostDashboardReturnTarget);
+
+  return <NewHostSessionRoute returnTarget={returnTarget} />;
+}
+
+function EditHostSessionRouteElement() {
+  const location = useLocation();
+  const returnTarget = readReadmatesReturnTarget(location.state, hostDashboardReturnTarget);
+
+  return <EditHostSessionRoute returnTarget={returnTarget} />;
+}
 
 export const routes: RouteObject[] = [
   {
@@ -92,11 +122,39 @@ export const routes: RouteObject[] = [
       </RequireHost>
     ),
     children: [
-      { index: true, element: <HostPage /> },
-      { path: "members", element: <HostMembersPage /> },
-      { path: "invitations", element: <HostInvitationsPage /> },
-      { path: "sessions/new", element: <NewHostSessionPage /> },
-      { path: "sessions/:sessionId/edit", element: <EditHostSessionPage /> },
+      {
+        index: true,
+        element: <HostDashboardRouteElement />,
+        loader: hostDashboardLoader,
+        errorElement: <HostRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="운영 원장을 불러오는 중" variant="host" />,
+      },
+      {
+        path: "members",
+        element: <HostMembersRoute />,
+        loader: hostMembersLoader,
+        errorElement: <HostRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
+      },
+      {
+        path: "invitations",
+        element: <HostInvitationsRoute />,
+        loader: hostInvitationsLoader,
+        errorElement: <HostRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
+      },
+      {
+        path: "sessions/new",
+        element: <NewHostSessionRouteElement />,
+        errorElement: <HostRouteError />,
+      },
+      {
+        path: "sessions/:sessionId/edit",
+        element: <EditHostSessionRouteElement />,
+        loader: hostSessionEditorLoader,
+        errorElement: <HostRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="세션 편집 정보를 불러오는 중" variant="host" />,
+      },
     ],
   },
 ];
