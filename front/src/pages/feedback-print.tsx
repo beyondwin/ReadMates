@@ -1,5 +1,1 @@
-import FeedbackDocumentRoutePage from "./feedback-document";
-
-export default function FeedbackDocumentPrintRoutePage() {
-  return <FeedbackDocumentRoutePage printMode />;
-}
+export { FeedbackDocumentPrintRoute as default } from "@/features/feedback/route/feedback-document-route";

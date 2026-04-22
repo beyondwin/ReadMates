@@ -11,6 +11,10 @@ import {
   ArchiveRouteError,
   ArchiveRouteLoading,
 } from "@/features/archive/route/archive-route-state";
+import { publicClubLoader, publicSessionLoader } from "@/features/public/route/public-route-data";
+import { PublicRouteError } from "@/features/public/route/public-route-state";
+import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
+import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 import { memberSessionDetailLoader } from "@/features/archive/route/member-session-detail-data";
 import { myPageLoader } from "@/features/archive/route/my-page-data";
 import {
@@ -63,10 +67,34 @@ export const routes: RouteObject[] = [
   {
     element: <PublicRouteLayout />,
     children: [
-      { path: "/", element: <PublicHomePage /> },
-      { path: "/about", element: <AboutPage /> },
-      { path: "/records", element: <PublicRecordsPage /> },
-      { path: "/sessions/:sessionId", element: <PublicSessionPage /> },
+      {
+        path: "/",
+        element: <PublicHomePage />,
+        loader: publicClubLoader,
+        errorElement: <PublicRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 홈을 불러오는 중" variant="public" />,
+      },
+      {
+        path: "/about",
+        element: <AboutPage />,
+        loader: publicClubLoader,
+        errorElement: <PublicRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="클럽 소개를 불러오는 중" variant="public" />,
+      },
+      {
+        path: "/records",
+        element: <PublicRecordsPage />,
+        loader: publicClubLoader,
+        errorElement: <PublicRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 기록을 불러오는 중" variant="public" />,
+      },
+      {
+        path: "/sessions/:sessionId",
+        element: <PublicSessionPage />,
+        loader: publicSessionLoader,
+        errorElement: <PublicRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
+      },
       { path: "/login", element: <LoginPage /> },
       { path: "/invite/:token", element: <InvitePage /> },
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
@@ -126,8 +154,20 @@ export const routes: RouteObject[] = [
         errorElement: <ArchiveRouteError />,
         hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
       },
-      { path: "feedback/:sessionId", element: <FeedbackDocumentRoutePage /> },
-      { path: "feedback/:sessionId/print", element: <FeedbackDocumentPrintRoutePage /> },
+      {
+        path: "feedback/:sessionId",
+        element: <FeedbackDocumentRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
+      },
+      {
+        path: "feedback/:sessionId/print",
+        element: <FeedbackDocumentPrintRoutePage />,
+        loader: feedbackDocumentLoader,
+        errorElement: <FeedbackRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
+      },
     ],
   },
   {
@@ -175,4 +215,6 @@ export const routes: RouteObject[] = [
   },
 ];
 
-export const router = createBrowserRouter(routes);
+export function createReadmatesRouter() {
+  return createBrowserRouter(routes);
+}
