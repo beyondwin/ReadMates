@@ -445,7 +445,7 @@ Expected: commit succeeds.
 - Create: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacySessionParticipationWriteAdapter.kt`
 - Create: `server/src/test/kotlin/com/readmates/session/application/service/SessionMemberWriteServiceTest.kt`
 
-- [ ] **Step 1: Write the application service test**
+- [x] **Step 1: Write the application service test**
 
 Create `server/src/test/kotlin/com/readmates/session/application/service/SessionMemberWriteServiceTest.kt`:
 
@@ -542,7 +542,7 @@ class SessionMemberWriteServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run the service test and verify it fails**
+- [x] **Step 2: Run the service test and verify it fails**
 
 Run:
 
@@ -552,7 +552,7 @@ Run:
 
 Expected: FAIL because the command, port, and service classes do not exist.
 
-- [ ] **Step 3: Add command models**
+- [x] **Step 3: Add command models**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/SessionMemberCommands.kt`:
 
@@ -595,7 +595,7 @@ data class SaveLongReviewCommand(
 )
 ```
 
-- [ ] **Step 4: Add result models**
+- [x] **Step 4: Add result models**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/SessionMemberResults.kt`:
 
@@ -630,7 +630,7 @@ data class LongReviewResult(
 )
 ```
 
-- [ ] **Step 5: Add inbound use case interfaces**
+- [x] **Step 5: Add inbound use case interfaces**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/in/SessionMemberWriteUseCases.kt`:
 
@@ -672,7 +672,7 @@ interface SaveReviewUseCase {
 }
 ```
 
-- [ ] **Step 6: Add outbound write port**
+- [x] **Step 6: Add outbound write port**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/out/SessionParticipationWritePort.kt`:
 
@@ -702,7 +702,7 @@ interface SessionParticipationWritePort {
 }
 ```
 
-- [ ] **Step 7: Add application service**
+- [x] **Step 7: Add application service**
 
 Create `server/src/main/kotlin/com/readmates/session/application/service/SessionMemberWriteService.kt`:
 
@@ -758,7 +758,7 @@ class SessionMemberWriteService(
 }
 ```
 
-- [ ] **Step 8: Add legacy adapter**
+- [x] **Step 8: Add legacy adapter**
 
 Create `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacySessionParticipationWriteAdapter.kt`:
 
@@ -828,7 +828,7 @@ class LegacySessionParticipationWriteAdapter(
 }
 ```
 
-- [ ] **Step 9: Run the service test**
+- [x] **Step 9: Run the service test**
 
 Run:
 
@@ -838,7 +838,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 Run:
 
