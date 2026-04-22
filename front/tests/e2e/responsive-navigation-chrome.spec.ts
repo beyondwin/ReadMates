@@ -87,6 +87,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await page.goto("/app");
   await expect(page.locator(".app-content > .rm-route-reveal")).toBeVisible();
   await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
+  await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveText("운영");
   await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "호스트 화면" }));
   await expect(mobileHeader.locator(".m-hdr-side")).toHaveCount(2);
   const memberTabs = page.getByRole("navigation", { name: "앱 탭" });
@@ -96,6 +97,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await mobileHeader.getByRole("link", { name: "호스트 화면" }).click();
   await expect(page).toHaveURL(/\/app\/host$/);
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+  await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveText("멤버");
   await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "멤버 화면으로" }));
   await mobileHeader.getByRole("link", { name: "멤버 화면으로" }).click();
   await expect(page).toHaveURL(/\/app$/);
@@ -104,7 +106,9 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(mobileHeader).toBeVisible();
   await expect(mobileHeader).toContainText("세션");
   await expect(mobileHeader.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
+  await expect(mobileHeader.getByRole("link", { name: "뒤로" })).toContainText("오늘");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+  await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveText("멤버");
 
   const tabs = page.getByRole("navigation", { name: "앱 탭" });
   await expect(tabs).toBeVisible();
@@ -122,6 +126,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(page).toHaveURL(/\/app\/archive$/);
   await expect(mobileHeader).toContainText("기록");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+  await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveText("멤버");
   await expect(tabs.getByRole("link")).toHaveText(["오늘", "세션", "멤버", "기록"]);
   await expect(tabs.getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
   await expect(tabs.getByRole("link", { name: "아카이브" })).toHaveCount(0);
