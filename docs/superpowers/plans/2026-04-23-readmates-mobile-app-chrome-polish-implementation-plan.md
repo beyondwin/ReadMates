@@ -681,7 +681,7 @@ git commit -m "style: refine mobile app chrome"
 - Modify: `front/features/member-home/components/member-home.tsx`
 - Modify: `front/shared/styles/mobile.css`
 
-- [ ] **Step 1: Replace the member mobile hero inline padding**
+- [x] **Step 1: Replace the member mobile hero inline padding**
 
 In `front/features/member-home/components/member-home.tsx`, replace:
 
@@ -695,7 +695,7 @@ with:
 <section className="rm-member-home-mobile__hero">
 ```
 
-- [ ] **Step 2: Add member mobile spacing CSS**
+- [x] **Step 2: Add member mobile spacing CSS**
 
 In `front/shared/styles/mobile.css`, add this block immediately before `/* Member home mobile */`:
 
@@ -708,7 +708,7 @@ In `front/shared/styles/mobile.css`, add this block immediately before `/* Membe
 }
 ```
 
-- [ ] **Step 3: Run member home unit tests**
+- [x] **Step 3: Run member home unit tests**
 
 Run:
 
@@ -722,7 +722,7 @@ Expected:
 PASS  front/tests/unit/member-home.test.tsx
 ```
 
-- [ ] **Step 4: Run responsive navigation unit tests**
+- [x] **Step 4: Run responsive navigation unit tests**
 
 Run:
 
@@ -736,7 +736,7 @@ Expected:
 PASS  front/tests/unit/responsive-navigation.test.tsx
 ```
 
-- [ ] **Step 5: Commit the spacing change**
+- [x] **Step 5: Commit the spacing change**
 
 ```bash
 git add front/features/member-home/components/member-home.tsx front/shared/styles/mobile.css
