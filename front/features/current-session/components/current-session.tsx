@@ -31,22 +31,27 @@ import type {
 } from "@/features/current-session/components/current-session-types";
 import {
   SUSPENDED_MEMBER_NOTICE,
-  VIEWER_MEMBER_NOTICE,
   VIEWER_MEMBER_SHORT_NOTICE,
 } from "@/features/current-session/components/current-session-types";
+import {
+  buildQuestionPayload,
+  countWrittenQuestions,
+  createAddedQuestionInput,
+  getAddQuestionValidationMessage,
+  getQuestionPayloadValidationMessage,
+  getRemoveQuestionValidationMessage,
+} from "@/features/current-session/model/current-session-form-model";
+import {
+  getBlockedWriteValidationMessage,
+  getCurrentSessionAccessState,
+  getCurrentSessionBoardTabs,
+  type CurrentSessionBoardTab,
+} from "@/features/current-session/model/current-session-view-model";
 import { requestReadmatesRouteRefresh } from "@/src/pages/readmates-page-data";
 import { Link } from "@/src/app/router-link";
 import type { CurrentSessionResponse } from "@/shared/api/readmates";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateLabel, formatDeadlineLabel, formatSessionKicker, rsvpLabel } from "@/shared/ui/readmates-display";
-
-type BoardTab = "questions" | "checkins" | "highlights";
-
-const boardTabs: Array<{ key: BoardTab; label: (session: CurrentSession) => string }> = [
-  { key: "questions", label: (session) => `질문 · ${session.board.questions.length}` },
-  { key: "checkins", label: (session) => `읽기 흔적 · ${session.board.checkins.length}` },
-  { key: "highlights", label: (session) => `하이라이트 · ${session.board.highlights.length}` },
-];
 
 const emptySaveStatuses: Record<SaveScope, SaveState> = {
   rsvp: "idle",
@@ -102,13 +107,11 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
   const [longReview, setLongReview] = useState(session.myLongReview?.body ?? "");
   const [oneLineReview, setOneLineReview] = useState(session.myOneLineReview?.text ?? "");
   const [saveStatuses, setSaveStatuses] = useState<Record<SaveScope, SaveState>>(emptySaveStatuses);
-  const [boardTab, setBoardTab] = useState<BoardTab>("questions");
+  const [boardTab, setBoardTab] = useState<CurrentSessionBoardTab>("questions");
   const [mobileTab, setMobileTab] = useState<MobileSessionTab>("prep");
-  const writtenQuestionCount = questionInputs.filter((input) => input.text.trim()).length;
-  const isViewer = auth?.membershipStatus === "VIEWER";
-  const isSuspended = auth?.membershipStatus === "SUSPENDED";
-  const isHost = auth?.role === "HOST";
-  const canWrite = auth ? auth.membershipStatus === "ACTIVE" && auth.approvalState === "ACTIVE" : true;
+  const writtenQuestionCount = countWrittenQuestions(questionInputs);
+  const { isViewer, isSuspended, isHost, canWrite } = getCurrentSessionAccessState(auth);
+  const boardTabs = getCurrentSessionBoardTabs(session.board);
 
   const setSaveStatus = (scope: SaveScope, status: SaveState) => {
     setSaveStatuses((current) => ({ ...current, [scope]: status }));
@@ -123,8 +126,9 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       return false;
     }
 
-    if (isViewer) {
-      setQuestionValidationMessage(VIEWER_MEMBER_NOTICE);
+    const validationMessage = getBlockedWriteValidationMessage({ isViewer });
+    if (validationMessage) {
+      setQuestionValidationMessage(validationMessage);
     }
 
     return true;
@@ -148,13 +152,14 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
     }
 
     resetSaveStatus("question");
-    if (questionInputs.length >= 5) {
-      setQuestionValidationMessage("최대 5개까지 작성할 수 있어요.");
+    const validationMessage = getAddQuestionValidationMessage(questionInputs);
+    if (validationMessage) {
+      setQuestionValidationMessage(validationMessage);
       return;
     }
 
     setQuestionValidationMessage("");
-    setQuestionInputs((current) => [...current, { clientId: `added-${Date.now()}-${current.length}`, text: "" }]);
+    setQuestionInputs((current) => [...current, createAddedQuestionInput(current.length)]);
   };
 
   const removeQuestionInput = (index: number) => {
@@ -164,8 +169,9 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
 
     resetSaveStatus("question");
     setQuestionValidationMessage("");
-    if (questionInputs.length <= 2) {
-      setQuestionValidationMessage("질문 입력칸은 최소 2개가 필요해요.");
+    const validationMessage = getRemoveQuestionValidationMessage(questionInputs);
+    if (validationMessage) {
+      setQuestionValidationMessage(validationMessage);
       return;
     }
 
@@ -177,11 +183,12 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       return;
     }
 
-    const validQuestionPayload = questionInputs.map((input) => ({ text: input.text.trim() })).filter((input) => input.text);
+    const validQuestionPayload = buildQuestionPayload(questionInputs);
+    const validationMessage = getQuestionPayloadValidationMessage(validQuestionPayload);
 
-    if (validQuestionPayload.length < 2) {
+    if (validationMessage) {
       resetSaveStatus("question");
-      setQuestionValidationMessage("질문은 최소 2개 작성해 주세요.");
+      setQuestionValidationMessage(validationMessage);
       return;
     }
 
@@ -228,11 +235,11 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
       });
   };
 
-  const handleBoardTab = (tab: BoardTab) => {
+  const handleBoardTab = (tab: CurrentSessionBoardTab) => {
     setBoardTab(tab);
   };
 
-  const focusBoardTab = (tab: BoardTab) => {
+  const focusBoardTab = (tab: CurrentSessionBoardTab) => {
     globalThis.setTimeout(() => {
       document.getElementById(`current-session-board-tab-${tab}`)?.focus();
     }, 0);
@@ -541,7 +548,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
                       fontWeight: boardTab === tab.key ? 500 : 400,
                     }}
                   >
-                    {tab.label(session)}
+                    {tab.label}
                   </button>
                 ))}
               </div>
