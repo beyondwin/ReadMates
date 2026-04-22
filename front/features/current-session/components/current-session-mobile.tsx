@@ -2,6 +2,10 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { Icon, SaveFeedback } from "@/features/current-session/components/current-session-primitives";
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/components/current-session-question-editor";
 import { Link } from "@/src/app/router-link";
+import {
+  MAX_QUESTION_INPUT_COUNT,
+  MIN_QUESTION_INPUT_COUNT,
+} from "@/features/current-session/model/current-session-form-model";
 import type {
   BoardCheckin,
   BoardHighlight,
@@ -10,7 +14,7 @@ import type {
   RsvpUpdateStatus,
   SaveState,
 } from "@/features/current-session/components/current-session-types";
-import { SUSPENDED_MEMBER_NOTICE } from "@/features/current-session/components/current-session-types";
+import type { getCurrentSessionMemberNotice } from "@/features/current-session/model/current-session-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
@@ -97,8 +101,8 @@ export function MobileCurrentSessionBoard({
   onSaveCheckin,
   onSaveLongReview,
   onSaveOneLineReview,
-  isSuspended,
   isViewer,
+  memberNotice,
   isHost,
   canWrite,
 }: {
@@ -130,8 +134,8 @@ export function MobileCurrentSessionBoard({
   onSaveCheckin: () => void;
   onSaveLongReview: () => void;
   onSaveOneLineReview: () => void;
-  isSuspended: boolean;
   isViewer: boolean;
+  memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
   isHost: boolean;
   canWrite: boolean;
 }) {
@@ -199,8 +203,8 @@ export function MobileCurrentSessionBoard({
         </div>
       </div>
 
-      {isSuspended ? <MobileSuspendedMemberNotice /> : null}
-      {isViewer ? <MobileViewerMemberNotice /> : null}
+      {memberNotice?.kind === "suspended" ? <MobileSuspendedMemberNotice message={memberNotice.message} /> : null}
+      {memberNotice?.kind === "viewer" ? <MobileViewerMemberNotice /> : null}
 
       {mobileTab === "prep" && isViewer ? (
         <MobileViewerPrepSegment
@@ -267,12 +271,12 @@ function SuspendedFieldset({ disabled, children }: { disabled: boolean; children
   );
 }
 
-function MobileSuspendedMemberNotice() {
+function MobileSuspendedMemberNotice({ message }: { message: string }) {
   return (
     <section className="m-sec">
       <div className="m-card-quiet" role="note" style={{ borderColor: "var(--danger)", color: "var(--danger)" }}>
         <p className="small" style={{ margin: 0 }}>
-          {SUSPENDED_MEMBER_NOTICE}
+          {message}
         </p>
       </div>
     </section>
@@ -319,7 +323,7 @@ function MobileViewerPrepSegment({
           <div className="rm-current-session-mobile__meta-grid" style={{ marginTop: 14 }}>
             <MobileReadOnlyStat label="RSVP" value={rsvpLabel(rsvp)} />
             <MobileReadOnlyStat label="읽기 기록" value={`${readingProgress}%`} />
-            <MobileReadOnlyStat label="토론 질문" value={`${writtenQuestionCount}/5`} />
+            <MobileReadOnlyStat label="토론 질문" value={`${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`} />
             <MobileReadOnlyStat label="피드백 문서" value="정식 멤버 전환 후" />
           </div>
         </div>
@@ -522,7 +526,11 @@ function MobilePrepMeta({
   const statusItems = [
     { label: "RSVP", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
     { label: "읽기", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress >= 100 },
-    { label: "질문", value: `${writtenQuestionCount}/5`, ok: writtenQuestionCount >= 2 },
+    {
+      label: "질문",
+      value: `${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`,
+      ok: writtenQuestionCount >= MIN_QUESTION_INPUT_COUNT,
+    },
   ];
 
   return (

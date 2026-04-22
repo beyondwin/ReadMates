@@ -30,10 +30,6 @@ import type {
   SaveState,
 } from "@/features/current-session/components/current-session-types";
 import {
-  SUSPENDED_MEMBER_NOTICE,
-  VIEWER_MEMBER_SHORT_NOTICE,
-} from "@/features/current-session/components/current-session-types";
-import {
   buildQuestionPayload,
   countWrittenQuestions,
   createAddedQuestionInput,
@@ -45,6 +41,7 @@ import {
   getBlockedWriteValidationMessage,
   getCurrentSessionAccessState,
   getCurrentSessionBoardTabs,
+  getCurrentSessionMemberNotice,
   type CurrentSessionBoardTab,
 } from "@/features/current-session/model/current-session-view-model";
 import { requestReadmatesRouteRefresh } from "@/src/pages/readmates-page-data";
@@ -110,7 +107,9 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
   const [boardTab, setBoardTab] = useState<CurrentSessionBoardTab>("questions");
   const [mobileTab, setMobileTab] = useState<MobileSessionTab>("prep");
   const writtenQuestionCount = countWrittenQuestions(questionInputs);
-  const { isViewer, isSuspended, isHost, canWrite } = getCurrentSessionAccessState(auth);
+  const accessState = getCurrentSessionAccessState(auth);
+  const { isViewer, isHost, canWrite } = accessState;
+  const memberNotice = getCurrentSessionMemberNotice(accessState);
   const boardTabs = getCurrentSessionBoardTabs(session.board);
 
   const setSaveStatus = (scope: SaveScope, status: SaveState) => {
@@ -365,8 +364,8 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
         onSaveCheckin={handleSaveCheckin}
         onSaveLongReview={handleSaveLongReview}
         onSaveOneLineReview={handleSaveOneLineReview}
-        isSuspended={isSuspended}
         isViewer={isViewer}
+        memberNotice={memberNotice}
         isHost={isHost}
         canWrite={canWrite}
       />
@@ -418,6 +417,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
                   checkinNote={checkinNote}
                   longReview={longReview}
                   oneLineReview={oneLineReview}
+                  memberNotice={memberNotice}
                 />
               ) : (
                 <fieldset
@@ -425,7 +425,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
                   disabled={!canWrite}
                   style={{ "--stack": "20px", border: 0, margin: 0, padding: 0, minWidth: 0 } as CSSProperties}
                 >
-                  {isSuspended ? <SuspendedMemberNotice /> : null}
+                  {memberNotice?.kind === "suspended" ? <SuspendedMemberNotice message={memberNotice.message} /> : null}
 
                   <section aria-labelledby="attendance-rsvp-heading">
                     <div className="eyebrow" id="attendance-rsvp-heading" style={{ marginBottom: "10px" }}>
@@ -564,7 +564,7 @@ function CurrentSessionBoard({ session, auth }: { session: CurrentSession; auth?
   );
 }
 
-function SuspendedMemberNotice() {
+function SuspendedMemberNotice({ message }: { message: string }) {
   return (
     <div
       className="surface-quiet"
@@ -576,20 +576,20 @@ function SuspendedMemberNotice() {
       }}
     >
       <p className="small" style={{ margin: 0 }}>
-        {SUSPENDED_MEMBER_NOTICE}
+        {message}
       </p>
     </div>
   );
 }
 
-function ViewerMemberNotice() {
+function ViewerMemberNotice({ message }: { message: string }) {
   return (
     <div className="surface-quiet" role="note" style={{ padding: "16px 18px" }}>
       <p className="eyebrow" style={{ margin: 0 }}>
         둘러보기 멤버
       </p>
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-        {VIEWER_MEMBER_SHORT_NOTICE}
+        {message}
       </p>
       <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
         정식 멤버가 되면 RSVP와 질문 작성이 열립니다.
@@ -605,6 +605,7 @@ function ViewerSessionReadOnly({
   checkinNote,
   longReview,
   oneLineReview,
+  memberNotice,
 }: {
   session: CurrentSession;
   rsvp: CurrentSession["myRsvpStatus"];
@@ -612,6 +613,7 @@ function ViewerSessionReadOnly({
   checkinNote: string;
   longReview: string;
   oneLineReview: string;
+  memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
 }) {
   const questions = session.myQuestions.filter((question) => question.text.trim());
   const reviewItems = [
@@ -629,7 +631,7 @@ function ViewerSessionReadOnly({
 
   return (
     <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
-      <ViewerMemberNotice />
+      {memberNotice?.kind === "viewer" ? <ViewerMemberNotice message={memberNotice.message} /> : null}
 
       <section className="surface" aria-labelledby="viewer-session-detail-heading" style={{ padding: "28px" }}>
         <div className="eyebrow">읽기 전용 세션 상세</div>
