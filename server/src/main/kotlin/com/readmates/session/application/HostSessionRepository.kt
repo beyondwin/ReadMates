@@ -1,10 +1,11 @@
 package com.readmates.session.application
 
-import com.readmates.session.api.AttendanceEntry
-import com.readmates.session.api.HostDashboardMissingMember
-import com.readmates.session.api.HostDashboardResponse
-import com.readmates.session.api.HostSessionRequest
-import com.readmates.session.api.PublicationRequest
+import com.readmates.session.application.model.AttendanceEntryCommand
+import com.readmates.session.application.model.ConfirmAttendanceCommand
+import com.readmates.session.application.model.HostDashboardMissingMemberResult
+import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
@@ -34,19 +35,22 @@ private data class ExistingHostSessionSchedule(
     val questionDeadlineAt: LocalDateTime,
 )
 
+private const val DEFAULT_START_TIME = "20:00"
+private const val DEFAULT_END_TIME = "22:00"
+
 @Repository
 class HostSessionRepository(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) {
     @Transactional
-    fun createOpenSession(host: CurrentMember, request: HostSessionRequest): CreatedSessionResponse {
+    fun createOpenSession(host: CurrentMember, request: HostSessionCommand): CreatedSessionResponse {
         requireHost(host)
 
         val jdbcTemplate = jdbcTemplate()
         val sessionId = UUID.randomUUID()
         val sessionDate = LocalDate.parse(request.date)
-        val startTime = parseSessionTime(request.effectiveStartTime())
-        val endTime = parseSessionTime(request.effectiveEndTime())
+        val startTime = parseSessionTime(request.startTime ?: DEFAULT_START_TIME)
+        val endTime = parseSessionTime(request.endTime ?: DEFAULT_END_TIME)
         val questionDeadlineAt = deadlineOrDefault(request, sessionDate)
         val bookLink = blankToNull(request.bookLink)
         val bookImageUrl = blankToNull(request.bookImageUrl)
@@ -181,7 +185,7 @@ class HostSessionRepository(
         )
     }
 
-    fun hostDashboard(member: CurrentMember): HostDashboardResponse {
+    fun hostDashboard(member: CurrentMember): HostDashboardResult {
         requireHost(member)
         val jdbcTemplate = jdbcTemplate()
         val currentMetrics = jdbcTemplate.queryForObject(
@@ -257,7 +261,7 @@ class HostSessionRepository(
         ) ?: 0
         val currentSessionMissingMembers = findCurrentSessionMissingMembers(jdbcTemplate, member)
 
-        return HostDashboardResponse(
+        return HostDashboardResult(
             rsvpPending = currentMetrics.rsvpPending,
             checkinMissing = currentMetrics.checkinMissing,
             publishPending = publishPending,
@@ -270,7 +274,7 @@ class HostSessionRepository(
     private fun findCurrentSessionMissingMembers(
         jdbcTemplate: JdbcTemplate,
         member: CurrentMember,
-    ): List<HostDashboardMissingMember> {
+    ): List<HostDashboardMissingMemberResult> {
         return jdbcTemplate.query(
             """
             select
@@ -298,7 +302,7 @@ class HostSessionRepository(
             order by memberships.joined_at is null, memberships.joined_at, memberships.created_at, memberships.id
             """.trimIndent(),
             { resultSet, _ ->
-                HostDashboardMissingMember(
+                HostDashboardMissingMemberResult(
                     membershipId = resultSet.uuid("membership_id").toString(),
                     displayName = resultSet.getString("display_name"),
                     email = resultSet.getString("email"),
@@ -374,7 +378,7 @@ class HostSessionRepository(
     fun updateHostSession(
         member: CurrentMember,
         sessionId: UUID,
-        request: HostSessionRequest,
+        request: HostSessionCommand,
     ): HostSessionDetailResponse {
         requireHost(member)
         val jdbcTemplate = jdbcTemplate()
@@ -464,13 +468,11 @@ class HostSessionRepository(
 
     @Transactional
     fun confirmAttendance(
-        member: CurrentMember,
-        sessionId: UUID,
-        entries: List<AttendanceEntry>,
+        command: ConfirmAttendanceCommand,
     ): HostAttendanceResponse {
-        requireHostSession(member, sessionId)
+        requireHostSession(command.host, command.sessionId)
         val jdbcTemplate = jdbcTemplate()
-        entries.forEach { entry ->
+        command.entries.forEach { entry: AttendanceEntryCommand ->
             val membershipId = parseMembershipId(entry.membershipId)
             val updated = jdbcTemplate.update(
                 """
@@ -483,8 +485,8 @@ class HostSessionRepository(
                   and participation_status = 'ACTIVE'
                 """.trimIndent(),
                 entry.attendanceStatus,
-                sessionId.dbString(),
-                member.clubId.dbString(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
                 membershipId.dbString(),
             )
             if (updated == 0) {
@@ -493,18 +495,16 @@ class HostSessionRepository(
         }
 
         return HostAttendanceResponse(
-            sessionId = sessionId.toString(),
-            count = entries.size,
+            sessionId = command.sessionId.toString(),
+            count = command.entries.size,
         )
     }
 
     @Transactional
     fun upsertPublication(
-        member: CurrentMember,
-        sessionId: UUID,
-        request: PublicationRequest,
+        command: UpsertPublicationCommand,
     ): HostPublicationResponse {
-        requireHostSession(member, sessionId)
+        requireHostSession(command.host, command.sessionId)
         val jdbcTemplate = jdbcTemplate()
         jdbcTemplate.update(
             """
@@ -531,13 +531,13 @@ class HostSessionRepository(
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
-            member.clubId.dbString(),
-            sessionId.dbString(),
-            request.publicSummary,
-            request.isPublic,
-            request.isPublic,
+            command.host.clubId.dbString(),
+            command.sessionId.dbString(),
+            command.publicSummary,
+            command.isPublic,
+            command.isPublic,
         )
-        if (request.isPublic) {
+        if (command.isPublic) {
             jdbcTemplate.update(
                 """
                 update sessions
@@ -547,15 +547,15 @@ class HostSessionRepository(
                   and club_id = ?
                   and state = 'CLOSED'
                 """.trimIndent(),
-                sessionId.dbString(),
-                member.clubId.dbString(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
             )
         }
 
         return HostPublicationResponse(
-            sessionId = sessionId.toString(),
-            publicSummary = request.publicSummary,
-            isPublic = request.isPublic,
+            sessionId = command.sessionId.toString(),
+            publicSummary = command.publicSummary,
+            isPublic = command.isPublic,
         )
     }
 
@@ -584,7 +584,7 @@ class HostSessionRepository(
     private fun parseSessionTime(value: String): LocalTime =
         LocalTime.parse(value)
 
-    private fun deadlineOrDefault(request: HostSessionRequest, sessionDate: LocalDate) =
+    private fun deadlineOrDefault(request: HostSessionCommand, sessionDate: LocalDate) =
         request.questionDeadlineAt
             ?.takeIf { it.isNotBlank() }
             ?.let { OffsetDateTime.parse(it).toUtcLocalDateTime() }
