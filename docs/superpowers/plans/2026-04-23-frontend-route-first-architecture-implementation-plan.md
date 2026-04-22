@@ -219,11 +219,11 @@ Captured on 2026-04-23 during Task 0 and resolved on rerun:
 
 - Create: `front/tests/unit/frontend-boundaries.test.ts`
 
-- [ ] **Step 1: Create recursive file collector**
+- [x] **Step 1: Create recursive file collector**
 
 Add a Vitest test that recursively reads `front/src`, `front/features`, and `front/shared` using Node `fs` and `path`. Keep it dependency-free; do not add a glob package.
 
-- [ ] **Step 2: Parse static import specifiers**
+- [x] **Step 2: Parse static import specifiers**
 
 Detect static imports with a conservative regex covering:
 
@@ -234,7 +234,7 @@ export ... from "..."
 
 This test is a boundary guard, not a TypeScript parser. It should prefer clear error messages over clever parsing.
 
-- [ ] **Step 3: Enforce shared restrictions**
+- [x] **Step 3: Enforce shared restrictions**
 
 Fail when any file under `front/shared` imports:
 
@@ -244,7 +244,7 @@ Fail when any file under `front/shared` imports:
 @/src/app/
 ```
 
-- [ ] **Step 4: Enforce feature-to-feature restrictions**
+- [x] **Step 4: Enforce feature-to-feature restrictions**
 
 Fail when a file under `front/features/<feature>` imports another feature directly:
 
@@ -254,7 +254,7 @@ Fail when a file under `front/features/<feature>` imports another feature direct
 
 Allow same-feature imports.
 
-- [ ] **Step 5: Enforce model restrictions**
+- [x] **Step 5: Enforce model restrictions**
 
 Fail when `front/features/*/model/*` imports:
 
@@ -266,7 +266,7 @@ react-router-dom
 @/features/*/api/
 ```
 
-- [ ] **Step 6: Enforce UI restrictions**
+- [x] **Step 6: Enforce UI restrictions**
 
 Fail when `front/features/*/ui/*` imports:
 
@@ -278,7 +278,7 @@ Fail when `front/features/*/ui/*` imports:
 
 Also scan UI source text for direct `fetch(` calls and fail with a message pointing to the route/API boundary.
 
-- [ ] **Step 7: Run the new focused test**
+- [x] **Step 7: Run the new focused test**
 
 Run:
 
@@ -288,7 +288,7 @@ pnpm --dir front test -- frontend-boundaries.test.ts
 
 Expected: PASS. If current code violates future-only `ui` restrictions because files still live under `components`, keep the test scoped to new `ui` directories until the relevant feature is moved.
 
-- [ ] **Step 8: Commit Task 1**
+- [x] **Step 8: Commit Task 1**
 
 Commit only the boundary test:
 
