@@ -1,4 +1,4 @@
-package com.readmates.note.api
+package com.readmates.note.adapter.`in`.web
 
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

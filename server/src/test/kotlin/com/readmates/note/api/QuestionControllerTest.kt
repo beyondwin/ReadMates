@@ -1,4 +1,4 @@
-package com.readmates.note.api
+package com.readmates.note.adapter.`in`.web
 
 import com.readmates.support.MySqlTestContainer
 import org.junit.jupiter.api.Test

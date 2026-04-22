@@ -37,6 +37,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.testcontainers:testcontainers-mysql:2.0.2")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
 }
 
 val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")

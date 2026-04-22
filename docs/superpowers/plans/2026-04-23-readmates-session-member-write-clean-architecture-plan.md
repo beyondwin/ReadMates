@@ -119,7 +119,7 @@ Implementation workers must not edit those files. If a task unexpectedly require
 - Read only: `server/src/test/kotlin/com/readmates/session/api/*`
 - Read only: `server/src/test/kotlin/com/readmates/note/api/*`
 
-- [ ] **Step 1: Confirm current dirty files**
+- [x] **Step 1: Confirm current dirty files**
 
 Run:
 
@@ -133,7 +133,7 @@ Expected: Only unrelated frontend files should be dirty before this server plan 
 git diff -- server
 ```
 
-- [ ] **Step 2: Run focused validation tests**
+- [x] **Step 2: Run focused validation tests**
 
 Run:
 
@@ -152,7 +152,9 @@ Run:
 
 Expected: PASS. If a test fails before changes, record the failure in this plan under a new `Baseline Failures` section before editing code.
 
-- [ ] **Step 3: Commit only if baseline notes were added**
+Task 1 result on 2026-04-23: the new worktree status was clean, the focused validation command passed, and no `Baseline Failures` section was needed.
+
+- [x] **Step 3: Commit only if baseline notes were added**
 
 If Step 2 required adding baseline notes, commit the plan note:
 
@@ -162,6 +164,8 @@ git commit -m "docs: record session architecture baseline"
 ```
 
 Expected: commit succeeds. If there were no baseline notes, do not commit.
+
+Completion note: no baseline failure notes were added because the focused suite passed. This checkbox was still committed to satisfy the user-level requirement that each Task update plan checkboxes and produce a Task commit.
 
 ## Task 2: Add CurrentMember Use Case And Web Argument Resolver
 
@@ -175,7 +179,7 @@ Expected: commit succeeds. If there were no baseline notes, do not commit.
 - Create: `server/src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberWebConfig.kt`
 - Create: `server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt`
 
-- [ ] **Step 1: Write the argument resolver unit test**
+- [x] **Step 1: Write the argument resolver unit test**
 
 Create `server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt`:
 
@@ -258,7 +262,7 @@ class CurrentMemberArgumentResolverTest {
 }
 ```
 
-- [ ] **Step 2: Run the resolver test and verify it fails**
+- [x] **Step 2: Run the resolver test and verify it fails**
 
 Run:
 
@@ -268,7 +272,7 @@ Run:
 
 Expected: FAIL because `ResolveCurrentMemberUseCase` and `CurrentMemberArgumentResolver` do not exist.
 
-- [ ] **Step 3: Add the inbound and outbound ports**
+- [x] **Step 3: Add the inbound and outbound ports**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/port/in/ResolveCurrentMemberUseCase.kt`:
 
@@ -294,7 +298,7 @@ interface LoadCurrentMemberPort {
 }
 ```
 
-- [ ] **Step 4: Add the application service**
+- [x] **Step 4: Add the application service**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/service/ResolveCurrentMemberService.kt`:
 
@@ -315,7 +319,7 @@ class ResolveCurrentMemberService(
 }
 ```
 
-- [ ] **Step 5: Add the temporary persistence adapter**
+- [x] **Step 5: Add the temporary persistence adapter**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/out/persistence/JdbcCurrentMemberAdapter.kt`:
 
@@ -336,7 +340,7 @@ class JdbcCurrentMemberAdapter(
 }
 ```
 
-- [ ] **Step 6: Add the argument resolver**
+- [x] **Step 6: Add the argument resolver**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolver.kt`:
 
@@ -380,7 +384,7 @@ class CurrentMemberArgumentResolver(
 }
 ```
 
-- [ ] **Step 7: Register the argument resolver**
+- [x] **Step 7: Register the argument resolver**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberWebConfig.kt`:
 
@@ -402,7 +406,7 @@ class CurrentMemberWebConfig(
 }
 ```
 
-- [ ] **Step 8: Run the resolver test**
+- [x] **Step 8: Run the resolver test**
 
 Run:
 
@@ -412,7 +416,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Run:
 
@@ -441,7 +445,7 @@ Expected: commit succeeds.
 - Create: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacySessionParticipationWriteAdapter.kt`
 - Create: `server/src/test/kotlin/com/readmates/session/application/service/SessionMemberWriteServiceTest.kt`
 
-- [ ] **Step 1: Write the application service test**
+- [x] **Step 1: Write the application service test**
 
 Create `server/src/test/kotlin/com/readmates/session/application/service/SessionMemberWriteServiceTest.kt`:
 
@@ -538,7 +542,7 @@ class SessionMemberWriteServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run the service test and verify it fails**
+- [x] **Step 2: Run the service test and verify it fails**
 
 Run:
 
@@ -548,7 +552,7 @@ Run:
 
 Expected: FAIL because the command, port, and service classes do not exist.
 
-- [ ] **Step 3: Add command models**
+- [x] **Step 3: Add command models**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/SessionMemberCommands.kt`:
 
@@ -591,7 +595,7 @@ data class SaveLongReviewCommand(
 )
 ```
 
-- [ ] **Step 4: Add result models**
+- [x] **Step 4: Add result models**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/SessionMemberResults.kt`:
 
@@ -626,7 +630,7 @@ data class LongReviewResult(
 )
 ```
 
-- [ ] **Step 5: Add inbound use case interfaces**
+- [x] **Step 5: Add inbound use case interfaces**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/in/SessionMemberWriteUseCases.kt`:
 
@@ -668,7 +672,7 @@ interface SaveReviewUseCase {
 }
 ```
 
-- [ ] **Step 6: Add outbound write port**
+- [x] **Step 6: Add outbound write port**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/out/SessionParticipationWritePort.kt`:
 
@@ -698,7 +702,7 @@ interface SessionParticipationWritePort {
 }
 ```
 
-- [ ] **Step 7: Add application service**
+- [x] **Step 7: Add application service**
 
 Create `server/src/main/kotlin/com/readmates/session/application/service/SessionMemberWriteService.kt`:
 
@@ -754,7 +758,7 @@ class SessionMemberWriteService(
 }
 ```
 
-- [ ] **Step 8: Add legacy adapter**
+- [x] **Step 8: Add legacy adapter**
 
 Create `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacySessionParticipationWriteAdapter.kt`:
 
@@ -824,7 +828,7 @@ class LegacySessionParticipationWriteAdapter(
 }
 ```
 
-- [ ] **Step 9: Run the service test**
+- [x] **Step 9: Run the service test**
 
 Run:
 
@@ -834,7 +838,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 Run:
 
@@ -865,7 +869,7 @@ Expected: commit succeeds.
   - `server/src/test/kotlin/com/readmates/note/api/QuestionControllerTest.kt`
   - `server/src/test/kotlin/com/readmates/note/api/ReviewControllerTest.kt`
 
-- [ ] **Step 1: Move controller files**
+- [x] **Step 1: Move controller files**
 
 Run:
 
@@ -884,7 +888,7 @@ git mv server/src/main/kotlin/com/readmates/note/api/ReviewController.kt \
 
 Expected: files are moved.
 
-- [ ] **Step 2: Replace `RsvpController` content**
+- [x] **Step 2: Replace `RsvpController` content**
 
 Edit `server/src/main/kotlin/com/readmates/session/adapter/in/web/RsvpController.kt`:
 
@@ -929,7 +933,7 @@ class RsvpController(
 }
 ```
 
-- [ ] **Step 3: Replace `CheckinController` content**
+- [x] **Step 3: Replace `CheckinController` content**
 
 Edit `server/src/main/kotlin/com/readmates/note/adapter/in/web/CheckinController.kt`:
 
@@ -977,7 +981,7 @@ class CheckinController(
 }
 ```
 
-- [ ] **Step 4: Replace `QuestionController` content**
+- [x] **Step 4: Replace `QuestionController` content**
 
 Edit `server/src/main/kotlin/com/readmates/note/adapter/in/web/QuestionController.kt`:
 
@@ -1060,7 +1064,7 @@ class QuestionController(
 }
 ```
 
-- [ ] **Step 5: Replace `ReviewController` content**
+- [x] **Step 5: Replace `ReviewController` content**
 
 Edit `server/src/main/kotlin/com/readmates/note/adapter/in/web/ReviewController.kt`:
 
@@ -1116,7 +1120,7 @@ class ReviewController(
 }
 ```
 
-- [ ] **Step 6: Update test package declarations**
+- [x] **Step 6: Update test package declarations**
 
 Edit these test files so their package declarations match moved controllers:
 
@@ -1136,7 +1140,7 @@ for `CheckinControllerTest.kt`, `QuestionControllerTest.kt`, and `ReviewControll
 
 Do not move DB integration tests in this task; their package can remain as-is because they hit HTTP routes through MockMvc.
 
-- [ ] **Step 7: Run member write controller tests**
+- [x] **Step 7: Run member write controller tests**
 
 Run:
 
@@ -1151,7 +1155,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 Run:
 
@@ -1186,7 +1190,7 @@ Expected: commit succeeds.
 - Modify: `server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt`
 
-- [ ] **Step 1: Add command models**
+- [x] **Step 1: Add command models**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/HostSessionCommands.kt`:
 
@@ -1242,7 +1246,7 @@ data class UpsertPublicationCommand(
 )
 ```
 
-- [ ] **Step 2: Add dashboard result model**
+- [x] **Step 2: Add dashboard result model**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/HostDashboardResult.kt`:
 
@@ -1265,7 +1269,7 @@ data class HostDashboardMissingMemberResult(
 )
 ```
 
-- [ ] **Step 3: Add inbound use cases**
+- [x] **Step 3: Add inbound use cases**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/in/HostSessionUseCases.kt`:
 
@@ -1307,7 +1311,7 @@ interface GetHostDashboardUseCase {
 }
 ```
 
-- [ ] **Step 4: Add outbound host port**
+- [x] **Step 4: Add outbound host port**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionWritePort.kt`:
 
@@ -1340,7 +1344,7 @@ interface HostSessionWritePort {
 }
 ```
 
-- [ ] **Step 5: Add host command service**
+- [x] **Step 5: Add host command service**
 
 Create `server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt`:
 
@@ -1391,7 +1395,7 @@ class HostSessionCommandService(
 }
 ```
 
-- [ ] **Step 6: Change legacy host repository signatures to application commands**
+- [x] **Step 6: Change legacy host repository signatures to application commands**
 
 Modify `server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt` imports:
 
@@ -1530,7 +1534,7 @@ HostDashboardMissingMemberResult(
 )
 ```
 
-- [ ] **Step 7: Add legacy host adapter**
+- [x] **Step 7: Add legacy host adapter**
 
 Create `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacyHostSessionWriteAdapter.kt`:
 
@@ -1579,7 +1583,7 @@ class LegacyHostSessionWriteAdapter(
 }
 ```
 
-- [ ] **Step 8: Run compilation-focused tests**
+- [x] **Step 8: Run compilation-focused tests**
 
 Run:
 
@@ -1589,7 +1593,7 @@ Run:
 
 Expected: PASS. The new adapter compiles while controllers still use legacy packages.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Run:
 
@@ -1600,7 +1604,9 @@ git add server/src/main/kotlin/com/readmates/session/application/model/HostSessi
   server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionWritePort.kt \
   server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt \
   server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacyHostSessionWriteAdapter.kt \
-  server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt
+  server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt \
+  server/src/main/kotlin/com/readmates/session/application/SessionRepository.kt \
+  server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt
 git commit -m "refactor: add host session use cases"
 ```
 
@@ -1620,7 +1626,7 @@ Expected: commit succeeds.
 - Create: `server/src/main/kotlin/com/readmates/session/application/service/CurrentSessionQueryService.kt`
 - Create: `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacyCurrentSessionAdapter.kt`
 
-- [ ] **Step 1: Add current session use case**
+- [x] **Step 1: Add current session use case**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/in/GetCurrentSessionUseCase.kt`:
 
@@ -1686,7 +1692,7 @@ class LegacyCurrentSessionAdapter(
 }
 ```
 
-- [ ] **Step 2: Move host/current controller files**
+- [x] **Step 2: Move host/current controller files**
 
 Run:
 
@@ -1705,7 +1711,7 @@ git mv server/src/main/kotlin/com/readmates/session/api/HostDashboardController.
 
 Expected: files are moved.
 
-- [ ] **Step 3: Update moved controllers**
+- [x] **Step 3: Update moved controllers**
 
 Apply these concrete conversions:
 
@@ -1806,7 +1812,7 @@ class HostDashboardController(
 }
 ```
 
-- [ ] **Step 4: Update imports that referenced moved request DTOs**
+- [x] **Step 4: Update imports that referenced moved request DTOs**
 
 Search:
 
@@ -1816,7 +1822,7 @@ rg -n "com\\.readmates\\.session\\.api\\.(AttendanceEntry|HostSessionRequest|Pub
 
 Expected: no production import remains for `com.readmates.session.api.AttendanceEntry`, `com.readmates.session.api.HostSessionRequest`, `com.readmates.session.api.PublicationRequest`, or `com.readmates.session.api.HostDashboardResponse`.
 
-- [ ] **Step 5: Run host/current session tests**
+- [x] **Step 5: Run host/current session tests**
 
 Run:
 
@@ -1829,7 +1835,7 @@ Run:
 
 Expected: PASS. Test package names can remain old if class package declarations are not changed; if declarations are changed, update the `--tests` selectors to the new packages.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -1842,7 +1848,8 @@ git add server/src/main/kotlin/com/readmates/session/application/port/in/GetCurr
   server/src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt \
   server/src/main/kotlin/com/readmates/session/adapter/in/web/AttendanceController.kt \
   server/src/main/kotlin/com/readmates/session/adapter/in/web/PublicationController.kt \
-  server/src/main/kotlin/com/readmates/session/adapter/in/web/HostDashboardController.kt
+  server/src/main/kotlin/com/readmates/session/adapter/in/web/HostDashboardController.kt \
+  server/src/main/kotlin/com/readmates/session/application/SessionRepository.kt
 git add -u server/src/main/kotlin/com/readmates/session/api
 git commit -m "refactor: route host session endpoints through use cases"
 ```
@@ -1856,7 +1863,7 @@ Expected: commit succeeds.
 - Modify: `server/src/main/kotlin/com/readmates/session/application/SessionRepository.kt`
 - Test: all focused backend tests from Task 1
 
-- [ ] **Step 1: Search for migrated controller violations**
+- [x] **Step 1: Search for migrated controller violations**
 
 Run:
 
@@ -1868,7 +1875,7 @@ rg -n "MemberAccountRepository|SessionRepository|JdbcTemplate|ObjectProvider<Jdb
 
 Expected: no output from the migrated web adapter directories.
 
-- [ ] **Step 2: Search for old controller package leftovers**
+- [x] **Step 2: Search for old controller package leftovers**
 
 Run:
 
@@ -1878,7 +1885,7 @@ find server/src/main/kotlin/com/readmates/session/api server/src/main/kotlin/com
 
 Expected: no migrated controller files remain in these directories. `NotesFeedController.kt` may remain under `note/api` because archive/note read flow is outside this plan.
 
-- [ ] **Step 3: Keep `SessionRepository` only as a legacy facade if still referenced**
+- [x] **Step 3: Keep `SessionRepository` only as a legacy facade if still referenced**
 
 Run:
 
@@ -1942,7 +1949,7 @@ class InvalidSessionScheduleException : RuntimeException("Session end time must 
 class InvalidQuestionSetException : RuntimeException("Questions must include 2 to 5 non-empty items")
 ```
 
-- [ ] **Step 4: Run focused backend tests**
+- [x] **Step 4: Run focused backend tests**
 
 Run:
 
@@ -1956,7 +1963,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Run:
 
@@ -1974,7 +1981,7 @@ Expected: commit succeeds if code changed. If Step 3 did not change files, skip 
 - Create: `server/src/test/kotlin/com/readmates/architecture/SessionCleanArchitectureBoundaryTest.kt`
 - Modify: `server/build.gradle.kts`
 
-- [ ] **Step 1: Add ArchUnit dependency**
+- [x] **Step 1: Add ArchUnit dependency**
 
 Modify `server/build.gradle.kts` test dependencies:
 
@@ -1982,7 +1989,7 @@ Modify `server/build.gradle.kts` test dependencies:
 testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
 ```
 
-- [ ] **Step 2: Create boundary test**
+- [x] **Step 2: Create boundary test**
 
 Create `server/src/test/kotlin/com/readmates/architecture/SessionCleanArchitectureBoundaryTest.kt`:
 
@@ -2041,7 +2048,7 @@ class SessionCleanArchitectureBoundaryTest {
 }
 ```
 
-- [ ] **Step 3: Run boundary test and verify it passes**
+- [x] **Step 3: Run boundary test and verify it passes**
 
 Run:
 
@@ -2051,7 +2058,7 @@ Run:
 
 Expected: PASS. If it fails because a temporary bridge still references moved web DTOs from application, move those DTO-compatible models into `session.application.model` and update the bridge before committing.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 Run:
 
@@ -2068,7 +2075,7 @@ Expected: commit succeeds.
 
 - No planned source edits.
 
-- [ ] **Step 1: Run focused server suite**
+- [x] **Step 1: Run focused server suite**
 
 Run:
 
@@ -2085,7 +2092,9 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full backend tests if focused suite passes**
+Task 9 result on 2026-04-23: focused server suite passed (`BUILD SUCCESSFUL`).
+
+- [x] **Step 2: Run full backend tests if focused suite passes**
 
 Run:
 
@@ -2095,7 +2104,9 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Confirm no unrelated files were changed**
+Task 9 result on 2026-04-23: full backend test suite passed with `./server/gradlew -p server test --rerun-tasks` (`BUILD SUCCESSFUL in 36s`).
+
+- [x] **Step 3: Confirm no unrelated files were changed**
 
 Run:
 
@@ -2104,6 +2115,8 @@ git status --short
 ```
 
 Expected: only the pre-existing unrelated frontend dirty files remain, or no dirty files if the user cleaned them in another session.
+
+Task 9 result on 2026-04-23: `git status --short` was clean before recording these verification notes.
 
 ## Self-Review
 
