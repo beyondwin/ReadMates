@@ -1,5 +1,12 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 import { loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
+
+async function expectPracticalTapTarget(locator: Locator) {
+  const box = await locator.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+  expect(box!.width).toBeGreaterThanOrEqual(44);
+}
 
 test.beforeEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
@@ -10,7 +17,7 @@ test.afterEach(() => {
 });
 
 test("desktop public and host pages show the expected top navigation", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 1366, height: 900 });
 
   await page.goto("/");
   const publicNav = page.getByRole("navigation", { name: "공개 내비게이션" });
@@ -56,7 +63,7 @@ test("desktop public and host pages show the expected top navigation", async ({ 
 });
 
 test("mobile public pages hide app tabs and host app pages show mobile chrome", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
+  await page.setViewportSize({ width: 360, height: 812 });
   const mobileHeader = page.getByRole("banner");
 
   await page.goto("/");
@@ -74,18 +81,22 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(mobileHeader).toBeVisible();
   await expect(mobileHeader).toContainText("로그인");
   await expect(mobileHeader.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/");
+  await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "뒤로" }));
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app");
   await expect(page.locator(".app-content > .rm-route-reveal")).toBeVisible();
   await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
+  await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "호스트 화면" }));
   await expect(mobileHeader.locator(".m-hdr-side")).toHaveCount(2);
   const memberTabs = page.getByRole("navigation", { name: "앱 탭" });
   await expect(memberTabs.getByRole("link")).toHaveText(["홈", "이번 세션", "클럽 노트", "아카이브", "내 공간"]);
+  await expectPracticalTapTarget(memberTabs.getByRole("link", { name: "이번 세션" }));
   await memberTabs.getByRole("link", { name: "홈" }).click();
   await mobileHeader.getByRole("link", { name: "호스트 화면" }).click();
   await expect(page).toHaveURL(/\/app\/host$/);
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+  await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "멤버 화면으로" }));
   await mobileHeader.getByRole("link", { name: "멤버 화면으로" }).click();
   await expect(page).toHaveURL(/\/app$/);
 
@@ -105,6 +116,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
   await expect(tabs.getByRole("link", { name: "호스트" })).toHaveCount(0);
   await expect(tabs.getByRole("link", { name: "이번 세션" })).toHaveCount(0);
+  await expectPracticalTapTarget(tabs.getByRole("link", { name: "세션" }));
 
   await tabs.getByRole("link", { name: "기록" }).click();
   await expect(page).toHaveURL(/\/app\/archive$/);

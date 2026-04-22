@@ -954,21 +954,7 @@ export default function HostSessionEditor({
       ) : null}
 
       {toast ? (
-        <div
-          role="status"
-          style={{
-            position: "fixed",
-            bottom: "30px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "var(--ink-900)",
-            color: "var(--paper-50)",
-            padding: "10px 18px",
-            borderRadius: "999px",
-            fontSize: "13px",
-            zIndex: 60,
-          }}
-        >
+        <div role="status" className="m-toast is-on">
           ✓ {toast}
         </div>
       ) : null}
