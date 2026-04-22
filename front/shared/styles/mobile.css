@@ -10,11 +10,12 @@
   --m-safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-html, body {
-  font-size: 16px;
-  overscroll-behavior-y: contain;
-  overflow-x: hidden;
-  -webkit-tap-highlight-color: transparent;
+@media (max-width: 768px) {
+  html, body {
+    font-size: 16px;
+    overscroll-behavior-y: contain;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 .m-app {
@@ -672,7 +673,7 @@ html, body {
 
 /* Current session mobile */
 .mobile-only.rm-current-session-mobile {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 .mobile-only.rm-current-session-mobile,
 .mobile-only.rm-current-session-mobile * {
@@ -831,7 +832,7 @@ html, body {
 
 /* Host dashboard mobile */
 .mobile-only.rm-host-dashboard-mobile {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 .mobile-only.rm-host-dashboard-mobile,
 .mobile-only.rm-host-dashboard-mobile * {
@@ -921,7 +922,7 @@ html, body {
 }
 @media (max-width: 768px) {
   .rm-host-session-editor {
-    overflow-x: hidden;
+    overflow-x: clip;
   }
   .rm-host-session-editor,
   .rm-host-session-editor * {
