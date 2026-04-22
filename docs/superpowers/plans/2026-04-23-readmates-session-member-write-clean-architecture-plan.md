@@ -119,7 +119,7 @@ Implementation workers must not edit those files. If a task unexpectedly require
 - Read only: `server/src/test/kotlin/com/readmates/session/api/*`
 - Read only: `server/src/test/kotlin/com/readmates/note/api/*`
 
-- [ ] **Step 1: Confirm current dirty files**
+- [x] **Step 1: Confirm current dirty files**
 
 Run:
 
@@ -133,7 +133,7 @@ Expected: Only unrelated frontend files should be dirty before this server plan 
 git diff -- server
 ```
 
-- [ ] **Step 2: Run focused validation tests**
+- [x] **Step 2: Run focused validation tests**
 
 Run:
 
@@ -152,7 +152,9 @@ Run:
 
 Expected: PASS. If a test fails before changes, record the failure in this plan under a new `Baseline Failures` section before editing code.
 
-- [ ] **Step 3: Commit only if baseline notes were added**
+Task 1 result on 2026-04-23: the new worktree status was clean, the focused validation command passed, and no `Baseline Failures` section was needed.
+
+- [x] **Step 3: Commit only if baseline notes were added**
 
 If Step 2 required adding baseline notes, commit the plan note:
 
@@ -162,6 +164,8 @@ git commit -m "docs: record session architecture baseline"
 ```
 
 Expected: commit succeeds. If there were no baseline notes, do not commit.
+
+Completion note: no baseline failure notes were added because the focused suite passed. This checkbox was still committed to satisfy the user-level requirement that each Task update plan checkboxes and produce a Task commit.
 
 ## Task 2: Add CurrentMember Use Case And Web Argument Resolver
 
