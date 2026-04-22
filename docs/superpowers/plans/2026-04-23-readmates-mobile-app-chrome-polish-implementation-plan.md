@@ -971,9 +971,10 @@ Task 6 verification evidence:
 
 - `pnpm --dir front lint`: PASS.
 - `pnpm --dir front test`: PASS, 43 files and 407 tests.
-- `pnpm --dir front build`: PASS, with the existing Vite chunk-size warning for `index-BqbUMHp2.js`.
+- `pnpm --dir front build`: PASS, with the existing Vite chunk-size warning for the main JS chunk (`index-DXITf_Pm.js` in the latest run).
 - `pnpm --dir front test:e2e -- front/tests/e2e/responsive-navigation-chrome.spec.ts`: PASS, 4 Playwright tests.
 - Mobile visual QA: PASS across 360x812, 390x844, and 430x932 for `/app`, `/app/session/current`, `/app/notes`, `/app/me`, `/app/host`, `/app/host/sessions/new`, `/app/host/members`, and `/app/archive`.
+- Final visual QA rerun after the back-label clipping fix confirmed `/app/host/sessions/new` shows the full `오늘` label at 360x812, 390x844, and 430x932.
 - Temporary screenshots and contact sheets were saved under `front/.tmp/task6-mobile-chrome-visual-qa/` and intentionally not committed.
 
 ---
