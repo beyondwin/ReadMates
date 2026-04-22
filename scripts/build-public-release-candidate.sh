@@ -178,6 +178,7 @@ preflight_envrc_loaders() {
     "front"
     "server"
     "deploy/oci"
+    "docs/development"
     "docs/deploy"
     "scripts"
   )
@@ -213,6 +214,7 @@ preflight_source_symlinks() {
     "front"
     "server"
     "deploy/oci"
+    "docs/development"
     "docs/deploy"
     "scripts"
   )
@@ -360,6 +362,7 @@ copy_manifest() {
     --exclude='/*.state'
 
   copy_dir "docs/deploy"
+  copy_dir "docs/development"
 
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/README.md"
@@ -376,7 +379,7 @@ is_approved_manifest_path() {
     front|front/*) return 0 ;;
     server|server/*) return 0 ;;
     deploy|deploy/oci|deploy/oci/*) return 0 ;;
-    docs|docs/deploy|docs/deploy/*) return 0 ;;
+    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*) return 0 ;;
     scripts|scripts/README.md|scripts/build-public-release-candidate.sh|scripts/public-release-check.sh|scripts/verify-public-release-fixtures.sh) return 0 ;;
     *) return 1 ;;
   esac

@@ -30,8 +30,8 @@ SPRING_PROFILES_ACTIVE=prod
 SPRING_DATASOURCE_URL=jdbc:mysql://<mysql-private-host>:3306/readmates?useSSL=true&serverTimezone=UTC
 SPRING_DATASOURCE_USERNAME=readmates
 SPRING_DATASOURCE_PASSWORD=<secret>
-READMATES_APP_BASE_URL=https://<cloudflare-pages-origin>
-READMATES_ALLOWED_ORIGINS=https://<cloudflare-pages-origin>
+READMATES_APP_BASE_URL=https://readmates.pages.dev
+READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
 READMATES_BFF_SECRET=<same-pages-function-secret>
 READMATES_BFF_SECRET_REQUIRED=true
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
@@ -53,7 +53,7 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 - Database name: `readmates`
 - Application user: `readmates`
 - Character set/collation: MySQL 8 기본값 사용, 별도 한국어 collation 요구가 생기면 재검토
-- Time zone: UTC, backend Hikari `set time_zone = '+00:00'`와 일치
+- Time zone: UTC, 백엔드 Hikari `set time_zone = '+00:00'`와 일치
 - Network: private endpoint 또는 Spring Compute VM에서만 접근 가능한 security list
 - Schema migration: Spring 시작 시 `server/src/main/resources/db/mysql/migration`의 Flyway migration 적용
 
@@ -132,7 +132,7 @@ gunzip -c readmates-20260420T000000Z.sql.gz | mysql \
 - Spring이 `SPRING_PROFILES_ACTIVE=prod`로 시작하는지 확인합니다.
 - Cloudflare Pages와 Spring의 `READMATES_BFF_SECRET`이 같은지 확인합니다.
 - `READMATES_ALLOWED_ORIGINS`가 운영 Cloudflare Pages origin으로 제한되어 있는지 확인합니다.
-- `READMATES_AUTH_SESSION_COOKIE_SECURE=true`로 session cookie가 Secure로 나가는지 확인합니다.
+- `READMATES_AUTH_SESSION_COOKIE_SECURE=true`로 세션 cookie가 Secure로 나가는지 확인합니다.
 - Google OAuth client 변수와 redirect URI가 운영 Pages origin과 맞는지 확인합니다.
 - export script가 dump를 생성하는지 확인합니다.
 - Object Storage를 사용 중이면 최신 export를 비운영 DB로 복구할 수 있는지 확인합니다.

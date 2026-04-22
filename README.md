@@ -1,166 +1,122 @@
 # ReadMates
 
-ReadMates is an invite-only reading club web app. It combines a public site, member session preparation, host operations, and post-session feedback documents in one full-stack product.
+ReadMates는 소규모 정기 독서모임의 세션 준비, 참여 관리, 기록 공개, 피드백 문서 열람을 하나의 흐름으로 묶은 invite-only 풀스택 웹 서비스입니다.
 
-Public demo: [https://readmates.pages.dev](https://readmates.pages.dev)
+- Demo: [https://readmates.pages.dev](https://readmates.pages.dev)
+- Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`
+- Scope: 1개 독서모임과 1개 현재 세션에 최적화된 운영형 서비스
+- Highlight: Google OAuth, 서버 측 session cookie, Cloudflare BFF 보안 경계, 역할 기반 권한 제어, 피드백 문서 접근 제어, Playwright E2E, 공개 릴리즈 후보 scan
 
-This repository is prepared for public review. It documents the product, architecture, trust boundaries, local setup, test commands, and deployment model without private operational state.
+이 저장소는 포트폴리오 공개 검토를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
 
-## Product
+## 왜 만들었나
 
-ReadMates is built for a small recurring book club.
+소규모 독서모임은 규모가 작아도 운영 정보가 쉽게 흩어집니다. 모임 공지, RSVP, 읽은 분량, 질문, 하이라이트, 한줄평, 장문 서평, 참석 기록, 모임 후 피드백 문서가 채팅방과 문서 도구 사이에 분산되면 다음 회차를 준비하거나 지난 기록을 다시 찾기 어렵습니다.
 
-- Public visitors can read the club introduction, published sessions, and public records.
-- Viewer members can sign in with Google without an invitation and browse private session records and current-session status in read-only mode.
-- Full members can accept an invitation link or be activated by a host, then RSVP for the current session, submit reading progress, questions, short reviews, and long reviews.
-- Hosts can create invitations, activate viewer members, manage member status, create and edit sessions, confirm attendance, publish session records, and upload feedback documents.
-- Members who attended a session can read its feedback document. Viewers and non-attendees see a locked state.
+ReadMates는 이 문제를 단순 게시판이나 CRUD 목록으로 풀지 않습니다. 공개 사이트, 멤버 앱, 호스트 운영 도구, 공개 기록, 참석자 전용 피드백 문서를 하나의 제품 흐름으로 연결해 세션 전후의 실제 운영을 줄이는 데 초점을 둡니다.
 
-The current app supports one club and one open current session at a time. Password login and password-reset endpoints are intentionally retired and return `410 Gone`; Google OAuth and local dev-login are the active login paths.
+## 역할별 기능
 
-No screenshots are included in this public README. The demo and local seed data use sample records only.
-
-## Stack
-
-| Area | Technology |
+| 역할 | 할 수 있는 일 |
 | --- | --- |
-| Frontend | React 19, React Router 7, TypeScript, Vite |
-| Frontend tests | Vitest, Testing Library, Playwright |
-| Edge/BFF | Cloudflare Pages Functions |
-| Backend | Kotlin, Spring Boot, Spring Security, OAuth2 Client, JPA, Flyway |
-| Database | MySQL 8 compatible database, Testcontainers MySQL |
-| Deployment | Cloudflare Pages, OCI Compute, OCI MySQL HeatWave, systemd, Caddy |
+| 게스트 | 로그인 없이 공개 소개, 공개 기록, 공개 세션 상세를 볼 수 있습니다. |
+| 둘러보기 멤버 | 초대 없이 Google로 로그인한 계정입니다. 비공개 세션 기록과 현재 세션 현황을 읽을 수 있지만 RSVP, 체크인, 질문/서평 작성, 피드백 문서 열람, 호스트 도구는 제한됩니다. |
+| 정식 멤버 | 초대 링크를 수락했거나 호스트가 전환한 계정입니다. 현재 세션 참여, RSVP, 읽은 분량 제출, 질문, 한줄평, 장문 서평 작성이 가능하며 참석한 회차의 피드백 문서를 읽을 수 있습니다. |
+| 호스트 | 정식 멤버 권한에 운영 권한이 추가됩니다. 초대 생성, 둘러보기 멤버 전환, 멤버 상태 관리, 세션 생성/수정, 참석 확정, 공개 기록 발행, 피드백 문서 업로드를 수행합니다. |
 
-## Repository Map
+비밀번호 로그인과 비밀번호 재설정 엔드포인트는 현재 운영 경로에서 제외되어 `410 Gone`을 반환합니다. 실제 로그인은 Google OAuth를 사용하며, 로컬 개발에서는 fixture 기반 dev-login을 사용할 수 있습니다.
 
-| Path | Purpose |
-| --- | --- |
-| `front/` | Vite React SPA, Cloudflare Pages Functions, frontend tests |
-| `front/src/app` | Router, layouts, auth state, route guards |
-| `front/features` | Domain UI and actions for public, member, host, archive, notes, feedback |
-| `front/shared` | API types/client, shared UI, styles, security helpers |
-| `front/functions` | Cloudflare Pages BFF and OAuth proxy functions |
-| `server/` | Spring Boot API |
-| `server/src/main/kotlin/com/readmates/auth` | Google login, invitations, membership lifecycle, session cookies |
-| `server/src/main/kotlin/com/readmates/session` | Current sessions, host session operations, RSVP, attendance, publication |
-| `server/src/main/kotlin/com/readmates/archive` | Archive, member history, notes feed |
-| `server/src/main/kotlin/com/readmates/feedback` | Feedback document upload, parsing, rendering |
-| `server/src/main/kotlin/com/readmates/publication` | Public homepage and published session APIs |
-| `server/src/main/resources/db/mysql` | MySQL Flyway migrations and dev seed data |
-| `docs/deploy` | Public deployment and release-safety runbooks |
-| `deploy/oci` | Placeholder-based OCI VM setup and deployment scripts |
-
-## Architecture
+## 아키텍처 요약
 
 ```text
 Browser
   |
-  | same-origin app and /api/bff/** requests
+  | same-origin SPA, /api/bff/**, /oauth2/**, /login/oauth2/**
   v
 Cloudflare Pages
-  |-- Vite SPA from front/dist
-  |-- Pages Functions from front/functions
+  |-- Vite SPA
+  |-- Pages Functions BFF and OAuth proxy
         |-- /api/bff/** -> Spring /api/**
         |-- /oauth2/authorization/** -> Spring OAuth start
         |-- /login/oauth2/code/** -> Spring OAuth callback
   |
-  | X-Readmates-Bff-Secret + forwarded cookies
+  | X-Readmates-Bff-Secret, forwarded cookies
   v
 Spring Boot API
-  |-- Spring Security
+  |-- Google OAuth success handling
   |-- HttpOnly readmates_session cookie
-  |-- membership, role, and session rules
+  |-- membership, role, and session authorization
+  |-- feedback document parsing and access control
   |-- Flyway migrations
   v
 MySQL
 ```
 
-The browser does not call the Spring API directly in production. It calls same-origin Cloudflare Pages Functions under `/api/bff/**`; the BFF forwards to Spring `/api/**` and adds `X-Readmates-Bff-Secret`. Spring validates that header on API requests, so the direct API origin is not the trusted browser-facing boundary.
+프로덕션에서 브라우저는 Spring API origin을 직접 신뢰 경계로 사용하지 않습니다. 브라우저는 같은 origin의 Cloudflare Pages Functions에 요청하고, BFF가 Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. 직접 API origin 예시는 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다.
 
-Mutation requests also require an allowed origin or referer. The BFF secret is stored only in Cloudflare Pages Functions and Spring runtime configuration. It is never put in the browser bundle.
+## 주요 기술적 의사결정
 
-## Auth And Trust Boundaries
+- Google OAuth와 서버 측 session cookie: 로그인 성공 후 Spring이 `readmates_session`을 발급합니다. Cookie는 `HttpOnly`, `SameSite=Lax`, production `Secure`로 설정하고, 서버는 token 원문이 아니라 hash를 `auth_sessions`에 저장합니다.
+- Cloudflare Pages Functions BFF: SPA와 API 호출을 같은 origin으로 묶고, `/api/bff/**` 요청만 Spring `/api/**`로 전달합니다. OAuth 시작과 callback도 Pages Functions proxy를 거쳐 public demo origin에서 자연스럽게 동작합니다.
+- BFF secret과 origin/referrer 경계: Spring은 API 요청의 `X-Readmates-Bff-Secret`을 검증합니다. `POST`, `PUT`, `PATCH`, `DELETE` 요청은 허용된 `Origin` 또는 `Referer`도 요구합니다. BFF secret은 Cloudflare Pages Functions와 Spring runtime 설정에만 두고 브라우저 bundle에 넣지 않습니다.
+- 역할 기반 접근 제어: `게스트`, `둘러보기 멤버`, `정식 멤버`, `호스트` 상태에 따라 route와 API 권한을 분리합니다. 읽기 가능한 화면과 쓰기 가능한 operation을 별도로 제한합니다.
+- 피드백 문서 접근 제어: 호스트가 Markdown 피드백 문서를 업로드하면 서버가 파싱해 typed response로 제공합니다. 호스트는 전체 문서를 관리할 수 있고, 정식 멤버는 본인이 참석한 회차의 피드백 문서만 읽을 수 있습니다. 둘러보기 멤버와 미참석자는 locked state를 봅니다.
+- 공개 기록 경계: public route/API에는 공개로 발행된 세션과 공개 가능한 하이라이트/한줄평만 노출합니다. 현재 세션 참여, private notes, meeting data, feedback document 본문은 인증과 권한 검사를 통과해야 접근할 수 있습니다.
+- 공개 릴리즈 안전성: `scripts/build-public-release-candidate.sh`로 공개 릴리즈 후보를 만든 뒤 `scripts/public-release-check.sh`로 private path, local workstation path, OCI OCID, GitHub token, OpenAI/API-key-shaped token, real-looking DB/BFF/OAuth secret, Gmail 주소 등을 검사합니다.
 
-ReadMates uses Google OAuth for user authentication. The OAuth callback flows through Cloudflare Pages Functions to Spring, and Spring issues a `readmates_session` cookie after a successful login.
+## AI-assisted 운영 콘텐츠
 
-Session-cookie posture:
+ReadMates의 피드백, 하이라이트, 한줄평은 앱 외부 운영 워크플로우에서 AI로 정리된 운영 산출물입니다. ReadMates는 그 산출물을 저장, 파싱, 권한 검증, 공개하고 세션 기록과 피드백 문서로 보여줍니다.
 
-- `HttpOnly`: JavaScript cannot read the session token.
-- `SameSite=Lax`: normal top-level navigation works while reducing cross-site request risk.
-- `Secure` in production: production sets `READMATES_AUTH_SESSION_COOKIE_SECURE=true` so cookies are sent only over HTTPS.
-- Session tokens are stored server-side as hashes in `auth_sessions`.
+현재 ReadMates 앱, 서버, 프론트엔드는 AI API를 직접 호출하지 않습니다. 즉, 제품 기능은 in-app AI generation이 아니라 외부에서 정리된 콘텐츠를 안전하게 운영하고 노출하는 흐름입니다.
 
-Membership is invite-only for participation, with browse-only access for uninvited Google users:
+## 기술 스택
 
-- Guests can read only public home, club introduction, published sessions, and public records.
-- A Google user without an accepted invitation becomes a `VIEWER` member. Viewers can browse private session records and current-session status, but cannot RSVP, check in, submit questions or reviews, read feedback documents, or use host tools.
-- Invitation-link acceptance creates an `ACTIVE` full member immediately.
-- A host can activate a viewer into a full member, manage member status, and manage current-session participants.
-- `host` routes and APIs require an active host role.
-- Member write APIs require an `ACTIVE` full member who is eligible for the current session.
+| 영역 | 기술 |
+| --- | --- |
+| Frontend | `React 19`, `React Router 7`, `TypeScript`, `Vite` |
+| Frontend tests | `Vitest`, `Testing Library`, `Playwright` |
+| Edge/BFF | `Cloudflare Pages Functions` |
+| Backend | `Kotlin`, `Spring Boot`, `Spring Security`, `OAuth2 Client`, `JPA`, `Flyway` |
+| Database | `MySQL 8` compatible database, `Testcontainers MySQL` |
+| Deployment | `Cloudflare Pages`, `OCI Compute`, `OCI MySQL HeatWave`, `systemd`, `Caddy` |
 
-## 멤버십 접근 단계
+## 검증 방식
 
-- 게스트: 로그인 없이 공개 홈, 공개 소개, 공개 기록만 볼 수 있습니다.
-- 둘러보기 멤버: 초대 없이 Google로 로그인한 계정입니다. 전체 비공개 세션 기록과 이번 세션 현황은 읽을 수 있지만, RSVP, 체크인, 질문, 서평 작성과 피드백 문서 열람은 제한됩니다.
-- 정식 멤버: 초대 링크를 수락했거나 호스트가 둘러보기 멤버를 전환한 계정입니다. 현재 세션 참여와 작성 기능을 사용할 수 있고, 참석한 회차의 피드백 문서를 읽을 수 있습니다.
-- 호스트: 정식 멤버 권한에 운영 권한이 추가된 계정입니다. 세션, 초대, 멤버 상태, 출석, 공개 기록, 피드백 문서를 관리합니다.
+주요 검증 명령은 아래와 같습니다. 상세 설명은 [테스트 가이드](docs/development/test-guide.md)를 참고합니다.
 
-Public APIs expose only published sessions that have explicitly been marked public. Member-only operational details such as current-session participation, feedback access, meeting data, and private notes stay behind authentication and authorization checks.
+```bash
+pnpm --dir front lint
+pnpm --dir front test
+pnpm --dir front build
+pnpm --dir front test:e2e
+./server/gradlew -p server clean test
+```
 
-## Main Routes
+공개 릴리즈 후보 검증은 배포 절차와 별개로 실행합니다.
 
-Public:
+```bash
+./scripts/build-public-release-candidate.sh
+./scripts/public-release-check.sh .tmp/public-release-candidate
+```
 
-- `/`
-- `/about`
-- `/records`
-- `/sessions/:sessionId`
-- `/login`
-- `/invite/:token`
+## 로컬 실행 요약
 
-Member app:
+자세한 로컬 실행 절차는 [docs/development/local-setup.md](docs/development/local-setup.md)에 정리합니다.
 
-- `/app`
-- `/app/pending`
-- `/app/session/current`
-- `/app/notes`
-- `/app/archive`
-- `/app/me`
-- `/app/sessions/:sessionId`
-- `/app/feedback/:sessionId`
-- `/app/feedback/:sessionId/print`
+필수 도구:
 
-Host app:
+- `JDK 21`
+- `Node.js`
+- `pnpm`
+- `Docker Compose` 또는 `MySQL 8` compatible database
 
-- `/app/host`
-- `/app/host/members`
-- `/app/host/invitations`
-- `/app/host/sessions/new`
-- `/app/host/sessions/:sessionId/edit`
-
-## Local Setup
-
-Prerequisites:
-
-- JDK 21
-- Node.js
-- pnpm
-- Docker Compose or a MySQL 8 compatible database
-
-Install frontend dependencies:
+요약 명령:
 
 ```bash
 pnpm --dir front install --frozen-lockfile
-```
-
-Start MySQL with Docker Compose:
-
-```bash
 docker compose up -d mysql
 ```
-
-Run the backend with the dev profile. The dev profile applies MySQL migrations and loads sample seed data.
 
 ```bash
 SPRING_PROFILES_ACTIVE=dev \
@@ -171,84 +127,28 @@ READMATES_BFF_SECRET=local-dev-secret \
 ./server/gradlew -p server bootRun
 ```
 
-Run the frontend in another terminal:
-
 ```bash
 READMATES_API_BASE_URL=http://localhost:8080 \
 READMATES_BFF_SECRET=local-dev-secret \
 pnpm --dir front dev
 ```
 
-Open `http://localhost:5173`.
+브라우저에서 `http://localhost:5173`을 엽니다. Dev profile은 sample seed data와 dev-login을 로컬 개발용으로만 제공합니다.
 
-Local dev mode shows dev-login buttons on the login page. Seed accounts use reserved sample addresses such as `host@example.com` and `member1@example.com`.
+## 문서 링크
 
-## Test Commands
+| 목적 | 문서 |
+| --- | --- |
+| 개발자 문서 허브 | [docs/development/README.md](docs/development/README.md) |
+| 로컬 실행 | [docs/development/local-setup.md](docs/development/local-setup.md) |
+| 아키텍처 상세 | [docs/development/architecture.md](docs/development/architecture.md) |
+| 테스트 가이드 | [docs/development/test-guide.md](docs/development/test-guide.md) |
+| 배포 문서 허브 | [docs/deploy/README.md](docs/deploy/README.md) |
+| Cloudflare Pages | [docs/deploy/cloudflare-pages.md](docs/deploy/cloudflare-pages.md) |
+| SPA fallback | [docs/deploy/cloudflare-pages-spa.md](docs/deploy/cloudflare-pages-spa.md) |
+| OCI backend | [docs/deploy/oci-backend.md](docs/deploy/oci-backend.md) |
+| OCI MySQL HeatWave | [docs/deploy/oci-mysql-heatwave.md](docs/deploy/oci-mysql-heatwave.md) |
+| 공개 저장소 보안과 release safety | [docs/deploy/security-public-repo.md](docs/deploy/security-public-repo.md) |
+| Release helper scripts | [scripts/README.md](scripts/README.md) |
 
-Core checks:
-
-```bash
-pnpm --dir front lint
-pnpm --dir front test
-pnpm --dir front build
-./server/gradlew -p server clean test
-```
-
-End-to-end checks:
-
-```bash
-pnpm --dir front test:e2e
-```
-
-The E2E setup starts the app against a local `readmates_e2e` database, uses the test BFF secret `e2e-secret`, launches the Vite app, and runs Playwright Chromium tests against fixture login flows.
-
-Backend tests use Testcontainers for MySQL where needed.
-
-## Deployment Overview
-
-The production-oriented deployment model is:
-
-- Cloudflare Pages serves the Vite SPA from `front/dist`.
-- Cloudflare Pages Functions in `front/functions` provide the BFF and OAuth proxy.
-- Spring Boot runs as a JAR on an OCI Compute VM behind Caddy.
-- MySQL data lives in an OCI MySQL HeatWave compatible database.
-- Spring applies Flyway migrations on startup.
-- Production secrets are managed outside Git in Cloudflare, the server runtime environment, Google Cloud, OCI, or ignored operator files.
-
-Public demo origin:
-
-- `https://readmates.pages.dev`
-
-Placeholder direct API origin used in docs and examples:
-
-- `https://api.example.com`
-
-Important production environment variables:
-
-- Cloudflare Pages Functions: `READMATES_API_BASE_URL`, `READMATES_BFF_SECRET`
-- Spring app: `READMATES_APP_BASE_URL`, `READMATES_ALLOWED_ORIGINS`, `READMATES_BFF_SECRET`, `READMATES_BFF_SECRET_REQUIRED=true`, `READMATES_AUTH_SESSION_COOKIE_SECURE=true`
-- Spring OAuth: `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID`, `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET`
-- Spring DB: `SPRING_PROFILES_ACTIVE=prod`, `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`
-
-Deployment runbooks:
-
-- [docs/deploy/README.md](docs/deploy/README.md)
-- [docs/deploy/cloudflare-pages.md](docs/deploy/cloudflare-pages.md)
-- [docs/deploy/oci-backend.md](docs/deploy/oci-backend.md)
-- [docs/deploy/oci-mysql-heatwave.md](docs/deploy/oci-mysql-heatwave.md)
-- [docs/deploy/security-public-repo.md](docs/deploy/security-public-repo.md)
-
-## Public Release Safety
-
-Before publishing, build a clean public release candidate and run the release checks:
-
-```bash
-./scripts/build-public-release-candidate.sh
-./scripts/public-release-check.sh .tmp/public-release-candidate
-```
-
-The release candidate intentionally excludes private planning docs, local env files, provider state, generated design artifacts, build output, database dumps, screenshots, and other local-only material.
-
-If `gitleaks` is installed, the release checker runs `gitleaks dir`. Without it, the script runs fallback path and content checks that block obvious mistakes but are not a complete professional secret scan.
-
-Do not commit real OCI OCIDs, API keys, SSH keys, database dumps, BFF secrets, Google OAuth secrets, private member data, or production exports.
+README는 포트폴리오 첫 화면 역할에 집중하고, 상세 로컬 실행 절차와 테스트, 아키텍처, 배포 runbook은 위 문서로 분리합니다.

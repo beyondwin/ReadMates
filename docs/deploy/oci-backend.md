@@ -2,6 +2,8 @@
 
 백엔드는 OCI Compute VM에서 Spring Boot JAR로 실행되고 systemd가 프로세스를 관리합니다. Caddy가 운영 HTTPS endpoint를 받아 로컬 Spring `127.0.0.1:8080`으로 reverse proxy합니다.
 
+상위 배포 허브는 [README.md](README.md)입니다. Cloudflare Pages와 Pages Functions 설정은 [cloudflare-pages.md](cloudflare-pages.md)를 함께 확인합니다.
+
 ## 런타임 기준
 
 | 항목 | 값 |
@@ -32,7 +34,7 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-cl
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 ```
 
-Git에는 변수 이름과 placeholder만 둡니다. 프로덕션 secret 실제 값은 VM, Cloudflare, Google Cloud, OCI 콘솔, 또는 로컬 ignored 파일에만 둡니다.
+Git에는 변수 이름과 placeholder만 둡니다. 프로덕션 secret 실제 값은 VM, Cloudflare, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 둡니다.
 
 ## 최초 VM 설정
 
@@ -60,7 +62,7 @@ GOOGLE_CLIENT_SECRET='<google-oauth-client-secret>' \
 ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-configure.sh
 ```
 
-`CADDY_SITE`는 운영 HTTPS 사이트 주소여야 합니다. `:80`, `http://...`, plaintext Spring origin은 사용할 수 없습니다.
+`CADDY_SITE`는 `https://api.example.com` 같은 직접 API origin에 대응하는 운영 HTTPS host여야 합니다. `:80`, `http://...`, plaintext Spring origin은 사용할 수 없습니다.
 
 `02-configure.sh`가 수행하는 일:
 
@@ -111,5 +113,5 @@ curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.page
 
 - Spring `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기본 운영 기준입니다. secret이 비면 시작 실패가 맞습니다.
 - DB migration은 Spring 시작 시 Flyway가 `db/mysql/migration`을 적용합니다.
-- 백엔드 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 자동 배포 runner는 유료 전환 또는 별도 운영 결정 전까지 추가하지 않습니다.
+- 백엔드 프로덕션 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
 - Caddy 로그는 `/var/log/caddy/readmates.log`에 남습니다.

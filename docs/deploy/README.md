@@ -1,25 +1,40 @@
-# ReadMates Deployment Runbook
+# ReadMates 배포 문서
 
-Last reviewed: 2026-04-22
+검토일: 2026-04-22
 
-This directory contains public-safe deployment notes for ReadMates. The docs describe the intended production shape and the security boundaries, while keeping account-specific values and private operational state out of Git.
+이 디렉터리는 ReadMates의 공개 안전 배포 문서 허브입니다. 운영 환경의 목표 구조, 신뢰 경계, secret 보관 원칙, 공개 릴리즈 후보 검증 흐름을 설명하되 계정별 값과 private deployment state는 Git에 두지 않습니다.
 
-Approved portfolio demo URL: [https://readmates.pages.dev](https://readmates.pages.dev)
+승인된 포트폴리오 데모 URL: [https://readmates.pages.dev](https://readmates.pages.dev)
 
-## Deployment Shape
+관련 상위 문서:
 
-| Layer | Runtime | Notes |
+- [루트 README](../../README.md)
+- [개발자 문서 허브](../development/README.md). clean 공개 릴리즈 후보에는 루트 README, `docs/deploy` 배포 문서 subset, `docs/development` 개발 문서 subset이 포함됩니다.
+
+## 문서 지도
+
+| 목적 | 문서 |
+| --- | --- |
+| Cloudflare Pages와 Pages Functions 배포 | [cloudflare-pages.md](cloudflare-pages.md) |
+| SPA fallback, OAuth proxy, deep route 점검 | [cloudflare-pages-spa.md](cloudflare-pages-spa.md) |
+| Spring Boot API와 Caddy 운영 | [oci-backend.md](oci-backend.md) |
+| OCI MySQL HeatWave와 백업 참고 | [oci-mysql-heatwave.md](oci-mysql-heatwave.md) |
+| 공개 저장소 보안과 공개 릴리즈 후보 검증 | [security-public-repo.md](security-public-repo.md) |
+
+## 배포 형태
+
+| 계층 | Runtime | 설명 |
 | --- | --- | --- |
-| Frontend SPA | Cloudflare Pages | Builds `front/dist` from the Vite app |
-| BFF and OAuth proxy | Cloudflare Pages Functions | Functions live in `front/functions` |
-| Spring API | OCI Compute or equivalent VM | Runs the Spring Boot JAR behind a reverse proxy |
-| Reverse proxy | Caddy | Terminates the direct API origin when used |
-| Database | MySQL 8 compatible service | OCI MySQL HeatWave is the documented target |
-| Migrations | Flyway | Applied by Spring on startup |
+| Frontend SPA | Cloudflare Pages | Vite 앱을 빌드한 `front/dist`를 서빙합니다. |
+| BFF와 OAuth proxy | Cloudflare Pages Functions | `front/functions`의 함수가 같은 origin API 경계를 제공합니다. |
+| Spring API | OCI Compute 또는 동등한 VM | Spring Boot JAR를 reverse proxy 뒤에서 실행합니다. |
+| Reverse proxy | Caddy | 직접 API origin이 필요할 때 HTTPS를 종료하고 Spring으로 전달합니다. |
+| Database | MySQL 8 compatible service | 문서화된 운영 대상은 OCI MySQL HeatWave입니다. |
+| Migrations | Flyway | Spring 시작 시 migration을 적용합니다. |
 
-Production secrets stay outside Git. Public docs use variable names and placeholders only. Real values belong in Cloudflare Pages secrets, server runtime environment files, Google Cloud, OCI, or ignored operator-managed files.
+프로덕션 secret 실제 값은 Git 밖에 둡니다. 공개 문서는 환경 변수 이름과 placeholder만 사용합니다. 실제 값은 Cloudflare Pages secret, 서버 런타임 환경 파일, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 저장합니다.
 
-## BFF Security Boundary
+## BFF 신뢰 경계
 
 ```text
 Browser
@@ -33,33 +48,34 @@ Cloudflare Pages Functions
 Spring Boot /api/**
 ```
 
-The browser-facing trust boundary is Cloudflare Pages, not the direct Spring API origin. Browsers call same-origin `/api/bff/**`; Pages Functions forward the request to Spring and attach `X-Readmates-Bff-Secret`. Spring validates that header on API requests and should fail startup in production when `READMATES_BFF_SECRET` is missing.
+브라우저가 신뢰하는 공개 경계는 직접 Spring API origin이 아니라 Cloudflare Pages입니다. 브라우저는 같은 origin의 `/api/bff/**`를 호출하고, Pages Functions가 Spring으로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. Spring은 API 요청에서 이 header를 검증하며, 운영에서는 `READMATES_BFF_SECRET`이 없으면 시작 실패가 맞습니다.
 
-The BFF secret must never be exposed through `VITE_*`, `NEXT_PUBLIC_*`, static assets, browser logs, screenshots, or public docs.
+BFF secret은 `VITE_*`, `NEXT_PUBLIC_*`, 정적 asset, 브라우저 로그, screenshot, 공개 문서에 노출하면 안 됩니다.
 
-Mutation requests also check the request origin or referer against the allowed app origins.
+변경 요청은 허용된 앱 origin의 `Origin` 또는 `Referer`도 확인합니다.
 
-## Session Cookie Posture
+## 세션 Cookie 기준
 
-Spring issues the `readmates_session` cookie after successful Google OAuth login.
+Google OAuth 로그인 성공 후 Spring은 `readmates_session` cookie를 발급합니다.
 
-- `HttpOnly`: browser JavaScript cannot read the token.
-- `SameSite=Lax`: normal login and navigation work while reducing cross-site request risk.
-- `Secure` in production: set `READMATES_AUTH_SESSION_COOKIE_SECURE=true` so the cookie is HTTPS-only.
-- Session tokens are matched server-side through hashed records in `auth_sessions`.
+- `HttpOnly`: 브라우저 JavaScript가 token을 읽지 못합니다.
+- `SameSite=Lax`: 일반 로그인과 탐색을 유지하면서 cross-site request 위험을 줄입니다.
+- 운영 `Secure`: `READMATES_AUTH_SESSION_COOKIE_SECURE=true`로 HTTPS에서만 cookie가 전송되게 합니다.
+- 세션 token 원문은 저장하지 않고 `auth_sessions`의 hash 기록과 대조합니다.
 
-## Membership And Authorization
+## 멤버십과 권한
 
-ReadMates is invite-only at the product level.
+ReadMates는 제품 수준에서 invite-only 흐름을 사용합니다.
 
-- A host creates invitation links.
-- A Google user can become pending approval when no accepted invitation is available.
-- A host approves or rejects pending members and can suspend, restore, deactivate, or remove members from the current session.
-- Host APIs require an active `host` role.
-- Member APIs require an allowed `member` state and, for current-session writes, active participation in that session.
-- Public APIs return only explicitly published public sessions.
+- 게스트는 공개 홈과 공개 기록만 볼 수 있습니다.
+- 초대 없이 Google로 로그인한 사용자는 둘러보기 멤버가 될 수 있습니다.
+- 호스트는 둘러보기 멤버를 정식 멤버로 전환하거나, 정식 멤버를 현재 세션에서 제외/복구/비활성화/삭제할 수 있습니다.
+- 호스트 API는 활성 `host` role을 요구합니다.
+- 멤버 API는 허용된 `member` 상태를 요구하며, 현재 세션 쓰기는 해당 세션 참여 상태도 확인합니다.
+- Public API는 공개로 발행된 공개 기록만 반환합니다.
+- 피드백 문서는 권한과 참석 여부를 통과한 정식 멤버 또는 호스트에게만 노출합니다.
 
-## Environment Variables
+## 환경 변수
 
 Cloudflare Pages Functions:
 
@@ -85,30 +101,32 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-cl
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 ```
 
-Use placeholders in committed files. Do not paste real secret values into docs, issues, terminal transcripts, screenshots, or release notes.
+직접 API origin 예시는 공개 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다. 실제 운영 secret, DB password, OAuth secret, OCI OCID, private IP, DB dump는 문서와 Git에 넣지 않습니다.
 
-## Deployment Steps
+## 배포 절차 요약
 
-Frontend:
+Cloudflare Pages:
 
-1. Configure Cloudflare Pages with root directory `front`.
-2. Use install command `pnpm install --frozen-lockfile`.
-3. Use build command `pnpm build`.
-4. Use output directory `dist`.
-5. Set the Pages Function secrets listed above.
+1. Root directory를 `front`로 설정합니다.
+2. Install command를 `pnpm install --frozen-lockfile`로 설정합니다.
+3. Build command를 `pnpm build`로 설정합니다.
+4. Output directory를 `dist`로 설정합니다.
+5. Pages Functions secret으로 `READMATES_API_BASE_URL`과 `READMATES_BFF_SECRET`을 설정합니다.
 
-Backend:
+Spring Boot:
 
 ```bash
 ./server/gradlew -p server bootJar
 VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
 ```
 
-The OCI scripts are placeholder-based and expect operator-supplied values. They should not contain real tenancy IDs, API keys, database passwords, private IPs, or deploy state.
+OCI helper script는 placeholder 기반이며 운영자가 값을 주입하는 전제를 둡니다. script와 문서에는 실제 tenancy ID, API key, database password, private IP, 배포 상태 값을 넣지 않습니다.
 
-## Smoke Checks
+백엔드 프로덕션 배포는 현재 수동 운영 기준입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
 
-Use the public demo origin when checking the approved portfolio deployment:
+## Smoke Check
+
+승인된 포트폴리오 배포는 공개 데모 origin으로 확인합니다.
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/app
@@ -117,38 +135,30 @@ curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.page
 curl -sS https://readmates.pages.dev/api/bff/api/public/club
 ```
 
-Use placeholders for direct backend checks in public docs:
+직접 API 확인 예시는 공개 문서에서 placeholder만 사용합니다.
 
 ```bash
 curl -sS https://api.example.com/internal/health
 ```
 
-## Cost Guardrails
+## 비용 기준
 
-The documented target stays compatible with free or low-cost tiers unless there is a separate explicit upgrade decision:
+별도 유료 전환 결정이 없다면 아래 free 또는 low-cost 호환 범위를 기준으로 문서화합니다.
 
-- Cloudflare Pages and Workers-compatible free usage
-- OCI A1 Compute within free-tier limits
-- OCI boot/block volume within free-tier limits
-- OCI MySQL HeatWave `MySQL.Free` where available
+- Cloudflare Pages와 Workers-compatible free usage
+- OCI A1 Compute free-tier 범위
+- OCI boot/block volume free-tier 범위
+- OCI MySQL HeatWave `MySQL.Free`가 가능한 region
 
-Avoid adding production deployment credentials to GitHub Actions unless automated backend deployment is explicitly approved later.
+프로덕션 배포 credential을 GitHub Actions에 추가하는 일은 자동화된 백엔드 배포를 별도로 승인한 뒤에만 검토합니다.
 
-## Public Release Checks
+## 공개 릴리즈 후보 점검
 
-Before publishing a public repository, generate and inspect the clean release candidate:
+공개 저장소로 내보내기 전에는 clean 공개 릴리즈 후보를 만들고 검사합니다.
 
 ```bash
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
-The candidate should not contain local env files, provider state, database dumps, key material, generated design artifacts, private planning docs, screenshots with real data, or private deployment state.
-
-## Related Docs
-
-- [Cloudflare Pages deployment](cloudflare-pages.md)
-- [OCI backend deployment](oci-backend.md)
-- [OCI MySQL HeatWave and backups](oci-mysql-heatwave.md)
-- [Cloudflare Pages SPA notes](cloudflare-pages-spa.md)
-- [Public repository security checklist](security-public-repo.md)
+공개 릴리즈 후보에는 local env files, provider state, database dump, key material, generated design artifacts, private planning docs, 실제 데이터가 담긴 screenshot, private deployment state가 없어야 합니다.

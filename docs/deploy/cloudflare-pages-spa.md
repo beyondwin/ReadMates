@@ -4,7 +4,7 @@
 
 ## 배포 형태
 
-ReadMates 운영 프론트엔드는 Cloudflare Pages가 `front/dist`의 Vite React SPA를 서빙하고, `front/functions`의 Pages Functions가 같은 origin BFF와 OAuth proxy를 제공합니다. 인증, 멤버십, 세션, 아카이브, 피드백 문서의 진실은 OCI Spring Boot API와 MySQL에 있습니다.
+ReadMates 운영 프론트엔드는 Cloudflare Pages가 `front/dist`의 Vite React SPA를 서빙하고, `front/functions`의 Pages Functions가 같은 origin BFF와 OAuth proxy를 제공합니다. 인증, 멤버십, 현재 세션, 공개 기록, 피드백 문서의 진실은 OCI Spring Boot API와 MySQL에 있습니다.
 
 ## Pages 프로젝트 설정
 
@@ -44,7 +44,7 @@ READMATES_BFF_SECRET=<shared-secret>
 
 `READMATES_API_BASE_URL`은 운영 HTTPS origin이어야 합니다. `READMATES_BFF_SECRET`은 Spring `READMATES_BFF_SECRET`과 같은 값이어야 하며 브라우저에 노출되는 `VITE_` 변수로 만들지 않습니다.
 
-Preview 배포에는 운영 secret을 넣지 않습니다. Preview가 API를 써야 하면 별도 preview backend와 별도 BFF secret을 둡니다.
+Preview 배포에는 운영 secret을 넣지 않습니다. Preview가 API를 써야 하면 별도 preview 백엔드와 별도 BFF secret을 둡니다.
 
 프로덕션 secret 값은 Git 밖에 둡니다. 이 문서는 변수 이름과 placeholder만 포함합니다.
 
@@ -91,11 +91,11 @@ https://readmates.pages.dev/login/oauth2/code/google
 1. `https://readmates.pages.dev`가 공개 홈을 렌더링하는지 확인합니다.
 2. `https://readmates.pages.dev/app` 같은 deep route가 404가 아니라 SPA를 렌더링하는지 확인합니다.
 3. Google login 클릭 시 `/oauth2/authorization/google` 흐름으로 나가는지 확인합니다.
-4. 기존 Gmail 멤버는 로그인 후 `/app`으로 들어가는지 확인합니다.
-5. 초대 없이 들어온 새 Google 사용자는 `/app/pending`으로 가는지 확인합니다.
-6. 호스트가 `/app/host/members`에서 pending 사용자를 승인할 수 있는지 확인합니다.
-7. 승인된 사용자가 `/app`을 reload해도 멤버 route에 접근할 수 있는지 확인합니다.
-8. pending 사용자가 feedback document route에 접근할 수 없는지 확인합니다.
+4. 정식 멤버는 로그인 후 `/app`으로 들어가는지 확인합니다.
+5. 초대 없이 들어온 새 Google 사용자는 둘러보기 멤버 상태로 `/app/pending`에 도달하는지 확인합니다.
+6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 전환할 수 있는지 확인합니다.
+7. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있는지 확인합니다.
+8. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.
 9. 피드백 문서의 `PDF로 저장` 흐름이 print route를 열고 browser print를 호출하는지 확인합니다.
 
 빠른 path 점검:
@@ -110,6 +110,6 @@ curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.page
 
 - Deep link가 404면 `_redirects`가 build output에 없거나 `/* /index.html 200` fallback이 function pass-through보다 위에 있을 가능성이 큽니다.
 - 변경 요청의 `/api/bff/**`가 403이면 same-origin 검증, browser origin, Spring `READMATES_ALLOWED_ORIGINS`를 확인합니다.
-- API 호출이 401이거나 session이 유지되지 않으면 cookie 설정, `READMATES_AUTH_SESSION_COOKIE_SECURE`, BFF 우회 여부를 확인합니다.
+- API 호출이 401이거나 세션이 유지되지 않으면 cookie 설정, `READMATES_AUTH_SESSION_COOKIE_SECURE`, BFF 우회 여부를 확인합니다.
 - `/api/bff/**`가 500이면 `READMATES_API_BASE_URL`이 없거나 Spring origin에 도달할 수 없는 상태일 수 있습니다.
 - OAuth redirect mismatch는 Google OAuth client, Spring `READMATES_APP_BASE_URL`, Cloudflare Pages public origin이 서로 다를 때 발생합니다.

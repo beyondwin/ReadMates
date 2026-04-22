@@ -1,0 +1,125 @@
+# 테스트 가이드
+
+ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle test, 공개 릴리즈 후보 점검으로 나뉩니다.
+
+## Frontend
+
+의존성 설치:
+
+```bash
+pnpm --dir front install --frozen-lockfile
+```
+
+Lint:
+
+```bash
+pnpm --dir front lint
+```
+
+Unit test:
+
+```bash
+pnpm --dir front test
+```
+
+Production build:
+
+```bash
+pnpm --dir front build
+```
+
+## Playwright E2E
+
+```bash
+pnpm --dir front test:e2e
+```
+
+`front/playwright.config.ts`는 E2E 실행 중 backend와 frontend dev server를 함께 띄웁니다.
+
+- 기본 frontend port는 `PLAYWRIGHT_PORT`가 없으면 `3100`입니다.
+- 기본 backend origin은 `READMATES_API_BASE_URL`이 없으면 `http://127.0.0.1:18080`입니다.
+- E2E backend는 `SPRING_PROFILES_ACTIVE=dev`, `READMATES_FLYWAY_LOCATIONS=classpath:db/mysql/migration,classpath:db/mysql/dev`, `READMATES_BFF_SECRET=e2e-secret`로 실행됩니다.
+- E2E database 기본값은 `READMATES_E2E_DB_HOST=127.0.0.1`, `READMATES_E2E_DB_PORT=3306`, `READMATES_E2E_DB_USER=readmates`, `READMATES_E2E_DB_PASSWORD=readmates`, `READMATES_E2E_DB_NAME=readmates_e2e`입니다.
+- Playwright config는 `mysql` CLI로 E2E database를 생성하므로 로컬 MySQL server와 MySQL client가 필요합니다.
+
+기본 `compose.yml`의 MySQL을 쓴다면 먼저 실행합니다.
+
+```bash
+docker compose up -d mysql
+```
+
+다른 MySQL을 쓴다면 E2E 환경 변수를 맞춥니다.
+
+```bash
+READMATES_E2E_DB_HOST=127.0.0.1 \
+READMATES_E2E_DB_PORT=3306 \
+READMATES_E2E_DB_USER=readmates \
+READMATES_E2E_DB_PASSWORD=readmates \
+READMATES_E2E_DB_NAME=readmates_e2e \
+pnpm --dir front test:e2e
+```
+
+## Backend
+
+전체 backend test:
+
+```bash
+./server/gradlew -p server clean test
+```
+
+Backend test suite에는 MySQL 기반 repository/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
+
+## 공개 릴리즈 후보 점검
+
+공개 저장소로 낼 수 있는 후보 tree를 만들고 검사합니다.
+
+```bash
+./scripts/build-public-release-candidate.sh
+./scripts/public-release-check.sh .tmp/public-release-candidate
+```
+현재 private working tree를 직접 검사할 수도 있습니다.
+
+```bash
+./scripts/public-release-check.sh
+```
+
+Release helper script의 scanner pattern을 바꿨다면 fixture 검증도 실행합니다.
+
+```bash
+./scripts/verify-public-release-fixtures.sh
+```
+
+세부 정책은 [공개 저장소 보안 문서](../deploy/security-public-repo.md)와 [scripts 문서](../../scripts/README.md)를 참고합니다. 이 검사는 secret/path 실수를 줄이는 guardrail이며, 운영 secret rotation이나 GitHub 공개 전환을 대신하지 않습니다.
+
+## 권장 확인 순서
+
+작은 frontend 변경:
+
+```bash
+pnpm --dir front lint
+pnpm --dir front test
+pnpm --dir front build
+```
+
+인증, route, BFF, 화면 흐름 변경:
+
+```bash
+pnpm --dir front lint
+pnpm --dir front test
+pnpm --dir front build
+pnpm --dir front test:e2e
+```
+
+Backend API, authorization, database 변경:
+
+```bash
+./server/gradlew -p server clean test
+pnpm --dir front test:e2e
+```
+
+공개 배포 또는 public repo 후보 점검:
+
+```bash
+./scripts/build-public-release-candidate.sh
+./scripts/public-release-check.sh .tmp/public-release-candidate
+```

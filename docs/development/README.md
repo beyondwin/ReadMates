@@ -1,0 +1,24 @@
+# ReadMates 개발자 문서
+
+ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 위한 개발자 문서 허브입니다. 루트 `README.md`는 포트폴리오 첫 화면에 집중하고, 세부 실행 절차는 이 디렉터리에서 관리합니다.
+
+## 바로 가기
+
+| 목적 | 문서 |
+| --- | --- |
+| 로컬 실행 | [local-setup.md](local-setup.md) |
+| 테스트와 공개 릴리즈 점검 | [test-guide.md](test-guide.md) |
+| 제품/기술 구조 | [architecture.md](architecture.md) |
+| 배포 문서 허브 | [../deploy/README.md](../deploy/README.md) |
+| Cloudflare Pages 배포 | [../deploy/cloudflare-pages.md](../deploy/cloudflare-pages.md) |
+| OCI backend 배포 | [../deploy/oci-backend.md](../deploy/oci-backend.md) |
+| 공개 저장소 보안 | [../deploy/security-public-repo.md](../deploy/security-public-repo.md) |
+| Release helper scripts | [../../scripts/README.md](../../scripts/README.md) |
+
+## 문서 경계
+
+- 개발 문서는 한국어 설명을 기본으로 합니다.
+- 명령어, 경로, 환경 변수, API path, 기술명은 코드와 같은 표기를 유지합니다.
+- 운영 secret, 실제 멤버 데이터, DB dump, private deployment state, 로컬 절대 경로는 문서에 넣지 않습니다.
+- 직접 backend/API origin 예시는 `https://api.example.com` 같은 placeholder만 사용합니다.
+- 배포 절차의 상세 runbook은 `docs/deploy`에 두고, 이 디렉터리에서는 개발자가 알아야 할 연결점만 다룹니다.

@@ -2,6 +2,8 @@
 
 Cloudflare Pages는 Vite SPA와 같은 origin에서 동작하는 BFF/OAuth proxy 함수를 배포합니다.
 
+상위 배포 허브는 [README.md](README.md)입니다. 승인된 포트폴리오 데모 URL은 `https://readmates.pages.dev`입니다.
+
 ## 프로젝트 설정
 
 | 항목 | 값 |
@@ -47,9 +49,9 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 
 프로덕션 secret 값은 Git에 기록하지 않습니다. Cloudflare Pages 환경 변수/secret 저장소와 Spring 운영 환경 파일에만 실제 값을 둡니다.
 
-## GitHub 자동 배포
+## Cloudflare Pages Git 연동
 
-정상 배포 경로:
+프론트엔드 정상 배포 경로:
 
 1. GitHub `main`에 병합합니다.
 2. Cloudflare Pages가 `front`를 빌드합니다.
@@ -57,6 +59,8 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 4. [README.md](README.md)의 smoke check를 실행합니다.
 
 Wrangler 직접 업로드는 장애 대응용입니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 다시 맞춥니다.
+
+이 절차는 Cloudflare Pages의 프론트엔드 배포 흐름입니다. Spring Boot 백엔드 프로덕션 배포가 GitHub Actions로 이미 구성되어 있다고 가정하지 않습니다.
 
 ## Google OAuth 설정
 
@@ -96,6 +100,7 @@ curl -sS https://readmates.pages.dev/api/bff/api/public/club
 - `/app`은 `200`으로 SPA를 반환합니다.
 - `/api/bff/api/auth/me`는 BFF를 통해 Spring에 도달합니다. 로그아웃 상태여도 anonymous auth state를 담은 `200`일 수 있습니다.
 - `/oauth2/authorization/google`은 Google 또는 Spring OAuth 흐름으로 redirect됩니다.
+- `/api/bff/api/public/club`은 공개 기록에 노출 가능한 club 정보만 반환해야 합니다.
 
 ## 비용 상태 확인
 
