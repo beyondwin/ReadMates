@@ -194,6 +194,14 @@ wc -l front/features/host/components/host-dashboard.tsx \
 
 Expected: output confirms the largest refactoring targets. Do not edit files in this step.
 
+### Baseline Failures
+
+Captured on 2026-04-23 during Task 0:
+
+- `pnpm --dir front lint`: failed before linting because `eslint` was not found. pnpm reported `front/node_modules` is missing.
+- `pnpm --dir front test`: failed before running tests because `vitest` was not found. pnpm reported `front/node_modules` is missing.
+- `pnpm --dir front build`: failed before building because `vite` was not found. pnpm reported `front/node_modules` is missing.
+
 ## Task 1: Add Frontend Dependency Boundary Test
 
 **Files:**
