@@ -139,6 +139,7 @@ describe("SPA AppRouteLayout", () => {
       "/app/host",
       "/app/host",
     ]);
+    expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.textContent)).toContain("운영");
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
@@ -197,7 +198,9 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
 
     expect(screen.getAllByText("기록")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
+    const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
+    expect(memberReturn).toHaveAttribute("href", "/app");
+    expect(memberReturn.textContent).toBe("멤버");
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     await waitFor(() => {
@@ -251,8 +254,12 @@ describe("SPA AppRouteLayout", () => {
     );
 
     expect(await screen.findByText("feedback child")).toBeInTheDocument();
-    expect(screen.getAllByText("기록")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/archive?view=report");
+    const mobileHeader = screen.getAllByRole("banner").find((element) => element.classList.contains("m-hdr"));
+    expect(mobileHeader).toBeDefined();
+    expect(within(mobileHeader!).getAllByText("기록")).toHaveLength(2);
+    const backLink = within(mobileHeader!).getByRole("link", { name: "뒤로" });
+    expect(backLink).toHaveAttribute("href", "/app/archive?view=report");
+    expect(backLink).toHaveTextContent(/^기록$/);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     await waitFor(() => {

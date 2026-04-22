@@ -125,6 +125,7 @@
 }
 .m-hdr-back {
   max-width: 100%;
+  min-width: 44px;
   gap: 2px;
   padding: 0 8px 0 0;
   border-radius: var(--r-3);

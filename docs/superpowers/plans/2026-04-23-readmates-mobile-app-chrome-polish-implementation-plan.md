@@ -752,7 +752,7 @@ git commit -m "style: add mobile member content breathing room"
 - Modify: `front/tests/unit/spa-layout.test.tsx`
 - Modify: `front/tests/e2e/responsive-navigation-chrome.spec.ts`
 
-- [ ] **Step 1: Add visible compact-label assertions to `spa-layout.test.tsx`**
+- [x] **Step 1: Add visible compact-label assertions to `spa-layout.test.tsx`**
 
 In the host archive layout test, replace:
 
@@ -774,7 +774,7 @@ In the member layout test where the host links are collected, add this after the
 expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.textContent)).toContain("운영");
 ```
 
-- [ ] **Step 2: Add visible compact-label assertions to the E2E chrome test**
+- [x] **Step 2: Add visible compact-label assertions to the E2E chrome test**
 
 In `front/tests/e2e/responsive-navigation-chrome.spec.ts`, after:
 
@@ -812,7 +812,7 @@ add:
 await expect(mobileHeader.getByRole("link", { name: "뒤로" })).toContainText("오늘");
 ```
 
-- [ ] **Step 3: Run layout unit tests**
+- [x] **Step 3: Run layout unit tests**
 
 Run:
 
@@ -827,7 +827,7 @@ PASS  front/tests/unit/spa-layout.test.tsx
 PASS  front/tests/unit/responsive-navigation.test.tsx
 ```
 
-- [ ] **Step 4: Run the responsive navigation E2E test**
+- [x] **Step 4: Run the responsive navigation E2E test**
 
 Run:
 
@@ -843,7 +843,7 @@ Expected:
 
 If the local E2E environment requires a seeded backend, run the same command after starting the existing project test stack described in `docs/development/test-guide.md`.
 
-- [ ] **Step 5: Commit test expectation updates**
+- [x] **Step 5: Commit test expectation updates**
 
 ```bash
 git add front/tests/unit/spa-layout.test.tsx front/tests/e2e/responsive-navigation-chrome.spec.ts
