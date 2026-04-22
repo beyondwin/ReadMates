@@ -9,6 +9,10 @@ import type {
   RsvpUpdateStatus,
   SaveState,
 } from "@/features/current-session/components/current-session-types";
+import {
+  MAX_QUESTION_INPUT_COUNT,
+  MIN_QUESTION_INPUT_COUNT,
+} from "@/features/current-session/model/current-session-form-model";
 import { getCurrentSessionFeedbackAccessState } from "@/features/current-session/model/current-session-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
@@ -275,7 +279,11 @@ export function MyStatusCard({
   const items = [
     { label: "RSVP", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
     { label: "읽기 체크인", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress > 0 },
-    { label: "질문", value: `${writtenQuestionCount}/5`, ok: writtenQuestionCount >= 2 },
+    {
+      label: "질문",
+      value: `${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`,
+      ok: writtenQuestionCount >= MIN_QUESTION_INPUT_COUNT,
+    },
     { label: "한줄평", value: hasOneLineReview ? "작성 완료" : "기록 전", ok: hasOneLineReview },
     { label: "피드백 문서", value: "세션 후", ok: false },
   ];

@@ -1,6 +1,12 @@
 import { type CSSProperties } from "react";
 import { SaveFeedback } from "@/features/current-session/components/current-session-primitives";
 import type { SaveState } from "@/features/current-session/components/current-session-types";
+import {
+  MAX_QUESTION_INPUT_COUNT,
+  MIN_QUESTION_INPUT_COUNT,
+  canAddQuestionInput,
+  canRemoveQuestionInput,
+} from "@/features/current-session/model/current-session-form-model";
 
 export type QuestionInput = {
   clientId: string;
@@ -29,8 +35,8 @@ export function QuestionEditor({
   onSaveQuestions: () => void;
 }) {
   const isMobile = variant === "mobile";
-  const canAddQuestion = questionInputs.length < 5;
-  const canRemoveQuestion = questionInputs.length > 2;
+  const canAddQuestion = canAddQuestionInput(questionInputs);
+  const canRemoveQuestion = canRemoveQuestionInput(questionInputs);
   const textareaClassName = isMobile ? "m-textarea" : "textarea";
   const inputStyle = isMobile ? undefined : { fontSize: "15px", lineHeight: 1.6, letterSpacing: 0 };
   const questionList = (
@@ -83,7 +89,10 @@ export function QuestionEditor({
 
       <div className={isMobile ? "rm-current-session-mobile__save-row" : "row-between"} style={{ marginTop: isMobile ? 14 : 16 }}>
         <span className={isMobile ? "tiny" : "small"} style={{ color: validationMessage ? "var(--danger)" : "var(--text-3)" }}>
-          {validationMessage || (writtenQuestionCount < 2 ? `질문 ${2 - writtenQuestionCount}개 더 필요` : "저장하면 공동 보드에 반영돼요")}
+          {validationMessage ||
+            (writtenQuestionCount < MIN_QUESTION_INPUT_COUNT
+              ? `질문 ${MIN_QUESTION_INPUT_COUNT - writtenQuestionCount}개 더 필요`
+              : "저장하면 공동 보드에 반영돼요")}
         </span>
         <div className={isMobile ? "m-row" : "row"} style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="question" status={saveStatus} />
@@ -92,7 +101,7 @@ export function QuestionEditor({
               + 질문 추가
             </button>
           ) : (
-            <span className="badge">최대 5개까지 작성했어요</span>
+            <span className="badge">최대 {MAX_QUESTION_INPUT_COUNT}개까지 작성했어요</span>
           )}
           <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSaveQuestions}>
             질문 저장
@@ -108,7 +117,7 @@ export function QuestionEditor({
         <div className="m-eyebrow-row">
           <span className="eyebrow">질문 작성</span>
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            {writtenQuestionCount}/5
+            {writtenQuestionCount}/{MAX_QUESTION_INPUT_COUNT}
           </span>
         </div>
         <div className="m-card">{questionList}</div>
@@ -125,11 +134,11 @@ export function QuestionEditor({
             이번 달 내 질문
           </div>
           <p className="small" style={{ color: "var(--text-3)", margin: "6px 0 0" }}>
-            최소 2개, 최대 5개까지 준비해 주세요.
+            최소 {MIN_QUESTION_INPUT_COUNT}개, 최대 {MAX_QUESTION_INPUT_COUNT}개까지 준비해 주세요.
           </p>
         </div>
         <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-          내 질문 {writtenQuestionCount}/5
+          내 질문 {writtenQuestionCount}/{MAX_QUESTION_INPUT_COUNT}
         </span>
       </div>
       {questionList}
