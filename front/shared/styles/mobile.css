@@ -51,7 +51,7 @@
   min-height: calc(var(--m-hdr-h) + var(--m-safe-top));
   padding: var(--m-safe-top) 14px 0;
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) minmax(44px, auto);
+  grid-template-columns: minmax(44px, max-content) minmax(0, 1fr) minmax(44px, auto);
   align-items: center;
   gap: 10px;
   background: color-mix(in oklch, var(--bg) 92%, transparent);
@@ -135,7 +135,7 @@
   white-space: nowrap;
 }
 .m-hdr-back__label {
-  max-width: 48px;
+  max-width: 64px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
