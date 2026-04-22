@@ -1,32 +1,9 @@
 import type { CSSProperties } from "react";
 import type { SaveScope, SaveState } from "@/features/current-session/components/current-session-types";
-
-const saveScopeLabels: Record<SaveScope, string> = {
-  rsvp: "RSVP",
-  checkin: "체크인",
-  question: "질문",
-  longReview: "서평",
-  oneLineReview: "한줄평",
-};
-
-function saveFeedbackLabel(scope: SaveScope, status: SaveState) {
-  if (status === "saving") {
-    return `${saveScopeLabels[scope]} 변경사항을 저장하는 중`;
-  }
-
-  if (status === "saved") {
-    return `${saveScopeLabels[scope]} 저장됨`;
-  }
-
-  if (status === "error") {
-    return `${saveScopeLabels[scope]} 저장 실패 · 다시 시도해 주세요`;
-  }
-
-  return "";
-}
+import { getCurrentSessionSaveStatusLabel } from "@/features/current-session/model/current-session-view-model";
 
 export function SaveFeedback({ scope, status }: { scope: SaveScope; status: SaveState }) {
-  const label = saveFeedbackLabel(scope, status);
+  const label = getCurrentSessionSaveStatusLabel(scope, status);
 
   return (
     <span

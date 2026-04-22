@@ -434,7 +434,7 @@ git commit -m "refactor: extract current session api"
 - Create or modify: `front/tests/unit/current-session-model.test.ts`
 - Modify: `front/tests/unit/current-session.test.tsx`
 
-- [ ] **Step 1: Extract form model**
+- [x] **Step 1: Extract form model**
 
 Move question form calculations into `current-session-form-model.ts`:
 
@@ -446,7 +446,7 @@ Move question form calculations into `current-session-form-model.ts`:
 
 Keep Korean copy identical.
 
-- [ ] **Step 2: Extract view model**
+- [x] **Step 2: Extract view model**
 
 Move read-only derived values into `current-session-view-model.ts`:
 
@@ -456,15 +456,15 @@ Move read-only derived values into `current-session-view-model.ts`:
 - feedback access state if currently embedded in panels
 - save status labels if reusable
 
-- [ ] **Step 3: Add model tests**
+- [x] **Step 3: Add model tests**
 
 Create focused tests for form validation and permission-derived UI state. These tests must not render React.
 
-- [ ] **Step 4: Replace inline logic in component**
+- [x] **Step 4: Replace inline logic in component**
 
 Update `current-session.tsx` to call model functions. Keep JSX structure and CSS classes unchanged.
 
-- [ ] **Step 5: Run focused checks**
+- [x] **Step 5: Run focused checks**
 
 ```bash
 pnpm --dir front test -- current-session-model.test.ts current-session.test.tsx current-session-actions.test.ts frontend-boundaries.test.ts
@@ -473,7 +473,7 @@ pnpm --dir front lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add front/features/current-session front/tests/unit/current-session-model.test.ts front/tests/unit/current-session.test.tsx

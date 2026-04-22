@@ -9,6 +9,7 @@ import type {
   RsvpUpdateStatus,
   SaveState,
 } from "@/features/current-session/components/current-session-types";
+import { getCurrentSessionFeedbackAccessState } from "@/features/current-session/model/current-session-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
@@ -366,24 +367,24 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
 }
 
 export function FeedbackAccessPanel({ isViewer }: { isViewer: boolean }) {
+  const feedbackAccess = getCurrentSessionFeedbackAccessState(isViewer);
+
   return (
-    <section className={isViewer ? "rm-locked-state" : "surface-quiet"} style={{ padding: "22px" }}>
+    <section className={feedbackAccess.className} style={{ padding: "22px" }}>
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
         피드백 문서 접근
       </div>
       <div className="body editorial" style={{ fontSize: "17px" }}>
-        {isViewer ? "정식 멤버에게 열립니다" : "참석한 세션의 피드백 문서를 보존합니다"}
+        {feedbackAccess.title}
       </div>
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-        {isViewer
-          ? "둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다."
-          : "이번 세션 피드백은 모임 이후 호스트가 업로드하면 참석자 기준으로 열립니다."}
+        {feedbackAccess.body}
       </p>
-      {isViewer ? null : (
+      {feedbackAccess.canOpenArchive ? (
         <Link to="/app/archive?view=report" className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
           보존된 피드백 보기
         </Link>
-      )}
+      ) : null}
     </section>
   );
 }
