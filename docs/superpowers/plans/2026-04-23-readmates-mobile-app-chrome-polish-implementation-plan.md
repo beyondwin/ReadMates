@@ -209,7 +209,7 @@ git commit -m "test: capture compact mobile chrome labels"
 
 - Modify: `front/shared/ui/mobile-header.tsx`
 
-- [ ] **Step 1: Add the header action and back-target types**
+- [x] **Step 1: Add the header action and back-target types**
 
 In `front/shared/ui/mobile-header.tsx`, replace the current `AppBackTarget` type with:
 
@@ -227,7 +227,7 @@ type HeaderAction = {
 };
 ```
 
-- [ ] **Step 2: Replace `appBackTarget` with labeled return targets**
+- [x] **Step 2: Replace `appBackTarget` with labeled return targets**
 
 Replace the current `appBackTarget` function with:
 
@@ -264,7 +264,7 @@ function appBackTarget(pathname: string, state: unknown): HeaderBackTarget | nul
 }
 ```
 
-- [ ] **Step 3: Add small header icons**
+- [x] **Step 3: Add small header icons**
 
 Add these helpers above `HeaderShell`:
 
@@ -289,7 +289,7 @@ function HeaderMark() {
 }
 ```
 
-- [ ] **Step 4: Replace `HeaderShell`**
+- [x] **Step 4: Replace `HeaderShell`**
 
 Replace the current `HeaderShell` component with:
 
@@ -339,7 +339,7 @@ function HeaderShell({
 }
 ```
 
-- [ ] **Step 5: Update guest back targets**
+- [x] **Step 5: Update guest back targets**
 
 In `GuestMobileHeader`, replace the direct `backTarget` expression with this local value:
 
@@ -364,7 +364,7 @@ return (
 );
 ```
 
-- [ ] **Step 6: Replace `appRightAction`**
+- [x] **Step 6: Replace `appRightAction`**
 
 Replace the current `appRightAction` function with:
 
@@ -390,7 +390,7 @@ function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHost
 }
 ```
 
-- [ ] **Step 7: Add host kicker in `AppMobileHeader`**
+- [x] **Step 7: Add host kicker in `AppMobileHeader`**
 
 Replace the `HeaderShell` call in `AppMobileHeader` with:
 
@@ -406,7 +406,7 @@ return (
 );
 ```
 
-- [ ] **Step 8: Run the focused unit test**
+- [x] **Step 8: Run the focused unit test**
 
 Run:
 
@@ -420,7 +420,7 @@ Expected:
 PASS  front/tests/unit/responsive-navigation.test.tsx
 ```
 
-- [ ] **Step 9: Commit the header implementation**
+- [x] **Step 9: Commit the header implementation**
 
 ```bash
 git add front/shared/ui/mobile-header.tsx front/tests/unit/responsive-navigation.test.tsx

@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 function renderAt(pathname: string, element: ReactElement) {
-  render(<MemoryRouter initialEntries={[pathname]}>{element}</MemoryRouter>);
+  return render(<MemoryRouter initialEntries={[pathname]}>{element}</MemoryRouter>);
 }
 
 describe("TopNav responsive variants", () => {
@@ -115,9 +115,9 @@ describe("MobileHeader route titles and actions", () => {
       ),
     );
 
-    renderAt("/sessions/session-6", <MobileHeader variant="guest" />);
+    const { container } = renderAt("/sessions/session-6", <MobileHeader variant="guest" />);
 
-    expect(screen.getByText("공개 기록")).toBeInTheDocument();
+    expect(container.querySelector(".m-hdr-title")).toHaveTextContent("공개 기록");
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/records");
     expect(await screen.findByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
   });

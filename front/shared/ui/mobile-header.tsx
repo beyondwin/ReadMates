@@ -11,7 +11,7 @@ import {
   type ReadmatesReturnState,
 } from "@/src/app/route-continuity";
 import { Link } from "@/src/app/router-link";
-import { usePublicAuthAction, type PublicAuthAction } from "./public-auth-action-state";
+import { usePublicAuthAction } from "./public-auth-action-state";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
@@ -92,18 +92,25 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
   return variant === "host" ? READMATES_NAV_LABELS.host.operations : "읽는사이";
 }
 
-type AppBackTarget = {
+type HeaderBackTarget = {
   href: string;
   state?: ReadmatesReturnState;
+  label: string;
 };
 
-function appBackTarget(pathname: string, state: unknown): AppBackTarget | null {
+type HeaderAction = {
+  href: string;
+  label: string;
+  ariaLabel?: string;
+};
+
+function appBackTarget(pathname: string, state: unknown): HeaderBackTarget | null {
   if (pathname === "/app/notes") {
-    return { href: "/app" };
+    return { href: "/app", label: "홈" };
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {
-    return { href: "/app/host" };
+    return { href: "/app/host", label: "오늘" };
   }
 
   if (pathname.startsWith("/app/feedback/") && pathname.endsWith("/print")) {
@@ -111,44 +118,78 @@ function appBackTarget(pathname: string, state: unknown): AppBackTarget | null {
     return {
       href: pathname.replace(/\/print$/, ""),
       state: readmatesReturnState(sourceTarget),
+      label: "문서",
     };
   }
 
   if (pathname.startsWith("/app/feedback/")) {
     const target = readReadmatesReturnTarget(state, archiveReportReturnTarget);
-    return { href: target.href, state: target.state };
+    return { href: target.href, state: target.state, label: "기록" };
   }
 
   if (pathname.startsWith("/app/sessions/")) {
     const target = readReadmatesReturnTarget(state, archiveSessionsReturnTarget);
-    return { href: target.href, state: target.state };
+    return { href: target.href, state: target.state, label: "기록" };
   }
 
   return null;
 }
 
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M15 19 8 12l7-7" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function HeaderMark() {
+  return (
+    <span className="m-hdr-mark" aria-hidden>
+      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
+        <path d="M10 4 3.5 5.4v11L10 15.1V4Z" fill="currentColor" />
+        <path d="M10 4 16.5 5.4v11L10 15.1V4Z" fill="currentColor" opacity="0.42" />
+      </svg>
+    </span>
+  );
+}
+
 function HeaderShell({
+  workspace,
   title,
+  kicker,
   backTarget,
   rightAction,
 }: {
+  workspace: MobileHeaderVariant;
   title: string;
-  backTarget?: AppBackTarget | null;
-  rightAction?: PublicAuthAction | null;
+  kicker?: string | null;
+  backTarget?: HeaderBackTarget | null;
+  rightAction?: HeaderAction | null;
 }) {
+  const brandHref = workspace === "host" ? "/app/host" : workspace === "member" ? "/app" : "/";
+
   return (
-    <header className="m-hdr">
-      <div className="m-hdr-side">
+    <header className={`m-hdr m-hdr--${workspace}`} data-workspace={workspace}>
+      <div className="m-hdr-side m-hdr-side--left">
         {backTarget ? (
-          <Link to={backTarget.href} state={backTarget.state} className="m-hdr-link" aria-label="뒤로">
-            뒤로
+          <Link to={backTarget.href} state={backTarget.state} className="m-hdr-back" aria-label="뒤로">
+            <ChevronLeftIcon />
+            <span className="m-hdr-back__label">{backTarget.label}</span>
           </Link>
-        ) : null}
+        ) : (
+          <Link to={brandHref} className="m-hdr-brand" aria-label="읽는사이 홈">
+            <HeaderMark />
+          </Link>
+        )}
       </div>
-      <div className="m-hdr-title">{title}</div>
+      <div className="m-hdr-heading">
+        {kicker ? <div className="m-hdr-kicker">{kicker}</div> : null}
+        <div className="m-hdr-title">{title}</div>
+      </div>
       <div className="m-hdr-side m-hdr-side--right">
         {rightAction ? (
-          <Link to={rightAction.href} className="m-hdr-link">
+          <Link to={rightAction.href} className="m-hdr-link" aria-label={rightAction.ariaLabel}>
             {rightAction.label}
           </Link>
         ) : null}
@@ -165,23 +206,37 @@ function GuestMobileHeader() {
   const publicSessionReturnTarget = pathname.startsWith("/sessions/")
     ? readPublicReadmatesReturnTarget(location.state, publicRecordsReturnTarget)
     : null;
+  const backTarget: HeaderBackTarget | null = isEntryRoute
+    ? { href: "/", label: "홈" }
+    : publicSessionReturnTarget
+      ? { ...publicSessionReturnTarget, label: "공개 기록" }
+      : null;
 
   return (
     <HeaderShell
+      workspace="guest"
       title={publicTitle(pathname)}
-      backTarget={isEntryRoute ? { href: "/" } : publicSessionReturnTarget}
+      backTarget={backTarget}
       rightAction={isEntryRoute ? null : authAction}
     />
   );
 }
 
-function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHostEntry: boolean): PublicAuthAction | null {
+function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHostEntry: boolean): HeaderAction | null {
   if (variant === "host") {
-    return { href: "/app", label: READMATES_WORKSPACE_LABELS.memberWorkspaceReturn };
+    return {
+      href: "/app",
+      label: "멤버",
+      ariaLabel: READMATES_WORKSPACE_LABELS.memberWorkspaceReturn,
+    };
   }
 
   if (showHostEntry) {
-    return { href: "/app/host", label: READMATES_WORKSPACE_LABELS.hostWorkspace };
+    return {
+      href: "/app/host",
+      label: "운영",
+      ariaLabel: READMATES_WORKSPACE_LABELS.hostWorkspace,
+    };
   }
 
   return null;
@@ -199,6 +254,8 @@ function AppMobileHeader({
 
   return (
     <HeaderShell
+      workspace={variant}
+      kicker={variant === "host" ? "호스트" : null}
       title={appTitle(variant, pathname)}
       backTarget={appBackTarget(pathname, location.state)}
       rightAction={appRightAction(variant, showHostEntry)}
