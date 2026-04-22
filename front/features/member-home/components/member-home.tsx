@@ -214,7 +214,7 @@ function MobileMemberHome({
 
   return (
     <div className="mobile-only rm-member-home-mobile m-body">
-      <section style={{ padding: "12px 18px 4px" }}>
+      <section className="rm-member-home-mobile__hero">
         <div className="tiny mono" style={{ color: "var(--text-3)", letterSpacing: "0.1em" }}>
           {mobileTodayLabel()}
         </div>

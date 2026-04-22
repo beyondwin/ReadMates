@@ -668,6 +668,14 @@
   color: var(--accent);
 }
 
+.mobile-only.rm-member-home-mobile {
+  padding-top: 6px;
+}
+
+.mobile-only .rm-member-home-mobile__hero {
+  padding: 18px 18px 8px;
+}
+
 /* Member home mobile */
 .mobile-only .rm-member-session-card {
   padding: 0;
