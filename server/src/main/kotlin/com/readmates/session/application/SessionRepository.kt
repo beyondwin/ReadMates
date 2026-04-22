@@ -2,10 +2,17 @@ package com.readmates.session.application
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.readmates.session.api.AttendanceEntry
+import com.readmates.session.api.HostDashboardMissingMember
 import com.readmates.session.api.HostDashboardResponse
 import com.readmates.session.api.HostSessionRequest
 import com.readmates.session.api.PublicationRequest
 import com.readmates.session.domain.SessionParticipationStatus
+import com.readmates.session.application.model.AttendanceEntryCommand
+import com.readmates.session.application.model.ConfirmAttendanceCommand
+import com.readmates.session.application.model.HostDashboardMissingMemberResult
+import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.ObjectProvider
@@ -201,10 +208,10 @@ class SessionRepository(
     private val hostSessionDeletionRepository: HostSessionDeletionRepository,
 ) {
     fun createOpenSession(host: CurrentMember, request: HostSessionRequest): CreatedSessionResponse =
-        hostSessionRepository.createOpenSession(host, request)
+        hostSessionRepository.createOpenSession(host, request.toCommand(host))
 
     fun hostDashboard(member: CurrentMember): HostDashboardResponse =
-        hostSessionRepository.hostDashboard(member)
+        hostSessionRepository.hostDashboard(member).toResponse()
 
     fun findHostSession(member: CurrentMember, sessionId: UUID): HostSessionDetailResponse =
         hostSessionRepository.findHostSession(member, sessionId)
@@ -219,19 +226,32 @@ class SessionRepository(
         member: CurrentMember,
         sessionId: UUID,
         request: HostSessionRequest,
-    ): HostSessionDetailResponse = hostSessionRepository.updateHostSession(member, sessionId, request)
+    ): HostSessionDetailResponse = hostSessionRepository.updateHostSession(member, sessionId, request.toCommand(member))
 
     fun confirmAttendance(
         member: CurrentMember,
         sessionId: UUID,
         entries: List<AttendanceEntry>,
-    ): HostAttendanceResponse = hostSessionRepository.confirmAttendance(member, sessionId, entries)
+    ): HostAttendanceResponse = hostSessionRepository.confirmAttendance(
+        ConfirmAttendanceCommand(
+            host = member,
+            sessionId = sessionId,
+            entries = entries.map { it.toCommand() },
+        ),
+    )
 
     fun upsertPublication(
         member: CurrentMember,
         sessionId: UUID,
         request: PublicationRequest,
-    ): HostPublicationResponse = hostSessionRepository.upsertPublication(member, sessionId, request)
+    ): HostPublicationResponse = hostSessionRepository.upsertPublication(
+        UpsertPublicationCommand(
+            host = member,
+            sessionId = sessionId,
+            publicSummary = request.publicSummary,
+            isPublic = request.isPublic,
+        ),
+    )
 
     fun findCurrentSession(member: CurrentMember): CurrentSessionPayload =
         currentSessionRepository.findCurrentSession(member)
@@ -256,6 +276,42 @@ class SessionRepository(
 
     fun findOpenSessionId(clubId: UUID): UUID =
         currentSessionRepository.findOpenSessionId(clubId)
+
+    private fun HostSessionRequest.toCommand(host: CurrentMember) = HostSessionCommand(
+        host = host,
+        title = title,
+        bookTitle = bookTitle,
+        bookAuthor = bookAuthor,
+        bookLink = bookLink,
+        bookImageUrl = bookImageUrl,
+        date = date,
+        startTime = startTime,
+        endTime = endTime,
+        questionDeadlineAt = questionDeadlineAt,
+        locationLabel = locationLabel,
+        meetingUrl = meetingUrl,
+        meetingPasscode = meetingPasscode,
+    )
+
+    private fun AttendanceEntry.toCommand() = AttendanceEntryCommand(
+        membershipId = membershipId,
+        attendanceStatus = attendanceStatus,
+    )
+
+    private fun HostDashboardResult.toResponse() = HostDashboardResponse(
+        rsvpPending = rsvpPending,
+        checkinMissing = checkinMissing,
+        publishPending = publishPending,
+        feedbackPending = feedbackPending,
+        currentSessionMissingMemberCount = currentSessionMissingMemberCount,
+        currentSessionMissingMembers = currentSessionMissingMembers.map { it.toResponse() },
+    )
+
+    private fun HostDashboardMissingMemberResult.toResponse() = HostDashboardMissingMember(
+        membershipId = membershipId,
+        displayName = displayName,
+        email = email,
+    )
 }
 
 internal fun jdbcTemplateOrThrow(jdbcTemplateProvider: ObjectProvider<JdbcTemplate>): JdbcTemplate =

@@ -1190,7 +1190,7 @@ Expected: commit succeeds.
 - Modify: `server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt`
 
-- [ ] **Step 1: Add command models**
+- [x] **Step 1: Add command models**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/HostSessionCommands.kt`:
 
@@ -1246,7 +1246,7 @@ data class UpsertPublicationCommand(
 )
 ```
 
-- [ ] **Step 2: Add dashboard result model**
+- [x] **Step 2: Add dashboard result model**
 
 Create `server/src/main/kotlin/com/readmates/session/application/model/HostDashboardResult.kt`:
 
@@ -1269,7 +1269,7 @@ data class HostDashboardMissingMemberResult(
 )
 ```
 
-- [ ] **Step 3: Add inbound use cases**
+- [x] **Step 3: Add inbound use cases**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/in/HostSessionUseCases.kt`:
 
@@ -1311,7 +1311,7 @@ interface GetHostDashboardUseCase {
 }
 ```
 
-- [ ] **Step 4: Add outbound host port**
+- [x] **Step 4: Add outbound host port**
 
 Create `server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionWritePort.kt`:
 
@@ -1344,7 +1344,7 @@ interface HostSessionWritePort {
 }
 ```
 
-- [ ] **Step 5: Add host command service**
+- [x] **Step 5: Add host command service**
 
 Create `server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt`:
 
@@ -1395,7 +1395,7 @@ class HostSessionCommandService(
 }
 ```
 
-- [ ] **Step 6: Change legacy host repository signatures to application commands**
+- [x] **Step 6: Change legacy host repository signatures to application commands**
 
 Modify `server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt` imports:
 
@@ -1534,7 +1534,7 @@ HostDashboardMissingMemberResult(
 )
 ```
 
-- [ ] **Step 7: Add legacy host adapter**
+- [x] **Step 7: Add legacy host adapter**
 
 Create `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacyHostSessionWriteAdapter.kt`:
 
@@ -1583,7 +1583,7 @@ class LegacyHostSessionWriteAdapter(
 }
 ```
 
-- [ ] **Step 8: Run compilation-focused tests**
+- [x] **Step 8: Run compilation-focused tests**
 
 Run:
 
@@ -1593,7 +1593,7 @@ Run:
 
 Expected: PASS. The new adapter compiles while controllers still use legacy packages.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 Run:
 
@@ -1604,7 +1604,9 @@ git add server/src/main/kotlin/com/readmates/session/application/model/HostSessi
   server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionWritePort.kt \
   server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt \
   server/src/main/kotlin/com/readmates/session/adapter/out/persistence/LegacyHostSessionWriteAdapter.kt \
-  server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt
+  server/src/main/kotlin/com/readmates/session/application/HostSessionRepository.kt \
+  server/src/main/kotlin/com/readmates/session/application/SessionRepository.kt \
+  server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt
 git commit -m "refactor: add host session use cases"
 ```
 
