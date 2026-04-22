@@ -2075,7 +2075,7 @@ Expected: commit succeeds.
 
 - No planned source edits.
 
-- [ ] **Step 1: Run focused server suite**
+- [x] **Step 1: Run focused server suite**
 
 Run:
 
@@ -2092,7 +2092,9 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full backend tests if focused suite passes**
+Task 9 result on 2026-04-23: focused server suite passed (`BUILD SUCCESSFUL`).
+
+- [x] **Step 2: Run full backend tests if focused suite passes**
 
 Run:
 
@@ -2102,7 +2104,9 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Confirm no unrelated files were changed**
+Task 9 result on 2026-04-23: full backend test suite passed with `./server/gradlew -p server test --rerun-tasks` (`BUILD SUCCESSFUL in 36s`).
+
+- [x] **Step 3: Confirm no unrelated files were changed**
 
 Run:
 
@@ -2111,6 +2115,8 @@ git status --short
 ```
 
 Expected: only the pre-existing unrelated frontend dirty files remain, or no dirty files if the user cleaned them in another session.
+
+Task 9 result on 2026-04-23: `git status --short` was clean before recording these verification notes.
 
 ## Self-Review
 
