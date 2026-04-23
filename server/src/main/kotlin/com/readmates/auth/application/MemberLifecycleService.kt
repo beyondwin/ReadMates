@@ -2,6 +2,8 @@ package com.readmates.auth.application
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
+import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
@@ -32,8 +34,8 @@ private data class LifecycleMembershipRow(
 @Service
 class MemberLifecycleService(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    fun listMembers(host: CurrentMember): List<HostMemberListItem> {
+) : ManageMemberLifecycleUseCase, LeaveMembershipUseCase {
+    override fun listMembers(host: CurrentMember): List<HostMemberListItem> {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         return jdbcTemplate.query(
@@ -86,7 +88,7 @@ class MemberLifecycleService(
     }
 
     @Transactional
-    fun suspend(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse {
+    override fun suspend(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val membership = ensureMutableMembership(jdbcTemplate, host, membershipId)
@@ -119,7 +121,7 @@ class MemberLifecycleService(
     }
 
     @Transactional
-    fun restore(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse {
+    override fun restore(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val membership = ensureMutableMembership(jdbcTemplate, host, membershipId)
@@ -152,7 +154,7 @@ class MemberLifecycleService(
     }
 
     @Transactional
-    fun deactivate(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse {
+    override fun deactivate(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val membership = ensureMutableMembership(jdbcTemplate, host, membershipId)
@@ -185,7 +187,7 @@ class MemberLifecycleService(
     }
 
     @Transactional
-    fun addToCurrentSession(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse {
+    override fun addToCurrentSession(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val membership = ensureMutableMembership(jdbcTemplate, host, membershipId)
@@ -227,7 +229,7 @@ class MemberLifecycleService(
     }
 
     @Transactional
-    fun removeFromCurrentSession(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse {
+    override fun removeFromCurrentSession(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         ensureMutableMembership(jdbcTemplate, host, membershipId)
@@ -245,7 +247,7 @@ class MemberLifecycleService(
     }
 
     @Transactional
-    fun leave(member: CurrentMember, request: MemberLifecycleRequest): MemberLifecycleResponse {
+    override fun leave(member: CurrentMember, request: MemberLifecycleRequest): MemberLifecycleResponse {
         val jdbcTemplate = jdbcTemplate()
         if (member.role == MembershipRole.HOST) {
             lockActiveHostRows(jdbcTemplate, member.clubId)

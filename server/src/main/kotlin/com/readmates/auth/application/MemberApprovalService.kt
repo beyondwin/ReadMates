@@ -1,6 +1,7 @@
 package com.readmates.auth.application
 
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
@@ -28,8 +29,8 @@ data class ViewerMemberResponse(
 @Service
 class MemberApprovalService(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    fun listViewers(host: CurrentMember): List<ViewerMemberResponse> {
+) : ManageMemberApprovalsUseCase {
+    override fun listViewers(host: CurrentMember): List<ViewerMemberResponse> {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         return jdbcTemplate.query(
@@ -56,7 +57,7 @@ class MemberApprovalService(
     }
 
     @Transactional
-    fun activateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
+    override fun activateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -82,7 +83,7 @@ class MemberApprovalService(
     }
 
     @Transactional
-    fun deactivateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
+    override fun deactivateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(

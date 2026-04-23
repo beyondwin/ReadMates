@@ -1,5 +1,6 @@
 package com.readmates.auth.application
 
+import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
 import com.readmates.shared.db.dbString
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.ObjectProvider
@@ -29,8 +30,8 @@ data class PendingCurrentSessionResponse(
 @Service
 class PendingApprovalReadService(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    fun get(member: CurrentMember): PendingApprovalAppResponse {
+) : GetPendingApprovalUseCase {
+    override fun get(member: CurrentMember): PendingApprovalAppResponse {
         if (!member.isViewer) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "Pending approval required")
         }
