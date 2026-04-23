@@ -179,7 +179,7 @@
 }
 
 .page-header {
-  padding: 48px 0 28px;
+  padding: 28px 0;
   border-bottom: 1px solid var(--line);
 }
 
@@ -286,7 +286,7 @@
 }
 
 .public-home-hero {
-  padding: 72px 0 24px;
+  padding: 28px 0 24px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -297,7 +297,7 @@
     "copy latest"
     "peek latest";
   gap: 64px;
-  align-items: end;
+  align-items: start;
 }
 
 .public-home-hero__copy {
@@ -436,6 +436,10 @@
   color: var(--text-3);
   font-size: 13px;
   white-space: nowrap;
+}
+
+.public-club-header__grid {
+  align-items: start;
 }
 
 .public-club-overview {

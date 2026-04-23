@@ -103,7 +103,7 @@ export default function PublicClub({ data }: PublicClubProps) {
   return (
     <main className="page-frame public-club">
       <section className="page-header public-club-header">
-        <div className="container public-grid-2" style={{ alignItems: "end" }}>
+        <div className="container public-grid-2 public-club-header__grid">
           <div>
             <div className="eyebrow" style={{ marginBottom: 16 }}>
               작게 읽고 깊게 나누는 모임
