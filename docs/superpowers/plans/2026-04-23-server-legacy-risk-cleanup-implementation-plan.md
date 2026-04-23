@@ -269,7 +269,7 @@ git commit -m "refactor: replace feedback document legacy bridge"
 - Move/delete when unused: `server/src/main/kotlin/com/readmates/archive/application/NotesFeedQueryRepository.kt`
 - Modify tests under: `server/src/test/kotlin/com/readmates/note/*`
 
-- [ ] **Step 1: Move web DTOs and controller package**
+- [x] **Step 1: Move web DTOs and controller package**
 
 Preserve:
 
@@ -279,19 +279,27 @@ Preserve:
 - invalid `sessionId` behavior returning an empty list
 - unauthenticated behavior returning `401`
 
-- [ ] **Step 2: Replace direct auth repository lookup**
+- Result: moved notes feed endpoints to `note.adapter.in.web.NotesFeedController` with response DTOs in `NotesFeedWebDtos.kt`. Route paths and response field/list shapes are preserved.
+
+- [x] **Step 2: Replace direct auth repository lookup**
 
 Use `CurrentMember` argument resolution or `ResolveCurrentMemberUseCase` through established auth adapter patterns. Do not keep direct `Authentication` plus `MemberAccountRepository` lookup in the controller.
 
-- [ ] **Step 3: Add note use case and outbound port**
+- Result: controller now accepts `CurrentMember` directly and no longer imports `Authentication` or `MemberAccountRepository`; unauthenticated requests continue through the shared resolver and return `401`.
+
+- [x] **Step 3: Add note use case and outbound port**
 
 `NotesFeedController` should call `GetNotesFeedUseCase` / `ListNoteSessionsUseCase` style inbound ports. `NotesFeedService` should own orchestration and session-id parsing decisions if they are not pure HTTP parsing.
 
-- [ ] **Step 4: Move notes feed SQL into note persistence adapter**
+- Result: added `GetNotesFeedUseCase`, `ListNoteSessionsUseCase`, `LoadNotesFeedPort`, `NotesFeedService`, and result models under `note.application`. Invalid `sessionId` parsing remains an empty-list application decision.
+
+- [x] **Step 4: Move notes feed SQL into note persistence adapter**
 
 Move `NotesFeedQueryRepository` SQL into `note.adapter.out.persistence.JdbcNotesFeedAdapter` implementing `LoadNotesFeedPort`. Delete the old archive application repository after callers move.
 
-- [ ] **Step 5: Validate note behavior**
+- Result: moved the existing notes feed SQL and row mapping into `JdbcNotesFeedAdapter`. Deleted `archive.application.NotesFeedQueryRepository` and the now-unused `ArchiveRepository` note-feed delegation.
+
+- [x] **Step 5: Validate note behavior**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.note.*'
@@ -301,12 +309,20 @@ rg -n "package com\\.readmates\\.note\\.api|JdbcTemplate|query\\(|queryForObject
 
 Expected: no `note.api` package remains, and no notes-feed JDBC remains under `archive.application`.
 
-- [ ] **Step 6: Commit notes feed migration**
+- Result: validation passed.
+  - `./server/gradlew -p server test --tests 'com.readmates.note.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 4 executed, 2 up-to-date).
+  - `./server/gradlew -p server test --tests 'com.readmates.architecture.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - `rg -n "package com\\.readmates\\.note\\.api|JdbcTemplate|query\\(|queryForObject" server/src/main/kotlin/com/readmates/note server/src/main/kotlin/com/readmates/archive/application` returned only the expected `JdbcNotesFeedAdapter` hits under `note.adapter.out.persistence`; no `note.api` package or archive application notes-feed JDBC remains.
+  - Additional behavior check `./server/gradlew -p server test --tests 'com.readmates.archive.api.ArchiveAndNotesDbTest'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+
+- [x] **Step 6: Commit notes feed migration**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/note server/src/main/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/note server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
 git commit -m "refactor: migrate notes feed to clean architecture"
 ```
+
+- Result: Task 3 changes committed by the implementation worker with message `refactor: migrate notes feed to clean architecture`.
 
 ## Task 4: Move Shared Health Controller Out Of Legacy API Package
 
