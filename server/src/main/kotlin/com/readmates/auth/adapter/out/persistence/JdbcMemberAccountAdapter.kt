@@ -1,5 +1,6 @@
 package com.readmates.auth.adapter.out.persistence
 
+import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
@@ -162,18 +163,22 @@ class JdbcMemberAccountAdapter(
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
             ?: throw IllegalStateException("JdbcTemplate is unavailable")
 
-        jdbcTemplate.update(
-            """
-            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (?, ?, ?, ?, ?, ?, 'GOOGLE')
-            """.trimIndent(),
-            userId.dbString(),
-            normalizedSubject,
-            normalizedEmail,
-            normalizedName,
-            shortNameFor(normalizedName),
-            normalizedProfileImageUrl,
-        )
+        try {
+            jdbcTemplate.update(
+                """
+                insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
+                values (?, ?, ?, ?, ?, ?, 'GOOGLE')
+                """.trimIndent(),
+                userId.dbString(),
+                normalizedSubject,
+                normalizedEmail,
+                normalizedName,
+                shortNameFor(normalizedName),
+                normalizedProfileImageUrl,
+            )
+        } catch (exception: DuplicateKeyException) {
+            throw MemberAccountDuplicateException(exception)
+        }
 
         return userId
     }
@@ -199,35 +204,39 @@ class JdbcMemberAccountAdapter(
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
             ?: throw IllegalStateException("JdbcTemplate is unavailable")
 
-        jdbcTemplate.update(
-            """
-            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (?, ?, ?, ?, ?, ?, 'GOOGLE')
-            """.trimIndent(),
-            userId.dbString(),
-            normalizedSubject,
-            normalizedEmail,
-            normalizedName,
-            shortNameFor(normalizedName),
-            normalizedProfileImageUrl,
-        )
+        try {
+            jdbcTemplate.update(
+                """
+                insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
+                values (?, ?, ?, ?, ?, ?, 'GOOGLE')
+                """.trimIndent(),
+                userId.dbString(),
+                normalizedSubject,
+                normalizedEmail,
+                normalizedName,
+                shortNameFor(normalizedName),
+                normalizedProfileImageUrl,
+            )
 
-        jdbcTemplate.update(
-            """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            select
-              ?,
-              clubs.id,
-              ?,
-              'MEMBER',
-              'VIEWER',
-              null
-            from clubs
-            where clubs.slug = 'reading-sai'
-            """.trimIndent(),
-            membershipId.dbString(),
-            userId.dbString(),
-        )
+            jdbcTemplate.update(
+                """
+                insert into memberships (id, club_id, user_id, role, status, joined_at)
+                select
+                  ?,
+                  clubs.id,
+                  ?,
+                  'MEMBER',
+                  'VIEWER',
+                  null
+                from clubs
+                where clubs.slug = 'reading-sai'
+                """.trimIndent(),
+                membershipId.dbString(),
+                userId.dbString(),
+            )
+        } catch (exception: DuplicateKeyException) {
+            throw MemberAccountDuplicateException(exception)
+        }
 
         return findMemberByUserIdIncludingViewer(userId)
             ?: throw IllegalStateException("Created Google user has no membership")

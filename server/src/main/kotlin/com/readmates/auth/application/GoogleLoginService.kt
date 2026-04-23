@@ -1,8 +1,8 @@
 package com.readmates.auth.application
 
+import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.shared.security.CurrentMember
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
@@ -63,7 +63,7 @@ class GoogleLoginService(
                 displayName = displayName,
                 profileImageUrl = profileImageUrl,
             )
-        } catch (exception: DuplicateKeyException) {
+        } catch (exception: MemberAccountDuplicateException) {
             resolveDuplicateViewerGoogleMember(googleSubjectId, normalizedEmail, profileImageUrl, exception)
         }
     }
@@ -72,7 +72,7 @@ class GoogleLoginService(
         googleSubjectId: String,
         normalizedEmail: String,
         profileImageUrl: String?,
-        exception: DuplicateKeyException,
+        exception: MemberAccountDuplicateException,
     ): CurrentMember {
         val memberBySubject = memberAccountStore.findMemberByGoogleSubject(googleSubjectId)
         if (memberBySubject != null) {

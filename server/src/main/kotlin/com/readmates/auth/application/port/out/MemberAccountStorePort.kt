@@ -3,6 +3,8 @@ package com.readmates.auth.application.port.out
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
+class MemberAccountDuplicateException(cause: Throwable) : RuntimeException("Member account duplicate", cause)
+
 interface MemberAccountStorePort {
     fun findActiveMemberByEmail(email: String): CurrentMember?
     fun findDevSeedActiveMemberByEmail(email: String): CurrentMember?
