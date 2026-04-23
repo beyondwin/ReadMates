@@ -221,13 +221,22 @@ describe("NotesPage", () => {
     });
   });
 
-  it("passes the URL note filter through to the feed page", async () => {
+  it("passes a supported URL note filter through to the feed page", async () => {
+    mockNotesBff();
+
+    renderNotesPage("session-6", "highlights");
+    const props = await latestNotesProps();
+
+    expect(props.initialFilter).toBe("highlights");
+  });
+
+  it("falls back removed note filters to all", async () => {
     mockNotesBff();
 
     renderNotesPage("session-6", "reviews");
     const props = await latestNotesProps();
 
-    expect(props.initialFilter).toBe("reviews");
+    expect(props.initialFilter).toBe("all");
   });
 
   it("falls back invalid sessionId to the first session with records", async () => {

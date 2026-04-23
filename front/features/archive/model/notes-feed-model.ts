@@ -1,4 +1,4 @@
-export type FeedFilter = "all" | "highlights" | "oneliners" | "reviews" | "questions";
+export type FeedFilter = "all" | "highlights" | "oneliners" | "questions";
 
 export type NoteFeedKind = "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
 
@@ -29,12 +29,11 @@ export const noteFeedFilters: Array<{ key: FeedFilter; label: string }> = [
   { key: "all", label: "전체" },
   { key: "highlights", label: "하이라이트" },
   { key: "oneliners", label: "한줄평" },
-  { key: "reviews", label: "서평" },
   { key: "questions", label: "질문" },
 ];
 
 export function feedFilterFromSearchParam(value: string | null): FeedFilter {
-  if (value === "questions" || value === "oneliners" || value === "reviews" || value === "highlights") {
+  if (value === "questions" || value === "oneliners" || value === "highlights") {
     return value;
   }
 
@@ -58,7 +57,7 @@ export function selectNoteSession(noteSessions: NoteSessionItem[], requestedSess
     }
   }
 
-  return noteSessions.find((session) => session.totalCount > 0) ?? noteSessions[0] ?? null;
+  return noteSessions.find((session) => visibleNoteCount(session) > 0) ?? noteSessions[0] ?? null;
 }
 
 export function resolveSelectedSession({
@@ -88,11 +87,22 @@ export function sessionHref(session: NoteSessionItem, filter: FeedFilter) {
 }
 
 export function sessionRecordSummary(session: NoteSessionItem) {
-  return `기록 ${noteCountOrZero(session.totalCount)}`;
+  return `기록 ${visibleNoteCount(session)}`;
 }
 
 export function noteCountOrZero(count: unknown) {
   return typeof count === "number" && Number.isFinite(count) ? count : 0;
+}
+
+export function visibleNoteCount(session: Pick<NoteSessionItem, "questionCount" | "oneLinerCount" | "highlightCount" | "longReviewCount" | "totalCount">) {
+  const visibleKindCount =
+    noteCountOrZero(session.questionCount) + noteCountOrZero(session.oneLinerCount) + noteCountOrZero(session.highlightCount);
+
+  if (visibleKindCount > 0) {
+    return visibleKindCount;
+  }
+
+  return Math.max(0, noteCountOrZero(session.totalCount) - noteCountOrZero(session.longReviewCount));
 }
 
 export function sessionMatchesQuery(session: NoteSessionItem, query: string) {
@@ -156,7 +166,7 @@ export function noteKindLabel(item: Pick<NoteFeedItem, "kind">) {
   }
 
   if (item.kind === "LONG_REVIEW") {
-    return "서평";
+    return "기록";
   }
 
   return "기록";
@@ -173,10 +183,6 @@ export function filterKind(filter: FeedFilter): NoteFeedKind | null {
 
   if (filter === "oneliners") {
     return "ONE_LINE_REVIEW";
-  }
-
-  if (filter === "reviews") {
-    return "LONG_REVIEW";
   }
 
   if (filter === "highlights") {

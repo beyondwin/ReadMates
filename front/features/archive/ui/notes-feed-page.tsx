@@ -81,7 +81,7 @@ export default function NotesFeedPage({
         <div className="container">
           <SelectedSessionHeader session={displayedSession} />
           <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", maxWidth: 620 }}>
-            세션을 먼저 고르고, 하이라이트·한줄평·서평·질문을 작성자와 함께 훑는 클럽 기록장입니다.
+            세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.
           </p>
           <NotesFilterBar filter={filter} onFilterChange={handleFilterChange} selectedSession={displayedSession} />
           <MobileSessionPicker

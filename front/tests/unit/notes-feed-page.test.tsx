@@ -145,7 +145,7 @@ const selectedItems: NoteFeedItem[] = [
     authorName: "정멤버3",
     authorShortName: "정",
     kind: "LONG_REVIEW",
-    text: "문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.",
+    text: "문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.",
   },
   {
     sessionId: "session-6",
@@ -280,24 +280,28 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByRole("heading", { name: "가난한 찰리의 연감" })).toBeInTheDocument();
     expect(screen.getAllByText("No.06 · 2026.04.15").length).toBeGreaterThan(0);
-    expect(screen.getByText("세션을 먼저 고르고, 하이라이트·한줄평·서평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
+    expect(screen.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
     expect(screen.getByText("질문 4")).toBeInTheDocument();
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
-    expect(screen.getByText("서평 1")).toBeInTheDocument();
     expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
     expect(screen.queryByLabelText("선택한 세션 기록 수")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("클럽 노트 필터")).getAllByRole("button").map((button) => button.textContent)).toEqual([
-      "전체 13",
+      "전체 12",
       "하이라이트 3",
       "한줄평 5",
-      "서평 1",
       "질문 4",
     ]);
     expect(screen.queryByRole("button", { name: removedLabel("읽기 ", "흔적") })).not.toBeInTheDocument();
     expect(screen.queryByText(removedLabel("읽기 ", "흔적 5"))).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "남은 문장들" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "길게 남긴 서평" })).toBeInTheDocument();
-    expect(screen.getByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).toBeInTheDocument();
+    const highlightRow = screen
+      .getByText("다학문적 사고는 더 안전한 판단을 만들기도 하지만 실행을 늦추는 부담이 되기도 했다.")
+      .closest(".rm-notes-highlight-row");
+
+    expect(highlightRow).not.toBeNull();
+    expect(within(highlightRow as HTMLElement).getByText("읽는사이")).toBeInTheDocument();
+    expect(within(highlightRow as HTMLElement).queryByText("No.06 · 가난한 찰리의 연감")).not.toBeInTheDocument();
+    expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "지난 세션의 질문들" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "이번 달의 질문들" })).not.toBeInTheDocument();
     const rail = desktopRail();
@@ -310,7 +314,7 @@ describe("NotesFeedPage", () => {
     expect(selectedLink).toHaveAttribute("href", "/app/notes?sessionId=session-6");
     expect(selectedLink).toHaveAttribute("aria-current", "page");
     expect(selectedLink).toHaveTextContent("선택됨");
-    expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 13");
+    expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 12");
   });
 
   it("renders missing note counts as zero", () => {
@@ -332,7 +336,6 @@ describe("NotesFeedPage", () => {
       "전체 0",
       "하이라이트 0",
       "한줄평 0",
-      "서평 0",
       "질문 0",
     ]);
     expect(within(desktopRail()).getByRole("link", { name: "No.10 이전 응답 모양 세션 보기" })).toHaveTextContent("기록 0");
@@ -376,9 +379,9 @@ describe("NotesFeedPage", () => {
       "/app/notes?sessionId=session-8&filter=highlights",
     );
 
-    await user.click(screen.getByRole("button", { name: "서평 1" }));
+    await user.click(screen.getByRole("button", { name: "질문 4" }));
 
-    expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=reviews");
+    expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=questions");
   });
 
   it("filters the desktop session rail by book title and No.06-style labels", async () => {
@@ -543,21 +546,14 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
     expect(screen.getByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).toBeInTheDocument();
-    expect(screen.getByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).toBeInTheDocument();
-    expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "서평 1" }));
-
-    expect(screen.queryByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).not.toBeInTheDocument();
-    expect(screen.queryByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).not.toBeInTheDocument();
-    expect(screen.getByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).toBeInTheDocument();
+    expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
     expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "질문 4" }));
 
     expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
     expect(screen.queryByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).not.toBeInTheDocument();
-    expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
     expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
   });
 

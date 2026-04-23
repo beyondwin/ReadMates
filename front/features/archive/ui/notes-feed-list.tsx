@@ -8,6 +8,7 @@ import {
   noteCountOrZero,
   noteKindLabel,
   sessionNumberLabel,
+  visibleNoteCount,
 } from "@/features/archive/model/notes-feed-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
@@ -61,15 +62,11 @@ function noteFilterCount(session: NoteSessionItem, filter: FeedFilter) {
     return noteCountOrZero(session.oneLinerCount);
   }
 
-  if (filter === "reviews") {
-    return noteCountOrZero(session.longReviewCount);
-  }
-
   if (filter === "questions") {
     return noteCountOrZero(session.questionCount);
   }
 
-  return noteCountOrZero(session.totalCount);
+  return visibleNoteCount(session);
 }
 
 export function FeedSections({
@@ -87,12 +84,14 @@ export function FeedSections({
     return <NotesEmptyState message="아직 발행된 세션 기록이 없습니다." />;
   }
 
-  if (items.length === 0) {
+  const visibleItems = items.filter((item) => item.kind !== "LONG_REVIEW");
+
+  if (visibleItems.length === 0) {
     return <NotesEmptyState message="이 세션에는 아직 공개된 기록이 없습니다." />;
   }
 
   const selectedKind = filterKind(filter);
-  const filteredItems = selectedKind ? byKind(items, selectedKind) : items;
+  const filteredItems = selectedKind ? byKind(visibleItems, selectedKind) : visibleItems;
 
   if (filteredItems.length === 0) {
     return <NotesEmptyState message="이 세션에는 해당 기록이 없습니다." />;
@@ -101,10 +100,9 @@ export function FeedSections({
   return (
     <>
       <NotesFeedListStyles />
-      {(filter === "all" || filter === "highlights") && <FeedHighlights items={byKind(items, "HIGHLIGHT")} />}
-      {(filter === "all" || filter === "oneliners") && <FeedOneLiners items={byKind(items, "ONE_LINE_REVIEW")} />}
-      {(filter === "all" || filter === "reviews") && <FeedLongReviews items={byKind(items, "LONG_REVIEW")} />}
-      {(filter === "all" || filter === "questions") && <FeedQuestions items={byKind(items, "QUESTION")} />}
+      {(filter === "all" || filter === "highlights") && <FeedHighlights items={byKind(visibleItems, "HIGHLIGHT")} />}
+      {(filter === "all" || filter === "oneliners") && <FeedOneLiners items={byKind(visibleItems, "ONE_LINE_REVIEW")} />}
+      {(filter === "all" || filter === "questions") && <FeedQuestions items={byKind(visibleItems, "QUESTION")} />}
     </>
   );
 }
@@ -152,7 +150,7 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
 
 function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 서평">
+    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 한줄평">
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
         {items.map((item, index) => (
           <article
@@ -174,46 +172,15 @@ function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
   );
 }
 
-function FeedLongReviews({ items }: { items: NoteFeedItem[] }) {
-  return (
-    <FeedSection eyebrow={`서평 · ${items.length}`} title="길게 남긴 서평">
-      <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-        {items.map((item, index) => (
-          <article
-            key={itemKey(item)}
-            style={{
-              padding: "24px 0",
-              borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
-            }}
-          >
-            <div className="body editorial" style={{ fontSize: "17px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
-              {item.text}
-            </div>
-            <FeedAuthorRow item={item} rightLabel={`${sessionNumberLabel(item)} · ${noteKindLabel(item)}`} markerSize={22} style={{ gap: "10px", marginTop: "14px" }} />
-          </article>
-        ))}
-      </div>
-    </FeedSection>
-  );
-}
-
 function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
   return (
     <FeedSection eyebrow={`하이라이트 · ${items.length}`} title="남은 문장들">
-      <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-        {items.map((item, index) => (
-          <div
-            key={itemKey(item)}
-            style={{
-              padding: "24px 0",
-              borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
-            }}
-          >
-            <div className="quote editorial" style={{ fontSize: "18px" }}>
-              {item.text}
-            </div>
-            <FeedAuthorRow item={item} rightLabel={`${sessionNumberLabel(item)} · ${item.bookTitle}`} markerSize={20} style={{ gap: "10px", marginTop: "10px" }} />
-          </div>
+      <div className="rm-notes-highlight-list">
+        {items.map((item) => (
+          <article key={itemKey(item)} className="rm-notes-highlight-row">
+            <p className="rm-notes-highlight-row__quote editorial">{item.text}</p>
+            <FeedAuthorRow item={item} markerSize={20} style={{ gap: "10px", marginTop: "18px", paddingLeft: "34px" }} />
+          </article>
         ))}
       </div>
     </FeedSection>
@@ -237,7 +204,57 @@ function FeedSection({ eyebrow, title, children }: { eyebrow: string; title: str
 function NotesFeedListStyles() {
   return (
     <style>{`
+      .rm-notes-highlight-list {
+        border-top: 1px solid var(--line);
+      }
+
+      .rm-notes-highlight-row {
+        padding: 42px 0 44px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .rm-notes-highlight-row__quote {
+        position: relative;
+        max-width: 920px;
+        margin: 0;
+        padding-left: 34px;
+        color: var(--text);
+        font-size: 30px;
+        font-weight: 600;
+        line-height: 1.45;
+        letter-spacing: 0;
+      }
+
+      .rm-notes-highlight-row__quote::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.2em;
+        width: 3px;
+        min-height: 24px;
+        height: calc(100% - 0.4em);
+        background: var(--accent);
+      }
+
       @media (max-width: 768px) {
+        .rm-notes-highlight-row {
+          padding: 30px 0 32px;
+        }
+
+        .rm-notes-highlight-row__quote {
+          padding-left: 22px;
+          font-size: 22px;
+          line-height: 1.48;
+        }
+
+        .rm-notes-highlight-row__quote::before {
+          width: 2px;
+        }
+
+        .rm-notes-highlight-row .row {
+          padding-left: 22px !important;
+        }
+
         .rm-notes-excerpt-row .quote {
           border-bottom: 0;
         }
@@ -254,7 +271,7 @@ function FeedAuthorRow({
   style,
 }: {
   item: NoteFeedItem;
-  rightLabel: string;
+  rightLabel?: string;
   markerSize: number;
   children?: React.ReactNode;
   style?: CSSProperties;
@@ -266,9 +283,11 @@ function FeedAuthorRow({
       ) : null}
       {item.authorName ? <span className="small">{item.authorName}</span> : null}
       {children}
-      <span className="tiny mono" style={{ marginLeft: "auto" }}>
-        {rightLabel}
-      </span>
+      {rightLabel ? (
+        <span className="tiny mono" style={{ marginLeft: "auto" }}>
+          {rightLabel}
+        </span>
+      ) : null}
     </div>
   );
 }
