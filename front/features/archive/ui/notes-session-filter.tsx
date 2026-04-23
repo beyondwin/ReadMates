@@ -25,7 +25,7 @@ export function SelectedSessionHeader({ session }: { session: NoteSessionItem | 
       <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
         {session
           ? `${noteSessionNumberLabel(session)} · ${formatDateOnlyLabel(session.date)}`
-          : "다른 멤버의 하이라이트, 한줄평, 서평, 질문. 댓글도 좋아요도 없는 조용한 피드."}
+          : "다른 멤버의 하이라이트, 한줄평, 질문. 댓글도 좋아요도 없는 조용한 피드."}
       </p>
     </div>
   );
