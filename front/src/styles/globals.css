@@ -497,10 +497,11 @@
   display: flex;
   gap: 10px;
   margin: 0;
+  flex-wrap: wrap;
 }
 
 .public-session-meta div {
-  min-width: 78px;
+  min-width: 116px;
   padding: 10px 12px;
   text-align: center;
   background: var(--bg-sub);
@@ -544,6 +545,81 @@
 .public-one-liner-list {
   display: grid;
   gap: 0;
+}
+
+.public-note-highlight-list {
+  border-top: 1px solid var(--line);
+}
+
+.public-note-highlight-row {
+  padding: 24px 0 26px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.public-note-highlight-row__quote {
+  position: relative;
+  max-width: 920px;
+  margin: 0;
+  padding-left: 34px;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.48;
+  letter-spacing: 0;
+}
+
+.public-note-highlight-row__quote::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.2em;
+  width: 3px;
+  min-height: 24px;
+  height: calc(100% - 0.4em);
+  background: var(--accent);
+}
+
+.public-note-oneliner-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.public-note-oneliner-card {
+  min-height: 126px;
+  padding: 24px 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: color-mix(in oklch, var(--bg), var(--bg-raised) 48%);
+}
+
+.public-note-oneliner-card__quote {
+  position: relative;
+  margin: 0;
+  padding-left: 34px;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0;
+}
+
+.public-note-oneliner-card__quote::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.16em;
+  width: 3px;
+  min-height: 30px;
+  height: calc(100% - 0.32em);
+  background: var(--accent);
+}
+
+.public-note-author-row {
+  gap: 10px;
+  margin-top: 12px;
+  padding-left: 34px;
+  color: var(--text-3);
 }
 
 .public-record-index-row {
@@ -1088,6 +1164,46 @@
   .public-host-note,
   .public-session-document {
     padding: 22px;
+  }
+
+  .public-document-head {
+    display: grid;
+    gap: 18px;
+  }
+
+  .public-session-meta div {
+    min-width: 0;
+    flex: 1 1 128px;
+  }
+
+  .public-note-oneliner-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .public-note-oneliner-card {
+    min-height: 0;
+    padding: 20px 18px;
+  }
+
+  .public-note-oneliner-card__quote,
+  .public-note-highlight-row__quote {
+    padding-left: 22px;
+    font-size: 16px;
+    line-height: 1.48;
+  }
+
+  .public-note-oneliner-card__quote::before,
+  .public-note-highlight-row__quote::before {
+    width: 2px;
+  }
+
+  .public-note-oneliner-card .public-note-author-row {
+    padding-left: 22px;
+  }
+
+  .public-note-highlight-row {
+    padding: 20px 0 22px;
   }
 
   .public-record-index-row__body,

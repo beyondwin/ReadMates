@@ -14,6 +14,8 @@ type PublicSessionProps = {
 
 export default function PublicSession({ session, returnTarget = publicRecordsReturnTarget }: PublicSessionProps) {
   const { bookTitle, bookAuthor, dateLabel, summary } = getPublicSessionDetailDisplay(session);
+  const highlightCount = session.highlights.length;
+  const oneLinerCount = session.oneLiners.length;
 
   return (
     <main className="page-frame public-session-record">
@@ -44,19 +46,19 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
           <article className="rm-document-panel public-session-document">
             <header className="public-document-head">
               <div>
-                <div className="eyebrow">발행 요약</div>
+                <div className="eyebrow">요약</div>
                 <h2 className="h2 editorial" style={{ margin: "8px 0 0" }}>
-                  공개된 세션 기록
+                  회차 기록
                 </h2>
               </div>
               <dl className="public-session-meta" aria-label="공개 세션 메타데이터">
                 <div>
-                  <dt>하이라이트</dt>
-                  <dd>{session.highlights.length}</dd>
+                  <dt>회차 하이라이트</dt>
+                  <dd>{highlightCount}</dd>
                 </div>
                 <div>
-                  <dt>한줄평</dt>
-                  <dd>{session.oneLiners.length}</dd>
+                  <dt>함께 남긴 한줄평</dt>
+                  <dd>{oneLinerCount}</dd>
                 </div>
               </dl>
             </header>
@@ -70,30 +72,29 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
           <div className="public-section-head">
             <div>
               <div className="eyebrow" style={{ marginBottom: 8 }}>
-                하이라이트
+                회차 하이라이트 · {highlightCount}
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
-                남은 문장들
+                모임에서 남은 문장
               </h2>
             </div>
           </div>
-          {session.highlights.length > 0 ? (
-            <div className="public-record-list">
+          {highlightCount > 0 ? (
+            <div className="public-note-highlight-list">
               {session.highlights.map((highlight, index) => (
-                <div className="rm-record-row public-highlight-row" key={`${index}-${highlight}`}>
-                  <span className="mono tiny">H{String(index + 1).padStart(2, "0")}</span>
-                  <blockquote className="quote editorial">{displayText(highlight, "공개 하이라이트가 준비 중입니다.")}</blockquote>
-                </div>
+                <article className="public-note-highlight-row" key={`${index}-${highlight}`}>
+                  <p className="public-note-highlight-row__quote editorial">{displayText(highlight, "회차 하이라이트가 준비 중입니다.")}</p>
+                </article>
               ))}
             </div>
           ) : (
             <div className="rm-empty-state public-empty-record">
-              <div className="eyebrow">하이라이트</div>
+              <div className="eyebrow">회차 하이라이트</div>
               <div className="h3 editorial" style={{ marginTop: 10 }}>
-                공개된 하이라이트가 없습니다
+                아직 회차 하이라이트가 없습니다
               </div>
               <p className="body" style={{ margin: "12px 0 0" }}>
-                이번 기록은 요약 중심으로 발행되었습니다. 공개 가능한 문장이 정리되면 이 영역에 보관됩니다.
+                이번 기록은 요약 중심으로 발행되었습니다. 대표 문장이 정리되면 이 영역에 보관됩니다.
               </p>
             </div>
           )}
@@ -105,31 +106,26 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
           <div className="public-section-head">
             <div>
               <div className="eyebrow" style={{ marginBottom: 8 }}>
-                한줄평
+                함께 남긴 한줄평 · {oneLinerCount}
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
-                참석자가 남긴 짧은 기록
+                짧게 남긴 감상
               </h2>
             </div>
           </div>
-          {session.oneLiners.length > 0 ? (
-            <div className="public-one-liner-list">
+          {oneLinerCount > 0 ? (
+            <div className="public-note-oneliner-grid">
               {session.oneLiners.map((oneLiner, index) => {
                 const authorName = displayText(oneLiner.authorName, "익명");
                 const authorShortName = displayText(oneLiner.authorShortName, authorName);
-                const text = displayText(oneLiner.text, "공개 한줄평이 준비 중입니다.");
+                const text = displayText(oneLiner.text, "한줄평이 준비 중입니다.");
 
                 return (
-                  <article className="rm-record-row public-one-liner-row" key={`${index}-${oneLiner.authorName}-${oneLiner.text}`}>
-                    <span className="mono tiny">R{String(index + 1).padStart(2, "0")}</span>
-                    <div>
-                      <p className="body editorial" style={{ margin: 0 }}>
-                        {text}
-                      </p>
-                      <div className="row" style={{ marginTop: 12, gap: 8 }}>
-                        <AvatarChip name={authorName} fallbackInitial={authorShortName} label={authorName} size={22} />
-                        <span className="tiny">{authorName}</span>
-                      </div>
+                  <article className="public-note-oneliner-card" key={`${index}-${oneLiner.authorName}-${oneLiner.text}`}>
+                    <p className="public-note-oneliner-card__quote editorial">{text}</p>
+                    <div className="row public-note-author-row">
+                      <AvatarChip name={authorName} fallbackInitial={authorShortName} label={authorName} size={22} />
+                      <span className="small">{authorName}</span>
                     </div>
                   </article>
                 );
@@ -137,12 +133,12 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
             </div>
           ) : (
             <div className="rm-empty-state public-empty-record">
-              <div className="eyebrow">한줄평</div>
+              <div className="eyebrow">함께 남긴 한줄평</div>
               <div className="h3 editorial" style={{ marginTop: 10 }}>
-                공개된 한줄평이 없습니다
+                아직 함께 남긴 한줄평이 없습니다
               </div>
               <p className="body" style={{ margin: "12px 0 0" }}>
-                참석자 전용 기록과 공개 기록의 경계를 지키기 위해 발행된 한줄평만 보여줍니다.
+                멤버가 공개해도 좋은 짧은 감상을 남기면 이 영역에 모입니다.
               </p>
             </div>
           )}

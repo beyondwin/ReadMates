@@ -77,16 +77,29 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "요약" })).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "클럽 기록" })).toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "내 기록" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "피드백 문서" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "회차 하이라이트 · 1" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "함께 남긴 질문 · 1" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "함께 남긴 한줄평 · 1" })).toBeInTheDocument();
     expect(desktop.getAllByText("2026.04.20 등록").length).toBeGreaterThan(0);
     expect(mobile.getByText("팩트풀니스")).toBeInTheDocument();
     expect(mobile.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(mobile.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
     expect(mobile.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "클럽 기록" })).toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "피드백 문서" })).toBeInTheDocument();
+    expect(container.querySelector(".mobile-only .rm-session-detail-mobile-tabs")).not.toBeNull();
+    expect(mobile.getByRole("link", { name: "요약" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.getByRole("link", { name: "회차 기록" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.getByRole("link", { name: "내 기록" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.getByRole("link", { name: "피드백 문서" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "회차 하이라이트 · 1" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "함께 남긴 질문 · 1" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "함께 남긴 한줄평 · 1" })).toBeInTheDocument();
     expect(mobile.getByText("2026.04.20 등록")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("Join the reading");
 
@@ -324,6 +337,16 @@ describe("MemberSessionDetailPage", () => {
     });
 
     expect(screen.getAllByText("이 회차에 남긴 내 질문이나 서평이 없습니다.").length).toBeGreaterThan(0);
+  });
+
+  it("renders mobile club record cards in spaced lists", () => {
+    const { container } = renderDetail();
+    const mobileClubRecords = container.querySelector(".mobile-only #mobile-club-records");
+
+    expect(mobileClubRecords).not.toBeNull();
+    expect(mobileClubRecords?.querySelector(":scope > .rm-mobile-record-list")).not.toBeNull();
+    expect(mobileClubRecords?.querySelectorAll(".rm-mobile-record-list").length).toBeGreaterThanOrEqual(4);
+    expect(mobileClubRecords?.querySelectorAll(".m-card, .m-card-quiet").length).toBeGreaterThanOrEqual(3);
   });
 
   it("removes club checkins and shows club one-line records", () => {

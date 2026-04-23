@@ -156,6 +156,20 @@ describe("PublicSession", () => {
       "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
     );
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
+    expect(screen.getByText("요약")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
+    expect(screen.getByText("회차 하이라이트")).toBeInTheDocument();
+    expect(screen.getByText("함께 남긴 한줄평")).toBeInTheDocument();
+    expect(screen.getByText("회차 하이라이트 · 1")).toBeInTheDocument();
+    expect(screen.getByText("함께 남긴 한줄평 · 1")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "모임에서 남은 문장" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "짧게 남긴 감상" })).toBeInTheDocument();
+    expect(container.querySelector(".public-note-highlight-row")).not.toBeNull();
+    expect(container.querySelector(".public-note-oneliner-card")).not.toBeNull();
+    expect(container).not.toHaveTextContent("H01");
+    expect(container).not.toHaveTextContent("R01");
+    expect(container).not.toHaveTextContent("발행 요약");
+    expect(container).not.toHaveTextContent("공개된 세션 기록");
     expect(screen.getByRole("link", { name: "기존 멤버 로그인" })).toHaveAttribute("href", "/login");
     const inviteCta = screen.getByRole("button", { name: /초대 수락하기/ });
     expect(inviteCta).toBeDisabled();

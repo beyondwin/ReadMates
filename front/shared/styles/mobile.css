@@ -214,6 +214,11 @@
 }
 .m-card-tight { padding: 14px 16px; }
 
+.rm-mobile-record-list {
+  display: grid;
+  gap: 10px;
+}
+
 .rm-home-answer-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -581,6 +586,11 @@
 }
 .m-hscroll::-webkit-scrollbar { display: none; }
 .m-hscroll > * { scroll-snap-align: start; flex-shrink: 0; }
+
+.rm-session-detail-mobile-tabs {
+  gap: 6px;
+  padding: 0 18px 6px;
+}
 
 /* Touch list */
 .m-list { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--r-3); overflow: hidden; }
@@ -1215,6 +1225,14 @@
 }
 .m-chip.is-on { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
 .m-chip-done { color: var(--ok); border-color: color-mix(in oklch, var(--ok), transparent 70%); background: var(--ok-soft); }
+
+.m-chip.rm-session-detail-mobile-tab {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 14px;
+  font-size: 13px;
+  background: transparent;
+}
 
 /* Role switcher */
 .m-role-bar {
