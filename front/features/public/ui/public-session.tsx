@@ -84,6 +84,10 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
               {session.highlights.map((highlight, index) => (
                 <article className="public-note-highlight-row" key={`${index}-${highlight}`}>
                   <p className="public-note-highlight-row__quote editorial">{displayText(highlight, "회차 하이라이트가 준비 중입니다.")}</p>
+                  <div className="row public-note-author-row">
+                    <AvatarChip name="읽는사이" fallbackInitial="읽" label="읽는사이" size={20} />
+                    <span className="small">읽는사이</span>
+                  </div>
                 </article>
               ))}
             </div>
