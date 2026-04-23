@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -35,6 +35,8 @@ function mockAuthMe(authenticated: boolean) {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  window.sessionStorage.clear();
 });
 
 function renderAt(pathname: string, element: ReactElement) {
@@ -102,6 +104,22 @@ describe("public navigation auth state", () => {
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByText("초대 메일의 개인 링크에서만 열립니다.")).not.toBeInTheDocument();
+  });
+
+  it("moves footer public navigation to the top instead of restoring prior record scroll", () => {
+    const scrollTo = vi.fn();
+    Object.defineProperty(window, "scrollTo", { configurable: true, value: scrollTo });
+    window.sessionStorage.setItem(
+      "readmates:public-records-scroll",
+      JSON.stringify({ pathname: "/records", search: "", scrollY: 720 }),
+    );
+
+    renderAt("/sessions/session-1", <PublicFooter showGuestMemberActions={false} />);
+
+    fireEvent.click(screen.getByRole("link", { name: "공개 기록" }));
+
+    expect(window.sessionStorage.getItem("readmates:public-records-scroll")).toBeNull();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
   });
 
   it("does not duplicate guest member actions in the full public route shell", async () => {
