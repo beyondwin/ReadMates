@@ -19,6 +19,7 @@ type TabLink = {
   label: string;
   pendingLabel?: string;
   icon: TabIconName;
+  state?: { readmatesWorkspace: "host" | "member" };
   current: (pathname: string) => boolean;
 };
 
@@ -91,6 +92,7 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
       href: "/app/archive",
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
+      state: { readmatesWorkspace: "host" },
       current: (pathname) =>
         pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
     },
@@ -191,6 +193,7 @@ export function MobileTabBar({ variant, currentSessionId }: MobileTabBarProps) {
           <Link
             key={tab.key}
             to={tab.href}
+            state={tab.state}
             className="m-tab"
             aria-current={tab.current(pathname) ? "page" : undefined}
           >

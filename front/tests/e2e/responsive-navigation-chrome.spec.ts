@@ -101,6 +101,13 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "멤버 화면으로" }));
   await mobileHeader.getByRole("link", { name: "멤버 화면으로" }).click();
   await expect(page).toHaveURL(/\/app$/);
+  await memberTabs.getByRole("link", { name: "아카이브" }).click();
+  await expect(page).toHaveURL(/\/app\/archive$/);
+  await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
+  await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveText("운영");
+  await expect(memberTabs.getByRole("link")).toHaveText(["홈", "이번 세션", "클럽 노트", "아카이브", "내 공간"]);
+  await expect(memberTabs.getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
+  await expect(memberTabs.getByRole("link", { name: "기록" })).toHaveCount(0);
 
   await page.goto("/app/host/sessions/new");
   await expect(mobileHeader).toBeVisible();
