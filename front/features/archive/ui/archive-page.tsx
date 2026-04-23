@@ -539,9 +539,20 @@ function ArchiveMobileReports({ reports, sessions }: { reports: FeedbackDocument
       <div className="m-list">
         {reports.map((report) => {
           const cover = reportBookCoverMeta(report, sessions);
-
-          return (
-            <div key={report.sessionId} className="m-list-row" style={{ gridTemplateColumns: "40px minmax(0, 1fr) auto" }}>
+          const readHref = appFeedbackHref(report.sessionId);
+          const readState = archiveReturnState("report", "아카이브로 돌아가기");
+          const readLabel = feedbackReportActionLabel(report, "읽기");
+          const reportRowLinkStyle: CSSProperties = {
+            display: "grid",
+            gridTemplateColumns: "40px minmax(0, 1fr) auto",
+            gap: 14,
+            alignItems: "center",
+            minWidth: 0,
+            color: "inherit",
+            textDecoration: "none",
+          };
+          const reportRowContent = (
+            <>
               <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={36} decorative />
               <div style={{ minWidth: 0 }}>
                 <div className="body" style={{ fontSize: 14 }}>
@@ -554,27 +565,43 @@ function ArchiveMobileReports({ reports, sessions }: { reports: FeedbackDocument
                   {formatDateOnlyLabel(report.uploadedAt)} 등록
                 </div>
               </div>
+              <span className="btn btn-quiet btn-sm" aria-hidden="true">
+                <ReportActionIcon name="read" />
+              </span>
+            </>
+          );
+
+          if (!feedbackDocumentPdfDownloadsEnabled) {
+            return (
+              <Link
+                key={report.sessionId}
+                className="m-list-row"
+                to={readHref}
+                state={readState}
+                aria-label={readLabel}
+                title={readLabel}
+                style={reportRowLinkStyle}
+              >
+                {reportRowContent}
+              </Link>
+            );
+          }
+
+          return (
+            <div key={report.sessionId} className="m-list-row" style={{ gridTemplateColumns: "minmax(0, 1fr) auto" }}>
+              <Link to={readHref} state={readState} aria-label={readLabel} title={readLabel} style={reportRowLinkStyle}>
+                {reportRowContent}
+              </Link>
               <div className="m-row" style={{ gap: 4 }}>
                 <Link
                   className="btn btn-quiet btn-sm"
-                  to={appFeedbackHref(report.sessionId)}
-                  state={archiveReturnState("report", "아카이브로 돌아가기")}
-                  aria-label={feedbackReportActionLabel(report, "읽기")}
-                  title={feedbackReportActionLabel(report, "읽기")}
+                  to={appFeedbackHref(report.sessionId, true)}
+                  state={readState}
+                  aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+                  title={feedbackReportActionLabel(report, "PDF로 저장")}
                 >
-                  <ReportActionIcon name="read" />
+                  <ReportActionIcon name="download" />
                 </Link>
-                {feedbackDocumentPdfDownloadsEnabled ? (
-                  <Link
-                    className="btn btn-quiet btn-sm"
-                    to={appFeedbackHref(report.sessionId, true)}
-                    state={archiveReturnState("report", "아카이브로 돌아가기")}
-                    aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
-                    title={feedbackReportActionLabel(report, "PDF로 저장")}
-                  >
-                    <ReportActionIcon name="download" />
-                  </Link>
-                ) : null}
               </div>
             </div>
           );
