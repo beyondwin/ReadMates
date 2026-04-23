@@ -55,10 +55,10 @@ export default function PublicRecordsPage({
       <section className="page-header">
         <div className="container container-sm">
           <div className="eyebrow" style={{ marginBottom: 14 }}>
-            {display.clubName} · {display.showsRecentSubset ? "최근 공개 기록" : "공개 아카이브"}
+            {display.clubName} · 공개 기록
           </div>
           <h1 className="h1 editorial" style={{ margin: 0 }}>
-            {display.showsRecentSubset ? "최근 공개 기록 색인" : "공개 기록 색인"}
+            {display.showsRecentSubset ? "최근 공개 기록" : "공개 기록"}
           </h1>
           <p className="body-lg" style={{ color: "var(--text-2)", marginTop: 16, maxWidth: 620 }}>
             {display.tagline}
@@ -103,7 +103,7 @@ export default function PublicRecordsPage({
                 아직 발행된 공개 기록이 없습니다
               </div>
               <p className="body" style={{ margin: "12px 0 0" }}>
-                공개 색인은 빈 상태도 보관합니다. 모임 이후 발행된 요약과 한줄평이 생기면 이 목록에서 먼저 볼 수 있습니다.
+                아직 공개된 기록이 없어도 이 자리는 열어둡니다. 모임 이후 발행된 요약과 한줄평이 생기면 이 목록에서 먼저 볼 수 있습니다.
               </p>
               <Link to="/about" className="btn btn-ghost btn-sm" style={{ marginTop: 18 }}>
                 클럽 소개 보기
