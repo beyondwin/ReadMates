@@ -462,7 +462,7 @@ git commit -m "feat: store reading progress without checkin notes"
 - Modify: `server/src/main/kotlin/com/readmates/session/application/CurrentSessionRepository.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerDbTest.kt`
 
-- [ ] **Step 1: Update current-session DB test expectations first**
+- [x] **Step 1: Update current-session DB test expectations first**
 
 In `CurrentSessionControllerDbTest.kt`, update assertions that inspect checkins:
 
@@ -482,7 +482,7 @@ Add an assertion in the removed participant test:
 jsonPath("$.currentSession.board.oneLineReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
 ```
 
-- [ ] **Step 2: Run focused current session test and verify it fails**
+- [x] **Step 2: Run focused current session test and verify it fails**
 
 Run:
 
@@ -492,7 +492,7 @@ Run:
 
 Expected: FAIL because the response still has `board.checkins` and lacks `board.oneLineReviews`.
 
-- [ ] **Step 3: Update application response models**
+- [x] **Step 3: Update application response models**
 
 In `SessionApplicationModels.kt`, replace current-session checkin and board model declarations with:
 
@@ -516,7 +516,7 @@ data class BoardOneLineReview(
 
 Remove the `BoardCheckin` data class.
 
-- [ ] **Step 4: Update my checkin query**
+- [x] **Step 4: Update my checkin query**
 
 In `CurrentSessionRepository.findMyCheckin`, replace the selected columns and mapper:
 
@@ -533,7 +533,7 @@ CurrentSessionCheckin(
 )
 ```
 
-- [ ] **Step 5: Replace board checkin query with board one-line query**
+- [x] **Step 5: Replace board checkin query with board one-line query**
 
 Delete `findBoardCheckins` and add:
 
@@ -570,7 +570,7 @@ private fun findBoardOneLineReviews(jdbcTemplate: JdbcTemplate, sessionId: UUID,
     )
 ```
 
-- [ ] **Step 6: Wire current-session board**
+- [x] **Step 6: Wire current-session board**
 
 In `toCurrentSessionDetail`, replace board construction with:
 
@@ -582,7 +582,7 @@ board = CurrentSessionBoard(
 )
 ```
 
-- [ ] **Step 7: Run focused current-session backend test**
+- [x] **Step 7: Run focused current-session backend test**
 
 Run:
 
@@ -592,7 +592,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit current-session contract**
+- [x] **Step 8: Commit current-session contract**
 
 Run:
 

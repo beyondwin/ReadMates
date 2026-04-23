@@ -108,7 +108,7 @@ class CurrentSessionRepository(
     ): CurrentSessionCheckin? =
         jdbcTemplate.query(
             """
-            select reading_progress, note
+            select reading_progress
             from reading_checkins
             where reading_checkins.session_id = ?
               and reading_checkins.club_id = ?
@@ -125,7 +125,6 @@ class CurrentSessionRepository(
             { resultSet, _ ->
                 CurrentSessionCheckin(
                     readingProgress = resultSet.getInt("reading_progress"),
-                    note = resultSet.getString("note"),
                 )
             },
             sessionId.dbString(),
@@ -233,36 +232,48 @@ class CurrentSessionRepository(
             member.membershipId.dbString(),
         ).firstOrNull()
 
-    private fun findBoardCheckins(jdbcTemplate: JdbcTemplate, sessionId: UUID, clubId: UUID): List<BoardCheckin> =
+    private fun findBoardOneLineReviews(
+        jdbcTemplate: JdbcTemplate,
+        sessionId: UUID,
+        member: CurrentMember,
+    ): List<BoardOneLineReview> =
         jdbcTemplate.query(
             """
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name,
-              reading_checkins.reading_progress,
-              reading_checkins.note
-            from reading_checkins
-            join memberships on memberships.id = reading_checkins.membership_id
-              and memberships.club_id = reading_checkins.club_id
+              one_line_reviews.text
+            from one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
             join users on users.id = memberships.user_id
-            join session_participants on session_participants.session_id = reading_checkins.session_id
-              and session_participants.club_id = reading_checkins.club_id
-              and session_participants.membership_id = reading_checkins.membership_id
+            join session_participants on session_participants.session_id = one_line_reviews.session_id
+              and session_participants.club_id = one_line_reviews.club_id
+              and session_participants.membership_id = one_line_reviews.membership_id
               and session_participants.participation_status = 'ACTIVE'
-            where reading_checkins.session_id = ?
-              and reading_checkins.club_id = ?
-            order by reading_checkins.created_at, users.name
+            where one_line_reviews.session_id = ?
+              and one_line_reviews.club_id = ?
+              and one_line_reviews.visibility in ('SESSION', 'PUBLIC')
+              and exists (
+                select 1
+                from session_participants requester_participants
+                where requester_participants.session_id = one_line_reviews.session_id
+                  and requester_participants.club_id = one_line_reviews.club_id
+                  and requester_participants.membership_id = ?
+                  and requester_participants.participation_status = 'ACTIVE'
+              )
+            order by one_line_reviews.created_at, users.name
             """.trimIndent(),
             { resultSet, _ ->
-                BoardCheckin(
+                BoardOneLineReview(
                     authorName = resultSet.getString("author_name"),
                     authorShortName = resultSet.getString("author_short_name"),
-                    readingProgress = resultSet.getInt("reading_progress"),
-                    note = resultSet.getString("note"),
+                    text = resultSet.getString("text"),
                 )
             },
             sessionId.dbString(),
-            clubId.dbString(),
+            member.clubId.dbString(),
+            member.membershipId.dbString(),
         )
 
     private fun findBoardHighlights(jdbcTemplate: JdbcTemplate, sessionId: UUID, clubId: UUID): List<BoardHighlight> =
@@ -331,7 +342,7 @@ class CurrentSessionRepository(
             myLongReview = findMyLongReview(jdbcTemplate, sessionId, member),
             board = CurrentSessionBoard(
                 questions = findQuestions(jdbcTemplate, sessionId, member.clubId),
-                checkins = findBoardCheckins(jdbcTemplate, sessionId, member.clubId),
+                oneLineReviews = findBoardOneLineReviews(jdbcTemplate, sessionId, member),
                 highlights = findBoardHighlights(jdbcTemplate, sessionId, member.clubId),
             ),
         )

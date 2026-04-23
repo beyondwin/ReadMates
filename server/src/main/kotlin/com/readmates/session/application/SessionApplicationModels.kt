@@ -42,7 +42,6 @@ data class SessionAttendee(
 
 data class CurrentSessionCheckin(
     val readingProgress: Int,
-    val note: String,
 )
 
 data class CurrentSessionQuestion(
@@ -63,15 +62,14 @@ data class CurrentSessionLongReview(
 
 data class CurrentSessionBoard(
     val questions: List<CurrentSessionQuestion>,
-    val checkins: List<BoardCheckin>,
+    val oneLineReviews: List<BoardOneLineReview>,
     val highlights: List<BoardHighlight>,
 )
 
-data class BoardCheckin(
+data class BoardOneLineReview(
     val authorName: String,
     val authorShortName: String,
-    val readingProgress: Int,
-    val note: String,
+    val text: String,
 )
 
 data class BoardHighlight(
