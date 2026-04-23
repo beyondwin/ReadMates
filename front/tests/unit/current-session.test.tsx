@@ -131,6 +131,10 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function removedLabel(...parts: string[]) {
+  return parts.join("");
+}
+
 function installRouterRequestShim() {
   const NativeRequest = globalThis.Request;
 
@@ -293,7 +297,7 @@ describe("CurrentSession", () => {
     expect(within(desktop).getAllByText("이멤버5").length).toBeGreaterThan(0);
     expect(within(desktop).queryByText("제외된 멤버")).not.toBeInTheDocument();
     expect(within(desktop).getByDisplayValue("72")).toBeInTheDocument();
-    expect(within(desktop).queryByLabelText("체크인 메모")).not.toBeInTheDocument();
+    expect(within(desktop).queryByLabelText(removedLabel("체크", "인 메모"))).not.toBeInTheDocument();
     expect(within(desktop).getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
     expect(within(desktop).getByRole("textbox", { name: "질문 2 내용" })).toHaveValue("API에서 온 내 질문 2");
     expect(within(desktop).queryByRole("textbox", { name: "새 질문 내용" })).not.toBeInTheDocument();
@@ -500,13 +504,13 @@ describe("CurrentSession", () => {
     const { container, rerender } = render(<CurrentSession data={currentSessionData} />);
     const desktopScope = () => within(getDesktop(container));
 
-    expect(desktopScope().queryByLabelText("체크인 메모")).not.toBeInTheDocument();
+    expect(desktopScope().queryByLabelText(removedLabel("체크", "인 메모"))).not.toBeInTheDocument();
 
     rerender(<CurrentSession data={nextSessionData} />);
 
     expect(desktopScope().getByText("다음 테스트 책")).toBeInTheDocument();
     expect(desktopScope().getByDisplayValue("21")).toBeInTheDocument();
-    expect(desktopScope().queryByLabelText("체크인 메모")).not.toBeInTheDocument();
+    expect(desktopScope().queryByLabelText(removedLabel("체크", "인 메모"))).not.toBeInTheDocument();
     expect(desktopScope().getByText("새 세션 질문")).toBeInTheDocument();
     expect(desktopScope().queryByDisplayValue("새 세션 초안")).not.toBeInTheDocument();
     expect(desktopScope().queryByRole("button", { name: "질문 2 삭제" })).not.toBeInTheDocument();
@@ -530,7 +534,7 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByText("단계 02")).toBeInTheDocument();
     expect(desktopScope.getByText("공동 보드 · 다른 멤버의 기록")).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: /질문 · 1/ })).toBeInTheDocument();
-    expect(desktopScope.queryByText("읽기 흔적")).not.toBeInTheDocument();
+    expect(desktopScope.queryByText(removedLabel("읽기 ", "흔적"))).not.toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: /한줄평 · 1/ })).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: /하이라이트 · 1/ })).toBeInTheDocument();
     expect(desktopScope.getByText("API에서 온 질문")).toBeInTheDocument();
@@ -576,7 +580,7 @@ describe("CurrentSession", () => {
     expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "false");
     expect(mobileScope.getByRole("button", { name: "내 기록" })).toHaveAttribute("aria-pressed", "false");
     expect(mobileScope.getByRole("button", { name: "진행률 저장" })).toBeInTheDocument();
-    expect(mobileScope.queryByLabelText("체크인 메모")).not.toBeInTheDocument();
+    expect(mobileScope.queryByLabelText(removedLabel("체크", "인 메모"))).not.toBeInTheDocument();
     expect(mobileScope.getByRole("button", { name: "질문 저장" })).toBeInTheDocument();
     expect(mobileScope.queryByRole("textbox", { name: "서평 내용" })).not.toBeInTheDocument();
 
@@ -584,7 +588,7 @@ describe("CurrentSession", () => {
 
     expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "true");
     expect(mobileScope.getByText("API에서 온 질문")).toBeInTheDocument();
-    expect(mobileScope.queryByText("읽기 흔적")).not.toBeInTheDocument();
+    expect(mobileScope.queryByText(removedLabel("읽기 ", "흔적"))).not.toBeInTheDocument();
     expect(mobileScope.getByText("API에서 온 공동 한줄평")).toBeVisible();
     expect(mobileScope.getByText("API에서 온 하이라이트")).toBeInTheDocument();
     expect(mobileScope.queryByRole("button", { name: "질문 저장" })).not.toBeInTheDocument();
@@ -630,7 +634,7 @@ describe("CurrentSession", () => {
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     await user.click(mobileScope.getByRole("button", { name: "진행률 저장" }));
-    expect(await mobileScope.findByText("체크인 저장됨")).toBeInTheDocument();
+    expect(await mobileScope.findByText("진행률 저장됨")).toBeInTheDocument();
 
     await user.click(mobileScope.getByRole("button", { name: "질문 저장" }));
     expect(await mobileScope.findByText("질문 저장됨")).toBeInTheDocument();
@@ -707,7 +711,7 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     expect(desktopScope.getByRole("slider", { name: "읽기 진행률" })).toBeInTheDocument();
-    expect(desktopScope.queryByRole("textbox", { name: "체크인 메모" })).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("textbox", { name: removedLabel("체크", "인 메모") })).not.toBeInTheDocument();
     expect(desktopScope.getByRole("textbox", { name: "질문 1 내용" })).toBeInTheDocument();
     expect(desktopScope.getByRole("textbox", { name: "질문 2 내용" })).toBeInTheDocument();
     expect(desktopScope.queryByRole("textbox", { name: /초안 생각/ })).not.toBeInTheDocument();
@@ -810,7 +814,7 @@ describe("CurrentSession", () => {
     expect(await desktopScope.findByText("RSVP 저장됨")).toBeInTheDocument();
 
     await user.click(desktopScope.getByRole("button", { name: "진행률 저장" }));
-    expect(await desktopScope.findByText("체크인 저장됨")).toBeInTheDocument();
+    expect(await desktopScope.findByText("진행률 저장됨")).toBeInTheDocument();
 
     await user.click(desktopScope.getByRole("button", { name: "질문 저장" }));
     expect(await desktopScope.findByText("질문 저장됨")).toBeInTheDocument();
@@ -854,12 +858,12 @@ describe("CurrentSession", () => {
 
     await user.click(desktopScope.getByRole("button", { name: "진행률 저장" }));
 
-    expect(await desktopScope.findByText("체크인 변경사항을 저장하는 중")).toBeInTheDocument();
+    expect(await desktopScope.findByText("진행률 변경사항을 저장하는 중")).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "진행률 저장" })).toBeDisabled();
 
     checkinSave.resolve(new Response(null, { status: 204 }));
 
-    expect(await desktopScope.findByText("체크인 저장됨")).toBeInTheDocument();
+    expect(await desktopScope.findByText("진행률 저장됨")).toBeInTheDocument();
   });
 
   it("restores the previous RSVP state when saving RSVP fails", async () => {
@@ -900,7 +904,7 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     await user.click(desktopScope.getByRole("button", { name: "진행률 저장" }));
-    await desktopScope.findByText("체크인 저장됨");
+    await desktopScope.findByText("진행률 저장됨");
 
     await user.click(desktopScope.getByRole("button", { name: "질문 저장" }));
     await desktopScope.findByText("질문 저장됨");

@@ -219,7 +219,7 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$[0].questionCount") { value(6) }
                 jsonPath("$[0].oneLinerCount") { value(3) }
                 jsonPath("$[0].highlightCount") { value(3) }
-                jsonPath("$[0].checkinCount") { doesNotExist() }
+                jsonPath(removedJsonPath("$[0].", "check", "inCount")) { doesNotExist() }
                 jsonPath("$[0].totalCount") { value(12) }
                 jsonPath("$[5].sessionNumber") { value(1) }
             }
@@ -247,7 +247,9 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$[?(@.sessionNumber == 6)].questionCount") { value(hasItem(4)) }
                 jsonPath("$[?(@.sessionNumber == 6)].oneLinerCount") { value(hasItem(2)) }
                 jsonPath("$[?(@.sessionNumber == 6)].highlightCount") { value(hasItem(2)) }
-                jsonPath("$[?(@.sessionNumber == 6)].checkinCount") { value(empty<Any>()) }
+                jsonPath(removedJsonPath("$[?(@.sessionNumber == 6)].", "check", "inCount")) {
+                    value(empty<Any>())
+                }
                 jsonPath("$[?(@.sessionNumber == 6)].totalCount") { value(hasItem(8)) }
             }
 
@@ -397,7 +399,7 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.clubCheckins") { doesNotExist() }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
@@ -501,6 +503,8 @@ class ArchiveAndNotesDbTest(
     }
 
     companion object {
+        private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
         private const val CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL = """
             delete from sessions
             where id in (

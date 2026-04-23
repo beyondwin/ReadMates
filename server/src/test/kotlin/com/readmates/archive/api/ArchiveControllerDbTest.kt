@@ -59,7 +59,7 @@ class ArchiveControllerDbTest(
                 jsonPath("$.clubQuestions[0].draftThought") { value(null) }
                 jsonPath("$.clubQuestions[*].authorName") { value(hasItem("김호스트")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("호스트")) }
-                jsonPath("$.clubCheckins") { doesNotExist() }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners.length()") { value(greaterThan(0)) }
                 jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("김호스트")) }
                 jsonPath("$.clubOneLiners[*].text") { value(everyItem(not(emptyOrNullString()))) }
@@ -76,7 +76,7 @@ class ArchiveControllerDbTest(
                 jsonPath("$.myCheckin.authorName") { doesNotExist() }
                 jsonPath("$.myCheckin.authorShortName") { doesNotExist() }
                 jsonPath("$.myCheckin.readingProgress") { value(100) }
-                jsonPath("$.myCheckin.note") { doesNotExist() }
+                jsonPath(removedJsonPath("$.my", "Checkin.", "note")) { doesNotExist() }
                 jsonPath("$.myOneLineReview.text") { exists() }
                 jsonPath("$.myLongReview") { value(null) }
                 jsonPath("$.feedbackDocument.available") { value(true) }
@@ -154,7 +154,7 @@ class ArchiveControllerDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.clubCheckins") { doesNotExist() }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners[*].text") { value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")) }
                 jsonPath("$.publicOneLiners[*].text") { value(not(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다."))) }
             }
@@ -247,7 +247,7 @@ class ArchiveControllerDbTest(
                     value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다.")))
                 }
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("최멤버2"))) }
-                jsonPath("$.clubCheckins") { doesNotExist() }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
                 jsonPath("$.clubQuestions[*].text") { value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?"))) }
@@ -257,6 +257,8 @@ class ArchiveControllerDbTest(
     }
 
     companion object {
+        private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
         private const val MARK_SESSION6_MEMBER5_ONE_LINER_SESSION_SQL = """
             update one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id

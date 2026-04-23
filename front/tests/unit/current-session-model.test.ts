@@ -173,7 +173,7 @@ describe("current session view model", () => {
 
   it("returns reusable save status labels", () => {
     expect(getCurrentSessionSaveStatusLabel("rsvp", "idle")).toBe("");
-    expect(getCurrentSessionSaveStatusLabel("checkin", "saving")).toBe("체크인 변경사항을 저장하는 중");
+    expect(getCurrentSessionSaveStatusLabel("checkin", "saving")).toBe("진행률 변경사항을 저장하는 중");
     expect(getCurrentSessionSaveStatusLabel("question", "saved")).toBe("질문 저장됨");
     expect(getCurrentSessionSaveStatusLabel("longReview", "error")).toBe("서평 저장 실패 · 다시 시도해 주세요");
     expect(getCurrentSessionSaveStatusLabel("oneLineReview", "saved")).toBe("한줄평 저장됨");

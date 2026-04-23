@@ -1601,7 +1601,7 @@ git commit -m "feat: remove read traces from member surfaces"
 - Modify test files found by the searches in this task.
 - Modify source files found by the searches in this task.
 
-- [ ] **Step 1: Search for removed contract fields**
+- [x] **Step 1: Search for removed contract fields**
 
 Run:
 
@@ -1611,7 +1611,7 @@ rg -n "board\\.checkins|clubCheckins|checkinCount|NoteFeedKind.*CHECKIN|kind: \"
 
 Expected: no matches for removed contract fields. Matches for deletion preview counts or table names are acceptable only when they refer to destructive session deletion metadata, not user-facing read traces.
 
-- [ ] **Step 2: Fix remaining removed-contract matches**
+- [x] **Step 2: Fix remaining removed-contract matches**
 
 For each non-acceptable match from Step 1, update it to the new contract:
 
@@ -1627,7 +1627,7 @@ readingProgress
 
 or remove the checkin feed reference if the file is a notes/archive/public surface.
 
-- [ ] **Step 3: Search public boundary**
+- [x] **Step 3: Search public boundary**
 
 Run:
 
@@ -1637,7 +1637,7 @@ rg -n "visibility in \\('SESSION', 'PUBLIC'\\)|visibility = 'SESSION'" server/sr
 
 Expected: no matches. Public code must use only `visibility = 'PUBLIC'` for one-line reviews.
 
-- [ ] **Step 4: Run focused backend suite**
+- [x] **Step 4: Run focused backend suite**
 
 Run:
 
@@ -1656,7 +1656,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Run focused frontend suite**
+- [x] **Step 5: Run focused frontend suite**
 
 Run:
 
@@ -1677,7 +1677,7 @@ pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 6: Run build/lint smoke**
+- [x] **Step 6: Run build/lint smoke**
 
 Run:
 
@@ -1688,7 +1688,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 7: Run full backend test if Docker is available**
+- [x] **Step 7: Run full backend test if Docker is available**
 
 Run:
 
@@ -1698,7 +1698,7 @@ Run:
 
 Expected: PASS. If Docker/Testcontainers is unavailable, keep the focused backend results and record the Docker blocker in the final implementation summary.
 
-- [ ] **Step 8: Final commit**
+- [x] **Step 8: Final commit**
 
 Run:
 

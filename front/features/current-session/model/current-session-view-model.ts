@@ -21,7 +21,7 @@ export type CurrentSessionSaveState = "idle" | "saving" | "saved" | "error";
 
 const saveScopeLabels: Record<CurrentSessionSaveScope, string> = {
   rsvp: "RSVP",
-  checkin: "체크인",
+  checkin: "진행률",
   question: "질문",
   longReview: "서평",
   oneLineReview: "한줄평",

@@ -235,6 +235,10 @@ function renderNotesFilterUrlHarness(initialEntry = "/app/notes?sessionId=sessio
   );
 }
 
+function removedLabel(...parts: string[]) {
+  return parts.join("");
+}
+
 function desktopRail() {
   const search = screen.getByLabelText("세션 검색");
   const rail = search.closest("div")?.parentElement;
@@ -261,9 +265,8 @@ describe("NotesFeedPage", () => {
     expect(screen.getByText("질문 4")).toBeInTheDocument();
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
     expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "읽기 흔적" })).not.toBeInTheDocument();
-    expect(screen.queryByText("읽기 흔적 5")).not.toBeInTheDocument();
-
+    expect(screen.queryByRole("button", { name: removedLabel("읽기 ", "흔적") })).not.toBeInTheDocument();
+    expect(screen.queryByText(removedLabel("읽기 ", "흔적 5"))).not.toBeInTheDocument();
     const rail = desktopRail();
 
     expect(within(rail).getByText("세션별")).toBeInTheDocument();

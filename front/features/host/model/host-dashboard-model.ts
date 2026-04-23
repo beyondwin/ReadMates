@@ -163,13 +163,13 @@ export function getHostDashboardSessionMetrics(
 ): HostDashboardSessionMetric[] {
   const attendeeCount = session.attendees.length;
   const goingCount = session.attendees.filter((attendee) => attendee.rsvpStatus === "GOING").length;
-  const checkinCount = typeof session.myCheckin?.readingProgress === "number" ? 1 : 0;
+  const readingProgressCount = typeof session.myCheckin?.readingProgress === "number" ? 1 : 0;
   const questionCount = session.board.questions.length;
   const questionCapacity = attendeeCount * questionLimitPerMember;
 
   return [
     ["참석", `${goingCount}/${session.attendees.length}`],
-    ["읽기", `${checkinCount}/${attendeeCount}`],
+    ["읽기", `${readingProgressCount}/${attendeeCount}`],
     ["질문", `${questionCount}/${questionCapacity}`],
     ["상태", statusLabel],
   ];

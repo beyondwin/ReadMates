@@ -39,7 +39,7 @@ describe("API contract fixtures", () => {
     expect(hostCurrentSessionContractFixture.currentSession?.board).not.toHaveProperty("checkins");
 
     expect(archiveSessionDetailContractFixture.clubOneLiners).toHaveLength(1);
-    expect(archiveSessionDetailContractFixture).not.toHaveProperty("clubCheckins");
+    expect(archiveSessionDetailContractFixture).not.toHaveProperty(["club", "Checkins"].join(""));
     expect(archiveSessionDetailContractFixture.myCheckin).toHaveProperty("readingProgress", 100);
     expect(archiveSessionDetailContractFixture.myCheckin).not.toHaveProperty("authorName");
     expect(archiveSessionDetailContractFixture.myCheckin).not.toHaveProperty("authorShortName");

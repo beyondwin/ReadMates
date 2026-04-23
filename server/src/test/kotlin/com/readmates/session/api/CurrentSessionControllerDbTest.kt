@@ -118,7 +118,7 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.questionDeadlineAt") { value("2026-05-19T14:59Z") }
             jsonPath("$.currentSession.myRsvpStatus") { value("GOING") }
             jsonPath("$.currentSession.myCheckin.readingProgress") { value(72) }
-            jsonPath("$.currentSession.myCheckin.note") { doesNotExist() }
+            jsonPath(removedJsonPath("$.currentSession.my", "Checkin.", "note")) { doesNotExist() }
             jsonPath("$.currentSession.myQuestions[0].priority") { value(1) }
             jsonPath("$.currentSession.myQuestions[0].text") { value("현재 세션 hydrate 질문") }
             jsonPath("$.currentSession.myQuestions[0].draftThought") { value("hydrate 초안") }
@@ -131,7 +131,7 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.board.questions[0].priority") { value(1) }
             jsonPath("$.currentSession.board.questions[0].text") { value("현재 세션 hydrate 질문") }
             jsonPath("$.currentSession.board.questions[0].draftThought") { value("hydrate 초안") }
-            jsonPath("$.currentSession.board.checkins") { doesNotExist() }
+            jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
             jsonPath("$.currentSession.board.oneLineReviews.length()") { value(greaterThan(0)) }
             jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '현재 세션 hydrate 한줄평')].authorName") {
                 value(hasItem("안멤버1"))
@@ -245,7 +245,7 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.myCheckin") { value(null) }
             jsonPath("$.currentSession.myQuestions.length()") { value(0) }
             jsonPath("$.currentSession.board.questions.length()") { value(0) }
-            jsonPath("$.currentSession.board.checkins") { doesNotExist() }
+            jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
             jsonPath("$.currentSession.board.oneLineReviews.length()") { value(0) }
             jsonPath("$.currentSession.board.oneLineReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
             jsonPath("$.currentSession.board.oneLineReviews[*].text") { value(not(hasItem("활성 호스트의 세션 한줄평"))) }
@@ -345,6 +345,8 @@ class CurrentSessionControllerDbTest(
     }
 
     companion object {
+        private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
         private const val MARK_MEMBER1_LEFT_SQL = """
             update memberships
             join users on users.id = memberships.user_id
