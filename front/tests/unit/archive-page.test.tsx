@@ -389,6 +389,10 @@ describe("ArchivePage", () => {
     expect(scoped.getByRole("button", { name: "피드백 문서" })).toHaveClass("is-on");
     expect(scoped.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
     expect(scoped.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
+    expect(scoped.getByText("팩트풀니스 · 2025.11.26").closest(".m-list-row")?.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
+    );
     const readAction = scoped.getByRole("link", { name: seededReportReadLabel });
     const pdfAction = scoped.getByRole("link", { name: seededReportPdfLabel });
     expect(readAction).toHaveAttribute("href", "/app/feedback/session-1");
@@ -583,13 +587,18 @@ describe("ArchivePage", () => {
     await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
     expect(desktop.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
     expect(desktop.getByText("2026.04.20 등록")).toBeInTheDocument();
-    expect(desktop.getByText("문서")).toBeInTheDocument();
+    expect(desktop.getByText("팩트풀니스 · 2025.11.26").closest("article")?.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
+    );
     expect(desktop.queryByText("DOC")).not.toBeInTheDocument();
     const readAction = desktop.getByRole("link", { name: seededReportReadLabel });
     const pdfAction = desktop.getByRole("link", { name: seededReportPdfLabel });
     expect(readAction).toHaveAttribute("href", "/app/feedback/session-1");
     expect(readAction).toHaveAttribute("aria-label", seededReportReadLabel);
     expect(readAction).toHaveAttribute("title", seededReportReadLabel);
+    expect(readAction).toHaveClass("btn-quiet");
+    expect(readAction).not.toHaveClass("btn-ghost");
     expect(readAction).not.toHaveTextContent("읽기");
     expect(pdfAction).toHaveAttribute("href", "/app/feedback/session-1/print");
     expect(pdfAction).toHaveAttribute("aria-label", seededReportPdfLabel);
