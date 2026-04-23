@@ -402,10 +402,16 @@ describe("ArchivePage", () => {
     expect(scoped.getByRole("button", { name: "내 서평" })).toHaveAttribute("aria-pressed", "true");
     expect(scoped.getByText("2026.04.15 · 가난한 찰리의 연감")).toBeInTheDocument();
     expect(scoped.getByText("내가 모르는 영역을 인정하는 태도가 가장 현실적인 지혜처럼 느껴졌다.")).toBeInTheDocument();
-    expect(scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" })).toHaveAttribute(
-      "href",
-      "/app/sessions/session-6#mobile-my-records",
-    );
+    const mobileReviewLink = scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" });
+    expect(mobileReviewLink).toHaveAttribute("href", "/app/sessions/session-6#mobile-my-records");
+    expect(mobileReviewLink).toHaveStyle({
+      display: "grid",
+      gridTemplateColumns: "minmax(0, 1fr) auto",
+      alignItems: "center",
+      columnGap: "12px",
+    });
+    expect(within(mobileReviewLink).getByText("›")).toHaveAttribute("aria-hidden", "true");
+    expect(within(mobileReviewLink).queryByText("한줄평")).not.toBeInTheDocument();
 
     await user.click(scoped.getByRole("button", { name: "내 질문" }));
     expect(scoped.getByRole("button", { name: "내 질문" })).toHaveClass("is-on");
