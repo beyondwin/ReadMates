@@ -10,7 +10,6 @@ data class UpdateRsvpCommand(
 data class SaveCheckinCommand(
     val member: CurrentMember,
     val readingProgress: Int,
-    val note: String,
 )
 
 data class SaveQuestionCommand(

@@ -41,11 +41,10 @@ class SessionMemberWriteServiceTest {
         val port = RecordingSessionParticipationWritePort()
         val service = SessionMemberWriteService(port)
 
-        val result = service.saveCheckin(SaveCheckinCommand(member, 80, "메모"))
+        val result = service.saveCheckin(SaveCheckinCommand(member, 80))
 
         assertEquals(80, result.readingProgress)
-        assertEquals("메모", result.note)
-        assertEquals("saveCheckin:80:메모", port.calls.single())
+        assertEquals("saveCheckin:80", port.calls.single())
     }
 
     @Test
@@ -69,8 +68,8 @@ class SessionMemberWriteServiceTest {
                 .also { calls += "updateRsvp:${command.status}" }
 
         override fun saveCheckin(command: SaveCheckinCommand) =
-            com.readmates.session.application.model.CheckinResult(command.readingProgress, command.note)
-                .also { calls += "saveCheckin:${command.readingProgress}:${command.note}" }
+            com.readmates.session.application.model.CheckinResult(command.readingProgress)
+                .also { calls += "saveCheckin:${command.readingProgress}" }
 
         override fun saveQuestion(command: SaveQuestionCommand) =
             com.readmates.session.application.model.QuestionResult(command.priority, command.text, command.draftThought)

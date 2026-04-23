@@ -52,7 +52,7 @@ class MemberActionControllerDbTest(
             with(user("member5@example.com"))
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80,"note":"질문을 준비 중입니다."}"""
+            content = """{"readingProgress":80}"""
         }.andExpect {
             status { isConflict() }
         }
@@ -88,7 +88,7 @@ class MemberActionControllerDbTest(
             with(user("member5@example.com"))
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80,"note":"참가자가 아닌 체크인"}"""
+            content = """{"readingProgress":80}"""
         }.andExpect {
             status { isConflict() }
         }
@@ -172,10 +172,51 @@ class MemberActionControllerDbTest(
             with(user("member5@example.com"))
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80,"note":"제외된 참가자의 체크인"}"""
+            content = """{"readingProgress":80}"""
         }.andExpect {
             status { isForbidden() }
         }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_OPEN_SESSION_WITH_PARTICIPANTS_SQL,
+            OPEN_SESSION_WITH_PARTICIPANTS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_OPEN_SESSION_WITH_PARTICIPANTS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `persists checkin reading progress for current member`() {
+        mockMvc.put("/api/sessions/current/checkin") {
+            with(user("member5@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"readingProgress":80}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.readingProgress") { value(80) }
+            jsonPath("$.note") { doesNotExist() }
+        }
+
+        val readingProgress = jdbcTemplate.queryForObject(
+            """
+            select reading_checkins.reading_progress
+            from reading_checkins
+            join memberships on memberships.id = reading_checkins.membership_id
+              and memberships.club_id = reading_checkins.club_id
+            join users on users.id = memberships.user_id
+            where reading_checkins.session_id = '00000000-0000-0000-0000-000000009102'
+              and users.email = 'member5@example.com'
+            """.trimIndent(),
+            Int::class.java,
+        )
+        assertEquals(80, readingProgress)
     }
 
     @Test
@@ -225,6 +266,18 @@ class MemberActionControllerDbTest(
             """.trimIndent(),
             { resultSet, _ -> resultSet.getString("text") },
         ).firstOrNull()
+        val oneLineReviewVisibility = jdbcTemplate.query(
+            """
+            select one_line_reviews.visibility
+            from one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            where one_line_reviews.session_id = '00000000-0000-0000-0000-000000009102'
+              and users.email = 'member5@example.com'
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.getString("visibility") },
+        ).firstOrNull()
         val longReview = jdbcTemplate.query(
             """
             select long_reviews.body
@@ -239,6 +292,7 @@ class MemberActionControllerDbTest(
         ).firstOrNull()
 
         assertEquals("저장된 한줄평", oneLineReview)
+        assertEquals("SESSION", oneLineReviewVisibility)
         assertEquals("저장된 장문 서평", longReview)
 
         val oneLineReviewSessionNumbers = jdbcTemplate.query(
@@ -337,7 +391,7 @@ class MemberActionControllerDbTest(
             with(user("member5@example.com"))
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80,"note":"최신 세션 비참가자"}"""
+            content = """{"readingProgress":80}"""
         }.andExpect {
             status { isConflict() }
         }
