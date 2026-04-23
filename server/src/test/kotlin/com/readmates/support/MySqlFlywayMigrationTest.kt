@@ -66,6 +66,31 @@ class MySqlFlywayMigrationTest(
             """.trimIndent(),
         )
         assertEquals(1, participantColumns.size)
+
+        val checkinNoteColumns = jdbcTemplate.queryForList(
+            """
+            select column_name
+            from information_schema.columns
+            where table_schema = database()
+              and table_name = 'reading_checkins'
+              and column_name = 'note'
+            """.trimIndent(),
+        )
+        assertEquals(0, checkinNoteColumns.size)
+
+        val oneLineVisibilityConstraints = jdbcTemplate.queryForList(
+            """
+            select constraint_name, check_clause
+            from information_schema.check_constraints
+            where constraint_schema = database()
+              and constraint_name = 'one_line_reviews_visibility_check'
+            """.trimIndent(),
+        )
+        assertTrue(oneLineVisibilityConstraints.any { row ->
+            row["CHECK_CLAUSE"].toString().contains("SESSION") &&
+                row["CHECK_CLAUSE"].toString().contains("PUBLIC") &&
+                row["CHECK_CLAUSE"].toString().contains("PRIVATE")
+        })
     }
 
     private fun columnValue(
