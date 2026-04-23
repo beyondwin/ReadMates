@@ -122,7 +122,7 @@ export type NoteFeedItem = {
   date: string;
   authorName: string | null;
   authorShortName: string | null;
-  kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
+  kind: "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
   text: string;
 };
 
@@ -133,6 +133,7 @@ export type NoteSessionItem = {
   date: string;
   questionCount: number;
   oneLinerCount: number;
+  longReviewCount: number;
   highlightCount: number;
   totalCount: number;
 };

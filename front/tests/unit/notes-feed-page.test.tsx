@@ -20,6 +20,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-07-15",
     questionCount: 2,
     oneLinerCount: 2,
+    longReviewCount: 0,
     highlightCount: 1,
     totalCount: 5,
   },
@@ -30,6 +31,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-06-17",
     questionCount: 1,
     oneLinerCount: 1,
+    longReviewCount: 0,
     highlightCount: 1,
     totalCount: 3,
   },
@@ -40,6 +42,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-05-20",
     questionCount: 0,
     oneLinerCount: 0,
+    longReviewCount: 0,
     highlightCount: 0,
     totalCount: 0,
   },
@@ -50,8 +53,9 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-04-15",
     questionCount: 4,
     oneLinerCount: 5,
+    longReviewCount: 1,
     highlightCount: 3,
-    totalCount: 12,
+    totalCount: 13,
   },
   {
     sessionId: "session-5",
@@ -60,6 +64,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-03-18",
     questionCount: 1,
     oneLinerCount: 1,
+    longReviewCount: 0,
     highlightCount: 0,
     totalCount: 2,
   },
@@ -70,6 +75,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-02-18",
     questionCount: 2,
     oneLinerCount: 1,
+    longReviewCount: 0,
     highlightCount: 2,
     totalCount: 5,
   },
@@ -80,6 +86,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-01-21",
     questionCount: 1,
     oneLinerCount: 2,
+    longReviewCount: 0,
     highlightCount: 2,
     totalCount: 5,
   },
@@ -90,6 +97,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2025-12-17",
     questionCount: 1,
     oneLinerCount: 1,
+    longReviewCount: 0,
     highlightCount: 1,
     totalCount: 3,
   },
@@ -100,6 +108,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2025-11-26",
     questionCount: 1,
     oneLinerCount: 0,
+    longReviewCount: 0,
     highlightCount: 0,
     totalCount: 1,
   },
@@ -127,6 +136,16 @@ const selectedItems: NoteFeedItem[] = [
     authorShortName: "수",
     kind: "ONE_LINE_REVIEW",
     text: "실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.",
+  },
+  {
+    sessionId: "session-6",
+    sessionNumber: 6,
+    bookTitle: "가난한 찰리의 연감",
+    date: "2026-04-15",
+    authorName: "정멤버3",
+    authorShortName: "정",
+    kind: "LONG_REVIEW",
+    text: "문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.",
   },
   {
     sessionId: "session-6",
@@ -261,12 +280,24 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByRole("heading", { name: "가난한 찰리의 연감" })).toBeInTheDocument();
     expect(screen.getAllByText("No.06 · 2026.04.15").length).toBeGreaterThan(0);
-    expect(screen.getByText("세션을 먼저 고르고, 질문·한줄평·하이라이트를 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
+    expect(screen.getByText("세션을 먼저 고르고, 하이라이트·한줄평·서평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
     expect(screen.getByText("질문 4")).toBeInTheDocument();
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
+    expect(screen.getByText("서평 1")).toBeInTheDocument();
     expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
+    expect(screen.queryByLabelText("선택한 세션 기록 수")).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("클럽 노트 필터")).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "전체 13",
+      "하이라이트 3",
+      "한줄평 5",
+      "서평 1",
+      "질문 4",
+    ]);
     expect(screen.queryByRole("button", { name: removedLabel("읽기 ", "흔적") })).not.toBeInTheDocument();
     expect(screen.queryByText(removedLabel("읽기 ", "흔적 5"))).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "남은 문장들" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "길게 남긴 서평" })).toBeInTheDocument();
+    expect(screen.getByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "지난 세션의 질문들" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "이번 달의 질문들" })).not.toBeInTheDocument();
     const rail = desktopRail();
@@ -279,7 +310,32 @@ describe("NotesFeedPage", () => {
     expect(selectedLink).toHaveAttribute("href", "/app/notes?sessionId=session-6");
     expect(selectedLink).toHaveAttribute("aria-current", "page");
     expect(selectedLink).toHaveTextContent("선택됨");
-    expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 12");
+    expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 13");
+  });
+
+  it("renders missing note counts as zero", () => {
+    const legacySession = {
+      sessionId: "legacy-session",
+      sessionNumber: 10,
+      bookTitle: "이전 응답 모양",
+      date: "2026-08-19",
+    } as unknown as NoteSessionItem;
+
+    renderNotesFeedPage({
+      renderItems: [],
+      renderNoteSessions: [legacySession],
+      selectedSessionId: legacySession.sessionId,
+      renderSelectedSession: legacySession,
+    });
+
+    expect(within(screen.getByLabelText("클럽 노트 필터")).getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "전체 0",
+      "하이라이트 0",
+      "한줄평 0",
+      "서평 0",
+      "질문 0",
+    ]);
+    expect(within(desktopRail()).getByRole("link", { name: "No.10 이전 응답 모양 세션 보기" })).toHaveTextContent("기록 0");
   });
 
   it("uses router navigation for desktop and mobile session filter links", async () => {
@@ -305,7 +361,7 @@ describe("NotesFeedPage", () => {
     const user = userEvent.setup();
     const { container } = renderNotesFilterUrlHarness();
 
-    await user.click(screen.getByRole("button", { name: "하이라이트" }));
+    await user.click(screen.getByRole("button", { name: "하이라이트 3" }));
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=highlights");
     expect(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" })).toHaveAttribute(
@@ -319,6 +375,10 @@ describe("NotesFeedPage", () => {
       "href",
       "/app/notes?sessionId=session-8&filter=highlights",
     );
+
+    await user.click(screen.getByRole("button", { name: "서평 1" }));
+
+    expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=reviews");
   });
 
   it("filters the desktop session rail by book title and No.06-style labels", async () => {
@@ -470,7 +530,7 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "하이라이트" }));
+    await user.click(screen.getByRole("button", { name: "하이라이트 3" }));
 
     expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
     expect(screen.queryByText("이 세션에는 아직 공개된 기록이 없습니다.")).not.toBeInTheDocument();
@@ -479,16 +539,25 @@ describe("NotesFeedPage", () => {
   it("keeps feed filters scoped to the selected session items", async () => {
     const user = userEvent.setup();
 
-    renderNotesFeedPage({ renderItems: [selectedItems[0], selectedItems[1], otherSessionItem] });
+    renderNotesFeedPage({ renderItems: [selectedItems[0], selectedItems[1], selectedItems[2], otherSessionItem] });
 
     expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
     expect(screen.getByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).toBeInTheDocument();
+    expect(screen.getByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).toBeInTheDocument();
     expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "질문" }));
+    await user.click(screen.getByRole("button", { name: "서평 1" }));
+
+    expect(screen.queryByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).not.toBeInTheDocument();
+    expect(screen.queryByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).not.toBeInTheDocument();
+    expect(screen.getByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).toBeInTheDocument();
+    expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "질문 4" }));
 
     expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
     expect(screen.queryByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 서평을 남겼다.")).not.toBeInTheDocument();
     expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
   });
 

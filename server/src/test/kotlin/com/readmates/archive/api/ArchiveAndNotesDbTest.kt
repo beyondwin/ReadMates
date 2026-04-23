@@ -228,6 +228,43 @@ class ArchiveAndNotesDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_NOTE_FEED_LONG_REVIEWS_SQL,
+            INSERT_NOTE_FEED_LONG_REVIEWS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_NOTE_FEED_LONG_REVIEWS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `notes sessions and feed include public long reviews only`() {
+        mockMvc.get("/api/notes/sessions") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[?(@.sessionNumber == 6)].longReviewCount") { value(hasItem(1)) }
+                jsonPath("$[?(@.sessionNumber == 6)].totalCount") { value(hasItem(13)) }
+            }
+
+        mockMvc.get("/api/notes/feed") {
+            param("sessionId", "00000000-0000-0000-0000-000000000306")
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(13) }
+                jsonPath("$[*].kind") { value(hasItem("LONG_REVIEW")) }
+                jsonPath("$[*].text") { value(hasItem(PUBLIC_NOTE_FEED_LONG_REVIEW_TEXT)) }
+                jsonPath("$[*].text") { value(not(hasItem(PRIVATE_NOTE_FEED_LONG_REVIEW_TEXT))) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             MARK_MEMBER2_SESSION_SIX_REMOVED_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -717,6 +754,59 @@ class ArchiveAndNotesDbTest(
               '2030-01-02 00:00:00.000000'
             from sessions
             join users on users.email = 'member1@example.com'
+            join memberships on memberships.club_id = sessions.club_id
+              and memberships.user_id = users.id
+            where sessions.id = '00000000-0000-0000-0000-000000000306';
+        """
+
+        private const val PUBLIC_NOTE_FEED_LONG_REVIEW_TEXT = "공개 서평은 클럽 노트에서 함께 읽을 수 있습니다."
+        private const val PRIVATE_NOTE_FEED_LONG_REVIEW_TEXT = "비공개 서평은 클럽 노트에서 제외됩니다."
+        private const val CLEANUP_NOTE_FEED_LONG_REVIEWS_SQL = """
+            delete from long_reviews
+            where id in (
+              '00000000-0000-0000-0000-000000008201',
+              '00000000-0000-0000-0000-000000008202'
+            );
+        """
+        private const val INSERT_NOTE_FEED_LONG_REVIEWS_SQL = """
+            insert into long_reviews (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              body,
+              visibility,
+              created_at,
+              updated_at
+            )
+            select
+              '00000000-0000-0000-0000-000000008201',
+              sessions.club_id,
+              sessions.id,
+              memberships.id,
+              '$PUBLIC_NOTE_FEED_LONG_REVIEW_TEXT',
+              'PUBLIC',
+              '2030-01-03 00:00:00.000000',
+              '2030-01-03 00:00:00.000000'
+            from sessions
+            join users on users.email = 'member3@example.com'
+            join memberships on memberships.club_id = sessions.club_id
+              and memberships.user_id = users.id
+            where sessions.id = '00000000-0000-0000-0000-000000000306'
+
+            union all
+
+            select
+              '00000000-0000-0000-0000-000000008202',
+              sessions.club_id,
+              sessions.id,
+              memberships.id,
+              '$PRIVATE_NOTE_FEED_LONG_REVIEW_TEXT',
+              'PRIVATE',
+              '2030-01-04 00:00:00.000000',
+              '2030-01-04 00:00:00.000000'
+            from sessions
+            join users on users.email = 'member4@example.com'
             join memberships on memberships.club_id = sessions.club_id
               and memberships.user_id = users.id
             where sessions.id = '00000000-0000-0000-0000-000000000306';

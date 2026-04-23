@@ -56,6 +56,21 @@ class NotesFeedQueryRepository(
               ) as one_liner_count,
               (
                 select count(*)
+                from long_reviews
+                where long_reviews.club_id = sessions.club_id
+                  and long_reviews.session_id = sessions.id
+                  and long_reviews.visibility = 'PUBLIC'
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = long_reviews.session_id
+                      and session_participants.club_id = long_reviews.club_id
+                      and session_participants.membership_id = long_reviews.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
+              ) as long_review_count,
+              (
+                select count(*)
                 from highlights
                 where highlights.club_id = sessions.club_id
                   and highlights.session_id = sessions.id
@@ -79,6 +94,7 @@ class NotesFeedQueryRepository(
             { resultSet, _ ->
                 val questionCount = resultSet.getInt("question_count")
                 val oneLinerCount = resultSet.getInt("one_liner_count")
+                val longReviewCount = resultSet.getInt("long_review_count")
                 val highlightCount = resultSet.getInt("highlight_count")
 
                 NoteSessionItem(
@@ -88,8 +104,9 @@ class NotesFeedQueryRepository(
                     date = resultSet.getObject("session_date", LocalDate::class.java).toString(),
                     questionCount = questionCount,
                     oneLinerCount = oneLinerCount,
+                    longReviewCount = longReviewCount,
                     highlightCount = highlightCount,
-                    totalCount = questionCount + oneLinerCount + highlightCount,
+                    totalCount = questionCount + oneLinerCount + longReviewCount + highlightCount,
                 )
             },
             clubId.dbString(),
@@ -126,6 +143,34 @@ class NotesFeedQueryRepository(
                 and session_participants.membership_id = questions.membership_id
                 and session_participants.participation_status = 'ACTIVE'
               where questions.club_id = ?
+                and sessions.state = 'PUBLISHED'
+
+              union all
+
+              select
+                sessions.id as session_id,
+                sessions.number as session_number,
+                sessions.book_title as book_title,
+                sessions.session_date as session_date,
+                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name_source,
+                'LONG_REVIEW' as kind,
+                long_reviews.body as text,
+                long_reviews.created_at as created_at,
+                40 as source_order,
+                0 as item_order
+              from long_reviews
+              join sessions on sessions.id = long_reviews.session_id
+                and sessions.club_id = long_reviews.club_id
+              join memberships on memberships.id = long_reviews.membership_id
+                and memberships.club_id = long_reviews.club_id
+              join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = long_reviews.session_id
+                and session_participants.club_id = long_reviews.club_id
+                and session_participants.membership_id = long_reviews.membership_id
+                and session_participants.participation_status = 'ACTIVE'
+              where long_reviews.club_id = ?
+                and long_reviews.visibility = 'PUBLIC'
                 and sessions.state = 'PUBLISHED'
 
               union all
@@ -199,6 +244,7 @@ class NotesFeedQueryRepository(
             clubId.dbString(),
             clubId.dbString(),
             clubId.dbString(),
+            clubId.dbString(),
         )
     }
 
@@ -233,6 +279,35 @@ class NotesFeedQueryRepository(
                 and session_participants.participation_status = 'ACTIVE'
               where questions.club_id = ?
                 and sessions.id = ?
+                and sessions.state = 'PUBLISHED'
+
+              union all
+
+              select
+                sessions.id as session_id,
+                sessions.number as session_number,
+                sessions.book_title as book_title,
+                sessions.session_date as session_date,
+                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name_source,
+                'LONG_REVIEW' as kind,
+                long_reviews.body as text,
+                long_reviews.created_at as created_at,
+                40 as source_order,
+                0 as item_order
+              from long_reviews
+              join sessions on sessions.id = long_reviews.session_id
+                and sessions.club_id = long_reviews.club_id
+              join memberships on memberships.id = long_reviews.membership_id
+                and memberships.club_id = long_reviews.club_id
+              join users on users.id = memberships.user_id
+              join session_participants on session_participants.session_id = long_reviews.session_id
+                and session_participants.club_id = long_reviews.club_id
+                and session_participants.membership_id = long_reviews.membership_id
+                and session_participants.participation_status = 'ACTIVE'
+              where long_reviews.club_id = ?
+                and sessions.id = ?
+                and long_reviews.visibility = 'PUBLIC'
                 and sessions.state = 'PUBLISHED'
 
               union all
@@ -304,6 +379,8 @@ class NotesFeedQueryRepository(
               text
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNoteFeedItem() },
+            clubId.dbString(),
+            sessionId.dbString(),
             clubId.dbString(),
             sessionId.dbString(),
             clubId.dbString(),
