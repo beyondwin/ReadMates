@@ -246,7 +246,7 @@ function ArchiveDesktop({
         </div>
       </section>
 
-      <section style={{ padding: "40px 0 80px" }}>
+      <section style={{ padding: "28px 0 80px" }}>
         <div className="container">
           <ArchiveSelectedSection view={view}>
             {view === "sessions" ? <ArchiveSessions sessions={sessions} /> : null}
@@ -337,7 +337,7 @@ function ArchiveSelectedSection({ view, children }: { view: ArchiveView; childre
     <section
       aria-labelledby={`archive-${view}-heading`}
       style={{
-        padding: "30px 0 36px",
+        padding: "0 0 36px",
         borderBottom: "1px solid var(--line)",
       }}
     >
