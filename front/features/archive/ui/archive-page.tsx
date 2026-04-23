@@ -338,7 +338,6 @@ function ArchiveSelectedSection({ view, children }: { view: ArchiveView; childre
       aria-labelledby={`archive-${view}-heading`}
       style={{
         padding: "30px 0 36px",
-        borderTop: "1px solid var(--line)",
         borderBottom: "1px solid var(--line)",
       }}
     >
