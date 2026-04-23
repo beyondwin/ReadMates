@@ -566,7 +566,7 @@ git commit -m "test: harden server architecture boundaries"
 - Modify: this plan
 - Modify if needed: `README.md`
 
-- [ ] **Step 1: Run full server test suite**
+- [x] **Step 1: Run full server test suite**
 
 ```bash
 ./server/gradlew -p server clean test
@@ -574,25 +574,37 @@ git commit -m "test: harden server architecture boundaries"
 
 Expected: PASS.
 
-- [ ] **Step 2: Run final legacy risk scan**
+- Result: passed (`BUILD SUCCESSFUL in 30s`, 7 actionable tasks: 7 executed).
+
+- [x] **Step 2: Run final legacy risk scan**
 
 ```bash
 rg -n "JdbcTemplate|query\\(|queryForObject|org\\.springframework\\.jdbc" server/src/main/kotlin/com/readmates/*/application
+rg -n "org\\.springframework\\.dao" server/src/main/kotlin/com/readmates/*/application
 rg -n "package com\\.readmates\\..*\\.api" server/src/main/kotlin/com/readmates/note server/src/main/kotlin/com/readmates/shared
-rg -n "Legacy.*Adapter|Legacy.*Repository" server/src/main/kotlin/com/readmates/archive server/src/main/kotlin/com/readmates/feedback
+rg -n "Legacy.*Adapter|Legacy.*Repository" server/src/main/kotlin/com/readmates/archive server/src/main/kotlin/com/readmates/feedback server/src/main/kotlin/com/readmates/session
 ```
 
 Expected:
 
 - no application JDBC hits in migrated packages
+- no application Spring DAO hits in migrated packages
 - no `note.api` or `shared.api`
-- no archive/feedback `Legacy*` bridge classes
+- no archive/feedback/session `Legacy*` bridge classes
 
-- [ ] **Step 3: Update architecture docs**
+- Result: all four scans returned no matches:
+  - no application `JdbcTemplate`, `query(`, `queryForObject`, or Spring JDBC hits
+  - no application Spring DAO hits
+  - no `note.api` or `shared.api` package hits
+  - no archive/feedback/session `Legacy*Adapter` or `Legacy*Repository` hits
+
+- [x] **Step 3: Update architecture docs**
 
 Update `docs/development/architecture.md` and `README.md` if they still mention the old residual risks as current exceptions.
 
-- [ ] **Step 4: Commit final docs**
+- Result: `docs/development/architecture.md` already described the completed server boundaries and had no stale server residual-risk/current-exception language. Updated `README.md` to remove stale note/auth legacy wording and describe the final server boundary state.
+
+- [x] **Step 4: Commit final docs**
 
 ```bash
 git add docs/development/architecture.md README.md docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
@@ -601,18 +613,20 @@ git commit -m "docs: record server legacy risk cleanup"
 
 Only include `README.md` if it actually changed.
 
+- Result: final docs/plan changes committed with message `docs: record server legacy risk cleanup`.
+
 ## Final Acceptance Checklist
 
-- [ ] Archive application package no longer owns JDBC query orchestration for archive API paths.
-- [ ] Feedback application package no longer owns JDBC query orchestration.
-- [ ] `note.api.NotesFeedController` is gone; notes feed uses note web/application/port/persistence boundaries.
-- [ ] `shared.api.HealthController` is gone or no `shared.api` package remains.
-- [ ] Auth operational application services no longer import Spring JDBC.
-- [ ] `PasswordAuthController` depends on a logout/session cleanup inbound port, not `AuthSessionService`.
-- [ ] Boundary tests include auth application in stricter application rules.
-- [ ] Boundary tests ban JDBC dependencies from migrated application packages.
-- [ ] API route paths, JSON response shapes, HTTP statuses, auth behavior, and DB schema are preserved.
-- [ ] `./server/gradlew -p server clean test` passes.
+- [x] Archive application package no longer owns JDBC query orchestration for archive API paths. Final application JDBC scan returned no matches.
+- [x] Feedback application package no longer owns JDBC query orchestration. Final application JDBC scan returned no matches.
+- [x] `note.api.NotesFeedController` is gone; notes feed uses note web/application/port/persistence boundaries. Final note/shared API package scan returned no matches.
+- [x] `shared.api.HealthController` is gone or no `shared.api` package remains. Final note/shared API package scan returned no matches.
+- [x] Auth operational application services no longer import Spring JDBC. Final application JDBC scan returned no matches.
+- [x] `PasswordAuthController` depends on a logout/session cleanup inbound port, not `AuthSessionService`.
+- [x] Boundary tests include auth application in stricter application rules.
+- [x] Boundary tests ban JDBC dependencies from migrated application packages.
+- [x] API route paths, JSON response shapes, HTTP statuses, auth behavior, and DB schema are preserved.
+- [x] `./server/gradlew -p server clean test` passes (`BUILD SUCCESSFUL in 30s`).
 
 ## Known Follow-Ups
 
