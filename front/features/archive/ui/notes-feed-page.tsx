@@ -64,7 +64,7 @@ export default function NotesFeedPage({
 
         @media (max-width: 768px) {
           .rm-notes-feed-page .page-header-compact {
-            padding: 16px 0 18px;
+            padding: 24px 0 18px;
           }
 
           .rm-notes-feed-page__layout {

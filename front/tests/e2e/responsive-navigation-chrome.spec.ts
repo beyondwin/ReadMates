@@ -194,12 +194,12 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
 
   await page.goto("/app/host");
   await expect(page).toHaveURL(/\/app\/host$/);
-  await expect(page.getByRole("heading", { name: "운영 원장" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
   await page.getByRole("link", { name: /세션 문서 편집|새 세션 만들기/ }).first().click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(.+\/edit|new)$/);
   await expect(page.getByRole("banner").getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
 
   await page.getByRole("banner").getByRole("link", { name: "뒤로" }).click();
   await expect(page).toHaveURL(/\/app\/host$/);
-  await expect(page.getByRole("heading", { name: "운영 원장" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
 });

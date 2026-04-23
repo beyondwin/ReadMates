@@ -227,13 +227,18 @@ describe("HostMembersPage", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members", expect.objectContaining({ cache: "no-store" }));
   });
 
-  it("keeps the member list body on the shared container horizontal padding", async () => {
+  it("keeps the member tab header and body on the shared mobile start line", async () => {
     renderHostMembersPage();
 
     expect(await screen.findByRole("tab", { name: "활성 멤버" })).toBeInTheDocument();
 
+    const page = document.querySelector("main.rm-host-members-page");
+    const headerEyebrow = document.querySelector(".page-header-compact .eyebrow");
     const contentContainer = document.querySelector("main > section.container") as HTMLElement | null;
+    expect(page).not.toBeNull();
+    expect(headerEyebrow?.tagName).toBe("DIV");
     expect(contentContainer).not.toBeNull();
+    expect(contentContainer).toHaveClass("rm-host-members-page__body");
     expect(contentContainer?.style.paddingTop).toBe("24px");
     expect(contentContainer?.style.paddingBottom).toBe("72px");
     expect(contentContainer?.style.paddingLeft).toBe("");

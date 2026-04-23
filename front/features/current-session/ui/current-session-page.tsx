@@ -107,7 +107,7 @@ export function CurrentSessionEmpty({
 }) {
   return (
     <main>
-      <section className="page-header-compact" style={{ padding: "48px 0" }}>
+      <section className="page-header-compact rm-current-session-empty-header">
         <div className="container">
           <div className="rm-empty-state" style={{ padding: "34px" }}>
             <p className="eyebrow" style={{ margin: 0 }}>

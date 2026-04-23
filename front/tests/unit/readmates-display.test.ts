@@ -5,6 +5,7 @@ import {
   formatDateOnlyLabel,
   formatDateLabel,
   formatDeadlineLabel,
+  formatMobileTodayLabel,
   hostAlertStateLabel,
   nonNegativeCount,
   rsvpLabel,
@@ -50,6 +51,10 @@ describe("readmates display helpers", () => {
     expect(formatDeadlineLabel("", "마감 미정")).toBe("마감 미정");
     expect(formatDeadlineLabel(null, "마감 미정")).toBe("마감 미정");
     expect(formatDeadlineLabel(undefined, "마감 미정")).toBe("마감 미정");
+  });
+
+  it("formats the mobile home today label in Seoul time", () => {
+    expect(formatMobileTodayLabel(new Date("2026-04-23T03:00:00Z"))).toBe("4월 23일 (목)");
   });
 
   it("labels RSVP statuses", () => {
