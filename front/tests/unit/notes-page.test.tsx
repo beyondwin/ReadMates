@@ -157,6 +157,7 @@ function renderNotesPage(sessionId?: string, filter?: string) {
         path: "/app/notes",
         element: <NotesPage />,
         loader: notesFeedLoader,
+        hydrateFallbackElement: <div>클럽 노트를 불러오는 중</div>,
       },
     ],
     { initialEntries: [`/app/notes${search ? `?${search}` : ""}`] },

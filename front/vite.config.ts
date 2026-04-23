@@ -7,6 +7,18 @@ export default defineConfig({
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   build: {
     chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: "vendor",
+              test: /node_modules/,
+            },
+          ],
+        },
+      },
+    },
   },
   server: {
     proxy: {

@@ -523,6 +523,7 @@ describe("MyPage", () => {
           path: "/app/me",
           element: <MyRoutePage />,
           loader: myPageLoader,
+          hydrateFallbackElement: <div>내 공간을 불러오는 중</div>,
         },
       ],
       { initialEntries: ["/app/me"] },
