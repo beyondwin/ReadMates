@@ -83,8 +83,8 @@ describe("HostInvitations", () => {
   it("renders invitation list statuses and actions", () => {
     render(<HostInvitationsForTest initialInvitations={invitations} />);
 
-    expect(screen.getByText("초대 파이프라인")).toBeInTheDocument();
-    expect(screen.getByText("초대 생성, 대기 링크, 사용됨, 만료/취소 상태를 같은 원장에서 확인합니다.")).toBeInTheDocument();
+    expect(screen.getByText("멤버 초대 관리")).toBeInTheDocument();
+    expect(screen.getByText("초대 링크 생성부터 수락, 만료, 취소 상태까지 한곳에서 확인합니다.")).toBeInTheDocument();
     expect(screen.getByText("pending@example.com")).toBeInTheDocument();
     expect(screen.getByText("대기 멤버")).toBeInTheDocument();
     expect(screen.getByText("accepted@example.com")).toBeInTheDocument();

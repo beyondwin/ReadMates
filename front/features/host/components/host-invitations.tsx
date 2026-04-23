@@ -268,10 +268,10 @@ export default function HostInvitations({
         <div className="container">
           <div className="eyebrow">운영 · 멤버 초대</div>
           <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-            초대 파이프라인
+            멤버 초대 관리
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            초대 생성, 대기 링크, 사용됨, 만료/취소 상태를 같은 원장에서 확인합니다.
+            초대 링크 생성부터 수락, 만료, 취소 상태까지 한곳에서 확인합니다.
           </p>
         </div>
       </section>

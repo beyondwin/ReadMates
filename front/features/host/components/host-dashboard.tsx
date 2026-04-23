@@ -32,7 +32,7 @@ const HOST_DASHBOARD_LABELS = {
   operationTimeline: "운영 일정",
   memberStatus: "멤버 참여",
   publishFeedback: "공개 · 피드백",
-  invitePipeline: "초대 파이프라인",
+  invitePipeline: "멤버 초대 관리",
   nextAction: "다음 운영 액션",
   quickActions: "운영 액션 목록",
 } as const;
@@ -945,13 +945,13 @@ function InvitePipelineSection({ mobile = false }: { mobile?: boolean }) {
         </div>
       ) : null}
       <div className="body" style={{ fontSize: "13.5px", fontWeight: 600 }}>
-        초대 생성 · 대기 · 사용 · 만료 상태는 초대 화면에서 관리합니다.
+        초대 링크 생성, 대기, 수락, 만료 상태를 초대 화면에서 관리합니다.
       </div>
       <p className="tiny" style={{ margin: "6px 0 12px", color: "var(--text-3)" }}>
         보안상 초대 URL은 생성 직후에만 복사합니다. 기존 대기 초대는 취소하거나 새 링크를 발급하세요.
       </p>
       <Link to="/app/host/invitations" className="btn btn-ghost btn-sm">
-        초대 파이프라인 열기
+        초대 관리 열기
       </Link>
     </section>
   );
