@@ -1,10 +1,8 @@
-package com.readmates.auth.api
+package com.readmates.auth.adapter.`in`.web
 
-import com.readmates.auth.application.MemberAccountRepository
+import com.readmates.auth.application.port.`in`.DevLoginMemberUseCase
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
-import jakarta.validation.constraints.Email
-import jakarta.validation.constraints.NotBlank
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
 import org.springframework.http.HttpStatus
@@ -19,25 +17,19 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 
-data class DevLoginRequest(
-    @field:NotBlank
-    @field:Email
-    val email: String,
-)
-
 @RestController
 @RequestMapping("/api/dev")
 @Profile("!prod & !production")
 @ConditionalOnProperty(prefix = "readmates.dev", name = ["login-enabled"], havingValue = "true")
 class DevLoginController(
-    private val memberAccountRepository: MemberAccountRepository,
+    private val devLoginMember: DevLoginMemberUseCase,
 ) {
     @PostMapping("/login")
     fun login(
         @Valid @RequestBody request: DevLoginRequest,
         httpRequest: HttpServletRequest,
     ): AuthMemberResponse {
-        val member = memberAccountRepository.findDevSeedActiveMemberByEmail(request.email)
+        val member = devLoginMember.findDevSeedActiveMemberByEmail(request.email)
             ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown dev login email")
         val authentication = UsernamePasswordAuthenticationToken(
             member.email,

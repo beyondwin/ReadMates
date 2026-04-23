@@ -1,4 +1,4 @@
-package com.readmates.auth.api
+package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.AuthSessionService
 import jakarta.servlet.http.HttpServletRequest
@@ -29,5 +29,4 @@ class PasswordAuthController(
 
         response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
     }
-
 }

@@ -1,14 +1,10 @@
-package com.readmates.auth.api
+package com.readmates.auth.adapter.`in`.web
 
-import com.readmates.auth.application.AuthenticatedMemberResolver
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
-import com.readmates.shared.security.emailOrNull
-import org.springframework.security.core.Authentication
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
+import jakarta.validation.constraints.Email
+import jakarta.validation.constraints.NotBlank
 import java.util.UUID
 
 enum class ApprovalState {
@@ -67,15 +63,24 @@ data class AuthMemberResponse(
     }
 }
 
-@RestController
-@RequestMapping("/api/auth/me")
-class AuthMeController(
-    private val authenticatedMemberResolver: AuthenticatedMemberResolver,
-) {
-    @GetMapping
-    fun me(authentication: Authentication?): AuthMemberResponse {
-        val member = authenticatedMemberResolver.resolve(authentication)
-            ?: return AuthMemberResponse.anonymous(authentication.emailOrNull())
-        return AuthMemberResponse.from(member)
-    }
+class CreateInvitationRequest(email: String, name: String, applyToCurrentSession: Boolean? = null) {
+    @field:NotBlank
+    @field:Email
+    val email: String = email.trim()
+
+    @field:NotBlank
+    val name: String = name.trim()
+
+    val applyToCurrentSession: Boolean = applyToCurrentSession ?: true
 }
+
+data class DevLoginRequest(
+    @field:NotBlank
+    @field:Email
+    val email: String,
+)
+
+data class InvitationErrorResponse(
+    val code: String,
+    val message: String,
+)

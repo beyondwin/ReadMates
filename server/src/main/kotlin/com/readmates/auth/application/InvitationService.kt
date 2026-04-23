@@ -3,6 +3,8 @@ package com.readmates.auth.application
 import com.readmates.auth.domain.InvitationStatus
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
+import com.readmates.auth.application.port.`in`.PreviewInvitationUseCase
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
@@ -80,13 +82,13 @@ class InvitationService(
     private val memberAccountRepository: MemberAccountRepository,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
-) {
+) : ManageHostInvitationsUseCase, PreviewInvitationUseCase {
     @Transactional
-    fun createInvitation(
+    override fun createInvitation(
         host: CurrentMember,
         email: String,
         name: String,
-        applyToCurrentSession: Boolean = true,
+        applyToCurrentSession: Boolean,
     ): HostInvitationResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
@@ -130,12 +132,12 @@ class InvitationService(
         return findHostInvitation(jdbcTemplate, host.clubId, invitationId).copy(acceptUrl = acceptUrl(token))
     }
 
-    fun listHostInvitations(host: CurrentMember): List<HostInvitationResponse> {
+    override fun listHostInvitations(host: CurrentMember): List<HostInvitationResponse> {
         requireHost(host)
         return listHostInvitations(jdbcTemplate(), host.clubId)
     }
 
-    fun previewInvitation(rawToken: String): InvitationPreviewResponse {
+    override fun previewInvitation(rawToken: String): InvitationPreviewResponse {
         val invitation = findInvitationByToken(rawToken)
         val effectiveStatus = effectiveStatus(invitation.status, invitation.expiresAt)
         return InvitationPreviewResponse(
@@ -265,7 +267,7 @@ class InvitationService(
     }
 
     @Transactional
-    fun revokeInvitation(host: CurrentMember, invitationId: UUID): HostInvitationResponse {
+    override fun revokeInvitation(host: CurrentMember, invitationId: UUID): HostInvitationResponse {
         requireHost(host)
         val jdbcTemplate = jdbcTemplate()
         jdbcTemplate.update(
