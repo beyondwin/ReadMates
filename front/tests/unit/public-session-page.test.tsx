@@ -139,7 +139,14 @@ describe("PublicSession", () => {
       bookImageUrl: "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
       date: "2025-11-26",
       summary: "데이터로 세상을 더 정확하게 보는 태도를 이야기했습니다.",
-      highlights: ["세계를 오해하게 만드는 본능을 점검했습니다."],
+      highlights: [
+        {
+          text: "세계를 오해하게 만드는 본능을 점검했습니다.",
+          sortOrder: 0,
+          authorName: "이멤버5",
+          authorShortName: "멤버5",
+        },
+      ],
       oneLiners: [
         {
           authorName: "김호스트",
@@ -167,8 +174,8 @@ describe("PublicSession", () => {
     expect(container.querySelector(".public-note-highlight-row")).not.toBeNull();
     const highlightRow = screen.getByText("세계를 오해하게 만드는 본능을 점검했습니다.").closest(".public-note-highlight-row");
     expect(highlightRow).not.toBeNull();
-    expect(within(highlightRow as HTMLElement).getByText("읽는사이")).toBeInTheDocument();
-    expect(within(highlightRow as HTMLElement).getByLabelText("읽는사이")).toHaveTextContent("읽");
+    expect(within(highlightRow as HTMLElement).getByText("이멤버5")).toBeInTheDocument();
+    expect(within(highlightRow as HTMLElement).getByLabelText("이멤버5")).toHaveTextContent("이");
     expect(container.querySelector(".public-note-oneliner-card")).not.toBeNull();
     expect(container).not.toHaveTextContent("H01");
     expect(container).not.toHaveTextContent("R01");

@@ -28,6 +28,13 @@ export type PublicOneLiner = {
   text: string;
 };
 
+export type PublicHighlight = {
+  text: string;
+  sortOrder: number;
+  authorName: string | null;
+  authorShortName: string | null;
+};
+
 export type PublicSessionDetailResponse = {
   sessionId: string;
   sessionNumber: number;
@@ -36,6 +43,6 @@ export type PublicSessionDetailResponse = {
   bookImageUrl: string | null;
   date: string;
   summary: string;
-  highlights: string[];
+  highlights: PublicHighlight[];
   oneLiners: PublicOneLiner[];
 };

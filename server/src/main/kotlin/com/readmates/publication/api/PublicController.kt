@@ -47,8 +47,15 @@ data class PublicSessionDetailResponse(
     val bookImageUrl: String?,
     val date: String,
     val summary: String,
-    val highlights: List<String>,
+    val highlights: List<PublicHighlight>,
     val oneLiners: List<PublicOneLiner>,
+)
+
+data class PublicHighlight(
+    val text: String,
+    val sortOrder: Int,
+    val authorName: String?,
+    val authorShortName: String?,
 )
 
 data class PublicOneLiner(
@@ -217,11 +224,18 @@ class PublicController(
             clubId.dbString(),
         )
 
-    private fun publicHighlights(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<String> =
+    private fun publicHighlights(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicHighlight> =
         jdbcTemplate.query(
             """
-            select highlights.text
+            select
+              highlights.text,
+              highlights.sort_order,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name
             from highlights
+            left join memberships on memberships.id = highlights.membership_id
+              and memberships.club_id = highlights.club_id
+            left join users on users.id = memberships.user_id
             left join session_participants on session_participants.session_id = highlights.session_id
               and session_participants.club_id = highlights.club_id
               and session_participants.membership_id = highlights.membership_id
@@ -231,9 +245,16 @@ class PublicController(
                 highlights.membership_id is null
                 or session_participants.participation_status = 'ACTIVE'
               )
-            order by highlights.sort_order
+            order by highlights.sort_order, highlights.created_at
             """.trimIndent(),
-            { rs, _ -> rs.getString("text") },
+            { rs, _ ->
+                PublicHighlight(
+                    text = rs.getString("text"),
+                    sortOrder = rs.getInt("sort_order"),
+                    authorName = rs.getString("author_name"),
+                    authorShortName = rs.getString("author_short_name"),
+                )
+            },
             clubId.dbString(),
             sessionId.dbString(),
         )
