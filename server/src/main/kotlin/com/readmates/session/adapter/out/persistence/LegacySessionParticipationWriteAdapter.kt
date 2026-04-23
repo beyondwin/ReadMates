@@ -28,10 +28,9 @@ class LegacySessionParticipationWriteAdapter(
     }
 
     override fun saveCheckin(command: SaveCheckinCommand): CheckinResult {
-        val result = repository.saveCheckin(command.member, command.readingProgress, command.note)
+        val result = repository.saveCheckin(command.member, command.readingProgress)
         return CheckinResult(
             readingProgress = result.getValue("readingProgress") as Int,
-            note = result.getValue("note") as String,
         )
     }
 

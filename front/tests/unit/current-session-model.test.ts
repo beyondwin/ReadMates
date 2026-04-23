@@ -148,12 +148,12 @@ describe("current session view model", () => {
     expect(
       getCurrentSessionBoardTabs({
         questions: [{ id: 1 }, { id: 2 }],
-        checkins: [{ id: 1 }],
+        oneLineReviews: [{ id: 1 }],
         highlights: [],
       }),
     ).toEqual([
       { key: "questions", label: "질문 · 2", count: 2 },
-      { key: "checkins", label: "읽기 흔적 · 1", count: 1 },
+      { key: "oneLineReviews", label: "한줄평 · 1", count: 1 },
       { key: "highlights", label: "하이라이트 · 0", count: 0 },
     ]);
 
@@ -173,7 +173,7 @@ describe("current session view model", () => {
 
   it("returns reusable save status labels", () => {
     expect(getCurrentSessionSaveStatusLabel("rsvp", "idle")).toBe("");
-    expect(getCurrentSessionSaveStatusLabel("checkin", "saving")).toBe("체크인 변경사항을 저장하는 중");
+    expect(getCurrentSessionSaveStatusLabel("checkin", "saving")).toBe("진행률 변경사항을 저장하는 중");
     expect(getCurrentSessionSaveStatusLabel("question", "saved")).toBe("질문 저장됨");
     expect(getCurrentSessionSaveStatusLabel("longReview", "error")).toBe("서평 저장 실패 · 다시 시도해 주세요");
     expect(getCurrentSessionSaveStatusLabel("oneLineReview", "saved")).toBe("한줄평 저장됨");

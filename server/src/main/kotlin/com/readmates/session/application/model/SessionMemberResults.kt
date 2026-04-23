@@ -6,7 +6,6 @@ data class RsvpResult(
 
 data class CheckinResult(
     val readingProgress: Int,
-    val note: String,
 )
 
 data class QuestionResult(

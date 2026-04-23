@@ -66,7 +66,7 @@ data class MemberArchiveSessionDetailResponse(
     val publicSummary: String?,
     val publicHighlights: List<MemberArchiveHighlightItem>,
     val clubQuestions: List<MemberArchiveQuestionItem>,
-    val clubCheckins: List<MemberArchiveCheckinItem>,
+    val clubOneLiners: List<MemberArchiveOneLinerItem>,
     val publicOneLiners: List<MemberArchiveOneLinerItem>,
     val myQuestions: List<MemberArchiveQuestionItem>,
     val myCheckin: MemberArchiveCheckinItem?,
@@ -89,10 +89,7 @@ data class MemberArchiveQuestionItem(
 )
 
 data class MemberArchiveCheckinItem(
-    val authorName: String,
-    val authorShortName: String,
     val readingProgress: Int,
-    val note: String,
 )
 
 data class MemberArchiveOneLinerItem(

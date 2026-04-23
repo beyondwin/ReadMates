@@ -25,7 +25,6 @@ export type MemberHomeCurrentSessionResponse = {
     myRsvpStatus: RsvpStatus;
     myCheckin: null | {
       readingProgress: number;
-      note: string;
     };
     myQuestions: Array<{
       priority: number;
@@ -48,11 +47,10 @@ export type MemberHomeCurrentSessionResponse = {
         authorName: string;
         authorShortName: string;
       }>;
-      checkins: Array<{
+      oneLineReviews: Array<{
         authorName: string;
         authorShortName: string;
-        readingProgress: number;
-        note: string;
+        text: string;
       }>;
       highlights: Array<{
         text: string;
@@ -78,7 +76,7 @@ export type MemberHomeNoteFeedItem = {
   date: string;
   authorName: string | null;
   authorShortName: string | null;
-  kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT" | "CHECKIN";
+  kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
   text: string;
 };
 

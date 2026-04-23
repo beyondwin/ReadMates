@@ -18,7 +18,6 @@ type CurrentSessionActionPayload = {
   intent?: unknown;
   status?: unknown;
   readingProgress?: unknown;
-  note?: unknown;
   questions?: unknown;
   body?: unknown;
   text?: unknown;
@@ -124,7 +123,6 @@ async function actionPayloadFromRequest(request: Request): Promise<CurrentSessio
     intent: formData.get("intent"),
     status: formData.get("status"),
     readingProgress: formData.get("readingProgress"),
-    note: formData.get("note"),
     questions: formData.get("questions") ?? formData.getAll("question").map((question) => ({ text: question })),
     body: formData.get("body"),
     text: formData.get("text"),
@@ -153,7 +151,7 @@ export async function currentSessionAction({ request }: ActionFunctionArgs) {
       return badRequest("Invalid reading progress.");
     }
 
-    const response = await saveCurrentSessionCheckin(readingProgress, stringValue(payload.note));
+    const response = await saveCurrentSessionCheckin(readingProgress);
     return mutationResponse(response);
   }
 

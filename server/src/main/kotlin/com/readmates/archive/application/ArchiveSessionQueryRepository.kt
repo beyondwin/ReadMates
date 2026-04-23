@@ -163,7 +163,7 @@ class ArchiveSessionQueryRepository(
                     publicSummary = resultSet.getString("public_summary"),
                     publicHighlights = findArchiveHighlights(jdbcTemplate, currentMember.clubId, sessionUuid),
                     clubQuestions = findArchiveClubQuestions(jdbcTemplate, currentMember.clubId, sessionUuid),
-                    clubCheckins = findArchiveClubCheckins(jdbcTemplate, currentMember.clubId, sessionUuid),
+                    clubOneLiners = findArchiveClubOneLiners(jdbcTemplate, currentMember.clubId, sessionUuid),
                     publicOneLiners = findArchivePublicOneLiners(jdbcTemplate, currentMember.clubId, sessionUuid),
                     myQuestions = findArchiveMyQuestions(jdbcTemplate, currentMember, sessionUuid),
                     myCheckin = findArchiveMyCheckin(jdbcTemplate, currentMember, sessionUuid),
@@ -252,37 +252,35 @@ class ArchiveSessionQueryRepository(
             sessionId.dbString(),
         )
 
-    private fun findArchiveClubCheckins(
+    private fun findArchiveClubOneLiners(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
-    ): List<MemberArchiveCheckinItem> =
+    ): List<MemberArchiveOneLinerItem> =
         jdbcTemplate.query(
             """
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name,
-              reading_checkins.reading_progress,
-              reading_checkins.note
-            from reading_checkins
-            join memberships on memberships.id = reading_checkins.membership_id
-              and memberships.club_id = reading_checkins.club_id
+              one_line_reviews.text
+            from one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
             join users on users.id = memberships.user_id
-            join session_participants on session_participants.session_id = reading_checkins.session_id
-              and session_participants.club_id = reading_checkins.club_id
-              and session_participants.membership_id = reading_checkins.membership_id
+            join session_participants on session_participants.session_id = one_line_reviews.session_id
+              and session_participants.club_id = one_line_reviews.club_id
+              and session_participants.membership_id = one_line_reviews.membership_id
               and session_participants.participation_status = 'ACTIVE'
-            where reading_checkins.club_id = ?
-              and reading_checkins.session_id = ?
-              and length(trim(reading_checkins.note)) > 0
-            order by users.name, reading_checkins.created_at
+            where one_line_reviews.club_id = ?
+              and one_line_reviews.session_id = ?
+              and one_line_reviews.visibility in ('SESSION', 'PUBLIC')
+            order by one_line_reviews.created_at, users.name
             """.trimIndent(),
             { resultSet, _ ->
-                MemberArchiveCheckinItem(
+                MemberArchiveOneLinerItem(
                     authorName = resultSet.getString("author_name"),
                     authorShortName = resultSet.getString("author_short_name"),
-                    readingProgress = resultSet.getInt("reading_progress"),
-                    note = resultSet.getString("note"),
+                    text = resultSet.getString("text"),
                 )
             },
             clubId.dbString(),
@@ -367,11 +365,8 @@ class ArchiveSessionQueryRepository(
     ): MemberArchiveCheckinItem? =
         jdbcTemplate.query(
             """
-            select users.name as author_name, reading_checkins.reading_progress, reading_checkins.note
+            select reading_checkins.reading_progress
             from reading_checkins
-            join memberships on memberships.id = reading_checkins.membership_id
-              and memberships.club_id = reading_checkins.club_id
-            join users on users.id = memberships.user_id
             join session_participants on session_participants.session_id = reading_checkins.session_id
               and session_participants.club_id = reading_checkins.club_id
               and session_participants.membership_id = reading_checkins.membership_id
@@ -381,12 +376,8 @@ class ArchiveSessionQueryRepository(
               and reading_checkins.membership_id = ?
             """.trimIndent(),
             { resultSet, _ ->
-                val authorName = resultSet.getString("author_name")
                 MemberArchiveCheckinItem(
-                    authorName = authorName,
-                    authorShortName = shortNameFor(authorName),
                     readingProgress = resultSet.getInt("reading_progress"),
-                    note = resultSet.getString("note"),
                 )
             },
             currentMember.clubId.dbString(),

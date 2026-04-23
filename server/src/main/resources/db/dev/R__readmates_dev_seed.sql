@@ -1802,31 +1802,31 @@ delete from reading_checkins
 where id >= '00000000-0000-0000-0000-000000001101'::uuid
   and id <= '00000000-0000-0000-0000-000000001603'::uuid;
 
-with seed(id_suffix, session_number, email, reading_progress, note) as (
+with seed(id_suffix, session_number, email, reading_progress) as (
   values
-    (1101, 1, 'host@example.com', 100, '팩트풀니스의 본능과 데이터 기반 사고를 중심으로 질문을 정리했습니다.'),
-    (1102, 1, 'member1@example.com', 100, '사실과 데이터로 설명되지 않는 현실에 대한 질문을 표시했습니다.'),
-    (1103, 1, 'member5@example.com', 100, '소득 4단계와 단일관점 본능을 중심으로 읽었습니다.'),
-    (1201, 2, 'host@example.com', 100, '효과 기준의 선택이 취미와 일상에도 적용될 수 있는지 메모했습니다.'),
-    (1202, 2, 'member2@example.com', 100, '효율이라는 기준이 가져올 부정적 영향에 밑줄을 그었습니다.'),
-    (1203, 2, 'member5@example.com', 100, '효과적 이타주의를 직업 선택과 기부의 기준으로 연결해 읽었습니다.'),
-    (1301, 3, 'host@example.com', 100, '돌봄과 생계가 가족에게 집중되는 장면을 중심으로 읽었습니다.'),
-    (1302, 3, 'member2@example.com', 100, '몰입과 웃음의 거리가 드러난 장면을 표시했습니다.'),
-    (1303, 3, 'member3@example.com', 100, '불편한 감정을 만든 장면을 따로 메모했습니다.'),
-    (1304, 3, 'member1@example.com', 100, '가족의 정의와 오래 남은 장면을 중심으로 질문을 준비했습니다.'),
-    (1305, 3, 'member4@example.com', 100, '도덕적 해이와 겨울을 보내는 방식에 대한 질문을 남겼습니다.'),
-    (1306, 3, 'member5@example.com', 100, '블랙코미디처럼 보이는 장면과 사회 문제의 연결을 메모했습니다.'),
-    (1401, 4, 'host@example.com', 100, '공정한 관찰자와 인정 욕구를 중심으로 읽었습니다.'),
-    (1402, 4, 'member2@example.com', 100, '이기와 이타가 구분되는 기준을 질문으로 정리했습니다.'),
-    (1403, 4, 'member3@example.com', 100, '미덕과 행복한 삶을 현실에 적용하는 대목을 표시했습니다.'),
-    (1404, 4, 'member4@example.com', 100, '다름을 이해하는 계기와 각자의 행복을 메모했습니다.'),
-    (1501, 5, 'host@example.com', 100, '생각을 의심하는 태도가 이해인지 불안인지 중심으로 읽었습니다.'),
-    (1502, 5, 'member4@example.com', 100, '신념과 명상, 돈오점수를 질문으로 정리했습니다.'),
-    (1503, 5, 'member1@example.com', 100, '선택과 후회가 나를 만드는 방식에 밑줄을 그었습니다.'),
-    (1504, 5, 'member2@example.com', 100, '도덕의 기원과 의식의 주체를 중심으로 읽었습니다.'),
-    (1601, 6, 'host@example.com', 100, '모르는 영역을 피하는 태도와 다학문적 사고를 중심으로 읽었습니다.'),
-    (1602, 6, 'member2@example.com', 100, '전기의 효용과 정의의 주장을 중심으로 질문을 정리했습니다.'),
-    (1603, 6, 'member5@example.com', 100, '뒤집어서 생각하기와 왜곡된 보상 구조를 메모했습니다.')
+    (1101, 1, 'host@example.com', 100),
+    (1102, 1, 'member1@example.com', 100),
+    (1103, 1, 'member5@example.com', 100),
+    (1201, 2, 'host@example.com', 100),
+    (1202, 2, 'member2@example.com', 100),
+    (1203, 2, 'member5@example.com', 100),
+    (1301, 3, 'host@example.com', 100),
+    (1302, 3, 'member2@example.com', 100),
+    (1303, 3, 'member3@example.com', 100),
+    (1304, 3, 'member1@example.com', 100),
+    (1305, 3, 'member4@example.com', 100),
+    (1306, 3, 'member5@example.com', 100),
+    (1401, 4, 'host@example.com', 100),
+    (1402, 4, 'member2@example.com', 100),
+    (1403, 4, 'member3@example.com', 100),
+    (1404, 4, 'member4@example.com', 100),
+    (1501, 5, 'host@example.com', 100),
+    (1502, 5, 'member4@example.com', 100),
+    (1503, 5, 'member1@example.com', 100),
+    (1504, 5, 'member2@example.com', 100),
+    (1601, 6, 'host@example.com', 100),
+    (1602, 6, 'member2@example.com', 100),
+    (1603, 6, 'member5@example.com', 100)
 ),
 resolved as (
   select
@@ -1834,23 +1834,20 @@ resolved as (
     clubs.id as club_id,
     sessions.id as session_id,
     memberships.id as membership_id,
-    seed.reading_progress,
-    seed.note
+    seed.reading_progress
   from seed
   join clubs on clubs.slug = 'reading-sai'
   join sessions on sessions.club_id = clubs.id and sessions.number = seed.session_number
   join users on users.email = seed.email
   join memberships on memberships.club_id = clubs.id and memberships.user_id = users.id
 )
-insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress, note)
+insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
 select
   ('00000000-0000-0000-0000-' || lpad(id_suffix::text, 12, '0'))::uuid,
   club_id,
   session_id,
   membership_id,
-  reading_progress,
-  note
+  reading_progress
 from resolved
 on conflict (session_id, membership_id) do update set
-  reading_progress = excluded.reading_progress,
-  note = excluded.note;
+  reading_progress = excluded.reading_progress;

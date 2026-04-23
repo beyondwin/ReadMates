@@ -71,7 +71,6 @@ export function FeedSections({
       {(filter === "all" || filter === "questions") && <FeedQuestions items={byKind(items, "QUESTION")} />}
       {(filter === "all" || filter === "oneliners") && <FeedOneLiners items={byKind(items, "ONE_LINE_REVIEW")} />}
       {(filter === "all" || filter === "highlights") && <FeedHighlights items={byKind(items, "HIGHLIGHT")} />}
-      {(filter === "all" || filter === "checkins") && <FeedCheckins items={byKind(items, "CHECKIN")} />}
     </>
   );
 }
@@ -164,47 +163,6 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
   );
 }
 
-function FeedCheckins({ items }: { items: NoteFeedItem[] }) {
-  return (
-    <FeedSection eyebrow={`읽기 흔적 · ${items.length}`} title="읽기 흔적">
-      <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-        {items.map((item, index) => (
-          <div
-            key={itemKey(item)}
-            className="rm-notes-checkin-row"
-            style={{
-              padding: "20px 0",
-              borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
-              display: "grid",
-              gridTemplateColumns: "minmax(100px, 120px) minmax(52px, 64px) minmax(0, 1fr) auto",
-              gap: "20px",
-              alignItems: "center",
-            }}
-          >
-            <span className="row" style={{ gap: "8px", minWidth: 0 }}>
-              {item.authorName ? (
-                <AvatarChip name={item.authorName} fallbackInitial={item.authorShortName} label={item.authorName} size={20} />
-              ) : null}
-              {item.authorName ? (
-                <span className="small" style={{ fontWeight: 500 }}>
-                  {item.authorName}
-                </span>
-              ) : null}
-            </span>
-            <span className="mono small" style={{ color: "var(--text-2)" }}>
-              {sessionNumberLabel(item)}
-            </span>
-            <span className="small" style={{ color: "var(--text-2)" }}>
-              {item.text}
-            </span>
-            <span className="tiny mono">{formatDateOnlyLabel(item.date)}</span>
-          </div>
-        ))}
-      </div>
-    </FeedSection>
-  );
-}
-
 function FeedSection({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
     <section style={{ paddingBottom: "44px" }}>
@@ -225,17 +183,6 @@ function NotesFeedListStyles() {
       @media (max-width: 768px) {
         .rm-notes-excerpt-row .quote {
           border-bottom: 0;
-        }
-
-        .rm-notes-checkin-row {
-          grid-template-columns: minmax(0, 1fr) !important;
-          gap: 6px !important;
-          align-items: start !important;
-        }
-
-        .rm-notes-checkin-row > span:last-child {
-          justify-self: start;
-          color: var(--text-3);
         }
       }
     `}</style>

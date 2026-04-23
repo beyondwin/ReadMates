@@ -27,10 +27,13 @@ const session: HostDashboardCurrentSession = {
   startTime: "20:00",
   locationLabel: "온라인",
   meetingUrl: "https://meet.google.com/readmates-host",
+  myCheckin: {
+    readingProgress: 62,
+  },
   attendees: [{ rsvpStatus: "NO_RESPONSE" }, { rsvpStatus: "GOING" }],
   board: {
     questions: [{ priority: 1 }, { priority: 2 }],
-    checkins: [{ authorName: "안멤버1" }],
+    oneLineReviews: [{ authorName: "안멤버1" }],
   },
 };
 
@@ -57,6 +60,8 @@ describe("host dashboard model", () => {
   it("builds upcoming session phase and metrics", () => {
     const phase = getHostDashboardSessionPhase(session, new Date(2026, 4, 17, 12));
 
+    expect(session.myCheckin).not.toHaveProperty("note");
+    expect(session.board).not.toHaveProperty("checkins");
     expect(formatHostSessionDday(session.date, new Date(2026, 4, 17, 12))).toBe("D-3");
     expect(phase).toMatchObject({
       eyebrow: "No.07 · D-3",
@@ -66,10 +71,15 @@ describe("host dashboard model", () => {
     });
     expect(getHostDashboardSessionMetrics(session, phase.status)).toEqual([
       ["참석", "1/2"],
-      ["체크인", "1/2"],
+      ["읽기", "1/2"],
       ["질문", "2/10"],
       ["상태", "준비 중"],
     ]);
+  });
+
+  it("derives the reading metric from myCheckin only", () => {
+    expect(getHostDashboardSessionMetrics({ ...session, myCheckin: null }, "준비 중")).toContainEqual(["읽기", "0/2"]);
+    expect(getHostDashboardSessionMetrics(session, "준비 중")).toContainEqual(["읽기", "1/2"]);
   });
 
   it("builds D-day session phase", () => {

@@ -375,8 +375,7 @@ function ClubRecords({ session, mobile = false }: { session: MemberArchiveSessio
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
         <HighlightsList highlights={session.publicHighlights} mobile />
         <QuestionList questions={session.clubQuestions} mobile />
-        <CheckinList checkins={session.clubCheckins} mobile />
-        <OneLinerList oneLiners={session.publicOneLiners} mobile />
+        <OneLinerList oneLiners={session.clubOneLiners} mobile />
       </div>
     );
   }
@@ -389,11 +388,8 @@ function ClubRecords({ session, mobile = false }: { session: MemberArchiveSessio
       <RecordGroup title="클럽 질문">
         <QuestionList questions={session.clubQuestions} />
       </RecordGroup>
-      <RecordGroup title="체크인">
-        <CheckinList checkins={session.clubCheckins} />
-      </RecordGroup>
-      <RecordGroup title="한줄 기록">
-        <OneLinerList oneLiners={session.publicOneLiners} />
+      <RecordGroup title="한줄평">
+        <OneLinerList oneLiners={session.clubOneLiners} />
       </RecordGroup>
     </div>
   );
@@ -414,7 +410,7 @@ function MyRecords({ session, mobile = false }: { session: MemberArchiveSessionD
     return (
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
         <QuestionList questions={session.myQuestions} mobile />
-        {session.myCheckin ? <CheckinList checkins={[session.myCheckin]} mobile /> : null}
+        {session.myCheckin ? <ReadingProgressRecord checkin={session.myCheckin} /> : null}
         <ReviewList oneLineReview={session.myOneLineReview} longReview={session.myLongReview} mobile />
       </div>
     );
@@ -426,8 +422,8 @@ function MyRecords({ session, mobile = false }: { session: MemberArchiveSessionD
         <QuestionList questions={session.myQuestions} />
       </RecordGroup>
       {session.myCheckin ? (
-        <RecordGroup title="내 체크인">
-          <CheckinList checkins={[session.myCheckin]} />
+        <RecordGroup title="내 읽기 진행률">
+          <ReadingProgressRecord checkin={session.myCheckin} />
         </RecordGroup>
       ) : null}
       <RecordGroup title="내 서평">
@@ -511,76 +507,16 @@ function QuestionList({ questions, mobile = false }: { questions: MemberArchiveQ
   );
 }
 
-function CheckinList({ checkins, mobile = false }: { checkins: MemberArchiveCheckinItem[]; mobile?: boolean }) {
-  if (checkins.length === 0) {
-    return null;
-  }
-
-  if (mobile) {
-    return (
-      <div className="m-list">
-        {checkins.map((checkin) => (
-          <div
-            key={`${checkin.authorName}-${checkin.note}`}
-            className="m-list-row"
-            style={{ gridTemplateColumns: "32px minmax(0, 1fr) auto", alignItems: "start" }}
-          >
-            <AvatarChip
-              name={checkin.authorName}
-              fallbackInitial={checkin.authorShortName}
-              label={checkin.authorName}
-              size={32}
-            />
-            <div>
-              <div className="body" style={{ fontSize: 14 }}>
-                {checkin.note}
-              </div>
-              <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
-                {checkin.authorName}
-              </div>
-            </div>
-            <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-              {checkin.readingProgress}%
-            </span>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
+function ReadingProgressRecord({ checkin }: { checkin: MemberArchiveCheckinItem }) {
   return (
-    <div className="surface" style={{ overflow: "hidden" }}>
-      {checkins.map((checkin, index) => (
-        <div
-          key={`${checkin.authorName}-${checkin.note}`}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "44px minmax(0, 1fr) 54px",
-            gap: 16,
-            padding: "16px 18px",
-            borderTop: index === 0 ? 0 : "1px solid var(--line-soft)",
-          }}
-        >
-          <AvatarChip
-            name={checkin.authorName}
-            fallbackInitial={checkin.authorShortName}
-            label={checkin.authorName}
-            size={36}
-          />
-          <div>
-            <div className="body" style={{ fontSize: 14 }}>
-              {checkin.note}
-            </div>
-            <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
-              {checkin.authorName}
-            </div>
-          </div>
-          <div className="tiny mono" style={{ color: "var(--text-3)", textAlign: "right" }}>
-            {checkin.readingProgress}%
-          </div>
-        </div>
-      ))}
-    </div>
+    <article className="surface-quiet" style={{ padding: "16px 18px" }}>
+      <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+        저장된 진행률
+      </div>
+      <div className="h4 editorial" style={{ marginTop: 6 }}>
+        {checkin.readingProgress}%
+      </div>
+    </article>
   );
 }
 

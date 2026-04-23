@@ -3,7 +3,7 @@ package com.readmates.archive.api
 import com.readmates.auth.application.AuthSessionService
 import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
-import org.junit.jupiter.api.AfterEach
+import org.hamcrest.Matchers.empty
 import org.hamcrest.Matchers.emptyOrNullString
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.everyItem
@@ -11,6 +11,7 @@ import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -218,8 +219,8 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$[0].questionCount") { value(6) }
                 jsonPath("$[0].oneLinerCount") { value(3) }
                 jsonPath("$[0].highlightCount") { value(3) }
-                jsonPath("$[0].checkinCount") { value(3) }
-                jsonPath("$[0].totalCount") { value(15) }
+                jsonPath(removedJsonPath("$[0].", "check", "inCount")) { doesNotExist() }
+                jsonPath("$[0].totalCount") { value(12) }
                 jsonPath("$[5].sessionNumber") { value(1) }
             }
     }
@@ -246,8 +247,10 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$[?(@.sessionNumber == 6)].questionCount") { value(hasItem(4)) }
                 jsonPath("$[?(@.sessionNumber == 6)].oneLinerCount") { value(hasItem(2)) }
                 jsonPath("$[?(@.sessionNumber == 6)].highlightCount") { value(hasItem(2)) }
-                jsonPath("$[?(@.sessionNumber == 6)].checkinCount") { value(hasItem(2)) }
-                jsonPath("$[?(@.sessionNumber == 6)].totalCount") { value(hasItem(10)) }
+                jsonPath(removedJsonPath("$[?(@.sessionNumber == 6)].", "check", "inCount")) {
+                    value(empty<Any>())
+                }
+                jsonPath("$[?(@.sessionNumber == 6)].totalCount") { value(hasItem(8)) }
             }
 
         mockMvc.get("/api/notes/feed") {
@@ -256,7 +259,7 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(10) }
+                jsonPath("$.length()") { value(8) }
                 jsonPath("$[*].text") {
                     value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?")))
                 }
@@ -275,10 +278,13 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(15) }
+                jsonPath("$.length()") { value(12) }
                 jsonPath("$[*].sessionId") { value(everyItem(equalTo("00000000-0000-0000-0000-000000000306"))) }
                 jsonPath("$[*].kind") {
-                    value(hasItems("QUESTION", "ONE_LINE_REVIEW", "HIGHLIGHT", "CHECKIN"))
+                    value(hasItems("QUESTION", "ONE_LINE_REVIEW", "HIGHLIGHT"))
+                }
+                jsonPath("$[*].kind") {
+                    value(not(hasItem("CHECKIN")))
                 }
                 jsonPath("$[*].text") {
                     value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다."))
@@ -315,7 +321,7 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(140) }
+                jsonPath("$.length()") { value(137) }
                 jsonPath("$[*].text") { value(hasItem("세션 필터 무제한 하이라이트 125")) }
             }
     }
@@ -393,10 +399,11 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(not(hasItem("멤버1"))) }
-                jsonPath("$.clubCheckins[*].authorName") { value(hasItem("탈퇴한 멤버")) }
-                jsonPath("$.clubCheckins[*].authorName") { value(not(hasItem("안멤버1"))) }
-                jsonPath("$.clubCheckins[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
-                jsonPath("$.clubCheckins[*].authorShortName") { value(not(hasItem("멤버1"))) }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
+                jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
+                jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
+                jsonPath("$.clubOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
+                jsonPath("$.clubOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
@@ -410,7 +417,10 @@ class ArchiveAndNotesDbTest(
             .andExpect {
                 status { isOk() }
                 jsonPath("$[?(@.authorName == '탈퇴한 멤버')].kind") {
-                    value(hasItems("QUESTION", "ONE_LINE_REVIEW", "CHECKIN", "HIGHLIGHT"))
+                    value(hasItems("QUESTION", "ONE_LINE_REVIEW", "HIGHLIGHT"))
+                }
+                jsonPath("$[*].kind") {
+                    value(not(hasItem("CHECKIN")))
                 }
                 jsonPath("$[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$[*].authorShortName") { value(not(hasItem("멤버1"))) }
@@ -493,6 +503,8 @@ class ArchiveAndNotesDbTest(
     }
 
     companion object {
+        private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
         private const val CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL = """
             delete from sessions
             where id in (
