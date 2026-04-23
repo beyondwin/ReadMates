@@ -64,7 +64,7 @@ export default function MemberHome({
   return (
     <main>
       <div className="desktop-only rm-member-home-desktop">
-        <section style={{ padding: "48px 0 20px" }}>
+        <section className="page-header-compact">
           <div className="container">
             <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "28px" }}>
               <div>

@@ -201,6 +201,15 @@ describe("MemberHome", () => {
     expect(desktop.getByText("Passcode · memberpass")).toBeInTheDocument();
   });
 
+  it("aligns the desktop home header with other member tab headers", () => {
+    const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
+    const desktop = container.querySelector(".rm-member-home-desktop");
+    const header = desktop?.querySelector("section");
+
+    expect(header).toHaveClass("page-header-compact");
+    expect(within(header as HTMLElement).getByText("읽는사이 · 홈")).toBeInTheDocument();
+  });
+
   it("uses the current session RSVP count for next session attendance", () => {
     const { container } = render(
       <MemberHome
