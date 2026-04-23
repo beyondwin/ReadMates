@@ -14,6 +14,7 @@ import { Link } from "@/src/app/router-link";
 import { usePublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
+import { TabIcon, type TabIconName } from "./mobile-tab-bar";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
 
@@ -74,7 +75,7 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
     return "지난 세션";
   }
 
-  if (pathname.startsWith("/app/session")) {
+  if (pathname === "/app/session" || pathname.startsWith("/app/session/")) {
     return READMATES_NAV_LABELS.member.currentSession;
   }
 
@@ -97,7 +98,7 @@ type HeaderBackTarget = {
   href: string;
   state?: ReadmatesReturnState;
   label: string;
-  iconOnly?: boolean;
+  icon?: TabIconName | "brand";
 };
 
 type HeaderAction = {
@@ -107,12 +108,16 @@ type HeaderAction = {
 };
 
 function appBackTarget(pathname: string, state: unknown): HeaderBackTarget | null {
+  if (pathname === "/app/session" || pathname.startsWith("/app/session/")) {
+    return { href: "/app", label: "홈", icon: "brand" };
+  }
+
   if (pathname === "/app/notes") {
-    return { href: "/app", label: "홈" };
+    return { href: "/app", label: "홈", icon: "brand" };
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {
-    return { href: "/app/host", label: "오늘", iconOnly: true };
+    return { href: "/app/host", label: "오늘", icon: "brand" };
   }
 
   if (pathname.startsWith("/app/feedback/") && pathname.endsWith("/print")) {
@@ -145,6 +150,18 @@ function ChevronLeftIcon() {
   );
 }
 
+function HeaderBackIcon({ icon }: { icon: HeaderBackTarget["icon"] }) {
+  if (icon === "brand") {
+    return <ReadmatesBrandMark />;
+  }
+
+  if (icon) {
+    return <TabIcon name={icon} />;
+  }
+
+  return <ChevronLeftIcon />;
+}
+
 function HeaderShell({
   workspace,
   title,
@@ -167,12 +184,12 @@ function HeaderShell({
           <Link
             to={backTarget.href}
             state={backTarget.state}
-            className={`m-hdr-back${backTarget.iconOnly ? " m-hdr-back--icon" : ""}`}
+            className={`m-hdr-back${backTarget.icon ? " m-hdr-back--icon" : ""}`}
             aria-label="뒤로"
-            style={backTarget.iconOnly ? { width: 44, padding: 0 } : undefined}
+            style={backTarget.icon ? { width: 44, padding: 0 } : undefined}
           >
-            <ChevronLeftIcon />
-            {backTarget.iconOnly ? null : <span className="m-hdr-back__label">{backTarget.label}</span>}
+            <HeaderBackIcon icon={backTarget.icon} />
+            {backTarget.icon ? null : <span className="m-hdr-back__label">{backTarget.label}</span>}
           </Link>
         ) : (
           <Link to={brandHref} className="m-hdr-brand" aria-label="읽는사이 홈">

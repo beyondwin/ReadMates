@@ -11,7 +11,7 @@ type MobileTabBarProps = {
   currentSessionId?: string | null | undefined;
 };
 
-type TabIconName = "home" | "session" | "notes" | "archive" | "me" | "host" | "edit" | "invite" | "approve";
+export type TabIconName = "home" | "session" | "notes" | "archive" | "me" | "host" | "edit" | "invite" | "approve";
 
 type TabLink = {
   key: string;
@@ -99,7 +99,7 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
   ];
 }
 
-function TabIcon({ name }: { name: TabIconName }) {
+export function TabIcon({ name }: { name: TabIconName }) {
   const common = {
     width: 20,
     height: 20,
