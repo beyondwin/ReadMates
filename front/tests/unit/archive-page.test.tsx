@@ -604,8 +604,9 @@ describe("ArchivePage", () => {
     const desktop = getDesktop(container);
 
     await user.click(desktop.getByRole("button", { name: "내 서평" }));
-    expect(desktop.getByText("저장된 발췌 · 2026.04.15")).toBeInTheDocument();
+    expect(desktop.getByText("서평 · 2026-04-15")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
+    expect(desktop.getByText("나")).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" })).toHaveAttribute(
       "href",
       "/app/sessions/session-6#my-records",

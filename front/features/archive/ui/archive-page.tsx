@@ -110,6 +110,11 @@ function reportNumberLabel(sessionNumber: number) {
   return `No.${String(sessionNumber).padStart(2, "0")}`;
 }
 
+function formatReviewDateLabel(value: string) {
+  const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return dateOnlyMatch ? `${dateOnlyMatch[1]}-${dateOnlyMatch[2]}-${dateOnlyMatch[3]}` : formatDateOnlyLabel(value);
+}
+
 export default function ArchivePage({
   sessions,
   questions,
@@ -119,6 +124,7 @@ export default function ArchivePage({
   onViewChange,
   routePathname,
   routeSearch,
+  reviewAuthorName,
 }: {
   sessions: ArchiveSessionItemLike[];
   questions: ArchiveQuestionItem[];
@@ -128,6 +134,7 @@ export default function ArchivePage({
   onViewChange?: (view: ArchiveView) => void;
   routePathname?: string;
   routeSearch?: string;
+  reviewAuthorName?: string | null;
 }) {
   const [fallbackView, setFallbackView] = useState<ArchiveView>(initialView);
   const view = onViewChange ? initialView : fallbackView;
@@ -158,6 +165,7 @@ export default function ArchivePage({
           questions={questions}
           reviews={reviews}
           reports={reports}
+          reviewAuthorName={reviewAuthorName}
         />
       </div>
       <div className="mobile-only">
@@ -181,6 +189,7 @@ function ArchiveDesktop({
   questions,
   reviews,
   reports,
+  reviewAuthorName,
 }: {
   view: ArchiveView;
   setView: (view: ArchiveView) => void;
@@ -188,6 +197,7 @@ function ArchiveDesktop({
   questions: ArchiveQuestionItem[];
   reviews: ArchiveReviewItem[];
   reports: FeedbackDocumentListItem[];
+  reviewAuthorName?: string | null;
 }) {
   return (
     <>
@@ -240,7 +250,7 @@ function ArchiveDesktop({
         <div className="container">
           <ArchiveSelectedSection view={view}>
             {view === "sessions" ? <ArchiveSessions sessions={sessions} /> : null}
-            {view === "reviews" ? <ArchiveReviews reviews={reviews} /> : null}
+            {view === "reviews" ? <ArchiveReviews reviews={reviews} reviewAuthorName={reviewAuthorName} /> : null}
             {view === "questions" ? <ArchiveQuestions questions={questions} /> : null}
             {view === "report" ? <ArchiveReports reports={reports} sessions={sessions} /> : null}
           </ArchiveSelectedSection>
@@ -672,36 +682,55 @@ function SessionAction({ session }: { session: ArchiveSessionRecord }) {
   );
 }
 
-function ArchiveReviews({ reviews }: { reviews: ArchiveReviewItem[] }) {
+function ArchiveReviews({ reviews, reviewAuthorName }: { reviews: ArchiveReviewItem[]; reviewAuthorName?: string | null }) {
   if (reviews.length === 0) {
     return <EmptyState message="아직 작성된 서평이 없습니다." />;
   }
 
   return (
-    <div className="grid-2" style={{ marginTop: "22px" }}>
+    <div className="grid-2" style={{ gap: "18px", marginTop: "18px" }}>
       {reviews.map((review) => (
-        <article key={`${review.sessionId}-${review.kind}`} className="rm-document-panel" style={{ padding: "28px" }}>
-          <div className="eyebrow">저장된 발췌 · {formatDateOnlyLabel(review.date)}</div>
-          <h2 className="h3 editorial" style={{ margin: "10px 0 0" }}>
+        <Link
+          key={`${review.sessionId}-${review.kind}`}
+          className="rm-document-panel"
+          to={appSessionHref(review.sessionId, "my-records")}
+          state={archiveReturnState("reviews")}
+          aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
+          style={{
+            display: "grid",
+            gridTemplateRows: "auto auto auto auto",
+            alignContent: "start",
+            padding: "20px 48px 20px",
+            color: "inherit",
+            textDecoration: "none",
+          }}
+        >
+          <div className="eyebrow">서평 · {formatReviewDateLabel(review.date)}</div>
+          <h2 className="h3 editorial" style={{ margin: "18px 0 0" }}>
             {review.bookTitle}
           </h2>
-          <p className="quote editorial" style={{ margin: "16px 0 0" }}>
+          <p
+            className="editorial"
+            style={{
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: 3,
+              alignSelf: "start",
+              overflow: "hidden",
+              color: "var(--text-2)",
+              fontSize: "18px",
+              lineHeight: 1.55,
+              margin: "20px 0 0",
+              wordBreak: "keep-all",
+              overflowWrap: "anywhere",
+            }}
+          >
             {review.text}
           </p>
-          <div className="rule" style={{ marginTop: "16px" }}>
-            <span className="mono">
-              No.{String(review.sessionNumber).padStart(2, "0")} · {review.kind === "ONE_LINE_REVIEW" ? "한줄평" : "장문 서평"}
-            </span>
-            <Link
-              className="btn btn-ghost btn-sm"
-              to={appSessionHref(review.sessionId, "my-records")}
-              state={archiveReturnState("reviews")}
-              aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
-            >
-              세션으로 →
-            </Link>
+          <div className="rule" style={{ margin: "16px 0 0" }}>
+            <span>{reviewAuthorName ?? "나"}</span>
           </div>
-        </article>
+        </Link>
       ))}
     </div>
   );
