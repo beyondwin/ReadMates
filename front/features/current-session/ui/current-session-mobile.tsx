@@ -750,11 +750,11 @@ function MobileRecordsSegment({
             </div>
             <span className="badge">언제든</span>
           </div>
-          <label className="label" htmlFor="mobile-long-review">
+          <label className="label rm-sr-only" htmlFor="mobile-long-review">
             서평 내용
           </label>
           <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-            긴 기록은 아카이브에서 이어 쓸 수 있습니다.
+            모임 전후로 떠오른 생각을 자유롭게 남겨 주세요.
           </p>
           <textarea
             id="mobile-long-review"
@@ -765,10 +765,7 @@ function MobileRecordsSegment({
             onChange={(event) => onLongReviewChange(event.target.value)}
             placeholder="완독 후든, 모임 이후든, 시간이 흐른 뒤에라도 이 책에 대해 남기고 싶은 문장을 천천히 적어 주세요."
           />
-          <div className="rm-current-session-mobile__save-row">
-            <span className="tiny" style={{ color: "var(--text-3)" }}>
-              아카이브에서 이어 쓰기
-            </span>
+          <div className="rm-current-session-mobile__save-row" style={{ justifyContent: "flex-end" }}>
             <div className="m-row" style={{ gap: 10, justifyContent: "flex-end" }}>
               <SaveFeedback scope="longReview" status={longReviewSaveStatus} />
               <button
@@ -809,7 +806,7 @@ function MobileViewerRecordsSegment({ longReview, oneLineReview }: { longReview:
             내 기록은 읽기 전용입니다
           </div>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-            정식 멤버가 되면 한줄평과 서평을 새로 저장하거나 이어 쓸 수 있습니다.
+            정식 멤버가 되면 한줄평과 서평을 새로 저장할 수 있습니다.
           </p>
         </div>
       </section>

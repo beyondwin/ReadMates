@@ -174,11 +174,11 @@ export function LongReviewPanel({
         </div>
         <span className="badge">언제든 작성 가능</span>
       </div>
-      <label className="label" htmlFor={reviewId}>
+      <label className="label rm-sr-only" htmlFor={reviewId}>
         서평 내용
       </label>
       <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-        긴 기록은 아카이브에서 다시 이어 쓸 수 있습니다.
+        모임 전후로 떠오른 생각을 자유롭게 남겨 주세요.
       </p>
       <textarea
         id={reviewId}
@@ -188,16 +188,11 @@ export function LongReviewPanel({
         onChange={(event) => onChange(event.target.value)}
         placeholder="완독 후든, 모임 이후든, 시간이 흐른 뒤에라도 — 이 책에 대해 남기고 싶은 문장을 천천히 적어 주세요."
       />
-      <div className="row-between" style={{ marginTop: "12px" }}>
-        <div className="small" style={{ color: "var(--text-3)" }}>
-          저장하면 아카이브에서 이어 쓸 수 있어요
-        </div>
-        <div className="row" style={{ gap: "10px", justifyContent: "flex-end" }}>
-          <SaveFeedback scope="longReview" status={saveStatus} />
-          <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSave}>
-            서평 저장
-          </button>
-        </div>
+      <div className="row" style={{ marginTop: "12px", gap: "10px", justifyContent: "flex-end" }}>
+        <SaveFeedback scope="longReview" status={saveStatus} />
+        <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSave}>
+          서평 저장
+        </button>
       </div>
     </section>
   );
@@ -231,11 +226,11 @@ export function MyStatusCard({
       <div className="eyebrow" style={{ marginBottom: "14px" }}>
         내 상태
       </div>
-      <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
+      <dl className="rm-session-status-list">
         {items.map((item) => (
-          <div key={item.label} className="row-between">
-            <span className="small">{item.label}</span>
-            <span className="row" style={{ gap: "8px" }}>
+          <div key={item.label} className="rm-session-status-row">
+            <dt className="small">{item.label}</dt>
+            <dd>
               <span className="body" style={{ fontSize: "14px", fontWeight: 500, color: item.ok ? "var(--ok)" : "var(--text)" }}>
                 {item.value}
               </span>
@@ -248,10 +243,10 @@ export function MyStatusCard({
                   background: item.ok ? "var(--ok)" : "var(--text-4)",
                 }}
               />
-            </span>
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
     </div>
   );
 }
@@ -264,29 +259,29 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
       <div className="eyebrow" style={{ marginBottom: "14px" }}>
         세션 정보
       </div>
-      <dl
-        style={{
-          display: "grid",
-          gridTemplateColumns: "auto 1fr",
-          columnGap: "14px",
-          rowGap: "8px",
-          margin: 0,
-        }}
-      >
-        <dt className="eyebrow">날짜</dt>
-        <dd style={{ margin: 0 }}>{formatDateLabel(session.date)}</dd>
-        <dt className="eyebrow">시간</dt>
-        <dd style={{ margin: 0 }}>
-          {session.startTime} – {session.endTime}
-        </dd>
-        <dt className="eyebrow">장소</dt>
-        <dd style={{ margin: 0 }}>{session.locationLabel}</dd>
-        <dt className="eyebrow">질문 마감</dt>
-        <dd style={{ margin: 0 }}>{formatDeadlineLabel(session.questionDeadlineAt)}</dd>
+      <dl className="rm-session-meta-list">
+        <div className="rm-session-meta-row">
+          <dt className="eyebrow">날짜</dt>
+          <dd>{formatDateLabel(session.date)}</dd>
+        </div>
+        <div className="rm-session-meta-row">
+          <dt className="eyebrow">시간</dt>
+          <dd>
+            {session.startTime} – {session.endTime}
+          </dd>
+        </div>
+        <div className="rm-session-meta-row">
+          <dt className="eyebrow">장소</dt>
+          <dd>{session.locationLabel}</dd>
+        </div>
+        <div className="rm-session-meta-row">
+          <dt className="eyebrow">질문 마감</dt>
+          <dd>{formatDeadlineLabel(session.questionDeadlineAt)}</dd>
+        </div>
         {meetingUrl ? (
-          <>
+          <div className="rm-session-meta-row">
             <dt className="eyebrow">모임 링크</dt>
-            <dd style={{ margin: 0 }}>
+            <dd>
               <a className="btn btn-ghost btn-sm" href={meetingUrl} target="_blank" rel="noreferrer">
                 미팅 입장
               </a>
@@ -296,10 +291,12 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
                 </div>
               ) : null}
             </dd>
-          </>
+          </div>
         ) : null}
-        <dt className="eyebrow">기록</dt>
-        <dd style={{ margin: 0 }}>음성만 · 자동 정리 참고용</dd>
+        <div className="rm-session-meta-row">
+          <dt className="eyebrow">기록</dt>
+          <dd>음성만 · 자동 정리 참고용</dd>
+        </div>
       </dl>
       <hr className="divider-soft" style={{ margin: "14px 0" }} />
       <div className="row" style={{ gap: "8px" }}>
