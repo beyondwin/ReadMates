@@ -107,7 +107,7 @@ type HeaderAction = {
   ariaLabel?: string;
 };
 
-function appBackTarget(pathname: string, state: unknown): HeaderBackTarget | null {
+function appBackTarget(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string, state: unknown): HeaderBackTarget | null {
   if (pathname === "/app/session" || pathname.startsWith("/app/session/")) {
     return { href: "/app", label: "홈", icon: "brand" };
   }
@@ -131,7 +131,12 @@ function appBackTarget(pathname: string, state: unknown): HeaderBackTarget | nul
 
   if (pathname.startsWith("/app/feedback/")) {
     const target = readReadmatesReturnTarget(state, archiveReportReturnTarget);
-    return { href: target.href, state: target.state, label: "뒤로" };
+    return {
+      href: target.href,
+      state: target.state,
+      label: "뒤로",
+      ...(variant === "host" ? { icon: "archive" as const } : {}),
+    };
   }
 
   if (pathname.startsWith("/app/sessions/")) {
@@ -271,7 +276,7 @@ function AppMobileHeader({
       workspace={variant}
       kicker={variant === "host" ? "호스트" : null}
       title={appTitle(variant, pathname)}
-      backTarget={appBackTarget(pathname, location.state)}
+      backTarget={appBackTarget(variant, pathname, location.state)}
       rightAction={appRightAction(variant, showHostEntry)}
     />
   );
