@@ -10,11 +10,11 @@ export type CurrentSessionAccessAuth = {
 
 export type CurrentSessionBoard = {
   questions: readonly unknown[];
-  checkins: readonly unknown[];
+  oneLineReviews: readonly unknown[];
   highlights: readonly unknown[];
 };
 
-export type CurrentSessionBoardTab = "questions" | "checkins" | "highlights";
+export type CurrentSessionBoardTab = "questions" | "oneLineReviews" | "highlights";
 
 export type CurrentSessionSaveScope = "rsvp" | "checkin" | "question" | "longReview" | "oneLineReview";
 export type CurrentSessionSaveState = "idle" | "saving" | "saved" | "error";
@@ -66,7 +66,7 @@ export function getCurrentSessionMemberNotice(access: { isViewer: boolean; isSus
 export function getCurrentSessionBoardTabs(board: CurrentSessionBoard) {
   return [
     { key: "questions", label: `질문 · ${board.questions.length}`, count: board.questions.length },
-    { key: "checkins", label: `읽기 흔적 · ${board.checkins.length}`, count: board.checkins.length },
+    { key: "oneLineReviews", label: `한줄평 · ${board.oneLineReviews.length}`, count: board.oneLineReviews.length },
     { key: "highlights", label: `하이라이트 · ${board.highlights.length}`, count: board.highlights.length },
   ] satisfies Array<{ key: CurrentSessionBoardTab; label: string; count: number }>;
 }
