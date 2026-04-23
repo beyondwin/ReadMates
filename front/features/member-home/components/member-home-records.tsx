@@ -104,55 +104,6 @@ export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
   );
 }
 
-export function MyRecent({ items }: { items: NoteFeedItem[] }) {
-  return (
-    <section>
-      <SectionHeader
-        eyebrow="아카이브"
-        title="최근에 남긴 내 기록"
-        action={
-          <Link to="/app/archive" className="btn btn-quiet btn-sm">
-            아카이브 →
-          </Link>
-        }
-      />
-      {items.length === 0 ? (
-        <div className="surface-quiet" style={{ padding: "20px" }}>
-          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            아직 내가 남긴 기록이 없습니다.
-          </p>
-        </div>
-      ) : (
-        <div className="grid-2">
-          {items.map((item) => (
-            <article key={`${item.sessionNumber}-${item.kind}-${item.text}`} className="surface" style={{ padding: "24px" }}>
-              <div className="eyebrow">
-                {noteKindLabel(item.kind)} · No.{String(item.sessionNumber).padStart(2, "0")}
-              </div>
-              <h3 className="h4 editorial" style={{ margin: "10px 0 0" }}>
-                내 기록
-              </h3>
-              <p
-                className="body"
-                style={{
-                  color: "var(--text-2)",
-                  margin: "10px 0 0",
-                  display: "-webkit-box",
-                  WebkitLineClamp: 3,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
-              >
-                {item.text}
-              </p>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 export function MobileMemberActivity({ items }: { items: NoteFeedItem[] }) {
   return (
     <section className="m-sec">

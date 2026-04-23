@@ -10,7 +10,6 @@ import {
   ClubPulse,
   MobileMemberActivity,
   MobileStats,
-  MyRecent,
   RosterSummary,
 } from "@/features/member-home/components/member-home-records";
 import {
@@ -51,15 +50,6 @@ export default function MemberHome({
   const memberName = auth.shortName ?? auth.displayName ?? "멤버";
   const attendanceSummary = attendanceSummaryFromMyPage(myPage);
   const isViewer = auth.membershipStatus === "VIEWER";
-  const authDisplayName = auth.displayName?.trim();
-  const authShortName = auth.shortName?.trim();
-  const myRecentItems = noteFeedItems
-    .filter(
-      (item) =>
-        (authDisplayName ? item.authorName === authDisplayName : false) ||
-        (authShortName ? item.authorShortName === authShortName : false),
-    )
-    .slice(0, 2);
 
   return (
     <main>
@@ -102,7 +92,6 @@ export default function MemberHome({
             <div className="home-grid">
               <div className="stack" style={{ "--stack": "40px" } as CSSProperties}>
                 <ClubPulse items={noteFeedItems.slice(0, 3)} />
-                <MyRecent items={myRecentItems} />
               </div>
               <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
                 <RosterSummary current={current} />
