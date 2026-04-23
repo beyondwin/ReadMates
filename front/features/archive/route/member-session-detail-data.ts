@@ -1,8 +1,44 @@
 import type { LoaderFunctionArgs } from "react-router-dom";
-import { fetchMemberArchiveSession } from "@/features/archive/api/archive-api";
+import { fetchMemberArchiveSession, fetchNotesFeed } from "@/features/archive/api/archive-api";
+import type {
+  MemberArchiveSessionDetailResponse,
+  NoteFeedItem,
+} from "@/features/archive/api/archive-contracts";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
 
 export type MemberSessionDetailRouteData = Awaited<ReturnType<typeof fetchMemberArchiveSession>>;
+
+export function enrichSessionDetailHighlightAuthors(
+  session: MemberArchiveSessionDetailResponse,
+  notesFeed: NoteFeedItem[],
+): MemberArchiveSessionDetailResponse {
+  const highlightAuthorsByText = new Map(
+    notesFeed
+      .filter((item) => item.kind === "HIGHLIGHT" && item.authorName)
+      .map((item) => [item.text, item]),
+  );
+
+  return {
+    ...session,
+    publicHighlights: session.publicHighlights.map((highlight) => {
+      if (highlight.authorName) {
+        return highlight;
+      }
+
+      const note = highlightAuthorsByText.get(highlight.text);
+
+      if (!note) {
+        return highlight;
+      }
+
+      return {
+        ...highlight,
+        authorName: note.authorName,
+        authorShortName: note.authorShortName,
+      };
+    }),
+  };
+}
 
 export async function memberSessionDetailLoader({
   params,
@@ -13,5 +49,19 @@ export async function memberSessionDetailLoader({
     return null;
   }
 
-  return params.sessionId ? fetchMemberArchiveSession(params.sessionId) : null;
+  if (!params.sessionId) {
+    return null;
+  }
+
+  const session = await fetchMemberArchiveSession(params.sessionId);
+
+  if (!session || session.publicHighlights.every((highlight) => highlight.authorName)) {
+    return session;
+  }
+
+  try {
+    return enrichSessionDetailHighlightAuthors(session, await fetchNotesFeed(session.sessionId));
+  } catch {
+    return session;
+  }
 }

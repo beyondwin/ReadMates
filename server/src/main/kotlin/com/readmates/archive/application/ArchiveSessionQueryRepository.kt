@@ -191,8 +191,15 @@ class ArchiveSessionQueryRepository(
     ): List<MemberArchiveHighlightItem> =
         jdbcTemplate.query(
             """
-            select highlights.text, highlights.sort_order
+            select
+              highlights.text,
+              highlights.sort_order,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name
             from highlights
+            left join memberships on memberships.id = highlights.membership_id
+              and memberships.club_id = highlights.club_id
+            left join users on users.id = memberships.user_id
             left join session_participants on session_participants.session_id = highlights.session_id
               and session_participants.club_id = highlights.club_id
               and session_participants.membership_id = highlights.membership_id
@@ -208,6 +215,8 @@ class ArchiveSessionQueryRepository(
                 MemberArchiveHighlightItem(
                     text = resultSet.getString("text"),
                     sortOrder = resultSet.getInt("sort_order"),
+                    authorName = resultSet.getString("author_name"),
+                    authorShortName = resultSet.getString("author_short_name"),
                 )
             },
             clubId.dbString(),

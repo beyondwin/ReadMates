@@ -180,6 +180,8 @@ export const archiveSessionDetailContractFixture = {
     {
       text: "세계는 생각보다 나아지고 있지만, 우리의 감각은 느리게 따라온다.",
       sortOrder: 1,
+      authorName: "안멤버1",
+      authorShortName: "멤버1",
     },
   ],
   clubQuestions: [

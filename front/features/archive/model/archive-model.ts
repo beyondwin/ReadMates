@@ -101,6 +101,8 @@ export type MemberArchiveSessionDetail = {
 export type MemberArchiveHighlightItem = {
   text: string;
   sortOrder: number;
+  authorName: string | null;
+  authorShortName: string | null;
 };
 
 export type MemberArchiveQuestionItem = {
