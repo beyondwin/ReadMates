@@ -108,18 +108,18 @@ export function MyRecent({ items }: { items: NoteFeedItem[] }) {
   return (
     <section>
       <SectionHeader
-        eyebrow="내 최근 기록"
-        title="내 최근 기록"
+        eyebrow="아카이브"
+        title="최근에 남긴 내 기록"
         action={
-          <Link to="/app/me" className="btn btn-quiet btn-sm">
-            내 공간 →
+          <Link to="/app/archive" className="btn btn-quiet btn-sm">
+            아카이브 →
           </Link>
         }
       />
       {items.length === 0 ? (
         <div className="surface-quiet" style={{ padding: "20px" }}>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            아직 내 기록이 없습니다.
+            아직 내가 남긴 기록이 없습니다.
           </p>
         </div>
       ) : (
