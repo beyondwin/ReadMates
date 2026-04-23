@@ -262,7 +262,7 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
         <div className="m-list">
           {reports.map((report) => (
             <div key={report.sessionId} className="m-list-row" style={{ gridTemplateColumns: "32px minmax(0, 1fr) auto" }}>
-              <span aria-hidden style={{ color: "var(--accent)", fontSize: 18 }}>
+              <span aria-hidden style={{ color: "var(--text-2)", fontSize: 18 }}>
                 <Icon name="notes" size={18} />
               </span>
               <div style={{ minWidth: 0 }}>
@@ -549,7 +549,7 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
               alignItems: "center",
             }}
           >
-            <span aria-hidden style={{ color: "var(--accent)", fontSize: "18px" }}>
+            <span aria-hidden style={{ color: "var(--text-2)", fontSize: "18px" }}>
               <Icon name="notes" size={18} />
             </span>
             <div style={{ minWidth: 0 }}>
