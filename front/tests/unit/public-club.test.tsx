@@ -47,7 +47,7 @@ describe("PublicClub", () => {
 
     const overview = screen.getByLabelText("클럽 운영 정보");
     expect(within(overview).getByText("시작")).toBeInTheDocument();
-    expect(within(overview).getByText("2024.03")).toBeInTheDocument();
+    expect(within(overview).getByText("2024.11")).toBeInTheDocument();
     expect(within(overview).getByText("운영 리듬")).toBeInTheDocument();
     expect(within(overview).getByText("호스트가 공지하는 날 · 20:00 – 22:00")).toBeInTheDocument();
     expect(within(overview).getByText("멤버 정원")).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("PublicClub", () => {
     expect(within(overview).getByText("호스트")).toBeInTheDocument();
     expect(within(overview).getByText("김호스트 · 2025.11~")).toBeInTheDocument();
     expect(within(overview).getByText("기록 방식")).toBeInTheDocument();
-    expect(within(overview).getByText("음성만 · 자동 정리 참고용")).toBeInTheDocument();
+    expect(within(overview).getByText("음성 기록 · AI 피드백 참고용")).toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "작게 읽고, 분명하게 남깁니다" })).toBeInTheDocument();
     expect(screen.getByText("참여, 피드백 문서, 개인 노트는 정식 멤버 공간에만 남깁니다.")).toBeInTheDocument();
