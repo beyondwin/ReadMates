@@ -49,7 +49,7 @@ export default function NotesFeedPage({
       <style>{`
         .rm-notes-feed-page__layout {
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 300px;
+          grid-template-columns: minmax(0, 1fr) 280px;
           gap: 56px;
           align-items: start;
         }
