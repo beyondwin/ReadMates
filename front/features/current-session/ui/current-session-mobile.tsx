@@ -148,8 +148,8 @@ export function MobileCurrentSessionBoard({
 }) {
   const tabs: Array<{ key: MobileSessionTab; label: string }> = [
     { key: "prep", label: "내 준비" },
-    { key: "board", label: "공동 보드" },
     { key: "after", label: "내 기록" },
+    { key: "board", label: "공동 보드" },
   ];
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
 
@@ -192,6 +192,7 @@ export function MobileCurrentSessionBoard({
       <div className="rm-current-session-mobile__seg-wrap">
         <div
           className="m-seg"
+          role="group"
           aria-label="세션 보기"
           onKeyDown={(event) => handleMobileSessionTabKeyDown(event, mobileTab, onMobileTabChange, tabs)}
         >
