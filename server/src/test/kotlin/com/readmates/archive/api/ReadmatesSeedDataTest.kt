@@ -66,6 +66,35 @@ class ReadmatesSeedDataTest(
     }
 
     @Test
+    fun `seed highlights exist for every attended participant`() {
+        val rows = jdbcTemplate.query(
+            """
+            select sessions.number, users.email
+            from highlights
+            join sessions on sessions.id = highlights.session_id
+              and sessions.club_id = highlights.club_id
+            join memberships on memberships.id = highlights.membership_id
+              and memberships.club_id = highlights.club_id
+            join users on users.id = memberships.user_id
+            where sessions.club_id = ?
+              and sessions.number between 1 and 6
+            order by sessions.number, users.email
+            """.trimIndent(),
+            { rs, _ -> rs.getInt("number") to rs.getString("email") },
+            CLUB_ID,
+        )
+
+        EXPECTED_ATTENDANCE.forEach { (sessionNumber, expectedAttendedEmails) ->
+            val actualHighlightEmails = rows
+                .filter { it.first == sessionNumber }
+                .map { it.second }
+                .toSet()
+
+            assertEquals(expectedAttendedEmails, actualHighlightEmails, "session $sessionNumber highlight authors")
+        }
+    }
+
+    @Test
     fun `seed sessions include cover image urls and neutral locations`() {
         val rows = jdbcTemplate.query(
             """

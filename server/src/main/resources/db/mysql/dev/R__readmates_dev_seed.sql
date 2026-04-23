@@ -1565,11 +1565,19 @@ with seed as (
   union all
   select 5303, 3, 'member2@example.com', '극한 상황의 범죄를 법, 윤리, 생존의 언어로 나누어 보았다.', 2
   union all
-  select 5401, 4, 'member1@example.com', '공정한 관찰자는 완전히 개인적인 목소리라기보다 경험과 사회가 쌓인 기준처럼 보였다.', 0
+  select 5304, 3, 'host@example.com', '가족의 의미가 나이와 생활 구조에 따라 달라진다는 점을 조심스럽게 붙잡았다.', 3
+  union all
+  select 5305, 3, 'member1@example.com', '명주의 감정을 원망, 연민, 화해가 섞인 애증으로 읽어냈다.', 4
+  union all
+  select 5306, 3, 'member5@example.com', '비극적 장면을 구조와 장르 감각으로 연결해 사회 문제로 확장했다.', 5
+  union all
+  select 5401, 4, 'host@example.com', '공정한 관찰자는 완전히 개인적인 목소리라기보다 경험과 사회가 쌓인 기준처럼 보였다.', 0
   union all
   select 5402, 4, 'member3@example.com', '사랑받고 싶은 욕구와 선행의 관계를 이기와 이타의 경계에서 다시 물었다.', 1
   union all
   select 5403, 4, 'member4@example.com', '행복한 삶은 칭찬보다 스스로 부끄럽지 않은 기준을 갖는 데 가까웠다.', 2
+  union all
+  select 5404, 4, 'member2@example.com', '이기와 이타, 행복, 자기 객관화를 조건과 인과의 문제로 다시 해석했다.', 3
   union all
   select 5501, 5, 'host@example.com', '검증이 부족한 추상적 설명은 독서의 어려움이 되었지만, 신념을 의심하는 계기가 되었다.', 0
   union all
@@ -1577,11 +1585,13 @@ with seed as (
   union all
   select 5503, 5, 'member4@example.com', '의식과 명상, 도덕의 기원을 각자의 언어로 붙잡아 보려 했다.', 2
   union all
+  select 5504, 5, 'member1@example.com', '후회와 선택, 명상을 불확실성을 인정하는 자기 언어로 풀어냈다.', 3
+  union all
   select 5601, 6, 'member5@example.com', '모르는 영역을 피하는 전략과 배움을 확장하는 전략의 장단점을 비교했다.', 0
   union all
   select 5602, 6, 'member2@example.com', '왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다.', 1
   union all
-  select 5603, 6, 'member4@example.com', '다학문적 사고는 더 안전한 판단을 만들기도 하지만 실행을 늦추는 부담이 되기도 했다.', 2
+  select 5603, 6, 'host@example.com', '다학문적 사고는 더 안전한 판단을 만들기도 하지만 실행을 늦추는 부담이 되기도 했다.', 2
 ),
 resolved as (
   select

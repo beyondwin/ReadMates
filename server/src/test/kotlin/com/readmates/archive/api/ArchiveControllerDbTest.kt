@@ -53,8 +53,8 @@ class ArchiveControllerDbTest(
                 jsonPath("$.publicHighlights.length()") { value(greaterThan(0)) }
                 jsonPath("$.publicHighlights[*].text") { value(everyItem(not(emptyOrNullString()))) }
                 jsonPath("$.publicHighlights[*].sortOrder") { value(hasItem(0)) }
-                jsonPath("$.publicHighlights[*].authorName") { value(hasItems("이멤버5", "최멤버2", "송멤버4")) }
-                jsonPath("$.publicHighlights[*].authorShortName") { value(hasItems("멤버5", "멤버2", "멤버4")) }
+                jsonPath("$.publicHighlights[*].authorName") { value(hasItems("이멤버5", "최멤버2", "김호스트")) }
+                jsonPath("$.publicHighlights[*].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
                 jsonPath("$.clubQuestions.length()") { value(greaterThan(0)) }
                 jsonPath("$.clubQuestions[*].priority") { value(hasItems(1, 2)) }
                 jsonPath("$.clubQuestions[*].text") { value(everyItem(not(emptyOrNullString()))) }
