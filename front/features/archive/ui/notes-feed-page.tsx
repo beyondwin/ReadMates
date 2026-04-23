@@ -35,7 +35,6 @@ export default function NotesFeedPage({
   const activeSessionId = displayedSession?.sessionId ?? null;
   const selectedSessionItems = activeSessionId ? items.filter((item) => item.sessionId === activeSessionId) : [];
   const filter = onFilterChange ? initialFilter : fallbackFilter;
-  const showAiAssistedLabel = filter === "highlights" || filter === "oneliners";
   const handleFilterChange = (nextFilter: FeedFilter) => {
     if (onFilterChange) {
       onFilterChange(nextFilter);
@@ -84,14 +83,7 @@ export default function NotesFeedPage({
 
       <section className="page-header-compact rm-notes-feed-page__header">
         <div className="container">
-          <div className="row-between" style={{ gap: "18px", alignItems: "start" }}>
-            <SelectedSessionHeader session={displayedSession} />
-            {showAiAssistedLabel ? (
-              <span className="tiny mono" style={{ color: "var(--text-3)", marginTop: "2px", whiteSpace: "nowrap" }}>
-                AI-assisted
-              </span>
-            ) : null}
-          </div>
+          <SelectedSessionHeader session={displayedSession} />
           <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", maxWidth: 620 }}>
             세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.
           </p>
