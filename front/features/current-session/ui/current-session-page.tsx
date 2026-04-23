@@ -5,8 +5,8 @@ import { MobileCurrentSessionBoard, type MobileSessionTab } from "@/features/cur
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
 import { initialQuestionInputs } from "@/features/current-session/ui/current-session-question-editor-utils";
 import {
-  BoardCheckins,
   BoardHighlights,
+  BoardOneLineReviews,
   BoardQuestions,
   CheckinPanel,
   FeedbackAccessPanel,
@@ -57,7 +57,7 @@ const emptySaveStatuses: Record<SaveScope, SaveState> = {
 
 export type CurrentSessionSaveActions = {
   updateRsvp: (status: RsvpUpdateStatus) => Promise<void>;
-  saveCheckin: (readingProgress: number, note: string) => Promise<void>;
+  saveCheckin: (readingProgress: number) => Promise<void>;
   saveQuestions: (questions: CurrentSessionQuestionPayloadItem[]) => Promise<void>;
   saveLongReview: (body: string) => Promise<void>;
   saveOneLineReview: (text: string) => Promise<void>;
@@ -117,7 +117,7 @@ export function CurrentSessionEmpty({
               아직 열린 세션이 없습니다
             </h1>
             <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              새 세션이 등록되면 RSVP, 읽기 체크인, 토론 질문, 한줄평 작업대가 열립니다.
+              새 세션이 등록되면 RSVP, 읽기 진행률, 토론 질문, 한줄평 작업대가 열립니다.
             </p>
             {auth?.role === "HOST" ? (
               <InternalLink href="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
@@ -146,7 +146,6 @@ export function CurrentSessionBoard({
 }) {
   const [rsvp, setRsvp] = useState<CurrentSession["myRsvpStatus"]>(session.myRsvpStatus);
   const [readingProgress, setReadingProgress] = useState(session.myCheckin?.readingProgress ?? 0);
-  const [checkinNote, setCheckinNote] = useState(session.myCheckin?.note ?? "");
   const [questionInputs, setQuestionInputs] = useState<QuestionInput[]>(() => initialQuestionInputs(session.myQuestions));
   const [questionValidationMessage, setQuestionValidationMessage] = useState("");
   const [longReview, setLongReview] = useState(session.myLongReview?.body ?? "");
@@ -322,15 +321,6 @@ export function CurrentSessionBoard({
     setReadingProgress(value);
   };
 
-  const handleCheckinNoteChange = (value: string) => {
-    if (!canWrite) {
-      return;
-    }
-
-    resetSaveStatus("checkin");
-    setCheckinNote(value);
-  };
-
   const handleLongReviewChange = (value: string) => {
     if (!canWrite) {
       return;
@@ -354,7 +344,7 @@ export function CurrentSessionBoard({
       return;
     }
 
-    void runSave("checkin", () => actions.saveCheckin(readingProgress, checkinNote));
+    void runSave("checkin", () => actions.saveCheckin(readingProgress));
   };
 
   const handleSaveLongReview = () => {
@@ -380,8 +370,6 @@ export function CurrentSessionBoard({
         rsvp={rsvp}
         readingProgress={readingProgress}
         onReadingProgressChange={handleReadingProgressChange}
-        checkinNote={checkinNote}
-        onCheckinNoteChange={handleCheckinNoteChange}
         questionInputs={questionInputs}
         questionValidationMessage={questionValidationMessage}
         onQuestionChange={updateQuestionInput}
@@ -440,12 +428,12 @@ export function CurrentSessionBoard({
         <section style={{ padding: "32px 0 24px" }} aria-labelledby="current-session-prep-heading">
           <div className="container">
             <div style={{ marginBottom: "18px" }}>
-              <span className="eyebrow">읽기 기록 · 출석 · 질문</span>
+              <span className="eyebrow">읽기 진행률 · 출석 · 질문</span>
               <h2 id="current-session-prep-heading" className="h3 editorial" style={{ margin: "6px 0 0" }}>
                 내 준비 작업대
               </h2>
               <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-                읽기 기록, RSVP, 토론 질문, 한줄평을 세션 전에 바로 정리합니다.
+                읽기 진행률, RSVP, 토론 질문, 한줄평을 세션 전에 바로 정리합니다.
               </p>
             </div>
 
@@ -455,7 +443,6 @@ export function CurrentSessionBoard({
                   session={session}
                   rsvp={rsvp}
                   readingProgress={readingProgress}
-                  checkinNote={checkinNote}
                   longReview={longReview}
                   oneLineReview={oneLineReview}
                   memberNotice={memberNotice}
@@ -477,14 +464,12 @@ export function CurrentSessionBoard({
 
                   <section aria-labelledby="reading-record-heading">
                     <div className="eyebrow" id="reading-record-heading" style={{ marginBottom: "10px" }}>
-                      읽기 기록
+                      읽기 진행률
                     </div>
                     <CheckinPanel
                       readingProgress={readingProgress}
-                      checkinNote={checkinNote}
                       saveStatus={saveStatuses.checkin}
                       onReadingProgressChange={handleReadingProgressChange}
-                      onCheckinNoteChange={handleCheckinNoteChange}
                       onSave={handleSaveCheckin}
                     />
                   </section>
@@ -596,7 +581,7 @@ export function CurrentSessionBoard({
             </div>
 
             {boardTab === "questions" ? <BoardQuestions questions={session.board.questions} /> : null}
-            {boardTab === "checkins" ? <BoardCheckins checkins={session.board.checkins} /> : null}
+            {boardTab === "oneLineReviews" ? <BoardOneLineReviews oneLineReviews={session.board.oneLineReviews} /> : null}
             {boardTab === "highlights" ? <BoardHighlights highlights={session.board.highlights} /> : null}
           </div>
         </section>
@@ -643,7 +628,6 @@ function ViewerSessionReadOnly({
   session,
   rsvp,
   readingProgress,
-  checkinNote,
   longReview,
   oneLineReview,
   memberNotice,
@@ -651,7 +635,6 @@ function ViewerSessionReadOnly({
   session: CurrentSession;
   rsvp: CurrentSession["myRsvpStatus"];
   readingProgress: number;
-  checkinNote: string;
   longReview: string;
   oneLineReview: string;
   memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
@@ -680,11 +663,11 @@ function ViewerSessionReadOnly({
           기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          둘러보기 멤버는 RSVP, 체크인, 질문, 서평 저장을 할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.
+          둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평 저장을 할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.
         </p>
         <div className="grid-2" style={{ marginTop: "18px" }}>
           <ReadOnlyMetric label="RSVP" value={rsvpLabel(rsvp)} />
-          <ReadOnlyMetric label="읽기 기록" value={`${readingProgress}%`} />
+          <ReadOnlyMetric label="읽기 진행률" value={`${readingProgress}%`} />
           <ReadOnlyMetric label="토론 질문" value={`${questions.length}개`} />
           <ReadOnlyMetric label="피드백 문서" value="정식 멤버 전환 후" />
         </div>
@@ -692,13 +675,13 @@ function ViewerSessionReadOnly({
 
       <section className="surface" aria-labelledby="viewer-checkin-heading" style={{ padding: "28px" }}>
         <div className="eyebrow" id="viewer-checkin-heading">
-          보존된 읽기 기록
+          읽기 진행률
         </div>
         <div className="h4 editorial" style={{ marginTop: "6px" }}>
           {readingProgress}%
         </div>
         <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", whiteSpace: "pre-wrap" }}>
-          {checkinNote.trim() || "아직 남긴 체크인 메모가 없습니다."}
+          진행률은 내 준비 상태와 호스트 운영 확인에 사용됩니다.
         </p>
       </section>
 

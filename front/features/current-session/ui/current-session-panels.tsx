@@ -1,8 +1,8 @@
 import { type CSSProperties } from "react";
 import { Icon, SaveFeedback } from "@/features/current-session/ui/current-session-primitives";
 import type {
-  BoardCheckin,
   BoardHighlight,
+  BoardOneLineReview,
   BoardQuestion,
   CurrentSession,
   CurrentSessionInternalLinkProps,
@@ -97,28 +97,23 @@ export function RsvpPanel({
 
 export function CheckinPanel({
   readingProgress,
-  checkinNote,
   saveStatus,
   onReadingProgressChange,
-  onCheckinNoteChange,
   onSave,
 }: {
   readingProgress: number;
-  checkinNote: string;
   saveStatus: SaveState;
   onReadingProgressChange: (value: number) => void;
-  onCheckinNoteChange: (value: string) => void;
   onSave: () => void;
 }) {
   const progressId = "desktop-checkin-progress";
-  const noteId = "desktop-checkin-note";
 
   return (
     <section className="surface" style={{ padding: "28px" }}>
       <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "16px" }}>
         <div>
           <div className="eyebrow">
-            읽기 체크인
+            읽기 진행률
           </div>
           <div className="h4 editorial" style={{ marginTop: "6px" }}>
             어디까지 읽으셨어요?
@@ -140,28 +135,14 @@ export function CheckinPanel({
         onChange={(event) => onReadingProgressChange(Number(event.target.value))}
         style={{ width: "100%", accentColor: "var(--accent)" }}
       />
-      <label className="label" htmlFor={noteId} style={{ marginTop: "14px" }}>
-        체크인 메모
-      </label>
-      <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-        멈춘 장면이나 함께 묻고 싶은 지점을 짧게 남겨 주세요.
-      </p>
-      <textarea
-        id={noteId}
-        className="textarea"
-        rows={3}
-        value={checkinNote}
-        onChange={(event) => onCheckinNoteChange(event.target.value)}
-        placeholder="멈춘 장면이나 떠오른 질문이 있다면 짧게 기록해 주세요."
-      />
       <div className="row-between" style={{ marginTop: "12px" }}>
         <p className="marginalia" style={{ margin: 0 }}>
-          ※ 체크인은 다른 멤버에게도 보입니다.
+          진행률은 내 준비 상태와 호스트 운영 확인에 사용됩니다.
         </p>
         <div className="row" style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="checkin" status={saveStatus} />
           <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSave}>
-            체크인 저장
+            진행률 저장
           </button>
         </div>
       </div>
@@ -197,7 +178,7 @@ export function OneLineReviewPanel({
         한줄평 내용
       </label>
       <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-        모임 뒤 공개 기록에 남길 수 있는 한 문장입니다.
+        저장하면 이번 세션 참여자가 함께 볼 수 있습니다.
       </p>
       <input
         id={reviewId}
@@ -208,7 +189,7 @@ export function OneLineReviewPanel({
       />
       <div className="row-between" style={{ marginTop: "10px" }}>
         <div className="tiny" style={{ color: "var(--text-3)" }}>
-          모임 종료 후 공개 · 이전까지는 본인만 볼 수 있어요
+          세션 참여자 공개
         </div>
         <div className="row" style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="oneLineReview" status={saveStatus} />
@@ -287,7 +268,7 @@ export function MyStatusCard({
 }) {
   const items = [
     { label: "RSVP", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
-    { label: "읽기 체크인", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress > 0 },
+    { label: "읽기 진행률", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress > 0 },
     {
       label: "질문",
       value: `${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`,
@@ -428,7 +409,7 @@ export function HostContextPanel({
         멤버 준비를 유지한 채 운영 문서로 이동
       </div>
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-        이 화면에서는 멤버로 RSVP, 체크인, 질문, 서평을 남기고, 운영 화면에서 세션 정보와 참석 확정을 관리합니다.
+        이 화면에서는 멤버로 RSVP, 진행률, 질문, 서평을 남기고, 운영 화면에서 세션 정보와 참석 확정을 관리합니다.
       </p>
       <InternalLink href={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
         세션 운영으로
@@ -538,52 +519,30 @@ export function BoardQuestions({ questions }: { questions: BoardQuestion[] }) {
   );
 }
 
-export function BoardCheckins({ checkins }: { checkins: BoardCheckin[] }) {
-  if (checkins.length === 0) {
+export function BoardOneLineReviews({ oneLineReviews }: { oneLineReviews: BoardOneLineReview[] }) {
+  if (oneLineReviews.length === 0) {
     return <EmptyBoardState />;
   }
 
   return (
-    <div className="grid-2">
-      {checkins.map((checkin) => (
+    <div className="grid-2" style={{ minWidth: 0 }}>
+      {oneLineReviews.map((review) => (
         <article
-          key={`${checkin.authorName}-${checkin.note}`}
-          style={{ padding: "22px", background: "var(--bg)", border: "1px solid var(--line-soft)", borderRadius: "10px" }}
+          key={`${review.authorName}-${review.text}`}
+          style={{
+            padding: "22px",
+            background: "var(--bg)",
+            border: "1px solid var(--line-soft)",
+            borderRadius: "10px",
+            minWidth: 0,
+          }}
         >
-          <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "12px" }}>
-            <div className="row" style={{ gap: "10px" }}>
-              <AvatarChip name={checkin.authorName} fallbackInitial={checkin.authorShortName} label={checkin.authorName} size={22} />
-              <span className="body" style={{ fontSize: "13.5px", fontWeight: 500 }}>
-                {checkin.authorName}
-              </span>
-            </div>
-          </div>
-          <div className="row" style={{ gap: "12px", marginBottom: "10px", alignItems: "center" }}>
-            <span className="mono" style={{ fontSize: "20px", fontWeight: 500, letterSpacing: "-0.02em", width: "60px" }}>
-              {checkin.readingProgress}%
-            </span>
-            <span
-              aria-hidden
-              style={{
-                height: "6px",
-                flex: 1,
-                borderRadius: "999px",
-                background: "var(--line-soft)",
-                overflow: "hidden",
-              }}
-            >
-              <span
-                style={{
-                  display: "block",
-                  width: `${checkin.readingProgress}%`,
-                  height: "100%",
-                  background: checkin.readingProgress >= 100 ? "var(--ok)" : "var(--accent)",
-                }}
-              />
-            </span>
-          </div>
-          <div className="small" style={{ color: "var(--text-2)" }}>
-            {checkin.note}
+          <p className="body editorial" style={{ fontSize: "17px", margin: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
+            {review.text}
+          </p>
+          <div className="row tiny" style={{ marginTop: 12, gap: 8, color: "var(--text-3)", minWidth: 0 }}>
+            <AvatarChip name={review.authorName} fallbackInitial={review.authorShortName} label={review.authorName} size={22} />
+            <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>{review.authorName}</span>
           </div>
         </article>
       ))}

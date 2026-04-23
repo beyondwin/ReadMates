@@ -1097,7 +1097,7 @@ git commit -m "feat: update frontend progress and one-line contracts"
 - Modify: `front/features/current-session/ui/current-session-mobile.tsx`
 - Test: `front/tests/unit/current-session.test.tsx`
 
-- [ ] **Step 1: Update current-session UI tests first**
+- [x] **Step 1: Update current-session UI tests first**
 
 In `current-session.test.tsx`, add or update assertions:
 
@@ -1127,7 +1127,7 @@ expect(fetchMock).toHaveBeenCalledWith(
 );
 ```
 
-- [ ] **Step 2: Run current-session tests and verify failures**
+- [x] **Step 2: Run current-session tests and verify failures**
 
 Run:
 
@@ -1137,7 +1137,7 @@ pnpm --dir front exec vitest run tests/unit/current-session.test.tsx
 
 Expected: FAIL because checkin memo UI and read-trace board still render.
 
-- [ ] **Step 3: Update CurrentSessionBoard state and actions**
+- [x] **Step 3: Update CurrentSessionBoard state and actions**
 
 In `current-session-page.tsx`, remove:
 
@@ -1163,7 +1163,7 @@ Update `CurrentSessionSaveActions`:
 saveCheckin: (readingProgress: number) => Promise<void>;
 ```
 
-- [ ] **Step 4: Update desktop CheckinPanel**
+- [x] **Step 4: Update desktop CheckinPanel**
 
 In `current-session-panels.tsx`, change props:
 
@@ -1204,7 +1204,7 @@ Change button text:
 진행률 저장
 ```
 
-- [ ] **Step 5: Add desktop one-line board component**
+- [x] **Step 5: Add desktop one-line board component**
 
 In `current-session-panels.tsx`, add:
 
@@ -1237,7 +1237,7 @@ export function BoardOneLineReviews({ oneLineReviews }: { oneLineReviews: BoardO
 
 Import `BoardOneLineReview` from `current-session-types`.
 
-- [ ] **Step 6: Wire desktop board tab rendering**
+- [x] **Step 6: Wire desktop board tab rendering**
 
 In `current-session-page.tsx`, replace checkins rendering:
 
@@ -1247,7 +1247,7 @@ In `current-session-page.tsx`, replace checkins rendering:
 
 Remove the `BoardCheckins` import and add `BoardOneLineReviews`.
 
-- [ ] **Step 7: Update one-line review input copy**
+- [x] **Step 7: Update one-line review input copy**
 
 In `OneLineReviewPanel`, replace helper copy:
 
@@ -1261,7 +1261,7 @@ Replace footer copy:
 세션 참여자 공개
 ```
 
-- [ ] **Step 8: Update mobile props and progress card**
+- [x] **Step 8: Update mobile props and progress card**
 
 In `current-session-mobile.tsx`, remove `checkinNote` props and handlers from `MobileCurrentSessionBoard`, `MobilePrepSegment`, and `MobileViewerPrepSegment`.
 
@@ -1279,7 +1279,7 @@ Remove the note label, helper, and textarea. Use save button text:
 진행률 저장
 ```
 
-- [ ] **Step 9: Add mobile one-line board list**
+- [x] **Step 9: Add mobile one-line board list**
 
 Add:
 
@@ -1319,7 +1319,7 @@ In `MobileBoardSegment`, remove the read-trace section and add:
 </section>
 ```
 
-- [ ] **Step 10: Update mobile one-line copy**
+- [x] **Step 10: Update mobile one-line copy**
 
 In `MobileRecordsSegment`, replace:
 
@@ -1333,7 +1333,7 @@ and footer:
 세션 참여자 공개
 ```
 
-- [ ] **Step 11: Run current-session UI tests**
+- [x] **Step 11: Run current-session UI tests**
 
 Run:
 
@@ -1343,7 +1343,7 @@ pnpm --dir front exec vitest run tests/unit/current-session.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 12: Commit current-session UI**
+- [x] **Step 12: Commit current-session UI**
 
 Run:
 
