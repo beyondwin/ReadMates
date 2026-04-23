@@ -1,11 +1,4 @@
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
-const PUBLIC_SCROLL_RESTORE_DELAYS = [0, 80, 180, 360, 720, 1200];
-
-type ReadmatesScrollSnapshot = {
-  pathname?: string;
-  search?: string;
-  scrollY?: number;
-};
 
 export type ReadmatesReturnState = {
   readmatesReturnTo: string;
@@ -32,12 +25,6 @@ export const publicRecordsReturnTarget: ReadmatesReturnTarget = {
 
 function noopCleanup() {
   return undefined;
-}
-
-function toUrlPath(to: string) {
-  const base = typeof window === "undefined" ? "https://readmates.local" : window.location.origin;
-  const url = new URL(to, base);
-  return { pathname: url.pathname, search: url.search };
 }
 
 function toSafePublicHref(value: string) {
@@ -103,76 +90,23 @@ export function readmatesReturnState(target: ReadmatesReturnTarget): ReadmatesRe
   return state;
 }
 
-export function rememberReadmatesPublicRecordsScroll(fromPathname: string, fromSearch: string, to: string) {
-  if (typeof window === "undefined" || fromPathname !== "/records") {
-    return;
+export function rememberReadmatesPublicRecordsScroll(_fromPathname: string, _fromSearch: string, _to: string) {
+  void _fromPathname;
+  void _fromSearch;
+  void _to;
+
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(PUBLIC_RECORDS_SCROLL_KEY);
   }
-
-  const target = toUrlPath(to);
-
-  if (!target.pathname.startsWith("/sessions/")) {
-    return;
-  }
-
-  window.sessionStorage.setItem(
-    PUBLIC_RECORDS_SCROLL_KEY,
-    JSON.stringify({ pathname: fromPathname, search: fromSearch, scrollY: window.scrollY }),
-  );
 }
 
-export function restoreReadmatesPublicRecordsScroll(pathname: string, search: string) {
-  if (typeof window === "undefined" || pathname !== "/records") {
-    return noopCleanup;
-  }
+export function restoreReadmatesPublicRecordsScroll(_pathname: string, _search: string) {
+  void _pathname;
+  void _search;
 
-  const raw = window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY);
-
-  if (!raw) {
-    return noopCleanup;
-  }
-
-  try {
-    const stored = JSON.parse(raw) as ReadmatesScrollSnapshot;
-
-    if (stored.pathname !== pathname || stored.search !== search || typeof stored.scrollY !== "number" || stored.scrollY <= 0) {
-      window.sessionStorage.removeItem(PUBLIC_RECORDS_SCROLL_KEY);
-      return noopCleanup;
-    }
-
-    let active = true;
-    let animationFrameId: number | null = null;
-    const timeoutIds: number[] = [];
-    const restore = () => {
-      if (!active || window.location.pathname !== pathname || window.location.search !== search) {
-        return;
-      }
-
-      window.scrollTo({ top: stored.scrollY, behavior: "auto" });
-      window.sessionStorage.removeItem(PUBLIC_RECORDS_SCROLL_KEY);
-    };
-
-    if (typeof window.requestAnimationFrame === "function") {
-      animationFrameId = window.requestAnimationFrame(restore);
-    }
-
-    PUBLIC_SCROLL_RESTORE_DELAYS.forEach((delay) => {
-      const timeoutId = window.setTimeout(restore, delay);
-      timeoutIds.push(timeoutId);
-    });
-
-    return () => {
-      active = false;
-
-      if (animationFrameId !== null && typeof window.cancelAnimationFrame === "function") {
-        window.cancelAnimationFrame(animationFrameId);
-      }
-
-      timeoutIds.forEach((timeoutId) => {
-        window.clearTimeout(timeoutId);
-      });
-    };
-  } catch {
+  if (typeof window !== "undefined") {
     window.sessionStorage.removeItem(PUBLIC_RECORDS_SCROLL_KEY);
-    return noopCleanup;
   }
+
+  return noopCleanup;
 }

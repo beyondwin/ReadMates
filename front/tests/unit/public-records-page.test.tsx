@@ -113,7 +113,7 @@ describe("PublicRecordsPage", () => {
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
   });
 
-  it("passes a public records return target and remembers list scroll before opening detail", async () => {
+  it("passes a public records return target and does not preserve list scroll before opening detail", async () => {
     const user = userEvent.setup();
     Object.defineProperty(window, "scrollY", { configurable: true, value: 480 });
     vi.stubGlobal(
@@ -156,11 +156,7 @@ describe("PublicRecordsPage", () => {
 
     expect(screen.getByTestId("return-to")).toHaveTextContent("/records");
     expect(screen.getByTestId("return-label")).toHaveTextContent("공개 기록");
-    expect(JSON.parse(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY) ?? "{}")).toEqual({
-      pathname: "/records",
-      search: "",
-      scrollY: 480,
-    });
+    expect(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY)).toBeNull();
   });
 
   it("renders an intentional empty public archive state when there are no published sessions", async () => {

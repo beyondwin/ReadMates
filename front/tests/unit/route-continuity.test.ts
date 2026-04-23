@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   rememberReadmatesListScroll,
+  resetReadmatesNavigationScroll,
   restoreReadmatesListScroll,
 } from "@/src/app/route-continuity";
 
+const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
 
 function setScrollY(scrollY: number) {
@@ -17,7 +19,6 @@ function setScrollToMock() {
 }
 
 afterEach(() => {
-  vi.useRealTimers();
   vi.restoreAllMocks();
   window.sessionStorage.clear();
   window.history.pushState({}, "", "/");
@@ -25,60 +26,19 @@ afterEach(() => {
 });
 
 describe("route continuity", () => {
-  it("stores list scroll snapshots with the source pathname and search", () => {
+  it("does not persist list scroll snapshots for link navigation", () => {
     setScrollY(480);
+    window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
+    window.sessionStorage.setItem(PUBLIC_RECORDS_SCROLL_KEY, "stale");
 
     rememberReadmatesListScroll("/records", "?page=2", "/sessions/session-1");
 
-    expect(JSON.parse(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY) ?? "{}")).toEqual({
-      pathname: "/records",
-      search: "?page=2",
-      scrollY: 480,
-    });
-  });
-
-  it("clears stale snapshots for mismatched list routes", () => {
-    const scrollTo = setScrollToMock();
-    window.sessionStorage.setItem(
-      PUBLIC_RECORDS_SCROLL_KEY,
-      JSON.stringify({
-        pathname: "/records",
-        search: "?page=2",
-        scrollY: 480,
-      }),
-    );
-
-    restoreReadmatesListScroll("/records", "");
-
-    expect(scrollTo).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY)).toBeNull();
   });
 
-  it("ignores delayed restore attempts after the browser route changes", () => {
-    vi.useFakeTimers();
+  it("clears stale list snapshots without restoring their scroll position", () => {
     const scrollTo = setScrollToMock();
-    window.history.pushState({}, "", "/records");
-    window.sessionStorage.setItem(
-      PUBLIC_RECORDS_SCROLL_KEY,
-      JSON.stringify({
-        pathname: "/records",
-        search: "",
-        scrollY: 480,
-      }),
-    );
-
-    const cleanup = restoreReadmatesListScroll("/records", "");
-    window.history.pushState({}, "", "/about");
-    vi.advanceTimersByTime(1_500);
-    cleanup();
-
-    expect(scrollTo).not.toHaveBeenCalled();
-  });
-
-  it("cancels delayed restore attempts during cleanup", () => {
-    vi.useFakeTimers();
-    const scrollTo = setScrollToMock();
-    window.history.pushState({}, "", "/records");
     window.sessionStorage.setItem(
       PUBLIC_RECORDS_SCROLL_KEY,
       JSON.stringify({
@@ -90,31 +50,20 @@ describe("route continuity", () => {
 
     const cleanup = restoreReadmatesListScroll("/records", "");
     cleanup();
-    vi.advanceTimersByTime(1_500);
 
     expect(scrollTo).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY)).toBeNull();
   });
 
-  it("keeps the snapshot available when a development cleanup runs before restore", () => {
-    vi.useFakeTimers();
+  it("resets navigation scroll state and moves the viewport to the top", () => {
     const scrollTo = setScrollToMock();
-    window.history.pushState({}, "", "/records");
-    window.sessionStorage.setItem(
-      PUBLIC_RECORDS_SCROLL_KEY,
-      JSON.stringify({
-        pathname: "/records",
-        search: "",
-        scrollY: 480,
-      }),
-    );
+    window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
+    window.sessionStorage.setItem(PUBLIC_RECORDS_SCROLL_KEY, "stale");
 
-    const firstCleanup = restoreReadmatesListScroll("/records", "");
-    firstCleanup();
+    resetReadmatesNavigationScroll();
 
-    restoreReadmatesListScroll("/records", "");
-    vi.advanceTimersByTime(1_500);
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 480, behavior: "auto" });
+    expect(window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY)).toBeNull();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
   });
 });

@@ -148,10 +148,8 @@ function setScrollY(scrollY: number) {
   Object.defineProperty(window, "scrollY", { configurable: true, value: scrollY });
 }
 
-function archiveScrollSnapshot() {
-  const raw = window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY);
-  expect(raw).not.toBeNull();
-  return JSON.parse(raw as string) as { pathname: string; search: string; scrollY: number };
+function expectNoArchiveScrollSnapshot() {
+  expect(window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY)).toBeNull();
 }
 
 function setScrollToMock() {
@@ -446,10 +444,11 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("열기 →")).not.toBeInTheDocument();
   });
 
-  it("uses router navigation to remember archive scroll before session and feedback links", async () => {
+  it("uses router navigation without preserving archive scroll before session and feedback links", async () => {
     const user = userEvent.setup();
 
     setScrollY(720);
+    window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
     const desktopRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
         <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
@@ -458,11 +457,12 @@ describe("ArchivePage", () => {
 
     await user.click(getDesktop(desktopRender.container).getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" }));
 
-    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=sessions", scrollY: 720 });
+    expectNoArchiveScrollSnapshot();
 
     desktopRender.unmount();
     window.sessionStorage.clear();
     setScrollY(360);
+    window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
 
     const mobileRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
@@ -473,11 +473,12 @@ describe("ArchivePage", () => {
 
     await user.click(mobile.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" }));
 
-    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=sessions", scrollY: 360 });
+    expectNoArchiveScrollSnapshot();
 
     mobileRender.unmount();
     window.sessionStorage.clear();
     setScrollY(540);
+    window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
 
     const feedbackRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=report"]}>
@@ -493,11 +494,12 @@ describe("ArchivePage", () => {
 
     await user.click(getDesktop(feedbackRender.container).getByRole("link", { name: seededReportReadLabel }));
 
-    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=report", scrollY: 540 });
+    expectNoArchiveScrollSnapshot();
 
     feedbackRender.unmount();
     window.sessionStorage.clear();
     setScrollY(420);
+    window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
 
     const printRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=report"]}>
@@ -513,7 +515,7 @@ describe("ArchivePage", () => {
 
     await user.click(getDesktop(printRender.container).getByRole("link", { name: seededReportPdfLabel }));
 
-    expect(archiveScrollSnapshot()).toEqual({ pathname: "/app/archive", search: "?view=report", scrollY: 420 });
+    expectNoArchiveScrollSnapshot();
   });
 
   it("links unpublished showcase sessions to member archive detail on desktop and mobile", () => {
@@ -696,7 +698,7 @@ describe("ArchivePage", () => {
     expect(getDesktop(container).getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
   });
 
-  it("restores archive scroll after archive content renders for the matching search params", async () => {
+  it("clears stale archive scroll snapshots after archive content renders", () => {
     const scrollTo = setScrollToMock();
     window.sessionStorage.setItem(
       ARCHIVE_SCROLL_KEY,
@@ -719,9 +721,7 @@ describe("ArchivePage", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(scrollTo).toHaveBeenCalledWith({ top: 640, behavior: "auto" });
-    });
+    expect(scrollTo).not.toHaveBeenCalled();
     expect(window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY)).toBeNull();
   });
 

@@ -1,12 +1,5 @@
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
-const ARCHIVE_SCROLL_RESTORE_DELAYS = [0, 80, 180, 360, 720, 1200];
-
-type ReadmatesScrollSnapshot = {
-  pathname?: string;
-  search?: string;
-  scrollY?: number;
-};
 
 export type ReadmatesReturnTarget = {
   href: string;
@@ -45,12 +38,6 @@ export const hostDashboardReturnTarget: ReadmatesReturnTarget = {
   href: "/app/host",
   label: "운영으로",
 };
-
-function toUrlPath(to: string) {
-  const base = typeof window === "undefined" ? "https://readmates.local" : window.location.origin;
-  const url = new URL(to, base);
-  return { pathname: url.pathname, search: url.search };
-}
 
 function toSafeReadmatesHref(value: string, scope: "app" | "public") {
   try {
@@ -146,50 +133,17 @@ export function readPublicReadmatesReturnTarget(state: unknown, fallback: Readma
   };
 }
 
-function shouldSnapshotArchiveScroll(pathname: string) {
-  return pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/");
-}
+export function rememberReadmatesListScroll(_fromPathname: string, _fromSearch: string, _to: string) {
+  void _fromPathname;
+  void _fromSearch;
+  void _to;
 
-function shouldSnapshotPublicRecordsScroll(pathname: string) {
-  return pathname.startsWith("/sessions/");
-}
-
-function scrollConfigForList(pathname: string) {
-  if (pathname === "/app/archive") {
-    return {
-      key: ARCHIVE_SCROLL_KEY,
-      shouldSnapshot: shouldSnapshotArchiveScroll,
-    };
-  }
-
-  if (pathname === "/records") {
-    return {
-      key: PUBLIC_RECORDS_SCROLL_KEY,
-      shouldSnapshot: shouldSnapshotPublicRecordsScroll,
-    };
-  }
-
-  return null;
-}
-
-export function rememberReadmatesListScroll(fromPathname: string, fromSearch: string, to: string) {
   if (typeof window === "undefined") {
     return;
   }
 
-  const config = scrollConfigForList(fromPathname);
-
-  if (!config) {
-    return;
-  }
-
-  const target = toUrlPath(to);
-
-  if (!config.shouldSnapshot(target.pathname)) {
-    return;
-  }
-
-  window.sessionStorage.setItem(config.key, JSON.stringify({ pathname: fromPathname, search: fromSearch, scrollY: window.scrollY }));
+  window.sessionStorage.removeItem(ARCHIVE_SCROLL_KEY);
+  window.sessionStorage.removeItem(PUBLIC_RECORDS_SCROLL_KEY);
 }
 
 export function resetReadmatesNavigationScroll() {
@@ -210,73 +164,16 @@ function noopCleanup() {
   return undefined;
 }
 
-function restoreReadmatesScroll(key: string, pathname: string, search: string) {
-  if (typeof window === "undefined") {
-    return noopCleanup;
+export function restoreReadmatesListScroll(_pathname: string, _search: string) {
+  void _pathname;
+  void _search;
+
+  if (typeof window !== "undefined") {
+    window.sessionStorage.removeItem(ARCHIVE_SCROLL_KEY);
+    window.sessionStorage.removeItem(PUBLIC_RECORDS_SCROLL_KEY);
   }
 
-  const raw = window.sessionStorage.getItem(key);
-
-  if (!raw) {
-    return noopCleanup;
-  }
-
-  try {
-    const stored = JSON.parse(raw) as ReadmatesScrollSnapshot;
-
-    if (stored.pathname !== pathname || stored.search !== search || typeof stored.scrollY !== "number" || stored.scrollY <= 0) {
-      window.sessionStorage.removeItem(key);
-      return noopCleanup;
-    }
-
-    let active = true;
-    let animationFrameId: number | null = null;
-    const timeoutIds: number[] = [];
-    const restore = () => {
-      if (!active || window.location.pathname !== pathname || window.location.search !== search) {
-        return;
-      }
-
-      window.scrollTo({ top: stored.scrollY, behavior: "auto" });
-      window.sessionStorage.removeItem(key);
-    };
-
-    if (typeof window.requestAnimationFrame === "function") {
-      animationFrameId = window.requestAnimationFrame(restore);
-    }
-
-    ARCHIVE_SCROLL_RESTORE_DELAYS.forEach((delay) => {
-      const timeoutId = window.setTimeout(() => {
-        restore();
-      }, delay);
-      timeoutIds.push(timeoutId);
-    });
-
-    return () => {
-      active = false;
-
-      if (animationFrameId !== null && typeof window.cancelAnimationFrame === "function") {
-        window.cancelAnimationFrame(animationFrameId);
-      }
-
-      timeoutIds.forEach((timeoutId) => {
-        window.clearTimeout(timeoutId);
-      });
-    };
-  } catch {
-    window.sessionStorage.removeItem(key);
-    return noopCleanup;
-  }
-}
-
-export function restoreReadmatesListScroll(pathname: string, search: string) {
-  const config = scrollConfigForList(pathname);
-
-  if (!config) {
-    return noopCleanup;
-  }
-
-  return restoreReadmatesScroll(config.key, pathname, search);
+  return noopCleanup;
 }
 
 export function restoreReadmatesArchiveScroll(pathname: string, search: string) {
