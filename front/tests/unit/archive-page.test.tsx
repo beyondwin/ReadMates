@@ -217,6 +217,7 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
     expect(within(mobile as HTMLElement).getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
     expect(screen.queryByText("지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.")).not.toBeInTheDocument();
+    expect(desktop.getByText("/ preserved record")).toBeInTheDocument();
     expect(desktop.getByRole("button", { name: "세션" })).toBeInTheDocument();
     expect(desktop.getByRole("button", { name: "내 서평" })).toBeInTheDocument();
     expect(desktop.getByRole("button", { name: "내 질문" })).toBeInTheDocument();
@@ -321,7 +322,7 @@ describe("ArchivePage", () => {
 
     expect(yearHeadings).toEqual(["2026", "미정"]);
     expect(yearHeadings).not.toContain("");
-    expect(desktopElement.querySelectorAll("article")).toHaveLength(2);
+    expect(desktopElement.querySelectorAll("a.rm-record-row")).toHaveLength(2);
     expect(desktop.getAllByText("가난한 찰리의 연감")).toHaveLength(1);
     expect(desktop.getAllByText("날짜 미정 책").length).toBeGreaterThan(0);
   });
@@ -460,14 +461,13 @@ describe("ArchivePage", () => {
 
     await user.keyboard("{ArrowRight}");
 
-    expect(desktop.getByRole("button", { name: "내 서평" })).toHaveAttribute("aria-pressed", "true");
-    expect(desktop.getByRole("button", { name: "내 서평" })).toHaveFocus();
+    expect(desktop.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
+    expect(desktop.getByRole("button", { name: "피드백 문서" })).toHaveFocus();
 
     await user.keyboard("{End}");
 
-    expect(desktop.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
-    expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
-    expect(desktop.getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: "내 서평" })).toHaveAttribute("aria-pressed", "true");
+    expect(desktop.getByText("서평 · 2026-04-15")).toBeInTheDocument();
   });
 
   it("uses contextual session actions only for available app session routes", () => {
@@ -482,12 +482,41 @@ describe("ArchivePage", () => {
       "/app/sessions/session-6",
     );
     expect(latestSessionLink).not.toHaveClass("btn");
-    expect(latestSessionLink).toHaveClass("rm-archive-session-action");
+    expect(latestSessionLink).toHaveClass("rm-record-row");
     expect(desktop.getByRole("link", { name: "No.1 팩트풀니스 열기" })).toHaveAttribute(
       "href",
       "/app/sessions/session-1",
     );
     expect(desktop.queryByText("열기 →")).not.toBeInTheDocument();
+  });
+
+  it("navigates when clicking the desktop session row content", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
+        <Routes>
+          <Route
+            path="/app/archive"
+            element={
+              <ArchivePage
+                sessions={seededSessions}
+                questions={seededQuestions}
+                reviews={seededReviews}
+                reports={seededReports}
+              />
+            }
+          />
+          <Route path="/app/sessions/:sessionId" element={<LocationStateEcho />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const desktop = getDesktop(container);
+    const latestSessionRow = desktop.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" });
+
+    await user.click(within(latestSessionRow).getByText("가난한 찰리의 연감"));
+
+    expect(screen.getByTestId("return-to")).toHaveTextContent("/app/archive?view=sessions");
+    expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로");
   });
 
   it("uses router navigation without preserving archive scroll before session and feedback links", async () => {
@@ -610,6 +639,7 @@ describe("ArchivePage", () => {
     const desktop = getDesktop(container);
 
     await user.click(desktop.getByRole("button", { name: "내 서평" }));
+    expect(desktop.queryByText("/ preserved record")).not.toBeInTheDocument();
     expect(desktop.getByText("서평 · 2026-04-15")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("나")).toBeInTheDocument();
@@ -620,6 +650,7 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("맡겨진 소녀")).not.toBeInTheDocument();
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
+    expect(desktop.queryByText("/ preserved record")).not.toBeInTheDocument();
     expect(desktop.getByText("Q1 · 2025.11.26")).toHaveStyle({ color: "var(--text-3)" });
     expect(desktop.queryByText("저장된 질문 Q1 · 2025.11.26")).not.toBeInTheDocument();
     expect(desktop.getByText("10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?")).toBeInTheDocument();
@@ -629,6 +660,7 @@ describe("ArchivePage", () => {
     );
 
     await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
+    expect(desktop.getByText("/ preserved record")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
     expect(desktop.queryByText("독서모임 1차 피드백")).not.toBeInTheDocument();

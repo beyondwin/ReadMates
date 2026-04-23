@@ -331,6 +331,7 @@ function ArchiveMobile({
 
 function ArchiveSelectedSection({ view, children }: { view: ArchiveView; children: ReactNode }) {
   const meta = selectedArchiveSectionMeta(view);
+  const showPreservedRecordLabel = view === "sessions" || view === "report";
 
   return (
     <section
@@ -363,9 +364,11 @@ function ArchiveSelectedSection({ view, children }: { view: ArchiveView; childre
             {meta.body}
           </p>
         </div>
-        <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-          / preserved record
-        </span>
+        {showPreservedRecordLabel ? (
+          <span className="tiny mono" style={{ color: "var(--text-3)" }}>
+            / preserved record
+          </span>
+        ) : null}
       </div>
       {children}
     </section>
@@ -614,15 +617,20 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
           </div>
           <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
             {group.list.map((session) => (
-              <article
+              <Link
                 key={session.id}
                 className="rm-record-row"
+                to={appSessionHref(session.id)}
+                state={archiveReturnState("sessions")}
+                aria-label={`No.${session.number} ${session.book} 열기`}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "64px minmax(0, 1fr) minmax(190px, auto) auto",
                   gap: "28px",
                   padding: "28px 0",
                   alignItems: "center",
+                  color: "inherit",
+                  textDecoration: "none",
                 }}
               >
                 <div aria-label={`${reportNumberLabel(session.number)} · ${formatSessionMonthDayLabel(session.date)}`}>
@@ -659,8 +667,8 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
                     {feedbackArchiveLabel(session.feedbackDocument)}
                   </span>
                 </div>
-                <SessionAction session={session} />
-              </article>
+                <SessionAction />
+              </Link>
             ))}
           </div>
         </section>
@@ -669,18 +677,11 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
   );
 }
 
-function SessionAction({ session }: { session: ArchiveSessionRecord }) {
-  const sessionLabel = `No.${session.number} ${session.book}`;
-
+function SessionAction() {
   return (
-    <Link
-      className="rm-archive-session-action"
-      to={appSessionHref(session.id)}
-      state={archiveReturnState("sessions")}
-      aria-label={`${sessionLabel} 열기`}
-    >
-      <span aria-hidden>→</span>
-    </Link>
+    <span className="rm-archive-session-action" aria-hidden>
+      →
+    </span>
   );
 }
 
