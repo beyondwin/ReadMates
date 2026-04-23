@@ -42,6 +42,7 @@ function renderRecordsRoute() {
         element: <PublicRecordsPage />,
         loader: publicClubLoader,
         errorElement: <PublicRouteError />,
+        hydrateFallbackElement: <div>공개 기록을 불러오는 중</div>,
       },
       { path: "/sessions/:sessionId", element: <LocationStateEcho /> },
       { path: "/about", element: <main>about target</main> },

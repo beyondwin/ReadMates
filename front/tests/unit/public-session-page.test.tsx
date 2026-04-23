@@ -29,6 +29,7 @@ function renderPublicSessionRoute(sessionId: string, state?: Record<string, stri
         element: <PublicSessionPage />,
         loader: publicSessionLoader,
         errorElement: <PublicRouteError />,
+        hydrateFallbackElement: <div>공개 세션 기록을 불러오는 중</div>,
       },
     ],
     { initialEntries: [state ? { pathname: `/sessions/${sessionId}`, state } : `/sessions/${sessionId}`] },

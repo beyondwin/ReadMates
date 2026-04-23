@@ -147,6 +147,7 @@ describe("MemberSessionDetailPage", () => {
           path: "/app/sessions/:sessionId",
           element: <MemberSessionDetailRoutePage />,
           loader: memberSessionDetailLoader,
+          hydrateFallbackElement: <div>지난 세션 기록을 불러오는 중</div>,
         },
       ],
       {
@@ -216,6 +217,7 @@ describe("MemberSessionDetailPage", () => {
           path: "/app/sessions/:sessionId",
           element: <MemberSessionDetailRoutePage />,
           loader: memberSessionDetailLoader,
+          hydrateFallbackElement: <div>지난 세션 기록을 불러오는 중</div>,
         },
         { path: "/app/feedback/:sessionId", element: <LocationStateEcho /> },
       ],
