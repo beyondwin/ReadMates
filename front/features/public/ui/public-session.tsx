@@ -162,8 +162,8 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
                 </Link>
                 <PublicInviteGuidance />
               </PublicGuestOnlyActions>
-              <Link to={returnTarget.href} className="btn btn-quiet">
-                {returnTarget.label}
+              <Link to={returnTarget.href} className="btn btn-quiet btn-sm">
+                {returnTarget.label} →
               </Link>
             </div>
             <p className="tiny" style={{ margin: "14px 0 0", color: "var(--text-3)" }}>
