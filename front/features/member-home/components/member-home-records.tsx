@@ -106,10 +106,12 @@ export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
 export function MobileMemberActivity({ items }: { items: NoteFeedItem[] }) {
   return (
     <section className="m-sec">
-      <div className="m-eyebrow-row">
-        <span className="eyebrow">멤버 활동</span>
-        <Link to="/app/notes" className="tiny" style={{ color: "var(--text-3)" }}>
-          클럽 노트
+      <div className="m-row-between" style={{ alignItems: "center" }}>
+        <div className="m-row" style={{ gap: 8, minWidth: 0 }}>
+          <div className="eyebrow">멤버 활동</div>
+        </div>
+        <Link to="/app/notes" className="btn btn-quiet btn-sm">
+          클럽 노트 →
         </Link>
       </div>
       {items.length === 0 ? (
