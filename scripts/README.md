@@ -53,6 +53,8 @@ clean 공개 릴리즈 후보를 검사합니다.
 
 현재 tree 모드는 `git ls-files`를 기준으로 tracked 금지 경로와 tracked symlink를 확인합니다. 후보 모드는 전달한 디렉터리를 `find`로 순회하며, 후보 안의 모든 symlink와 금지 경로를 거부합니다.
 
+현재 private tree에는 공개 후보에서 제외되는 historical planning 문서가 추적 중일 수 있습니다. no-arg 검사가 `docs/superpowers` 같은 private planning 경로를 보고 실패하면, 공개 판단은 clean 후보를 다시 만든 뒤 `.tmp/public-release-candidate`에 대해 실행한 결과를 기준으로 합니다.
+
 checker가 차단하는 주요 항목은 다음과 같습니다.
 
 - private keys

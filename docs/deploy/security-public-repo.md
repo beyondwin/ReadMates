@@ -126,6 +126,7 @@ deploy/oci/*.state
 `gitleaks`가 설치되어 있으면 스크립트가 `.gitleaks.toml` 설정으로 `gitleaks dir <path>`를 실행합니다. 공개 릴리즈 후보에는 root `.gitleaks.toml`도 포함됩니다. 설치된 구버전 `gitleaks`가 `dir` subcommand를 지원하지 않으면 compatibility fallback으로 `gitleaks detect --source <path>`를 실행하고 downgrade 메시지를 출력합니다. `gitleaks`가 없으면 명확한 fallback 메시지를 출력하고 targeted path/content scan만 실행합니다. Fallback scan 통과는 전문적이거나 완전한 secret scan 통과와 같지 않으며, 로컬 반복 전에 명백한 실수를 막는 최소 안전장치로만 봅니다.
 
 현재 private tree에는 공개 릴리즈 후보에서 제외되는 private planning 문서가 포함될 수 있습니다. 이 문서들은 risk example이나 과거 로컬 path를 의도적으로 기록할 수 있으므로, 공개 판단은 clean 공개 릴리즈 후보 scan 결과를 기준으로 합니다.
+따라서 no-arg current-tree scan이 `docs/superpowers` 같은 historical planning 경로에서 실패하는 것은 곧바로 공개 후보 실패를 뜻하지 않습니다. 공개 전에는 후보를 다시 만든 뒤 `.tmp/public-release-candidate`를 검사합니다.
 
 ## 공개 전 secret rotation
 

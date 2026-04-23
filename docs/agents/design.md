@@ -4,6 +4,8 @@ Read this for UI, layout, copy, and visual polish.
 
 ReadMates should feel thoughtful, archival, calm: a private reading room and precise operating ledger, not a generic SaaS dashboard.
 
+For broader design context, keep this guide aligned with `.impeccable.md`.
+
 Design direction:
 
 - Use warm paper-like surfaces, ink-toned hierarchy, editorial spacing, and restrained book/archive cues.
