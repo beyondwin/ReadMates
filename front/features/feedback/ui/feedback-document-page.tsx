@@ -11,6 +11,11 @@ import {
 } from "@/features/feedback/model/feedback-document-model";
 import { Link } from "@/features/feedback/ui/feedback-link";
 
+const singlePagePrintStyleId = "rm-feedback-document-single-page-print-style";
+const printPageExtraMinHeightPx = 520;
+const printPageExtraHeightRatio = 0.12;
+const printStyleCleanupDelayMs = 30_000;
+
 type FeedbackDocumentPageProps = {
   document: FeedbackDocumentView;
   printMode?: boolean;
@@ -56,22 +61,22 @@ export default function FeedbackDocumentPage({
                   </p>
                 </div>
                 {!printMode ? (
-                  <Link
+                  <button
+                    type="button"
                     className="btn btn-ghost btn-sm rm-feedback-document-pdf-action"
-                    to={appFeedbackHref(document.sessionId, true)}
-                    state={returnState}
+                    onClick={printFeedbackDocumentAsSinglePage}
                   >
                     PDF로 저장
-                  </Link>
+                  </button>
                 ) : null}
               </div>
             </div>
             {showHeaderActions ? (
               <div className="row rm-feedback-document-actions rm-feedback-document-header-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-                <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-quiet btn-sm" />
+                <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-quiet btn-sm rm-feedback-document-return-action" />
                 {printMode ? (
                   <>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => globalThis.print()}>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={printFeedbackDocumentAsSinglePage}>
                       인쇄
                     </button>
                     <Link className="btn btn-quiet btn-sm" to={feedbackHref} state={returnState}>
@@ -123,10 +128,99 @@ function PrintOnFirstRender() {
     }
 
     hasPrinted.current = true;
-    globalThis.print();
+    printFeedbackDocumentAsSinglePage();
   }, []);
 
   return null;
+}
+
+function printFeedbackDocumentAsSinglePage() {
+  if (typeof document === "undefined" || typeof globalThis.print !== "function") {
+    return;
+  }
+
+  const page = document.querySelector<HTMLElement>(".rm-feedback-document-page");
+
+  if (!page) {
+    globalThis.print();
+    return;
+  }
+
+  document.getElementById(singlePagePrintStyleId)?.remove();
+
+  const size = measureFeedbackDocumentPrintSize(page);
+  const style = document.createElement("style");
+  style.id = singlePagePrintStyleId;
+  style.textContent = `
+    @page {
+      size: ${size.width}px ${size.height}px;
+      margin: 0;
+    }
+
+    @media print {
+      html,
+      body {
+        width: ${size.width}px !important;
+        min-width: ${size.width}px !important;
+        margin: 0 !important;
+        overflow: visible !important;
+      }
+
+      .rm-route-reveal {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
+
+      .rm-feedback-document-page {
+        width: ${size.width}px !important;
+      }
+
+      .rm-feedback-document-page section,
+      .rm-feedback-document-page article,
+      .rm-feedback-document-page blockquote {
+        break-inside: auto !important;
+        page-break-inside: auto !important;
+      }
+    }
+  `;
+  (document.body ?? document.documentElement).appendChild(style);
+
+  const cleanup = () => {
+    globalThis.clearTimeout(cleanupTimeout);
+    style.remove();
+    if (typeof globalThis.removeEventListener === "function") {
+      globalThis.removeEventListener("afterprint", cleanup);
+    }
+  };
+
+  if (typeof globalThis.addEventListener === "function") {
+    globalThis.addEventListener("afterprint", cleanup, { once: true });
+  }
+
+  const cleanupTimeout = globalThis.setTimeout(cleanup, printStyleCleanupDelayMs);
+  globalThis.print();
+}
+
+function measureFeedbackDocumentPrintSize(page: HTMLElement) {
+  const rect = page.getBoundingClientRect();
+  const documentElement = document.documentElement;
+  const body = document.body;
+  const measuredWidth = Math.max(Math.ceil(rect.width), page.scrollWidth);
+  const measuredHeight = Math.max(Math.ceil(rect.height), page.scrollHeight);
+  const fallbackWidth = Math.max(
+    documentElement.clientWidth,
+    body?.clientWidth ?? 0,
+    Math.ceil(globalThis.innerWidth || 0),
+  );
+  const fallbackHeight = Math.max(documentElement.scrollHeight, body?.scrollHeight ?? 0);
+  const width = Math.max(1, measuredWidth || fallbackWidth);
+  const height = Math.max(1, measuredHeight || fallbackHeight);
+
+  return {
+    width,
+    height: height + Math.max(printPageExtraMinHeightPx, Math.ceil(height * printPageExtraHeightRatio)),
+  };
 }
 
 export function FeedbackDocumentUnavailablePage({
@@ -160,7 +254,7 @@ export function FeedbackDocumentUnavailablePage({
               </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-              <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-ghost btn-sm" />
+              <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-ghost btn-sm rm-feedback-document-return-action" />
             </div>
           </div>
         </div>
@@ -450,6 +544,10 @@ function FeedbackDocumentStyles() {
           gap: 10px;
         }
 
+        .rm-feedback-document-page .rm-feedback-document-return-action {
+          display: none;
+        }
+
         .rm-feedback-document-page .rm-feedback-document-pdf-action {
           min-height: 38px;
           height: 38px;
@@ -473,8 +571,10 @@ function FeedbackDocumentStyles() {
         }
 
         .topnav,
+        .public-footer,
         .m-hdr,
         .m-tabbar,
+        .rm-feedback-document-pdf-action,
         .rm-feedback-document-actions {
           display: none !important;
         }

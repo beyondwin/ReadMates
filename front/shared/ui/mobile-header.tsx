@@ -131,7 +131,7 @@ function appBackTarget(pathname: string, state: unknown): HeaderBackTarget | nul
 
   if (pathname.startsWith("/app/feedback/")) {
     const target = readReadmatesReturnTarget(state, archiveReportReturnTarget);
-    return { href: target.href, state: target.state, label: "기록", icon: "archive" };
+    return { href: target.href, state: target.state, label: "뒤로" };
   }
 
   if (pathname.startsWith("/app/sessions/")) {
