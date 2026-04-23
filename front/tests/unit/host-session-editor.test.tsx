@@ -201,6 +201,24 @@ describe("HostSessionEditor", () => {
     ]);
     expect(basic).toHaveAttribute("aria-selected", "true");
     expect(basic).toHaveAttribute("aria-controls", "host-editor-panel-basic-info host-editor-panel-basic-schedule");
+    expect(basic).toHaveStyle({
+      minHeight: "32px",
+      height: "32px",
+      padding: "0 14px",
+      fontSize: "13px",
+      borderColor: "var(--text)",
+      background: "var(--text)",
+      color: "var(--bg)",
+    });
+    expect(publish).toHaveStyle({
+      minHeight: "32px",
+      height: "32px",
+      padding: "0 14px",
+      fontSize: "13px",
+      borderColor: "var(--line)",
+      background: "transparent",
+      color: "var(--text-2)",
+    });
     expect(basicPanels).toHaveLength(2);
     basicPanels.forEach((panel) => {
       expect(panel).toHaveAttribute("role", "tabpanel");

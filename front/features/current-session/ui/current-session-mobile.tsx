@@ -409,18 +409,31 @@ function MobilePrepSegment({
             이번 모임에 참석하시나요?
           </div>
           <div className="m-chips">
-            {rsvpOptions.map((option) => (
-              <button
-                key={option.status}
-                type="button"
-                className={`m-chip${rsvp === option.status ? " is-on" : ""}`}
-                disabled={!canWrite || rsvpSaveStatus === "saving"}
-                aria-disabled={!canWrite || rsvpSaveStatus === "saving"}
-                onClick={() => onRsvpChange(option.status)}
-              >
-                {option.label}
-              </button>
-            ))}
+            {rsvpOptions.map((option) => {
+              const selected = rsvp === option.status;
+
+              return (
+                <button
+                  key={option.status}
+                  type="button"
+                  className={`m-chip${selected ? " is-on" : ""}`}
+                  disabled={!canWrite || rsvpSaveStatus === "saving"}
+                  aria-disabled={!canWrite || rsvpSaveStatus === "saving"}
+                  onClick={() => onRsvpChange(option.status)}
+                  style={{
+                    minHeight: 32,
+                    height: 32,
+                    padding: "0 14px",
+                    fontSize: 13,
+                    borderColor: selected ? "var(--text)" : "var(--line)",
+                    background: selected ? "var(--text)" : "transparent",
+                    color: selected ? "var(--bg)" : "var(--text-2)",
+                  }}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
           <div className="rm-current-session-mobile__save-row">
             <div className="tiny" style={{ color: "var(--text-3)" }}>
