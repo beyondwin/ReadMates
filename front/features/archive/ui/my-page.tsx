@@ -20,6 +20,10 @@ const notifications = [
   { label: "다른 멤버의 서평 공개", sub: "같은 책에 한해" },
 ];
 
+function feedbackReportTotalLabel(total: number) {
+  return `전체 ${total}개`;
+}
+
 type MyPageProps = {
   data: MyPageProfile;
   reports: FeedbackDocumentListItem[];
@@ -227,7 +231,7 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
         <div className="m-row" style={{ gap: 8, minWidth: 0 }}>
           <div className="eyebrow">피드백 문서</div>
           <div className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-            · 최근 3개
+            · {feedbackReportTotalLabel(reports.length)}
           </div>
         </div>
         <Link className="btn btn-quiet btn-sm" to="/app/archive?view=report">
@@ -519,7 +523,7 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
         title="피드백 문서"
         eyebrowHelper={
           <span className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-            · 최근 3개
+            · {feedbackReportTotalLabel(reports.length)}
           </span>
         }
         right={
