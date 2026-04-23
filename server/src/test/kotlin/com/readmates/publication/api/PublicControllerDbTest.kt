@@ -53,8 +53,8 @@ class PublicControllerDbTest(
                 jsonPath("$.summary") { exists() }
                 jsonPath("$.highlights.length()") { value(3) }
                 jsonPath("$.highlights[0].text") { value("모르는 영역을 피하는 전략과 배움을 확장하는 전략의 장단점을 비교했다.") }
-                jsonPath("$.highlights[*].authorName") { value(hasItems("이멤버5", "최멤버2", "송멤버4")) }
-                jsonPath("$.highlights[*].authorShortName") { value(hasItems("멤버5", "멤버2", "멤버4")) }
+                jsonPath("$.highlights[*].authorName") { value(hasItems("이멤버5", "최멤버2", "김호스트")) }
+                jsonPath("$.highlights[*].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
                 jsonPath("$.oneLiners.length()") { value(3) }
             }
     }

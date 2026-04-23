@@ -407,8 +407,8 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItems("이멤버5", "최멤버2", "송멤버4")) }
-                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorShortName") { value(hasItems("멤버5", "멤버2", "멤버4")) }
+                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItems("이멤버5", "최멤버2", "김호스트")) }
+                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
             }
     }
 
