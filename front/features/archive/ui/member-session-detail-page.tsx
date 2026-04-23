@@ -35,7 +35,7 @@ import { SessionIdentity } from "@/shared/ui/session-identity";
 
 const segmentLinks = [
   { key: "summary", desktopLabel: "요약", mobileLabel: "요약" },
-  { key: "club-records", desktopLabel: "클럽 기록", mobileLabel: "클럽 기록" },
+  { key: "club-records", desktopLabel: "회차 기록", mobileLabel: "회차 기록" },
   { key: "my-records", desktopLabel: "내 기록", mobileLabel: "내 기록" },
   { key: "feedback", desktopLabel: "피드백 문서", mobileLabel: "피드백 문서" },
 ];
@@ -185,11 +185,11 @@ function MemberSessionDetailDesktop({
             }}
           >
             <div className="stack" style={{ "--stack": "34px" } as CSSProperties}>
-              <DesktopSection id="summary" eyebrow="공개 요약" title="공개 요약">
+              <DesktopSection id="summary" eyebrow="요약" title="요약">
                 <SummaryBlock summary={session.publicSummary} />
               </DesktopSection>
 
-              <DesktopSection id="club-records" eyebrow="클럽 기록" title="클럽 기록">
+              <DesktopSection id="club-records" eyebrow="회차 기록" title="회차 기록">
                 <ClubRecords session={session} />
               </DesktopSection>
 
@@ -276,9 +276,9 @@ function MemberSessionDetailMobile({
         </div>
       </section>
 
-      <nav className="m-hscroll" style={{ padding: "0 18px 6px" }} aria-label="세션 상세 모바일 섹션">
+      <nav className="m-hscroll rm-session-detail-mobile-tabs" aria-label="세션 상세 모바일 섹션">
         {segmentLinks.map((link) => (
-          <a key={link.key} href={`#mobile-${link.key}`} className="m-chip">
+          <a key={link.key} href={`#mobile-${link.key}`} className="m-chip rm-session-detail-mobile-tab">
             {link.mobileLabel}
           </a>
         ))}
@@ -292,7 +292,7 @@ function MemberSessionDetailMobile({
       </section>
 
       <section id="mobile-club-records" className="m-sec">
-        <MobileSectionTitle title="클럽 기록" />
+        <MobileSectionTitle title="회차 기록" />
         <ClubRecords session={session} mobile />
       </section>
 
@@ -345,7 +345,7 @@ function MobileSectionTitle({ title }: { title: string }) {
 
 function SummaryBlock({ summary }: { summary: string | null }) {
   if (!summary?.trim()) {
-    return <EmptyText message="공개 요약이 아직 정리되지 않았습니다." />;
+    return <EmptyText message="아직 이 회차의 요약이 정리되지 않았습니다." />;
   }
 
   return (
@@ -359,34 +359,52 @@ function ClubRecords({ session, mobile = false }: { session: MemberArchiveSessio
   if (!hasClubRecords(session)) {
     return mobile ? (
       <div className="m-card-quiet">
-        <EmptyText message="아직 이 회차에 표시할 클럽 기록이 없습니다." />
+        <EmptyText message="아직 이 회차에 함께 남긴 기록이 없습니다." />
       </div>
     ) : (
-      <EmptyPanel message="아직 이 회차에 표시할 클럽 기록이 없습니다." />
+      <EmptyPanel message="아직 이 회차에 함께 남긴 기록이 없습니다." />
     );
   }
 
   if (mobile) {
     return (
-      <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
-        <HighlightsList highlights={session.publicHighlights} mobile />
-        <QuestionList questions={session.clubQuestions} mobile />
-        <OneLinerList oneLiners={session.clubOneLiners} mobile />
+      <div className="rm-mobile-record-list">
+        {session.publicHighlights.length > 0 ? (
+          <RecordGroup title="회차 하이라이트" count={session.publicHighlights.length} mobile>
+            <HighlightsList highlights={session.publicHighlights} mobile />
+          </RecordGroup>
+        ) : null}
+        {session.clubQuestions.length > 0 ? (
+          <RecordGroup title="함께 남긴 질문" count={session.clubQuestions.length} mobile>
+            <QuestionList questions={session.clubQuestions} labelPrefix="함께 남긴 질문" mobile />
+          </RecordGroup>
+        ) : null}
+        {session.clubOneLiners.length > 0 ? (
+          <RecordGroup title="함께 남긴 한줄평" count={session.clubOneLiners.length} mobile>
+            <OneLinerList oneLiners={session.clubOneLiners} mobile />
+          </RecordGroup>
+        ) : null}
       </div>
     );
   }
 
   return (
     <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
-      <RecordGroup title="공개 하이라이트">
-        <HighlightsList highlights={session.publicHighlights} />
-      </RecordGroup>
-      <RecordGroup title="클럽 질문">
-        <QuestionList questions={session.clubQuestions} />
-      </RecordGroup>
-      <RecordGroup title="한줄평">
-        <OneLinerList oneLiners={session.clubOneLiners} />
-      </RecordGroup>
+      {session.publicHighlights.length > 0 ? (
+        <RecordGroup title="회차 하이라이트" count={session.publicHighlights.length}>
+          <HighlightsList highlights={session.publicHighlights} />
+        </RecordGroup>
+      ) : null}
+      {session.clubQuestions.length > 0 ? (
+        <RecordGroup title="함께 남긴 질문" count={session.clubQuestions.length}>
+          <QuestionList questions={session.clubQuestions} labelPrefix="함께 남긴 질문" />
+        </RecordGroup>
+      ) : null}
+      {session.clubOneLiners.length > 0 ? (
+        <RecordGroup title="함께 남긴 한줄평" count={session.clubOneLiners.length}>
+          <OneLinerList oneLiners={session.clubOneLiners} />
+        </RecordGroup>
+      ) : null}
     </div>
   );
 }
@@ -405,8 +423,8 @@ function MyRecords({ session, mobile = false }: { session: MemberArchiveSessionD
   if (mobile) {
     return (
       <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
-        <QuestionList questions={session.myQuestions} mobile />
-        {session.myCheckin ? <ReadingProgressRecord checkin={session.myCheckin} /> : null}
+        <QuestionList questions={session.myQuestions} labelPrefix="내 질문" mobile />
+        {session.myCheckin ? <ReadingProgressRecord checkin={session.myCheckin} mobile /> : null}
         <ReviewList oneLineReview={session.myOneLineReview} longReview={session.myLongReview} mobile />
       </div>
     );
@@ -414,26 +432,32 @@ function MyRecords({ session, mobile = false }: { session: MemberArchiveSessionD
 
   return (
     <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
-      <RecordGroup title="내 질문">
-        <QuestionList questions={session.myQuestions} />
-      </RecordGroup>
+      {session.myQuestions.length > 0 ? (
+        <RecordGroup title="내 질문" count={session.myQuestions.length}>
+          <QuestionList questions={session.myQuestions} labelPrefix="내 질문" />
+        </RecordGroup>
+      ) : null}
       {session.myCheckin ? (
         <RecordGroup title="내 읽기 진행률">
           <ReadingProgressRecord checkin={session.myCheckin} />
         </RecordGroup>
       ) : null}
-      <RecordGroup title="내 서평">
-        <ReviewList oneLineReview={session.myOneLineReview} longReview={session.myLongReview} />
-      </RecordGroup>
+      {session.myOneLineReview || session.myLongReview ? (
+        <RecordGroup title="내 서평" count={(session.myOneLineReview ? 1 : 0) + (session.myLongReview ? 1 : 0)}>
+          <ReviewList oneLineReview={session.myOneLineReview} longReview={session.myLongReview} />
+        </RecordGroup>
+      ) : null}
     </div>
   );
 }
 
-function RecordGroup({ title, children }: { title: string; children: ReactNode }) {
+function RecordGroup({ title, count, mobile = false, children }: { title: string; count?: number; mobile?: boolean; children: ReactNode }) {
+  const heading = typeof count === "number" ? `${title} · ${count}` : title;
+
   return (
-    <section>
-      <h3 className="h4 editorial" style={{ margin: "0 0 10px" }}>
-        {title}
+    <section style={mobile ? { padding: "2px 0 4px" } : undefined}>
+      <h3 className={mobile ? "small mono" : "h4 editorial"} style={{ margin: mobile ? "0 0 10px" : "0 0 10px", color: mobile ? "var(--text-3)" : undefined }}>
+        {heading}
       </h3>
       {children}
     </section>
@@ -452,7 +476,7 @@ function HighlightsList({
   }
 
   return (
-    <div className={mobile ? "stack" : "stack"} style={mobile ? ({ "--stack": "10px" } as CSSProperties) : ({ "--stack": "0px" } as CSSProperties)}>
+    <div className={mobile ? "rm-mobile-record-list" : "stack"} style={mobile ? undefined : ({ "--stack": "0px" } as CSSProperties)}>
       {highlights.map((highlight) => (
         <blockquote
           key={`${highlight.sortOrder}-${highlight.text}`}
@@ -466,13 +490,21 @@ function HighlightsList({
   );
 }
 
-function QuestionList({ questions, mobile = false }: { questions: MemberArchiveQuestionItem[]; mobile?: boolean }) {
+function QuestionList({
+  questions,
+  labelPrefix = "저장된 질문",
+  mobile = false,
+}: {
+  questions: MemberArchiveQuestionItem[];
+  labelPrefix?: string;
+  mobile?: boolean;
+}) {
   if (questions.length === 0) {
     return null;
   }
 
   return (
-    <div className={mobile ? "stack" : "stack"} style={{ "--stack": mobile ? "10px" : "0px" } as CSSProperties}>
+    <div className={mobile ? "rm-mobile-record-list" : "stack"} style={mobile ? undefined : ({ "--stack": "0px" } as CSSProperties)}>
       {questions.map((question, index) => (
         <article
           key={`${question.priority}-${question.authorName}-${question.text}`}
@@ -487,7 +519,7 @@ function QuestionList({ questions, mobile = false }: { questions: MemberArchiveQ
           }
         >
           <div className="tiny mono" style={{ color: "var(--accent)" }}>
-            저장된 질문 Q{question.priority} · {question.authorName}
+            {labelPrefix} Q{question.priority} · {question.authorName}
           </div>
           <h4 className="body editorial" style={{ fontSize: mobile ? 15 : 17, margin: "6px 0 0", lineHeight: 1.58 }}>
             {question.text}
@@ -503,11 +535,11 @@ function QuestionList({ questions, mobile = false }: { questions: MemberArchiveQ
   );
 }
 
-function ReadingProgressRecord({ checkin }: { checkin: MemberArchiveCheckinItem }) {
+function ReadingProgressRecord({ checkin, mobile = false }: { checkin: MemberArchiveCheckinItem; mobile?: boolean }) {
   return (
-    <article className="surface-quiet" style={{ padding: "16px 18px" }}>
+    <article className={mobile ? "m-card-quiet" : "surface-quiet"} style={mobile ? undefined : { padding: "16px 18px" }}>
       <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-        저장된 진행률
+        내 읽기 진행률
       </div>
       <div className="h4 editorial" style={{ marginTop: 6 }}>
         {checkin.readingProgress}%
@@ -522,7 +554,7 @@ function OneLinerList({ oneLiners, mobile = false }: { oneLiners: MemberArchiveO
   }
 
   return (
-    <div className="stack" style={{ "--stack": mobile ? "10px" : "8px" } as CSSProperties}>
+    <div className={mobile ? "rm-mobile-record-list" : "stack"} style={mobile ? undefined : ({ "--stack": "8px" } as CSSProperties)}>
       {oneLiners.map((oneLiner) => (
         <article
           key={`${oneLiner.authorName}-${oneLiner.text}`}
@@ -565,7 +597,7 @@ function ReviewList({
       {oneLineReview ? (
         <article className={mobile ? "m-card-quiet" : "surface-quiet"} style={mobile ? undefined : { padding: "16px 18px" }}>
           <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-            저장된 한줄평
+            내 한줄평
           </div>
           <p className="body editorial" style={{ fontSize: mobile ? 15 : 16, margin: "6px 0 0" }}>
             {oneLineReview.text}
@@ -575,7 +607,7 @@ function ReviewList({
       {longReview ? (
         <article className={mobile ? "m-card" : "surface"} style={mobile ? undefined : { padding: "18px" }}>
           <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-            저장된 장문 서평
+            내 장문 서평
           </div>
           <p className="body" style={{ margin: "6px 0 0", color: "var(--text-2)", whiteSpace: "pre-wrap" }}>
             {longReview.body}
