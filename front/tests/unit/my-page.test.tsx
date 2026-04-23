@@ -98,7 +98,6 @@ const reports: FeedbackDocumentListItem[] = [
   },
 ];
 const reportReadLabel = "No.01 팩트풀니스 피드백 문서 읽기";
-const reportPdfLabel = "No.01 팩트풀니스 피드백 문서 PDF로 저장";
 
 function renderMyPage(overrides: Partial<MyPageProps> = {}) {
   const props: MyPageProps = {
@@ -143,7 +142,7 @@ describe("MyPage", () => {
     const { container } = renderMyPage();
     const scoped = desktopScope(container);
 
-    expect(scoped.getByRole("heading", { level: 1, name: "내 공간" })).toBeInTheDocument();
+    expect(scoped.getByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
     expect(scoped.queryByText("My")).not.toBeInTheDocument();
     expect(scoped.queryByText("내 서가 · 계정")).not.toBeInTheDocument();
     expect(scoped.getByText("계정")).toBeInTheDocument();
@@ -162,12 +161,9 @@ describe("MyPage", () => {
     expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveClass("btn", "btn-quiet", "btn-sm");
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("2025.11")).toBeInTheDocument();
-    expect(scoped.getByText("2025.11.26 · PDF")).toBeInTheDocument();
+    expect(scoped.getByText("2025.11.26 · 피드백 문서")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: reportReadLabel })).toHaveAttribute("href", "/app/feedback/session-1");
-    expect(scoped.getByRole("link", { name: reportPdfLabel })).toHaveAttribute(
-      "href",
-      "/app/feedback/session-1/print",
-    );
+    expect(scoped.queryByRole("link", { name: /PDF로 저장/ })).not.toBeInTheDocument();
     expect(scoped.queryByText("읽기")).not.toBeInTheDocument();
     expect(scoped.queryByText("PDF로 저장")).not.toBeInTheDocument();
     expect(scoped.queryByText("물고기는 존재하지 않는다")).not.toBeInTheDocument();
@@ -189,10 +185,7 @@ describe("MyPage", () => {
       "href",
       "/app/feedback/session%201%2Fslash",
     );
-    expect(scoped.getByRole("link", { name: reportPdfLabel })).toHaveAttribute(
-      "href",
-      "/app/feedback/session%201%2Fslash/print",
-    );
+    expect(scoped.queryByRole("link", { name: /PDF로 저장/ })).not.toBeInTheDocument();
   });
 
   it("renders the standalone-aligned mobile my page shell", () => {
@@ -232,7 +225,7 @@ describe("MyPage", () => {
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: reportReadLabel })).toHaveAttribute("href", "/app/feedback/session-1");
-    expect(scoped.getByRole("link", { name: reportPdfLabel })).toHaveAttribute("href", "/app/feedback/session-1/print");
+    expect(scoped.queryByRole("link", { name: /PDF로 저장/ })).not.toBeInTheDocument();
     expect(scoped.queryByText("준비 중")).not.toBeInTheDocument();
     expect(scoped.getByText("클럽 탈퇴 · 내 기록은 유지, 내 이름은 비공개 처리됩니다.")).toBeInTheDocument();
     const leaveButton = scoped.getByRole("button", { name: "탈퇴" });
@@ -488,7 +481,7 @@ describe("MyPage", () => {
     const scoped = desktopScope(container);
 
     expect(scoped.getByText("팩트풀니스")).toHaveClass("body");
-    expect(scoped.getByText("2025.11.26 · PDF")).toHaveClass("tiny");
+    expect(scoped.getByText("2025.11.26 · 피드백 문서")).toHaveClass("tiny");
     expect(scoped.queryByText("독서모임 1차 피드백")).not.toBeInTheDocument();
   });
 
@@ -567,7 +560,7 @@ describe("MyPage", () => {
     );
     render(<RouterProvider router={router} />);
 
-    expect(await screen.findByRole("heading", { level: 1, name: "내 공간" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
     expect(screen.getAllByText("아직 열람 가능한 피드백 문서가 없습니다.")).toHaveLength(2);
     expect(screen.queryByRole("heading", { name: "페이지를 불러오지 못했습니다." })).not.toBeInTheDocument();
   });

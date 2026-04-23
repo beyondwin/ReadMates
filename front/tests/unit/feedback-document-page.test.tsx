@@ -1,5 +1,4 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedbackDocumentPage, {
   FeedbackDocumentUnavailablePage,
@@ -38,11 +37,10 @@ describe("FeedbackDocumentPage", () => {
     const returnLink = screen.getByRole("link", { name: "아카이브로 돌아가기" });
     expect(returnLink).toHaveAttribute("href", "/app/archive?view=report");
     expect(returnLink).toHaveTextContent("← 아카이브");
-    const pdfButton = screen.getByRole("button", { name: "PDF로 저장" });
-    expect(pdfButton.closest(".rm-feedback-document-meta-row")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "PDF로 저장" })).not.toBeInTheDocument();
   });
 
-  it("saves the current layout as one long PDF page without moving to the print route", async () => {
+  it("omits PDF saving while document downloads are disabled", () => {
     const printMock = vi.fn();
     vi.stubGlobal("print", printMock);
 
@@ -63,16 +61,10 @@ describe("FeedbackDocumentPage", () => {
     });
     Object.defineProperty(page, "scrollHeight", { value: 2600, configurable: true });
 
-    const pdfButton = screen.getByRole("button", { name: "PDF로 저장" });
+    expect(screen.queryByRole("button", { name: "PDF로 저장" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "PDF로 저장" })).not.toBeInTheDocument();
 
-    await userEvent.click(pdfButton);
-
-    expect(printMock).toHaveBeenCalledTimes(1);
-    const singlePageStyle = document.getElementById("rm-feedback-document-single-page-print-style");
-    expect(singlePageStyle?.textContent).toContain("size: 480px 3120px");
-
-    globalThis.dispatchEvent(new Event("afterprint"));
+    expect(printMock).not.toHaveBeenCalled();
     expect(document.getElementById("rm-feedback-document-single-page-print-style")).toBeNull();
   });
 
@@ -85,7 +77,7 @@ describe("FeedbackDocumentPage", () => {
     );
 
     expect(screen.queryByText("내 공간으로 돌아가기")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "PDF로 저장" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "PDF로 저장" })).not.toBeInTheDocument();
 
     cleanup();
     render(
@@ -114,25 +106,19 @@ describe("FeedbackDocumentPage", () => {
     const returnLink = screen.getByRole("link", { name: "아카이브로 돌아가기" });
     expect(returnLink).toHaveAttribute("href", "/app/archive?view=report");
     expect(returnLink).toHaveTextContent("← 아카이브");
-    expect(screen.getByRole("link", { name: "문서로 돌아가기" })).toHaveAttribute(
-      "href",
-      "/app/feedback/session-1",
-    );
+    expect(screen.queryByRole("link", { name: "문서로 돌아가기" })).not.toBeInTheDocument();
   });
 
-  it("encodes feedback document print and document-return hrefs", () => {
+  it("encodes feedback document return hrefs without exposing PDF controls", () => {
     render(<FeedbackDocumentPage document={{ ...feedbackDocument, sessionId: "session 1/slash" }} />);
 
-    expect(screen.getByRole("button", { name: "PDF로 저장" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "PDF로 저장" })).not.toBeInTheDocument();
 
     cleanup();
     vi.stubGlobal("print", vi.fn());
     render(<FeedbackDocumentPage document={{ ...feedbackDocument, sessionId: "session 1/slash" }} printMode />);
 
-    expect(screen.getByRole("link", { name: "문서로 돌아가기" })).toHaveAttribute(
-      "href",
-      "/app/feedback/session%201%2Fslash",
-    );
+    expect(screen.queryByRole("link", { name: "문서로 돌아가기" })).not.toBeInTheDocument();
   });
 
   it("labels the missing state as a feedback document", () => {

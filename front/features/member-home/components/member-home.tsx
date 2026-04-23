@@ -312,22 +312,6 @@ function QuickLinks() {
               color: "var(--text)",
             }}
           >
-            <span
-              aria-hidden
-              style={{
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                background: "var(--bg-sub)",
-                border: "1px solid var(--line-soft)",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "var(--text-2)",
-              }}
-            >
-              ↗
-            </span>
             <span style={{ flex: 1 }}>
               <span className="body" style={{ display: "block", fontWeight: 500 }}>
                 {item.label}
@@ -335,7 +319,7 @@ function QuickLinks() {
               <span className="tiny">{item.sub}</span>
             </span>
             <span className="tiny" aria-hidden>
-              ›
+              &gt;
             </span>
           </Link>
         ))}

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -249,7 +249,7 @@ describe("Feedback document routes", () => {
     expect(printMock).not.toHaveBeenCalled();
   });
 
-  it("opens the browser print dialog after the print route renders a document", async () => {
+  it("does not open the browser print dialog while document downloads are disabled", async () => {
     const printMock = vi.fn();
     setupBffJson({
       sessionId: "session-1",
@@ -269,7 +269,7 @@ describe("Feedback document routes", () => {
     renderFeedbackRoute("/app/feedback/session-1/print");
 
     expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
-    await waitFor(() => expect(printMock).toHaveBeenCalledTimes(1));
+    expect(printMock).not.toHaveBeenCalled();
   });
 
   it("omits the my page return copy on the feedback document route", async () => {
@@ -297,7 +297,7 @@ describe("Feedback document routes", () => {
 
     expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
     expect(screen.queryByText("내 공간으로 돌아가기")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "PDF로 저장" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "PDF로 저장" })).not.toBeInTheDocument();
   });
 
   it("returns to session detail with the session detail archive return state intact", async () => {

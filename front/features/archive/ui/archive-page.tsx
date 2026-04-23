@@ -31,6 +31,7 @@ import {
   restoreReadmatesArchiveScroll,
 } from "@/features/archive/ui/archive-route-continuity";
 import { BookCover } from "@/shared/ui/book-cover";
+import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { Link } from "@/features/archive/ui/archive-link";
 
@@ -101,7 +102,7 @@ function ReportActionIcon({ name }: { name: ReportActionIconName }) {
 
   return (
     <svg {...common}>
-      <path d="M6 14L14 6M7 6h7v7" />
+      <path d="M8 5l5 5-5 5" />
     </svg>
   );
 }
@@ -365,7 +366,7 @@ function ArchiveSelectedSection({ view, children }: { view: ArchiveView; childre
         </div>
         {showPreservedRecordLabel ? (
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            / preserved record
+            AI-assisted
           </span>
         ) : null}
       </div>
@@ -406,7 +407,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
             to={appSessionHref(session.id)}
             state={archiveReturnState("sessions")}
             className="rm-archive-session-card m-card"
-            style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr)", gap: 14, width: "100%" }}
+            style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) auto", gap: 14, alignItems: "center", width: "100%" }}
             aria-label={`No.${session.number} ${session.book} 열기`}
           >
             <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={52} />
@@ -436,6 +437,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
                 </span>
               </div>
             </div>
+            <SessionAction />
           </Link>
         ))}
       </div>
@@ -562,15 +564,17 @@ function ArchiveMobileReports({ reports, sessions }: { reports: FeedbackDocument
                 >
                   <ReportActionIcon name="read" />
                 </Link>
-                <Link
-                  className="btn btn-quiet btn-sm"
-                  to={appFeedbackHref(report.sessionId, true)}
-                  state={archiveReturnState("report", "아카이브로 돌아가기")}
-                  aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
-                  title={feedbackReportActionLabel(report, "PDF로 저장")}
-                >
-                  <ReportActionIcon name="download" />
-                </Link>
+                {feedbackDocumentPdfDownloadsEnabled ? (
+                  <Link
+                    className="btn btn-quiet btn-sm"
+                    to={appFeedbackHref(report.sessionId, true)}
+                    state={archiveReturnState("report", "아카이브로 돌아가기")}
+                    aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+                    title={feedbackReportActionLabel(report, "PDF로 저장")}
+                  >
+                    <ReportActionIcon name="download" />
+                  </Link>
+                ) : null}
               </div>
             </div>
           );
@@ -679,7 +683,9 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
 function SessionAction() {
   return (
     <span className="rm-archive-session-action" aria-hidden>
-      →
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+        <path d="M8 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
     </span>
   );
 }
@@ -794,7 +800,9 @@ function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListIt
             key={report.sessionId}
             style={{
               display: "grid",
-              gridTemplateColumns: "64px minmax(0, 1fr) auto auto",
+              gridTemplateColumns: feedbackDocumentPdfDownloadsEnabled
+                ? "64px minmax(0, 1fr) auto auto"
+                : "64px minmax(0, 1fr) auto",
               gap: "20px",
               padding: "22px 0",
               borderTop: index === 0 ? "0" : "1px solid var(--line-soft)",
@@ -820,15 +828,17 @@ function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListIt
             >
               <ReportActionIcon name="read" />
             </Link>
-            <Link
-              className="btn btn-quiet btn-sm"
-              to={appFeedbackHref(report.sessionId, true)}
-              state={archiveReturnState("report", "아카이브로 돌아가기")}
-              aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
-              title={feedbackReportActionLabel(report, "PDF로 저장")}
-            >
-              <ReportActionIcon name="download" />
-            </Link>
+            {feedbackDocumentPdfDownloadsEnabled ? (
+              <Link
+                className="btn btn-quiet btn-sm"
+                to={appFeedbackHref(report.sessionId, true)}
+                state={archiveReturnState("report", "아카이브로 돌아가기")}
+                aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+                title={feedbackReportActionLabel(report, "PDF로 저장")}
+              >
+                <ReportActionIcon name="download" />
+              </Link>
+            ) : null}
           </article>
         );
       })}
