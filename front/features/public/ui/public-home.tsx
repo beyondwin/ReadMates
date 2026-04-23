@@ -329,9 +329,9 @@ export default function PublicHome({ data }: PublicHomeProps) {
               <span aria-hidden>→</span>
             </Link>
           </div>
-          {secondarySessions.length > 0 ? (
+          {data.recentSessions.length > 0 ? (
             <div className="public-record-list">
-              {secondarySessions.map((session) => (
+              {data.recentSessions.map((session) => (
                 <ArchiveRecordRow key={session.sessionId} session={session} />
               ))}
             </div>

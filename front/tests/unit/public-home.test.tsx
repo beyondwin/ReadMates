@@ -61,12 +61,13 @@ describe("PublicHome", () => {
     expect(
       container.querySelectorAll('a.public-latest-record[href="/sessions/00000000-0000-0000-0000-000000000306"]'),
     ).toHaveLength(1);
-    expect(container.querySelectorAll('a[href="/sessions/00000000-0000-0000-0000-000000000306"]')).toHaveLength(1);
+    expect(container.querySelectorAll('a[href="/sessions/00000000-0000-0000-0000-000000000306"]')).toHaveLength(2);
     expect(screen.getByText("공개한 모임 기록을 모았습니다")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "공개 기록 보기" })).toHaveAttribute("href", "/records");
     expect(container.querySelector(".public-note-list")).not.toHaveTextContent("가난한 찰리의 연감");
     expect(container.querySelector(".public-note-list")).toHaveTextContent("지대넓얕 무한");
-    expect(container.querySelector(".public-record-list")).not.toHaveTextContent("가난한 찰리의 연감");
+    expect(container.querySelector(".public-record-list")).toHaveTextContent("가난한 찰리의 연감");
+    expect(container.querySelector(".public-record-list")).toHaveTextContent("No.6");
     expect(container.querySelector(".public-record-list")).toHaveTextContent("지대넓얕 무한");
     expect(screen.getAllByText("공개 요약").length).toBeGreaterThan(0);
     expect(screen.getAllByText("하이라이트 3").length).toBeGreaterThan(0);
