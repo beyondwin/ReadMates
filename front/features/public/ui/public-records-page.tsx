@@ -49,22 +49,25 @@ export default function PublicRecordsPage({
   }, [routePathname, routeSearch, data.recentSessions.length]);
 
   const display = getPublicRecordsDisplay(data);
+  const headerDescription = display.showsRecentSubset
+    ? "최근 발행한 책과 대화의 흔적을 모았습니다."
+    : "함께 읽은 책과 대화에서 남은 문장을 모았습니다.";
 
   return (
     <main className="page-frame public-record-index">
       <section className="page-header">
         <div className="container container-sm">
           <div className="eyebrow" style={{ marginBottom: 14 }}>
-            {display.clubName} · 공개 기록
+            {display.clubName}
           </div>
           <h1 className="h1 editorial" style={{ margin: 0 }}>
             {display.showsRecentSubset ? "최근 공개 기록" : "공개 기록"}
           </h1>
           <p className="body-lg" style={{ color: "var(--text-2)", marginTop: 16, maxWidth: 620 }}>
-            {display.tagline}
+            {headerDescription}
           </p>
           <p className="body" style={{ color: "var(--text-2)", marginTop: 12, maxWidth: 620 }}>
-            {display.about}
+            공개 기록은 누구나 읽을 수 있고, 참여는 초대받은 멤버에게만 열려 있습니다.
           </p>
         </div>
       </section>
