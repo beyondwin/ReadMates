@@ -263,7 +263,7 @@ describe("MyPage", () => {
     expect(mobile.getByRole("link", { name: "전체 보기 →" })).not.toHaveClass("m-chip");
   });
 
-  it("passes my page return state from mobile feedback document links", async () => {
+  it("opens a mobile feedback document from the list row and preserves my page return state", async () => {
     const user = userEvent.setup();
     const { container } = render(
       <MemoryRouter initialEntries={["/app/me"]}>
@@ -287,7 +287,11 @@ describe("MyPage", () => {
     );
     const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
 
-    await user.click(mobile.getByRole("link", { name: reportReadLabel }));
+    const feedbackRow = mobile.getByText("팩트풀니스").closest(".m-list-row");
+    expect(feedbackRow).not.toBeNull();
+    expect(feedbackRow).toHaveAttribute("href", "/app/feedback/session-1");
+
+    await user.click(feedbackRow as HTMLElement);
 
     expect(screen.getByTestId("return-to")).toHaveTextContent("/app/me");
     expect(screen.getByTestId("return-label")).toHaveTextContent("내 공간으로 돌아가기");
