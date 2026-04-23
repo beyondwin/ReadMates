@@ -98,12 +98,13 @@ export default function PublicClub({ data }: PublicClubProps) {
         <div className="container public-grid-2" style={{ alignItems: "end" }}>
           <div>
             <div className="eyebrow" style={{ marginBottom: 16 }}>
-              {clubName} · {tagline}
+              작게 읽고 깊게 나누는 모임
             </div>
             <h1 className="h1 editorial" style={{ margin: 0 }}>
               {clubName}
             </h1>
-            <p className="body-lg" style={{ color: "var(--text-2)", marginTop: 16, maxWidth: 560 }}>
+            <p className="body-lg public-editorial-promise">{tagline}</p>
+            <p className="body" style={{ color: "var(--text-2)", marginTop: 16, maxWidth: 560 }}>
               {about}
             </p>
           </div>
