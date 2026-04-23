@@ -1,6 +1,7 @@
 package com.readmates.session.api
 
 import com.readmates.support.MySqlTestContainer
+import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Test
@@ -67,12 +68,20 @@ class CurrentSessionControllerDbTest(
             on duplicate key update text = values(text), draft_thought = values(draft_thought);
             """,
             """
-            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress, note)
+            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
             select '00000000-0000-0000-0000-000000009002', memberships.club_id, '00000000-0000-0000-0000-000000000777', memberships.id,
-                   72, '현재 세션 hydrate 체크인'
+                   72
             from memberships join users on users.id = memberships.user_id
             where users.email = 'member5@example.com'
-            on duplicate key update reading_progress = values(reading_progress), note = values(note);
+            on duplicate key update reading_progress = values(reading_progress);
+            """,
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            select '00000000-0000-0000-0000-000000009004', memberships.club_id, '00000000-0000-0000-0000-000000000777', memberships.id,
+                   '현재 세션 hydrate 한줄평', 'SESSION'
+            from memberships join users on users.id = memberships.user_id
+            where users.email = 'member1@example.com'
+            on duplicate key update text = values(text), visibility = values(visibility);
             """,
             """
             insert into highlights (id, club_id, session_id, text, sort_order)
@@ -109,7 +118,7 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.questionDeadlineAt") { value("2026-05-19T14:59Z") }
             jsonPath("$.currentSession.myRsvpStatus") { value("GOING") }
             jsonPath("$.currentSession.myCheckin.readingProgress") { value(72) }
-            jsonPath("$.currentSession.myCheckin.note") { value("현재 세션 hydrate 체크인") }
+            jsonPath("$.currentSession.myCheckin.note") { doesNotExist() }
             jsonPath("$.currentSession.myQuestions[0].priority") { value(1) }
             jsonPath("$.currentSession.myQuestions[0].text") { value("현재 세션 hydrate 질문") }
             jsonPath("$.currentSession.myQuestions[0].draftThought") { value("hydrate 초안") }
@@ -122,10 +131,17 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.board.questions[0].priority") { value(1) }
             jsonPath("$.currentSession.board.questions[0].text") { value("현재 세션 hydrate 질문") }
             jsonPath("$.currentSession.board.questions[0].draftThought") { value("hydrate 초안") }
-            jsonPath("$.currentSession.board.checkins[0].authorName") { value("이멤버5") }
-            jsonPath("$.currentSession.board.checkins[0].authorShortName") { value("멤버5") }
-            jsonPath("$.currentSession.board.checkins[0].readingProgress") { value(72) }
-            jsonPath("$.currentSession.board.checkins[0].note") { value("현재 세션 hydrate 체크인") }
+            jsonPath("$.currentSession.board.checkins") { doesNotExist() }
+            jsonPath("$.currentSession.board.oneLineReviews.length()") { value(greaterThan(0)) }
+            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '현재 세션 hydrate 한줄평')].authorName") {
+                value(hasItem("안멤버1"))
+            }
+            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '현재 세션 hydrate 한줄평')].authorShortName") {
+                value(hasItem("멤버1"))
+            }
+            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '현재 세션 hydrate 한줄평')].text") {
+                value(hasItem("현재 세션 hydrate 한줄평"))
+            }
             jsonPath("$.currentSession.board.highlights[0].text") { value("현재 세션 hydrate 하이라이트") }
             jsonPath("$.currentSession.board.highlights[0].sortOrder") { value(0) }
             jsonPath("$.currentSession.attendees[0].membershipId") { exists() }
@@ -165,7 +181,7 @@ class CurrentSessionControllerDbTest(
                    case when users.email = 'member5@example.com' then 'REMOVED' else 'ACTIVE' end
             from memberships
             join users on users.id = memberships.user_id
-            where users.email in ('host@example.com', 'member5@example.com')
+            where users.email in ('host@example.com', 'member1@example.com', 'member5@example.com')
             on duplicate key update
               rsvp_status = values(rsvp_status),
               participation_status = values(participation_status);
@@ -179,12 +195,36 @@ class CurrentSessionControllerDbTest(
             on duplicate key update text = values(text), draft_thought = values(draft_thought);
             """,
             """
-            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress, note)
+            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
             select '00000000-0000-0000-0000-000000009012', memberships.club_id, '00000000-0000-0000-0000-000000000778', memberships.id,
-                   64, '제외된 참가자의 체크인'
+                   64
             from memberships join users on users.id = memberships.user_id
             where users.email = 'member5@example.com'
-            on duplicate key update reading_progress = values(reading_progress), note = values(note);
+            on duplicate key update reading_progress = values(reading_progress);
+            """,
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            select '00000000-0000-0000-0000-000000009013', memberships.club_id, '00000000-0000-0000-0000-000000000778', memberships.id,
+                   '제외된 참가자의 한줄평', 'SESSION'
+            from memberships join users on users.id = memberships.user_id
+            where users.email = 'member5@example.com'
+            on duplicate key update text = values(text), visibility = values(visibility);
+            """,
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            select '00000000-0000-0000-0000-000000009014', memberships.club_id, '00000000-0000-0000-0000-000000000778', memberships.id,
+                   '활성 호스트의 세션 한줄평', 'SESSION'
+            from memberships join users on users.id = memberships.user_id
+            where users.email = 'host@example.com'
+            on duplicate key update text = values(text), visibility = values(visibility);
+            """,
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            select '00000000-0000-0000-0000-000000009015', memberships.club_id, '00000000-0000-0000-0000-000000000778', memberships.id,
+                   '활성 멤버의 공개 한줄평', 'PUBLIC'
+            from memberships join users on users.id = memberships.user_id
+            where users.email = 'member1@example.com'
+            on duplicate key update text = values(text), visibility = values(visibility);
             """,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -195,7 +235,7 @@ class CurrentSessionControllerDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `removed current-session participant is not treated as an active attendee`() {
+    fun `removed current-session participant cannot see active board one-line reviews`() {
         mockMvc.get("/api/sessions/current") {
             with(user("member5@example.com"))
         }.andExpect {
@@ -205,8 +245,12 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.myCheckin") { value(null) }
             jsonPath("$.currentSession.myQuestions.length()") { value(0) }
             jsonPath("$.currentSession.board.questions.length()") { value(0) }
-            jsonPath("$.currentSession.board.checkins.length()") { value(0) }
-            jsonPath("$.currentSession.attendees.length()") { value(1) }
+            jsonPath("$.currentSession.board.checkins") { doesNotExist() }
+            jsonPath("$.currentSession.board.oneLineReviews.length()") { value(0) }
+            jsonPath("$.currentSession.board.oneLineReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
+            jsonPath("$.currentSession.board.oneLineReviews[*].text") { value(not(hasItem("활성 호스트의 세션 한줄평"))) }
+            jsonPath("$.currentSession.board.oneLineReviews[*].text") { value(not(hasItem("활성 멤버의 공개 한줄평"))) }
+            jsonPath("$.currentSession.attendees.length()") { value(2) }
             jsonPath("$.currentSession.attendees[0].displayName") { value("김호스트") }
         }
     }
@@ -254,12 +298,12 @@ class CurrentSessionControllerDbTest(
             on duplicate key update text = values(text), draft_thought = values(draft_thought);
             """,
             """
-            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress, note)
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
             select '00000000-0000-0000-0000-000000009022', memberships.club_id, '00000000-0000-0000-0000-000000000779', memberships.id,
-                   88, '탈퇴 회원 기존 체크인'
+                   '탈퇴 회원 기존 한줄평', 'SESSION'
             from memberships join users on users.id = memberships.user_id
             where users.email = 'member1@example.com'
-            on duplicate key update reading_progress = values(reading_progress), note = values(note);
+            on duplicate key update text = values(text), visibility = values(visibility);
             """,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -285,14 +329,14 @@ class CurrentSessionControllerDbTest(
                 value(hasItem("탈퇴한 멤버"))
             }
             jsonPath("$.currentSession.board.questions[*].authorShortName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.board.checkins[?(@.note == '탈퇴 회원 기존 체크인')].authorName") {
+            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '탈퇴 회원 기존 한줄평')].authorName") {
                 value(hasItem("탈퇴한 멤버"))
             }
-            jsonPath("$.currentSession.board.checkins[*].authorName") { value(not(hasItem("안멤버1"))) }
-            jsonPath("$.currentSession.board.checkins[?(@.note == '탈퇴 회원 기존 체크인')].authorShortName") {
+            jsonPath("$.currentSession.board.oneLineReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
+            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '탈퇴 회원 기존 한줄평')].authorShortName") {
                 value(hasItem("탈퇴한 멤버"))
             }
-            jsonPath("$.currentSession.board.checkins[*].authorShortName") { value(not(hasItem("멤버1"))) }
+            jsonPath("$.currentSession.board.oneLineReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
             jsonPath("$.currentSession.attendees[*].displayName") { value(hasItem("탈퇴한 멤버")) }
             jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("안멤버1"))) }
             jsonPath("$.currentSession.attendees[*].shortName") { value(hasItem("탈퇴한 멤버")) }
