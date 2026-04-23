@@ -338,7 +338,7 @@ describe("MemberHome", () => {
     expect(desktop.getByText("클럽 흐름")).toBeInTheDocument();
     expect(screen.getAllByText("내가 직접 넣은 질문만 최근 클럽 흐름에 보여야 합니다.").length).toBeGreaterThan(0);
     expect(screen.queryByText("분류는 세계를 이해하기 위한 도구일까요, 아니면 세계를 좁히는 습관일까요?")).not.toBeInTheDocument();
-    expect(desktop.getAllByText("내 최근 기록").length).toBeGreaterThan(0);
+    expect(desktop.getByText("최근에 남긴 내 기록")).toBeInTheDocument();
     expect(desktop.getByText("RSVP · 참석 명단")).toBeInTheDocument();
     expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
     expect(desktop.getByText("바로가기")).toBeInTheDocument();
@@ -349,7 +349,7 @@ describe("MemberHome", () => {
     );
     expect(desktop.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
     expect(desktop.queryByRole("link", { name: "이번 세션" })).not.toBeInTheDocument();
-    expect(desktop.queryByRole("link", { name: "아카이브" })).not.toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "아카이브 →" })).toHaveAttribute("href", "/app/archive");
     expect(desktop.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: /아카이브 보기/ })).not.toBeInTheDocument();
   });
@@ -393,11 +393,11 @@ describe("MemberHome", () => {
       <MemberHome auth={anonymousAuth} current={current} noteFeedItems={[anonymousRecord]} />,
     );
     const desktop = getDesktopView(container);
-    const myRecentHeading = desktop.getAllByText("내 최근 기록")[1];
+    const myRecentHeading = desktop.getByText("최근에 남긴 내 기록");
     const myRecentSection = myRecentHeading.closest("section");
 
     expect(myRecentSection).not.toBeNull();
-    expect(within(myRecentSection as HTMLElement).getByText("아직 내 기록이 없습니다.")).toBeInTheDocument();
+    expect(within(myRecentSection as HTMLElement).getByText("아직 내가 남긴 기록이 없습니다.")).toBeInTheDocument();
     expect(within(myRecentSection as HTMLElement).queryByText(anonymousRecord.text)).not.toBeInTheDocument();
   });
 
