@@ -709,6 +709,29 @@ button.rm-record-row:hover {
   height: 2px;
   background: var(--accent);
 }
+.rm-workspace-switch {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition:
+    background var(--motion-fast) var(--ease-standard-refined),
+    border-color var(--motion-fast) var(--ease-standard-refined),
+    color var(--motion-fast) var(--ease-standard-refined);
+}
+.rm-workspace-switch:hover {
+  color: var(--text);
+  background: var(--bg-sub);
+  border-color: var(--line-strong);
+}
+.rm-workspace-switch svg {
+  flex-shrink: 0;
+}
 
 /* ============================================
    Page header

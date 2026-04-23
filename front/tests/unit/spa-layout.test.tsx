@@ -173,7 +173,7 @@ describe("SPA AppRouteLayout", () => {
       "/app/host",
       "/app/host",
     ]);
-    expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.textContent)).toContain("운영");
+    expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.textContent)).toEqual(["", ""]);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
@@ -286,7 +286,8 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getAllByText("기록")).toHaveLength(2);
     const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
     expect(memberReturn).toHaveAttribute("href", "/app");
-    expect(memberReturn.textContent).toBe("멤버");
+    expect(memberReturn).toHaveClass("m-hdr-link--icon");
+    expect(memberReturn.textContent).toBe("");
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     await waitFor(() => {
