@@ -165,9 +165,9 @@ const JOINED_MONTH_PATTERN = /^(\d{4})-(\d{2})$/;
 
 export const archiveTabs: Array<{ key: ArchiveView; label: string }> = [
   { key: "sessions", label: "세션" },
-  { key: "reviews", label: "내 서평" },
-  { key: "questions", label: "내 질문" },
   { key: "report", label: "피드백 문서" },
+  { key: "questions", label: "내 질문" },
+  { key: "reviews", label: "내 서평" },
 ];
 
 export const mobileArchiveTabs: Array<{ key: ArchiveView; label: string }> = archiveTabs;
