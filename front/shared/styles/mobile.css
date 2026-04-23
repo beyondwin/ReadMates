@@ -147,6 +147,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.m-hdr--guest .m-hdr-link:not(.m-hdr-link--icon) {
+  max-width: 86px;
+  padding: 0 6px;
+  border-color: transparent;
+  border-radius: var(--r-2);
+  color: var(--text-2);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
 .m-hdr-link--icon {
   width: 44px;
   max-width: 44px;
@@ -992,6 +1002,7 @@
 .mobile-only .rm-current-session-mobile__details {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
   column-gap: 12px;
   row-gap: 8px;
   margin: 0;
@@ -999,6 +1010,7 @@
 .mobile-only .rm-current-session-mobile__details dt {
   font-family: var(--f-mono);
   font-size: 10.5px;
+  line-height: 1.2;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -1006,6 +1018,7 @@
 .mobile-only .rm-current-session-mobile__details dd {
   margin: 0;
   color: var(--text-2);
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 .mobile-only .rm-current-session-mobile__roster {

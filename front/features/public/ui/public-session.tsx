@@ -3,7 +3,7 @@ import { publicRecordsReturnTarget, type ReadmatesReturnTarget } from "@/feature
 import type { PublicSessionDetailView } from "@/features/public/model/public-display-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
-import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public-auth-action";
+import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { displayText, getPublicSessionDetailDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE } from "@/features/public/model/public-copy";
 
@@ -168,17 +168,10 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
             <div className="public-membership-panel__actions">
               <PublicGuestOnlyActions>
                 <Link to="/login" className="btn btn-primary">
-                  기존 멤버 로그인
+                  로그인
                 </Link>
-                <PublicInviteGuidance />
               </PublicGuestOnlyActions>
-              <Link to={returnTarget.href} className="btn btn-quiet btn-sm">
-                {returnTarget.label} →
-              </Link>
             </div>
-            <p className="tiny" style={{ margin: "14px 0 0", color: "var(--text-3)" }}>
-              기존 멤버는 로그인으로 들어가고, 새 멤버는 호스트가 보낸 초대 링크에서 수락 절차를 시작합니다.
-            </p>
           </div>
         </div>
       </section>

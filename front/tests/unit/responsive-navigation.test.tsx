@@ -142,6 +142,7 @@ describe("MobileHeader route titles and actions", () => {
 
     expect(container.querySelector(".m-hdr-title")).toHaveTextContent("공개 기록");
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/records");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveTextContent("뒤로");
     expect(await screen.findByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
   });
 
@@ -352,11 +353,13 @@ describe("MobileHeader route titles and actions", () => {
 
     expect(screen.getByText("지난 세션")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/archive?view=questions");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveTextContent("뒤로");
 
     cleanup();
     renderAt("/app/sessions/session-6", <MobileHeader variant="member" />);
 
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/archive?view=sessions");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveTextContent("뒤로");
   });
 });
 
