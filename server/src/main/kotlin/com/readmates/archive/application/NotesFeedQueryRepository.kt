@@ -70,21 +70,7 @@ class NotesFeedQueryRepository(
                         and session_participants.participation_status = 'ACTIVE'
                     )
                   )
-              ) as highlight_count,
-              (
-                select count(*)
-                from reading_checkins
-                where reading_checkins.club_id = sessions.club_id
-                  and reading_checkins.session_id = sessions.id
-                  and exists (
-                    select 1
-                    from session_participants
-                    where session_participants.session_id = reading_checkins.session_id
-                      and session_participants.club_id = reading_checkins.club_id
-                      and session_participants.membership_id = reading_checkins.membership_id
-                      and session_participants.participation_status = 'ACTIVE'
-                  )
-              ) as checkin_count
+              ) as highlight_count
             from sessions
             where sessions.club_id = ?
               and sessions.state = 'PUBLISHED'
@@ -94,7 +80,6 @@ class NotesFeedQueryRepository(
                 val questionCount = resultSet.getInt("question_count")
                 val oneLinerCount = resultSet.getInt("one_liner_count")
                 val highlightCount = resultSet.getInt("highlight_count")
-                val checkinCount = resultSet.getInt("checkin_count")
 
                 NoteSessionItem(
                     sessionId = resultSet.uuid("id").toString(),
@@ -104,8 +89,7 @@ class NotesFeedQueryRepository(
                     questionCount = questionCount,
                     oneLinerCount = oneLinerCount,
                     highlightCount = highlightCount,
-                    checkinCount = checkinCount,
-                    totalCount = questionCount + oneLinerCount + highlightCount + checkinCount,
+                    totalCount = questionCount + oneLinerCount + highlightCount,
                 )
             },
             clubId.dbString(),
@@ -181,33 +165,6 @@ class NotesFeedQueryRepository(
                 sessions.session_date as session_date,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name_source,
-                'CHECKIN' as kind,
-                reading_checkins.note as text,
-                reading_checkins.created_at as created_at,
-                40 as source_order,
-                0 as item_order
-              from reading_checkins
-              join sessions on sessions.id = reading_checkins.session_id
-                and sessions.club_id = reading_checkins.club_id
-              join memberships on memberships.id = reading_checkins.membership_id
-                and memberships.club_id = reading_checkins.club_id
-              join users on users.id = memberships.user_id
-              join session_participants on session_participants.session_id = reading_checkins.session_id
-                and session_participants.club_id = reading_checkins.club_id
-                and session_participants.membership_id = reading_checkins.membership_id
-                and session_participants.participation_status = 'ACTIVE'
-              where reading_checkins.club_id = ?
-                and sessions.state = 'PUBLISHED'
-
-              union all
-
-              select
-                sessions.id as session_id,
-                sessions.number as session_number,
-                sessions.book_title as book_title,
-                sessions.session_date as session_date,
-                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name_source,
                 'HIGHLIGHT' as kind,
                 highlights.text as text,
                 highlights.created_at as created_at,
@@ -239,7 +196,6 @@ class NotesFeedQueryRepository(
             limit 120
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNoteFeedItem() },
-            clubId.dbString(),
             clubId.dbString(),
             clubId.dbString(),
             clubId.dbString(),
@@ -317,34 +273,6 @@ class NotesFeedQueryRepository(
                 sessions.session_date as session_date,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
                 case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name_source,
-                'CHECKIN' as kind,
-                reading_checkins.note as text,
-                reading_checkins.created_at as created_at,
-                40 as source_order,
-                0 as item_order
-              from reading_checkins
-              join sessions on sessions.id = reading_checkins.session_id
-                and sessions.club_id = reading_checkins.club_id
-              join memberships on memberships.id = reading_checkins.membership_id
-                and memberships.club_id = reading_checkins.club_id
-              join users on users.id = memberships.user_id
-              join session_participants on session_participants.session_id = reading_checkins.session_id
-                and session_participants.club_id = reading_checkins.club_id
-                and session_participants.membership_id = reading_checkins.membership_id
-                and session_participants.participation_status = 'ACTIVE'
-              where reading_checkins.club_id = ?
-                and sessions.id = ?
-                and sessions.state = 'PUBLISHED'
-
-              union all
-
-              select
-                sessions.id as session_id,
-                sessions.number as session_number,
-                sessions.book_title as book_title,
-                sessions.session_date as session_date,
-                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-                case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name_source,
                 'HIGHLIGHT' as kind,
                 highlights.text as text,
                 highlights.created_at as created_at,
@@ -376,8 +304,6 @@ class NotesFeedQueryRepository(
               text
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNoteFeedItem() },
-            clubId.dbString(),
-            sessionId.dbString(),
             clubId.dbString(),
             sessionId.dbString(),
             clubId.dbString(),

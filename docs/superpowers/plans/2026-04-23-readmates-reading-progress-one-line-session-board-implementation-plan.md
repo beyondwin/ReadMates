@@ -616,7 +616,7 @@ git commit -m "feat: expose one-line reviews on current session board"
 - Test: `server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerDbTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/publication/api/PublicControllerDbTest.kt`
 
-- [ ] **Step 1: Update notes feed tests first**
+- [x] **Step 1: Update notes feed tests first**
 
 In `ArchiveAndNotesDbTest.kt`, update note session count assertions for session 6:
 
@@ -649,7 +649,7 @@ jsonPath("$[*].kind") {
 }
 ```
 
-- [ ] **Step 2: Update archive detail tests first**
+- [x] **Step 2: Update archive detail tests first**
 
 In `ArchiveControllerDbTest.kt` and `ArchiveAndNotesDbTest.kt`, replace `clubCheckins` expectations with absence and `clubOneLiners` expectations:
 
@@ -660,7 +660,7 @@ jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("김호스트")) }
 jsonPath("$.clubOneLiners[*].text") { value(everyItem(not(emptyOrNullString()))) }
 ```
 
-- [ ] **Step 3: Run focused archive tests and verify failures**
+- [x] **Step 3: Run focused archive tests and verify failures**
 
 Run:
 
@@ -672,7 +672,7 @@ Run:
 
 Expected: FAIL because response contracts still include `checkinCount`, `CHECKIN`, and `clubCheckins`.
 
-- [ ] **Step 4: Update archive API models**
+- [x] **Step 4: Update archive API models**
 
 In `ArchiveController.kt`, remove:
 
@@ -696,7 +696,7 @@ data class MemberArchiveCheckinItem(
 )
 ```
 
-- [ ] **Step 5: Update archive session detail query**
+- [x] **Step 5: Update archive session detail query**
 
 In `ArchiveSessionQueryRepository.findArchiveSessionDetail`, replace:
 
@@ -751,7 +751,7 @@ private fun findArchiveClubOneLiners(
     )
 ```
 
-- [ ] **Step 6: Update my checkin archive query**
+- [x] **Step 6: Update my checkin archive query**
 
 In `findArchiveMyCheckin`, remove `reading_checkins.note` from the select and mapper:
 
@@ -769,7 +769,7 @@ MemberArchiveCheckinItem(
 )
 ```
 
-- [ ] **Step 7: Remove CHECKIN from notes feed models**
+- [x] **Step 7: Remove CHECKIN from notes feed models**
 
 In `NotesFeedQueryRepository.findNoteSessions`, remove the `checkin_count` subquery and construct:
 
@@ -788,7 +788,7 @@ NoteSessionItem(
 
 Remove both `CHECKIN` union branches from `findNotesFeed` and `findNotesFeedForSession`. Remove the corresponding SQL arguments so each query passes only the remaining question, one-line, and highlight arguments.
 
-- [ ] **Step 8: Verify public query boundary**
+- [x] **Step 8: Verify public query boundary**
 
 Run this search:
 
@@ -798,7 +798,7 @@ rg -n "one_line_reviews\\.visibility = 'PUBLIC'" server/src/main/kotlin/com/read
 
 Expected: every public one-line review query still includes `one_line_reviews.visibility = 'PUBLIC'`.
 
-- [ ] **Step 9: Run focused backend archive/public tests**
+- [x] **Step 9: Run focused backend archive/public tests**
 
 Run:
 
@@ -811,7 +811,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit notes/archive contract**
+- [x] **Step 10: Commit notes/archive contract**
 
 Run:
 

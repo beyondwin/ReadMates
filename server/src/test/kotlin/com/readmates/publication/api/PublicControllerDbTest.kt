@@ -58,6 +58,35 @@ class PublicControllerDbTest(
     @Test
     @Sql(
         statements = [
+            MARK_MEMBER5_SESSION_SIX_ONE_LINER_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_MEMBER5_SESSION_SIX_ONE_LINER_PUBLIC_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public surfaces keep session one-liners private to members`() {
+        mockMvc.get("/api/public/club")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.recentSessions[0].sessionNumber") { value(6) }
+                jsonPath("$.recentSessions[0].oneLinerCount") { value(2) }
+            }
+
+        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.oneLiners.length()") { value(2) }
+                jsonPath("$.oneLiners[*].text") { value(not(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다."))) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             MARK_MEMBER2_SESSION_SIX_REMOVED_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -169,6 +198,28 @@ class PublicControllerDbTest(
     }
 
     companion object {
+        private const val MARK_MEMBER5_SESSION_SIX_ONE_LINER_SESSION_SQL = """
+            update one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            set one_line_reviews.visibility = 'SESSION'
+            where one_line_reviews.club_id = '00000000-0000-0000-0000-000000000001'
+              and one_line_reviews.session_id = '00000000-0000-0000-0000-000000000306'
+              and users.email = 'member5@example.com';
+        """
+
+        private const val RESET_MEMBER5_SESSION_SIX_ONE_LINER_PUBLIC_SQL = """
+            update one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            set one_line_reviews.visibility = 'PUBLIC'
+            where one_line_reviews.club_id = '00000000-0000-0000-0000-000000000001'
+              and one_line_reviews.session_id = '00000000-0000-0000-0000-000000000306'
+              and users.email = 'member5@example.com';
+        """
+
         private const val MARK_MEMBER1_LEFT_SQL = """
             update memberships
             join users on users.id = memberships.user_id
