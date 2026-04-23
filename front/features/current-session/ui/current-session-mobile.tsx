@@ -96,18 +96,15 @@ export function MobileCurrentSessionBoard({
   longReview,
   onLongReviewChange,
   oneLineReview,
-  onOneLineReviewChange,
   checkinSaveStatus,
   questionSaveStatus,
   longReviewSaveStatus,
-  oneLineReviewSaveStatus,
   rsvpSaveStatus,
   onRsvpChange,
   mobileTab,
   onMobileTabChange,
   onSaveCheckin,
   onSaveLongReview,
-  onSaveOneLineReview,
   isViewer,
   memberNotice,
   isHost,
@@ -128,18 +125,15 @@ export function MobileCurrentSessionBoard({
   longReview: string;
   onLongReviewChange: (value: string) => void;
   oneLineReview: string;
-  onOneLineReviewChange: (value: string) => void;
   checkinSaveStatus: SaveState;
   questionSaveStatus: SaveState;
   longReviewSaveStatus: SaveState;
-  oneLineReviewSaveStatus: SaveState;
   rsvpSaveStatus: SaveState;
   onRsvpChange: (status: RsvpUpdateStatus) => void;
   mobileTab: MobileSessionTab;
   onMobileTabChange: (tab: MobileSessionTab) => void;
   onSaveCheckin: () => void;
   onSaveLongReview: () => void;
-  onSaveOneLineReview: () => void;
   isViewer: boolean;
   memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
   isHost: boolean;
@@ -254,12 +248,8 @@ export function MobileCurrentSessionBoard({
           <MobileRecordsSegment
             longReview={longReview}
             onLongReviewChange={onLongReviewChange}
-            oneLineReview={oneLineReview}
-            onOneLineReviewChange={onOneLineReviewChange}
             longReviewSaveStatus={longReviewSaveStatus}
-            oneLineReviewSaveStatus={oneLineReviewSaveStatus}
             onSaveLongReview={onSaveLongReview}
-            onSaveOneLineReview={onSaveOneLineReview}
             canWrite={canWrite}
           />
         </SuspendedFieldset>
@@ -737,71 +727,18 @@ function MobileEmptyBoardState() {
 function MobileRecordsSegment({
   longReview,
   onLongReviewChange,
-  oneLineReview,
-  onOneLineReviewChange,
   longReviewSaveStatus,
-  oneLineReviewSaveStatus,
   onSaveLongReview,
-  onSaveOneLineReview,
   canWrite,
 }: {
   longReview: string;
   onLongReviewChange: (value: string) => void;
-  oneLineReview: string;
-  onOneLineReviewChange: (value: string) => void;
   longReviewSaveStatus: SaveState;
-  oneLineReviewSaveStatus: SaveState;
   onSaveLongReview: () => void;
-  onSaveOneLineReview: () => void;
   canWrite: boolean;
 }) {
   return (
     <>
-      <section className="m-sec">
-        <div className="m-card">
-          <div className="m-row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>
-            <div>
-              <div className="eyebrow">한줄평</div>
-              <div className="h4 editorial" style={{ marginTop: 4 }}>
-                이 책을 한 문장으로
-              </div>
-            </div>
-            <span className="badge">언제든</span>
-          </div>
-          <label className="label" htmlFor="mobile-one-line-review">
-            한줄평 내용
-          </label>
-          <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-            세션 참여자에게 보이는 한 문장입니다.
-          </p>
-          <input
-            id="mobile-one-line-review"
-            className="m-input"
-            value={oneLineReview}
-            disabled={!canWrite}
-            onChange={(event) => onOneLineReviewChange(event.target.value)}
-            placeholder="예: 떠난 자리에 남은 온기를 만지는 책."
-          />
-          <div className="rm-current-session-mobile__save-row">
-            <span className="tiny" style={{ color: "var(--text-3)" }}>
-              세션 참여자 공개
-            </span>
-            <div className="m-row" style={{ gap: 10, justifyContent: "flex-end" }}>
-              <SaveFeedback scope="oneLineReview" status={oneLineReviewSaveStatus} />
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={!canWrite || oneLineReviewSaveStatus === "saving"}
-                aria-disabled={!canWrite || oneLineReviewSaveStatus === "saving"}
-                onClick={onSaveOneLineReview}
-              >
-                한줄평 저장
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section className="m-sec">
         <div className="m-card">
           <div className="m-row-between" style={{ alignItems: "flex-start", marginBottom: 10 }}>

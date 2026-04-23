@@ -11,7 +11,6 @@ import {
   CheckinPanel,
   LongReviewPanel,
   MyStatusCard,
-  OneLineReviewPanel,
   RosterList,
   RsvpPanel,
   SessionMeta,
@@ -115,7 +114,7 @@ export function CurrentSessionEmpty({
               아직 열린 세션이 없습니다
             </h1>
             <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              새 세션이 등록되면 RSVP, 읽기 진행률, 토론 질문, 한줄평 작업대가 열립니다.
+              새 세션이 등록되면 RSVP, 읽기 진행률, 토론 질문 작업대가 열립니다.
             </p>
             {auth?.role === "HOST" ? (
               <InternalLink href="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
@@ -147,7 +146,7 @@ export function CurrentSessionBoard({
   const [questionInputs, setQuestionInputs] = useState<QuestionInput[]>(() => initialQuestionInputs(session.myQuestions));
   const [questionValidationMessage, setQuestionValidationMessage] = useState("");
   const [longReview, setLongReview] = useState(session.myLongReview?.body ?? "");
-  const [oneLineReview, setOneLineReview] = useState(session.myOneLineReview?.text ?? "");
+  const oneLineReview = session.myOneLineReview?.text ?? "";
   const [saveStatuses, setSaveStatuses] = useState<Record<SaveScope, SaveState>>(emptySaveStatuses);
   const [boardTab, setBoardTab] = useState<CurrentSessionBoardTab>("questions");
   const [mobileTab, setMobileTab] = useState<MobileSessionTab>("prep");
@@ -328,15 +327,6 @@ export function CurrentSessionBoard({
     setLongReview(value);
   };
 
-  const handleOneLineReviewChange = (value: string) => {
-    if (!canWrite) {
-      return;
-    }
-
-    resetSaveStatus("oneLineReview");
-    setOneLineReview(value);
-  };
-
   const handleSaveCheckin = () => {
     if (blockReadOnlyWrite()) {
       return;
@@ -351,14 +341,6 @@ export function CurrentSessionBoard({
     }
 
     void runSave("longReview", () => actions.saveLongReview(longReview));
-  };
-
-  const handleSaveOneLineReview = () => {
-    if (blockReadOnlyWrite()) {
-      return;
-    }
-
-    void runSave("oneLineReview", () => actions.saveOneLineReview(oneLineReview));
   };
 
   return (
@@ -378,18 +360,15 @@ export function CurrentSessionBoard({
         longReview={longReview}
         onLongReviewChange={handleLongReviewChange}
         oneLineReview={oneLineReview}
-        onOneLineReviewChange={handleOneLineReviewChange}
         checkinSaveStatus={saveStatuses.checkin}
         questionSaveStatus={saveStatuses.question}
         longReviewSaveStatus={saveStatuses.longReview}
-        oneLineReviewSaveStatus={saveStatuses.oneLineReview}
         rsvpSaveStatus={saveStatuses.rsvp}
         onRsvpChange={handleRsvp}
         mobileTab={mobileTab}
         onMobileTabChange={handleMobileTab}
         onSaveCheckin={handleSaveCheckin}
         onSaveLongReview={handleSaveLongReview}
-        onSaveOneLineReview={handleSaveOneLineReview}
         isViewer={isViewer}
         memberNotice={memberNotice}
         isHost={isHost}
@@ -431,7 +410,7 @@ export function CurrentSessionBoard({
                 내 준비 작업대
               </h2>
               <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-                읽기 진행률, RSVP, 토론 질문, 한줄평을 세션 전에 바로 정리합니다.
+                읽기 진행률, RSVP, 토론 질문을 세션 전에 바로 정리합니다.
               </p>
             </div>
 
@@ -486,18 +465,6 @@ export function CurrentSessionBoard({
                       onAddQuestion={addQuestionInput}
                       onRemoveQuestion={removeQuestionInput}
                       onSaveQuestions={handleSaveQuestions}
-                    />
-                  </section>
-
-                  <section aria-labelledby="one-line-review-heading">
-                    <div className="eyebrow" id="one-line-review-heading" style={{ marginBottom: "10px" }}>
-                      한줄평
-                    </div>
-                    <OneLineReviewPanel
-                      oneLineReview={oneLineReview}
-                      saveStatus={saveStatuses.oneLineReview}
-                      onChange={handleOneLineReviewChange}
-                      onSave={handleSaveOneLineReview}
                     />
                   </section>
 

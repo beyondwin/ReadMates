@@ -150,58 +150,6 @@ export function CheckinPanel({
   );
 }
 
-export function OneLineReviewPanel({
-  oneLineReview,
-  saveStatus,
-  onChange,
-  onSave,
-}: {
-  oneLineReview: string;
-  saveStatus: SaveState;
-  onChange: (value: string) => void;
-  onSave: () => void;
-}) {
-  const reviewId = "desktop-one-line-review";
-
-  return (
-    <section className="surface" style={{ padding: "24px" }}>
-      <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "14px" }}>
-        <div>
-          <div className="eyebrow">한줄평</div>
-          <h2 className="h4 editorial" style={{ margin: "4px 0 0" }}>
-            이 책을 한 문장으로
-          </h2>
-        </div>
-        <span className="badge">언제든 작성 가능</span>
-      </div>
-      <label className="label" htmlFor={reviewId}>
-        한줄평 내용
-      </label>
-      <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-        저장하면 이번 세션 참여자가 함께 볼 수 있습니다.
-      </p>
-      <input
-        id={reviewId}
-        className="input"
-        value={oneLineReview}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder="예: 떠난 자리에 남은 온기를 만지는 책."
-      />
-      <div className="row-between" style={{ marginTop: "10px" }}>
-        <div className="tiny" style={{ color: "var(--text-3)" }}>
-          세션 참여자 공개
-        </div>
-        <div className="row" style={{ gap: "10px", justifyContent: "flex-end" }}>
-          <SaveFeedback scope="oneLineReview" status={saveStatus} />
-          <button type="button" className="btn btn-primary btn-sm" disabled={saveStatus === "saving"} onClick={onSave}>
-            한줄평 저장
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function LongReviewPanel({
   longReview,
   saveStatus,
@@ -219,7 +167,7 @@ export function LongReviewPanel({
     <section className="surface" style={{ padding: "28px" }}>
       <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "14px" }}>
         <div>
-          <div className="eyebrow">모임 이후 · 서평</div>
+          <div className="eyebrow">서평 작성</div>
           <h2 className="h4 editorial" style={{ margin: "4px 0 0" }}>
             이 책에 남기고 싶은 글
           </h2>
