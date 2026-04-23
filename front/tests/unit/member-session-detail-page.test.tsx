@@ -77,31 +77,42 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "요약" })).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "내 기록" })).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "피드백 문서" })).toBeInTheDocument();
-    expect(desktop.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "하이라이트와 한줄평" })).toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "함께 남긴 질문" })).toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "피드백" })).toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: "내 기록" })).not.toBeInTheDocument();
+    expect(desktop.queryAllByRole("heading", { name: "요약" })).toHaveLength(1);
+    expect(desktop.getByRole("heading", { name: "하이라이트와 한줄평" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "회차 하이라이트 · 1" })).toBeInTheDocument();
-    expect(desktop.getByRole("heading", { name: "함께 남긴 질문 · 1" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "함께 남긴 한줄평 · 1" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
+    expect(desktop.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
+    expect(desktop.queryByText("함께 남긴 질문 Q1 · 이멤버5")).not.toBeInTheDocument();
     expect(desktop.getAllByText("2026.04.20 등록").length).toBeGreaterThan(0);
     expect(mobile.getByText("팩트풀니스")).toBeInTheDocument();
     expect(mobile.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(mobile.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
     expect(mobile.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "피드백 문서" })).toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: "하이라이트" })).toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: "질문" })).toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: "피드백" })).toBeInTheDocument();
     expect(container.querySelector(".mobile-only .rm-session-detail-mobile-tabs")).not.toBeNull();
     expect(mobile.getByRole("link", { name: "요약" })).toHaveClass("rm-session-detail-mobile-tab");
-    expect(mobile.getByRole("link", { name: "회차 기록" })).toHaveClass("rm-session-detail-mobile-tab");
-    expect(mobile.getByRole("link", { name: "내 기록" })).toHaveClass("rm-session-detail-mobile-tab");
-    expect(mobile.getByRole("link", { name: "피드백 문서" })).toHaveClass("rm-session-detail-mobile-tab");
-    expect(mobile.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: "하이라이트" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.getByRole("link", { name: "질문" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.getByRole("link", { name: "피드백" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.queryByRole("link", { name: "내 기록" })).not.toBeInTheDocument();
+    expect(mobile.queryAllByRole("heading", { name: "요약" })).toHaveLength(1);
+    expect(mobile.getByRole("heading", { name: "하이라이트와 한줄평" })).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "회차 하이라이트 · 1" })).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "함께 남긴 질문 · 1" })).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "함께 남긴 한줄평 · 1" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
+    expect(mobile.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
+    expect(mobile.queryByText("함께 남긴 질문 Q1 · 이멤버5")).not.toBeInTheDocument();
     expect(mobile.getByText("2026.04.20 등록")).toBeInTheDocument();
     expect(container).not.toHaveTextContent("Join the reading");
+    expect(container).not.toHaveTextContent("회차 기록");
+    expect(container).not.toHaveTextContent("내 질문");
 
     for (const scope of [desktop, mobile]) {
       expect(scope.getByRole("link", { name: "피드백 문서 열기" })).toHaveAttribute(
@@ -327,26 +338,35 @@ describe("MemberSessionDetailPage", () => {
     expect(container.querySelector(".surface-quiet.rm-state--readonly")).toHaveTextContent("피드백 없음");
   });
 
-  it("shows an empty my-records state when the member has not written records", () => {
+  it("does not render personal question records on the session detail", () => {
     renderDetail({
       ...readableSession,
-      myQuestions: [],
-      myCheckin: null,
-      myOneLineReview: null,
-      myLongReview: null,
+      myQuestions: [
+        {
+          priority: 1,
+          text: "내 질문은 상세 화면에서 숨긴다.",
+          draftThought: null,
+          authorName: "이멤버5",
+          authorShortName: "수",
+        },
+      ],
     });
 
-    expect(screen.getAllByText("이 회차에 남긴 내 질문이나 서평이 없습니다.").length).toBeGreaterThan(0);
+    expect(screen.queryByText("내 질문은 상세 화면에서 숨긴다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("내 질문")).not.toBeInTheDocument();
   });
 
-  it("renders mobile club record cards in spaced lists", () => {
+  it("renders mobile highlight and question cards in spaced lists", () => {
     const { container } = renderDetail();
-    const mobileClubRecords = container.querySelector(".mobile-only #mobile-club-records");
+    const mobileHighlights = container.querySelector(".mobile-only #mobile-highlights");
+    const mobileQuestions = container.querySelector(".mobile-only #mobile-questions");
 
-    expect(mobileClubRecords).not.toBeNull();
-    expect(mobileClubRecords?.querySelector(":scope > .rm-mobile-record-list")).not.toBeNull();
-    expect(mobileClubRecords?.querySelectorAll(".rm-mobile-record-list").length).toBeGreaterThanOrEqual(4);
-    expect(mobileClubRecords?.querySelectorAll(".m-card, .m-card-quiet").length).toBeGreaterThanOrEqual(3);
+    expect(mobileHighlights).not.toBeNull();
+    expect(mobileQuestions).not.toBeNull();
+    expect(mobileHighlights?.querySelector(":scope > .rm-mobile-record-list")).not.toBeNull();
+    expect(mobileQuestions?.querySelector(":scope > .rm-mobile-record-list")).not.toBeNull();
+    expect(mobileHighlights?.querySelectorAll(".m-card, .m-card-quiet").length).toBeGreaterThanOrEqual(2);
+    expect(mobileQuestions?.querySelectorAll(".m-card, .m-card-quiet").length).toBeGreaterThanOrEqual(1);
   });
 
   it("removes club checkins and shows club one-line records", () => {
