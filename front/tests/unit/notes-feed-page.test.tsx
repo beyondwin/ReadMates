@@ -435,7 +435,7 @@ describe("NotesFeedPage", () => {
     );
     expect(within(picker as HTMLElement).queryByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "세션 목록" }));
+    await user.click(screen.getByRole("button", { name: "세션 목록 ->" }));
 
     const dialog = screen.getByRole("dialog", { name: "세션 목록" });
 
@@ -486,7 +486,7 @@ describe("NotesFeedPage", () => {
 
     renderNotesFeedPage();
 
-    const opener = screen.getByRole("button", { name: "세션 목록" });
+    const opener = screen.getByRole("button", { name: "세션 목록 ->" });
     await user.click(opener);
 
     const dialog = screen.getByRole("dialog", { name: "세션 목록" });
