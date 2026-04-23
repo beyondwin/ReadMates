@@ -38,10 +38,28 @@ describe("FeedbackDocumentPage", () => {
       "href",
       "/app/archive?view=report",
     );
-    expect(screen.getByRole("link", { name: "PDF로 저장" })).toHaveAttribute(
-      "href",
-      "/app/feedback/session-1/print",
+    const pdfLink = screen.getByRole("link", { name: "PDF로 저장" });
+    expect(pdfLink).toHaveAttribute("href", "/app/feedback/session-1/print");
+    expect(pdfLink.closest(".rm-feedback-document-meta-row")).not.toBeNull();
+  });
+
+  it("omits the my page return copy on feedback document screens", () => {
+    render(
+      <FeedbackDocumentPage
+        document={feedbackDocument}
+        returnTarget={{ href: "/app/me", label: "내 공간으로 돌아가기" }}
+      />,
     );
+
+    expect(screen.queryByText("내 공간으로 돌아가기")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "PDF로 저장" })).toBeInTheDocument();
+
+    cleanup();
+    render(
+      <FeedbackDocumentUnavailablePage reason="missing" returnTarget={{ href: "/app/me", label: "내 공간으로 돌아가기" }} />,
+    );
+
+    expect(screen.queryByText("내 공간으로 돌아가기")).not.toBeInTheDocument();
   });
 
   it("keeps print output visually aligned with the screen document", () => {

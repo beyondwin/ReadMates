@@ -30,6 +30,7 @@ export default function FeedbackDocumentPage({
 }: FeedbackDocumentPageProps) {
   const feedbackHref = appFeedbackHref(document.sessionId);
   const returnState = readmatesReturnState(returnTarget);
+  const showHeaderActions = printMode || shouldShowFeedbackReturnLink(returnTarget);
 
   return (
     <main className={`rm-feedback-document-page${printMode ? " rm-feedback-document-page--print" : ""}`}>
@@ -38,39 +39,48 @@ export default function FeedbackDocumentPage({
       <section className="page-header-compact">
         <div className="container">
           <div className="row-between" style={{ alignItems: "flex-end", gap: 18, flexWrap: "wrap" }}>
-            <div style={{ minWidth: 0 }}>
+            <div className="rm-feedback-document-heading">
               <p className="eyebrow" style={{ margin: 0 }}>
                 피드백 문서
               </p>
               <h1 className="h1 editorial" style={{ margin: "6px 0 6px" }}>
                 {document.title}
               </h1>
-              <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                {document.subtitle}
-              </p>
-              <p className="tiny mono" style={{ color: "var(--text-3)", margin: "8px 0 0" }}>
-                보존 문서 · 참석자 열람본
-              </p>
-            </div>
-            <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-              <Link className="btn btn-quiet btn-sm" to={returnTarget.href} state={returnTarget.state}>
-                {returnTarget.label}
-              </Link>
-              {printMode ? (
-                <>
-                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => globalThis.print()}>
-                    인쇄
-                  </button>
-                  <Link className="btn btn-quiet btn-sm" to={feedbackHref} state={returnState}>
-                    문서로 돌아가기
+              <div className="rm-feedback-document-meta-row">
+                <div className="rm-feedback-document-meta-copy">
+                  <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+                    {document.subtitle}
+                  </p>
+                  <p className="tiny mono" style={{ color: "var(--text-3)", margin: "8px 0 0" }}>
+                    보존 문서 · 참석자 열람본
+                  </p>
+                </div>
+                {!printMode ? (
+                  <Link
+                    className="btn btn-ghost btn-sm rm-feedback-document-pdf-action"
+                    to={appFeedbackHref(document.sessionId, true)}
+                    state={returnState}
+                  >
+                    PDF로 저장
                   </Link>
-                </>
-              ) : (
-                <Link className="btn btn-ghost btn-sm" to={appFeedbackHref(document.sessionId, true)} state={returnState}>
-                  PDF로 저장
-                </Link>
-              )}
+                ) : null}
+              </div>
             </div>
+            {showHeaderActions ? (
+              <div className="row rm-feedback-document-actions rm-feedback-document-header-actions" style={{ gap: 8, flexWrap: "wrap" }}>
+                <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-quiet btn-sm" />
+                {printMode ? (
+                  <>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => globalThis.print()}>
+                      인쇄
+                    </button>
+                    <Link className="btn btn-quiet btn-sm" to={feedbackHref} state={returnState}>
+                      문서로 돌아가기
+                    </Link>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -85,6 +95,22 @@ export default function FeedbackDocumentPage({
         </div>
       </section>
     </main>
+  );
+}
+
+function shouldShowFeedbackReturnLink(returnTarget: ReadmatesReturnTarget) {
+  return !(returnTarget.href === "/app/me" && returnTarget.label === "내 공간으로 돌아가기");
+}
+
+function FeedbackReturnLink({ returnTarget, className }: { returnTarget: ReadmatesReturnTarget; className: string }) {
+  if (!shouldShowFeedbackReturnLink(returnTarget)) {
+    return null;
+  }
+
+  return (
+    <Link className={className} to={returnTarget.href} state={returnTarget.state}>
+      {returnTarget.label}
+    </Link>
   );
 }
 
@@ -134,9 +160,7 @@ export function FeedbackDocumentUnavailablePage({
               </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-              <Link className="btn btn-ghost btn-sm" to={returnTarget.href} state={returnTarget.state}>
-                {returnTarget.label}
-              </Link>
+              <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-ghost btn-sm" />
             </div>
           </div>
         </div>
@@ -352,6 +376,39 @@ function FeedbackDocumentStyles() {
         border-top: 3px solid var(--text);
       }
 
+      .rm-feedback-document-heading {
+        flex: 1 1 100%;
+        min-width: 0;
+      }
+
+      .rm-feedback-document-meta-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        max-width: 100%;
+        width: 100%;
+      }
+
+      .rm-feedback-document-meta-copy {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+
+      .rm-feedback-document-page .rm-feedback-document-pdf-action {
+        flex: 0 0 auto;
+        margin-left: auto;
+        white-space: nowrap;
+        word-break: keep-all;
+        overflow-wrap: normal;
+      }
+
+      .rm-feedback-document-header-actions {
+        margin-left: auto;
+        justify-content: flex-end;
+      }
+
       .rm-feedback-observer-notes,
       .rm-feedback-participant-document {
         border-radius: var(--r-2);
@@ -385,6 +442,19 @@ function FeedbackDocumentStyles() {
 
         .rm-feedback-problem-fields dt:not(:first-child) {
           margin-top: 8px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .rm-feedback-document-meta-row {
+          gap: 10px;
+        }
+
+        .rm-feedback-document-page .rm-feedback-document-pdf-action {
+          min-height: 38px;
+          height: 38px;
+          padding-right: 12px;
+          padding-left: 12px;
         }
       }
 
