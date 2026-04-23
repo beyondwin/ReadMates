@@ -1,78 +1,28 @@
-package com.readmates.publication.api
+package com.readmates.publication.adapter.out.persistence
 
+import com.readmates.publication.application.model.PublicClubResult
+import com.readmates.publication.application.model.PublicClubStatsResult
+import com.readmates.publication.application.model.PublicHighlightResult
+import com.readmates.publication.application.model.PublicOneLinerResult
+import com.readmates.publication.application.model.PublicSessionDetailResult
+import com.readmates.publication.application.model.PublicSessionSummaryResult
+import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.web.bind.annotation.GetMapping
-import org.springframework.web.bind.annotation.PathVariable
-import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RestController
-import org.springframework.web.server.ResponseStatusException
+import org.springframework.stereotype.Component
 import java.time.LocalDate
 import java.util.UUID
 
-data class PublicClubResponse(
-    val clubName: String,
-    val tagline: String,
-    val about: String,
-    val stats: PublicClubStats,
-    val recentSessions: List<PublicSessionListItem>,
-)
-
-data class PublicClubStats(
-    val sessions: Int,
-    val books: Int,
-    val members: Int,
-)
-
-data class PublicSessionListItem(
-    val sessionId: String,
-    val sessionNumber: Int,
-    val bookTitle: String,
-    val bookAuthor: String,
-    val bookImageUrl: String?,
-    val date: String,
-    val summary: String,
-    val highlightCount: Int,
-    val oneLinerCount: Int,
-)
-
-data class PublicSessionDetailResponse(
-    val sessionId: String,
-    val sessionNumber: Int,
-    val bookTitle: String,
-    val bookAuthor: String,
-    val bookImageUrl: String?,
-    val date: String,
-    val summary: String,
-    val highlights: List<PublicHighlight>,
-    val oneLiners: List<PublicOneLiner>,
-)
-
-data class PublicHighlight(
-    val text: String,
-    val sortOrder: Int,
-    val authorName: String?,
-    val authorShortName: String?,
-)
-
-data class PublicOneLiner(
-    val authorName: String,
-    val authorShortName: String,
-    val text: String,
-)
-
-@RestController
-@RequestMapping("/api/public")
-class PublicController(
+@Component
+class JdbcPublicQueryAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    @GetMapping("/club")
-    fun club(): PublicClubResponse {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val club = jdbcTemplate.query(
+) : LoadPublishedPublicDataPort {
+    override fun loadClub(): PublicClubResult? {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
+
+        return jdbcTemplate.query(
             """
             select id, name, tagline, about
             from clubs
@@ -80,7 +30,7 @@ class PublicController(
             """.trimIndent(),
             { rs, _ ->
                 val clubId = rs.uuid("id")
-                PublicClubResponse(
+                PublicClubResult(
                     clubName = rs.getString("name"),
                     tagline = rs.getString("tagline"),
                     about = rs.getString("about"),
@@ -88,16 +38,11 @@ class PublicController(
                     recentSessions = publicSessions(jdbcTemplate, clubId),
                 )
             },
-        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-
-        return club
+        ).firstOrNull()
     }
 
-    @GetMapping("/sessions/{sessionId}")
-    fun session(@PathVariable sessionId: String): PublicSessionDetailResponse {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val id = runCatching { UUID.fromString(sessionId) }.getOrNull()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    override fun loadSession(sessionId: UUID): PublicSessionDetailResult? {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
 
         return jdbcTemplate.query(
             """
@@ -111,7 +56,7 @@ class PublicController(
               and public_session_publications.is_public = true
             """.trimIndent(),
             { rs, _ ->
-                PublicSessionDetailResponse(
+                PublicSessionDetailResult(
                     sessionId = rs.uuid("id").toString(),
                     sessionNumber = rs.getInt("number"),
                     bookTitle = rs.getString("book_title"),
@@ -119,16 +64,16 @@ class PublicController(
                     bookImageUrl = rs.getString("book_image_url"),
                     date = rs.getObject("session_date", LocalDate::class.java).toString(),
                     summary = rs.getString("public_summary"),
-                    highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), id),
-                    oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), id),
+                    highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), sessionId),
+                    oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), sessionId),
                 )
             },
-            id.dbString(),
-        ).firstOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+            sessionId.dbString(),
+        ).firstOrNull()
     }
 
-    private fun publicStats(jdbcTemplate: JdbcTemplate, clubId: UUID): PublicClubStats =
-        PublicClubStats(
+    private fun publicStats(jdbcTemplate: JdbcTemplate, clubId: UUID): PublicClubStatsResult =
+        PublicClubStatsResult(
             sessions = jdbcTemplate.queryForObject(
                 """
                 select count(*)
@@ -162,7 +107,7 @@ class PublicController(
             ) ?: 0,
         )
 
-    private fun publicSessions(jdbcTemplate: JdbcTemplate, clubId: UUID): List<PublicSessionListItem> =
+    private fun publicSessions(jdbcTemplate: JdbcTemplate, clubId: UUID): List<PublicSessionSummaryResult> =
         jdbcTemplate.query(
             """
             select sessions.id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
@@ -209,7 +154,7 @@ class PublicController(
             limit 6
             """.trimIndent(),
             { rs, _ ->
-                PublicSessionListItem(
+                PublicSessionSummaryResult(
                     sessionId = rs.uuid("id").toString(),
                     sessionNumber = rs.getInt("number"),
                     bookTitle = rs.getString("book_title"),
@@ -224,7 +169,7 @@ class PublicController(
             clubId.dbString(),
         )
 
-    private fun publicHighlights(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicHighlight> =
+    private fun publicHighlights(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicHighlightResult> =
         jdbcTemplate.query(
             """
             select
@@ -248,7 +193,7 @@ class PublicController(
             order by highlights.sort_order, highlights.created_at
             """.trimIndent(),
             { rs, _ ->
-                PublicHighlight(
+                PublicHighlightResult(
                     text = rs.getString("text"),
                     sortOrder = rs.getInt("sort_order"),
                     authorName = rs.getString("author_name"),
@@ -259,7 +204,7 @@ class PublicController(
             sessionId.dbString(),
         )
 
-    private fun publicOneLiners(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicOneLiner> =
+    private fun publicOneLiners(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicOneLinerResult> =
         jdbcTemplate.query(
             """
             select
@@ -280,7 +225,7 @@ class PublicController(
             order by one_line_reviews.created_at, users.name
             """.trimIndent(),
             { rs, _ ->
-                PublicOneLiner(
+                PublicOneLinerResult(
                     authorName = rs.getString("author_name"),
                     authorShortName = rs.getString("author_short_name"),
                     text = rs.getString("text"),
@@ -289,14 +234,4 @@ class PublicController(
             clubId.dbString(),
             sessionId.dbString(),
         )
-
-    private fun shortNameFor(displayName: String): String = when (displayName) {
-        "김호스트" -> "호스트"
-        "안멤버1" -> "멤버1"
-        "최멤버2" -> "멤버2"
-        "김멤버3" -> "멤버3"
-        "송멤버4" -> "멤버4"
-        "이멤버5" -> "멤버5"
-        else -> displayName
-    }
 }
