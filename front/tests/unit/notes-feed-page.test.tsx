@@ -281,6 +281,8 @@ describe("NotesFeedPage", () => {
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
     expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
     expect(screen.getByText("읽기 흔적 5")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "지난 세션의 질문들" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "이번 달의 질문들" })).not.toBeInTheDocument();
 
     const rail = desktopRail();
 

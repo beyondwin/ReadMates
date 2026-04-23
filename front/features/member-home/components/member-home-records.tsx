@@ -249,7 +249,7 @@ export function MobileStats({
         <span className="eyebrow">내 통계</span>
         {session ? (
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            이번 세션
+            전체 세션
           </span>
         ) : null}
       </div>

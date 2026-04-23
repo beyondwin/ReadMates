@@ -94,7 +94,7 @@ function NotesEmptyState({ message }: { message: string }) {
 
 function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`질문 · ${items.length}`} title="이번 달의 질문들">
+    <FeedSection eyebrow={`질문 · ${items.length}`} title="지난 세션의 질문들">
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
         {items.map((item, index) => (
           <article
