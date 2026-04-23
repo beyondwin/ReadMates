@@ -272,7 +272,7 @@ describe("Feedback document routes", () => {
     await waitFor(() => expect(printMock).toHaveBeenCalledTimes(1));
   });
 
-  it("uses route state for the feedback document return affordance", async () => {
+  it("omits the my page return copy on the feedback document route", async () => {
     setupBffJson({
       sessionId: "session-1",
       sessionNumber: 1,
@@ -296,7 +296,7 @@ describe("Feedback document routes", () => {
     });
 
     expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "내 공간으로 돌아가기" })).toHaveAttribute("href", "/app/me");
+    expect(screen.queryByText("내 공간으로 돌아가기")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "PDF로 저장" })).toHaveAttribute("href", "/app/feedback/session-1/print");
   });
 
