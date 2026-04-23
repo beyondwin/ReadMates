@@ -143,7 +143,7 @@ function appBackTarget(variant: Exclude<MobileHeaderVariant, "guest">, pathname:
 
   if (pathname.startsWith("/app/sessions/")) {
     const target = readReadmatesReturnTarget(state, archiveSessionsReturnTarget);
-    return { href: target.href, state: target.state, label: "기록" };
+    return { href: target.href, state: target.state, label: "뒤로" };
   }
 
   return null;
@@ -236,7 +236,7 @@ function GuestMobileHeader() {
   const backTarget: HeaderBackTarget | null = isEntryRoute
     ? { href: "/", label: "홈" }
     : publicSessionReturnTarget
-      ? { ...publicSessionReturnTarget, label: "공개 기록" }
+      ? { ...publicSessionReturnTarget, label: "뒤로" }
       : null;
 
   return (
