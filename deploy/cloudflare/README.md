@@ -1,12 +1,13 @@
-# Cloudflare 수동 프론트 배포
+# Cloudflare 프론트 배포 보조 절차
 
-Cloudflare Pages production 자동 배포를 끄고 deploy hook으로만 프론트를 배포할 때 사용하는 보조 절차입니다.
+Cloudflare Pages production 자동 배포를 끄거나, GitHub Actions에서 명시적으로 프론트 배포를 실행할 때 참고하는 보조 절차입니다.
 
 ## GitHub Actions 버튼으로 배포
 
-1. Cloudflare Pages 프로젝트 `readmates`에서 `main` branch용 Deploy Hook을 만듭니다.
-2. GitHub repository secret에 `CLOUDFLARE_PAGES_DEPLOY_HOOK_URL`을 추가합니다.
-3. GitHub Actions에서 `Deploy Front` workflow를 열고 `Run workflow`를 실행합니다.
+`.github/workflows/deploy-front.yml`은 `front`를 빌드한 뒤 Wrangler로 Cloudflare Pages에 직접 업로드합니다.
+
+1. GitHub repository secret에 `CLOUDFLARE_ACCOUNT_ID`와 `CLOUDFLARE_API_TOKEN`을 추가합니다.
+2. GitHub Actions에서 `Deploy Front` workflow를 열고 `Run workflow`를 실행합니다.
 
 CLI로도 실행할 수 있습니다.
 
@@ -14,9 +15,11 @@ CLI로도 실행할 수 있습니다.
 gh workflow run deploy-front.yml
 ```
 
-## 로컬에서 배포
+이 workflow는 `workflow_run`도 구독하므로 `main` branch의 `CI`가 성공하면 같은 commit을 배포합니다.
 
-예시 파일을 복사한 뒤 실제 deploy hook URL을 채웁니다.
+## 로컬에서 deploy hook으로 배포
+
+Cloudflare Pages Deploy Hook을 따로 만든 경우에는 로컬 보조 스크립트로 배포를 트리거할 수 있습니다. 예시 파일을 복사한 뒤 실제 deploy hook URL을 채웁니다.
 
 ```bash
 cp deploy/cloudflare/.deploy-hook.env.example deploy/cloudflare/.deploy-hook.env

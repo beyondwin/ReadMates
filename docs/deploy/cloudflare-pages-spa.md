@@ -96,7 +96,9 @@ https://readmates.pages.dev/login/oauth2/code/google
 6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 전환할 수 있는지 확인합니다.
 7. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있는지 확인합니다.
 8. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.
-9. 피드백 문서의 `PDF로 저장` 흐름이 print route를 열고 browser print를 호출하는지 확인합니다.
+9. 피드백 문서 `PDF로 저장` action이 숨겨져 있는지 확인합니다. 현재 `feedbackDocumentPdfDownloadsEnabled=false`라서 print route는 사용자-facing PDF 저장 흐름으로 쓰지 않습니다.
+
+PDF 저장 흐름을 다시 켜는 경우에는 `front/shared/config/readmates-feature-flags.ts`를 변경한 뒤 `/app/feedback/:sessionId/print`가 데이터를 불러오고 browser print를 한 번 호출하는지 별도로 검증합니다.
 
 빠른 path 점검:
 

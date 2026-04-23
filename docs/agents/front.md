@@ -4,7 +4,19 @@ Read this for work under `front/`.
 
 The frontend is a Vite React SPA with React Router 7 and Cloudflare Pages Functions for BFF/OAuth proxy routes.
 
-Follow the route-first boundary:
+Physical source roots under `front/`:
+
+```text
+src/app
+src/pages
+features
+shared
+functions
+```
+
+The `@/*` alias resolves to `front/*`.
+
+Follow the route-first dependency direction:
 
 ```text
 src/app -> src/pages -> features -> shared
@@ -17,6 +29,7 @@ src/app -> src/pages -> features -> shared
 - `features/<name>/route`: loader/action behavior, API/model calls, route state, UI prop assembly.
 - `features/<name>/ui`: render from props/callbacks only; no `fetch`, `shared/api`, feature API, or route imports.
 - `shared`: reusable primitives; do not import feature/page/app code except documented legacy exceptions.
+- `functions`: Cloudflare Pages Functions for same-origin BFF and OAuth proxy routes; never expose BFF secrets through `VITE_*`.
 
 Do not add new imports from removed `shared/api/readmates`. Use feature-owned API modules or `shared/api` primitives.
 
