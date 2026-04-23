@@ -63,7 +63,7 @@ MySQL
 - 피드백 문서 접근 제어: 호스트가 Markdown 피드백 문서를 업로드하면 서버가 파싱해 typed response로 제공합니다. 호스트는 전체 문서를 관리할 수 있고, 정식 멤버는 본인이 참석한 회차의 피드백 문서만 읽을 수 있습니다. 둘러보기 멤버와 미참석자는 locked state를 봅니다.
 - 공개 기록 경계: public route/API에는 공개로 발행된 세션과 공개 가능한 하이라이트/한줄평만 노출합니다. 현재 세션 참여, private notes, meeting data, feedback document 본문은 인증과 권한 검사를 통과해야 접근할 수 있습니다.
 - 프론트엔드 route-first 구조: React Router route module이 loader/action, API 호출, 모델 조립, UI props assembly를 담당합니다. Feature는 `api`, `model`, `route`, `ui` 책임으로 나누고, UI는 props와 callback만 받아 렌더링합니다.
-- 서버 클린 아키텍처 전환: 세션/노트 쓰기와 호스트 세션 흐름은 `adapter.in.web -> application.port.in -> application.service -> application.port.out -> adapter.out.persistence` 경계로 이동했습니다. 아직 전환되지 않은 legacy repository는 임시 persistence adapter 뒤에 격리합니다.
+- 서버 클린 아키텍처 전환: `publication`, `archive`, `feedback`, `session`은 `adapter.in.web -> application.port.in -> application.service -> application.port.out -> adapter.out.persistence` 경계를 따릅니다. `note`는 web adapter/DTO 정리 후 `session` use case를 호출합니다. `auth`는 operational member/invitation controller와 dev-login path가 inbound use case port에 의존하는 범위까지 전환되었고, disabled password/password-reset/dev-invitation endpoint와 logout/session cleanup은 문서화된 예외입니다. 남은 legacy surface는 새 기능의 기준으로 사용하지 않습니다.
 - 공개 릴리즈 안전성: `scripts/build-public-release-candidate.sh`로 공개 릴리즈 후보를 만든 뒤 `scripts/public-release-check.sh`로 private path, local workstation path, OCI OCID, GitHub token, OpenAI/API-key-shaped token, real-looking DB/BFF/OAuth secret, Gmail 주소 등을 검사합니다.
 
 ## AI-assisted 운영 콘텐츠

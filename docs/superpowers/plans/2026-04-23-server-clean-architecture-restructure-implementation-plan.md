@@ -159,7 +159,7 @@ domain -> adapter/application/web/persistence
 
 **Files:** none expected.
 
-- [ ] **Step 1: Confirm worktree status**
+- [x] **Step 1: Confirm worktree status**
 
 Run:
 
@@ -175,7 +175,7 @@ git diff -- server
 
 Record any relevant server dirty-file notes in this plan before editing.
 
-- [ ] **Step 2: Run server baseline tests**
+- [x] **Step 2: Run server baseline tests**
 
 Run:
 
@@ -188,7 +188,7 @@ Run:
 
 Expected: PASS. If a check fails before architecture edits, add a `Baseline Failures` section with the command and concise failure summary.
 
-- [ ] **Step 3: Capture current controller size and DTO counts**
+- [x] **Step 3: Capture current controller size and DTO counts**
 
 Run:
 
@@ -204,6 +204,55 @@ done | sort -nr | sed -n '1,40p'
 
 Expected: output confirms the first refactoring targets. Do not edit files in this step.
 
+Task 0 result on 2026-04-23: `git status --short --untracked-files=all` returned no output, so there were no dirty server files to inspect. Baseline tests passed:
+
+```text
+./server/gradlew -p server test --tests 'com.readmates.publication.*'  PASS (BUILD SUCCESSFUL in 12s)
+./server/gradlew -p server test --tests 'com.readmates.archive.*'      PASS (BUILD SUCCESSFUL in 11s)
+./server/gradlew -p server test --tests 'com.readmates.feedback.*'     PASS (BUILD SUCCESSFUL in 10s)
+./server/gradlew -p server test --tests 'com.readmates.architecture.*' PASS (BUILD SUCCESSFUL in 1s)
+```
+
+Controller size baseline:
+
+```text
+     302 server/src/main/kotlin/com/readmates/publication/api/PublicController.kt
+     160 server/src/main/kotlin/com/readmates/archive/api/ArchiveController.kt
+     217 server/src/main/kotlin/com/readmates/feedback/api/FeedbackDocumentController.kt
+     679 total
+```
+
+Top controller/data-class count baseline:
+
+```text
+         98 server/src/main/kotlin/com/readmates/auth/api/HostMemberApprovalController.kt
+         70 server/src/main/kotlin/com/readmates/auth/api/HostInvitationController.kt
+         33 server/src/main/kotlin/com/readmates/auth/api/PasswordAuthController.kt
+         28 server/src/main/kotlin/com/readmates/auth/api/SelfMembershipController.kt
+         26 server/src/main/kotlin/com/readmates/auth/api/PendingApprovalController.kt
+         23 server/src/main/kotlin/com/readmates/auth/api/InvitationController.kt
+         20 server/src/main/kotlin/com/readmates/auth/api/DevInvitationController.kt
+         18 server/src/main/kotlin/com/readmates/session/adapter/in/web/CurrentSessionController.kt
+         18 server/src/main/kotlin/com/readmates/auth/api/PasswordResetController.kt
+         15 server/src/main/kotlin/com/readmates/shared/api/HealthController.kt
+11      160 server/src/main/kotlin/com/readmates/archive/api/ArchiveController.kt
+ 7      217 server/src/main/kotlin/com/readmates/feedback/api/FeedbackDocumentController.kt
+ 6      302 server/src/main/kotlin/com/readmates/publication/api/PublicController.kt
+ 5       76 server/src/main/kotlin/com/readmates/note/adapter/in/web/QuestionController.kt
+ 4       49 server/src/main/kotlin/com/readmates/note/adapter/in/web/ReviewController.kt
+ 2       73 server/src/main/kotlin/com/readmates/note/api/NotesFeedController.kt
+ 2       47 server/src/main/kotlin/com/readmates/archive/api/MyPageController.kt
+ 2       46 server/src/main/kotlin/com/readmates/session/adapter/in/web/HostDashboardController.kt
+ 2       38 server/src/main/kotlin/com/readmates/session/adapter/in/web/RsvpController.kt
+ 2       38 server/src/main/kotlin/com/readmates/note/adapter/in/web/CheckinController.kt
+ 1      150 server/src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt
+ 1       81 server/src/main/kotlin/com/readmates/auth/api/AuthMeController.kt
+ 1       64 server/src/main/kotlin/com/readmates/auth/api/DevLoginController.kt
+ 1       42 server/src/main/kotlin/com/readmates/session/adapter/in/web/AttendanceController.kt
+ 1       34 server/src/main/kotlin/com/readmates/session/adapter/in/web/PublicationController.kt
+ 1       21 server/src/main/kotlin/com/readmates/auth/api/InvitationErrorHandler.kt
+```
+
 ## Task 1: Migrate Publication Read API
 
 **Files:**
@@ -217,7 +266,7 @@ Expected: output confirms the first refactoring targets. Do not edit files in th
 - Create: `server/src/main/kotlin/com/readmates/publication/adapter/out/persistence/JdbcPublicQueryAdapter.kt`
 - Modify: `server/src/test/kotlin/com/readmates/publication/api/PublicControllerDbTest.kt`
 
-- [ ] **Step 1: Move response DTOs to the web adapter**
+- [x] **Step 1: Move response DTOs to the web adapter**
 
 Create `PublicWebDtos.kt` under `publication.adapter.in.web` with the existing public response DTOs:
 
@@ -230,7 +279,7 @@ Create `PublicWebDtos.kt` under `publication.adapter.in.web` with the existing p
 
 Keep field names and types unchanged.
 
-- [ ] **Step 2: Introduce application result models**
+- [x] **Step 2: Introduce application result models**
 
 Create `PublicResults.kt` with application-owned result names such as:
 
@@ -243,7 +292,7 @@ Create `PublicResults.kt` with application-owned result names such as:
 
 Do not use `Request` or `Response` suffixes in application model names.
 
-- [ ] **Step 3: Add inbound use case ports**
+- [x] **Step 3: Add inbound use case ports**
 
 Create `PublicUseCases.kt` with:
 
@@ -259,7 +308,7 @@ interface GetPublicSessionUseCase {
 
 Use `UUID` in the use case contract. Keep path string parsing in the controller.
 
-- [ ] **Step 4: Add outbound data port**
+- [x] **Step 4: Add outbound data port**
 
 Create `LoadPublishedPublicDataPort.kt`. The port should expose application-level methods needed by `PublicQueryService`, not JDBC details.
 
@@ -274,7 +323,7 @@ interface LoadPublishedPublicDataPort {
 
 If keeping all assembly in the adapter is simpler for this read API, allow the adapter to return application result models directly. Do not expose `JdbcTemplate`, `ResultSet`, or DB row types through the port.
 
-- [ ] **Step 5: Move SQL into `JdbcPublicQueryAdapter`**
+- [x] **Step 5: Move SQL into `JdbcPublicQueryAdapter`**
 
 Move existing SQL and row mapping from `PublicController` into `JdbcPublicQueryAdapter`.
 
@@ -288,7 +337,7 @@ Preserve:
 - UUID string conversion
 - date string conversion
 
-- [ ] **Step 6: Add `PublicQueryService`**
+- [x] **Step 6: Add `PublicQueryService`**
 
 Implement `GetPublicClubUseCase` and `GetPublicSessionUseCase`.
 
@@ -297,7 +346,7 @@ Behavior:
 - `getClub()` returns the loaded club or throws `ResponseStatusException(HttpStatus.NOT_FOUND)` only if the current code's not-found behavior is easier to preserve there. Prefer returning nullable from the port and deciding HTTP status in the controller.
 - `getSession(sessionId)` returns nullable so the controller can map not-found to the existing HTTP status.
 
-- [ ] **Step 7: Move controller to `adapter.in.web`**
+- [x] **Step 7: Move controller to `adapter.in.web`**
 
 Move `PublicController` to `publication.adapter.in.web`.
 
@@ -316,11 +365,11 @@ Controller must not import:
 - `com.readmates.shared.db.*`
 - `publication.adapter.out.persistence.*`
 
-- [ ] **Step 8: Update tests for package movement**
+- [x] **Step 8: Update tests for package movement**
 
 Update publication tests only as needed for package/import changes. Do not weaken API assertions.
 
-- [ ] **Step 9: Validate publication slice**
+- [x] **Step 9: Validate publication slice**
 
 Run:
 
@@ -331,7 +380,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit publication migration**
+- [x] **Step 10: Commit publication migration**
 
 Commit only publication and required architecture/test package changes:
 
@@ -348,11 +397,11 @@ git commit -m "refactor: move public API behind use cases"
 - Rename/modify: `server/src/test/kotlin/com/readmates/architecture/SessionCleanArchitectureBoundaryTest.kt`
 - Preferred create: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 
-- [ ] **Step 1: Preserve current session/note rules**
+- [x] **Step 1: Preserve current session/note rules**
 
 Keep the current migrated web adapter restrictions for `session.adapter.in.web` and `note.adapter.in.web`.
 
-- [ ] **Step 2: Add general migrated web adapter rule**
+- [x] **Step 2: Add general migrated web adapter rule**
 
 For packages that have moved to `adapter.in.web`, assert no class depends on:
 
@@ -362,7 +411,7 @@ For packages that have moved to `adapter.in.web`, assert no class depends on:
 
 Include `publication.adapter.in.web` after Task 1.
 
-- [ ] **Step 3: Add application-to-adapter rule**
+- [x] **Step 3: Add application-to-adapter rule**
 
 Assert classes under migrated feature application packages do not depend on:
 
@@ -371,7 +420,7 @@ Assert classes under migrated feature application packages do not depend on:
 
 At this stage include `session`, `note`, and `publication`.
 
-- [ ] **Step 4: Add domain independence rule**
+- [x] **Step 4: Add domain independence rule**
 
 Assert classes under `..domain..` do not depend on:
 
@@ -381,7 +430,7 @@ Assert classes under `..domain..` do not depend on:
 
 Avoid over-blocking existing Spring Security or JPA annotations unless the imported classes show this rule is too broad.
 
-- [ ] **Step 5: Validate boundary tests**
+- [x] **Step 5: Validate boundary tests**
 
 Run:
 
@@ -391,7 +440,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit boundary tests**
+- [x] **Step 6: Commit boundary tests**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/architecture
@@ -413,13 +462,13 @@ git commit -m "test: expand server architecture boundaries"
 - Create: `server/src/main/kotlin/com/readmates/archive/adapter/out/persistence/LegacyArchiveQueryAdapter.kt`
 - Modify archive tests under `server/src/test/kotlin/com/readmates/archive/api`
 
-- [ ] **Step 1: Move archive web DTOs**
+- [x] **Step 1: Move archive web DTOs**
 
 Move all archive and my-page response DTOs into `ArchiveWebDtos.kt`.
 
 Keep JSON field names, `@JsonProperty`, nullability, and list ordering unchanged.
 
-- [ ] **Step 2: Create archive application result models**
+- [x] **Step 2: Create archive application result models**
 
 Create result models that mirror the current API data but avoid `Response` suffixes.
 
@@ -430,7 +479,7 @@ Use names such as:
 - `MemberArchiveQuestionResult`
 - `MyPageResult`
 
-- [ ] **Step 3: Add archive use case ports**
+- [x] **Step 3: Add archive use case ports**
 
 Create ports for current operations:
 
@@ -440,7 +489,7 @@ Create ports for current operations:
 - list my reviews
 - get my page summary
 
-- [ ] **Step 4: Move access checks into application service**
+- [x] **Step 4: Move access checks into application service**
 
 Move member app access checks from controllers into `ArchiveQueryService`.
 
@@ -450,13 +499,13 @@ Preferred controller input:
 
 If an endpoint still receives `Authentication?`, keep that only as a short transitional step and record why in a code comment or plan note.
 
-- [ ] **Step 5: Wrap existing repositories behind outbound port**
+- [x] **Step 5: Wrap existing repositories behind outbound port**
 
 Create `LegacyArchiveQueryAdapter` that delegates to existing archive query repositories.
 
 The adapter may call existing repository methods during this migration. The controller must not.
 
-- [ ] **Step 6: Move controllers to `archive.adapter.in.web`**
+- [x] **Step 6: Move controllers to `archive.adapter.in.web`**
 
 Controllers should:
 
@@ -466,11 +515,11 @@ Controllers should:
 - map application results to web DTOs
 - map missing details to existing HTTP status
 
-- [ ] **Step 7: Include archive in boundary tests**
+- [x] **Step 7: Include archive in boundary tests**
 
 Update architecture boundary tests so `archive.adapter.in.web` follows the same web adapter restrictions.
 
-- [ ] **Step 8: Validate archive slice**
+- [x] **Step 8: Validate archive slice**
 
 Run:
 
@@ -481,7 +530,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit archive migration**
+- [x] **Step 9: Commit archive migration**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/architecture
@@ -504,13 +553,13 @@ git commit -m "refactor: move archive APIs behind use cases"
 - Create: `server/src/main/kotlin/com/readmates/feedback/adapter/out/persistence/LegacyFeedbackDocumentAdapter.kt`
 - Modify feedback tests under `server/src/test/kotlin/com/readmates/feedback/api`
 
-- [ ] **Step 1: Move feedback web DTOs**
+- [x] **Step 1: Move feedback web DTOs**
 
 Move current list/detail/status response DTOs into `FeedbackDocumentWebDtos.kt`.
 
 Keep existing nested structure and field names unchanged.
 
-- [ ] **Step 2: Extract upload validation**
+- [x] **Step 2: Extract upload validation**
 
 Create `FeedbackDocumentUploadValidator` for:
 
@@ -526,13 +575,13 @@ Create `FeedbackDocumentUploadValidator` for:
 
 Keep existing Korean error messages unchanged.
 
-- [ ] **Step 3: Add application command/result models**
+- [x] **Step 3: Add application command/result models**
 
 Create upload command/result models. The upload command should contain already validated text/file metadata, not `MultipartFile`.
 
 Application service must not import `MultipartFile`.
 
-- [ ] **Step 4: Add use case ports**
+- [x] **Step 4: Add use case ports**
 
 Create use cases for:
 
@@ -541,7 +590,7 @@ Create use cases for:
 - get host feedback document status
 - upload host feedback document
 
-- [ ] **Step 5: Move authorization and orchestration into service**
+- [x] **Step 5: Move authorization and orchestration into service**
 
 Move full-member, viewer, host, attendance-readable, and upload orchestration checks into `FeedbackDocumentService`.
 
@@ -553,17 +602,17 @@ Controller keeps:
 - use case call
 - web response mapping
 
-- [ ] **Step 6: Wrap existing repository behind outbound port**
+- [x] **Step 6: Wrap existing repository behind outbound port**
 
 Create `LegacyFeedbackDocumentAdapter` around `FeedbackDocumentRepository`.
 
 The parser may remain in application or behind the port depending on current repository responsibilities. Do not let the controller call parser or repository directly.
 
-- [ ] **Step 7: Include feedback in boundary tests**
+- [x] **Step 7: Include feedback in boundary tests**
 
 Update architecture boundary tests so `feedback.adapter.in.web` follows the same web adapter restrictions.
 
-- [ ] **Step 8: Validate feedback slice**
+- [x] **Step 8: Validate feedback slice**
 
 Run:
 
@@ -574,7 +623,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit feedback migration**
+- [x] **Step 9: Commit feedback migration**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/architecture
@@ -591,7 +640,7 @@ git commit -m "refactor: move feedback document APIs behind use cases"
 - Existing auth application files under `server/src/main/kotlin/com/readmates/auth/application`
 - Auth tests under `server/src/test/kotlin/com/readmates/auth/api`
 
-- [ ] **Step 1: Classify auth controllers**
+- [x] **Step 1: Classify auth controllers**
 
 Classify each `auth.api` controller into one of:
 
@@ -602,7 +651,14 @@ Classify each `auth.api` controller into one of:
 
 Record the classification in this plan or a short note before moving files.
 
-- [ ] **Step 2: Move operational APIs first**
+Task 5 classification on 2026-04-23:
+
+- operational member/invitation API: `AuthMeController`, `HostInvitationController`, `HostMemberApprovalController`, `InvitationController` preview route, `InvitationErrorHandler`, `PendingApprovalController`, `SelfMembershipController`
+- dev-only API: `DevLoginController`, `DevInvitationController`
+- disabled password endpoint: `PasswordAuthController` login route, `PasswordResetController`, `InvitationController` password invitation accept route, `DevInvitationController` password invitation accept route; `PasswordAuthController` logout remains session cleanup behavior while the legacy login route stays `410 Gone`
+- OAuth/security infrastructure endpoint: none in `auth.api`; OAuth start/callback, filters, success handler, and `CurrentMember` resolver stay under `auth.infrastructure.security` / `auth.adapter.in.security`
+
+- [x] **Step 2: Move operational APIs first**
 
 For host invitations, member approval/lifecycle, self membership, pending approval, and auth me endpoints:
 
@@ -611,7 +667,7 @@ For host invitations, member approval/lifecycle, self membership, pending approv
 - move web DTOs to `auth.adapter.in.web`
 - move controllers to `auth.adapter.in.web`
 
-- [ ] **Step 3: Preserve explicit exceptions**
+- [x] **Step 3: Preserve explicit exceptions**
 
 For dev-only and disabled password endpoints, either:
 
@@ -620,15 +676,15 @@ For dev-only and disabled password endpoints, either:
 
 Do not change current `410 Gone` password behavior.
 
-- [ ] **Step 4: Keep security infrastructure separate**
+- [x] **Step 4: Keep security infrastructure separate**
 
 Do not force security filters and OAuth services into `adapter.in.web`. Keep `auth.infrastructure.security` and `auth.adapter.in.security` unless a focused security refactor is planned.
 
-- [ ] **Step 5: Include migrated auth web adapters in boundary tests**
+- [x] **Step 5: Include migrated auth web adapters in boundary tests**
 
 Add only migrated auth web packages to the general web adapter rule. Avoid applying rules to deliberately exempt security infrastructure.
 
-- [ ] **Step 6: Validate auth slice**
+- [x] **Step 6: Validate auth slice**
 
 Run focused auth tests relevant to moved controllers:
 
@@ -639,7 +695,7 @@ Run focused auth tests relevant to moved controllers:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit auth migration**
+- [x] **Step 7: Commit auth migration**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/architecture
@@ -654,7 +710,7 @@ git commit -m "refactor: align auth web APIs with application ports"
 - Existing files under `server/src/main/kotlin/com/readmates/note/adapter/in/web`
 - Existing session/note tests under `server/src/test/kotlin/com/readmates/session/api` and `server/src/test/kotlin/com/readmates/note/api`
 
-- [ ] **Step 1: Identify DTO-heavy migrated controllers**
+- [x] **Step 1: Identify DTO-heavy migrated controllers**
 
 Run:
 
@@ -664,7 +720,7 @@ for f in server/src/main/kotlin/com/readmates/session/adapter/in/web/*.kt server
 done | sort -nr
 ```
 
-- [ ] **Step 2: Extract web DTO files where useful**
+- [x] **Step 2: Extract web DTO files where useful**
 
 Extract DTOs from controllers with several request/response classes, especially:
 
@@ -674,11 +730,11 @@ Extract DTOs from controllers with several request/response classes, especially:
 
 Do not extract tiny one-off DTOs if it makes the code harder to navigate.
 
-- [ ] **Step 3: Extract web mapper files only where mapping is non-trivial**
+- [x] **Step 3: Extract web mapper files only where mapping is non-trivial**
 
 Create `*WebMapper.kt` only if controller mapping has nested lists or several repeated conversions.
 
-- [ ] **Step 4: Validate migrated session/note tests**
+- [x] **Step 4: Validate migrated session/note tests**
 
 Run:
 
@@ -690,7 +746,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit session/note cleanup**
+- [x] **Step 5: Commit session/note cleanup**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/session server/src/main/kotlin/com/readmates/note server/src/test/kotlin/com/readmates/session server/src/test/kotlin/com/readmates/note server/src/test/kotlin/com/readmates/architecture
@@ -705,7 +761,7 @@ git commit -m "refactor: finish server web adapter DTO cleanup"
 - Modify if needed: `README.md`
 - Modify if needed: this plan
 
-- [ ] **Step 1: Run full server test suite**
+- [x] **Step 1: Run full server test suite**
 
 Run:
 
@@ -715,7 +771,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 2: Search for remaining legacy controller issues**
+- [x] **Step 2: Search for remaining legacy controller issues**
 
 Run:
 
@@ -728,13 +784,13 @@ Expected:
 - no `JdbcTemplate` or SQL query calls in web controllers
 - remaining `data class` entries are small DTOs or documented exceptions
 
-- [ ] **Step 3: Update architecture docs**
+- [x] **Step 3: Update architecture docs**
 
 Update `docs/development/architecture.md` if the server internal structure section still describes the migration as limited to session/note only.
 
 Keep the docs concise. Do not duplicate this whole implementation plan.
 
-- [ ] **Step 4: Commit final docs**
+- [x] **Step 4: Commit final docs**
 
 ```bash
 git add docs/development/architecture.md README.md docs/superpowers/plans/2026-04-23-server-clean-architecture-restructure-implementation-plan.md
@@ -743,16 +799,38 @@ git commit -m "docs: update server architecture migration notes"
 
 Only include `README.md` if it actually changed.
 
+Task 7 final validation on 2026-04-23:
+
+- `./server/gradlew -p server clean test`: PASS (`BUILD SUCCESSFUL in 32s`, rerun after Task 7 review remediation).
+- `rg -n "JdbcTemplate|query\\(|queryForObject|data class" server/src/main/kotlin/com/readmates/*/api server/src/main/kotlin/com/readmates/*/adapter/in/web`: PASS for SQL/JDBC boundary. There were no `JdbcTemplate`, `query(`, or `queryForObject` hits in the scoped API/web paths. Remaining hits were `data class` DTOs in web DTO files, small request/response DTOs, and the existing `note.api.NotesFeedController` DTOs; none were SQL/JdbcTemplate usage.
+- `docs/development/architecture.md` now reflects the migrated package scope and `ServerArchitectureBoundaryTest`, including the narrower `note` and `auth` exceptions.
+- `README.md` received a one-line architecture summary update because its prior note still described the migration as session/note-only.
+
+## Two-Stage Review Record
+
+All implementation, spec compliance review, code quality review, remediation judgment, and final review work used `gpt-5.4` with reasoning effort `high`.
+
+| Task | Spec compliance review | Code quality review | Remediation / notes |
+| --- | --- | --- | --- |
+| Task 0 | APPROVED | APPROVED | Baseline-only task; no code changes. |
+| Task 1 | APPROVED | APPROVED | Publication route and response contracts preserved. |
+| Task 2 | APPROVED | APPROVED | Boundary test expansion passed architecture tests. |
+| Task 3 | APPROVED | APPROVED | Residual transitional risk recorded: archive legacy JDBC repositories remain behind application/outbound bridge. |
+| Task 4 | CHANGES_REQUIRED, then APPROVED | CHANGES_REQUIRED, then APPROVED | Deleted test-only legacy feedback controller, separated host upload authorization preflight from upload validation, and updated `ViewerSecurityTest`; reruns passed. |
+| Task 5 | APPROVED | CHANGES_REQUIRED, then APPROVED | Fixed Kotlin override default-argument compile failure. Auth test package naming remains a plan-compatible residual risk because the plan validation command targets `com.readmates.auth.api.*`. |
+| Task 6 | APPROVED | APPROVED | Session/note DTO extraction stayed within existing API behavior. |
+| Task 7 | CHANGES_REQUIRED twice, then APPROVED | CHANGES_REQUIRED twice, then APPROVED | Narrowed docs and checklist for `note`/`auth` exceptions and actual boundary-test application coverage; post-remediation `clean test` passed. |
+
 ## Final Acceptance Checklist
 
-- [ ] `publication` controller no longer owns SQL or `JdbcTemplate`.
-- [ ] `archive` controllers no longer own repository lookup or member-app access orchestration.
-- [ ] `feedback` controller no longer owns upload orchestration or repository calls.
-- [ ] migrated auth web controllers depend on use case ports.
-- [ ] `session` and `note` DTO cleanup is complete where useful.
-- [ ] boundary tests cover migrated web adapters and application packages.
-- [ ] existing API routes and JSON contracts are preserved.
-- [ ] `./server/gradlew -p server clean test` passes.
+- [x] `publication` controller no longer owns SQL or `JdbcTemplate`.
+- [x] `archive` controllers no longer own repository lookup or member-app access orchestration.
+- [x] `feedback` controller no longer owns upload orchestration or repository calls.
+- [x] migrated auth operational/dev-login web controllers depend on use case ports; disabled password/password-reset/dev-invitation/session cleanup remains the Task 5 documented exception.
+- [x] `session` and `note` DTO cleanup is complete where useful.
+- [x] boundary tests cover migrated web adapters and the `session`/`publication`/`archive`/`feedback` application packages; `note` uses `session` ports and `auth` application internals remain the documented exception.
+- [x] existing API routes and JSON contracts are preserved.
+- [x] `./server/gradlew -p server clean test` passes.
 
 ## Known Follow-Ups
 
