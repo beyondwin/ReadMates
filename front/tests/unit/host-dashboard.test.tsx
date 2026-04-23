@@ -289,7 +289,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("운영 일정")).toBeInTheDocument();
     expect(desktop.getByText("멤버 참여 · 이번 세션")).toBeInTheDocument();
     expect(desktop.getByText("운영 액션 목록")).toBeInTheDocument();
-    expect(desktop.getByText("초대 파이프라인")).toBeInTheDocument();
+    expect(desktop.getByText("멤버 초대 관리")).toBeInTheDocument();
     expect(mobile.getByText("운영 원장 · 호스트")).toBeInTheDocument();
     expect(mobile.getByText("운영 원장")).toBeInTheDocument();
     expect(mobile.getAllByText("확인 필요").length).toBeGreaterThan(0);
@@ -524,7 +524,7 @@ describe("HostDashboard", () => {
       "운영 일정",
       "멤버 참여",
       "공개 · 피드백",
-      "초대 파이프라인",
+      "멤버 초대 관리",
       "운영 액션 목록",
     ];
     const html = container.querySelector(".rm-host-dashboard-mobile")?.textContent ?? "";
