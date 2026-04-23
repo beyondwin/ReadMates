@@ -112,6 +112,9 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.getByText("아카이브 세션 · No.01 · 2025.11.26")).toBeInTheDocument();
     expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
+    const returnLink = desktop.getByRole("link", { name: "아카이브로 돌아가기" });
+    expect(returnLink).toHaveAttribute("href", "/app/archive?view=sessions");
+    expect(returnLink).toHaveTextContent("← 아카이브");
     expect(desktop.getByRole("link", { name: "요약" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "함께 남긴 질문" })).toBeInTheDocument();

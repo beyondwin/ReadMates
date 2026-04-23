@@ -35,7 +35,7 @@ export default function FeedbackDocumentPage({
 }: FeedbackDocumentPageProps) {
   const feedbackHref = appFeedbackHref(document.sessionId);
   const returnState = readmatesReturnState(returnTarget);
-  const showHeaderActions = printMode || shouldShowFeedbackReturnLink(returnTarget);
+  const showHeaderActions = printMode;
 
   return (
     <main className={`rm-feedback-document-page${printMode ? " rm-feedback-document-page--print" : ""}`}>
@@ -45,8 +45,12 @@ export default function FeedbackDocumentPage({
         <div className="container">
           <div className="row-between" style={{ alignItems: "flex-end", gap: 18, flexWrap: "wrap" }}>
             <div className="rm-feedback-document-heading">
-              <p className="eyebrow" style={{ margin: 0 }}>
-                피드백 문서
+              <p className="eyebrow rm-feedback-document-kicker" style={{ margin: 0 }}>
+                <FeedbackReturnLink returnTarget={returnTarget} className="rm-feedback-document-return-action" />
+                {shouldShowFeedbackReturnLink(returnTarget) ? (
+                  <span className="rm-feedback-document-kicker__divider">·</span>
+                ) : null}
+                <span>피드백 문서</span>
               </p>
               <h1 className="h1 editorial" style={{ margin: "6px 0 6px" }}>
                 {document.title}
@@ -73,7 +77,6 @@ export default function FeedbackDocumentPage({
             </div>
             {showHeaderActions ? (
               <div className="row rm-feedback-document-actions rm-feedback-document-header-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-                <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-quiet btn-sm rm-feedback-document-return-action" />
                 {printMode ? (
                   <>
                     <button type="button" className="btn btn-ghost btn-sm" onClick={printFeedbackDocumentAsSinglePage}>
@@ -107,14 +110,38 @@ function shouldShowFeedbackReturnLink(returnTarget: ReadmatesReturnTarget) {
   return !(returnTarget.href === "/app/me" && returnTarget.label === "내 공간으로 돌아가기");
 }
 
+function returnLinkAriaLabel(label: string) {
+  if (!label) {
+    return "돌아가기";
+  }
+
+  return label.includes("돌아가기") ? label : `${label} 돌아가기`;
+}
+
+function feedbackBackLabel(returnTarget: ReadmatesReturnTarget) {
+  if (returnTarget.href === "/app/me") {
+    return "내 공간";
+  }
+
+  if (returnTarget.href.startsWith("/app/sessions/")) {
+    return "세션";
+  }
+
+  if (returnTarget.href.startsWith("/app/archive")) {
+    return "아카이브";
+  }
+
+  return "이전 화면";
+}
+
 function FeedbackReturnLink({ returnTarget, className }: { returnTarget: ReadmatesReturnTarget; className: string }) {
   if (!shouldShowFeedbackReturnLink(returnTarget)) {
     return null;
   }
 
   return (
-    <Link className={className} to={returnTarget.href} state={returnTarget.state}>
-      {returnTarget.label}
+    <Link className={className} to={returnTarget.href} state={returnTarget.state} aria-label={returnLinkAriaLabel(returnTarget.label)}>
+      ← {feedbackBackLabel(returnTarget)}
     </Link>
   );
 }
@@ -254,7 +281,7 @@ export function FeedbackDocumentUnavailablePage({
               </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>
-              <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-ghost btn-sm rm-feedback-document-return-action" />
+              <FeedbackReturnLink returnTarget={returnTarget} className="btn btn-ghost rm-feedback-document-return-action" />
             </div>
           </div>
         </div>
@@ -478,6 +505,38 @@ function FeedbackDocumentStyles() {
       .rm-feedback-document-heading {
         flex: 1 1 100%;
         min-width: 0;
+      }
+
+      .rm-feedback-document-kicker {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .rm-feedback-document-page .rm-feedback-document-return-action {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        color: var(--text-2);
+        font-family: var(--f-sans);
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0;
+        line-height: 1.35;
+        text-decoration: none;
+        text-transform: none;
+        transition:
+          color var(--motion-fast) var(--ease-standard-refined),
+          background var(--motion-fast) var(--ease-standard-refined);
+      }
+
+      .rm-feedback-document-page .rm-feedback-document-return-action:hover {
+        color: var(--text);
+      }
+
+      .rm-feedback-document-kicker__divider {
+        color: var(--text-3);
       }
 
       .rm-feedback-document-meta-row {
