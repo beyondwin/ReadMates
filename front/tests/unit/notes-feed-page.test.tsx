@@ -375,6 +375,7 @@ describe("NotesFeedPage", () => {
     await user.click(screen.getByRole("button", { name: "하이라이트 3" }));
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=highlights");
+    expect(screen.getByText("AI-assisted")).toBeInTheDocument();
     expect(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" })).toHaveAttribute(
       "href",
       "/app/notes?sessionId=session-9&filter=highlights",
@@ -390,6 +391,14 @@ describe("NotesFeedPage", () => {
     await user.click(screen.getByRole("button", { name: "질문 4" }));
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=questions");
+    expect(screen.queryByText("AI-assisted")).not.toBeInTheDocument();
+  });
+
+  it("shows the AI-assisted label on oneliner note filter views", () => {
+    renderNotesFilterUrlHarness("/app/notes?sessionId=session-6&filter=oneliners");
+
+    expect(screen.getByText("AI-assisted")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "짧게 남긴 감상" })).toBeInTheDocument();
   });
 
   it("filters the desktop session rail by book title and No.06-style labels", async () => {
