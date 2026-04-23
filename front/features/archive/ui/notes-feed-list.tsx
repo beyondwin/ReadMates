@@ -6,8 +6,6 @@ import {
   itemKey,
   noteFeedFilters,
   noteCountOrZero,
-  noteKindLabel,
-  sessionNumberLabel,
   visibleNoteCount,
 } from "@/features/archive/model/notes-feed-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
