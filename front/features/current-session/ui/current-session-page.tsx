@@ -9,8 +9,6 @@ import {
   BoardOneLineReviews,
   BoardQuestions,
   CheckinPanel,
-  FeedbackAccessPanel,
-  HostContextPanel,
   LongReviewPanel,
   MyStatusCard,
   OneLineReviewPanel,
@@ -521,10 +519,6 @@ export function CurrentSessionBoard({
                 />
 
                 <SessionMeta session={session} />
-
-                <FeedbackAccessPanel isViewer={isViewer} internalLinkComponent={internalLinkComponent} />
-
-                {isHost ? <HostContextPanel sessionId={session.sessionId} internalLinkComponent={internalLinkComponent} /> : null}
 
                 <RosterList session={session} />
               </aside>
