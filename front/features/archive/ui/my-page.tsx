@@ -90,13 +90,13 @@ function MyDesktop({
 }) {
   return (
     <>
-      <section className="page-header-compact">
+      <section className="page-header-compact" style={{ paddingBottom: 0 }}>
         <div className="container">
           <p className="eyebrow" style={{ margin: 0 }}>
             내 공간
           </p>
           <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-            내 공간
+            계정과 기록
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
             멤버 정체성, 참석, 내가 쓴 기록, 계정 경계를 확인합니다.
@@ -104,7 +104,7 @@ function MyDesktop({
         </div>
       </section>
 
-      <section style={{ padding: "40px 0 80px" }}>
+      <section style={{ padding: "28px 0 80px" }}>
         <div className="container" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.1fr) minmax(320px, 1fr)", gap: "56px" }}>
           <div className="stack" style={{ "--stack": "44px" } as CSSProperties}>
             <AccountSection data={data} LogoutButtonComponent={LogoutButtonComponent} />
