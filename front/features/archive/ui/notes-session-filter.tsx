@@ -25,14 +25,13 @@ export function SelectedSessionHeader({ session }: { session: NoteSessionItem | 
       <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
         {session
           ? `${noteSessionNumberLabel(session)} · ${formatDateOnlyLabel(session.date)}`
-          : "다른 멤버의 질문, 한줄평, 읽기 흔적. 댓글도 좋아요도 없는 조용한 피드."}
+          : "다른 멤버의 질문, 한줄평, 하이라이트. 댓글도 좋아요도 없는 조용한 피드."}
       </p>
       {session ? (
         <div className="row" style={{ gap: "6px", flexWrap: "wrap", marginTop: "14px" }} aria-label="선택한 세션 기록 수">
           <span className="badge">질문 {session.questionCount}</span>
           <span className="badge">한줄평 {session.oneLinerCount}</span>
           <span className="badge">하이라이트 {session.highlightCount}</span>
-          <span className="badge">읽기 흔적 {session.checkinCount}</span>
         </div>
       ) : null}
     </div>

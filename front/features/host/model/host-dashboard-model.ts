@@ -11,12 +11,15 @@ export type HostDashboardCurrentSession = {
   startTime: string;
   locationLabel: string;
   meetingUrl: string | null;
+  myCheckin: null | {
+    readingProgress: number;
+  };
   attendees: Array<{
     rsvpStatus: HostDashboardRsvpStatus;
   }>;
   board: {
     questions: unknown[];
-    checkins: unknown[];
+    oneLineReviews: unknown[];
   };
 };
 
@@ -130,7 +133,7 @@ export function getHostDashboardSessionPhase(
       eyebrow: `No.${String(session.sessionNumber).padStart(2, "0")} · D-day`,
       title: "오늘 진행 세션",
       status: "진행 중",
-      helper: "참석 응답, 체크인, 미팅 링크를 바로 확인해야 합니다.",
+      helper: "참석 응답, 읽기 진행률, 미팅 링크를 바로 확인해야 합니다.",
       tone: "warn",
     };
   }
@@ -160,13 +163,13 @@ export function getHostDashboardSessionMetrics(
 ): HostDashboardSessionMetric[] {
   const attendeeCount = session.attendees.length;
   const goingCount = session.attendees.filter((attendee) => attendee.rsvpStatus === "GOING").length;
-  const checkinCount = session.board.checkins.length;
+  const checkinCount = typeof session.myCheckin?.readingProgress === "number" ? 1 : 0;
   const questionCount = session.board.questions.length;
   const questionCapacity = attendeeCount * questionLimitPerMember;
 
   return [
     ["참석", `${goingCount}/${session.attendees.length}`],
-    ["체크인", `${checkinCount}/${attendeeCount}`],
+    ["읽기", `${checkinCount}/${attendeeCount}`],
     ["질문", `${questionCount}/${questionCapacity}`],
     ["상태", statusLabel],
   ];
@@ -252,8 +255,8 @@ export function getHostDashboardNextOperationAction(
   const checkinMissing = nonNegativeDashboardCount(data.checkinMissing);
   if (checkinMissing > 0) {
     return {
-      title: "체크인과 질문 작성 현황 확인",
-      helper: `체크인 미작성 ${checkinMissing}명이 있습니다. 참석 roster와 질문 수를 같이 확인하세요.`,
+      title: "읽기 진행률과 질문 작성 현황 확인",
+      helper: `읽기 진행률 미작성 ${checkinMissing}명이 있습니다. 참석 roster와 질문 수를 같이 확인하세요.`,
       href: hostSessionEditHref(session.sessionId),
       label: "세션 문서 열기",
     };

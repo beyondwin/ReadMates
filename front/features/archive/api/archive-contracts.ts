@@ -33,8 +33,6 @@ export type MemberArchiveQuestionItem = {
 };
 
 export type MemberArchiveCheckinItem = {
-  authorName: string;
-  authorShortName: string;
   readingProgress: number;
 };
 

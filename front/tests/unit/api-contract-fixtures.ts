@@ -3,6 +3,7 @@ import type { FeedbackDocumentResponse } from "@/features/feedback/api/feedback-
 import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type {
+  CurrentSessionResponse as HostCurrentSessionResponse,
   HostInvitationListItem,
   HostMemberListItem,
   HostSessionDetailResponse,
@@ -158,6 +159,8 @@ export const currentSessionContractFixture = {
   },
 } satisfies CurrentSessionResponse;
 
+export const hostCurrentSessionContractFixture = currentSessionContractFixture satisfies HostCurrentSessionResponse;
+
 export const archiveSessionDetailContractFixture = {
   sessionId: "00000000-0000-0000-0000-000000000301",
   sessionNumber: 1,
@@ -212,8 +215,6 @@ export const archiveSessionDetailContractFixture = {
     },
   ],
   myCheckin: {
-    authorName: "이멤버5",
-    authorShortName: "수",
     readingProgress: 100,
   },
   myOneLineReview: {

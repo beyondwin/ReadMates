@@ -5,6 +5,7 @@ import {
   authMeContractFixture,
   currentSessionContractFixture,
   feedbackDocumentContractFixture,
+  hostCurrentSessionContractFixture,
   hostInvitationContractFixture,
   hostMemberContractFixture,
   hostSessionDetailContractFixture,
@@ -33,10 +34,15 @@ describe("API contract fixtures", () => {
     expect(currentSession?.myCheckin).not.toHaveProperty("note");
     expect(currentSession?.board.oneLineReviews).toHaveLength(1);
     expect(currentSession?.board).not.toHaveProperty("checkins");
+    expect(hostCurrentSessionContractFixture.currentSession?.myCheckin).not.toHaveProperty("note");
+    expect(hostCurrentSessionContractFixture.currentSession?.board.oneLineReviews).toHaveLength(1);
+    expect(hostCurrentSessionContractFixture.currentSession?.board).not.toHaveProperty("checkins");
 
     expect(archiveSessionDetailContractFixture.clubOneLiners).toHaveLength(1);
     expect(archiveSessionDetailContractFixture).not.toHaveProperty("clubCheckins");
     expect(archiveSessionDetailContractFixture.myCheckin).toHaveProperty("readingProgress", 100);
+    expect(archiveSessionDetailContractFixture.myCheckin).not.toHaveProperty("authorName");
+    expect(archiveSessionDetailContractFixture.myCheckin).not.toHaveProperty("authorShortName");
     expect(archiveSessionDetailContractFixture.myCheckin).not.toHaveProperty("note");
   });
 });

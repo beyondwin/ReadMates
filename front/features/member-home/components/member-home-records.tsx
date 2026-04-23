@@ -23,10 +23,6 @@ function noteKindLabel(kind: string) {
     return "하이라이트";
   }
 
-  if (kind === "CHECKIN") {
-    return "읽기 흔적";
-  }
-
   return kind;
 }
 
@@ -240,7 +236,7 @@ export function MobileStats({
     total: fallbackAttendeeCount,
   };
   const questionCount = Math.max(session?.board.questions.length ?? 0, session?.myQuestions.length ?? 0);
-  const checkinCount = Math.max(session?.board.checkins.length ?? 0, session?.myCheckin ? 1 : 0);
+  const readingProgress = session?.myCheckin ? 1 : 0;
   const reviewCount = (session?.myOneLineReview ? 1 : 0) + (session?.myLongReview ? 1 : 0);
 
   return (
@@ -260,7 +256,7 @@ export function MobileStats({
           sub={`현재 RSVP ${session ? rsvpLabel(session.myRsvpStatus) : "-"}`}
         />
         <MobileStatCell label="질문" value={`${questionCount}`} sub={`내 질문 ${session?.myQuestions.length ?? 0}/5`} />
-        <MobileStatCell label="체크인" value={`${checkinCount}`} sub={`${session?.myCheckin?.readingProgress ?? 0}%`} />
+        <MobileStatCell label="읽기" value={`${readingProgress}`} sub={`${session?.myCheckin?.readingProgress ?? 0}%`} />
         <MobileStatCell label="서평" value={`${reviewCount}`} sub={session?.myOneLineReview ? "한줄평 완료" : "기록 전"} />
       </div>
     </section>

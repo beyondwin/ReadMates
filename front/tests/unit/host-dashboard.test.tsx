@@ -84,8 +84,10 @@ const current: CurrentSessionResponse = {
     meetingUrl: "https://meet.google.com/readmates-host",
     meetingPasscode: "hostpass",
     questionDeadlineAt: "2026-05-19T14:59:00Z",
-    myRsvpStatus: "NO_RESPONSE",
-    myCheckin: null,
+    myRsvpStatus: "GOING",
+    myCheckin: {
+      readingProgress: 62,
+    },
     myQuestions: [],
     myOneLineReview: null,
     myLongReview: null,
@@ -106,12 +108,11 @@ const current: CurrentSessionResponse = {
           authorShortName: "우",
         },
       ],
-      checkins: [
+      oneLineReviews: [
         {
           authorName: "안멤버1",
           authorShortName: "멤버1",
-          readingProgress: 62,
-          note: "읽는 중",
+          text: "호스트 화면 계약용 한줄평",
         },
       ],
       highlights: [],
@@ -122,7 +123,7 @@ const current: CurrentSessionResponse = {
         displayName: "김호스트",
         shortName: "우",
         role: "HOST",
-        rsvpStatus: "NO_RESPONSE",
+        rsvpStatus: "GOING",
         attendanceStatus: "UNKNOWN",
       },
       {
@@ -130,7 +131,7 @@ const current: CurrentSessionResponse = {
         displayName: "안멤버1",
         shortName: "멤버1",
         role: "MEMBER",
-        rsvpStatus: "GOING",
+        rsvpStatus: "NO_RESPONSE",
         attendanceStatus: "UNKNOWN",
       },
     ],
@@ -297,10 +298,10 @@ describe("HostDashboard", () => {
     expect(mobile.getByText("멤버 참여")).toBeInTheDocument();
     expect(mobile.getByText("운영 액션 목록")).toBeInTheDocument();
     expect(desktop.getByText("RSVP 미응답")).toBeInTheDocument();
-    expect(desktop.getByText("체크인 미작성")).toBeInTheDocument();
+    expect(desktop.getByText("진행률 미작성")).toBeInTheDocument();
     expect(desktop.getByText("공개 대기")).toBeInTheDocument();
     expect(desktop.getByText("피드백 문서 등록 대기")).toBeInTheDocument();
-    expect(mobile.getByText("체크인 미작성")).toBeInTheDocument();
+    expect(mobile.getByText("진행률 미작성")).toBeInTheDocument();
     expect(mobile.getByText("공개 대기")).toBeInTheDocument();
     expect(mobile.getByText("피드백 문서 등록 대기")).toBeInTheDocument();
     expect(desktop.getByText("3")).toBeInTheDocument();
@@ -515,7 +516,7 @@ describe("HostDashboard", () => {
     const orderedLabels = [
       "오늘의 운영 판단",
       "RSVP 미응답",
-      "체크인 미작성",
+      "진행률 미작성",
       "공개 대기",
       "피드백 문서 등록 대기",
       "다음 운영 액션",
@@ -538,8 +539,11 @@ describe("HostDashboard", () => {
     expect(mobile.getByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).toBeInTheDocument();
     expect(mobile.getByText("2026.05.20 · 20:00")).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(current.currentSession?.myCheckin).not.toHaveProperty("note");
+    expect(current.currentSession?.board).not.toHaveProperty("checkins");
     expect(mobile.getByText("질문").parentElement).toHaveTextContent("2/10");
-    expect(mobile.getByText("체크인").parentElement).toHaveTextContent("1/2");
+    expect(mobile.getByText("읽기").parentElement).toHaveTextContent("1/2");
+    expect(mobile.getByText("참석 · 62%")).toBeInTheDocument();
     expect(mobile.getByText("김호스트")).toBeInTheDocument();
     expect(mobile.getByText("안멤버1")).toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
@@ -563,7 +567,7 @@ describe("HostDashboard", () => {
   it("links the current session action to the host edit page", () => {
     vi.setSystemTime(new Date(2026, 4, 17, 12));
 
-    const { container } = render(<HostDashboardForTest current={current} data={dashboard} />);
+    const { container } = render(<HostDashboardForTest auth={hostAuth} current={current} data={dashboard} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
 
@@ -573,7 +577,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).toBeInTheDocument();
     expect(desktop.getByText("2026.05.20 20:00 · 온라인")).toBeInTheDocument();
     expect(desktop.getByText("질문").parentElement).toHaveTextContent("2/10");
-    expect(desktop.getByText("체크인").parentElement).toHaveTextContent("1/2");
+    expect(desktop.getByText("읽기").parentElement).toHaveTextContent("1/2");
     expect(desktop.getByRole("img", { name: "테스트 책 표지" })).toHaveAttribute(
       "src",
       "https://example.com/covers/test-book.jpg",
@@ -581,6 +585,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("참석 응답과 미팅 URL 점검")).toBeInTheDocument();
     expect(desktop.getByText("미응답")).toBeInTheDocument();
     expect(desktop.getByText("참석 · 62%")).toBeInTheDocument();
+    expect(desktop.queryByText("읽는 중")).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "피드백 문서 등록" })).not.toBeInTheDocument();
@@ -635,11 +640,11 @@ describe("HostDashboard", () => {
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
   });
 
-  it("normalizes negative check-in metric counts for current sessions", () => {
+  it("normalizes negative reading metric counts for current sessions", () => {
     const { container } = render(<HostDashboardForTest current={current} data={{ ...dashboard, checkinMissing: -1 }} />);
     const desktop = getDesktopView(container);
 
     expect(screen.queryByText("-1명 미작성")).not.toBeInTheDocument();
-    expect(desktop.getByText("체크인").parentElement).toHaveTextContent("1/2");
+    expect(desktop.getByText("읽기").parentElement).toHaveTextContent("1/2");
   });
 });

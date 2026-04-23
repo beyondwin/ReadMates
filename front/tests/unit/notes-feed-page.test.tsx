@@ -21,8 +21,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 2,
     oneLinerCount: 2,
     highlightCount: 1,
-    checkinCount: 4,
-    totalCount: 9,
+    totalCount: 5,
   },
   {
     sessionId: "session-8",
@@ -32,8 +31,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 1,
     oneLinerCount: 1,
     highlightCount: 1,
-    checkinCount: 4,
-    totalCount: 7,
+    totalCount: 3,
   },
   {
     sessionId: "session-7",
@@ -43,7 +41,6 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 0,
     oneLinerCount: 0,
     highlightCount: 0,
-    checkinCount: 0,
     totalCount: 0,
   },
   {
@@ -54,8 +51,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 4,
     oneLinerCount: 5,
     highlightCount: 3,
-    checkinCount: 5,
-    totalCount: 17,
+    totalCount: 12,
   },
   {
     sessionId: "session-5",
@@ -65,8 +61,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 1,
     oneLinerCount: 1,
     highlightCount: 0,
-    checkinCount: 3,
-    totalCount: 5,
+    totalCount: 2,
   },
   {
     sessionId: "session-4",
@@ -76,8 +71,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 2,
     oneLinerCount: 1,
     highlightCount: 2,
-    checkinCount: 3,
-    totalCount: 8,
+    totalCount: 5,
   },
   {
     sessionId: "session-3",
@@ -87,8 +81,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 1,
     oneLinerCount: 2,
     highlightCount: 2,
-    checkinCount: 3,
-    totalCount: 8,
+    totalCount: 5,
   },
   {
     sessionId: "session-2",
@@ -98,8 +91,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 1,
     oneLinerCount: 1,
     highlightCount: 1,
-    checkinCount: 3,
-    totalCount: 6,
+    totalCount: 3,
   },
   {
     sessionId: "session-1",
@@ -109,7 +101,6 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 1,
     oneLinerCount: 0,
     highlightCount: 0,
-    checkinCount: 0,
     totalCount: 1,
   },
 ];
@@ -146,16 +137,6 @@ const selectedItems: NoteFeedItem[] = [
     authorShortName: "읽",
     kind: "HIGHLIGHT",
     text: "다학문적 사고는 더 안전한 판단을 만들기도 하지만 실행을 늦추는 부담이 되기도 했다.",
-  },
-  {
-    sessionId: "session-6",
-    sessionNumber: 6,
-    bookTitle: "가난한 찰리의 연감",
-    date: "2026-04-15",
-    authorName: "박민준",
-    authorShortName: "민",
-    kind: "CHECKIN",
-    text: "완독. 8장 마지막 문단이 오래 남습니다.",
   },
 ];
 
@@ -276,11 +257,12 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByRole("heading", { name: "가난한 찰리의 연감" })).toBeInTheDocument();
     expect(screen.getAllByText("No.06 · 2026.04.15").length).toBeGreaterThan(0);
-    expect(screen.getByText("세션을 먼저 고르고, 질문·서평·하이라이트를 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
+    expect(screen.getByText("세션을 먼저 고르고, 질문·한줄평·하이라이트를 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
     expect(screen.getByText("질문 4")).toBeInTheDocument();
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
     expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
-    expect(screen.getByText("읽기 흔적 5")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "읽기 흔적" })).not.toBeInTheDocument();
+    expect(screen.queryByText("읽기 흔적 5")).not.toBeInTheDocument();
 
     const rail = desktopRail();
 
@@ -292,7 +274,7 @@ describe("NotesFeedPage", () => {
     expect(selectedLink).toHaveAttribute("href", "/app/notes?sessionId=session-6");
     expect(selectedLink).toHaveAttribute("aria-current", "page");
     expect(selectedLink).toHaveTextContent("선택됨");
-    expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 17");
+    expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 12");
   });
 
   it("uses router navigation for desktop and mobile session filter links", async () => {
