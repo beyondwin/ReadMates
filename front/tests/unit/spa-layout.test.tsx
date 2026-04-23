@@ -1,8 +1,10 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
-import { AppRouteLayout } from "@/src/app/layouts";
+import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
+import { Link } from "@/src/app/router-link";
 import { RequireMemberApp } from "@/src/app/route-guards";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
@@ -59,9 +61,40 @@ function jsonResponse(body: unknown) {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("SPA AppRouteLayout", () => {
+  it("scrolls public route navigation to the top", async () => {
+    const scrollTo = vi.fn();
+    Object.defineProperty(window, "scrollTo", { configurable: true, value: scrollTo });
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <Routes>
+          <Route element={<PublicRouteLayout />}>
+            <Route
+              path="/"
+              element={
+                <main>
+                  <Link to="/about">클럽 소개로 이동</Link>
+                </main>
+              }
+            />
+            <Route path="/about" element={<main>club page</main>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    scrollTo.mockClear();
+    await user.click(screen.getByRole("link", { name: "클럽 소개로 이동" }));
+
+    expect(await screen.findByText("club page")).toBeInTheDocument();
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
+  });
+
   it("renders the member app shell for suspended members", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();

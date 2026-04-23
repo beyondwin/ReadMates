@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import { useAuth } from "@/src/app/auth-state";
+import { resetReadmatesNavigationScroll } from "@/src/app/route-continuity";
 import { readmatesFetch } from "@/shared/api/client";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
@@ -11,6 +12,10 @@ import { TopNav } from "@/shared/ui/top-nav";
 
 function RouteOutlet() {
   const location = useLocation();
+
+  useEffect(() => {
+    resetReadmatesNavigationScroll();
+  }, [location.pathname, location.search]);
 
   // CSS-only route reveal keeps browser snapshots from duplicating persistent chrome.
   return (
