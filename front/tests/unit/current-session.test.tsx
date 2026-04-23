@@ -408,6 +408,11 @@ describe("CurrentSession", () => {
 
     expect(mobile).toBeInTheDocument();
     expect(container.querySelector(".rm-current-session-desktop")).toBeInTheDocument();
+    expect(
+      within(within(mobile).getByRole("group", { name: "세션 보기" }))
+        .getAllByRole("button")
+        .map((tab) => tab.textContent),
+    ).toEqual(["내 준비", "내 기록", "공동 보드"]);
     expect(within(mobile).getByRole("button", { name: "내 준비" })).toHaveAttribute("aria-pressed", "true");
     expect(within(mobile).getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "false");
     expect(within(mobile).getByRole("button", { name: "내 기록" })).toHaveAttribute("aria-pressed", "false");
@@ -625,14 +630,14 @@ describe("CurrentSession", () => {
 
     await user.keyboard("{ArrowRight}");
 
-    expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "true");
-    expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveFocus();
-    expect(mobileScope.getByText("API에서 온 질문")).toBeInTheDocument();
+    expect(mobileScope.getByRole("button", { name: "내 기록" })).toHaveAttribute("aria-pressed", "true");
+    expect(mobileScope.getByRole("button", { name: "내 기록" })).toHaveFocus();
+    expect(mobileScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
 
     await user.keyboard("{End}");
 
-    expect(mobileScope.getByRole("button", { name: "내 기록" })).toHaveAttribute("aria-pressed", "true");
-    expect(mobileScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
+    expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "true");
+    expect(mobileScope.getByText("API에서 온 질문")).toBeInTheDocument();
   });
 
   it("preserves mobile save actions and feedback across session segments", async () => {
