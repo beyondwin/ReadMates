@@ -12,6 +12,7 @@ import {
 } from "@/src/app/route-continuity";
 import { Link } from "@/src/app/router-link";
 import { usePublicAuthAction } from "./public-auth-action-state";
+import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
@@ -143,17 +144,6 @@ function ChevronLeftIcon() {
   );
 }
 
-function HeaderMark() {
-  return (
-    <span className="m-hdr-mark" aria-hidden>
-      <svg width="19" height="19" viewBox="0 0 20 20" fill="none">
-        <path d="M10 4 3.5 5.4v11L10 15.1V4Z" fill="currentColor" />
-        <path d="M10 4 16.5 5.4v11L10 15.1V4Z" fill="currentColor" opacity="0.42" />
-      </svg>
-    </span>
-  );
-}
-
 function HeaderShell({
   workspace,
   title,
@@ -179,7 +169,7 @@ function HeaderShell({
           </Link>
         ) : (
           <Link to={brandHref} className="m-hdr-brand" aria-label="읽는사이 홈">
-            <HeaderMark />
+            <ReadmatesBrandMark />
           </Link>
         )}
       </div>
