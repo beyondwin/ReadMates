@@ -1,5 +1,7 @@
-package com.readmates.auth.application
+package com.readmates.auth.adapter.out.persistence
 
+import com.readmates.auth.application.port.out.MemberAccountDuplicateException
+import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.db.dbString
@@ -13,9 +15,9 @@ import java.util.Locale
 import java.util.UUID
 
 @Repository
-class MemberAccountRepository(
+class JdbcMemberAccountAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
+) : MemberAccountStorePort {
     private val devSeedEmails = setOf(
         "host@example.com",
         "member1@example.com",
@@ -29,11 +31,11 @@ class MemberAccountRepository(
         val googleSubjectId: String?,
     )
 
-    fun findActiveMemberByEmail(email: String): CurrentMember? {
+    override fun findActiveMemberByEmail(email: String): CurrentMember? {
         return queryActiveMemberByEmail(email)
     }
 
-    fun findDevSeedActiveMemberByEmail(email: String): CurrentMember? {
+    override fun findDevSeedActiveMemberByEmail(email: String): CurrentMember? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT)
         if (normalizedEmail !in devSeedEmails) {
             return null
@@ -41,7 +43,7 @@ class MemberAccountRepository(
         return queryActiveMemberByEmail(normalizedEmail)
     }
 
-    fun findActiveMemberByUserId(userId: String): CurrentMember? {
+    override fun findActiveMemberByUserId(userId: String): CurrentMember? {
         val normalizedUserId = userId.trim().takeIf { it.isNotEmpty() } ?: return null
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
@@ -68,7 +70,7 @@ class MemberAccountRepository(
         ).firstOrNull()
     }
 
-    fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember? {
+    override fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember? {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return null
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
@@ -95,7 +97,7 @@ class MemberAccountRepository(
         ).firstOrNull()
     }
 
-    fun findAnyUserIdByEmail(email: String): UUID? {
+    override fun findAnyUserIdByEmail(email: String): UUID? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
@@ -110,7 +112,7 @@ class MemberAccountRepository(
         ).firstOrNull()
     }
 
-    fun connectGoogleSubject(userId: UUID, googleSubjectId: String, profileImageUrl: String?): Boolean {
+    override fun connectGoogleSubject(userId: UUID, googleSubjectId: String, profileImageUrl: String?): Boolean {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return false
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return false
@@ -141,7 +143,7 @@ class MemberAccountRepository(
         }
     }
 
-    fun createGoogleUser(
+    override fun createGoogleUser(
         googleSubjectId: String,
         email: String,
         displayName: String?,
@@ -161,23 +163,27 @@ class MemberAccountRepository(
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
             ?: throw IllegalStateException("JdbcTemplate is unavailable")
 
-        jdbcTemplate.update(
-            """
-            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (?, ?, ?, ?, ?, ?, 'GOOGLE')
-            """.trimIndent(),
-            userId.dbString(),
-            normalizedSubject,
-            normalizedEmail,
-            normalizedName,
-            shortNameFor(normalizedName),
-            normalizedProfileImageUrl,
-        )
+        try {
+            jdbcTemplate.update(
+                """
+                insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
+                values (?, ?, ?, ?, ?, ?, 'GOOGLE')
+                """.trimIndent(),
+                userId.dbString(),
+                normalizedSubject,
+                normalizedEmail,
+                normalizedName,
+                shortNameFor(normalizedName),
+                normalizedProfileImageUrl,
+            )
+        } catch (exception: DuplicateKeyException) {
+            throw MemberAccountDuplicateException(exception)
+        }
 
         return userId
     }
 
-    fun createViewerGoogleMember(
+    override fun createViewerGoogleMember(
         googleSubjectId: String,
         email: String,
         displayName: String?,
@@ -198,41 +204,45 @@ class MemberAccountRepository(
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
             ?: throw IllegalStateException("JdbcTemplate is unavailable")
 
-        jdbcTemplate.update(
-            """
-            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (?, ?, ?, ?, ?, ?, 'GOOGLE')
-            """.trimIndent(),
-            userId.dbString(),
-            normalizedSubject,
-            normalizedEmail,
-            normalizedName,
-            shortNameFor(normalizedName),
-            normalizedProfileImageUrl,
-        )
+        try {
+            jdbcTemplate.update(
+                """
+                insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
+                values (?, ?, ?, ?, ?, ?, 'GOOGLE')
+                """.trimIndent(),
+                userId.dbString(),
+                normalizedSubject,
+                normalizedEmail,
+                normalizedName,
+                shortNameFor(normalizedName),
+                normalizedProfileImageUrl,
+            )
 
-        jdbcTemplate.update(
-            """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            select
-              ?,
-              clubs.id,
-              ?,
-              'MEMBER',
-              'VIEWER',
-              null
-            from clubs
-            where clubs.slug = 'reading-sai'
-            """.trimIndent(),
-            membershipId.dbString(),
-            userId.dbString(),
-        )
+            jdbcTemplate.update(
+                """
+                insert into memberships (id, club_id, user_id, role, status, joined_at)
+                select
+                  ?,
+                  clubs.id,
+                  ?,
+                  'MEMBER',
+                  'VIEWER',
+                  null
+                from clubs
+                where clubs.slug = 'reading-sai'
+                """.trimIndent(),
+                membershipId.dbString(),
+                userId.dbString(),
+            )
+        } catch (exception: DuplicateKeyException) {
+            throw MemberAccountDuplicateException(exception)
+        }
 
         return findMemberByUserIdIncludingViewer(userId)
             ?: throw IllegalStateException("Created Google user has no membership")
     }
 
-    fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? {
+    override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
@@ -258,7 +268,7 @@ class MemberAccountRepository(
         ).firstOrNull()
     }
 
-    fun googleSubjectOwnerEmail(googleSubjectId: String): String? {
+    override fun googleSubjectOwnerEmail(googleSubjectId: String): String? {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return null
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
@@ -273,7 +283,7 @@ class MemberAccountRepository(
         ).firstOrNull()
     }
 
-    fun recordLastLogin(userId: UUID) {
+    override fun recordLastLogin(userId: UUID) {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return
         jdbcTemplate.update(
             """
@@ -286,7 +296,7 @@ class MemberAccountRepository(
         )
     }
 
-    fun createDevGoogleMember(
+    override fun createDevGoogleMember(
         googleSubjectId: String,
         email: String,
         displayName: String?,

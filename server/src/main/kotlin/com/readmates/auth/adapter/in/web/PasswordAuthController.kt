@@ -1,6 +1,6 @@
 package com.readmates.auth.adapter.`in`.web
 
-import com.readmates.auth.application.AuthSessionService
+import com.readmates.auth.application.port.`in`.LogoutAuthSessionUseCase
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpHeaders
@@ -12,7 +12,7 @@ import org.springframework.web.server.ResponseStatusException
 
 @RestController
 class PasswordAuthController(
-    private val authSessionService: AuthSessionService,
+    private val logoutAuthSessionUseCase: LogoutAuthSessionUseCase,
 ) {
     @PostMapping("/api/auth/login")
     fun login(): Nothing =
@@ -21,12 +21,10 @@ class PasswordAuthController(
     @PostMapping("/api/auth/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun logout(request: HttpServletRequest, response: HttpServletResponse) {
-        request.cookies
-            ?.firstOrNull { it.name == AuthSessionService.COOKIE_NAME }
+        val rawToken = request.cookies
+            ?.firstOrNull { it.name == logoutAuthSessionUseCase.sessionCookieName }
             ?.value
-            ?.takeIf { it.isNotBlank() }
-            ?.let(authSessionService::revokeSession)
 
-        response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
+        response.addHeader(HttpHeaders.SET_COOKIE, logoutAuthSessionUseCase.logout(rawToken))
     }
 }

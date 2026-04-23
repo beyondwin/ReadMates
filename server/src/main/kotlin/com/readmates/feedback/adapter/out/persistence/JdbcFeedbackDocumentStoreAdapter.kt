@@ -1,8 +1,9 @@
-package com.readmates.feedback.application
+package com.readmates.feedback.adapter.out.persistence
 
 import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
 import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
+import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
@@ -17,12 +18,12 @@ import java.time.LocalDate
 import java.util.UUID
 
 @Repository
-class FeedbackDocumentRepository(
+class JdbcFeedbackDocumentStoreAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    fun listLatestReadableDocuments(member: CurrentMember): List<StoredFeedbackDocumentResult> {
+) : FeedbackDocumentStorePort {
+    override fun listLatestReadableDocuments(currentMember: CurrentMember): List<StoredFeedbackDocumentResult> {
         val jdbcTemplate = jdbcTemplate()
-        val sql = if (member.isHost) {
+        val sql = if (currentMember.isHost) {
             """
             select *
             from (
@@ -78,10 +79,10 @@ class FeedbackDocumentRepository(
             order by session_number desc
             """.trimIndent()
         }
-        val args = if (member.isHost) {
-            arrayOf<Any>(member.clubId.dbString())
+        val args = if (currentMember.isHost) {
+            arrayOf<Any>(currentMember.clubId.dbString())
         } else {
-            arrayOf<Any>(member.membershipId.dbString(), member.clubId.dbString())
+            arrayOf<Any>(currentMember.membershipId.dbString(), currentMember.clubId.dbString())
         }
 
         return jdbcTemplate.query(sql, { resultSet, _ ->
@@ -89,7 +90,7 @@ class FeedbackDocumentRepository(
         }, *args)
     }
 
-    fun findReadableSession(
+    override fun findReadableSession(
         clubId: UUID,
         sessionId: UUID,
     ): FeedbackDocumentSessionResult? =
@@ -106,8 +107,8 @@ class FeedbackDocumentRepository(
             clubId.dbString(),
         ).firstOrNull()
 
-    fun hasActiveAttendedSession(
-        member: CurrentMember,
+    override fun hasActiveAttendedSession(
+        currentMember: CurrentMember,
         sessionId: UUID,
     ): Boolean =
         jdbcTemplate().queryForObject(
@@ -121,12 +122,12 @@ class FeedbackDocumentRepository(
               and participation_status = 'ACTIVE'
             """.trimIndent(),
             Int::class.java,
-            member.clubId.dbString(),
+            currentMember.clubId.dbString(),
             sessionId.dbString(),
-            member.membershipId.dbString(),
+            currentMember.membershipId.dbString(),
         ) == 1
 
-    fun findLatestDocument(
+    override fun findLatestDocument(
         clubId: UUID,
         sessionId: UUID,
     ): StoredFeedbackDocumentResult? =
@@ -153,7 +154,7 @@ class FeedbackDocumentRepository(
             sessionId.dbString(),
         ).firstOrNull()
 
-    fun findSessionForUpload(
+    override fun findSessionForUpload(
         clubId: UUID,
         sessionId: UUID,
     ): FeedbackDocumentSessionResult? =
@@ -170,7 +171,7 @@ class FeedbackDocumentRepository(
             clubId.dbString(),
         ).firstOrNull()
 
-    fun nextDocumentVersion(
+    override fun nextDocumentVersion(
         clubId: UUID,
         sessionId: UUID,
     ): Int =
@@ -186,8 +187,8 @@ class FeedbackDocumentRepository(
             sessionId.dbString(),
         ) ?: 1
 
-    fun insertDocument(
-        member: CurrentMember,
+    override fun insertDocument(
+        currentMember: CurrentMember,
         command: FeedbackDocumentUploadCommand,
         version: Int,
         documentId: UUID,
@@ -207,7 +208,7 @@ class FeedbackDocumentRepository(
             values (?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             documentId.dbString(),
-            member.clubId.dbString(),
+            currentMember.clubId.dbString(),
             command.sessionId.dbString(),
             version,
             command.sourceText,

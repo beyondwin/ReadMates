@@ -1,5 +1,8 @@
 package com.readmates.auth.application
 
+import com.readmates.auth.application.model.StoredAuthSession
+import com.readmates.auth.application.port.`in`.LogoutAuthSessionUseCase
+import com.readmates.auth.application.port.out.AuthSessionStorePort
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.ResponseCookie
 import org.springframework.stereotype.Service
@@ -21,11 +24,13 @@ data class IssuedAuthSession(
 
 @Service
 class AuthSessionService(
-    private val repository: AuthSessionRepository,
+    private val authSessionStore: AuthSessionStorePort,
     @param:Value("\${readmates.auth.session-cookie-secure:true}")
     private val secureCookie: Boolean = false,
-) {
+) : LogoutAuthSessionUseCase {
     private val secureRandom = SecureRandom()
+
+    override val sessionCookieName: String = COOKIE_NAME
 
     fun issueSession(userId: String, userAgent: String?, ipAddress: String?): IssuedAuthSession {
         val rawToken = generateToken()
@@ -33,7 +38,7 @@ class AuthSessionService(
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val expiresAt = now.plus(SESSION_TTL)
 
-        repository.create(
+        authSessionStore.create(
             StoredAuthSession(
                 id = UUID.randomUUID().toString(),
                 userId = UUID.fromString(userId).toString(),
@@ -56,17 +61,24 @@ class AuthSessionService(
 
     fun findValidSession(rawToken: String): StoredAuthSession? {
         val tokenHash = hashToken(rawToken)
-        val session = repository.findValidByTokenHash(tokenHash) ?: return null
-        repository.touchByTokenHash(tokenHash)
+        val session = authSessionStore.findValidByTokenHash(tokenHash) ?: return null
+        authSessionStore.touchByTokenHash(tokenHash)
         return session
     }
 
     fun revokeSession(rawToken: String) {
-        repository.revokeByTokenHash(hashToken(rawToken))
+        authSessionStore.revokeByTokenHash(hashToken(rawToken))
     }
 
     fun revokeAllForUser(userId: String) {
-        repository.revokeAllForUser(userId)
+        authSessionStore.revokeAllForUser(userId)
+    }
+
+    override fun logout(rawToken: String?): String {
+        rawToken
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::revokeSession)
+        return clearedSessionCookie()
     }
 
     fun sessionCookie(rawToken: String): String =

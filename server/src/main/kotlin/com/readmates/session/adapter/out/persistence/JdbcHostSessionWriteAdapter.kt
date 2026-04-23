@@ -1,11 +1,28 @@
-package com.readmates.session.application
+package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.CreatedSessionResponse
+import com.readmates.session.application.HostAttendanceResponse
+import com.readmates.session.application.HostPublicationResponse
+import com.readmates.session.application.HostSessionAttendee
+import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.HostSessionFeedbackDocument
+import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.HostSessionParticipantNotFoundException
+import com.readmates.session.application.HostSessionPublication
+import com.readmates.session.application.InvalidMembershipIdException
+import com.readmates.session.application.InvalidSessionScheduleException
+import com.readmates.session.application.OpenSessionAlreadyExistsException
+import com.readmates.session.application.requireHost
+import com.readmates.session.application.shortNameFor
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
@@ -39,9 +56,39 @@ private const val DEFAULT_START_TIME = "20:00"
 private const val DEFAULT_END_TIME = "22:00"
 
 @Repository
-class HostSessionRepository(
+class JdbcHostSessionWriteAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
+    private val deletionQueries: HostSessionDeletionQueries,
+) : HostSessionWritePort {
+    @Transactional
+    override fun create(command: HostSessionCommand) =
+        createOpenSession(command.host, command)
+
+    override fun detail(command: HostSessionIdCommand) =
+        findHostSession(command.host, command.sessionId)
+
+    @Transactional
+    override fun update(command: UpdateHostSessionCommand) =
+        updateHostSession(command.host, command.sessionId, command.session)
+
+    override fun deletionPreview(command: HostSessionIdCommand) =
+        deletionQueries.previewOpenSessionDeletion(command.host, command.sessionId)
+
+    @Transactional
+    override fun delete(command: HostSessionIdCommand) =
+        deletionQueries.deleteOpenHostSession(command.host, command.sessionId)
+
+    @Transactional
+    override fun confirmAttendance(command: ConfirmAttendanceCommand) =
+        confirmHostAttendance(command)
+
+    @Transactional
+    override fun upsertPublication(command: UpsertPublicationCommand) =
+        upsertHostPublication(command)
+
+    override fun dashboard(host: CurrentMember) =
+        hostDashboard(host)
+
     @Transactional
     fun createOpenSession(host: CurrentMember, request: HostSessionCommand): CreatedSessionResponse {
         requireHost(host)
@@ -467,7 +514,7 @@ class HostSessionRepository(
     }
 
     @Transactional
-    fun confirmAttendance(
+    fun confirmHostAttendance(
         command: ConfirmAttendanceCommand,
     ): HostAttendanceResponse {
         requireHostSession(command.host, command.sessionId)
@@ -501,7 +548,7 @@ class HostSessionRepository(
     }
 
     @Transactional
-    fun upsertPublication(
+    fun upsertHostPublication(
         command: UpsertPublicationCommand,
     ): HostPublicationResponse {
         requireHostSession(command.host, command.sessionId)
