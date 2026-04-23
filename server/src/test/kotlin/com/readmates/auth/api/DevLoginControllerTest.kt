@@ -1,6 +1,6 @@
 package com.readmates.auth.api
 
-import com.readmates.auth.application.MemberAccountRepository
+import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.support.MySqlTestContainer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -35,7 +35,7 @@ import org.springframework.test.web.servlet.post
 class DevLoginControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-    @param:Autowired private val memberAccountRepository: MemberAccountRepository,
+    @param:Autowired private val memberAccountStore: MemberAccountStorePort,
 ) {
     @Test
     fun `logs in seeded host by email`() {
@@ -156,7 +156,7 @@ class DevLoginControllerTest(
             displayName = "Subject Owner",
         )
 
-        val member = memberAccountRepository.createDevGoogleMember(
+        val member = memberAccountStore.createDevGoogleMember(
             googleSubjectId = "readmates-dev-google-subject-owner",
             email = "subject.new@example.com",
             displayName = "Subject New",

@@ -5,6 +5,7 @@ import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
 import com.readmates.auth.application.port.`in`.PreviewInvitationUseCase
+import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
@@ -79,7 +80,7 @@ class InvitationDomainException(
 class InvitationService(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
     private val tokenService: InvitationTokenService,
-    private val memberAccountRepository: MemberAccountRepository,
+    private val memberAccountStore: MemberAccountStorePort,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : ManageHostInvitationsUseCase, PreviewInvitationUseCase {
@@ -214,7 +215,7 @@ class InvitationService(
         if (invitation.applyToCurrentSession) {
             addToCurrentOpenSessionIfSafe(jdbcTemplate, invitation.clubId, membershipId)
         }
-        memberAccountRepository.recordLastLogin(userId)
+        memberAccountStore.recordLastLogin(userId)
         return findCurrentMember(jdbcTemplate, membershipId)
     }
 
@@ -392,14 +393,14 @@ class InvitationService(
         displayName: String?,
         profileImageUrl: String?,
     ): UUID {
-        val ownerEmail = memberAccountRepository.googleSubjectOwnerEmail(googleSubjectId)
+        val ownerEmail = memberAccountStore.googleSubjectOwnerEmail(googleSubjectId)
         if (ownerEmail != null && ownerEmail != normalizedEmail) {
             throw GoogleLoginException("Google account is already connected")
         }
 
-        val existingUserId = memberAccountRepository.findAnyUserIdByEmail(normalizedEmail)
+        val existingUserId = memberAccountStore.findAnyUserIdByEmail(normalizedEmail)
         if (existingUserId != null) {
-            val connected = memberAccountRepository.connectGoogleSubject(
+            val connected = memberAccountStore.connectGoogleSubject(
                 userId = existingUserId,
                 googleSubjectId = googleSubjectId,
                 profileImageUrl = profileImageUrl,
@@ -411,16 +412,16 @@ class InvitationService(
         }
 
         return try {
-            memberAccountRepository.createGoogleUser(
+            memberAccountStore.createGoogleUser(
                 googleSubjectId = googleSubjectId,
                 email = normalizedEmail,
                 displayName = displayName,
                 profileImageUrl = profileImageUrl,
             )
         } catch (exception: DuplicateKeyException) {
-            val racedUserId = memberAccountRepository.findAnyUserIdByEmail(normalizedEmail)
+            val racedUserId = memberAccountStore.findAnyUserIdByEmail(normalizedEmail)
                 ?: throw GoogleLoginException("Google account is already connected")
-            val connected = memberAccountRepository.connectGoogleSubject(
+            val connected = memberAccountStore.connectGoogleSubject(
                 userId = racedUserId,
                 googleSubjectId = googleSubjectId,
                 profileImageUrl = profileImageUrl,

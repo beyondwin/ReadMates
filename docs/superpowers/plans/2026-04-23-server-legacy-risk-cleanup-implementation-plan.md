@@ -381,19 +381,25 @@ git commit -m "refactor: move health endpoint to web adapter"
   - `server/src/main/kotlin/com/readmates/auth/adapter/in/web/PasswordAuthController.kt`
   - auth tests
 
-- [ ] **Step 1: Add auth session outbound port**
+- [x] **Step 1: Add auth session outbound port**
 
 Move JDBC-backed auth session storage behind `AuthSessionStorePort`. Keep in-memory test double behavior available through the port if tests rely on it.
 
-- [ ] **Step 2: Add logout/session cleanup inbound port**
+- Result: created `AuthSessionStorePort` and moved the stored session model to `auth.application.model`. Moved JDBC-backed session storage to `JdbcAuthSessionAdapter`; the in-memory test double remains available as `AuthSessionStorePort.InMemoryForTest`.
+
+- [x] **Step 2: Add logout/session cleanup inbound port**
 
 Add a use case for logout/session cleanup so `PasswordAuthController` no longer injects `AuthSessionService` directly. Keep cookie clearing and status `204` behavior unchanged.
 
-- [ ] **Step 3: Move member account SQL behind outbound port**
+- Result: added `LogoutAuthSessionUseCase` in `AuthSessionUseCases.kt`. `PasswordAuthController` now depends on the inbound use case, still returns `204`, clears the session cookie, and revokes the session token when present.
+
+- [x] **Step 3: Move member account SQL behind outbound port**
 
 Move `MemberAccountRepository` SQL and row mapping into `JdbcMemberAccountAdapter`. Application services should depend on a port that preserves current operations without exposing JDBC.
 
-- [ ] **Step 4: Validate auth session/member account behavior**
+- Result: created `MemberAccountStorePort` and moved member-account SQL/row mapping into `JdbcMemberAccountAdapter`. `GoogleLoginService`, `AuthenticatedMemberResolver`, `DevLoginMemberService`, `InvitationService`, and current-member persistence wiring now depend on ports instead of the old repository.
+
+- [x] **Step 4: Validate auth session/member account behavior**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.auth.api.*'
@@ -403,12 +409,20 @@ rg -n "JdbcTemplate|query\\(|queryForObject" server/src/main/kotlin/com/readmate
 
 Expected: auth application JDBC hits are reduced to invitation/member-lifecycle/approval/pending services that are scheduled for Task 6.
 
-- [ ] **Step 5: Commit auth session/member account extraction**
+- Result: validation passed.
+  - `./server/gradlew -p server test --tests 'com.readmates.auth.api.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 4 executed, 2 up-to-date).
+  - `./server/gradlew -p server test --tests 'com.readmates.architecture.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - Extra touched-service validation passed: `./server/gradlew -p server test --tests 'com.readmates.auth.application.AuthSessionServiceTest' --tests 'com.readmates.auth.application.GoogleLoginServiceTest'` (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - `rg -n "JdbcTemplate|query\\(|queryForObject" server/src/main/kotlin/com/readmates/auth/application` now reports only `InvitationService.kt`, `MemberApprovalService.kt`, `MemberLifecycleService.kt`, and `PendingApprovalReadService.kt` hits scheduled for Task 6; no session/member-account storage hits remain.
+
+- [x] **Step 5: Commit auth session/member account extraction**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
 git commit -m "refactor: extract auth session and account persistence"
 ```
+
+- Result: Task 5 changes committed by the implementation worker with message `refactor: extract auth session and account persistence`.
 
 ## Task 6: Extract Auth Invitation, Approval, Lifecycle, And Pending Persistence
 

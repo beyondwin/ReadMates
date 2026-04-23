@@ -1,5 +1,6 @@
 package com.readmates.auth.application
 
+import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.shared.security.CurrentMember
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
@@ -14,7 +15,7 @@ class GoogleLoginException(message: String) : RuntimeException(message)
 
 @Service
 class GoogleLoginService(
-    private val memberAccountRepository: MemberAccountRepository,
+    private val memberAccountStore: MemberAccountStorePort,
 ) {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun loginVerifiedGoogleUser(
@@ -37,7 +38,7 @@ class GoogleLoginService(
         displayName: String?,
         profileImageUrl: String?,
     ): CurrentMember {
-        val memberBySubject = memberAccountRepository.findMemberByGoogleSubject(googleSubjectId)
+        val memberBySubject = memberAccountStore.findMemberByGoogleSubject(googleSubjectId)
         if (memberBySubject != null) {
             if (memberBySubject.email != normalizedEmail) {
                 throw GoogleLoginException("Google account is already connected")
@@ -56,7 +57,7 @@ class GoogleLoginService(
         profileImageUrl: String?,
     ): CurrentMember {
         return try {
-            memberAccountRepository.createViewerGoogleMember(
+            memberAccountStore.createViewerGoogleMember(
                 googleSubjectId = googleSubjectId,
                 email = normalizedEmail,
                 displayName = displayName,
@@ -73,7 +74,7 @@ class GoogleLoginService(
         profileImageUrl: String?,
         exception: DuplicateKeyException,
     ): CurrentMember {
-        val memberBySubject = memberAccountRepository.findMemberByGoogleSubject(googleSubjectId)
+        val memberBySubject = memberAccountStore.findMemberByGoogleSubject(googleSubjectId)
         if (memberBySubject != null) {
             if (memberBySubject.email != normalizedEmail) {
                 throw GoogleLoginException("Google account is already connected")
@@ -90,13 +91,13 @@ class GoogleLoginService(
         normalizedEmail: String,
         profileImageUrl: String?,
     ): CurrentMember? {
-        val ownerEmail = memberAccountRepository.googleSubjectOwnerEmail(googleSubjectId)
+        val ownerEmail = memberAccountStore.googleSubjectOwnerEmail(googleSubjectId)
         if (ownerEmail != null && ownerEmail != normalizedEmail) {
             throw GoogleLoginException("Google account is already connected")
         }
 
-        val userId = memberAccountRepository.findAnyUserIdByEmail(normalizedEmail) ?: return null
-        val connected = memberAccountRepository.connectGoogleSubject(
+        val userId = memberAccountStore.findAnyUserIdByEmail(normalizedEmail) ?: return null
+        val connected = memberAccountStore.connectGoogleSubject(
             userId = userId,
             googleSubjectId = googleSubjectId,
             profileImageUrl = profileImageUrl,
@@ -104,7 +105,7 @@ class GoogleLoginService(
         if (!connected) {
             throw GoogleLoginException("Existing user is connected to a different Google account")
         }
-        return memberAccountRepository.findMemberByUserIdIncludingViewer(userId)
+        return memberAccountStore.findMemberByUserIdIncludingViewer(userId)
             ?: throw GoogleLoginException("Connected user has no membership")
     }
 }
