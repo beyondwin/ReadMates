@@ -180,7 +180,7 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
 
   await page.goto("/app/archive?view=report");
   await expect(page).toHaveURL(/\/app\/archive\?view=report$/);
-  const feedbackLink = page.getByRole("link", { name: "No.01 팩트풀니스 · 독서모임 1차 피드백 읽기" });
+  const feedbackLink = page.getByRole("link", { name: "No.01 팩트풀니스 피드백 문서 읽기" });
   await expect(feedbackLink).toBeVisible();
   await feedbackLink.click();
   await expect(page).toHaveURL(/\/app\/feedback\//);
@@ -189,7 +189,8 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
   await page.getByRole("banner").getByRole("link", { name: "뒤로" }).click();
   await expect(page).toHaveURL(/\/app\/archive\?view=report$/);
   await expect(page.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".rm-archive-mobile").getByText("팩트풀니스 · 2025.11.26")).toBeVisible();
+  await expect(page.locator(".rm-archive-mobile").getByText("팩트풀니스")).toBeVisible();
+  await expect(page.locator(".rm-archive-mobile").getByText("No.01 · 2025.11.26")).toBeVisible();
 
   await page.goto("/app/host");
   await expect(page).toHaveURL(/\/app\/host$/);

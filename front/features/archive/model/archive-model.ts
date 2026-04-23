@@ -286,23 +286,27 @@ export function archiveSummary({
 }
 
 export function feedbackReportActionLabel(report: FeedbackDocumentListItem, action: "읽기" | "PDF로 저장") {
-  return `No.${String(report.sessionNumber).padStart(2, "0")} ${report.bookTitle} · ${report.title} ${action}`;
+  return `No.${String(report.sessionNumber).padStart(2, "0")} ${report.bookTitle} 피드백 문서 ${action}`;
 }
 
-export function publicationLabel(published: boolean) {
+export function publicationLabel(published: boolean, variant: "desktop" | "mobile" = "desktop") {
+  if (variant === "mobile") {
+    return published ? "공개" : "비공개";
+  }
+
   return published ? "공개 기록" : "비공개 기록";
 }
 
 export function feedbackArchiveLabel(feedbackDocument: ArchiveFeedbackDocumentStatus) {
   if (!feedbackDocument.available) {
-    return "피드백 문서 없음";
+    return "피드백 없음";
   }
 
   if (!feedbackDocument.readable) {
     return "피드백 잠김";
   }
 
-  return "피드백 문서 있음";
+  return "피드백 있음";
 }
 
 export function feedbackArchiveDescription(feedbackDocument: ArchiveFeedbackDocumentStatus) {
