@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import { useAuth } from "@/src/app/auth-state";
-import { resetReadmatesNavigationScroll } from "@/src/app/route-continuity";
+import {
+  readReadmatesWorkspaceState,
+  readStoredReadmatesMobileWorkspace,
+  rememberReadmatesMobileWorkspace,
+  resetReadmatesNavigationScroll,
+  type ReadmatesMobileWorkspace,
+} from "@/src/app/route-continuity";
 import { readmatesFetch } from "@/shared/api/client";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
@@ -52,10 +58,18 @@ export function AppRouteLayout() {
     pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/");
   const isActiveHost = auth?.role === "HOST" && auth.approvalState === "ACTIVE";
   const desktopVariant = isHostWorkspace ? "host" : "member";
-  const mobileVariant = isActiveHost && (isHostWorkspace || isHostRecordRoute) ? "host" : "member";
+  const explicitWorkspace = readReadmatesWorkspaceState(location.state);
+  const storedWorkspace = readStoredReadmatesMobileWorkspace();
+  const mobileWorkspace: ReadmatesMobileWorkspace =
+    isActiveHost && isHostWorkspace
+      ? "host"
+      : isActiveHost && isHostRecordRoute
+        ? (explicitWorkspace ?? storedWorkspace ?? "host")
+        : "member";
+  const mobileVariant = mobileWorkspace;
   const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
   const memberName = auth?.displayName ?? auth?.shortName ?? null;
-  const activeHostKey = isActiveHost && (isHostWorkspace || isHostRecordRoute) ? auth.membershipId : null;
+  const activeHostKey = isActiveHost && mobileWorkspace === "host" ? auth.membershipId : null;
   const [hostCurrentSession, setHostCurrentSession] = useState<{
     hostKey: string | null;
     sessionId: string | null;
@@ -92,6 +106,14 @@ export function AppRouteLayout() {
       cancelled = true;
     };
   }, [activeHostKey]);
+
+  useEffect(() => {
+    if (!isActiveHost) {
+      return;
+    }
+
+    rememberReadmatesMobileWorkspace(mobileWorkspace);
+  }, [isActiveHost, mobileWorkspace]);
 
   return (
     <div className="app-shell">

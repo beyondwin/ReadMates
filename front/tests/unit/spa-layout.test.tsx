@@ -60,6 +60,7 @@ function jsonResponse(body: unknown) {
 
 afterEach(() => {
   cleanup();
+  window.sessionStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -188,6 +189,55 @@ describe("SPA AppRouteLayout", () => {
     const appContent = document.querySelector(".app-content");
     expect(appContent?.querySelector(":scope > .rm-route-reveal")).toBeInTheDocument();
     expect(appContent?.querySelector(".topnav")).not.toBeInTheDocument();
+  });
+
+  it("keeps host users on member mobile chrome after opening archive from the member workspace", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(hostAuth));
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/app"]}>
+          <Routes>
+            <Route path="/app" element={<AppRouteLayout />}>
+              <Route index element={<main>member child</main>} />
+              <Route path="archive" element={<main>archive child</main>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("member child")).toBeInTheDocument();
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    await user.click(within(tabs).getByRole("link", { name: "아카이브" }));
+
+    expect(await screen.findByText("archive child")).toBeInTheDocument();
+    expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
+      "홈",
+      "이번 세션",
+      "클럽 노트",
+      "아카이브",
+      "내 공간",
+    ]);
+    expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).queryByRole("link", { name: "기록" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.getAttribute("href"))).toEqual([
+      "/app/host",
+      "/app/host",
+    ]);
+    expect(screen.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
   });
 
   it("keeps active hosts on host mobile chrome for archive routes", async () => {
