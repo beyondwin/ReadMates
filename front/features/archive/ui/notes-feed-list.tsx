@@ -135,10 +135,8 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
               borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
             }}
           >
-            <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} markerSize={22} style={{ gap: "10px", marginBottom: "12px" }}>
-              <span className="tiny mono">{sessionNumberLabel(item)} · {noteKindLabel(item)}</span>
-            </FeedAuthorRow>
-            <div className="body editorial" style={{ fontSize: "18px", lineHeight: 1.55 }}>
+            <FeedAuthorRow item={item} rightLabel={formatDateOnlyLabel(item.date)} markerSize={22} style={{ gap: "10px", marginBottom: "12px" }} />
+            <div className="body editorial rm-notes-question-text" style={{ fontSize: "16px", lineHeight: 1.58 }}>
               {item.text}
             </div>
           </article>
@@ -150,21 +148,12 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
 
 function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 한줄평">
-      <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-        {items.map((item, index) => (
-          <article
-            key={itemKey(item)}
-            className="rm-notes-excerpt-row"
-            style={{
-              padding: "22px 0",
-              borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
-            }}
-          >
-            <div className="quote editorial" style={{ fontSize: "17px", margin: 0 }}>
-              {item.text}
-            </div>
-            <FeedAuthorRow item={item} rightLabel={`${sessionNumberLabel(item)} · ${formatDateOnlyLabel(item.date)}`} markerSize={20} style={{ marginTop: "14px" }} />
+    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 감상">
+      <div className="rm-notes-oneliner-grid">
+        {items.map((item) => (
+          <article key={itemKey(item)} className="rm-notes-oneliner-card">
+            <p className="rm-notes-oneliner-card__quote editorial">{item.text}</p>
+            <FeedAuthorRow item={item} markerSize={22} style={{ gap: "10px", marginTop: "12px", paddingLeft: "34px" }} />
           </article>
         ))}
       </div>
@@ -179,7 +168,7 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-highlight-row">
             <p className="rm-notes-highlight-row__quote editorial">{item.text}</p>
-            <FeedAuthorRow item={item} markerSize={20} style={{ gap: "10px", marginTop: "18px", paddingLeft: "34px" }} />
+            <FeedAuthorRow item={item} markerSize={20} style={{ gap: "10px", marginTop: "10px", paddingLeft: "34px" }} />
           </article>
         ))}
       </div>
@@ -192,7 +181,7 @@ function FeedSection({ eyebrow, title, children }: { eyebrow: string; title: str
     <section style={{ paddingBottom: "44px" }}>
       <div className="row" style={{ marginBottom: "20px", gap: "14px", alignItems: "baseline" }}>
         <span className="eyebrow">{eyebrow}</span>
-        <h2 className="h3 editorial" style={{ margin: 0 }}>
+        <h2 className="h3 editorial rm-notes-section-title" style={{ margin: 0 }}>
           {title}
         </h2>
       </div>
@@ -204,12 +193,48 @@ function FeedSection({ eyebrow, title, children }: { eyebrow: string; title: str
 function NotesFeedListStyles() {
   return (
     <style>{`
+      .rm-notes-oneliner-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .rm-notes-oneliner-card {
+        min-height: 126px;
+        padding: 24px 28px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-3);
+        background: color-mix(in oklch, var(--bg), var(--bg-raised) 48%);
+      }
+
+      .rm-notes-oneliner-card__quote {
+        position: relative;
+        margin: 0;
+        padding-left: 34px;
+        color: var(--text);
+        font-size: 17px;
+        font-weight: 600;
+        line-height: 1.45;
+        letter-spacing: 0;
+      }
+
+      .rm-notes-oneliner-card__quote::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.16em;
+        width: 3px;
+        min-height: 30px;
+        height: calc(100% - 0.32em);
+        background: var(--accent);
+      }
+
       .rm-notes-highlight-list {
         border-top: 1px solid var(--line);
       }
 
       .rm-notes-highlight-row {
-        padding: 42px 0 44px;
+        padding: 24px 0 26px;
         border-bottom: 1px solid var(--line-soft);
       }
 
@@ -219,7 +244,7 @@ function NotesFeedListStyles() {
         margin: 0;
         padding-left: 34px;
         color: var(--text);
-        font-size: 30px;
+        font-size: 18px;
         font-weight: 600;
         line-height: 1.45;
         letter-spacing: 0;
@@ -237,13 +262,48 @@ function NotesFeedListStyles() {
       }
 
       @media (max-width: 768px) {
+        .rm-notes-section-title {
+          font-size: 18px;
+          line-height: 1.3;
+        }
+
+        .rm-notes-question-text {
+          font-size: 15px !important;
+          line-height: 1.58 !important;
+        }
+
+        .rm-notes-oneliner-grid {
+          grid-template-columns: 1fr;
+          gap: 12px;
+        }
+
+        .rm-notes-oneliner-card {
+          min-height: 0;
+          padding: 20px 18px;
+        }
+
+        .rm-notes-oneliner-card__quote {
+          padding-left: 22px;
+          font-size: 15px;
+          line-height: 1.48;
+        }
+
+        .rm-notes-oneliner-card__quote::before {
+          width: 2px;
+          min-height: 24px;
+        }
+
+        .rm-notes-oneliner-card .row {
+          padding-left: 22px !important;
+        }
+
         .rm-notes-highlight-row {
-          padding: 30px 0 32px;
+          padding: 20px 0 22px;
         }
 
         .rm-notes-highlight-row__quote {
           padding-left: 22px;
-          font-size: 22px;
+          font-size: 16px;
           line-height: 1.48;
         }
 

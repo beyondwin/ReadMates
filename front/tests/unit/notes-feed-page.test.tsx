@@ -301,6 +301,14 @@ describe("NotesFeedPage", () => {
     expect(highlightRow).not.toBeNull();
     expect(within(highlightRow as HTMLElement).getByText("읽는사이")).toBeInTheDocument();
     expect(within(highlightRow as HTMLElement).queryByText("No.06 · 가난한 찰리의 연감")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "짧게 남긴 감상" })).toBeInTheDocument();
+    const oneLinerCard = screen
+      .getByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")
+      .closest(".rm-notes-oneliner-card");
+
+    expect(oneLinerCard).not.toBeNull();
+    expect(within(oneLinerCard as HTMLElement).getByText("이멤버5")).toBeInTheDocument();
+    expect(within(oneLinerCard as HTMLElement).queryByText("No.06 · 2026.04.15")).not.toBeInTheDocument();
     expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "지난 세션의 질문들" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "이번 달의 질문들" })).not.toBeInTheDocument();
