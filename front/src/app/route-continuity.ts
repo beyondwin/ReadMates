@@ -192,6 +192,16 @@ export function rememberReadmatesListScroll(fromPathname: string, fromSearch: st
   window.sessionStorage.setItem(config.key, JSON.stringify({ pathname: fromPathname, search: fromSearch, scrollY: window.scrollY }));
 }
 
+export function resetReadmatesNavigationScroll() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(ARCHIVE_SCROLL_KEY);
+  window.sessionStorage.removeItem(PUBLIC_RECORDS_SCROLL_KEY);
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
 export function rememberReadmatesArchiveScroll(fromPathname: string, fromSearch: string, to: string) {
   rememberReadmatesListScroll(fromPathname, fromSearch, to);
 }

@@ -21,9 +21,15 @@ export function PublicFooter({ showGuestMemberActions = true }: PublicFooterProp
               클럽
             </div>
             <div className="small public-footer__links">
-              <Link to="/">공개 홈</Link>
-              <Link to="/about">클럽 소개</Link>
-              <Link to="/records">공개 기록</Link>
+              <Link to="/" resetScroll>
+                공개 홈
+              </Link>
+              <Link to="/about" resetScroll>
+                클럽 소개
+              </Link>
+              <Link to="/records" resetScroll>
+                공개 기록
+              </Link>
             </div>
           </div>
           {showGuestMemberActions ? (

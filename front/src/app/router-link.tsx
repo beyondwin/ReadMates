@@ -5,9 +5,10 @@ import {
   useLocation,
   type LinkProps as RouterLinkProps,
 } from "react-router-dom";
-import { rememberReadmatesListScroll } from "@/src/app/route-continuity";
+import { rememberReadmatesListScroll, resetReadmatesNavigationScroll } from "@/src/app/route-continuity";
 
 type ReadmatesLinkProps = RouterLinkProps & {
+  resetScroll?: boolean;
   to: string;
 };
 
@@ -15,7 +16,7 @@ function isModifiedEvent(event: MouseEvent<HTMLAnchorElement>) {
   return event.metaKey || event.altKey || event.ctrlKey || event.shiftKey || event.button !== 0;
 }
 
-function RouterAwareLink({ to, children, onClick, ...props }: ReadmatesLinkProps) {
+function RouterAwareLink({ to, children, onClick, resetScroll = false, ...props }: ReadmatesLinkProps) {
   const location = useLocation();
 
   return (
@@ -26,6 +27,10 @@ function RouterAwareLink({ to, children, onClick, ...props }: ReadmatesLinkProps
         onClick?.(event);
 
         if (!event.defaultPrevented && !isModifiedEvent(event)) {
+          if (resetScroll) {
+            resetReadmatesNavigationScroll();
+          }
+
           rememberReadmatesListScroll(location.pathname, location.search, to);
         }
       }}
@@ -35,7 +40,7 @@ function RouterAwareLink({ to, children, onClick, ...props }: ReadmatesLinkProps
   );
 }
 
-export function Link({ to, children, state, ...props }: ReadmatesLinkProps) {
+export function Link({ to, children, resetScroll = false, state, ...props }: ReadmatesLinkProps) {
   const inRouter = useInRouterContext();
 
   if (!inRouter) {
@@ -46,5 +51,9 @@ export function Link({ to, children, state, ...props }: ReadmatesLinkProps) {
     );
   }
 
-  return <RouterAwareLink {...props} to={to} state={state}>{children}</RouterAwareLink>;
+  return (
+    <RouterAwareLink {...props} to={to} resetScroll={resetScroll} state={state}>
+      {children}
+    </RouterAwareLink>
+  );
 }
