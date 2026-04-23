@@ -134,7 +134,7 @@ describe("MemberHome", () => {
     expect(mobileView.getByText("내 통계")).toBeInTheDocument();
     expect(mobileView.getByText("바로가기")).toBeInTheDocument();
     expect(mobileView.getByText("4개")).toBeInTheDocument();
-    expect(mobileView.getByText("이번 세션")).toBeInTheDocument();
+    expect(mobileView.getByText("전체 세션")).toBeInTheDocument();
     expect(mobileView.queryByText(/actions/i)).not.toBeInTheDocument();
     expect(mobileView.queryByText("current")).not.toBeInTheDocument();
 

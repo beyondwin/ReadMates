@@ -208,9 +208,15 @@ describe("ArchivePage", () => {
       <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
     );
     const desktop = getDesktop(container);
+    const mobile = container.querySelector(".rm-archive-mobile");
+
+    expect(mobile).not.toBeNull();
 
     expect(desktop.getByText("기록 저장소")).toBeInTheDocument();
     expect(desktop.getByText("지난 모임과 내가 쓴 문장들을 회고합니다. 속도감보다 축적감.")).toBeInTheDocument();
+    expect(desktop.getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
+    expect(within(mobile as HTMLElement).getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
+    expect(screen.queryByText("지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.")).not.toBeInTheDocument();
     expect(desktop.getByRole("button", { name: "세션" })).toBeInTheDocument();
     expect(desktop.getByRole("button", { name: "내 서평" })).toBeInTheDocument();
     expect(desktop.getByRole("button", { name: "내 질문" })).toBeInTheDocument();

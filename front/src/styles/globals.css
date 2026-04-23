@@ -870,6 +870,11 @@
     padding: 36px 0 72px;
   }
 
+  .auth-shell.container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
   .auth-card {
     padding: 22px;
   }

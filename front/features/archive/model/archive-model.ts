@@ -361,7 +361,7 @@ export function selectedArchiveSectionMeta(view: ArchiveView) {
   return {
     eyebrow: "SESSION RECORDS",
     title: "세션 기록",
-    body: "지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.",
+    body: "지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.",
   };
 }
 
