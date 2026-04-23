@@ -33,9 +33,6 @@ export function LoginCard({
 
   return (
     <section className="surface auth-card auth-card--club">
-      <div className="auth-card__mark" aria-hidden="true">
-        RM
-      </div>
       <p className="eyebrow">Private reading room</p>
       <h1 className="h1 editorial">읽는사이 멤버 입장</h1>
       <p className="body auth-card__lede">
