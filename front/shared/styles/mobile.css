@@ -112,17 +112,6 @@
   width: 44px;
   border-radius: var(--r-3);
 }
-.m-hdr-mark {
-  width: 31px;
-  height: 31px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line);
-  border-radius: var(--r-2);
-  color: var(--accent);
-  background: color-mix(in oklch, var(--accent-soft), var(--bg) 40%);
-}
 .m-hdr-back {
   max-width: 100%;
   min-width: 44px;

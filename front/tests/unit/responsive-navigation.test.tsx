@@ -84,6 +84,19 @@ describe("TopNav responsive variants", () => {
     expect(screen.getByRole("link", { name: /읽는사이/ })).toHaveAttribute("href", "/app/host");
     expect(screen.getByLabelText("김호스트")).toHaveTextContent("김");
   });
+
+  it("uses the shared brand mark on desktop and mobile headers", () => {
+    const desktop = renderAt("/app", <TopNav variant="member" memberName="이멤버5" />);
+
+    expect(desktop.container.querySelector(".topnav .rm-brand-mark")).toBeInTheDocument();
+
+    cleanup();
+
+    const mobile = renderAt("/app", <MobileHeader variant="member" />);
+
+    expect(mobile.container.querySelector(".m-hdr-brand .rm-brand-mark")).toBeInTheDocument();
+    expect(mobile.container.querySelector(".m-hdr-mark")).not.toBeInTheDocument();
+  });
 });
 
 describe("MobileHeader route titles and actions", () => {

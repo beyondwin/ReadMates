@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { Link } from "@/src/app/router-link";
 import { AvatarChip } from "./avatar-chip";
 import { usePublicAuthAction, type PublicAuthAction } from "./public-auth-action-state";
+import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
 
 export type TopNavVariant = "guest" | "member" | "host";
@@ -98,33 +99,10 @@ const memberReturnLink: NavLink = {
   current: (pathname) => pathname === "/app",
 };
 
-function Logo() {
-  return (
-    <span
-      aria-hidden
-      style={{
-        width: "30px",
-        height: "30px",
-        borderRadius: "6px",
-        background: "var(--accent)",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M10 4 L3 5.5 L3 16.5 L10 15 Z" fill="var(--paper-50)" />
-        <path d="M10 4 L17 5.5 L17 16.5 L10 15 Z" fill="var(--paper-50)" fillOpacity="0.42" />
-      </svg>
-    </span>
-  );
-}
-
 function Brand({ href }: { href: string }) {
   return (
     <Link to={href} className="row" style={{ gap: "10px" }}>
-      <Logo />
+      <ReadmatesBrandMark />
       <span>
         <span
           className="editorial"
