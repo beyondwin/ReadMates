@@ -254,7 +254,7 @@ describe("CurrentSession", () => {
 
     expect(screen.getByText("아직 열린 세션이 없습니다")).toBeInTheDocument();
     expect(
-      screen.getByText("새 세션이 등록되면 RSVP, 읽기 진행률, 토론 질문 작업대가 열립니다."),
+      screen.getByText("새 세션이 등록되면 참석 여부, 읽기 진행률, 질문 작성이 열립니다."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/6회차는 종료되었습니다/)).not.toBeInTheDocument();
   });
@@ -274,7 +274,7 @@ describe("CurrentSession", () => {
     const desktop = getDesktop(container);
 
     expect(within(desktop).getAllByText("RSVP").length).toBeGreaterThan(0);
-    expect(within(desktop).getByText("출석과 RSVP")).toBeInTheDocument();
+    expect(within(desktop).getByText("참석 여부")).toBeInTheDocument();
     expect(within(desktop).queryByText("읽기 기록")).not.toBeInTheDocument();
     expect(within(desktop).getAllByText("읽기 진행률").length).toBeGreaterThan(0);
     expect(within(desktop).getByText("토론 질문")).toBeInTheDocument();
