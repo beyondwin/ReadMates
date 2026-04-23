@@ -4,7 +4,6 @@ export const MAX_QUESTION_INPUT_COUNT = 5;
 export const QUESTION_FORM_VALIDATION_MESSAGES = {
   maxQuestionCount: `최대 ${MAX_QUESTION_INPUT_COUNT}개까지 작성할 수 있어요.`,
   minQuestionInputCount: `질문 입력칸은 최소 ${MIN_QUESTION_INPUT_COUNT}개가 필요해요.`,
-  minQuestionPayloadCount: `질문은 최소 ${MIN_QUESTION_INPUT_COUNT}개 작성해 주세요.`,
 } as const;
 
 export type CurrentSessionQuestionRecord = {
@@ -18,25 +17,32 @@ export type CurrentSessionQuestionInput = {
 };
 
 export type CurrentSessionQuestionPayloadItem = {
+  priority: number;
   text: string;
 };
 
 export function normalizeInitialQuestionInputs(
   questions: readonly CurrentSessionQuestionRecord[],
 ): CurrentSessionQuestionInput[] {
-  const inputs = [...questions]
-    .sort((first, second) => first.priority - second.priority)
-    .slice(0, MAX_QUESTION_INPUT_COUNT)
-    .map((question) => ({
-      clientId: `saved-${question.priority}`,
-      text: question.text,
-    }));
+  const savedByPriority = new Map(
+    [...questions]
+      .filter((question) => question.priority >= 1 && question.priority <= MAX_QUESTION_INPUT_COUNT)
+      .sort((first, second) => first.priority - second.priority)
+      .map((question) => [question.priority, question.text] as const),
+  );
+  const highestSavedPriority = [...savedByPriority.keys()].at(-1) ?? 0;
+  const inputCount = Math.max(MIN_QUESTION_INPUT_COUNT, highestSavedPriority);
+  const inputs = Array.from({ length: inputCount }, (_, index) => {
+    const priority = index + 1;
+    const savedText = savedByPriority.get(priority);
 
-  while (inputs.length < MIN_QUESTION_INPUT_COUNT) {
-    inputs.push({ clientId: `empty-${inputs.length + 1}`, text: "" });
-  }
+    return {
+      clientId: savedText === undefined ? `empty-${priority}` : `saved-${priority}`,
+      text: savedText ?? "",
+    };
+  });
 
-  return inputs;
+  return inputs.slice(0, MAX_QUESTION_INPUT_COUNT);
 }
 
 export function countWrittenQuestions(inputs: readonly CurrentSessionQuestionInput[]) {
@@ -66,9 +72,11 @@ export function getRemoveQuestionValidationMessage(inputs: readonly CurrentSessi
 export function buildQuestionPayload(
   inputs: readonly CurrentSessionQuestionInput[],
 ): CurrentSessionQuestionPayloadItem[] {
-  return inputs.map((input) => ({ text: input.text.trim() })).filter((input) => input.text);
+  return inputs
+    .map((input, index) => ({ priority: index + 1, text: input.text.trim() }))
+    .filter((input) => input.text);
 }
 
 export function getQuestionPayloadValidationMessage(payload: readonly CurrentSessionQuestionPayloadItem[]) {
-  return payload.length < MIN_QUESTION_INPUT_COUNT ? QUESTION_FORM_VALIDATION_MESSAGES.minQuestionPayloadCount : "";
+  return payload.length > MAX_QUESTION_INPUT_COUNT ? QUESTION_FORM_VALIDATION_MESSAGES.maxQuestionCount : "";
 }

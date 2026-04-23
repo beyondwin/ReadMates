@@ -57,14 +57,10 @@ export type CurrentSession = {
       authorName: string;
       authorShortName: string;
     }>;
-    oneLineReviews: Array<{
+    longReviews: Array<{
       authorName: string;
       authorShortName: string;
-      text: string;
-    }>;
-    highlights: Array<{
-      text: string;
-      sortOrder: number;
+      body: string;
     }>;
   };
   attendees: Array<{
@@ -84,8 +80,7 @@ export type CurrentSessionPageData = {
 
 export type RsvpUpdateStatus = Exclude<CurrentSession["myRsvpStatus"], "NO_RESPONSE">;
 export type BoardQuestion = CurrentSession["board"]["questions"][number];
-export type BoardOneLineReview = CurrentSession["board"]["oneLineReviews"][number];
-export type BoardHighlight = CurrentSession["board"]["highlights"][number];
+export type BoardLongReview = CurrentSession["board"]["longReviews"][number];
 export type SaveScope = "rsvp" | "checkin" | "question" | "longReview" | "oneLineReview";
 export type SaveState = "idle" | "saving" | "saved" | "error";
 

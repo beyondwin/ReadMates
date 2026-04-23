@@ -335,6 +335,57 @@ class MemberActionControllerDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_OPEN_SESSION_WITH_PARTICIPANTS_SQL,
+            OPEN_SESSION_WITH_PARTICIPANTS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_OPEN_SESSION_WITH_PARTICIPANTS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `blank long review save clears the current member review`() {
+        mockMvc.post("/api/sessions/current/reviews") {
+            with(user("member5@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"body":"저장 후 지울 장문 서평"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.body") { value("저장 후 지울 장문 서평") }
+        }
+
+        mockMvc.post("/api/sessions/current/reviews") {
+            with(user("member5@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"body":" "}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.body") { value("") }
+        }
+
+        val longReviewCount = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from long_reviews
+            join memberships on memberships.id = long_reviews.membership_id
+              and memberships.club_id = long_reviews.club_id
+            join users on users.id = memberships.user_id
+            where long_reviews.session_id = '00000000-0000-0000-0000-000000009102'
+              and users.email = 'member5@example.com'
+            """.trimIndent(),
+            Int::class.java,
+        )
+
+        assertEquals(0, longReviewCount)
+    }
+
+    @Test
+    @Sql(
+        statements = [
             CLEANUP_LATEST_OPEN_SESSION_WITHOUT_MEMBER_SQL,
             LATEST_OPEN_SESSION_WITHOUT_MEMBER_SQL,
         ],

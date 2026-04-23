@@ -5,8 +5,7 @@ import { MobileCurrentSessionBoard, type MobileSessionTab } from "@/features/cur
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
 import { initialQuestionInputs } from "@/features/current-session/ui/current-session-question-editor-utils";
 import {
-  BoardHighlights,
-  BoardOneLineReviews,
+  BoardLongReviews,
   BoardQuestions,
   CheckinPanel,
   LongReviewPanel,
@@ -377,7 +376,7 @@ export function CurrentSessionBoard({
       />
 
       <main className="desktop-only rm-current-session-desktop">
-        <section className="page-header-compact" style={{ padding: "28px 0 24px" }}>
+        <section className="page-header-compact" style={{ padding: "28px 0 0" }}>
           <div className="container">
             <div className="row-between" style={{ alignItems: "flex-start" }}>
               <div className="row" style={{ alignItems: "flex-start", gap: "16px", minWidth: 0 }}>
@@ -402,7 +401,7 @@ export function CurrentSessionBoard({
           </div>
         </section>
 
-        <section style={{ padding: "32px 0 24px" }} aria-labelledby="current-session-prep-heading">
+        <section style={{ padding: "28px 0 24px" }} aria-labelledby="current-session-prep-heading">
           <div className="container">
             <div style={{ marginBottom: "18px" }}>
               <span className="eyebrow">읽기 진행률 · 출석 · 질문</span>
@@ -542,8 +541,7 @@ export function CurrentSessionBoard({
             </div>
 
             {boardTab === "questions" ? <BoardQuestions questions={session.board.questions} /> : null}
-            {boardTab === "oneLineReviews" ? <BoardOneLineReviews oneLineReviews={session.board.oneLineReviews} /> : null}
-            {boardTab === "highlights" ? <BoardHighlights highlights={session.board.highlights} /> : null}
+            {boardTab === "longReviews" ? <BoardLongReviews longReviews={session.board.longReviews} /> : null}
           </div>
         </section>
       </main>

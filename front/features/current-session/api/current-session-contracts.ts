@@ -44,14 +44,10 @@ export type CurrentSessionResponse = {
         authorName: string;
         authorShortName: string;
       }>;
-      oneLineReviews: Array<{
+      longReviews: Array<{
         authorName: string;
         authorShortName: string;
-        text: string;
-      }>;
-      highlights: Array<{
-        text: string;
-        sortOrder: number;
+        body: string;
       }>;
     };
     attendees: Array<{

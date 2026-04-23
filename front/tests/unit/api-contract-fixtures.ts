@@ -92,14 +92,14 @@ export const currentSessionContractFixture = {
     },
     myQuestions: [
       {
-        priority: 3,
+        priority: 1,
         text: "API에서 온 내 질문",
         draftThought: "API에서 온 내 초안",
         authorName: "이멤버5",
         authorShortName: "수",
       },
       {
-        priority: 4,
+        priority: 2,
         text: "API에서 온 내 질문 2",
         draftThought: "API에서 온 내 초안 2",
         authorName: "이멤버5",
@@ -122,17 +122,11 @@ export const currentSessionContractFixture = {
           authorShortName: "우",
         },
       ],
-      oneLineReviews: [
+      longReviews: [
         {
           authorName: "김호스트",
           authorShortName: "우",
-          text: "API에서 온 공동 한줄평",
-        },
-      ],
-      highlights: [
-        {
-          text: "API에서 온 하이라이트",
-          sortOrder: 1,
+          body: "API에서 온 공동 서평",
         },
       ],
     },

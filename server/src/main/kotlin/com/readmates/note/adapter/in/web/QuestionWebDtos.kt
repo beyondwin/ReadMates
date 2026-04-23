@@ -1,6 +1,7 @@
 package com.readmates.note.adapter.`in`.web
 
 import com.readmates.session.application.model.ReplaceQuestionsCommand
+import com.readmates.session.application.model.ReplaceQuestionCommandItem
 import com.readmates.session.application.model.SaveQuestionCommand
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.constraints.Max
@@ -20,10 +21,19 @@ data class ReplaceQuestionsRequest(
     val questions: List<ReplaceQuestionItem> = emptyList(),
 ) {
     fun toCommand(member: CurrentMember): ReplaceQuestionsCommand =
-        ReplaceQuestionsCommand(member, questions.map { it.text })
+        ReplaceQuestionsCommand(
+            member,
+            questions.mapIndexed { index, question ->
+                ReplaceQuestionCommandItem(
+                    priority = question.priority ?: index + 1,
+                    text = question.text,
+                )
+            },
+        )
 }
 
 data class ReplaceQuestionItem(
+    val priority: Int? = null,
     val text: String,
 )
 

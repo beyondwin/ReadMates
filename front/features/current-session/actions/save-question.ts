@@ -4,6 +4,6 @@ export async function saveQuestion(priority: number, text: string, draftThought:
   return saveCurrentSessionQuestion(priority, text, draftThought);
 }
 
-export async function saveQuestions(questions: Array<{ text: string }>) {
+export async function saveQuestions(questions: Array<{ priority: number; text: string }>) {
   return saveCurrentSessionQuestions(questions);
 }

@@ -10,7 +10,7 @@ data class OneLineReviewRequest(@field:NotBlank val text: String) {
         SaveOneLineReviewCommand(member, text)
 }
 
-data class LongReviewRequest(@field:NotBlank val body: String) {
+data class LongReviewRequest(val body: String = "") {
     fun toCommand(member: CurrentMember): SaveLongReviewCommand =
         SaveLongReviewCommand(member, body)
 }
