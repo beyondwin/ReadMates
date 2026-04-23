@@ -614,6 +614,10 @@ function FeedbackDocumentStyles() {
           display: none;
         }
 
+        .rm-feedback-document-kicker__divider {
+          display: none;
+        }
+
         .rm-feedback-document-page .rm-feedback-document-pdf-action {
           min-height: 38px;
           height: 38px;
