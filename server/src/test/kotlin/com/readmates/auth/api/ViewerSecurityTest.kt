@@ -1,7 +1,8 @@
 package com.readmates.auth.api
 
 import com.readmates.auth.application.AuthSessionService
-import com.readmates.feedback.api.FeedbackDocumentController
+import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
+import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
 import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
@@ -14,8 +15,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -36,7 +35,8 @@ class ViewerSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
-    @param:Autowired private val feedbackDocumentController: FeedbackDocumentController,
+    @param:Autowired private val resolveCurrentMemberUseCase: ResolveCurrentMemberUseCase,
+    @param:Autowired private val getReadableFeedbackDocumentUseCase: GetReadableFeedbackDocumentUseCase,
 ) {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
@@ -144,18 +144,16 @@ class ViewerSecurityTest(
     }
 
     @Test
-    fun `feedback document controller rejects viewer before readable lookup`() {
+    fun `feedback document use case rejects viewer before readable lookup`() {
         val email = viewerMemberEmail("viewer.feedback.guard")
         viewerSessionCookie(email)
+        val currentMember = resolveCurrentMemberUseCase.resolveByEmail(email)
+            ?: error("Expected viewer member to resolve")
 
         val exception = assertThrows<ResponseStatusException> {
-            feedbackDocumentController.feedbackDocument(
-                authentication = UsernamePasswordAuthenticationToken(
-                    email,
-                    null,
-                    listOf(SimpleGrantedAuthority("ROLE_VIEWER")),
-                ),
-                sessionId = "00000000-0000-0000-0000-000000000301",
+            getReadableFeedbackDocumentUseCase.getReadableFeedbackDocument(
+                currentMember,
+                UUID.fromString("00000000-0000-0000-0000-000000000301"),
             )
         }
 
