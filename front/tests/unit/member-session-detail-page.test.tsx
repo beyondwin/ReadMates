@@ -126,7 +126,7 @@ describe("MemberSessionDetailPage", () => {
     expect(desktopHighlightRow).not.toBeNull();
     expect(within(desktopHighlightRow as HTMLElement).getByText("안멤버1")).toBeInTheDocument();
     expect(within(desktopHighlightRow as HTMLElement).getByLabelText("안멤버1")).toBeInTheDocument();
-    expect(desktop.getByRole("heading", { name: "함께 남긴 한줄평 · 1" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "텍스트 한줄평 · 1" })).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(desktop.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
     expect(desktop.queryByText("함께 남긴 질문 Q1 · 이멤버5")).not.toBeInTheDocument();
@@ -152,7 +152,7 @@ describe("MemberSessionDetailPage", () => {
     expect(mobileHighlightRow).not.toBeNull();
     expect(within(mobileHighlightRow as HTMLElement).getByText("안멤버1")).toBeInTheDocument();
     expect(within(mobileHighlightRow as HTMLElement).getByLabelText("안멤버1")).toBeInTheDocument();
-    expect(mobile.getByRole("heading", { name: "함께 남긴 한줄평 · 1" })).toBeInTheDocument();
+    expect(mobile.getByRole("heading", { name: "텍스트 한줄평 · 1" })).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(mobile.getByText("Q1 · 이멤버5")).toHaveStyle({ color: "var(--text-3)" });
     expect(mobile.queryByText("함께 남긴 질문 Q1 · 이멤버5")).not.toBeInTheDocument();
