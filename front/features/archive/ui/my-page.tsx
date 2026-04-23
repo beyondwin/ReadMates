@@ -10,6 +10,7 @@ import {
 } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
 import { appFeedbackHref, readmatesReturnState } from "@/features/archive/ui/archive-route-continuity";
+import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
@@ -267,17 +268,19 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
                   aria-label={feedbackReportActionLabel(report, "읽기")}
                   title={feedbackReportActionLabel(report, "읽기")}
                 >
-                  <Icon name="arrow-up-right" size={12} />
+                  <Icon name="chevron-right" size={12} />
                 </Link>
-                <Link
-                  className="btn btn-quiet btn-sm"
-                  to={appFeedbackHref(report.sessionId, true)}
-                  state={myPageReturnState}
-                  aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
-                  title={feedbackReportActionLabel(report, "PDF로 저장")}
-                >
-                  <Icon name="download" size={13} />
-                </Link>
+                {feedbackDocumentPdfDownloadsEnabled ? (
+                  <Link
+                    className="btn btn-quiet btn-sm"
+                    to={appFeedbackHref(report.sessionId, true)}
+                    state={myPageReturnState}
+                    aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+                    title={feedbackReportActionLabel(report, "PDF로 저장")}
+                  >
+                    <Icon name="download" size={13} />
+                  </Link>
+                ) : null}
               </div>
             </div>
           ))}
@@ -314,7 +317,7 @@ function SectionHeader({
   );
 }
 
-type IconName = "arrow-up-right" | "download" | "edit" | "eye" | "me" | "notes" | "settings";
+type IconName = "arrow-up-right" | "chevron-right" | "download" | "edit" | "eye" | "me" | "notes" | "settings";
 
 function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
   const common = {
@@ -330,6 +333,12 @@ function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
   };
 
   switch (name) {
+    case "chevron-right":
+      return (
+        <svg {...common}>
+          <path d="M8 5l5 5-5 5" />
+        </svg>
+      );
     case "arrow-up-right":
       return (
         <svg {...common}>
@@ -545,7 +554,9 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
             key={report.sessionId}
             style={{
               display: "grid",
-              gridTemplateColumns: "28px minmax(0, 1fr) auto auto",
+              gridTemplateColumns: feedbackDocumentPdfDownloadsEnabled
+                ? "28px minmax(0, 1fr) auto auto"
+                : "28px minmax(0, 1fr) auto",
               gap: "14px",
               padding: "16px 0",
               borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
@@ -559,7 +570,7 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
               <h3 className="body" style={{ fontSize: "14px", margin: 0 }}>
                 {report.bookTitle}
               </h3>
-              <div className="tiny">{formatDateOnlyLabel(report.date)} · PDF</div>
+              <div className="tiny">{formatDateOnlyLabel(report.date)} · 피드백 문서</div>
             </div>
             <Link
               className="btn btn-quiet btn-sm"
@@ -568,17 +579,19 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
               aria-label={feedbackReportActionLabel(report, "읽기")}
               title={feedbackReportActionLabel(report, "읽기")}
             >
-              <Icon name="arrow-up-right" size={12} />
+              <Icon name="chevron-right" size={12} />
             </Link>
-            <Link
-              className="btn btn-quiet btn-sm"
-              to={appFeedbackHref(report.sessionId, true)}
-              state={myPageReturnState}
-              aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
-              title={feedbackReportActionLabel(report, "PDF로 저장")}
-            >
-              <Icon name="download" size={13} />
-            </Link>
+            {feedbackDocumentPdfDownloadsEnabled ? (
+              <Link
+                className="btn btn-quiet btn-sm"
+                to={appFeedbackHref(report.sessionId, true)}
+                state={myPageReturnState}
+                aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+                title={feedbackReportActionLabel(report, "PDF로 저장")}
+              >
+                <Icon name="download" size={13} />
+              </Link>
+            ) : null}
           </article>
         ))}
       </div>

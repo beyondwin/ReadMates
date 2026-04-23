@@ -4,16 +4,18 @@ import { readFeedbackReturnTarget } from "@/features/feedback/route/feedback-rou
 import FeedbackDocumentPage, {
   FeedbackDocumentUnavailablePage,
 } from "@/features/feedback/ui/feedback-document-page";
+import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 
 export function FeedbackDocumentRoute({ printMode = false }: { printMode?: boolean }) {
   const result = useLoaderData() as FeedbackDocumentRouteData;
   const location = useLocation();
   const returnTarget = readFeedbackReturnTarget(location.state);
+  const effectivePrintMode = printMode && feedbackDocumentPdfDownloadsEnabled;
 
   return result.status === "ready" ? (
-    <FeedbackDocumentPage document={result.document} printMode={printMode} returnTarget={returnTarget} />
+    <FeedbackDocumentPage document={result.document} printMode={effectivePrintMode} returnTarget={returnTarget} />
   ) : (
-    <FeedbackDocumentUnavailablePage reason={result.reason} printMode={printMode} returnTarget={returnTarget} />
+    <FeedbackDocumentUnavailablePage reason={result.reason} printMode={effectivePrintMode} returnTarget={returnTarget} />
   );
 }
 

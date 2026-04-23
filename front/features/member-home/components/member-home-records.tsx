@@ -104,7 +104,7 @@ export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
 export function MobileMemberActivity({ items }: { items: NoteFeedItem[] }) {
   return (
     <section className="m-sec">
-      <div className="m-row-between" style={{ alignItems: "center" }}>
+      <div className="m-row-between rm-member-activity__header" style={{ alignItems: "center" }}>
         <div className="m-row" style={{ gap: 8, minWidth: 0 }}>
           <div className="eyebrow">멤버 활동</div>
         </div>
@@ -119,51 +119,39 @@ export function MobileMemberActivity({ items }: { items: NoteFeedItem[] }) {
           </p>
         </div>
       ) : (
-        <div className="m-timeline">
+        <div className="rm-member-activity-list">
           {items.map((item) => {
             const authorName = item.kind === "HIGHLIGHT" ? null : item.authorName;
+            const kindLabel = noteKindLabel(item.kind);
 
             return (
-              <div
+              <article
                 key={`${item.sessionNumber}-${item.kind}-${item.authorName ?? "no-author"}-${item.text}`}
-                className="m-timeline-item"
+                className="rm-member-activity-card"
               >
-                <div style={{ minWidth: 0 }}>
-                  <div className="m-row-between" style={{ alignItems: "flex-start", gap: 10 }}>
-                    <div className="m-row" style={{ minWidth: 0, gap: 8 }}>
-                      {authorName ? (
-                        <AvatarChip name={authorName} fallbackInitial={item.authorShortName} label={authorName} size={24} />
-                      ) : (
-                        <span className="m-avatar accent" aria-hidden style={{ width: 24, height: 24, fontSize: 11 }}>
-                          H
-                        </span>
-                      )}
-                      <div className="body" style={{ minWidth: 0, fontSize: 14, fontWeight: 500 }}>
-                        {authorName ?? noteKindLabel(item.kind)}
-                      </div>
-                    </div>
-                    <div style={{ flexShrink: 0, textAlign: "right" }}>
-                      <div className="mono tiny" style={{ color: "var(--text-2)" }}>
-                        No.{String(item.sessionNumber).padStart(2, "0")}
-                      </div>
-                      <div className="tiny" style={{ color: "var(--text-3)" }}>
-                        {noteKindLabel(item.kind)}
-                      </div>
+                <div className="rm-member-activity-card__top">
+                  <div className="rm-member-activity-card__author">
+                    {authorName ? (
+                      <AvatarChip name={authorName} fallbackInitial={item.authorShortName} label={authorName} size={26} />
+                    ) : (
+                      <span className="m-avatar accent rm-member-activity-card__avatar" aria-hidden>
+                        H
+                      </span>
+                    )}
+                    <div className="rm-member-activity-card__author-copy">
+                      <div className="rm-member-activity-card__author-name">{authorName ?? "회차 하이라이트"}</div>
+                      <div className="rm-member-activity-card__book">{item.bookTitle}</div>
                     </div>
                   </div>
-                  <div
-                    className="tiny"
-                    style={{
-                      color: "var(--text-3)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {item.text}
+                  <div className="rm-member-activity-card__meta">
+                    <div className="mono tiny">No.{String(item.sessionNumber).padStart(2, "0")}</div>
+                    <div className="tiny">
+                      {kindLabel}
+                    </div>
                   </div>
                 </div>
-              </div>
+                <p className="rm-member-activity-card__text editorial">{item.text}</p>
+              </article>
             );
           })}
         </div>

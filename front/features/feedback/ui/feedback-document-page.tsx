@@ -10,6 +10,7 @@ import {
   type ReadmatesReturnTarget,
 } from "@/features/feedback/model/feedback-document-model";
 import { Link } from "@/features/feedback/ui/feedback-link";
+import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 
 const singlePagePrintStyleId = "rm-feedback-document-single-page-print-style";
 const printPageExtraMinHeightPx = 520;
@@ -35,11 +36,11 @@ export default function FeedbackDocumentPage({
 }: FeedbackDocumentPageProps) {
   const feedbackHref = appFeedbackHref(document.sessionId);
   const returnState = readmatesReturnState(returnTarget);
-  const showHeaderActions = printMode;
+  const showHeaderActions = printMode && feedbackDocumentPdfDownloadsEnabled;
 
   return (
     <main className={`rm-feedback-document-page${printMode ? " rm-feedback-document-page--print" : ""}`}>
-      {printMode ? <PrintOnFirstRender /> : null}
+      {printMode && feedbackDocumentPdfDownloadsEnabled ? <PrintOnFirstRender /> : null}
       <FeedbackDocumentStyles />
       <section className="page-header-compact">
         <div className="container">
@@ -64,7 +65,7 @@ export default function FeedbackDocumentPage({
                     보존 문서 · 참석자 열람본
                   </p>
                 </div>
-                {!printMode ? (
+                {!printMode && feedbackDocumentPdfDownloadsEnabled ? (
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm rm-feedback-document-pdf-action"
@@ -276,8 +277,8 @@ export function FeedbackDocumentUnavailablePage({
               <div className="eyebrow">열람 규칙</div>
               <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
                 {reason === "forbidden"
-                  ? "정식 멤버이며 해당 회차 참석 기록이 있는 계정만 문서 본문과 PDF 저장을 사용할 수 있습니다."
-                  : "문서가 등록되지 않은 회차는 본문과 PDF 저장 버튼을 표시하지 않습니다."}
+                  ? "정식 멤버이며 해당 회차 참석 기록이 있는 계정만 문서 본문을 열람할 수 있습니다."
+                  : "문서가 등록되지 않은 회차는 본문을 표시하지 않습니다."}
               </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>

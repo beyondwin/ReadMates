@@ -217,7 +217,7 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
     expect(within(mobile as HTMLElement).getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
     expect(screen.queryByText("지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.")).not.toBeInTheDocument();
-    expect(desktop.getByText("/ preserved record")).toBeInTheDocument();
+    expect(desktop.getByText("AI-assisted")).toBeInTheDocument();
     const desktopSessionTab = desktop.getByRole("button", { name: "세션" });
     expect(desktopSessionTab).toBeInTheDocument();
     expect(desktopSessionTab).toHaveStyle({
@@ -448,15 +448,11 @@ describe("ArchivePage", () => {
       "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
     );
     const readAction = scoped.getByRole("link", { name: seededReportReadLabel });
-    const pdfAction = scoped.getByRole("link", { name: seededReportPdfLabel });
     expect(readAction).toHaveAttribute("href", "/app/feedback/session-1");
     expect(readAction).toHaveAttribute("aria-label", seededReportReadLabel);
     expect(readAction).toHaveAttribute("title", seededReportReadLabel);
     expect(readAction).not.toHaveTextContent("읽기");
-    expect(pdfAction).toHaveAttribute("href", "/app/feedback/session-1/print");
-    expect(pdfAction).toHaveAttribute("aria-label", seededReportPdfLabel);
-    expect(pdfAction).toHaveAttribute("title", seededReportPdfLabel);
-    expect(pdfAction).not.toHaveTextContent("PDF로 저장");
+    expect(scoped.queryByRole("link", { name: seededReportPdfLabel })).not.toBeInTheDocument();
     expect(scoped.queryByText("feedback-6-suhan.html")).not.toBeInTheDocument();
   });
 
@@ -579,28 +575,10 @@ describe("ArchivePage", () => {
       </MemoryRouter>,
     );
 
-    await user.click(getDesktop(feedbackRender.container).getByRole("link", { name: seededReportReadLabel }));
+    const feedbackDesktop = getDesktop(feedbackRender.container);
+    expect(feedbackDesktop.queryByRole("link", { name: seededReportPdfLabel })).not.toBeInTheDocument();
 
-    expectNoArchiveScrollSnapshot();
-
-    feedbackRender.unmount();
-    window.sessionStorage.clear();
-    setScrollY(420);
-    window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
-
-    const printRender = render(
-      <MemoryRouter initialEntries={["/app/archive?view=report"]}>
-        <ArchivePage
-          sessions={seededSessions}
-          questions={seededQuestions}
-          reviews={seededReviews}
-          reports={seededReports}
-          initialView="report"
-        />
-      </MemoryRouter>,
-    );
-
-    await user.click(getDesktop(printRender.container).getByRole("link", { name: seededReportPdfLabel }));
+    await user.click(feedbackDesktop.getByRole("link", { name: seededReportReadLabel }));
 
     expectNoArchiveScrollSnapshot();
   });
@@ -651,7 +629,7 @@ describe("ArchivePage", () => {
     const desktop = getDesktop(container);
 
     await user.click(desktop.getByRole("button", { name: "내 서평" }));
-    expect(desktop.queryByText("/ preserved record")).not.toBeInTheDocument();
+    expect(desktop.queryByText("AI-assisted")).not.toBeInTheDocument();
     expect(desktop.getByText("서평 · 2026-04-15")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("나")).toBeInTheDocument();
@@ -662,7 +640,7 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("맡겨진 소녀")).not.toBeInTheDocument();
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
-    expect(desktop.queryByText("/ preserved record")).not.toBeInTheDocument();
+    expect(desktop.queryByText("AI-assisted")).not.toBeInTheDocument();
     expect(desktop.getByText("Q1 · 2025.11.26")).toHaveStyle({ color: "var(--text-3)" });
     expect(desktop.queryByText("저장된 질문 Q1 · 2025.11.26")).not.toBeInTheDocument();
     expect(desktop.getByText("10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?")).toBeInTheDocument();
@@ -672,7 +650,7 @@ describe("ArchivePage", () => {
     );
 
     await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
-    expect(desktop.getByText("/ preserved record")).toBeInTheDocument();
+    expect(desktop.getByText("AI-assisted")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
     expect(desktop.queryByText("독서모임 1차 피드백")).not.toBeInTheDocument();
@@ -682,17 +660,13 @@ describe("ArchivePage", () => {
     );
     expect(desktop.queryByText("DOC")).not.toBeInTheDocument();
     const readAction = desktop.getByRole("link", { name: seededReportReadLabel });
-    const pdfAction = desktop.getByRole("link", { name: seededReportPdfLabel });
     expect(readAction).toHaveAttribute("href", "/app/feedback/session-1");
     expect(readAction).toHaveAttribute("aria-label", seededReportReadLabel);
     expect(readAction).toHaveAttribute("title", seededReportReadLabel);
     expect(readAction).toHaveClass("btn-quiet");
     expect(readAction).not.toHaveClass("btn-ghost");
     expect(readAction).not.toHaveTextContent("읽기");
-    expect(pdfAction).toHaveAttribute("href", "/app/feedback/session-1/print");
-    expect(pdfAction).toHaveAttribute("aria-label", seededReportPdfLabel);
-    expect(pdfAction).toHaveAttribute("title", seededReportPdfLabel);
-    expect(pdfAction).not.toHaveTextContent("PDF로 저장");
+    expect(desktop.queryByRole("link", { name: seededReportPdfLabel })).not.toBeInTheDocument();
     expect(desktop.queryByText("feedback-13.html")).not.toBeInTheDocument();
   });
 
@@ -722,15 +696,14 @@ describe("ArchivePage", () => {
     expect(desktop.queryByRole("link", { name: "읽기" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "PDF로 저장" })).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: seededReportReadLabel })).toHaveAttribute("href", "/app/feedback/session-1");
-    expect(desktop.getByRole("link", { name: seededReportPdfLabel })).toHaveAttribute("href", "/app/feedback/session-1/print");
+    expect(desktop.queryByRole("link", { name: seededReportPdfLabel })).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 피드백 문서 읽기" })).toHaveAttribute(
       "href",
       "/app/feedback/session-2",
     );
-    expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 피드백 문서 PDF로 저장" })).toHaveAttribute(
-      "href",
-      "/app/feedback/session-2/print",
-    );
+    expect(
+      desktop.queryByRole("link", { name: "No.02 냉정한 이타주의자 피드백 문서 PDF로 저장" }),
+    ).not.toBeInTheDocument();
   });
 
   it("passes source archive tab state to session detail links", async () => {
@@ -901,10 +874,7 @@ describe("ArchivePage", () => {
       "href",
       "/app/feedback/session%207%2Fslash",
     );
-    expect(desktop.getByRole("link", { name: "No.07 URL 책 피드백 문서 PDF로 저장" })).toHaveAttribute(
-      "href",
-      "/app/feedback/session%207%2Fslash/print",
-    );
+    expect(desktop.queryByRole("link", { name: "No.07 URL 책 피드백 문서 PDF로 저장" })).not.toBeInTheDocument();
   });
 
   it("renders empty states instead of fallback samples", async () => {

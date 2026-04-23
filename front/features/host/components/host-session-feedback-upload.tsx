@@ -40,57 +40,102 @@ export function HostSessionFeedbackUpload({
     );
   }
 
+  const statusLabel = feedbackDocument.uploaded ? "업로드 완료" : "미등록";
+  const fileLabel = feedbackDocument.fileName ?? "파일 없음";
+
   return (
     <>
-      <div className="marginalia" style={{ marginBottom: "12px" }}>
-        회차별 피드백 문서 원본을 업로드하세요. 참석 멤버는 피드백 화면에서 문서를 확인하고 PDF로 저장할 수
-        있어요.
-      </div>
-      <div className="surface-quiet" style={{ padding: "22px", borderStyle: "dashed" }}>
-        <div className="row-between" style={{ alignItems: "flex-start", gap: "18px", flexWrap: "wrap" }}>
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 8 }}>
-              피드백 문서 상태
+      <div className="surface-quiet rm-feedback-upload">
+        <div className="rm-feedback-upload__summary">
+          <div className="rm-feedback-upload__copy">
+            <div className="rm-feedback-upload__meta">
+              <span className={feedbackDocument.uploaded ? "badge badge-ok badge-dot" : "badge"}>{statusLabel}</span>
+              <span className="tiny rm-feedback-upload__format">
+                <code className="mono">.md</code>
+                <span aria-hidden="true"> · </span>
+                <code className="mono">.txt</code>
+              </span>
             </div>
-            <span className={feedbackDocument.uploaded ? "badge badge-ok badge-dot" : "badge"}>
-              {feedbackDocument.uploaded ? "업로드 완료" : "미등록"}
-            </span>
-            <div className="body" style={{ fontSize: "14px", marginTop: "12px" }}>
-              {feedbackDocument.fileName ?? "업로드된 피드백 문서가 없습니다."}
-            </div>
-            <div className="tiny" style={{ marginTop: "4px", color: "var(--text-3)" }}>
-              <code className="mono">.md</code> 또는 <code className="mono">.txt</code> 파일을 업로드하세요.
-            </div>
+            <p className="rm-feedback-upload__file">{fileLabel}</p>
           </div>
-          <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
+          <div className="rm-feedback-upload__actions">
             {feedbackDocument.uploaded ? (
               <Link className="btn btn-quiet btn-sm" to={appFeedbackHref(sessionId)} state={previewState}>
                 미리보기
               </Link>
             ) : null}
-            <button
-              className="btn btn-ghost btn-sm"
-              type="button"
-              onClick={() => inputRef.current?.click()}
-            >
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => inputRef.current?.click()}>
               {feedbackDocument.uploaded ? "교체" : "등록"}
             </button>
           </div>
         </div>
-        <div style={{ marginTop: "16px" }}>
-          <label className="label" htmlFor="feedback-document-file">
-            피드백 문서 파일
-          </label>
-          <input
-            ref={inputRef}
-            id="feedback-document-file"
-            className="input"
-            type="file"
-            accept=".md,.txt"
-            onChange={onUploadFeedbackDocument}
-          />
-        </div>
+        <label className="label rm-sr-only" htmlFor="feedback-document-file">
+          피드백 문서 파일
+        </label>
+        <input
+          ref={inputRef}
+          id="feedback-document-file"
+          className="rm-sr-only"
+          type="file"
+          accept=".md,.txt"
+          onChange={onUploadFeedbackDocument}
+        />
       </div>
+      <style>{`
+        .rm-feedback-upload {
+          padding: 18px;
+        }
+        .rm-feedback-upload__summary {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 18px;
+        }
+        .rm-feedback-upload__copy {
+          min-width: 0;
+        }
+        .rm-feedback-upload__meta {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .rm-feedback-upload__format {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          color: var(--text-3);
+        }
+        .rm-feedback-upload__file {
+          margin: 10px 0 0;
+          color: var(--text);
+          font-size: 14px;
+          line-height: 1.45;
+          overflow-wrap: anywhere;
+        }
+        .rm-feedback-upload__actions {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        @media (max-width: 768px) {
+          .rm-feedback-upload {
+            padding: 16px !important;
+          }
+          .rm-feedback-upload__summary {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 14px;
+          }
+          .rm-feedback-upload__actions {
+            justify-content: stretch;
+          }
+          .rm-feedback-upload__actions .btn {
+            flex: 1 1 120px;
+          }
+        }
+      `}</style>
     </>
   );
 }
