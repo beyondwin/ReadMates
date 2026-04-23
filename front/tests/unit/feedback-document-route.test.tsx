@@ -331,6 +331,7 @@ describe("Feedback document routes", () => {
     expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
     const returnLink = screen.getByRole("link", { name: "세션으로 돌아가기" });
     expect(returnLink).toHaveAttribute("href", "/app/sessions/session-1#feedback");
+    expect(returnLink).toHaveTextContent("← 세션");
 
     await user.click(returnLink);
 

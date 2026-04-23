@@ -32,6 +32,26 @@ const segmentLinks = [
   { key: "questions", desktopLabel: "함께 남긴 질문", mobileLabel: "질문" },
 ];
 
+function returnLinkAriaLabel(label: string) {
+  if (!label) {
+    return "돌아가기";
+  }
+
+  return label.includes("돌아가기") ? label : `${label} 돌아가기`;
+}
+
+function sessionDetailBackLabel(returnTarget: ReadmatesReturnTarget) {
+  if (returnTarget.href === "/app/me") {
+    return "내 공간";
+  }
+
+  if (returnTarget.href.startsWith("/app/archive")) {
+    return "아카이브";
+  }
+
+  return "이전 화면";
+}
+
 export default function MemberSessionDetailPage({
   session,
   returnTarget = archiveSessionsReturnTarget,
@@ -41,6 +61,7 @@ export default function MemberSessionDetailPage({
 }) {
   return (
     <main className="rm-member-session-detail-page">
+      <MemberSessionDetailStyles />
       <div className="desktop-only">
         <MemberSessionDetailDesktop session={session} returnTarget={returnTarget} />
       </div>
@@ -109,20 +130,6 @@ function MemberSessionDetailDesktop({
 
   return (
     <>
-      <section className="page-header-compact">
-        <div className="container">
-          <div className="row" style={{ justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
-            <nav className="row" style={{ gap: 6, flexWrap: "wrap" }} aria-label="세션 상세 섹션">
-              {segmentLinks.map((link) => (
-                <a key={link.key} href={`#${link.key}`} className="badge">
-                  {link.desktopLabel}
-                </a>
-              ))}
-            </nav>
-          </div>
-        </div>
-      </section>
-
       <section style={{ padding: "36px 0 80px" }}>
         <div className="container">
           <div
@@ -137,8 +144,19 @@ function MemberSessionDetailDesktop({
           >
             <BookCover title={session.bookTitle} author={session.bookAuthor} imageUrl={session.bookImageUrl} width={180} />
             <div>
-              <p className="eyebrow" style={{ margin: 0 }}>
-                아카이브 세션 · {sessionNo(session.sessionNumber)} · {date}
+              <p className="eyebrow rm-session-detail-kicker" style={{ margin: 0 }}>
+                <Link
+                  to={returnTarget.href}
+                  state={returnTarget.state}
+                  className="rm-session-detail-backlink"
+                  aria-label={returnLinkAriaLabel(returnTarget.label)}
+                >
+                  ← {sessionDetailBackLabel(returnTarget)}
+                </Link>
+                <span className="rm-session-detail-kicker__divider">·</span>
+                <span>
+                  아카이브 세션 · {sessionNo(session.sessionNumber)} · {date}
+                </span>
               </p>
               <div style={{ marginTop: 10 }}>
                 <SessionIdentity
@@ -164,6 +182,13 @@ function MemberSessionDetailDesktop({
                 <span className="badge">{session.locationLabel}</span>
                 <span className={feedbackBadgeClass(session.feedbackDocument)}>{feedbackStatusText(session.feedbackDocument)}</span>
               </div>
+              <nav className="rm-session-detail-section-nav" aria-label="세션 상세 섹션">
+                {segmentLinks.map((link) => (
+                  <a key={link.key} href={`#${link.key}`}>
+                    {link.desktopLabel}
+                  </a>
+                ))}
+              </nav>
             </div>
           </div>
 
@@ -449,6 +474,79 @@ function HighlightsList({
         </article>
       ))}
     </div>
+  );
+}
+
+function MemberSessionDetailStyles() {
+  return (
+    <style>{`
+      .rm-session-detail-kicker {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .rm-session-detail-backlink {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        color: var(--text-2);
+        font-family: var(--f-sans);
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0;
+        line-height: 1.35;
+        text-decoration: none;
+        text-transform: none;
+        transition:
+          color var(--motion-fast) var(--ease-standard-refined),
+          background var(--motion-fast) var(--ease-standard-refined);
+      }
+
+      .rm-session-detail-backlink:hover {
+        color: var(--text);
+      }
+
+      .rm-session-detail-kicker__divider {
+        color: var(--text-3);
+      }
+
+      .rm-session-detail-section-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 24px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line-soft);
+      }
+
+      .rm-session-detail-section-nav a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 32px;
+        padding: 0 12px;
+        border: 1px solid var(--line);
+        border-radius: var(--r-2);
+        background: var(--bg-sub);
+        color: var(--text-2);
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.4;
+        text-decoration: none;
+        transition:
+          background var(--motion-fast) var(--ease-standard-refined),
+          border-color var(--motion-fast) var(--ease-standard-refined),
+          color var(--motion-fast) var(--ease-standard-refined);
+      }
+
+      .rm-session-detail-section-nav a:hover {
+        border-color: var(--line-strong);
+        background: var(--bg);
+        color: var(--text);
+      }
+    `}</style>
   );
 }
 
