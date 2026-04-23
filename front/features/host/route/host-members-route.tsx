@@ -19,7 +19,7 @@ export function HostMembersRoute() {
           </p>
         </div>
       </section>
-      <section className="container" style={{ padding: "24px 0 72px" }}>
+      <section className="container" style={{ paddingTop: 24, paddingBottom: 72 }}>
         <HostMembers initialMembers={members} actions={hostMembersActions} />
       </section>
     </main>
