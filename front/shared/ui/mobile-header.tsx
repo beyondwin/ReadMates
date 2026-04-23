@@ -97,6 +97,7 @@ type HeaderBackTarget = {
   href: string;
   state?: ReadmatesReturnState;
   label: string;
+  iconOnly?: boolean;
 };
 
 type HeaderAction = {
@@ -111,7 +112,7 @@ function appBackTarget(pathname: string, state: unknown): HeaderBackTarget | nul
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {
-    return { href: "/app/host", label: "오늘" };
+    return { href: "/app/host", label: "오늘", iconOnly: true };
   }
 
   if (pathname.startsWith("/app/feedback/") && pathname.endsWith("/print")) {
@@ -163,9 +164,15 @@ function HeaderShell({
     <header className={`m-hdr m-hdr--${workspace}`} data-workspace={workspace}>
       <div className="m-hdr-side m-hdr-side--left">
         {backTarget ? (
-          <Link to={backTarget.href} state={backTarget.state} className="m-hdr-back" aria-label="뒤로">
+          <Link
+            to={backTarget.href}
+            state={backTarget.state}
+            className={`m-hdr-back${backTarget.iconOnly ? " m-hdr-back--icon" : ""}`}
+            aria-label="뒤로"
+            style={backTarget.iconOnly ? { width: 44, padding: 0 } : undefined}
+          >
             <ChevronLeftIcon />
-            <span className="m-hdr-back__label">{backTarget.label}</span>
+            {backTarget.iconOnly ? null : <span className="m-hdr-back__label">{backTarget.label}</span>}
           </Link>
         ) : (
           <Link to={brandHref} className="m-hdr-brand" aria-label="읽는사이 홈">

@@ -112,7 +112,8 @@ describe("MobileHeader route titles and actions", () => {
     expect(container.querySelector(".m-hdr-side--right")).toHaveTextContent(/^멤버$/);
     expect(screen.getByText("호스트")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
-    expect(screen.getByRole("link", { name: "뒤로" })).toHaveTextContent(/^오늘$/);
+    expect(screen.getByRole("link", { name: "뒤로" }).textContent).toBe("");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveClass("m-hdr-back--icon");
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveTextContent(/^멤버$/);
   });
