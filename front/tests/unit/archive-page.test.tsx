@@ -218,10 +218,22 @@ describe("ArchivePage", () => {
     expect(within(mobile as HTMLElement).getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
     expect(screen.queryByText("지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.")).not.toBeInTheDocument();
     expect(desktop.getByText("/ preserved record")).toBeInTheDocument();
-    expect(desktop.getByRole("button", { name: "세션" })).toBeInTheDocument();
+    const desktopSessionTab = desktop.getByRole("button", { name: "세션" });
+    expect(desktopSessionTab).toBeInTheDocument();
+    expect(desktopSessionTab).toHaveStyle({
+      border: "1px solid var(--text)",
+      background: "var(--text)",
+      color: "var(--bg)",
+    });
     expect(desktop.getByRole("button", { name: "내 서평" })).toBeInTheDocument();
     expect(desktop.getByRole("button", { name: "내 질문" })).toBeInTheDocument();
-    expect(desktop.getByRole("button", { name: "피드백 문서" })).toBeInTheDocument();
+    const desktopFeedbackTab = desktop.getByRole("button", { name: "피드백 문서" });
+    expect(desktopFeedbackTab).toBeInTheDocument();
+    expect(desktopFeedbackTab).toHaveStyle({
+      border: "1px solid var(--line)",
+      background: "transparent",
+      color: "var(--text-2)",
+    });
     expect(desktop.getByText("2026")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();

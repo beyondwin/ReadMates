@@ -218,26 +218,30 @@ function ArchiveDesktop({
             aria-label="아카이브 탭"
             onKeyDown={(event) => handleArchiveTabKeyDown(event, view, setView, "desktop")}
           >
-            {archiveTabs.map((tab) => (
-              <button
-                key={tab.key}
-                id={`archive-desktop-tab-${tab.key}`}
-                type="button"
-                aria-pressed={view === tab.key}
-                onClick={() => setView(tab.key)}
-                style={{
-                  height: "32px",
-                  padding: "0 14px",
-                  fontSize: "13px",
-                  borderRadius: "999px",
-                  background: view === tab.key ? "var(--accent-soft)" : "transparent",
-                  color: view === tab.key ? "var(--accent)" : "var(--text-2)",
-                  border: `1px solid ${view === tab.key ? "var(--accent-line)" : "var(--line)"}`,
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
+            {archiveTabs.map((tab) => {
+              const selected = view === tab.key;
+
+              return (
+                <button
+                  key={tab.key}
+                  id={`archive-desktop-tab-${tab.key}`}
+                  type="button"
+                  aria-pressed={selected}
+                  onClick={() => setView(tab.key)}
+                  style={{
+                    height: "32px",
+                    padding: "0 14px",
+                    fontSize: "13px",
+                    borderRadius: "999px",
+                    border: `1px solid ${selected ? "var(--text)" : "var(--line)"}`,
+                    background: selected ? "var(--text)" : "transparent",
+                    color: selected ? "var(--bg)" : "var(--text-2)",
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
