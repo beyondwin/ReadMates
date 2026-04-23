@@ -118,7 +118,14 @@ function SummaryExcerpt({ session }: { session: PublicSessionListItemView }) {
 
   return (
     <Link to={sessionHref(session)} className="rm-record-row public-note-row">
-      <span className="mono tiny">No.{session.sessionNumber}</span>
+      <BookCover
+        title={display.title}
+        author={display.author}
+        imageUrl={session.bookImageUrl}
+        width={48}
+        className="public-note-row__cover"
+        decorative
+      />
       <span>
         <span className="quote-card__quote editorial">{display.summary}</span>
         <span className="small" style={{ display: "block", marginTop: 10, color: "var(--text-3)" }}>
@@ -178,9 +185,6 @@ function PublicRecordGuide({ hasPublishedRecords }: { hasPublishedRecords: boole
 
 export default function PublicHome({ data }: PublicHomeProps) {
   const latestSession = data.recentSessions[0] ?? null;
-  const secondarySessions = latestSession
-    ? data.recentSessions.filter((session) => session.sessionId !== latestSession.sessionId)
-    : data.recentSessions;
   const publicRecordPreviewSessions = data.recentSessions.slice(0, 3);
   const { clubName, tagline, about, stats } = getPublicClubDisplay(data);
 
@@ -278,9 +282,9 @@ export default function PublicHome({ data }: PublicHomeProps) {
               비공개 준비 과정과 참석자 전용 피드백은 멤버 공간에 남기고, 외부에는 공개 가능한 요약만 발행합니다.
             </p>
           </div>
-          {secondarySessions.length > 0 ? (
+          {publicRecordPreviewSessions.length > 0 ? (
             <div className="public-note-list">
-              {secondarySessions.slice(0, 3).map((session) => (
+              {publicRecordPreviewSessions.map((session) => (
                 <SummaryExcerpt key={session.sessionId} session={session} />
               ))}
             </div>
@@ -326,10 +330,10 @@ export default function PublicHome({ data }: PublicHomeProps) {
           <div className="row-between public-section-head">
             <div>
               <div className="eyebrow" style={{ marginBottom: 8 }}>
-                공개 기록
+                기록 아카이브
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
-                공개 기록
+                공개된 모임 기록
               </h2>
             </div>
             <Link to="/records" className="public-records-link">
