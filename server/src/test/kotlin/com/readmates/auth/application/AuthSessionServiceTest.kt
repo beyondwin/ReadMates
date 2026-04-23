@@ -1,12 +1,13 @@
 package com.readmates.auth.application
 
+import com.readmates.auth.application.port.out.AuthSessionStorePort
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class AuthSessionServiceTest {
-    private val repository = AuthSessionRepository.InMemoryForTest()
+    private val repository = AuthSessionStorePort.InMemoryForTest()
     private val service = AuthSessionService(repository)
 
     @Test
