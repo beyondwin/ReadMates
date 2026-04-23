@@ -203,7 +203,7 @@ export function MobileSessionPicker({
       <div className="row-between" style={{ marginBottom: "10px" }}>
         <span className="eyebrow">세션별</span>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onOpenAll} ref={allSessionsButtonRef}>
-          전체 세션
+          세션 목록
         </button>
       </div>
       {noteSessions.length === 0 ? (
@@ -354,15 +354,15 @@ export function MobileSessionSheet({
       >
         <div className="row-between" style={{ padding: "18px 18px 12px", borderBottom: "1px solid var(--line-soft)" }}>
           <h2 id="notes-mobile-session-sheet-title" className="h3 editorial" style={{ margin: 0 }}>
-            전체 세션
+            세션 목록
           </h2>
-          <button type="button" className="btn btn-quiet btn-sm" aria-label="전체 세션 닫기" onClick={onClose} ref={closeButtonRef}>
+          <button type="button" className="btn btn-quiet btn-sm" aria-label="세션 목록 닫기" onClick={onClose} ref={closeButtonRef}>
             닫기
           </button>
         </div>
         <div style={{ padding: "14px 18px 18px" }}>
           <label className="rm-sr-only" htmlFor="notes-mobile-session-search">
-            전체 세션 검색
+            세션 목록 검색
           </label>
           <input
             id="notes-mobile-session-search"

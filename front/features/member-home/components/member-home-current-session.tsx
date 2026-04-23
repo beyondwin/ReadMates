@@ -312,7 +312,7 @@ export function MobileTodayActions({
         </div>
         <div className="m-card-quiet" role="note" style={{ marginBottom: 10 }}>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            전체 세션은 볼 수 있어요. 정식 멤버가 되면 참여와 작성이 열립니다.
+            세션 기록은 볼 수 있어요. 정식 멤버가 되면 참여와 작성이 열립니다.
           </p>
         </div>
         <div className="m-action-grid">

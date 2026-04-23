@@ -52,7 +52,7 @@ function copyForAuth(auth: AuthMeView): PendingStateCopy {
       body: "세션 기록은 읽을 수 있지만 RSVP, 체크인, 질문과 서평 작성은 호스트가 멤버십을 복구한 뒤 다시 열립니다.",
       badge: "제한됨",
       badgeClass: "badge-warning",
-      primary: { label: "전체 세션 둘러보기", to: "/app/archive" },
+      primary: { label: "아카이브 둘러보기", to: "/app/archive" },
       secondary: { label: "내 공간 확인", to: "/app/me" },
       note: "권한 상태에 대한 확인이 필요하면 호스트에게 문의해 주세요.",
     };
@@ -65,7 +65,7 @@ function copyForAuth(auth: AuthMeView): PendingStateCopy {
       body: "초대 없이 Google로 로그인한 계정은 둘러보기 멤버로 시작합니다. 호스트가 정식 멤버로 전환하면 RSVP, 체크인, 질문과 서평 작성이 열립니다.",
       badge: "승인 대기",
       badgeClass: "badge-pending",
-      primary: { label: "전체 세션 둘러보기", to: "/app/archive" },
+      primary: { label: "아카이브 둘러보기", to: "/app/archive" },
       secondary: { label: "이번 세션 보기", to: "/app/session/current" },
       note: "초대 링크를 받았다면 해당 링크에서 같은 Google 계정으로 수락해 주세요.",
     };

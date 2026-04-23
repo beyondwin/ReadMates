@@ -300,7 +300,7 @@ function MobileViewerMemberNotice() {
       <div className="m-card-quiet" role="note">
         <div className="eyebrow">둘러보기 멤버</div>
         <p className="small" style={{ margin: "6px 0 0" }}>
-          전체 세션은 읽을 수 있어요. RSVP, 체크인, 질문, 서평 저장은 정식 멤버에게 열립니다.
+          세션 기록은 읽을 수 있어요. RSVP, 체크인, 질문, 서평 저장은 정식 멤버에게 열립니다.
         </p>
       </div>
     </section>

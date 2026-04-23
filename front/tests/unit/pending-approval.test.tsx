@@ -42,7 +42,7 @@ describe("PendingApprovalPage", () => {
     expect(screen.getByText("viewer@example.com")).toBeInTheDocument();
     expect(screen.getAllByText("VIEWER")).toHaveLength(2);
     expect(screen.getByText("초대 링크를 받았다면 해당 링크에서 같은 Google 계정으로 수락해 주세요.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 세션 둘러보기" })).toHaveAttribute("href", "/app/archive");
+    expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute("href", "/app/archive");
     expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute("href", "/app/session/current");
   });
 

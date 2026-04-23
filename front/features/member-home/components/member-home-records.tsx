@@ -60,7 +60,7 @@ export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
         title="최근 클럽 흐름"
         action={
           <Link to="/app/notes" className="btn btn-quiet btn-sm">
-            전체 피드 →
+            클럽 노트 →
           </Link>
         }
       />
@@ -116,7 +116,7 @@ export function MyRecent({ items }: { items: NoteFeedItem[] }) {
         title="내 최근 기록"
         action={
           <Link to="/app/me" className="btn btn-quiet btn-sm">
-            전체 기록 →
+            내 공간 →
           </Link>
         }
       />
@@ -163,7 +163,7 @@ export function MobileMemberActivity({ items }: { items: NoteFeedItem[] }) {
       <div className="m-eyebrow-row">
         <span className="eyebrow">멤버 활동</span>
         <Link to="/app/notes" className="tiny" style={{ color: "var(--text-3)" }}>
-          전체 피드
+          클럽 노트
         </Link>
       </div>
       {items.length === 0 ? (
@@ -249,7 +249,7 @@ export function MobileStats({
         <span className="eyebrow">내 통계</span>
         {session ? (
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            전체 세션
+            누적 통계
           </span>
         ) : null}
       </div>
