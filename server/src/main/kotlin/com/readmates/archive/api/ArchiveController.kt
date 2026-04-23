@@ -78,6 +78,8 @@ data class MemberArchiveSessionDetailResponse(
 data class MemberArchiveHighlightItem(
     val text: String,
     val sortOrder: Int,
+    val authorName: String?,
+    val authorShortName: String?,
 )
 
 data class MemberArchiveQuestionItem(

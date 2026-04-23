@@ -1,6 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
 import type {
-  ArchiveFeedbackDocumentStatus,
   MemberArchiveOneLinerItem,
   MemberArchiveQuestionItem,
   MemberArchiveSessionDetailResponse,
@@ -29,9 +28,8 @@ import { SessionIdentity } from "@/shared/ui/session-identity";
 
 const segmentLinks = [
   { key: "summary", desktopLabel: "요약", mobileLabel: "요약" },
-  { key: "highlights", desktopLabel: "하이라이트와 한줄평", mobileLabel: "하이라이트" },
+  { key: "highlights", desktopLabel: "회차 기록", mobileLabel: "회차 기록" },
   { key: "questions", desktopLabel: "함께 남긴 질문", mobileLabel: "질문" },
-  { key: "feedback", desktopLabel: "피드백", mobileLabel: "피드백" },
 ];
 
 export default function MemberSessionDetailPage({
@@ -183,22 +181,18 @@ function MemberSessionDetailDesktop({
                 <SummaryBlock summary={session.publicSummary} />
               </DesktopSection>
 
-              <DesktopSection id="highlights" title="하이라이트와 한줄평">
+              <DesktopSection id="highlights" title="회차 기록">
                 <SessionHighlights session={session} />
               </DesktopSection>
 
               <DesktopSection id="questions" title="함께 남긴 질문">
                 <SessionQuestions session={session} />
               </DesktopSection>
-
-              <DesktopSection id="feedback" title="피드백">
-                <FeedbackDocumentCard session={session} returnTarget={returnTarget} />
-              </DesktopSection>
             </div>
 
             <aside className="stack" style={{ "--stack": "14px", position: "sticky", top: 86 } as CSSProperties}>
               <RailCard title="내 참석 상태" value={attendanceText(session.myAttendanceStatus)} />
-              <FeedbackRailCard feedback={session.feedbackDocument} />
+              <FeedbackStatusCard session={session} returnTarget={returnTarget} />
               {session.isHost ? (
                 <Link to={`/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`} className="btn btn-quiet btn-sm">
                   세션 편집
@@ -269,6 +263,10 @@ function MemberSessionDetailMobile({
         </div>
       </section>
 
+      <section className="m-sec">
+        <FeedbackStatusCard session={session} returnTarget={returnTarget} mobile />
+      </section>
+
       <nav className="m-hscroll rm-session-detail-mobile-tabs" aria-label="세션 상세 모바일 섹션">
         {segmentLinks.map((link) => (
           <a key={link.key} href={`#mobile-${link.key}`} className="m-chip rm-session-detail-mobile-tab">
@@ -285,7 +283,7 @@ function MemberSessionDetailMobile({
       </section>
 
       <section id="mobile-highlights" className="m-sec">
-        <MobileSectionTitle title="하이라이트와 한줄평" />
+        <MobileSectionTitle title="회차 기록" />
         <SessionHighlights session={session} mobile />
       </section>
 
@@ -294,10 +292,6 @@ function MemberSessionDetailMobile({
         <SessionQuestions session={session} mobile />
       </section>
 
-      <section id="mobile-feedback" className="m-sec">
-        <MobileSectionTitle title="피드백" />
-        <FeedbackDocumentCard session={session} returnTarget={returnTarget} mobile />
-      </section>
     </div>
   );
 }
@@ -433,17 +427,93 @@ function HighlightsList({
   }
 
   return (
-    <div className={mobile ? "rm-mobile-record-list" : "stack"} style={mobile ? undefined : ({ "--stack": "0px" } as CSSProperties)}>
+    <div className="rm-session-highlight-list">
+      <SessionHighlightListStyles />
       {highlights.map((highlight) => (
-        <blockquote
+        <article
           key={`${highlight.sortOrder}-${highlight.text}`}
-          className={mobile ? "m-card-quiet" : "quote"}
-          style={mobile ? { margin: 0 } : { margin: 0 }}
+          className="rm-session-highlight-row"
         >
-          {highlight.text}
-        </blockquote>
+          <p className="rm-session-highlight-row__quote editorial">{highlight.text}</p>
+          {highlight.authorName ? (
+            <div className="row rm-session-highlight-row__source">
+              <AvatarChip
+                name={highlight.authorName}
+                fallbackInitial={highlight.authorShortName}
+                label={highlight.authorName}
+                size={mobile ? 18 : 20}
+              />
+              <span className="small">{highlight.authorName}</span>
+            </div>
+          ) : null}
+        </article>
       ))}
     </div>
+  );
+}
+
+function SessionHighlightListStyles() {
+  return (
+    <style>{`
+      .rm-session-highlight-list {
+        border-top: 1px solid var(--line);
+      }
+
+      .rm-session-highlight-row {
+        padding: 24px 0 26px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .rm-session-highlight-row__quote {
+        position: relative;
+        max-width: 920px;
+        margin: 0;
+        padding-left: 34px;
+        color: var(--text);
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1.45;
+        letter-spacing: 0;
+      }
+
+      .rm-session-highlight-row__quote::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.2em;
+        width: 3px;
+        min-height: 24px;
+        height: calc(100% - 0.4em);
+        background: var(--accent);
+      }
+
+      .rm-session-highlight-row__source {
+        gap: 10px;
+        margin-top: 10px;
+        padding-left: 34px;
+        color: var(--text-3);
+      }
+
+      @media (max-width: 768px) {
+        .rm-session-highlight-row {
+          padding: 20px 0 22px;
+        }
+
+        .rm-session-highlight-row__quote {
+          padding-left: 22px;
+          font-size: 16px;
+          line-height: 1.48;
+        }
+
+        .rm-session-highlight-row__quote::before {
+          width: 2px;
+        }
+
+        .rm-session-highlight-row__source {
+          padding-left: 22px;
+        }
+      }
+    `}</style>
   );
 }
 
@@ -521,89 +591,52 @@ function OneLinerList({ oneLiners, mobile = false }: { oneLiners: MemberArchiveO
   );
 }
 
-function FeedbackDocumentCard({
+function FeedbackStatusCard({
   session,
   returnTarget,
-  compact = false,
   mobile = false,
 }: {
   session: MemberArchiveSessionDetailResponse;
   returnTarget: ReadmatesReturnTarget;
-  compact?: boolean;
   mobile?: boolean;
 }) {
   const feedback = session.feedbackDocument;
-  const className = feedbackDocumentCardClassName({ feedback, compact, mobile });
-  const style = mobile ? undefined : { padding: compact ? 18 : 22 };
+  const className = mobile ? feedbackDocumentCardClassName({ feedback, compact: true, mobile }) : feedbackRailCardClassName(feedback);
+  const style = mobile ? undefined : { padding: 18 };
   const feedbackReturnTarget: ReadmatesReturnTarget = {
-    href: appSessionHref(session.sessionId, mobile ? "mobile-feedback" : "feedback"),
+    href: appSessionHref(session.sessionId),
     label: "세션으로 돌아가기",
     state: readmatesReturnState(returnTarget),
   };
   const feedbackReturnState = readmatesReturnState(feedbackReturnTarget);
 
-  if (!feedback.available) {
-    return (
-      <article className={className} style={style}>
-        <FeedbackCardTitle feedback={feedback} compact={compact} />
-        <p className="small" style={{ margin: "12px 0 0", color: "var(--text-2)" }}>
-          아직 등록된 피드백 문서가 없습니다.
-        </p>
-        <p className="tiny" style={{ margin: "6px 0 0", color: "var(--text-3)" }}>
-          {feedbackAccessCopy(feedback)}
-        </p>
-      </article>
-    );
-  }
-
-  if (!feedback.readable) {
-    return (
-      <article className={className} style={style}>
-        <FeedbackCardTitle feedback={feedback} compact={compact} />
-        <p className="small" style={{ margin: "12px 0 0", color: "var(--text-2)" }}>
-          피드백 문서는 정식 멤버와 참석자에게만 열립니다.
-        </p>
-        <p className="tiny" style={{ margin: "6px 0 0", color: "var(--text-3)" }}>
-          {feedbackAccessCopy(feedback)}
-        </p>
-      </article>
-    );
-  }
-
   return (
     <article className={className} style={style}>
-      <FeedbackCardTitle feedback={feedback} compact={compact} />
+      <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+        피드백
+      </div>
+      <div className="h4 editorial" style={{ marginTop: 6 }}>
+        {feedbackStatusText(feedback)}
+      </div>
+      {feedback.uploadedAt ? (
+        <div className="tiny mono" style={{ color: "var(--text-3)", marginTop: 8 }}>
+          {formatDateOnlyLabel(feedback.uploadedAt)} 등록
+        </div>
+      ) : null}
       <p className="tiny" style={{ margin: "10px 0 0", color: "var(--text-3)" }}>
         {feedbackAccessCopy(feedback)}
       </p>
-      <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: compact ? 12 : 16 }}>
-        <Link to={appFeedbackHref(session.sessionId)} state={feedbackReturnState} className="btn btn-ghost btn-sm">
-          피드백 문서 열기
+      {feedback.available && feedback.readable ? (
+        <Link
+          to={appFeedbackHref(session.sessionId)}
+          state={feedbackReturnState}
+          className="btn btn-ghost btn-sm"
+          style={{ marginTop: 12 }}
+        >
+          피드백 보기
         </Link>
-        <Link to={appFeedbackHref(session.sessionId, true)} state={feedbackReturnState} className="btn btn-quiet btn-sm">
-          PDF 저장
-        </Link>
-      </div>
+      ) : null}
     </article>
-  );
-}
-
-function FeedbackCardTitle({
-  feedback,
-  compact,
-}: {
-  feedback: ArchiveFeedbackDocumentStatus;
-  compact: boolean;
-}) {
-  return (
-    <div>
-      <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-        {feedback.uploadedAt ? `${formatDateOnlyLabel(feedback.uploadedAt)} 등록` : "피드백 문서"}
-      </div>
-      <h3 className={compact ? "h4 editorial" : "h3 editorial"} style={{ margin: "6px 0 0" }}>
-        {feedback.title ?? "피드백 문서"}
-      </h3>
-    </div>
   );
 }
 
@@ -616,24 +649,6 @@ function RailCard({ title, value }: { title: string; value: string }) {
       <div className="h4 editorial" style={{ marginTop: 6 }}>
         {value}
       </div>
-    </article>
-  );
-}
-
-function FeedbackRailCard({ feedback }: { feedback: ArchiveFeedbackDocumentStatus }) {
-  return (
-    <article className={feedbackRailCardClassName(feedback)} style={{ padding: 18 }}>
-      <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-        피드백
-      </div>
-      <div className="h4 editorial" style={{ marginTop: 6 }}>
-        {feedbackStatusText(feedback)}
-      </div>
-      {feedback.uploadedAt ? (
-        <div className="tiny mono" style={{ color: "var(--text-3)", marginTop: 8 }}>
-          {formatDateOnlyLabel(feedback.uploadedAt)} 등록
-        </div>
-      ) : null}
     </article>
   );
 }
