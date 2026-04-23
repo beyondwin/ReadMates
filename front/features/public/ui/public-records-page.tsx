@@ -58,7 +58,7 @@ export default function PublicRecordsPage({
       <section className="page-header">
         <div className="container container-sm">
           <div className="eyebrow" style={{ marginBottom: 14 }}>
-            {display.clubName}
+            기록 아카이브
           </div>
           <h1 className="h1 editorial" style={{ margin: 0 }}>
             {display.showsRecentSubset ? "최근 공개 기록" : "공개 기록"}
