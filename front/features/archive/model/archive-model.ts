@@ -64,6 +64,8 @@ export type FeedbackDocumentListItem = {
   sessionNumber: number;
   title: string;
   bookTitle: string;
+  bookAuthor?: string | null;
+  bookImageUrl?: string | null;
   date: string;
   fileName: string;
   uploadedAt: string;

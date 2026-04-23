@@ -239,7 +239,7 @@ function ArchiveDesktop({
             {view === "sessions" ? <ArchiveSessions sessions={sessions} /> : null}
             {view === "reviews" ? <ArchiveReviews reviews={reviews} /> : null}
             {view === "questions" ? <ArchiveQuestions questions={questions} /> : null}
-            {view === "report" ? <ArchiveReports reports={reports} /> : null}
+            {view === "report" ? <ArchiveReports reports={reports} sessions={sessions} /> : null}
           </ArchiveSelectedSection>
         </div>
       </section>
@@ -299,7 +299,7 @@ function ArchiveMobile({
       {view === "sessions" ? <ArchiveMobileSessions sessions={sessions} /> : null}
       {view === "reviews" ? <ArchiveMobileReviews reviews={reviews} /> : null}
       {view === "questions" ? <ArchiveMobileQuestions questions={questions} /> : null}
-      {view === "report" ? <ArchiveMobileReports reports={reports} /> : null}
+      {view === "report" ? <ArchiveMobileReports reports={reports} sessions={sessions} /> : null}
     </div>
   );
 }
@@ -499,7 +499,16 @@ function ArchiveMobileQuestions({ questions }: { questions: ArchiveQuestionItem[
   );
 }
 
-function ArchiveMobileReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
+function reportBookCoverMeta(report: FeedbackDocumentListItem, sessions: ArchiveSessionRecord[]) {
+  const session = sessions.find((item) => item.id === report.sessionId);
+
+  return {
+    author: report.bookAuthor ?? session?.author ?? null,
+    imageUrl: report.bookImageUrl ?? session?.bookImageUrl ?? null,
+  };
+}
+
+function ArchiveMobileReports({ reports, sessions }: { reports: FeedbackDocumentListItem[]; sessions: ArchiveSessionRecord[] }) {
   if (reports.length === 0) {
     return <MobileEmptyState message="아직 열람 가능한 피드백 문서가 없습니다." />;
   }
@@ -509,23 +518,22 @@ function ArchiveMobileReports({ reports }: { reports: FeedbackDocumentListItem[]
       <div className="m-list">
         {reports.map((report) => {
           const label = `${report.bookTitle} · ${formatDateOnlyLabel(report.date)}`;
+          const cover = reportBookCoverMeta(report, sessions);
 
           return (
             <div key={report.sessionId} className="m-list-row" style={{ gridTemplateColumns: "40px minmax(0, 1fr) auto" }}>
-              <span aria-hidden style={{ color: "var(--accent)", fontSize: 20 }}>
-                ▤
-              </span>
-            <div style={{ minWidth: 0 }}>
-              <div className="body" style={{ fontSize: 14 }}>
-                {label}
+              <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={36} decorative />
+              <div style={{ minWidth: 0 }}>
+                <div className="body" style={{ fontSize: 14 }}>
+                  {label}
+                </div>
+                <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                  No.{String(report.sessionNumber).padStart(2, "0")} · {report.title}
+                </div>
+                <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
+                  {formatDateOnlyLabel(report.uploadedAt)} 등록 · 열람 가능
+                </div>
               </div>
-              <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-                No.{String(report.sessionNumber).padStart(2, "0")} · {report.title}
-              </div>
-              <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
-                {formatDateOnlyLabel(report.uploadedAt)} 등록 · 열람 가능
-              </div>
-            </div>
               <div className="m-row" style={{ gap: 4 }}>
                 <Link
                   className="btn btn-quiet btn-sm"
@@ -741,14 +749,17 @@ function ArchiveQuestions({ questions }: { questions: ArchiveQuestionItem[] }) {
   );
 }
 
-function ArchiveReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
+function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListItem[]; sessions: ArchiveSessionRecord[] }) {
   if (reports.length === 0) {
     return <EmptyState message="아직 열람 가능한 피드백 문서가 없습니다." />;
   }
 
   return (
     <div className="stack" style={{ "--stack": "0px", marginTop: "10px" } as CSSProperties}>
-      {reports.map((report, index) => (
+      {reports.map((report, index) => {
+        const cover = reportBookCoverMeta(report, sessions);
+
+        return (
           <article
             key={report.sessionId}
             style={{
@@ -760,27 +771,7 @@ function ArchiveReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
               alignItems: "center",
             }}
           >
-            <span
-              aria-hidden
-              style={{
-                width: "48px",
-                height: "60px",
-                border: "1px solid var(--line)",
-                borderRadius: "3px",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "var(--bg-sub)",
-                gap: "2px",
-                color: "var(--accent)",
-              }}
-            >
-              ▤
-              <span className="tiny mono" style={{ fontSize: "9px", color: "var(--text-3)" }}>
-                문서
-              </span>
-            </span>
+            <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={48} decorative />
             <div>
               <h2 className="editorial" style={{ fontSize: "16px", margin: 0 }}>
                 {report.bookTitle} · {formatDateOnlyLabel(report.date)}
@@ -791,7 +782,7 @@ function ArchiveReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
               </div>
             </div>
             <Link
-              className="btn btn-ghost btn-sm"
+              className="btn btn-quiet btn-sm"
               to={appFeedbackHref(report.sessionId)}
               state={archiveReturnState("report", "아카이브로 돌아가기")}
               aria-label={feedbackReportActionLabel(report, "읽기")}
@@ -809,7 +800,8 @@ function ArchiveReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
               <ReportActionIcon name="download" />
             </Link>
           </article>
-      ))}
+        );
+      })}
     </div>
   );
 }
