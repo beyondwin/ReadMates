@@ -610,7 +610,7 @@ function MobileBoardSegment({ session }: { session: CurrentSession }) {
         <div className="m-eyebrow-row">
           <span className="eyebrow">질문</span>
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            {session.board.questions.length}
+            {session.board.questions.length}개
           </span>
         </div>
         <MobileQuestionList questions={session.board.questions} />
@@ -620,7 +620,7 @@ function MobileBoardSegment({ session }: { session: CurrentSession }) {
         <div className="m-eyebrow-row">
           <span className="eyebrow">서평</span>
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            {session.board.longReviews.length}
+            {session.board.longReviews.length}개
           </span>
         </div>
         <MobileLongReviewList longReviews={session.board.longReviews} />

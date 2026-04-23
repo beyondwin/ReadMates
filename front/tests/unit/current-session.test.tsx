@@ -599,6 +599,7 @@ describe("CurrentSession", () => {
     await user.click(mobileScope.getByRole("button", { name: "공동 보드" }));
 
     expect(mobileScope.getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "true");
+    expect(mobileScope.getAllByText("1개")).toHaveLength(2);
     expect(mobileScope.getByText("API에서 온 질문")).toBeInTheDocument();
     expect(mobileScope.queryByText(removedLabel("읽기 ", "흔적"))).not.toBeInTheDocument();
     expect(mobileScope.getByText("API에서 온 공동 서평")).toBeVisible();
