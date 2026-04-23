@@ -109,7 +109,7 @@ describe("PublicSessionPage", () => {
     });
 
     expect(await screen.findByRole("link", { name: "← 공개 기록" })).toHaveAttribute("href", "/records");
-    expect(screen.getAllByRole("link", { name: "공개 기록" }).at(-1)).toHaveAttribute("href", "/records");
+    expect(screen.getByRole("link", { name: "공개 기록 →" })).toHaveAttribute("href", "/records");
   });
 
   it("renders a missing state for missing public sessions", async () => {
@@ -176,7 +176,7 @@ describe("PublicSession", () => {
     expect(inviteCta).toHaveAttribute("aria-disabled", "true");
     expect(inviteCta).toHaveTextContent("초대 메일의 개인 링크에서만 열립니다.");
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /^공개 기록$/ }).at(-1)).toHaveAttribute("href", "/records");
+    expect(screen.getByRole("link", { name: "공개 기록 →" })).toHaveAttribute("href", "/records");
     expect(screen.getByText("김호스트")).toBeInTheDocument();
     expect(screen.getByText("김")).toBeInTheDocument();
     expect(screen.queryByText("우")).not.toBeInTheDocument();

@@ -1149,10 +1149,17 @@
 
   .public-session-meta {
     width: 100%;
+    flex-wrap: nowrap;
+    gap: 8px;
   }
 
   .public-session-meta div {
-    flex: 1;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .public-session-meta dt {
+    white-space: nowrap;
   }
 
   .public-session-summary-text {
@@ -1169,11 +1176,6 @@
   .public-document-head {
     display: grid;
     gap: 18px;
-  }
-
-  .public-session-meta div {
-    min-width: 0;
-    flex: 1 1 128px;
   }
 
   .public-note-oneliner-grid {
