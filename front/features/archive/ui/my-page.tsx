@@ -247,28 +247,69 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
         </div>
       ) : (
         <div className="m-list">
-          {recentReports.map((report) => (
-            <div key={report.sessionId} className="m-list-row" style={{ gridTemplateColumns: "32px minmax(0, 1fr) auto" }}>
-              <span aria-hidden style={{ color: "var(--text-2)", fontSize: 18 }}>
-                <Icon name="notes" size={18} />
-              </span>
-              <div style={{ minWidth: 0 }}>
-                <div className="body" style={{ fontSize: 14 }}>
-                  {report.bookTitle}
+          {recentReports.map((report) => {
+            const readHref = appFeedbackHref(report.sessionId);
+            const readLabel = feedbackReportActionLabel(report, "읽기");
+            const feedbackDocumentLinkStyle: CSSProperties = {
+              display: "grid",
+              gridTemplateColumns: "32px minmax(0, 1fr) auto",
+              gap: 14,
+              alignItems: "center",
+              minWidth: 0,
+              color: "inherit",
+              textDecoration: "none",
+            };
+            const feedbackDocumentLinkContent = (
+              <>
+                <span aria-hidden style={{ color: "var(--text-2)", fontSize: 18 }}>
+                  <Icon name="notes" size={18} />
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <div className="body" style={{ fontSize: 14 }}>
+                    {report.bookTitle}
+                  </div>
+                  <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                    No.{String(report.sessionNumber).padStart(2, "0")} · {formatDateOnlyLabel(report.date)}
+                  </div>
                 </div>
-                <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-                  No.{String(report.sessionNumber).padStart(2, "0")} · {formatDateOnlyLabel(report.date)}
-                </div>
-              </div>
-              <div className="m-row" style={{ gap: 4 }}>
-                <Link
-                  className="btn btn-quiet btn-sm"
-                  to={appFeedbackHref(report.sessionId)}
-                  state={myPageReturnState}
-                  aria-label={feedbackReportActionLabel(report, "읽기")}
-                  title={feedbackReportActionLabel(report, "읽기")}
-                >
+                <span className="btn btn-quiet btn-sm" aria-hidden="true">
                   <Icon name="chevron-right" size={12} />
+                </span>
+              </>
+            );
+
+            if (!feedbackDocumentPdfDownloadsEnabled) {
+              return (
+                <Link
+                  key={report.sessionId}
+                  className="m-list-row"
+                  to={readHref}
+                  state={myPageReturnState}
+                  aria-label={readLabel}
+                  title={readLabel}
+                  style={feedbackDocumentLinkStyle}
+                >
+                  {feedbackDocumentLinkContent}
+                </Link>
+              );
+            }
+
+            return (
+              <div
+                key={report.sessionId}
+                className="m-list-row"
+                style={{
+                  gridTemplateColumns: feedbackDocumentPdfDownloadsEnabled ? "minmax(0, 1fr) auto" : "minmax(0, 1fr)",
+                }}
+              >
+                <Link
+                  to={readHref}
+                  state={myPageReturnState}
+                  aria-label={readLabel}
+                  title={readLabel}
+                  style={feedbackDocumentLinkStyle}
+                >
+                  {feedbackDocumentLinkContent}
                 </Link>
                 {feedbackDocumentPdfDownloadsEnabled ? (
                   <Link
@@ -282,8 +323,8 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
                   </Link>
                 ) : null}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
