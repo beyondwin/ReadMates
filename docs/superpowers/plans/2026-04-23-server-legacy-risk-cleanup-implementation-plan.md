@@ -207,21 +207,27 @@ git commit -m "refactor: replace archive legacy query bridge"
   - `server/src/test/kotlin/com/readmates/feedback/api/*`
   - `server/src/test/kotlin/com/readmates/auth/api/ViewerSecurityTest.kt`
 
-- [ ] **Step 1: Move feedback SQL into a persistence adapter**
+- [x] **Step 1: Move feedback SQL into a persistence adapter**
 
 Create `JdbcFeedbackDocumentStoreAdapter` under `feedback.adapter.out.persistence` implementing `FeedbackDocumentStorePort`.
 
 Move the current `FeedbackDocumentRepository` SQL and row mapping into the adapter without changing parser or service behavior.
 
-- [ ] **Step 2: Remove transitional wrapper and application repository**
+- Result: created `JdbcFeedbackDocumentStoreAdapter` under `feedback.adapter.out.persistence` implementing `FeedbackDocumentStorePort`. Existing feedback document SQL, row mapping, unavailable-storage behavior, and version/upload behavior were moved intact into the adapter.
+
+- [x] **Step 2: Remove transitional wrapper and application repository**
 
 Delete `LegacyFeedbackDocumentAdapter` and `FeedbackDocumentRepository` once the new adapter is wired and tests pass.
 
-- [ ] **Step 3: Keep application service unchanged except constructor type**
+- Result: deleted `LegacyFeedbackDocumentAdapter` and `FeedbackDocumentRepository`.
+
+- [x] **Step 3: Keep application service unchanged except constructor type**
 
 `FeedbackDocumentService` should continue to depend only on `FeedbackDocumentStorePort`. It should not import Spring JDBC, adapter packages, or repository classes.
 
-- [ ] **Step 4: Validate feedback behavior**
+- Result: `FeedbackDocumentService` already depended only on `FeedbackDocumentStorePort`; no service changes were needed.
+
+- [x] **Step 4: Validate feedback behavior**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.feedback.*'
@@ -232,12 +238,20 @@ rg -n "JdbcTemplate|query\\(|queryForObject" server/src/main/kotlin/com/readmate
 
 Expected: no `JdbcTemplate`, `query(`, or `queryForObject` hits under `feedback.application`.
 
-- [ ] **Step 5: Commit feedback bridge removal**
+- Result: validation passed.
+  - `./server/gradlew -p server test --tests 'com.readmates.feedback.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 4 executed, 2 up-to-date).
+  - `./server/gradlew -p server test --tests 'com.readmates.auth.api.ViewerSecurityTest'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - `./server/gradlew -p server test --tests 'com.readmates.architecture.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - `rg -n "JdbcTemplate|query\\(|queryForObject" server/src/main/kotlin/com/readmates/feedback/application` returned no hits.
+
+- [x] **Step 5: Commit feedback bridge removal**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/auth docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
 git commit -m "refactor: replace feedback document legacy bridge"
 ```
+
+- Result: Task 2 changes committed by the implementation worker with message `refactor: replace feedback document legacy bridge`.
 
 ## Task 3: Migrate Notes Feed Legacy API
 
