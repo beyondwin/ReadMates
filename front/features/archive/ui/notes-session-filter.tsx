@@ -194,8 +194,8 @@ export function MobileSessionPicker({
     <div className="mobile-only rm-notes-feed-page__mobile-picker">
       <div className="row-between" style={{ marginBottom: "10px" }}>
         <span className="eyebrow">세션별</span>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onOpenAll} ref={allSessionsButtonRef}>
-          세션 목록
+        <button type="button" className="btn btn-quiet btn-sm" onClick={onOpenAll} ref={allSessionsButtonRef} style={{ border: 0 }}>
+          세션 목록 -&gt;
         </button>
       </div>
       {noteSessions.length === 0 ? (
