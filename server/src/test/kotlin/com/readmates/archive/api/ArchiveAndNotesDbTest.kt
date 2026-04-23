@@ -478,15 +478,29 @@ class ArchiveAndNotesDbTest(
     }
 
     @Test
-    fun `my archive reviews returns current member one-liners`() {
+    @Sql(
+        statements = [
+            CLEANUP_MY_ARCHIVE_LONG_REVIEW_SQL,
+            INSERT_MY_ARCHIVE_LONG_REVIEW_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_MY_ARCHIVE_LONG_REVIEW_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `my archive reviews returns current member long reviews and excludes one-liners`() {
         mockMvc.get("/api/archive/me/reviews") {
             with(user("member5@example.com"))
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].kind") { value("ONE_LINE_REVIEW") }
+                jsonPath("$[*].kind") { value(not(hasItem("ONE_LINE_REVIEW"))) }
+                jsonPath("$[0].kind") { value("LONG_REVIEW") }
                 jsonPath("$[0].bookTitle") { exists() }
-                jsonPath("$[0].text") { exists() }
+                jsonPath("$[0].text") { value(MY_ARCHIVE_LONG_REVIEW_TEXT) }
             }
     }
 
@@ -761,6 +775,37 @@ class ArchiveAndNotesDbTest(
 
         private const val PUBLIC_NOTE_FEED_LONG_REVIEW_TEXT = "공개 서평은 클럽 노트에서 함께 읽을 수 있습니다."
         private const val PRIVATE_NOTE_FEED_LONG_REVIEW_TEXT = "비공개 서평은 클럽 노트에서 제외됩니다."
+        private const val MY_ARCHIVE_LONG_REVIEW_TEXT = "아카이브 내 서평은 장문 서평 입력폼에서 저장한 글입니다."
+        private const val CLEANUP_MY_ARCHIVE_LONG_REVIEW_SQL = """
+            delete from long_reviews
+            where id = '00000000-0000-0000-0000-000000008301';
+        """
+        private const val INSERT_MY_ARCHIVE_LONG_REVIEW_SQL = """
+            insert into long_reviews (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              body,
+              visibility,
+              created_at,
+              updated_at
+            )
+            select
+              '00000000-0000-0000-0000-000000008301',
+              sessions.club_id,
+              sessions.id,
+              memberships.id,
+              '$MY_ARCHIVE_LONG_REVIEW_TEXT',
+              'PRIVATE',
+              '2030-01-05 00:00:00.000000',
+              '2030-01-05 00:00:00.000000'
+            from sessions
+            join users on users.email = 'member5@example.com'
+            join memberships on memberships.club_id = sessions.club_id
+              and memberships.user_id = users.id
+            where sessions.id = '00000000-0000-0000-0000-000000000306';
+        """
         private const val CLEANUP_NOTE_FEED_LONG_REVIEWS_SQL = """
             delete from long_reviews
             where id in (

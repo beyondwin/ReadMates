@@ -593,7 +593,7 @@ function WritingSection({ reviewCount, questionCount }: { reviewCount: number; q
       <div style={{ padding: "4px 0", borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "18px" }}>
           <WritingCountCard label="질문" value={questionCount} body="모임 전에 꺼낸 질문과 초안" href="/app/archive?view=questions" />
-          <WritingCountCard label="서평" value={reviewCount} body="한줄평과 장문 서평" href="/app/archive?view=reviews" />
+          <WritingCountCard label="서평" value={reviewCount} body="회차별로 남긴 장문 서평" href="/app/archive?view=reviews" />
         </div>
       </div>
     </section>

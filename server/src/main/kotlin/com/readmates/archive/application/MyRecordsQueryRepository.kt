@@ -47,43 +47,20 @@ class MyRecordsQueryRepository(
     fun findMyReviews(currentMember: CurrentMember): List<MyArchiveReviewItem> =
         jdbcTemplateProvider.ifAvailable?.query(
             """
-            select session_id, session_number, book_title, session_date, kind, text
-            from (
-              select
-                sessions.id as session_id,
-                sessions.number as session_number,
-                sessions.book_title as book_title,
-                sessions.session_date as session_date,
-                'ONE_LINE_REVIEW' as kind,
-                one_line_reviews.text as text,
-                one_line_reviews.created_at as created_at,
-                10 as item_order
-              from one_line_reviews
-              join sessions on sessions.id = one_line_reviews.session_id
-                and sessions.club_id = one_line_reviews.club_id
-              where one_line_reviews.club_id = ?
-                and one_line_reviews.membership_id = ?
-                and sessions.state = 'PUBLISHED'
-
-              union all
-
-              select
-                sessions.id as session_id,
-                sessions.number as session_number,
-                sessions.book_title as book_title,
-                sessions.session_date as session_date,
-                'LONG_REVIEW' as kind,
-                long_reviews.body as text,
-                long_reviews.created_at as created_at,
-                20 as item_order
-              from long_reviews
-              join sessions on sessions.id = long_reviews.session_id
-                and sessions.club_id = long_reviews.club_id
-              where long_reviews.club_id = ?
-                and long_reviews.membership_id = ?
-                and sessions.state = 'PUBLISHED'
-            ) reviews
-            order by session_number desc, item_order, created_at desc
+            select
+              sessions.id as session_id,
+              sessions.number as session_number,
+              sessions.book_title as book_title,
+              sessions.session_date as session_date,
+              'LONG_REVIEW' as kind,
+              long_reviews.body as text
+            from long_reviews
+            join sessions on sessions.id = long_reviews.session_id
+              and sessions.club_id = long_reviews.club_id
+            where long_reviews.club_id = ?
+              and long_reviews.membership_id = ?
+              and sessions.state = 'PUBLISHED'
+            order by sessions.number desc, long_reviews.created_at desc
             """.trimIndent(),
             { resultSet, _ ->
                 MyArchiveReviewItem(
@@ -95,8 +72,6 @@ class MyRecordsQueryRepository(
                     text = resultSet.getString("text"),
                 )
             },
-            currentMember.clubId.dbString(),
-            currentMember.membershipId.dbString(),
             currentMember.clubId.dbString(),
             currentMember.membershipId.dbString(),
         ) ?: emptyList()

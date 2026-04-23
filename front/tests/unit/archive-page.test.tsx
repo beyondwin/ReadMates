@@ -119,7 +119,7 @@ const seededReviews: MyArchiveReviewItem[] = [
     sessionNumber: 6,
     bookTitle: "가난한 찰리의 연감",
     date: "2026-04-15",
-    kind: "ONE_LINE_REVIEW",
+    kind: "LONG_REVIEW",
     text: "내가 모르는 영역을 인정하는 태도가 가장 현실적인 지혜처럼 느껴졌다.",
   },
 ];
@@ -850,7 +850,7 @@ describe("ArchivePage", () => {
         sessionNumber: 7,
         bookTitle: "URL 책",
         date: "2026-05-20",
-        kind: "ONE_LINE_REVIEW",
+        kind: "LONG_REVIEW",
         text: "링크 인코딩을 확인한다.",
       },
     ];

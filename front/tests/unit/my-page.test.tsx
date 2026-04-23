@@ -157,7 +157,7 @@ describe("MyPage", () => {
     expect(scoped.getByText("· 전체 1개")).toBeInTheDocument();
     expect(scoped.getByText("내가 남긴 문장")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: /모임 전에 꺼낸 질문과 초안/ })).toHaveAttribute("href", "/app/archive?view=questions");
-    expect(scoped.getByRole("link", { name: /한줄평과 장문 서평/ })).toHaveAttribute("href", "/app/archive?view=reviews");
+    expect(scoped.getByRole("link", { name: /회차별로 남긴 장문 서평/ })).toHaveAttribute("href", "/app/archive?view=reviews");
     expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
     expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveClass("btn", "btn-quiet", "btn-sm");
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();

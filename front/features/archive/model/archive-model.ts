@@ -55,7 +55,7 @@ export type ArchiveReviewItem = {
   sessionNumber: number;
   bookTitle: string;
   date: string;
-  kind: "ONE_LINE_REVIEW" | "LONG_REVIEW";
+  kind: "LONG_REVIEW";
   text: string;
 };
 
