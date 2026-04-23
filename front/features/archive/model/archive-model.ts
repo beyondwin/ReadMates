@@ -92,7 +92,7 @@ export type MemberArchiveSessionDetail = {
   myLongReview: unknown | null;
   publicHighlights: readonly unknown[];
   clubQuestions: readonly unknown[];
-  clubCheckins: readonly unknown[];
+  clubOneLiners: readonly unknown[];
   publicOneLiners: readonly unknown[];
 };
 
@@ -110,10 +110,7 @@ export type MemberArchiveQuestionItem = {
 };
 
 export type MemberArchiveCheckinItem = {
-  authorName: string;
-  authorShortName: string;
   readingProgress: number;
-  note: string;
 };
 
 export type MemberArchiveOneLinerItem = {
@@ -147,7 +144,7 @@ export type MemberArchiveSessionDetailResponse = {
   publicSummary: string | null;
   publicHighlights: MemberArchiveHighlightItem[];
   clubQuestions: MemberArchiveQuestionItem[];
-  clubCheckins: MemberArchiveCheckinItem[];
+  clubOneLiners: MemberArchiveOneLinerItem[];
   publicOneLiners: MemberArchiveOneLinerItem[];
   myQuestions: MemberArchiveQuestionItem[];
   myCheckin: MemberArchiveCheckinItem | null;
@@ -446,12 +443,7 @@ export function feedbackRailCardClassName(feedbackDocument: ArchiveFeedbackDocum
 }
 
 export function hasClubRecords(session: MemberArchiveSessionDetail) {
-  return (
-    session.publicHighlights.length > 0 ||
-    session.clubQuestions.length > 0 ||
-    session.clubCheckins.length > 0 ||
-    session.publicOneLiners.length > 0
-  );
+  return session.publicHighlights.length > 0 || session.clubQuestions.length > 0 || session.clubOneLiners.length > 0;
 }
 
 export function hasMyRecords(session: MemberArchiveSessionDetail) {

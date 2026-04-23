@@ -365,11 +365,8 @@ class ArchiveSessionQueryRepository(
     ): MemberArchiveCheckinItem? =
         jdbcTemplate.query(
             """
-            select users.name as author_name, reading_checkins.reading_progress
+            select reading_checkins.reading_progress
             from reading_checkins
-            join memberships on memberships.id = reading_checkins.membership_id
-              and memberships.club_id = reading_checkins.club_id
-            join users on users.id = memberships.user_id
             join session_participants on session_participants.session_id = reading_checkins.session_id
               and session_participants.club_id = reading_checkins.club_id
               and session_participants.membership_id = reading_checkins.membership_id
@@ -379,10 +376,7 @@ class ArchiveSessionQueryRepository(
               and reading_checkins.membership_id = ?
             """.trimIndent(),
             { resultSet, _ ->
-                val authorName = resultSet.getString("author_name")
                 MemberArchiveCheckinItem(
-                    authorName = authorName,
-                    authorShortName = shortNameFor(authorName),
                     readingProgress = resultSet.getInt("reading_progress"),
                 )
             },

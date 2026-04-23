@@ -246,7 +246,7 @@ export function MobileCurrentSessionCard({
           <div className="m-card-quiet" role="note" style={{ marginTop: 12 }}>
             <div className="eyebrow">둘러보기 멤버</div>
             <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-              정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
+              정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성이 열립니다.
             </p>
           </div>
         ) : null}
@@ -340,7 +340,7 @@ export function MobileTodayActions({
       </div>
       <div className="m-action-grid">
         <MobileActionTile label="RSVP" sub={rsvpLabel(session.myRsvpStatus)} href="/app/session/current" icon="01" />
-        <MobileActionTile label="읽기 체크인" sub={`${readingProgress}%`} href="/app/session/current" icon="02" />
+        <MobileActionTile label="읽기 진행률" sub={`${readingProgress}%`} href="/app/session/current" icon="02" />
         <MobileActionTile label="질문 쓰기" sub={`${session.myQuestions.length}/5 작성`} href="/app/session/current" icon="03" />
         <MobileActionTile
           label="한줄평"

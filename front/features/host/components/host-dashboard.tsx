@@ -82,20 +82,27 @@ export type HostDashboardActions = {
 
 const newSessionHref = "/app/host/sessions/new";
 
-function memberSessionState(session: CurrentSession, member: CurrentSession["attendees"][number]) {
+function memberSessionState(
+  session: CurrentSession,
+  member: CurrentSession["attendees"][number],
+  currentMembershipId: string | null | undefined,
+) {
   const rsvp = rsvpLabel(member.rsvpStatus);
 
   if (member.rsvpStatus === "NO_RESPONSE" || member.rsvpStatus === "DECLINED") {
     return rsvp;
   }
 
-  const checkin = session.board.checkins.find(
-    (item) => item.authorName === member.displayName || item.authorShortName === member.shortName,
-  );
-  const progress = checkin?.readingProgress;
-  const progressLabel = typeof progress === "number" ? (progress >= 100 ? "완독" : `${progress}%`) : "대기";
+  if (member.membershipId !== currentMembershipId) {
+    return rsvp;
+  }
 
-  return `${rsvp} · ${progressLabel}`;
+  const progress = session.myCheckin?.readingProgress;
+  if (typeof progress !== "number") {
+    return rsvp;
+  }
+
+  return `${rsvp} · ${progress >= 100 ? "완독" : `${progress}%`}`;
 }
 
 function hostAlertMetrics(data: HostDashboardResponse): Array<{
@@ -116,11 +123,11 @@ function hostAlertMetrics(data: HostDashboardResponse): Array<{
       tone: "warn",
     },
     {
-      desktopLabel: "체크인 미작성",
-      mobileLabel: "체크인 미작성",
+      desktopLabel: "진행률 미작성",
+      mobileLabel: "진행률 미작성",
       value: nonNegativeCount(data.checkinMissing),
-      desktopHint: "작성 현황 확인",
-      mobileHint: "작성 현황 확인",
+      desktopHint: "읽기 상태 확인",
+      mobileHint: "읽기 상태 확인",
       tone: "default",
     },
     {
@@ -377,7 +384,7 @@ export default function HostDashboard({
                         </p>
                       ) : (
                         session.attendees.map((member) => {
-                          const state = memberSessionState(session, member);
+                          const state = memberSessionState(session, member, auth?.membershipId);
                           const warn = member.rsvpStatus === "NO_RESPONSE";
 
                           return (
@@ -443,6 +450,7 @@ export default function HostDashboard({
         onMissingMemberResolved={resolveMissingMember}
         phase={phase}
         nextAction={nextAction}
+        currentMembershipId={auth?.membershipId}
       />
     </>
   );
@@ -461,6 +469,7 @@ function MobileHostDashboard({
   onMissingMemberResolved,
   phase,
   nextAction,
+  currentMembershipId,
 }: {
   hostName: string;
   session: CurrentSession | null;
@@ -474,6 +483,7 @@ function MobileHostDashboard({
   onMissingMemberResolved: (membershipId: string) => void;
   phase: SessionPhase;
   nextAction: NextOperationAction;
+  currentMembershipId: string | null | undefined;
 }) {
   const mobileAlerts = hostAlertMetrics(data);
 
@@ -658,7 +668,7 @@ function MobileHostDashboard({
         ) : (
           <div className="m-list">
             {session.attendees.map((member) => {
-              const state = memberSessionState(session, member);
+              const state = memberSessionState(session, member, currentMembershipId);
               const warn = member.rsvpStatus === "NO_RESPONSE";
 
               return (

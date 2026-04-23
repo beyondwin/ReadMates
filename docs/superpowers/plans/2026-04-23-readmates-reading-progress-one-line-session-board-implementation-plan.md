@@ -1375,7 +1375,7 @@ git commit -m "feat: show participant one-liners in current session"
 - Test: `front/tests/unit/member-session-detail-page.test.tsx`
 - Test: `front/tests/unit/host-dashboard.test.tsx`
 
-- [ ] **Step 1: Update notes feed UI tests first**
+- [x] **Step 1: Update notes feed UI tests first**
 
 In `notes-feed-page.test.tsx`, remove expectations for `읽기 흔적 5` and add:
 
@@ -1386,7 +1386,7 @@ expect(screen.queryByText("읽기 흔적 5")).not.toBeInTheDocument();
 
 Update record totals that previously included checkins by subtracting `checkinCount`.
 
-- [ ] **Step 2: Update member archive detail tests first**
+- [x] **Step 2: Update member archive detail tests first**
 
 In `member-session-detail-page.test.tsx`, replace checkin list expectations with:
 
@@ -1395,7 +1395,7 @@ expect(screen.queryByText("체크인")).not.toBeInTheDocument();
 expect(screen.getByText("낙관이 아니라 정확함의 문제였다.")).toBeInTheDocument();
 ```
 
-- [ ] **Step 3: Run focused frontend surface tests and verify failures**
+- [x] **Step 3: Run focused frontend surface tests and verify failures**
 
 Run:
 
@@ -1410,7 +1410,7 @@ pnpm --dir front exec vitest run \
 
 Expected: FAIL because surfaces still render checkin feed labels and archive checkin records.
 
-- [ ] **Step 4: Remove CHECKIN from member home feed labels**
+- [x] **Step 4: Remove CHECKIN from member home feed labels**
 
 In `member-home-records.tsx`, remove the `CHECKIN` branch from `noteKindLabel`. For unknown kinds, keep:
 
@@ -1430,7 +1430,7 @@ where:
 const readingProgress = session?.myCheckin ? 1 : 0;
 ```
 
-- [ ] **Step 5: Update member current session prep labels**
+- [x] **Step 5: Update member current session prep labels**
 
 In `member-home-current-session.tsx`, change the prep step label:
 
@@ -1449,7 +1449,7 @@ Change action tile label:
 <MobileActionTile label="읽기 진행률" sub={`${readingProgress}%`} href="/app/session/current" icon="02" />
 ```
 
-- [ ] **Step 6: Remove checkin filter and section from notes feed**
+- [x] **Step 6: Remove checkin filter and section from notes feed**
 
 In `notes-feed-list.tsx`, remove `FeedCheckins` and the render line:
 
@@ -1465,7 +1465,7 @@ Update header copy in `notes-feed-page.tsx`:
 
 In `notes-session-filter.tsx`, ensure summary text no longer references `checkinCount`. Use `sessionRecordSummary(session)` from the model.
 
-- [ ] **Step 7: Update archive model helpers**
+- [x] **Step 7: Update archive model helpers**
 
 In `archive-model.ts`, update `MemberArchiveSessionDetail`:
 
@@ -1488,7 +1488,7 @@ Update `hasClubRecords` to use:
 return session.publicHighlights.length > 0 || session.clubQuestions.length > 0 || session.clubOneLiners.length > 0;
 ```
 
-- [ ] **Step 8: Update archive detail UI**
+- [x] **Step 8: Update archive detail UI**
 
 In `member-session-detail-page.tsx`, update `ClubRecords` desktop groups:
 
@@ -1532,7 +1532,7 @@ function ReadingProgressRecord({ checkin }: { checkin: MemberArchiveCheckinItem 
 
 Delete `CheckinList`.
 
-- [ ] **Step 9: Update host dashboard copy**
+- [x] **Step 9: Update host dashboard copy**
 
 In `host-dashboard-model.ts`, change session metric label:
 
@@ -1556,7 +1556,7 @@ desktopHint: "읽기 상태 확인",
 mobileHint: "읽기 상태 확인",
 ```
 
-- [ ] **Step 10: Run focused frontend surface tests**
+- [x] **Step 10: Run focused frontend surface tests**
 
 Run:
 
@@ -1571,7 +1571,7 @@ pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit frontend surface cleanup**
+- [x] **Step 11: Commit frontend surface cleanup**
 
 Run:
 

@@ -73,8 +73,8 @@ class ArchiveControllerDbTest(
                 jsonPath("$.myQuestions[0].draftThought") { value(null) }
                 jsonPath("$.myQuestions[*].authorName") { value(hasItem("이멤버5")) }
                 jsonPath("$.myQuestions[*].authorShortName") { value(hasItem("멤버5")) }
-                jsonPath("$.myCheckin.authorName") { value("이멤버5") }
-                jsonPath("$.myCheckin.authorShortName") { value("멤버5") }
+                jsonPath("$.myCheckin.authorName") { doesNotExist() }
+                jsonPath("$.myCheckin.authorShortName") { doesNotExist() }
                 jsonPath("$.myCheckin.readingProgress") { value(100) }
                 jsonPath("$.myCheckin.note") { doesNotExist() }
                 jsonPath("$.myOneLineReview.text") { exists() }

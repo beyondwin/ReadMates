@@ -89,8 +89,6 @@ data class MemberArchiveQuestionItem(
 )
 
 data class MemberArchiveCheckinItem(
-    val authorName: String,
-    val authorShortName: String,
     val readingProgress: Int,
 )
 
