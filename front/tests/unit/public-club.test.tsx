@@ -96,6 +96,29 @@ describe("PublicClub", () => {
     );
   });
 
+  it("shows only the latest three public records with book thumbnails in the about list", () => {
+    const sessions = [6, 5, 4, 3].map((sessionNumber) => ({
+      ...publicClubFixture.recentSessions[0],
+      sessionId: `session-${sessionNumber}`,
+      sessionNumber,
+      bookTitle: `Book ${sessionNumber}`,
+      bookImageUrl: `https://example.com/book-${sessionNumber}.jpg`,
+    }));
+
+    render(<PublicClub data={{ ...publicClubFixture, recentSessions: sessions }} />);
+
+    const recordList = document.querySelector(".public-record-list") as HTMLElement;
+    const scoped = within(recordList);
+
+    expect(scoped.getAllByRole("link")).toHaveLength(3);
+    expect(scoped.getByText("Book 6")).toBeInTheDocument();
+    expect(scoped.getByText("Book 5")).toBeInTheDocument();
+    expect(scoped.getByText("Book 4")).toBeInTheDocument();
+    expect(scoped.queryByText("Book 3")).not.toBeInTheDocument();
+    expect(recordList).not.toHaveTextContent("No.6");
+    expect(recordList.querySelectorAll(".public-archive-row__cover img")).toHaveLength(3);
+  });
+
   it("renders a neutral public introduction fallback when API about is blank", () => {
     const { container } = render(<PublicClub data={{ ...publicClubFixture, about: "   " }} />);
 
