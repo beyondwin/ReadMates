@@ -135,8 +135,8 @@ const seededReports: FeedbackDocumentListItem[] = [
     uploadedAt: "2026-04-20T09:00:00Z",
   },
 ];
-const seededReportReadLabel = "No.01 팩트풀니스 · 독서모임 1차 피드백 읽기";
-const seededReportPdfLabel = "No.01 팩트풀니스 · 독서모임 1차 피드백 PDF로 저장";
+const seededReportReadLabel = "No.01 팩트풀니스 피드백 문서 읽기";
+const seededReportPdfLabel = "No.01 팩트풀니스 피드백 문서 PDF로 저장";
 
 function getDesktop(container: HTMLElement) {
   const desktop = container.querySelector(".desktop-only");
@@ -218,10 +218,13 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("2026")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
-    expect(desktop.getByLabelText("No.06 · 지난 회차 · 공개됨")).toBeInTheDocument();
+    expect(desktop.getByLabelText("No.06 · 04.15")).toBeInTheDocument();
+    expect(desktop.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(desktop.queryByText("공개됨")).not.toBeInTheDocument();
+    expect(desktop.queryByText("문서 있음")).not.toBeInTheDocument();
     expect(desktop.getAllByText("공개 기록")).toHaveLength(seededSessions.length);
-    expect(desktop.getByText("피드백 문서 있음")).toBeInTheDocument();
-    expect(desktop.getAllByText("피드백 문서 없음").length).toBe(seededSessions.length - 1);
+    expect(desktop.getByText("피드백 있음")).toBeInTheDocument();
+    expect(desktop.getAllByText("피드백 없음").length).toBe(seededSessions.length - 1);
   });
 
   it("shows locked feedback status from archive session metadata without readable reports", () => {
@@ -244,7 +247,7 @@ describe("ArchivePage", () => {
 
     for (const scope of [desktop, mobile]) {
       expect(scope.getByText("피드백 잠김")).toBeInTheDocument();
-      expect(scope.queryByText("피드백 문서 없음")).not.toBeInTheDocument();
+      expect(scope.queryByText("피드백 없음")).not.toBeInTheDocument();
       expect(scope.getByLabelText("등록된 피드백 문서가 있지만 이 계정에는 열람 권한이 없습니다.")).toBeInTheDocument();
     }
   });
@@ -340,12 +343,16 @@ describe("ArchivePage", () => {
     expect(scoped.queryByText("My questions")).not.toBeInTheDocument();
     expect(mobile?.querySelectorAll(".rm-archive-session-card.m-card")).toHaveLength(6);
     expect(scoped.getByText("No.06 · 2026.04.15")).toBeInTheDocument();
-    expect(scoped.getByLabelText("No.06 · 지난 회차 · 공개됨")).toBeInTheDocument();
+    const latestSessionCard = scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" });
+    expect(within(latestSessionCard).getAllByText(/^No\.06/)).toHaveLength(1);
+    expect(scoped.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(scoped.queryByText("공개됨")).not.toBeInTheDocument();
+    expect(scoped.queryByText("문서 있음")).not.toBeInTheDocument();
     expect(scoped.getByText("가난한 찰리의 연감")).toBeInTheDocument();
-    expect(scoped.getAllByText("공개 기록")).toHaveLength(seededSessions.length);
-    expect(scoped.getByText("피드백 문서 있음")).toBeInTheDocument();
-    expect(scoped.getAllByText("피드백 문서 없음").length).toBe(seededSessions.length - 1);
-    expect(scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" })).toHaveAttribute(
+    expect(scoped.getAllByText("공개")).toHaveLength(seededSessions.length);
+    expect(scoped.getByText("피드백 있음")).toBeInTheDocument();
+    expect(scoped.getAllByText("피드백 없음").length).toBe(seededSessions.length - 1);
+    expect(latestSessionCard).toHaveAttribute(
       "href",
       "/app/sessions/session-6",
     );
@@ -378,7 +385,7 @@ describe("ArchivePage", () => {
     await user.click(scoped.getByRole("button", { name: "내 질문" }));
     expect(scoped.getByRole("button", { name: "내 질문" })).toHaveClass("is-on");
     expect(scoped.getByRole("button", { name: "내 질문" })).toHaveAttribute("aria-pressed", "true");
-    expect(scoped.getByText("Q1 · 2025.11.26")).toBeInTheDocument();
+    expect(scoped.getByText("Q1 · 2025.11.26")).toHaveStyle({ color: "var(--text-3)" });
     expect(scoped.getByText("데이터 기반 사고가 일상 판단과 멀어지는 순간을 묻는다.")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: "Q1 팩트풀니스 세션으로" })).toHaveAttribute(
       "href",
@@ -388,8 +395,11 @@ describe("ArchivePage", () => {
     await user.click(scoped.getByRole("button", { name: "피드백 문서" }));
     expect(scoped.getByRole("button", { name: "피드백 문서" })).toHaveClass("is-on");
     expect(scoped.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
-    expect(scoped.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
-    expect(scoped.getByText("팩트풀니스 · 2025.11.26").closest(".m-list-row")?.querySelector("img")).toHaveAttribute(
+    expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
+    expect(scoped.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
+    expect(scoped.getByText("2026.04.20 등록")).toBeInTheDocument();
+    expect(scoped.queryByText("독서모임 1차 피드백")).not.toBeInTheDocument();
+    expect(scoped.getByText("팩트풀니스").closest(".m-list-row")?.querySelector("img")).toHaveAttribute(
       "src",
       "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
     );
@@ -425,7 +435,8 @@ describe("ArchivePage", () => {
     await user.keyboard("{End}");
 
     expect(desktop.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
-    expect(desktop.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
+    expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
+    expect(desktop.getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
   });
 
   it("uses contextual session actions only for available app session routes", () => {
@@ -556,7 +567,7 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("공개 기록")).not.toBeInTheDocument();
     expect(mobile.queryByText("공개 기록")).not.toBeInTheDocument();
     expect(desktop.getByText("비공개 기록")).toBeInTheDocument();
-    expect(mobile.getByText("비공개 기록")).toBeInTheDocument();
+    expect(mobile.getByText("비공개")).toBeInTheDocument();
   });
 
   it("switches archive tabs to reviews, questions, and feedback document listings", async () => {
@@ -577,7 +588,8 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("맡겨진 소녀")).not.toBeInTheDocument();
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
-    expect(desktop.getByText("저장된 질문 Q1 · 2025.11.26")).toBeInTheDocument();
+    expect(desktop.getByText("Q1 · 2025.11.26")).toHaveStyle({ color: "var(--text-3)" });
+    expect(desktop.queryByText("저장된 질문 Q1 · 2025.11.26")).not.toBeInTheDocument();
     expect(desktop.getByText("10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?")).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "Q1 팩트풀니스 세션으로" })).toHaveAttribute(
       "href",
@@ -585,9 +597,10 @@ describe("ArchivePage", () => {
     );
 
     await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
-    expect(desktop.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
-    expect(desktop.getByText("2026.04.20 등록")).toBeInTheDocument();
-    expect(desktop.getByText("팩트풀니스 · 2025.11.26").closest("article")?.querySelector("img")).toHaveAttribute(
+    expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
+    expect(desktop.getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
+    expect(desktop.queryByText("독서모임 1차 피드백")).not.toBeInTheDocument();
+    expect(desktop.getByText("팩트풀니스").closest("article")?.querySelector("img")).toHaveAttribute(
       "src",
       "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
     );
@@ -634,11 +647,11 @@ describe("ArchivePage", () => {
     expect(desktop.queryByRole("link", { name: "PDF로 저장" })).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: seededReportReadLabel })).toHaveAttribute("href", "/app/feedback/session-1");
     expect(desktop.getByRole("link", { name: seededReportPdfLabel })).toHaveAttribute("href", "/app/feedback/session-1/print");
-    expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 · 독서모임 2차 피드백 읽기" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 피드백 문서 읽기" })).toHaveAttribute(
       "href",
       "/app/feedback/session-2",
     );
-    expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 · 독서모임 2차 피드백 PDF로 저장" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "No.02 냉정한 이타주의자 피드백 문서 PDF로 저장" })).toHaveAttribute(
       "href",
       "/app/feedback/session-2/print",
     );
@@ -686,7 +699,8 @@ describe("ArchivePage", () => {
     const desktop = getDesktop(container);
 
     expect(desktop.getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
-    expect(desktop.getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
+    expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
+    expect(desktop.getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
   });
 
   it("syncs the visible archive tab when search params change after initial render", async () => {
@@ -704,7 +718,8 @@ describe("ArchivePage", () => {
     await waitFor(() => {
       expect(getDesktop(container).getByRole("button", { name: "피드백 문서" })).toHaveAttribute("aria-pressed", "true");
     });
-    expect(getDesktop(container).getByText("팩트풀니스 · 2025.11.26")).toBeInTheDocument();
+    expect(getDesktop(container).getByText("팩트풀니스")).toBeInTheDocument();
+    expect(getDesktop(container).getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
   });
 
   it("clears stale archive scroll snapshots after archive content renders", () => {
@@ -806,11 +821,11 @@ describe("ArchivePage", () => {
     expect(desktop.getByRole("link", { name: "Q2 URL 책 세션으로" })).toHaveAttribute("href", encodedRecordsHref);
 
     await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
-    expect(desktop.getByRole("link", { name: "No.07 URL 책 · 독서모임 7차 피드백 읽기" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "No.07 URL 책 피드백 문서 읽기" })).toHaveAttribute(
       "href",
       "/app/feedback/session%207%2Fslash",
     );
-    expect(desktop.getByRole("link", { name: "No.07 URL 책 · 독서모임 7차 피드백 PDF로 저장" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "No.07 URL 책 피드백 문서 PDF로 저장" })).toHaveAttribute(
       "href",
       "/app/feedback/session%207%2Fslash/print",
     );

@@ -32,7 +32,6 @@ import {
 } from "@/features/archive/ui/archive-route-continuity";
 import { BookCover } from "@/shared/ui/book-cover";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
-import { SessionIdentity } from "@/shared/ui/session-identity";
 import { Link } from "@/features/archive/ui/archive-link";
 
 type ReportActionIconName = "read" | "download";
@@ -105,6 +104,10 @@ function ReportActionIcon({ name }: { name: ReportActionIconName }) {
       <path d="M6 14L14 6M7 6h7v7" />
     </svg>
   );
+}
+
+function reportNumberLabel(sessionNumber: number) {
+  return `No.${String(sessionNumber).padStart(2, "0")}`;
 }
 
 export default function ArchivePage({
@@ -387,17 +390,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
               <div className="tiny mono" style={{ color: "var(--text-3)" }}>
                 No.{String(session.number).padStart(2, "0")} · {formatDateOnlyLabel(session.date)}
               </div>
-              <div style={{ marginTop: 6 }}>
-                <SessionIdentity
-                  sessionNumber={session.number}
-                  state={session.state}
-                  date={session.date}
-                  published={session.published}
-                  feedbackDocumentAvailable={session.feedbackDocument.available}
-                  compact
-                />
-              </div>
-              <div className="editorial" style={{ fontSize: 16, margin: "4px 0 2px", lineHeight: 1.3 }}>
+              <div className="editorial" style={{ fontSize: 16, margin: "6px 0 2px", lineHeight: 1.3 }}>
                 {session.book}
               </div>
               <div className="tiny" style={{ color: "var(--text-3)" }}>
@@ -405,10 +398,10 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
               </div>
               <div className="m-row" style={{ gap: 6, marginTop: 10, flexWrap: "wrap" }}>
                 <span className="badge">
-                  참석 {session.attendance}/{session.total}
+                  {session.attendance}/{session.total} 참석
                 </span>
                 <span className={session.published ? "badge badge-ok badge-dot" : "badge badge-readonly badge-dot"}>
-                  {publicationLabel(session.published)}
+                  {publicationLabel(session.published, "mobile")}
                 </span>
                 <span
                   className={feedbackArchiveBadgeClass(session.feedbackDocument)}
@@ -481,7 +474,7 @@ function ArchiveMobileQuestions({ questions }: { questions: ArchiveQuestionItem[
             style={{ display: "block" }}
             aria-label={`Q${question.priority} ${question.bookTitle} 세션으로`}
           >
-            <div className="tiny mono" style={{ color: "var(--accent)" }}>
+            <div className="tiny mono" style={{ color: "var(--text-3)" }}>
               Q{question.priority} · {formatDateOnlyLabel(question.date)}
             </div>
             <div className="body editorial" style={{ fontSize: 15, marginTop: 6, lineHeight: 1.55 }}>
@@ -517,7 +510,6 @@ function ArchiveMobileReports({ reports, sessions }: { reports: FeedbackDocument
     <section className="m-sec">
       <div className="m-list">
         {reports.map((report) => {
-          const label = `${report.bookTitle} · ${formatDateOnlyLabel(report.date)}`;
           const cover = reportBookCoverMeta(report, sessions);
 
           return (
@@ -525,13 +517,13 @@ function ArchiveMobileReports({ reports, sessions }: { reports: FeedbackDocument
               <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={36} decorative />
               <div style={{ minWidth: 0 }}>
                 <div className="body" style={{ fontSize: 14 }}>
-                  {label}
+                  {report.bookTitle}
                 </div>
                 <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-                  No.{String(report.sessionNumber).padStart(2, "0")} · {report.title}
+                  {reportNumberLabel(report.sessionNumber)} · {formatDateOnlyLabel(report.date)}
                 </div>
                 <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
-                  {formatDateOnlyLabel(report.uploadedAt)} 등록 · 열람 가능
+                  {formatDateOnlyLabel(report.uploadedAt)} 등록
                 </div>
               </div>
               <div className="m-row" style={{ gap: 4 }}>
@@ -603,22 +595,17 @@ function ArchiveSessions({ sessions }: { sessions: ArchiveSessionRecord[] }) {
                 className="rm-record-row"
                 style={{
                   display: "grid",
-                gridTemplateColumns: "90px minmax(0, 1fr) minmax(190px, auto) auto",
+                  gridTemplateColumns: "64px minmax(0, 1fr) minmax(190px, auto) auto",
                   gap: "28px",
                   padding: "28px 0",
                   alignItems: "center",
                 }}
               >
-                <div>
-                  <SessionIdentity
-                    sessionNumber={session.number}
-                    state={session.state}
-                    date={session.date}
-                    published={session.published}
-                    feedbackDocumentAvailable={session.feedbackDocument.available}
-                    compact
-                  />
-                  <div className="tiny mono" style={{ color: "var(--text-4)", marginTop: "2px" }}>
+                <div aria-label={`${reportNumberLabel(session.number)} · ${formatSessionMonthDayLabel(session.date)}`}>
+                  <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                    {reportNumberLabel(session.number)}
+                  </div>
+                  <div className="tiny mono" style={{ color: "var(--text-4)", marginTop: "6px" }}>
                     {formatSessionMonthDayLabel(session.date)}
                   </div>
                 </div>
@@ -729,7 +716,7 @@ function ArchiveQuestions({ questions }: { questions: ArchiveQuestionItem[] }) {
         >
           <div className="row-between" style={{ marginBottom: "8px" }}>
             <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-              저장된 질문 Q{question.priority} · {formatDateOnlyLabel(question.date)}
+              Q{question.priority} · {formatDateOnlyLabel(question.date)}
             </span>
             <span className="tiny mono">
               No.{String(question.sessionNumber).padStart(2, "0")} · {question.bookTitle}
@@ -774,10 +761,10 @@ function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListIt
             <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={48} decorative />
             <div>
               <h2 className="editorial" style={{ fontSize: "16px", margin: 0 }}>
-                {report.bookTitle} · {formatDateOnlyLabel(report.date)}
+                {report.bookTitle}
               </h2>
-              <div className="tiny">No.{String(report.sessionNumber).padStart(2, "0")} · {report.title}</div>
               <div className="tiny mono" style={{ color: "var(--text-3)", marginTop: "4px" }}>
+                {reportNumberLabel(report.sessionNumber)} · {formatDateOnlyLabel(report.date)} ·{" "}
                 {formatDateOnlyLabel(report.uploadedAt)} 등록
               </div>
             </div>
