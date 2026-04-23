@@ -154,10 +154,12 @@ describe("MyPage", () => {
     expect(scoped.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(scoped.getByText("나의 리듬")).toBeInTheDocument();
     expect(scoped.getByText("피드백 문서")).toBeInTheDocument();
+    expect(scoped.getByText("· 최근 3개")).toBeInTheDocument();
     expect(scoped.getByText("내가 남긴 문장")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: /모임 전에 꺼낸 질문과 초안/ })).toHaveAttribute("href", "/app/archive?view=questions");
     expect(scoped.getByRole("link", { name: /한줄평과 장문 서평/ })).toHaveAttribute("href", "/app/archive?view=reviews");
-    expect(scoped.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/archive?view=report");
+    expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
+    expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveClass("btn", "btn-quiet", "btn-sm");
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("2025.11")).toBeInTheDocument();
     expect(scoped.getByText("2025.11.26 · PDF")).toBeInTheDocument();
@@ -225,7 +227,8 @@ describe("MyPage", () => {
     expect(scoped.queryByText("테마 · 표시")).not.toBeInTheDocument();
     expect(scoped.queryByText("연결 안 됨")).not.toBeInTheDocument();
     expect(scoped.queryByText("라이트")).not.toBeInTheDocument();
-    expect(scoped.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/archive?view=report");
+    expect(scoped.getByText("· 최근 3개")).toBeInTheDocument();
+    expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: reportReadLabel })).toHaveAttribute("href", "/app/feedback/session-1");
@@ -238,6 +241,33 @@ describe("MyPage", () => {
     expect(scoped.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(mobile?.querySelector(".m-card")).not.toBeNull();
     expect(mobile?.querySelectorAll(".m-list")).toHaveLength(1);
+  });
+
+  it("shows only the three latest feedback documents on my page summaries", () => {
+    const manyReports: FeedbackDocumentListItem[] = [
+      { ...reports[0], sessionId: "session-4", sessionNumber: 4, bookTitle: "모순", date: "2026-02-26" },
+      { ...reports[0], sessionId: "session-3", sessionNumber: 3, bookTitle: "작별하지 않는다", date: "2026-01-26" },
+      { ...reports[0], sessionId: "session-2", sessionNumber: 2, bookTitle: "냉정한 이타주의자", date: "2025-12-26" },
+      reports[0],
+    ];
+    const { container } = renderMyPage({ reports: manyReports });
+    const desktop = desktopScope(container);
+    const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
+
+    for (const title of ["모순", "작별하지 않는다", "냉정한 이타주의자"]) {
+      expect(desktop.getByText(title)).toBeInTheDocument();
+    }
+    expect(desktop.queryByText("팩트풀니스")).not.toBeInTheDocument();
+    expect(desktop.getByText("· 최근 3개")).toBeInTheDocument();
+
+    expect(mobile.getByText("· 최근 3개")).toBeInTheDocument();
+    expect(mobile.getByText("모순")).toBeInTheDocument();
+    expect(mobile.getByText("작별하지 않는다")).toBeInTheDocument();
+    expect(mobile.getByText("냉정한 이타주의자")).toBeInTheDocument();
+    expect(mobile.queryByText("팩트풀니스")).not.toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
+    expect(mobile.getByRole("link", { name: "전체 보기 →" })).toHaveClass("btn", "btn-quiet", "btn-sm");
+    expect(mobile.getByRole("link", { name: "전체 보기 →" })).not.toHaveClass("m-chip");
   });
 
   it("passes my page return state from mobile feedback document links", async () => {

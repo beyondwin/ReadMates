@@ -219,13 +219,19 @@ function mobileMembershipStatusLabel(data: Pick<MyPageProfile, "role" | "members
 
 function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
   const myPageReturnState = readmatesReturnState({ href: "/app/me", label: "내 공간으로 돌아가기" });
+  const recentReports = reports.slice(0, 3);
 
   return (
     <section className="m-sec">
       <div className="m-row-between" style={{ marginBottom: 10, alignItems: "center" }}>
-        <div className="eyebrow">피드백 문서</div>
-        <Link className="m-chip" to="/app/archive?view=report" style={{ height: 30, padding: "0 12px" }}>
-          전체 보기
+        <div className="m-row" style={{ gap: 8, minWidth: 0 }}>
+          <div className="eyebrow">피드백 문서</div>
+          <div className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
+            · 최근 3개
+          </div>
+        </div>
+        <Link className="btn btn-quiet btn-sm" to="/app/archive?view=report">
+          전체 보기 →
         </Link>
       </div>
       {reports.length === 0 ? (
@@ -236,7 +242,7 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
         </div>
       ) : (
         <div className="m-list">
-          {reports.map((report) => (
+          {recentReports.map((report) => (
             <div key={report.sessionId} className="m-list-row" style={{ gridTemplateColumns: "32px minmax(0, 1fr) auto" }}>
               <span aria-hidden style={{ color: "var(--text-2)", fontSize: 18 }}>
                 <Icon name="notes" size={18} />
@@ -277,12 +283,23 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
   );
 }
 
-function SectionHeader({ eyebrow, title, right }: { eyebrow: string; title: string; right?: React.ReactNode }) {
+function SectionHeader({
+  eyebrow,
+  eyebrowHelper,
+  title,
+  right,
+}: {
+  eyebrow: string;
+  eyebrowHelper?: React.ReactNode;
+  title: string;
+  right?: React.ReactNode;
+}) {
   return (
     <div className="row-between" style={{ alignItems: "flex-end", marginBottom: "16px" }}>
       <div>
-        <div className="eyebrow" style={{ marginBottom: "8px" }}>
-          {eyebrow}
+        <div className="row" style={{ gap: 8, alignItems: "baseline", flexWrap: "wrap", marginBottom: "8px" }}>
+          <div className="eyebrow">{eyebrow}</div>
+          {eyebrowHelper}
         </div>
         <h2 className="h2" style={{ margin: 0 }}>
           {title}
@@ -493,15 +510,21 @@ function RhythmSection({
 
 function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
   const myPageReturnState = readmatesReturnState({ href: "/app/me", label: "내 공간으로 돌아가기" });
+  const recentReports = reports.slice(0, 3);
 
   return (
     <section>
       <SectionHeader
         eyebrow="기록"
         title="피드백 문서"
+        eyebrowHelper={
+          <span className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
+            · 최근 3개
+          </span>
+        }
         right={
           <Link className="btn btn-quiet btn-sm" to="/app/archive?view=report">
-            전체 보기
+            전체 보기 →
           </Link>
         }
       />
@@ -513,7 +536,7 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
             </p>
           </div>
         ) : null}
-        {reports.map((report, index) => (
+        {recentReports.map((report, index) => (
           <article
             key={report.sessionId}
             style={{

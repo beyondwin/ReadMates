@@ -411,6 +411,17 @@ describe("CurrentSession", () => {
     expect(within(mobile).getByRole("button", { name: "내 준비" })).toHaveAttribute("aria-pressed", "true");
     expect(within(mobile).getByRole("button", { name: "공동 보드" })).toHaveAttribute("aria-pressed", "false");
     expect(within(mobile).getByRole("button", { name: "내 기록" })).toHaveAttribute("aria-pressed", "false");
+    for (const label of ["참석", "아직 미정", "불참"]) {
+      expect(within(mobile).getByRole("button", { name: label })).toHaveStyle({
+        minHeight: "32px",
+        height: "32px",
+        padding: "0 14px",
+        fontSize: "13px",
+        borderColor: "var(--line)",
+        background: "transparent",
+        color: "var(--text-2)",
+      });
+    }
     expect(within(mobile).getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
     expect(within(mobile).getByText("참석자 · 1/2")).toBeInTheDocument();
     expect(within(mobile).queryByText("제외된 멤버")).not.toBeInTheDocument();

@@ -575,7 +575,15 @@ export default function HostSessionEditor({
                 aria-controls={section.panelIds.join(" ")}
                 tabIndex={selected ? 0 : -1}
                 onClick={() => setActiveMobileSection(section.key)}
-                style={{ height: 34, padding: "0 14px" }}
+                style={{
+                  minHeight: 32,
+                  height: 32,
+                  padding: "0 14px",
+                  fontSize: 13,
+                  borderColor: selected ? "var(--text)" : "var(--line)",
+                  background: selected ? "var(--text)" : "transparent",
+                  color: selected ? "var(--bg)" : "var(--text-2)",
+                }}
               >
                 {section.label}
               </button>

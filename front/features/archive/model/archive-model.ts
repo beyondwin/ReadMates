@@ -279,7 +279,7 @@ export function archiveSummary({
   reviews: readonly unknown[];
 }) {
   const bookCount = new Set(sessions.map((session) => session.book)).size;
-  return `${sessions.length}회 · ${bookCount}권 · ${questions.length}개의 질문 · ${reviews.length}개의 서평`;
+  return `${bookCount}권 · ${questions.length}개의 질문 · ${reviews.length}개의 서평`;
 }
 
 export function feedbackReportActionLabel(report: FeedbackDocumentListItem, action: "읽기" | "PDF로 저장") {

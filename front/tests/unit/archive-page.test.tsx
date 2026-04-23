@@ -337,13 +337,32 @@ describe("ArchivePage", () => {
 
     expect(scoped.getByText("아카이브")).toBeInTheDocument();
     expect(scoped.getByRole("heading", { name: "읽어 온 자리" })).toBeInTheDocument();
-    expect(scoped.getByText("6회 · 6권 · 1개의 질문 · 1개의 서평")).toBeInTheDocument();
+    expect(scoped.getByText("6권 · 1개의 질문 · 1개의 서평")).toBeInTheDocument();
     const sessionChip = scoped.getByRole("button", { name: "세션" });
     expect(sessionChip).toHaveClass("m-chip", "is-on");
     expect(sessionChip).toHaveAttribute("aria-pressed", "true");
+    expect(sessionChip).toHaveStyle({
+      minHeight: "32px",
+      height: "32px",
+      padding: "0 14px",
+      fontSize: "13px",
+      borderColor: "var(--text)",
+      background: "var(--text)",
+      color: "var(--bg)",
+    });
     expect(scoped.getByRole("button", { name: "내 서평" })).toHaveClass("m-chip");
     expect(scoped.getByRole("button", { name: "내 질문" })).toHaveClass("m-chip");
-    expect(scoped.getByRole("button", { name: "피드백 문서" })).toHaveClass("m-chip");
+    const feedbackChip = scoped.getByRole("button", { name: "피드백 문서" });
+    expect(feedbackChip).toHaveClass("m-chip");
+    expect(feedbackChip).toHaveStyle({
+      minHeight: "32px",
+      height: "32px",
+      padding: "0 14px",
+      fontSize: "13px",
+      borderColor: "var(--line)",
+      background: "transparent",
+      color: "var(--text-2)",
+    });
     expect(scoped.queryByText("By session")).not.toBeInTheDocument();
     expect(scoped.queryByText("Reviews")).not.toBeInTheDocument();
     expect(scoped.queryByText("My questions")).not.toBeInTheDocument();
@@ -864,7 +883,7 @@ describe("ArchivePage", () => {
     expect(mobile).not.toBeNull();
     const scoped = within(mobile);
 
-    expect(scoped.getByText("0회 · 0권 · 0개의 질문 · 0개의 서평")).toBeInTheDocument();
+    expect(scoped.getByText("0권 · 0개의 질문 · 0개의 서평")).toBeInTheDocument();
     expect(scoped.getByText("아직 저장된 모임 기록이 없습니다.")).toHaveClass("small");
     expect(mobile.querySelector(".m-card-quiet")).not.toBeNull();
 

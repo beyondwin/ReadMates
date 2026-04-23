@@ -283,19 +283,31 @@ function ArchiveMobile({
         aria-label="아카이브 모바일 탭"
         onKeyDown={(event) => handleArchiveTabKeyDown(event, view, setView, "mobile")}
       >
-        {mobileArchiveTabs.map((tab) => (
-          <button
-            key={tab.key}
-            id={`archive-mobile-tab-${tab.key}`}
-            type="button"
-            aria-pressed={view === tab.key}
-            onClick={() => setView(tab.key)}
-            className={`m-chip${view === tab.key ? " is-on" : ""}`}
-            style={{ height: 32, padding: "0 14px" }}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {mobileArchiveTabs.map((tab) => {
+          const selected = view === tab.key;
+
+          return (
+            <button
+              key={tab.key}
+              id={`archive-mobile-tab-${tab.key}`}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => setView(tab.key)}
+              className={`m-chip${selected ? " is-on" : ""}`}
+              style={{
+                minHeight: 32,
+                height: 32,
+                padding: "0 14px",
+                fontSize: 13,
+                borderColor: selected ? "var(--text)" : "var(--line)",
+                background: selected ? "var(--text)" : "transparent",
+                color: selected ? "var(--bg)" : "var(--text-2)",
+              }}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       <MobileArchiveSectionIntro view={view} />
