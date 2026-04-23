@@ -227,6 +227,19 @@ describe("HostMembersPage", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members", expect.objectContaining({ cache: "no-store" }));
   });
 
+  it("keeps the member list body on the shared container horizontal padding", async () => {
+    renderHostMembersPage();
+
+    expect(await screen.findByRole("tab", { name: "활성 멤버" })).toBeInTheDocument();
+
+    const contentContainer = document.querySelector("main > section.container") as HTMLElement | null;
+    expect(contentContainer).not.toBeNull();
+    expect(contentContainer?.style.paddingTop).toBe("24px");
+    expect(contentContainer?.style.paddingBottom).toBe("72px");
+    expect(contentContainer?.style.paddingLeft).toBe("");
+    expect(contentContainer?.style.paddingRight).toBe("");
+  });
+
   it("labels viewer members as browsing members instead of approval pending", async () => {
     const user = userEvent.setup();
     renderHostMembersPage();
