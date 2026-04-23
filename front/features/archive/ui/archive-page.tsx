@@ -455,23 +455,25 @@ function ArchiveMobileReviews({ reviews }: { reviews: ArchiveReviewItem[] }) {
             to={appSessionHref(review.sessionId, "mobile-my-records")}
             state={archiveReturnState("reviews")}
             className="m-card"
-            style={{ display: "block" }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              alignItems: "center",
+              columnGap: 12,
+            }}
             aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
           >
-            <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-              {formatDateOnlyLabel(review.date)} · {review.bookTitle}
+            <div style={{ minWidth: 0 }}>
+              <div className="tiny mono" style={{ color: "var(--text-3)" }}>
+                {formatDateOnlyLabel(review.date)} · {review.bookTitle}
+              </div>
+              <div className="body editorial" style={{ fontSize: 15, marginTop: 8, lineHeight: 1.6 }}>
+                {review.text}
+              </div>
             </div>
-            <div className="body editorial" style={{ fontSize: 15, marginTop: 8, lineHeight: 1.6 }}>
-              {review.text}
-            </div>
-            <div className="m-row-between" style={{ marginTop: 12 }}>
-              <span className="tiny" style={{ color: "var(--text-3)" }}>
-                {review.kind === "ONE_LINE_REVIEW" ? "한줄평" : "장문 서평"}
-              </span>
-              <span aria-hidden style={{ color: "var(--text-3)" }}>
-                ›
-              </span>
-            </div>
+            <span aria-hidden style={{ color: "var(--text-3)" }}>
+              ›
+            </span>
           </Link>
         ))}
       </div>
