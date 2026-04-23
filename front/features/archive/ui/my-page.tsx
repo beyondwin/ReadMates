@@ -7,7 +7,6 @@ import {
   formatJoinedMonth,
   identityLine,
   membershipIdentityLabel,
-  membershipJoinedLine,
 } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
 import { appFeedbackHref, readmatesReturnState } from "@/features/archive/ui/archive-route-continuity";
@@ -146,87 +145,60 @@ function MyMobile({
               <div className="h3 editorial">{data.displayName}</div>
               <div className="small">{data.email}</div>
             </div>
-            <span className="tiny" aria-label="프로필 수정 준비 중" style={{ color: "var(--text-3)", flexShrink: 0 }}>
-              준비 중
-            </span>
           </div>
-          <hr className="divider-soft" style={{ margin: "18px 0 14px" }} />
+          <dl
+            aria-label="멤버 정보"
+            style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, margin: "16px 0 0" }}
+          >
+            {[
+              ["멤버 상태", mobileMembershipStatusLabel(data)],
+              ["클럽", clubDisplayName(data)],
+              ["합류", formatJoinedMonth(data.joinedAt)],
+            ].map(([label, value]) => (
+              <div key={label} style={{ minWidth: 0 }}>
+                <dt className="tiny mono" style={{ color: "var(--text-3)" }}>
+                  {label}
+                </dt>
+                <dd className="body" style={{ fontSize: 13, fontWeight: 600, margin: "5px 0 0", wordBreak: "keep-all" }}>
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+          <hr className="divider-soft" style={{ margin: "16px 0 14px" }} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, textAlign: "center" }}>
             {[
               { label: "참석", value: String(data.sessionCount) },
-              { label: "서평", value: String(reviewCount) },
-              { label: "질문", value: String(questionCount) },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="editorial" style={{ fontSize: 22, letterSpacing: "-0.02em" }}>
-                  {item.value}
+              { label: "서평", value: String(reviewCount), href: "/app/archive?view=reviews" },
+              { label: "질문", value: String(questionCount), href: "/app/archive?view=questions" },
+            ].map((item) => {
+              const content = (
+                <>
+                  <div className="editorial" style={{ fontSize: 22, letterSpacing: 0 }}>
+                    {item.value}
+                  </div>
+                  <div className="tiny mono" style={{ color: "var(--text-3)", marginTop: 2 }}>
+                    {item.label}
+                  </div>
+                </>
+              );
+              const itemStyle: CSSProperties = { display: "block", padding: "6px 0", borderRadius: 8, color: "inherit", textDecoration: "none" };
+
+              return item.href ? (
+                <Link key={item.label} to={item.href} aria-label={`${item.label} ${item.value}`} style={itemStyle}>
+                  {content}
+                </Link>
+              ) : (
+                <div key={item.label} style={itemStyle}>
+                  {content}
                 </div>
-                <div className="tiny mono" style={{ color: "var(--text-3)", marginTop: 2 }}>
-                  {item.label}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
 
       <MobileFeedbackReports reports={reports} />
-
-      <section className="m-sec">
-        <MobileWritingSection reviewCount={reviewCount} questionCount={questionCount} />
-      </section>
-
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          클럽
-        </div>
-        <div className="m-list">
-          <div className="m-list-row">
-            <span aria-hidden style={{ color: "var(--text-2)", fontSize: 18 }}>
-              □
-            </span>
-            <div>
-              <div className="body" style={{ fontSize: 14, fontWeight: 500 }}>
-                {clubDisplayName(data)}
-              </div>
-              <div className="tiny">{membershipJoinedLine(data)}</div>
-            </div>
-            <span aria-hidden style={{ color: "var(--text-3)" }}>
-              ›
-            </span>
-          </div>
-        </div>
-      </section>
-
-      <section className="m-sec">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>
-          읽기 전용 설정
-        </div>
-        <div className="m-list">
-          {[
-            { icon: "♢", label: "알림", value: "현재 기본값", reason: "준비 중" },
-            { icon: "□", label: "캘린더 연동", value: "연결 안 됨", reason: "준비 중" },
-            { icon: "◇", label: "테마 · 표시", value: "라이트", reason: "준비 중" },
-          ].map((item) => (
-            <div key={item.label} className="m-list-row">
-              <span aria-hidden style={{ color: "var(--text-2)", fontSize: 18 }}>
-                {item.icon}
-              </span>
-              <span className="body" style={{ fontSize: 14 }}>
-                {item.label}
-              </span>
-              <div className="m-row" style={{ gap: 6 }}>
-                <span className="tiny" style={{ color: "var(--text-3)" }}>
-                  {item.value}
-                </span>
-                <span className="tiny" style={{ color: "var(--text-3)" }}>
-                  {item.reason}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       <section className="m-sec">
         <DangerZone variant="mobile" onLeaveMembership={onLeaveMembership} />
@@ -239,6 +211,10 @@ function MyMobile({
       </section>
     </div>
   );
+}
+
+function mobileMembershipStatusLabel(data: Pick<MyPageProfile, "role" | "membershipStatus">) {
+  return data.membershipStatus === "ACTIVE" ? "정식 멤버" : membershipIdentityLabel(data);
 }
 
 function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
@@ -616,25 +592,6 @@ function WritingCountCard({ label, value, body, href }: { label: string; value: 
   );
 }
 
-function MobileWritingSection({ reviewCount, questionCount }: { reviewCount: number; questionCount: number }) {
-  return (
-    <div className="m-card-quiet">
-      <div className="eyebrow">내 글</div>
-      <div className="m-row" style={{ gap: 10, marginTop: 12 }}>
-        <Link to="/app/archive?view=questions" className="m-chip" style={{ height: 34, padding: "0 12px" }}>
-          질문 {questionCount}
-        </Link>
-        <Link to="/app/archive?view=reviews" className="m-chip" style={{ height: 34, padding: "0 12px" }}>
-          서평 {reviewCount}
-        </Link>
-      </div>
-      <p className="small" style={{ color: "var(--text-2)", margin: "12px 0 0" }}>
-        내가 남긴 질문과 서평은 아카이브의 보존 기록으로 이어집니다.
-      </p>
-    </div>
-  );
-}
-
 function NotificationsSection() {
   return (
     <section>
@@ -732,6 +689,7 @@ function DangerZone({
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const isMobile = variant === "mobile";
+  const actionButtonStyle: CSSProperties = { whiteSpace: "nowrap", flexShrink: 0 };
 
   const handleLeave = async () => {
     setIsLeaving(true);
@@ -757,7 +715,7 @@ function DangerZone({
         <div className="small" style={{ color: "var(--text-2)" }}>
           클럽 탈퇴 · 내 기록은 유지, 내 이름은 비공개 처리됩니다.
         </div>
-        <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLeaveOpen((current) => !current)}>
+        <button type="button" className="btn btn-ghost btn-sm" style={actionButtonStyle} onClick={() => setLeaveOpen((current) => !current)}>
           탈퇴
         </button>
       </div>
@@ -767,10 +725,10 @@ function DangerZone({
             탈퇴하면 과거 기록은 보존되며, 다른 멤버에게는 작성자가 "탈퇴한 멤버"로 표시됩니다.
           </p>
           <div className={isMobile ? "m-row" : "row"} style={{ justifyContent: "flex-end", gap: "8px", marginTop: "14px" }}>
-            <button type="button" className="btn btn-quiet btn-sm" disabled={isLeaving} onClick={() => setLeaveOpen(false)}>
+            <button type="button" className="btn btn-quiet btn-sm" style={actionButtonStyle} disabled={isLeaving} onClick={() => setLeaveOpen(false)}>
               취소
             </button>
-            <button type="button" className="btn btn-primary btn-sm" disabled={isLeaving} onClick={handleLeave}>
+            <button type="button" className="btn btn-primary btn-sm" style={actionButtonStyle} disabled={isLeaving} onClick={handleLeave}>
               탈퇴 확인
             </button>
           </div>
