@@ -332,15 +332,15 @@ git commit -m "refactor: migrate notes feed to clean architecture"
 - Create: `server/src/main/kotlin/com/readmates/shared/adapter/in/web/HealthController.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 
-- [ ] **Step 1: Move health controller package**
+- [x] **Step 1: Move health controller package**
 
 Keep `/api/health` response and HTTP status unchanged. This endpoint has no application orchestration requirement unless tests or current behavior reveal hidden logic.
 
-- [ ] **Step 2: Include shared web adapter in lightweight boundary rule**
+- [x] **Step 2: Include shared web adapter in lightweight boundary rule**
 
 Add `com.readmates.shared.adapter.in.web..` to the web adapter rule that bans direct JDBC, repository, and outbound-adapter dependencies.
 
-- [ ] **Step 3: Validate health and architecture behavior**
+- [x] **Step 3: Validate health and architecture behavior**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.shared.*'
@@ -350,12 +350,15 @@ rg -n "package com\\.readmates\\.shared\\.api" server/src/main/kotlin/com/readma
 
 If there is no dedicated shared test suite, run architecture tests plus full server tests for this task.
 
-- [ ] **Step 4: Commit shared health migration**
+- [x] **Step 4: Commit shared health migration**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/shared server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
 git commit -m "refactor: move health endpoint to web adapter"
 ```
+
+- Result: moved `HealthController` from `shared.api` to `shared.adapter.in.web` and moved the matching shared health test package. The current code and tests use `/internal/health`, not the plan's `/api/health`; preserved `/internal/health` route, response payload, HTTP status, and unauthenticated access.
+- Validation: `./server/gradlew -p server test --tests 'com.readmates.shared.*'` passed; `./server/gradlew -p server test --tests 'com.readmates.architecture.*'` passed; `rg -n "package com\\.readmates\\.shared\\.api" server/src/main/kotlin/com/readmates/shared` returned no matches.
 
 ## Task 5: Extract Auth Session And Member Account Persistence
 
