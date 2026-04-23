@@ -210,13 +210,16 @@ export default function PublicClub({ data }: PublicClubProps) {
           <div className="row-between public-section-head">
             <div>
               <div className="eyebrow" style={{ marginBottom: 8 }}>
-                공개 기록
+                기록 아카이브
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
                 공개된 모임 기록
               </h2>
             </div>
-            <div className="small">총 {data.recentSessions.length}개의 공개 기록</div>
+            <Link to="/records" className="public-records-link">
+              전체 보기
+              <span aria-hidden>→</span>
+            </Link>
           </div>
 
           {publicRecordPreviewSessions.length > 0 ? (

@@ -297,7 +297,7 @@ describe("Feedback document routes", () => {
 
     expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
     expect(screen.queryByText("내 공간으로 돌아가기")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "PDF로 저장" })).toHaveAttribute("href", "/app/feedback/session-1/print");
+    expect(screen.getByRole("button", { name: "PDF로 저장" })).toBeInTheDocument();
   });
 
   it("returns to session detail with the session detail archive return state intact", async () => {

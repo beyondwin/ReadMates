@@ -266,6 +266,32 @@ describe("MobileHeader route titles and actions", () => {
 
     expect(screen.getByText("피드백 문서")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/me");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveTextContent("뒤로");
+
+    cleanup();
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/app/feedback/session-6",
+            state: {
+              readmatesReturnTo: "/app/sessions/session-6#mobile-feedback",
+              readmatesReturnLabel: "세션으로 돌아가기",
+              readmatesReturnState: {
+                readmatesReturnTo: "/app/archive?view=sessions",
+                readmatesReturnLabel: "아카이브로",
+              },
+            },
+          },
+        ]}
+      >
+        <MobileHeader variant="member" />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/sessions/session-6#mobile-feedback");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveTextContent("뒤로");
+    expect(screen.queryByText("세션으로 돌아가기")).not.toBeInTheDocument();
 
     cleanup();
     renderAt("/app/feedback/session-6", <MobileHeader variant="member" />);

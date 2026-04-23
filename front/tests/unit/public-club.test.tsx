@@ -65,6 +65,7 @@ describe("PublicClub", () => {
     expect(screen.getByLabelText("김호스트")).toBeInTheDocument();
     expect(screen.getByText("호스트 · 2025.11~")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "기존 멤버 로그인" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/records");
     const inviteCta = screen.getByRole("button", { name: /초대 수락하기/ });
     expect(inviteCta).toBeDisabled();
     expect(inviteCta).toHaveAttribute("aria-disabled", "true");
