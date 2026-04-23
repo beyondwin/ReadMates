@@ -43,7 +43,7 @@ export function PublicFooter({ showGuestMemberActions = true }: PublicFooterProp
       </div>
       <div className="container" style={{ marginTop: 40 }}>
         <div className="rule">
-          <span className="mono">© 2026 · 읽는사이 · v1.4</span>
+          <span className="mono">© 2025 · 읽는사이</span>
         </div>
       </div>
     </footer>
