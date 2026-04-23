@@ -1,11 +1,9 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import MemberHome from "@/features/member-home/components/member-home";
-import { attendanceSummaryFromMyPage } from "@/features/member-home/components/member-home-records-utils";
 import type {
   MemberHomeAuth as AuthMeResponse,
   MemberHomeCurrentSessionResponse as CurrentSessionResponse,
-  MemberHomeMyPageResponse as MyPageResponse,
   MemberHomeNoteFeedItem as NoteFeedItem,
 } from "@/features/member-home/api/member-home-contracts";
 
@@ -66,26 +64,6 @@ const current: CurrentSessionResponse = {
   },
 };
 
-const myPage: MyPageResponse = {
-  displayName: "이멤버5",
-  shortName: "수",
-  email: "member5@example.com",
-  role: "MEMBER",
-  membershipStatus: "ACTIVE",
-  clubName: "읽는사이",
-  joinedAt: "2025-11",
-  sessionCount: 3,
-  totalSessionCount: 6,
-  recentAttendances: [
-    { sessionNumber: 1, attended: true },
-    { sessionNumber: 2, attended: true },
-    { sessionNumber: 3, attended: true },
-    { sessionNumber: 4, attended: false },
-    { sessionNumber: 5, attended: false },
-    { sessionNumber: 6, attended: false },
-  ],
-};
-
 const noteFeedItems: NoteFeedItem[] = [
   {
     sessionId: "session-7",
@@ -116,12 +94,6 @@ function getDesktopView(container: HTMLElement) {
 }
 
 describe("MemberHome", () => {
-  it("derives member attendance summary from my page totals", () => {
-    expect(attendanceSummaryFromMyPage(myPage)).toEqual({ attended: 3, total: 6 });
-    expect(attendanceSummaryFromMyPage({ ...myPage, sessionCount: 8, totalSessionCount: 6 })).toEqual({ attended: 8, total: 8 });
-    expect(attendanceSummaryFromMyPage(null)).toBeNull();
-  });
-
   it("renders the mobile-first member home flow with real action links", () => {
     const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
 
@@ -134,10 +106,10 @@ describe("MemberHome", () => {
     expect(mobileView.getByText("이번 세션")).toBeInTheDocument();
     expect(mobileView.getByText("오늘 할 일")).toBeInTheDocument();
     expect(mobileView.getByText("멤버 활동")).toBeInTheDocument();
-    expect(mobileView.getByText("내 통계")).toBeInTheDocument();
+    expect(mobileView.queryByText("내 통계")).not.toBeInTheDocument();
     expect(mobileView.getByText("바로가기")).toBeInTheDocument();
     expect(mobileView.getByText("4개")).toBeInTheDocument();
-    expect(mobileView.getByText("누적 통계")).toBeInTheDocument();
+    expect(mobileView.queryByText("누적 통계")).not.toBeInTheDocument();
     expect(mobileView.queryByText(/actions/i)).not.toBeInTheDocument();
     expect(mobileView.queryByText("current")).not.toBeInTheDocument();
 
@@ -294,7 +266,6 @@ describe("MemberHome", () => {
           },
         }}
         noteFeedItems={noteFeedItems}
-        myPage={myPage}
       />,
     );
 
@@ -307,7 +278,7 @@ describe("MemberHome", () => {
     expect(desktop.getByText("현재 RSVP: 미응답")).toBeInTheDocument();
     expect(mobile.getByText("참석 2/6 · 현재 RSVP 미응답")).toBeInTheDocument();
     expect(mobile.queryByText("참석 3/7 · 현재 RSVP 미응답")).not.toBeInTheDocument();
-    expect(mobile.getAllByText("3/6").length).toBeGreaterThan(0);
+    expect(mobile.queryByText("3/6")).not.toBeInTheDocument();
   });
 
   it("shows the current member's reading check-in progress in the prep card", () => {

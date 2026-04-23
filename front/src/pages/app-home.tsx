@@ -17,7 +17,6 @@ export default function AppHomePage() {
       auth={authState.auth}
       current={data.current}
       noteFeedItems={data.noteFeedItems}
-      myPage={data.myPage}
     />
   );
 }

@@ -9,18 +9,12 @@ import {
 import {
   ClubPulse,
   MobileMemberActivity,
-  MobileStats,
   RosterSummary,
 } from "@/features/member-home/components/member-home-records";
-import {
-  attendanceSummaryFromMyPage,
-  type AttendanceSummary,
-} from "@/features/member-home/components/member-home-records-utils";
 import { PrepCard } from "@/features/member-home/components/prep-card";
 import type {
   MemberHomeAuth as AuthMeResponse,
   MemberHomeCurrentSessionResponse as CurrentSessionResponse,
-  MemberHomeMyPageResponse as MyPageResponse,
   MemberHomeNoteFeedItem as NoteFeedItem,
 } from "@/features/member-home/api/member-home-contracts";
 import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
@@ -39,16 +33,13 @@ export default function MemberHome({
   auth,
   current,
   noteFeedItems,
-  myPage,
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
   noteFeedItems: NoteFeedItem[];
-  myPage?: MyPageResponse | null;
 }) {
   const currentSession = current.currentSession;
   const memberName = auth.shortName ?? auth.displayName ?? "멤버";
-  const attendanceSummary = attendanceSummaryFromMyPage(myPage);
   const isViewer = auth.membershipStatus === "VIEWER";
 
   return (
@@ -108,7 +99,6 @@ export default function MemberHome({
         current={current}
         noteFeedItems={noteFeedItems}
         memberName={memberName}
-        attendanceSummary={attendanceSummary}
         isViewer={isViewer}
       />
     </main>
@@ -189,14 +179,12 @@ function MobileMemberHome({
   current,
   noteFeedItems,
   memberName,
-  attendanceSummary,
   isViewer,
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
   noteFeedItems: NoteFeedItem[];
   memberName: string;
-  attendanceSummary: AttendanceSummary | null;
   isViewer: boolean;
 }) {
   const session = current.currentSession;
@@ -230,7 +218,6 @@ function MobileMemberHome({
 
       <MobileTodayActions session={session} isViewer={isViewer} />
       <MobileMemberActivity items={noteFeedItems.slice(0, 4)} />
-      <MobileStats session={session} attendanceSummary={attendanceSummary} />
       <MobileQuickLinks />
     </div>
   );
