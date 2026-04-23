@@ -222,7 +222,7 @@ git commit -m "feat: migrate reading progress and one-line visibility"
 - Test: `server/src/test/kotlin/com/readmates/note/api/CheckinControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/note/api/MemberActionControllerDbTest.kt`
 
-- [ ] **Step 1: Update service unit test expectation first**
+- [x] **Step 1: Update service unit test expectation first**
 
 In `SessionMemberWriteServiceTest.kt`, replace the checkin test with:
 
@@ -248,7 +248,7 @@ override fun saveCheckin(command: SaveCheckinCommand) =
         .also { calls += "saveCheckin:${command.readingProgress}" }
 ```
 
-- [ ] **Step 2: Update controller DB test payloads first**
+- [x] **Step 2: Update controller DB test payloads first**
 
 In `MemberActionControllerDbTest.kt`, replace checkin JSON request bodies with:
 
@@ -274,7 +274,7 @@ val readingProgress = jdbcTemplate.queryForObject(
 assertEquals(80, readingProgress)
 ```
 
-- [ ] **Step 3: Run focused failing backend tests**
+- [x] **Step 3: Run focused failing backend tests**
 
 Run:
 
@@ -287,7 +287,7 @@ Run:
 
 Expected: FAIL with compile errors because command/result/request classes still require `note`.
 
-- [ ] **Step 4: Update command and result models**
+- [x] **Step 4: Update command and result models**
 
 Replace the checkin data classes:
 
@@ -304,7 +304,7 @@ data class CheckinResult(
 )
 ```
 
-- [ ] **Step 5: Update CheckinController DTOs**
+- [x] **Step 5: Update CheckinController DTOs**
 
 Replace checkin request/response in `CheckinController.kt`:
 
@@ -329,7 +329,7 @@ return CheckinResponse(result.readingProgress)
 
 Remove the unused `jakarta.validation.constraints.NotBlank` import.
 
-- [ ] **Step 6: Update repository saveCheckin**
+- [x] **Step 6: Update repository saveCheckin**
 
 Replace `saveCheckin` in `SessionParticipationRepository.kt` with:
 
@@ -381,7 +381,7 @@ fun saveCheckin(member: CurrentMember, readingProgress: Int): Map<String, Any> {
 }
 ```
 
-- [ ] **Step 7: Update persistence adapter**
+- [x] **Step 7: Update persistence adapter**
 
 Replace the checkin adapter method:
 
@@ -394,7 +394,7 @@ override fun saveCheckin(command: SaveCheckinCommand): CheckinResult {
 }
 ```
 
-- [ ] **Step 8: Save one-line reviews as SESSION**
+- [x] **Step 8: Save one-line reviews as SESSION**
 
 In `SessionParticipationRepository.saveOneLineReview`, replace both occurrences of `'PRIVATE'` in the insert/select block with `'SESSION'`.
 
@@ -404,7 +404,7 @@ Use this selected value:
 select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'SESSION'
 ```
 
-- [ ] **Step 9: Add DB assertion for one-line visibility**
+- [x] **Step 9: Add DB assertion for one-line visibility**
 
 In `MemberActionControllerDbTest.kt`, after saving one-line review, query visibility:
 
@@ -424,7 +424,7 @@ val oneLineReviewVisibility = jdbcTemplate.query(
 assertEquals("SESSION", oneLineReviewVisibility)
 ```
 
-- [ ] **Step 10: Run focused backend tests**
+- [x] **Step 10: Run focused backend tests**
 
 Run:
 
@@ -437,7 +437,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit checkin write contract**
+- [x] **Step 11: Commit checkin write contract**
 
 Run:
 

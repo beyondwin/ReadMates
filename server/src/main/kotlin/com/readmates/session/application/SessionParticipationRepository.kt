@@ -51,7 +51,7 @@ class SessionParticipationRepository(
         return mapOf("status" to status)
     }
 
-    fun saveCheckin(member: CurrentMember, readingProgress: Int, note: String): Map<String, Any> {
+    fun saveCheckin(member: CurrentMember, readingProgress: Int): Map<String, Any> {
         requireWritableMember(member)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -61,15 +61,13 @@ class SessionParticipationRepository(
               club_id,
               session_id,
               membership_id,
-              reading_progress,
-              note
+              reading_progress
             )
             select
               ?,
               current_session.club_id,
               current_session.id,
               session_participants.membership_id,
-              ?,
               ?
             from (
               select id, club_id
@@ -85,12 +83,10 @@ class SessionParticipationRepository(
               and session_participants.participation_status = 'ACTIVE'
             on duplicate key update
               reading_progress = values(reading_progress),
-              note = values(note),
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
             readingProgress,
-            note,
             member.clubId.dbString(),
             member.membershipId.dbString(),
         )
@@ -98,7 +94,7 @@ class SessionParticipationRepository(
             throwCurrentSessionWriteException(jdbcTemplate, member)
         }
 
-        return mapOf("readingProgress" to readingProgress, "note" to note)
+        return mapOf("readingProgress" to readingProgress)
     }
 
     fun saveQuestion(member: CurrentMember, priority: Int, text: String, draftThought: String?): Map<String, Any?> {
@@ -245,7 +241,7 @@ class SessionParticipationRepository(
         val updated = jdbcTemplate.update(
             """
             insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
-            select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'PRIVATE'
+            select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'SESSION'
             from (
               select id, club_id
               from sessions
