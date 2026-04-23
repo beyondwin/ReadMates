@@ -2,13 +2,8 @@ package com.readmates.session.application
 
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.web.bind.annotation.ResponseStatus
-
-internal fun jdbcTemplateOrThrow(jdbcTemplateProvider: ObjectProvider<JdbcTemplate>): JdbcTemplate =
-    jdbcTemplateProvider.ifAvailable ?: throw CurrentSessionNotOpenException()
 
 internal fun requireHost(member: CurrentMember) {
     if (!member.isHost) {

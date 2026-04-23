@@ -8,12 +8,12 @@ import com.readmates.auth.application.port.out.CreateHostInvitationCommand
 import com.readmates.auth.application.port.out.HostInvitationListRow
 import com.readmates.auth.application.port.out.HostInvitationStorePort
 import com.readmates.auth.application.port.out.InvitationTokenRow
+import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
-import org.springframework.dao.DuplicateKeyException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -224,7 +224,7 @@ class InvitationService(
                 displayName = displayName,
                 profileImageUrl = profileImageUrl,
             )
-        } catch (exception: DuplicateKeyException) {
+        } catch (_: MemberAccountDuplicateException) {
             val racedUserId = memberAccountStore.findAnyUserIdByEmail(normalizedEmail)
                 ?: throw GoogleLoginException("Google account is already connected")
             val connected = memberAccountStore.connectGoogleSubject(

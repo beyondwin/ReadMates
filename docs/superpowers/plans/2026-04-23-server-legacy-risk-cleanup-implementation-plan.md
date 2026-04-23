@@ -496,7 +496,7 @@ git commit -m "refactor: extract auth operational persistence"
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Modify if needed: `docs/development/architecture.md`
 
-- [ ] **Step 1: Add no-JDBC-in-application rule**
+- [x] **Step 1: Add no-JDBC-in-application rule**
 
 Add an ArchUnit rule that migrated application packages must not depend on:
 
@@ -513,15 +513,21 @@ Apply to:
 - `com.readmates.note.application..`
 - `com.readmates.auth.application..`
 
-- [ ] **Step 2: Add shared web adapter rule**
+- Result: added a migrated application ArchUnit rule banning Spring JDBC and Spring DAO dependencies from `session`, `publication`, `archive`, `feedback`, `note`, and `auth` application packages. During validation, the planned rule exposed transitional session JDBC repositories behind `Legacy*` bridge adapters; moved the existing session persistence implementation into `session.adapter.out.persistence` and made the concrete adapters implement `LoadCurrentSessionPort`, `HostSessionWritePort`, and `SessionParticipationWritePort` directly without changing SQL, mapping, transactions, or route-visible behavior. Also translated auth duplicate-key handling behind `MemberAccountStorePort` with a port-level exception so auth application no longer imports Spring DAO.
+
+- [x] **Step 2: Add shared web adapter rule**
 
 Include `shared.adapter.in.web` in the web adapter dependency rule.
 
-- [ ] **Step 3: Remove stale exceptions from architecture docs**
+- Result: `shared.adapter.in.web` is included in the migrated web adapter package list.
+
+- [x] **Step 3: Remove stale exceptions from architecture docs**
 
 Update `docs/development/architecture.md` so it no longer says archive/feedback bridges, `note.api`, `shared.api`, or auth application JDBC are current exceptions.
 
-- [ ] **Step 4: Validate strengthened boundaries**
+- Result: updated `docs/development/architecture.md` to describe the current server package roles, including `note`, `auth`, and `shared.adapter.in.web`, and removed stale current-exception language for removed bridge/API/auth-JDBC surfaces.
+
+- [x] **Step 4: Validate strengthened boundaries**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.architecture.*'
@@ -535,12 +541,22 @@ Expected:
 - no JDBC hits under migrated application packages
 - no `note.api` or `shared.api` packages remain
 
-- [ ] **Step 5: Commit boundary hardening**
+- Result: validation passed.
+  - `./server/gradlew -p server test --tests 'com.readmates.architecture.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 4 executed, 2 up-to-date).
+  - Relevant session validation `./server/gradlew -p server test --tests 'com.readmates.session.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - Extra touched-auth validation `./server/gradlew -p server test --tests 'com.readmates.auth.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - `rg -n "JdbcTemplate|query\\(|queryForObject|org\\.springframework\\.jdbc" server/src/main/kotlin/com/readmates/*/application` returned no hits.
+  - `rg -n "org\\.springframework\\.dao" server/src/main/kotlin/com/readmates/*/application` returned no hits.
+  - `rg -n "package com\\.readmates\\..*\\.api" server/src/main/kotlin/com/readmates/note server/src/main/kotlin/com/readmates/shared` returned no hits.
+
+- [x] **Step 5: Commit boundary hardening**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/architecture docs/development/architecture.md docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
 git commit -m "test: harden server architecture boundaries"
 ```
+
+- Result: Task 7 changes committed with message `test: harden server architecture boundaries`.
 
 ## Task 8: Final Validation And Documentation
 

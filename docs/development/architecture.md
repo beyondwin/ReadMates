@@ -68,22 +68,22 @@ adapter.in.web
   -> adapter.out.persistence
 ```
 
-현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`입니다. `note` 전환은 web adapter, DTO, mapper 정리에 한정되며 `note.adapter.in.web`은 `session.application.port.in` use case를 호출합니다. `auth` 전환은 operational member/invitation controller와 dev-login path가 inbound use case port에 의존하도록 하는 범위입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남고, logout/session cleanup은 `AuthSessionService`를 직접 호출하는 Task 5 예외입니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다. 일부 legacy auth application service는 아직 JDBC/repository orchestration을 직접 소유합니다.
+현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
 
 | 영역 | 현재 패키지 | 역할 |
 | --- | --- | --- |
-| Web adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, response mapping |
+| Web adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, response mapping; shared health endpoint |
 | Security adapter/infrastructure | `auth.adapter.in.security`, `auth.infrastructure.security` | Spring Security `Authentication` 해석, OAuth/session filter, cookie/security wiring |
-| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `auth.application.port.in` | controller가 의존하는 use case contract; `note.adapter.in.web`은 `session.application.port.in`을 사용하고 auth disabled/logout path는 예외 |
-| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, selected `auth.application.service` | command/query orchestration과 권한 확인 |
-| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out` | application service가 persistence 세부사항 없이 호출하는 contract |
-| Persistence adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence` | JDBC query 또는 legacy repository를 감싸는 bridge |
+| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `note.application.port.in`, `auth.application.port.in` | controller가 의존하는 use case contract |
+| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `note.application.service`, `auth.application`/`auth.application.service` | command/query orchestration과 권한 확인 |
+| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `note.application.port.out`, `auth.application.port.out` | application service가 persistence 세부사항 없이 호출하는 contract |
+| Persistence adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence` | JDBC query와 row mapping을 소유하는 outbound adapter |
 
 전환된 controller는 legacy repository, `JdbcTemplate`, persistence adapter를 직접 주입받지 않습니다. 인증된 사용자는 controller method에서 `CurrentMember`로 받으며, resolver가 `ResolveCurrentMemberUseCase`를 통해 멤버 정보를 조회합니다.
 
-아직 모든 legacy surface가 사라진 것은 아닙니다. 예를 들어 `note.api.NotesFeedController`와 `shared.api.HealthController`는 현재 구조를 유지합니다. 새 기능이나 전환된 slice에서는 기존 repository를 controller에 다시 주입하지 않고, 필요한 경우 inbound port, application service, outbound port와 adapter를 먼저 둡니다.
+새 기능이나 전환된 slice에서는 기존 repository를 controller에 다시 주입하지 않고, 필요한 경우 inbound port, application service, outbound port와 adapter를 먼저 둡니다.
 
-아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다. 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound adapter에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback` application package가 adapter에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
+아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다. 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound adapter에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth` application package가 adapter, Spring JDBC, Spring DAO 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
 
 ## 인증과 세션
 
