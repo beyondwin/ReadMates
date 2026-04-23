@@ -198,6 +198,8 @@ export default function HostSessionEditor({
   const saveGuidance = isNewSession
     ? "세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다."
     : "세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.";
+  const showReturnLink =
+    returnTarget.href !== hostDashboardReturnTarget.href || returnTarget.label !== hostDashboardReturnTarget.label;
   const feedbackPreviewState = session
     ? readmatesReturnState({
         href: `/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`,
@@ -487,10 +489,12 @@ export default function HostSessionEditor({
       <section className="page-header-compact">
         <div className="container">
           <div className="row-between" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
-              <div>
+            <div>
+              {showReturnLink ? (
                 <Link to={returnTarget.href} state={returnTarget.state} className="btn btn-quiet btn-sm" style={{ marginBottom: 14 }}>
                   {returnTarget.label}
                 </Link>
+              ) : null}
               <div className="eyebrow">세션 운영 문서 · {isNewSession ? "새 세션" : `No.${session.sessionNumber}`}</div>
               <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
                 {editorTitle}
