@@ -84,7 +84,7 @@ Do not change unrelated public-home or login-card work that is currently dirty i
 - Modify: `server/src/main/resources/db/dev/R__readmates_dev_seed.sql`
 - Test: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
-- [ ] **Step 1: Write the failing migration metadata test**
+- [x] **Step 1: Write the failing migration metadata test**
 
 Add these assertions inside `mysql baseline creates auth session and feedback document tables` in `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`, after the `participantColumns` assertion:
 
@@ -115,7 +115,7 @@ assertTrue(oneLineVisibilityConstraints.any { row ->
 })
 ```
 
-- [ ] **Step 2: Run the focused migration test and verify it fails**
+- [x] **Step 2: Run the focused migration test and verify it fails**
 
 Run:
 
@@ -125,7 +125,7 @@ Run:
 
 Expected: FAIL because `reading_checkins.note` still exists and the `one_line_reviews_visibility_check` constraint does not contain `SESSION`.
 
-- [ ] **Step 3: Add the MySQL migration**
+- [x] **Step 3: Add the MySQL migration**
 
 Create `server/src/main/resources/db/mysql/migration/V12__reading_progress_one_line_session_visibility.sql`:
 
@@ -141,7 +141,7 @@ alter table one_line_reviews
   check (visibility in ('PRIVATE', 'PUBLIC', 'SESSION'));
 ```
 
-- [ ] **Step 4: Add the base migration**
+- [x] **Step 4: Add the base migration**
 
 Create `server/src/main/resources/db/migration/V9__reading_progress_one_line_session_visibility.sql`:
 
@@ -157,7 +157,7 @@ alter table one_line_reviews
   check (visibility in ('PRIVATE', 'PUBLIC', 'SESSION'));
 ```
 
-- [ ] **Step 5: Update dev seed checkin inserts**
+- [x] **Step 5: Update dev seed checkin inserts**
 
 In both seed files, change every `insert into reading_checkins` statement from this shape:
 
@@ -173,7 +173,7 @@ insert into reading_checkins (id, club_id, session_id, membership_id, reading_pr
 
 For each corresponding `select` or `values` row, remove the final note expression and keep `reading_progress` as the last inserted value.
 
-- [ ] **Step 6: Keep seeded one-line reviews explicitly public**
+- [x] **Step 6: Keep seeded one-line reviews explicitly public**
 
 In both seed files, ensure existing one-line review seed rows still write `PUBLIC` explicitly:
 
@@ -183,7 +183,7 @@ In both seed files, ensure existing one-line review seed rows still write `PUBLI
 
 The seed rows represent public historical records and must not become `SESSION`.
 
-- [ ] **Step 7: Run migration and seed tests**
+- [x] **Step 7: Run migration and seed tests**
 
 Run:
 
@@ -195,7 +195,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit schema changes**
+- [x] **Step 8: Commit schema changes**
 
 Run:
 
