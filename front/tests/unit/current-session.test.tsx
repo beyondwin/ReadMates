@@ -279,7 +279,7 @@ describe("CurrentSession", () => {
     expect(within(desktop).getAllByText("읽기 진행률").length).toBeGreaterThan(0);
     expect(within(desktop).getByText("토론 질문")).toBeInTheDocument();
     expect(within(desktop).getByText("질문 작성")).toBeInTheDocument();
-    expect(within(desktop).getByText("피드백 문서 접근")).toBeInTheDocument();
+    expect(within(desktop).queryByText("피드백 문서 접근")).not.toBeInTheDocument();
     expect(within(desktop).queryByText("Question")).not.toBeInTheDocument();
     expect(within(desktop).getByText("테스트 책")).toBeInTheDocument();
     expect(within(desktop).getByText(/테스트 저자/)).toBeInTheDocument();
@@ -352,7 +352,7 @@ describe("CurrentSession", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("keeps host context available without removing member prep controls", () => {
+  it("keeps host member prep controls without the desktop host context shortcut", () => {
     const { container } = render(
       <CurrentSession auth={{ ...activeMemberAuthFixture, role: "HOST" }} data={currentSessionData} />,
     );
@@ -360,11 +360,8 @@ describe("CurrentSession", () => {
 
     expect(desktopScope.getByRole("button", { name: "참석" })).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "진행률 저장" })).toBeInTheDocument();
-    expect(desktopScope.getByText("호스트 맥락")).toBeInTheDocument();
-    expect(desktopScope.getByRole("link", { name: "세션 운영으로" })).toHaveAttribute(
-      "href",
-      "/app/host/sessions/session-7/edit",
-    );
+    expect(desktopScope.queryByText("호스트 맥락")).not.toBeInTheDocument();
+    expect(desktopScope.queryByRole("link", { name: "세션 운영으로" })).not.toBeInTheDocument();
   });
 
   it("mirrors viewer read-only controls on mobile current session", async () => {
