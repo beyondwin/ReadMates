@@ -308,7 +308,7 @@
 .public-editorial-promise {
   max-width: 520px;
   margin: 20px 0 0;
-  color: var(--accent);
+  color: var(--text-2);
 }
 
 .public-home-hero__peek {
@@ -637,22 +637,6 @@
   box-shadow: 0 20px 44px -36px oklch(0 0 0 / 0.42);
 }
 
-.auth-card__mark {
-  width: 42px;
-  height: 42px;
-  margin-bottom: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--line);
-  border-radius: var(--r-2);
-  background: var(--bg-sub);
-  color: var(--accent);
-  font-family: var(--f-mono);
-  font-size: 12px;
-  letter-spacing: 0;
-}
-
 .auth-card__kicker {
   align-items: flex-start;
   gap: 12px;
@@ -892,10 +876,6 @@
 
   .auth-card--club {
     padding-top: 24px;
-  }
-
-  .auth-card__mark {
-    margin-bottom: 22px;
   }
 
   .auth-card__actions--primary {
