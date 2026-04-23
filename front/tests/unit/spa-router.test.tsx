@@ -182,7 +182,7 @@ describe("SPA router", () => {
     expect(
       await screen.findByRole("heading", { name: "읽을 수 있는 공간은 열렸고, 참여는 승인 뒤 열립니다." }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "전체 세션 둘러보기" })).toHaveAttribute("href", "/app/archive");
+    expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute("href", "/app/archive");
     expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute("href", "/app/session/current");
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/app/pending", expect.anything());
   });

@@ -104,7 +104,7 @@ describe("FeedbackDocumentPage", () => {
     expect(screen.getByText("열람 제한")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "피드백 문서는 정식 멤버와 참석자에게만 열립니다." })).toBeInTheDocument();
     expect(
-      screen.getByText("둘러보기 멤버는 전체 세션 기록을 읽을 수 있지만, 회차 피드백 문서는 볼 수 없습니다."),
+      screen.getByText("둘러보기 멤버는 세션 기록을 읽을 수 있지만, 회차 피드백 문서는 볼 수 없습니다."),
     ).toBeInTheDocument();
   });
 });

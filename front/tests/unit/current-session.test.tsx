@@ -374,7 +374,7 @@ describe("CurrentSession", () => {
 
     expect(mobileScope.getByText("둘러보기 멤버")).toBeVisible();
     expect(
-      mobileScope.getByText("전체 세션은 읽을 수 있어요. RSVP, 체크인, 질문, 서평 저장은 정식 멤버에게 열립니다."),
+      mobileScope.getByText("세션 기록은 읽을 수 있어요. RSVP, 체크인, 질문, 서평 저장은 정식 멤버에게 열립니다."),
     ).toBeVisible();
     expect(mobileScope.getByText("기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다")).toBeVisible();
     expect(mobileScope.getByText("보존된 읽기 기록")).toBeVisible();

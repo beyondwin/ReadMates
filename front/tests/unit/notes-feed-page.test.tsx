@@ -379,18 +379,18 @@ describe("NotesFeedPage", () => {
     );
     expect(within(picker as HTMLElement).queryByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "전체 세션" }));
+    await user.click(screen.getByRole("button", { name: "세션 목록" }));
 
-    const dialog = screen.getByRole("dialog", { name: "전체 세션" });
+    const dialog = screen.getByRole("dialog", { name: "세션 목록" });
 
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "전체 세션 닫기" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "세션 목록 닫기" })).toBeInTheDocument();
     expect(within(dialog).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).toHaveAttribute(
       "href",
       "/app/notes?sessionId=session-1",
     );
 
-    const sheetSearch = within(dialog).getByLabelText("전체 세션 검색");
+    const sheetSearch = within(dialog).getByLabelText("세션 목록 검색");
 
     await user.type(sheetSearch, "No.01");
 
@@ -402,9 +402,9 @@ describe("NotesFeedPage", () => {
 
     expect(within(dialog).getByText("일치하는 세션이 없습니다.")).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "전체 세션 닫기" }));
+    await user.click(within(dialog).getByRole("button", { name: "세션 목록 닫기" }));
 
-    expect(screen.queryByRole("dialog", { name: "전체 세션" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "세션 목록" })).not.toBeInTheDocument();
   });
 
   it("keeps an older selected session visible in the capped mobile recent picker", () => {
@@ -430,12 +430,12 @@ describe("NotesFeedPage", () => {
 
     renderNotesFeedPage();
 
-    const opener = screen.getByRole("button", { name: "전체 세션" });
+    const opener = screen.getByRole("button", { name: "세션 목록" });
     await user.click(opener);
 
-    const dialog = screen.getByRole("dialog", { name: "전체 세션" });
-    const search = within(dialog).getByLabelText("전체 세션 검색");
-    const closeButton = within(dialog).getByRole("button", { name: "전체 세션 닫기" });
+    const dialog = screen.getByRole("dialog", { name: "세션 목록" });
+    const search = within(dialog).getByLabelText("세션 목록 검색");
+    const closeButton = within(dialog).getByRole("button", { name: "세션 목록 닫기" });
     const lastSessionLink = within(dialog).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" });
 
     await waitFor(() => expect(search).toHaveFocus());
@@ -451,7 +451,7 @@ describe("NotesFeedPage", () => {
 
     await user.keyboard("{Escape}");
 
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "전체 세션" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "세션 목록" })).not.toBeInTheDocument());
     expect(opener).toHaveFocus();
   });
 

@@ -134,7 +134,7 @@ describe("MemberHome", () => {
     expect(mobileView.getByText("내 통계")).toBeInTheDocument();
     expect(mobileView.getByText("바로가기")).toBeInTheDocument();
     expect(mobileView.getByText("4개")).toBeInTheDocument();
-    expect(mobileView.getByText("전체 세션")).toBeInTheDocument();
+    expect(mobileView.getByText("누적 통계")).toBeInTheDocument();
     expect(mobileView.queryByText(/actions/i)).not.toBeInTheDocument();
     expect(mobileView.queryByText("current")).not.toBeInTheDocument();
 
@@ -155,7 +155,7 @@ describe("MemberHome", () => {
     );
     expect(mobileView.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
     expect(mobileView.queryByRole("link", { name: /아카이브/ })).not.toBeInTheDocument();
-    expect(mobileView.queryByRole("link", { name: /클럽 노트/ })).not.toBeInTheDocument();
+    expect(mobileView.getByRole("link", { name: /클럽 노트/ })).toHaveAttribute("href", "/app/notes");
   });
 
   it("shows viewer members a read-only notice on member home", () => {
@@ -170,9 +170,9 @@ describe("MemberHome", () => {
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
     expect(desktop.getByText("둘러보기 멤버")).toBeInTheDocument();
-    expect(desktop.getByText("전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.")).toBeInTheDocument();
+    expect(desktop.getByText("세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.")).toBeInTheDocument();
     expect(mobile.getAllByText("둘러보기 멤버").length).toBeGreaterThan(0);
-    expect(mobile.getAllByText("전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.").length).toBeGreaterThan(0);
+    expect(mobile.getAllByText("세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.").length).toBeGreaterThan(0);
     expect(mobile.getByText("읽기 전용")).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: /세션 읽기/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobile.queryByRole("link", { name: /질문 쓰기/ })).not.toBeInTheDocument();
@@ -320,7 +320,7 @@ describe("MemberHome", () => {
     expect(desktop.getByText("RSVP · 참석 명단")).toBeInTheDocument();
     expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
     expect(desktop.getByText("바로가기")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: /전체 피드/ })).toHaveAttribute("href", "/app/notes");
+    expect(desktop.getByRole("link", { name: /클럽 노트/ })).toHaveAttribute("href", "/app/notes");
     expect(desktop.getByRole("link", { name: /피드백 문서/ })).toHaveAttribute(
       "href",
       "/app/archive?view=report",

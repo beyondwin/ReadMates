@@ -264,7 +264,7 @@ function ViewerMemberHomeNotice() {
         둘러보기 멤버
       </p>
       <p className="body" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
-        전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
+        세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
       </p>
     </section>
   );
@@ -277,7 +277,7 @@ function MobileViewerMemberHomeNotice() {
         둘러보기 멤버
       </p>
       <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
-        전체 세션은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
+        세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.
       </p>
     </div>
   );
