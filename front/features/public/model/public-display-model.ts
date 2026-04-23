@@ -30,6 +30,13 @@ export type PublicOneLinerView = {
   text: string;
 };
 
+export type PublicHighlightView = {
+  text: string;
+  sortOrder: number;
+  authorName: string | null;
+  authorShortName: string | null;
+};
+
 export type PublicSessionDetailView = {
   sessionId: string;
   sessionNumber: number;
@@ -38,7 +45,7 @@ export type PublicSessionDetailView = {
   bookImageUrl: string | null;
   date: string;
   summary: string;
-  highlights: string[];
+  highlights: PublicHighlightView[];
   oneLiners: PublicOneLinerView[];
 };
 

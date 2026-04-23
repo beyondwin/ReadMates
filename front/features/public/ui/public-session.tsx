@@ -81,15 +81,21 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
           </div>
           {highlightCount > 0 ? (
             <div className="public-note-highlight-list">
-              {session.highlights.map((highlight, index) => (
-                <article className="public-note-highlight-row" key={`${index}-${highlight}`}>
-                  <p className="public-note-highlight-row__quote editorial">{displayText(highlight, "회차 하이라이트가 준비 중입니다.")}</p>
-                  <div className="row public-note-author-row">
-                    <AvatarChip name="읽는사이" fallbackInitial="읽" label="읽는사이" size={20} />
-                    <span className="small">읽는사이</span>
-                  </div>
-                </article>
-              ))}
+              {session.highlights.map((highlight, index) => {
+                const authorName = displayText(highlight.authorName, "읽는사이");
+                const authorShortName = displayText(highlight.authorShortName, authorName === "읽는사이" ? "읽" : authorName);
+                const text = displayText(highlight.text, "회차 하이라이트가 준비 중입니다.");
+
+                return (
+                  <article className="public-note-highlight-row" key={`${index}-${highlight.sortOrder}-${highlight.authorName ?? "readmates"}-${highlight.text}`}>
+                    <p className="public-note-highlight-row__quote editorial">{text}</p>
+                    <div className="row public-note-author-row">
+                      <AvatarChip name={authorName} fallbackInitial={authorShortName} label={authorName} size={20} />
+                      <span className="small">{authorName}</span>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="rm-empty-state public-empty-record">

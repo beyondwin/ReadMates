@@ -2,6 +2,7 @@ package com.readmates.publication.api
 
 import com.readmates.support.MySqlTestContainer
 import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -51,6 +52,9 @@ class PublicControllerDbTest(
                 jsonPath("$.meetingPasscode") { doesNotExist() }
                 jsonPath("$.summary") { exists() }
                 jsonPath("$.highlights.length()") { value(3) }
+                jsonPath("$.highlights[0].text") { value("모르는 영역을 피하는 전략과 배움을 확장하는 전략의 장단점을 비교했다.") }
+                jsonPath("$.highlights[*].authorName") { value(hasItems("이멤버5", "최멤버2", "송멤버4")) }
+                jsonPath("$.highlights[*].authorShortName") { value(hasItems("멤버5", "멤버2", "멤버4")) }
                 jsonPath("$.oneLiners.length()") { value(3) }
             }
     }
@@ -110,9 +114,10 @@ class PublicControllerDbTest(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.highlights.length()") { value(2) }
-                jsonPath("$.highlights[*]") {
+                jsonPath("$.highlights[*].text") {
                     value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다.")))
                 }
+                jsonPath("$.highlights[*].authorName") { value(not(hasItem("최멤버2"))) }
                 jsonPath("$.oneLiners.length()") { value(2) }
                 jsonPath("$.oneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
                 jsonPath("$.oneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
@@ -136,6 +141,10 @@ class PublicControllerDbTest(
         mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000301")
             .andExpect {
                 status { isOk() }
+                jsonPath("$.highlights[*].authorName") { value(hasItem("탈퇴한 멤버")) }
+                jsonPath("$.highlights[*].authorName") { value(not(hasItem("안멤버1"))) }
+                jsonPath("$.highlights[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
+                jsonPath("$.highlights[*].authorShortName") { value(not(hasItem("멤버1"))) }
                 jsonPath("$.oneLiners[*].authorName") { value(hasItem("탈퇴한 멤버")) }
                 jsonPath("$.oneLiners[*].authorName") { value(not(hasItem("안멤버1"))) }
                 jsonPath("$.oneLiners[*].authorShortName") { value(hasItem("탈퇴한 멤버")) }
