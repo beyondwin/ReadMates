@@ -360,7 +360,7 @@ function SessionHighlights({ session, mobile = false }: { session: MemberArchive
           </RecordGroup>
         ) : null}
         {hasOneLiners ? (
-          <RecordGroup title="텍스트 한줄평" count={session.clubOneLiners.length} mobile>
+          <RecordGroup title="한줄평" count={session.clubOneLiners.length} mobile>
             <OneLinerList oneLiners={session.clubOneLiners} mobile />
           </RecordGroup>
         ) : null}
@@ -376,7 +376,7 @@ function SessionHighlights({ session, mobile = false }: { session: MemberArchive
         </RecordGroup>
       ) : null}
       {hasOneLiners ? (
-        <RecordGroup title="텍스트 한줄평" count={session.clubOneLiners.length}>
+        <RecordGroup title="한줄평" count={session.clubOneLiners.length}>
           <OneLinerList oneLiners={session.clubOneLiners} />
         </RecordGroup>
       ) : null}

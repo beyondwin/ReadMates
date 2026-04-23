@@ -462,8 +462,13 @@ function FeedbackDocumentStyles() {
     <style>{`
       .rm-feedback-problem-fields {
         display: grid;
-        grid-template-columns: max-content minmax(0, 1fr);
+        grid-template-columns: minmax(34px, max-content) minmax(0, 1fr);
         gap: 10px 22px;
+      }
+
+      .rm-feedback-problem-fields dt,
+      .rm-feedback-problem-fields dd {
+        align-self: center;
       }
 
       .rm-feedback-document-meta {
@@ -530,12 +535,13 @@ function FeedbackDocumentStyles() {
 
       @media (max-width: 560px) {
         .rm-feedback-problem-fields {
-          grid-template-columns: minmax(0, 1fr);
-          gap: 4px;
+          grid-template-columns: 34px minmax(0, 1fr);
+          gap: 8px 14px;
         }
 
-        .rm-feedback-problem-fields dt:not(:first-child) {
-          margin-top: 8px;
+        .rm-feedback-problem-fields dt,
+        .rm-feedback-problem-fields dd {
+          align-self: start;
         }
       }
 
