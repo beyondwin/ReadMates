@@ -10,8 +10,8 @@ afterEach(() => {
 
 const publicClubFixture: PublicClubResponse = {
   clubName: "읽는사이",
-  tagline: "읽고 돌아와 서로의 생각을 듣는 독서모임",
-  about: "읽는사이는 매달 한 권의 책을 읽고 질문, 감상, 대화를 조용히 쌓아가는 독서모임입니다.",
+  tagline: "함께 읽고 각자의 언어로 남기는 독서모임",
+  about: "초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.",
   stats: {
     sessions: 6,
     books: 6,
@@ -36,10 +36,10 @@ describe("PublicClub", () => {
   it("renders API about and tagline, dynamic member count, and static operational introduction", () => {
     const { container } = render(<PublicClub data={publicClubFixture} />);
 
-    expect(container).toHaveTextContent("읽는사이 · 읽고 돌아와 서로의 생각을 듣는 독서모임");
-    expect(container).toHaveTextContent(
-      "읽는사이는 매달 한 권의 책을 읽고 질문, 감상, 대화를 조용히 쌓아가는 독서모임입니다.",
-    );
+    expect(screen.getByText("작게 읽고 깊게 나누는 모임")).toBeInTheDocument();
+    expect(screen.getByText("함께 읽고 각자의 언어로 남기는 독서모임")).toBeInTheDocument();
+    expect(container).toHaveTextContent("초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.");
+    expect(container).not.toHaveTextContent("읽는사이 · 함께 읽고 각자의 언어로 남기는 독서모임");
     expect(container).not.toHaveTextContent(
       "한 권의 책이 사람을 완전히 바꾼다고 믿지 않습니다. 그러나 책을 통해 지나가는 생각의 결이 천천히 변화를 만든다고 믿습니다.",
     );

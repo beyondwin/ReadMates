@@ -7,8 +7,8 @@ afterEach(cleanup);
 
 const publicClubFixture: PublicClubResponse = {
   clubName: "읽는사이",
-  tagline: "함께 읽고 남기는 공개 기록",
-  about: "한 달에 한 권을 읽고 서로의 생각 사이에 머무르는 독서 모임입니다.",
+  tagline: "함께 읽고 각자의 언어로 남기는 독서모임",
+  about: "초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.",
   stats: {
     sessions: 6,
     books: 6,
@@ -45,9 +45,10 @@ describe("PublicHome", () => {
     const { container } = render(<PublicHome data={publicClubFixture} />);
 
     expect(screen.getByRole("heading", { name: "읽는사이", level: 1 })).toBeInTheDocument();
+    expect(screen.getByText("작게 읽고 깊게 나누는 모임")).toBeInTheDocument();
     expect(container).toHaveTextContent("읽는사이");
-    expect(screen.getByText("함께 읽고 남기는 공개 기록")).toBeInTheDocument();
-    expect(container).toHaveTextContent("한 달에 한 권을 읽고 서로의 생각 사이에 머무르는 독서 모임입니다.");
+    expect(screen.getByText("함께 읽고 각자의 언어로 남기는 독서모임")).toBeInTheDocument();
+    expect(container).toHaveTextContent("초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.");
     expect(container).not.toHaveTextContent("읽는사이 · 공개 기록");
     expect(container).not.toHaveTextContent("공개 소개가 아직 준비되지 않았습니다.");
     expect(screen.getAllByText("가난한 찰리의 연감").length).toBeGreaterThan(0);

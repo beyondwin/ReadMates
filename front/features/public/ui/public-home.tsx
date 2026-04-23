@@ -182,7 +182,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
         <div className="container public-home-hero__grid">
           <div className="public-home-hero__copy">
             <div className="eyebrow" style={{ marginBottom: 16 }}>
-              {clubName}
+              작게 읽고 깊게 나누는 모임
             </div>
             <h1 className="display editorial" style={{ margin: 0 }}>
               {clubName}
