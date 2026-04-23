@@ -114,6 +114,7 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
     expect(screen.getByRole("link", { name: "뒤로" }).textContent).toBe("");
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveClass("m-hdr-back--icon");
+    expect(screen.getByRole("link", { name: "뒤로" }).querySelector(".rm-brand-mark")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveTextContent(/^멤버$/);
   });
@@ -191,7 +192,20 @@ describe("MobileHeader route titles and actions", () => {
 
     expect(screen.getByText("클럽 노트")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app");
+    expect(screen.getByRole("link", { name: "뒤로" }).textContent).toBe("");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveClass("m-hdr-back--icon");
+    expect(screen.getByRole("link", { name: "뒤로" }).querySelector(".rm-brand-mark")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
+  });
+
+  it("renders member session mobile chrome with a brand mark back link", () => {
+    renderAt("/app/session/current", <MobileHeader variant="member" />);
+
+    expect(screen.getByText("이번 세션")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app");
+    expect(screen.getByRole("link", { name: "뒤로" }).textContent).toBe("");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveClass("m-hdr-back--icon");
+    expect(screen.getByRole("link", { name: "뒤로" }).querySelector(".rm-brand-mark")).toBeInTheDocument();
   });
 
   it("shows a compact mobile host workspace entry from member screens when requested", () => {
