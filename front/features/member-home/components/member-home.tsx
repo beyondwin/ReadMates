@@ -229,7 +229,7 @@ function MobileMemberHome({
 
       <section className="m-sec">
         <div className="m-eyebrow-row">
-          <span className="eyebrow">현재 세션</span>
+          <span className="eyebrow">이번 세션</span>
           {session ? (
             <span className="tiny mono" style={{ color: "var(--text-3)" }}>
               No.{String(session.sessionNumber).padStart(2, "0")}

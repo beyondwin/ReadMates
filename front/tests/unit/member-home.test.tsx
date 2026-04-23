@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import MemberHome from "@/features/member-home/components/member-home";
 import { attendanceSummaryFromMyPage } from "@/features/member-home/components/member-home-records-utils";
 import type {
@@ -10,6 +10,9 @@ import type {
 } from "@/features/member-home/api/member-home-contracts";
 
 afterEach(cleanup);
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const auth: AuthMeResponse = {
   authenticated: true,
@@ -128,7 +131,7 @@ describe("MemberHome", () => {
     const mobileElement = mobile as HTMLElement;
     const mobileView = within(mobileElement);
     expect(mobileView.getByText("안녕하세요, 수님.")).toBeInTheDocument();
-    expect(mobileView.getByText("현재 세션")).toBeInTheDocument();
+    expect(mobileView.getByText("이번 세션")).toBeInTheDocument();
     expect(mobileView.getByText("오늘 할 일")).toBeInTheDocument();
     expect(mobileView.getByText("멤버 활동")).toBeInTheDocument();
     expect(mobileView.getByText("내 통계")).toBeInTheDocument();
@@ -156,6 +159,17 @@ describe("MemberHome", () => {
     expect(mobileView.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
     expect(mobileView.queryByRole("link", { name: /아카이브/ })).not.toBeInTheDocument();
     expect(mobileView.getByRole("link", { name: /클럽 노트/ })).toHaveAttribute("href", "/app/notes");
+  });
+
+  it("renders the mobile session number before the days-until label", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-30T00:00:00+09:00"));
+
+    const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
+    const metaLine = container.querySelector(".rm-member-home-mobile .rm-member-session-card__meta-line");
+
+    expect(metaLine).not.toBeNull();
+    expect(metaLine).toHaveTextContent("No.07 · 20일 후");
   });
 
   it("shows viewer members a read-only notice on member home", () => {
