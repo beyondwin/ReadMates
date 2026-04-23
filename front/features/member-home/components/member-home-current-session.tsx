@@ -204,8 +204,8 @@ export function MobileCurrentSessionCard({
       <div className="rm-member-session-card__head">
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="rm-member-session-card__meta-line">
-            <div className="eyebrow">이번 세션{dday ? ` · ${dday}` : ""}</div>
             <span className="badge badge-accent badge-dot">No.{String(session.sessionNumber).padStart(2, "0")}</span>
+            {dday ? <span className="eyebrow"> · {dday}</span> : null}
           </div>
           <h2 className="h3 editorial rm-member-session-card__title">{bookTitle}</h2>
           <div className="tiny" style={{ color: "var(--text-2)" }}>
