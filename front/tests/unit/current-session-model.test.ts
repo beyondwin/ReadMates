@@ -148,12 +148,12 @@ describe("current session view model", () => {
     expect(
       getCurrentSessionBoardTabs({
         questions: [{ id: 1 }, { id: 2 }],
-        checkins: [{ id: 1 }],
+        oneLineReviews: [{ id: 1 }],
         highlights: [],
       }),
     ).toEqual([
       { key: "questions", label: "질문 · 2", count: 2 },
-      { key: "checkins", label: "읽기 흔적 · 1", count: 1 },
+      { key: "oneLineReviews", label: "한줄평 · 1", count: 1 },
       { key: "highlights", label: "하이라이트 · 0", count: 0 },
     ]);
 

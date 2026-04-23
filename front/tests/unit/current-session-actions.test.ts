@@ -59,7 +59,7 @@ describe("current session actions", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await saveCurrentSessionCheckin(72, "chapter notes");
+    await saveCurrentSessionCheckin(72);
     await saveCurrentSessionQuestions([{ text: "first question" }, { text: "second question" }]);
     await saveCurrentSessionLongReview("long review");
     await saveCurrentSessionOneLineReview("one line");
@@ -68,7 +68,7 @@ describe("current session actions", () => {
     expectJsonRequest(fetchMock, 1, {
       path: "/api/bff/api/sessions/current/checkin",
       method: "PUT",
-      body: { readingProgress: 72, note: "chapter notes" },
+      body: { readingProgress: 72 },
     });
     expectJsonRequest(fetchMock, 2, {
       path: "/api/bff/api/sessions/current/questions",
@@ -96,7 +96,7 @@ describe("current session actions", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await saveCheckin(72, "chapter notes");
+    await saveCheckin(72);
     await saveQuestion(1, "single question", "draft thought");
     await saveQuestions([{ text: "first question" }, { text: "second question" }]);
     await saveLongReview("long review");
@@ -106,7 +106,7 @@ describe("current session actions", () => {
     expectJsonRequest(fetchMock, 1, {
       path: "/api/bff/api/sessions/current/checkin",
       method: "PUT",
-      body: { readingProgress: 72, note: "chapter notes" },
+      body: { readingProgress: 72 },
     });
     expectJsonRequest(fetchMock, 2, {
       path: "/api/bff/api/sessions/current/questions",
@@ -141,14 +141,14 @@ describe("current session actions", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", { assign: assignMock });
 
-    await expect(saveCheckin(10, "expired")).rejects.toThrow("ReadMates session expired");
+    await expect(saveCheckin(10)).rejects.toThrow("ReadMates session expired");
 
     expect(assignMock).toHaveBeenCalledWith("/login");
   });
 
   it.each([
     ["rsvp", { intent: "rsvp", status: "GOING" }],
-    ["checkin", { intent: "checkin", readingProgress: 35, note: "blocked" }],
+    ["checkin", { intent: "checkin", readingProgress: 35 }],
     ["questions", { intent: "questions", questions: [{ text: "blocked question" }] }],
     ["longReview", { intent: "longReview", body: "blocked review" }],
     ["oneLineReview", { intent: "oneLineReview", text: "blocked line" }],

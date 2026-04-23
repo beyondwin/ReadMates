@@ -25,4 +25,18 @@ describe("API contract fixtures", () => {
     expect(hostSessionPublicationContractFixture.isPublic).toBe(true);
     expect(feedbackDocumentContractFixture.participants[0]?.revealingQuote.quote).toBeTruthy();
   });
+
+  it("represents the reading progress and one-line contract migration", () => {
+    const currentSession = currentSessionContractFixture.currentSession;
+
+    expect(currentSession?.myCheckin).toHaveProperty("readingProgress", 72);
+    expect(currentSession?.myCheckin).not.toHaveProperty("note");
+    expect(currentSession?.board.oneLineReviews).toHaveLength(1);
+    expect(currentSession?.board).not.toHaveProperty("checkins");
+
+    expect(archiveSessionDetailContractFixture.clubOneLiners).toHaveLength(1);
+    expect(archiveSessionDetailContractFixture).not.toHaveProperty("clubCheckins");
+    expect(archiveSessionDetailContractFixture.myCheckin).toHaveProperty("readingProgress", 100);
+    expect(archiveSessionDetailContractFixture.myCheckin).not.toHaveProperty("note");
+  });
 });

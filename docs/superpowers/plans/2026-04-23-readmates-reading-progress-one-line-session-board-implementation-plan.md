@@ -842,7 +842,7 @@ git commit -m "feat: remove checkins from member notes and archive"
 - Test: `front/tests/unit/current-session-actions.test.ts`
 - Test: `front/tests/unit/current-session-model.test.ts`
 
-- [ ] **Step 1: Update current-session action tests first**
+- [x] **Step 1: Update current-session action tests first**
 
 In `front/tests/unit/current-session-actions.test.ts`, update checkin assertions to expect no `note` in the body:
 
@@ -864,7 +864,7 @@ Update route action payload test for checkin:
 ["checkin", { intent: "checkin", readingProgress: 35 }],
 ```
 
-- [ ] **Step 2: Update board tab model test first**
+- [x] **Step 2: Update board tab model test first**
 
 In `current-session-model.test.ts`, replace the board tab expectation:
 
@@ -882,7 +882,7 @@ expect(
 ]);
 ```
 
-- [ ] **Step 3: Run focused frontend contract tests and verify failures**
+- [x] **Step 3: Run focused frontend contract tests and verify failures**
 
 Run:
 
@@ -892,7 +892,7 @@ pnpm --dir front exec vitest run tests/unit/current-session-actions.test.ts test
 
 Expected: FAIL because the API still requires `note` and board tabs still use `checkins`.
 
-- [ ] **Step 4: Update current-session contract types**
+- [x] **Step 4: Update current-session contract types**
 
 In both `current-session-contracts.ts` and `current-session-types.ts`, replace checkin and board shapes:
 
@@ -929,7 +929,7 @@ Replace `BoardCheckin` export with:
 export type BoardOneLineReview = CurrentSession["board"]["oneLineReviews"][number];
 ```
 
-- [ ] **Step 5: Update checkin API functions**
+- [x] **Step 5: Update checkin API functions**
 
 In `current-session-api.ts`, replace:
 
@@ -964,7 +964,7 @@ In `current-session-data.ts`, remove `note` from `CurrentSessionActionPayload` a
 const response = await saveCurrentSessionCheckin(readingProgress);
 ```
 
-- [ ] **Step 6: Update view-model board tabs**
+- [x] **Step 6: Update view-model board tabs**
 
 In `current-session-view-model.ts`, update types:
 
@@ -988,7 +988,7 @@ return [
 ] satisfies Array<{ key: CurrentSessionBoardTab; label: string; count: number }>;
 ```
 
-- [ ] **Step 7: Update archive and notes contract types**
+- [x] **Step 7: Update archive and notes contract types**
 
 In `archive-contracts.ts`, remove `CHECKIN` from `NoteFeedItem["kind"]`, remove `checkinCount` from `NoteSessionItem`, remove `clubCheckins`, and add:
 
@@ -1016,7 +1016,7 @@ export const noteFeedFilters: Array<{ key: FeedFilter; label: string }> = [
 
 Remove `checkins` handling from `feedFilterFromSearchParam`, `noteKindLabel`, and `filterKind`.
 
-- [ ] **Step 8: Update shared fixtures**
+- [x] **Step 8: Update shared fixtures**
 
 In `api-contract-fixtures.ts`, update `currentSessionContractFixture`:
 
@@ -1055,7 +1055,7 @@ myCheckin: {
 },
 ```
 
-- [ ] **Step 9: Run focused frontend contract tests**
+- [x] **Step 9: Run focused frontend contract tests**
 
 Run:
 
@@ -1068,7 +1068,7 @@ pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit frontend contracts**
+- [x] **Step 10: Commit frontend contracts**
 
 Run:
 
