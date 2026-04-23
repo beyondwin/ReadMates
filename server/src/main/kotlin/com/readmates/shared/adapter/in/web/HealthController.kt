@@ -1,4 +1,4 @@
-package com.readmates.shared.api
+package com.readmates.shared.adapter.`in`.web
 
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
