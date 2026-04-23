@@ -14,12 +14,14 @@ class ServerArchitectureBoundaryTest {
         "com.readmates.session.adapter.in.web..",
         "com.readmates.note.adapter.in.web..",
         "com.readmates.publication.adapter.in.web..",
+        "com.readmates.archive.adapter.in.web..",
     )
 
     private val migratedApplicationPackages = arrayOf(
         "com.readmates.session.application..",
         "com.readmates.note.application..",
         "com.readmates.publication.application..",
+        "com.readmates.archive.application..",
     )
 
     @Test

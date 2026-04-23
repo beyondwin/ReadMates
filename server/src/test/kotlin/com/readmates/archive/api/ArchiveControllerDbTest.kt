@@ -1,5 +1,6 @@
 package com.readmates.archive.api
 
+import com.readmates.archive.adapter.`in`.web.ArchiveController
 import com.readmates.support.MySqlTestContainer
 import org.hamcrest.Matchers.emptyOrNullString
 import org.hamcrest.Matchers.everyItem

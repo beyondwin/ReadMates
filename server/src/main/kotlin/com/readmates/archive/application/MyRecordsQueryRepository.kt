@@ -1,9 +1,9 @@
 package com.readmates.archive.application
 
-import com.readmates.archive.api.MyArchiveQuestionItem
-import com.readmates.archive.api.MyArchiveReviewItem
-import com.readmates.archive.api.MyPageResponse
-import com.readmates.archive.api.MyRecentAttendanceItem
+import com.readmates.archive.application.model.MyArchiveQuestionResult
+import com.readmates.archive.application.model.MyArchiveReviewResult
+import com.readmates.archive.application.model.MyPageResult
+import com.readmates.archive.application.model.MyRecentAttendanceResult
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
@@ -16,7 +16,7 @@ import java.time.LocalDate
 class MyRecordsQueryRepository(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) {
-    fun findMyQuestions(currentMember: CurrentMember): List<MyArchiveQuestionItem> =
+    fun findMyQuestions(currentMember: CurrentMember): List<MyArchiveQuestionResult> =
         jdbcTemplateProvider.ifAvailable?.query(
             """
             select sessions.id, sessions.number, sessions.book_title, sessions.session_date,
@@ -30,7 +30,7 @@ class MyRecordsQueryRepository(
             order by sessions.number desc, questions.priority
             """.trimIndent(),
             { resultSet, _ ->
-                MyArchiveQuestionItem(
+                MyArchiveQuestionResult(
                     sessionId = resultSet.uuid("id").toString(),
                     sessionNumber = resultSet.getInt("number"),
                     bookTitle = resultSet.getString("book_title"),
@@ -44,7 +44,7 @@ class MyRecordsQueryRepository(
             currentMember.membershipId.dbString(),
         ) ?: emptyList()
 
-    fun findMyReviews(currentMember: CurrentMember): List<MyArchiveReviewItem> =
+    fun findMyReviews(currentMember: CurrentMember): List<MyArchiveReviewResult> =
         jdbcTemplateProvider.ifAvailable?.query(
             """
             select
@@ -63,7 +63,7 @@ class MyRecordsQueryRepository(
             order by sessions.number desc, long_reviews.created_at desc
             """.trimIndent(),
             { resultSet, _ ->
-                MyArchiveReviewItem(
+                MyArchiveReviewResult(
                     sessionId = resultSet.uuid("session_id").toString(),
                     sessionNumber = resultSet.getInt("session_number"),
                     bookTitle = resultSet.getString("book_title"),
@@ -76,9 +76,9 @@ class MyRecordsQueryRepository(
             currentMember.membershipId.dbString(),
         ) ?: emptyList()
 
-    fun findMyPage(currentMember: CurrentMember): MyPageResponse {
+    fun findMyPage(currentMember: CurrentMember): MyPageResult {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
-            ?: return MyPageResponse(
+            ?: return MyPageResult(
                 displayName = currentMember.displayName,
                 shortName = currentMember.shortName,
                 email = currentMember.email,
@@ -110,7 +110,7 @@ class MyRecordsQueryRepository(
             order by session_number asc
             """.trimIndent(),
             { resultSet, _ ->
-                MyRecentAttendanceItem(
+                MyRecentAttendanceResult(
                     sessionNumber = resultSet.getInt("session_number"),
                     attended = resultSet.getBoolean("attended"),
                 )
@@ -146,7 +146,7 @@ class MyRecordsQueryRepository(
               and memberships.club_id = ?
             """.trimIndent(),
             { resultSet, _ ->
-                MyPageResponse(
+                MyPageResult(
                     displayName = currentMember.displayName,
                     shortName = currentMember.shortName,
                     email = currentMember.email,
@@ -161,7 +161,7 @@ class MyRecordsQueryRepository(
             },
             currentMember.membershipId.dbString(),
             currentMember.clubId.dbString(),
-        ).firstOrNull() ?: MyPageResponse(
+        ).firstOrNull() ?: MyPageResult(
             displayName = currentMember.displayName,
             shortName = currentMember.shortName,
             email = currentMember.email,

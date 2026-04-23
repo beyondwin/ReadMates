@@ -1,14 +1,14 @@
 package com.readmates.archive.application
 
-import com.readmates.archive.api.ArchiveSessionItem
-import com.readmates.archive.api.MemberArchiveCheckinItem
-import com.readmates.archive.api.MemberArchiveFeedbackDocumentStatus
-import com.readmates.archive.api.MemberArchiveHighlightItem
-import com.readmates.archive.api.MemberArchiveLongReview
-import com.readmates.archive.api.MemberArchiveOneLineReview
-import com.readmates.archive.api.MemberArchiveOneLinerItem
-import com.readmates.archive.api.MemberArchiveQuestionItem
-import com.readmates.archive.api.MemberArchiveSessionDetailResponse
+import com.readmates.archive.application.model.ArchiveSessionResult
+import com.readmates.archive.application.model.MemberArchiveCheckinResult
+import com.readmates.archive.application.model.MemberArchiveFeedbackDocumentStatusResult
+import com.readmates.archive.application.model.MemberArchiveHighlightResult
+import com.readmates.archive.application.model.MemberArchiveLongReviewResult
+import com.readmates.archive.application.model.MemberArchiveOneLineReviewResult
+import com.readmates.archive.application.model.MemberArchiveOneLinerResult
+import com.readmates.archive.application.model.MemberArchiveQuestionResult
+import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
@@ -25,7 +25,7 @@ import java.util.UUID
 class ArchiveSessionQueryRepository(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) {
-    fun findArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionItem> {
+    fun findArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionResult> {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
 
         return jdbcTemplate.query(
@@ -94,7 +94,7 @@ class ArchiveSessionQueryRepository(
         )
     }
 
-    fun findArchiveSessionDetail(currentMember: CurrentMember, sessionId: UUID): MemberArchiveSessionDetailResponse? {
+    fun findArchiveSessionDetail(currentMember: CurrentMember, sessionId: UUID): MemberArchiveSessionDetailResult? {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
 
         return jdbcTemplate.query(
@@ -146,7 +146,7 @@ class ArchiveSessionQueryRepository(
                 val sessionNumber = resultSet.getInt("number")
                 val myAttendanceStatus = resultSet.getString("my_attendance_status")
 
-                MemberArchiveSessionDetailResponse(
+                MemberArchiveSessionDetailResult(
                     sessionId = sessionUuid.toString(),
                     sessionNumber = sessionNumber,
                     title = resultSet.getString("title"),
@@ -188,7 +188,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
-    ): List<MemberArchiveHighlightItem> =
+    ): List<MemberArchiveHighlightResult> =
         jdbcTemplate.query(
             """
             select
@@ -212,7 +212,7 @@ class ArchiveSessionQueryRepository(
             order by highlights.sort_order, highlights.created_at
             """.trimIndent(),
             { resultSet, _ ->
-                MemberArchiveHighlightItem(
+                MemberArchiveHighlightResult(
                     text = resultSet.getString("text"),
                     sortOrder = resultSet.getInt("sort_order"),
                     authorName = resultSet.getString("author_name"),
@@ -227,7 +227,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
-    ): List<MemberArchiveQuestionItem> =
+    ): List<MemberArchiveQuestionResult> =
         jdbcTemplate.query(
             """
             select
@@ -249,7 +249,7 @@ class ArchiveSessionQueryRepository(
             order by questions.priority, users.name, questions.created_at
             """.trimIndent(),
             { resultSet, _ ->
-                MemberArchiveQuestionItem(
+                MemberArchiveQuestionResult(
                     priority = resultSet.getInt("priority"),
                     text = resultSet.getString("text"),
                     draftThought = resultSet.getString("draft_thought"),
@@ -265,7 +265,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
-    ): List<MemberArchiveOneLinerItem> =
+    ): List<MemberArchiveOneLinerResult> =
         jdbcTemplate.query(
             """
             select
@@ -286,7 +286,7 @@ class ArchiveSessionQueryRepository(
             order by one_line_reviews.created_at, users.name
             """.trimIndent(),
             { resultSet, _ ->
-                MemberArchiveOneLinerItem(
+                MemberArchiveOneLinerResult(
                     authorName = resultSet.getString("author_name"),
                     authorShortName = resultSet.getString("author_short_name"),
                     text = resultSet.getString("text"),
@@ -300,7 +300,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
-    ): List<MemberArchiveOneLinerItem> =
+    ): List<MemberArchiveOneLinerResult> =
         jdbcTemplate.query(
             """
             select
@@ -321,7 +321,7 @@ class ArchiveSessionQueryRepository(
             order by one_line_reviews.created_at, users.name
             """.trimIndent(),
             { resultSet, _ ->
-                MemberArchiveOneLinerItem(
+                MemberArchiveOneLinerResult(
                     authorName = resultSet.getString("author_name"),
                     authorShortName = resultSet.getString("author_short_name"),
                     text = resultSet.getString("text"),
@@ -335,7 +335,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): List<MemberArchiveQuestionItem> =
+    ): List<MemberArchiveQuestionResult> =
         jdbcTemplate.query(
             """
             select questions.priority, questions.text, questions.draft_thought, users.name as author_name
@@ -354,7 +354,7 @@ class ArchiveSessionQueryRepository(
             """.trimIndent(),
             { resultSet, _ ->
                 val authorName = resultSet.getString("author_name")
-                MemberArchiveQuestionItem(
+                MemberArchiveQuestionResult(
                     priority = resultSet.getInt("priority"),
                     text = resultSet.getString("text"),
                     draftThought = resultSet.getString("draft_thought"),
@@ -371,7 +371,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): MemberArchiveCheckinItem? =
+    ): MemberArchiveCheckinResult? =
         jdbcTemplate.query(
             """
             select reading_checkins.reading_progress
@@ -385,7 +385,7 @@ class ArchiveSessionQueryRepository(
               and reading_checkins.membership_id = ?
             """.trimIndent(),
             { resultSet, _ ->
-                MemberArchiveCheckinItem(
+                MemberArchiveCheckinResult(
                     readingProgress = resultSet.getInt("reading_progress"),
                 )
             },
@@ -398,7 +398,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): MemberArchiveOneLineReview? =
+    ): MemberArchiveOneLineReviewResult? =
         jdbcTemplate.query(
             """
             select text
@@ -415,7 +415,7 @@ class ArchiveSessionQueryRepository(
                   and session_participants.participation_status = 'ACTIVE'
               )
             """.trimIndent(),
-            { resultSet, _ -> MemberArchiveOneLineReview(text = resultSet.getString("text")) },
+            { resultSet, _ -> MemberArchiveOneLineReviewResult(text = resultSet.getString("text")) },
             currentMember.clubId.dbString(),
             sessionId.dbString(),
             currentMember.membershipId.dbString(),
@@ -425,7 +425,7 @@ class ArchiveSessionQueryRepository(
         jdbcTemplate: JdbcTemplate,
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): MemberArchiveLongReview? =
+    ): MemberArchiveLongReviewResult? =
         jdbcTemplate.query(
             """
             select body
@@ -442,7 +442,7 @@ class ArchiveSessionQueryRepository(
                   and session_participants.participation_status = 'ACTIVE'
               )
             """.trimIndent(),
-            { resultSet, _ -> MemberArchiveLongReview(body = resultSet.getString("body")) },
+            { resultSet, _ -> MemberArchiveLongReviewResult(body = resultSet.getString("body")) },
             currentMember.clubId.dbString(),
             sessionId.dbString(),
             currentMember.membershipId.dbString(),
@@ -454,7 +454,7 @@ class ArchiveSessionQueryRepository(
         sessionId: UUID,
         sessionNumber: Int,
         myAttendanceStatus: String?,
-    ): MemberArchiveFeedbackDocumentStatus {
+    ): MemberArchiveFeedbackDocumentStatusResult {
         val uploadedAt = jdbcTemplate.query(
             """
             select created_at
@@ -470,7 +470,7 @@ class ArchiveSessionQueryRepository(
         ).firstOrNull()
 
         if (uploadedAt == null) {
-            return MemberArchiveFeedbackDocumentStatus(
+            return MemberArchiveFeedbackDocumentStatusResult(
                 available = false,
                 readable = false,
                 lockedReason = "NOT_AVAILABLE",
@@ -480,7 +480,7 @@ class ArchiveSessionQueryRepository(
         }
 
         val readable = currentMember.isHost || (!currentMember.isViewer && myAttendanceStatus == "ATTENDED")
-        return MemberArchiveFeedbackDocumentStatus(
+        return MemberArchiveFeedbackDocumentStatusResult(
             available = true,
             readable = readable,
             lockedReason = if (readable) null else "NOT_ATTENDED",
@@ -489,14 +489,14 @@ class ArchiveSessionQueryRepository(
         )
     }
 
-    private fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): ArchiveSessionItem {
+    private fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): ArchiveSessionResult {
         val sessionNumber = getInt("number")
         val myAttendanceStatus = getString("my_attendance_status")
         val feedbackDocumentUploadedAt = utcOffsetDateTimeOrNull("feedback_document_uploaded_at")?.toString()
         val feedbackDocumentReadable = feedbackDocumentUploadedAt != null &&
             (currentMember.isHost || (!currentMember.isViewer && myAttendanceStatus == "ATTENDED"))
 
-        return ArchiveSessionItem(
+        return ArchiveSessionResult(
             sessionId = uuid("id").toString(),
             sessionNumber = sessionNumber,
             title = getString("title"),
@@ -508,7 +508,7 @@ class ArchiveSessionQueryRepository(
             total = getInt("total"),
             published = getBoolean("published"),
             state = getString("state"),
-            feedbackDocument = MemberArchiveFeedbackDocumentStatus(
+            feedbackDocument = MemberArchiveFeedbackDocumentStatusResult(
                 available = feedbackDocumentUploadedAt != null,
                 readable = feedbackDocumentReadable,
                 lockedReason = when {

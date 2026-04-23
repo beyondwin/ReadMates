@@ -1,10 +1,10 @@
 package com.readmates.archive.application
 
-import com.readmates.archive.api.ArchiveSessionItem
-import com.readmates.archive.api.MemberArchiveSessionDetailResponse
-import com.readmates.archive.api.MyArchiveQuestionItem
-import com.readmates.archive.api.MyArchiveReviewItem
-import com.readmates.archive.api.MyPageResponse
+import com.readmates.archive.application.model.ArchiveSessionResult
+import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
+import com.readmates.archive.application.model.MyArchiveQuestionResult
+import com.readmates.archive.application.model.MyArchiveReviewResult
+import com.readmates.archive.application.model.MyPageResult
 import com.readmates.note.api.NoteFeedItem
 import com.readmates.note.api.NoteSessionItem
 import com.readmates.shared.security.CurrentMember
@@ -17,22 +17,22 @@ class ArchiveRepository(
     private val myRecordsQueryRepository: MyRecordsQueryRepository,
     private val notesFeedQueryRepository: NotesFeedQueryRepository,
 ) {
-    fun findArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionItem> =
+    fun findArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionResult> =
         archiveSessionQueryRepository.findArchiveSessions(currentMember)
 
     fun findArchiveSessionDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): MemberArchiveSessionDetailResponse? =
+    ): MemberArchiveSessionDetailResult? =
         archiveSessionQueryRepository.findArchiveSessionDetail(currentMember, sessionId)
 
-    fun findMyQuestions(currentMember: CurrentMember): List<MyArchiveQuestionItem> =
+    fun findMyQuestions(currentMember: CurrentMember): List<MyArchiveQuestionResult> =
         myRecordsQueryRepository.findMyQuestions(currentMember)
 
-    fun findMyReviews(currentMember: CurrentMember): List<MyArchiveReviewItem> =
+    fun findMyReviews(currentMember: CurrentMember): List<MyArchiveReviewResult> =
         myRecordsQueryRepository.findMyReviews(currentMember)
 
-    fun findMyPage(currentMember: CurrentMember): MyPageResponse =
+    fun findMyPage(currentMember: CurrentMember): MyPageResult =
         myRecordsQueryRepository.findMyPage(currentMember)
 
     fun findNoteSessions(clubId: UUID): List<NoteSessionItem> =
