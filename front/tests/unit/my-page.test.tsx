@@ -154,7 +154,7 @@ describe("MyPage", () => {
     expect(scoped.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(scoped.getByText("나의 리듬")).toBeInTheDocument();
     expect(scoped.getByText("피드백 문서")).toBeInTheDocument();
-    expect(scoped.getByText("· 최근 3개")).toBeInTheDocument();
+    expect(scoped.getByText("· 전체 1개")).toBeInTheDocument();
     expect(scoped.getByText("내가 남긴 문장")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: /모임 전에 꺼낸 질문과 초안/ })).toHaveAttribute("href", "/app/archive?view=questions");
     expect(scoped.getByRole("link", { name: /한줄평과 장문 서평/ })).toHaveAttribute("href", "/app/archive?view=reviews");
@@ -227,7 +227,7 @@ describe("MyPage", () => {
     expect(scoped.queryByText("테마 · 표시")).not.toBeInTheDocument();
     expect(scoped.queryByText("연결 안 됨")).not.toBeInTheDocument();
     expect(scoped.queryByText("라이트")).not.toBeInTheDocument();
-    expect(scoped.getByText("· 최근 3개")).toBeInTheDocument();
+    expect(scoped.getByText("· 전체 1개")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
@@ -258,9 +258,9 @@ describe("MyPage", () => {
       expect(desktop.getByText(title)).toBeInTheDocument();
     }
     expect(desktop.queryByText("팩트풀니스")).not.toBeInTheDocument();
-    expect(desktop.getByText("· 최근 3개")).toBeInTheDocument();
+    expect(desktop.getByText("· 전체 4개")).toBeInTheDocument();
 
-    expect(mobile.getByText("· 최근 3개")).toBeInTheDocument();
+    expect(mobile.getByText("· 전체 4개")).toBeInTheDocument();
     expect(mobile.getByText("모순")).toBeInTheDocument();
     expect(mobile.getByText("작별하지 않는다")).toBeInTheDocument();
     expect(mobile.getByText("냉정한 이타주의자")).toBeInTheDocument();
