@@ -201,7 +201,7 @@ function ArchiveDesktop({
 }) {
   return (
     <>
-      <section className="page-header-compact">
+      <section className="page-header-compact" style={{ paddingBottom: 0 }}>
         <div className="container">
           <p className="eyebrow" style={{ margin: 0 }}>
             아카이브

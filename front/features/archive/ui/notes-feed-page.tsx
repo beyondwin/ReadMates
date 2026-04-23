@@ -54,8 +54,12 @@ export default function NotesFeedPage({
           align-items: start;
         }
 
+        .rm-notes-feed-page__header {
+          padding-bottom: 0;
+        }
+
         .rm-notes-feed-page__body {
-          padding: 40px 0 80px;
+          padding: 28px 0 80px;
         }
 
         .rm-notes-feed-page__mobile-picker {
@@ -63,8 +67,8 @@ export default function NotesFeedPage({
         }
 
         @media (max-width: 768px) {
-          .rm-notes-feed-page .page-header-compact {
-            padding: 24px 0 18px;
+          .rm-notes-feed-page .page-header-compact.rm-notes-feed-page__header {
+            padding: 24px 0 0;
           }
 
           .rm-notes-feed-page__layout {
@@ -72,12 +76,12 @@ export default function NotesFeedPage({
           }
 
           .rm-notes-feed-page__body {
-            padding: 24px 0 80px;
+            padding: 28px 0 80px;
           }
         }
       `}</style>
 
-      <section className="page-header-compact">
+      <section className="page-header-compact rm-notes-feed-page__header">
         <div className="container">
           <SelectedSessionHeader session={displayedSession} />
           <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 0", maxWidth: 620 }}>
