@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PublicSession from "@/features/public/ui/public-session";
@@ -165,6 +165,10 @@ describe("PublicSession", () => {
     expect(screen.getByRole("heading", { name: "모임에서 남은 문장" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "짧게 남긴 감상" })).toBeInTheDocument();
     expect(container.querySelector(".public-note-highlight-row")).not.toBeNull();
+    const highlightRow = screen.getByText("세계를 오해하게 만드는 본능을 점검했습니다.").closest(".public-note-highlight-row");
+    expect(highlightRow).not.toBeNull();
+    expect(within(highlightRow as HTMLElement).getByText("읽는사이")).toBeInTheDocument();
+    expect(within(highlightRow as HTMLElement).getByLabelText("읽는사이")).toHaveTextContent("읽");
     expect(container.querySelector(".public-note-oneliner-card")).not.toBeNull();
     expect(container).not.toHaveTextContent("H01");
     expect(container).not.toHaveTextContent("R01");

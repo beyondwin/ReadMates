@@ -1200,7 +1200,8 @@
     width: 2px;
   }
 
-  .public-note-oneliner-card .public-note-author-row {
+  .public-note-oneliner-card .public-note-author-row,
+  .public-note-highlight-row .public-note-author-row {
     padding-left: 22px;
   }
 
