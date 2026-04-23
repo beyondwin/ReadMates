@@ -137,7 +137,7 @@ function MyMobile({
 }) {
   return (
     <div className="rm-my-mobile m-body">
-      <section style={{ padding: "18px 18px 8px" }}>
+      <section style={{ padding: "24px 18px 8px" }}>
         <div className="m-card">
           <div className="m-row" style={{ gap: 14 }}>
             <AvatarChip name={data.displayName} fallbackInitial={data.shortName} label={data.displayName} size={56} />

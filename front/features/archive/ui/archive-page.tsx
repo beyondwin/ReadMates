@@ -267,7 +267,7 @@ function ArchiveMobile({
 }) {
   return (
     <div className="rm-archive-mobile m-body">
-      <section style={{ padding: "12px 18px 16px" }}>
+      <section style={{ padding: "24px 18px 16px" }}>
         <div className="eyebrow">아카이브</div>
         <h1 className="h2 editorial" style={{ margin: "6px 0 6px" }}>
           읽어 온 자리

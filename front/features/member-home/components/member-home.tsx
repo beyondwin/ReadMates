@@ -24,7 +24,7 @@ import type {
   MemberHomeMyPageResponse as MyPageResponse,
   MemberHomeNoteFeedItem as NoteFeedItem,
 } from "@/features/member-home/api/member-home-contracts";
-import { rsvpLabel } from "@/shared/ui/readmates-display";
+import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 
 const quickLinks = [
   { label: "피드백 문서", sub: "회차 피드백", href: "/app/archive?view=report", icon: "notes" },
@@ -216,7 +216,7 @@ function MobileMemberHome({
     <div className="mobile-only rm-member-home-mobile m-body">
       <section className="rm-member-home-mobile__hero">
         <div className="tiny mono" style={{ color: "var(--text-3)", letterSpacing: "0.1em" }}>
-          {mobileTodayLabel()}
+          {formatMobileTodayLabel()}
         </div>
         <h1 className="h2 editorial" style={{ margin: "8px 0 0" }}>
           안녕하세요, {memberName}님.
@@ -245,16 +245,6 @@ function MobileMemberHome({
       <MobileQuickLinks />
     </div>
   );
-}
-
-function mobileTodayLabel() {
-  const today = new Date();
-  return new Intl.DateTimeFormat("ko-KR", {
-    timeZone: "Asia/Seoul",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(today);
 }
 
 function ViewerMemberHomeNotice() {

@@ -22,11 +22,16 @@ import {
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { READMATES_NAV_LABELS } from "@/shared/ui/readmates-copy";
-import { formatDateOnlyLabel, hostAlertStateLabel, nonNegativeCount, rsvpLabel } from "@/shared/ui/readmates-display";
+import {
+  formatDateOnlyLabel,
+  formatMobileTodayLabel,
+  hostAlertStateLabel,
+  nonNegativeCount,
+  rsvpLabel,
+} from "@/shared/ui/readmates-display";
 import { SessionIdentity } from "@/shared/ui/session-identity";
 
 const HOST_DASHBOARD_LABELS = {
-  operations: "운영 원장",
   attention: "오늘의 운영 판단",
   upcoming: "세션 준비 문서",
   operationTimeline: "운영 일정",
@@ -191,9 +196,9 @@ export default function HostDashboard({
           <div className="container">
             <div className="row-between" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
               <div>
-                <div className="eyebrow">{HOST_DASHBOARD_LABELS.operations} · {hostName}</div>
+                <div className="eyebrow">{hostName}님</div>
                 <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-                  운영 원장
+                  모임 운영
                 </h1>
                 <div className="small" style={{ color: "var(--text-2)" }}>
                   세션 준비, 멤버 참여, 공개 기록, 초대 흐름을 작업 순서대로 확인합니다.
@@ -491,13 +496,13 @@ function MobileHostDashboard({
     <main className="mobile-only rm-host-dashboard-mobile m-body">
       <section className="rm-host-dashboard-mobile__hero">
         <div>
-          <div className="eyebrow">
-            {HOST_DASHBOARD_LABELS.operations} · {hostName}
+          <div className="tiny mono" style={{ color: "var(--text-3)", letterSpacing: "0.1em" }}>
+            {formatMobileTodayLabel()}
           </div>
-          <h1 className="h2 editorial rm-host-dashboard-mobile__title">운영 원장</h1>
+          <h1 className="h2 editorial rm-host-dashboard-mobile__title">모임 운영</h1>
         </div>
         <div className="small" style={{ color: "var(--text-2)" }}>
-          세션 준비, 멤버 참여, 공개 기록, 초대 흐름을 작업 순서대로 확인합니다.
+          {hostName}님, 세션 준비, 멤버 참여, 공개 기록, 초대 흐름을 작업 순서대로 확인합니다.
         </div>
       </section>
 

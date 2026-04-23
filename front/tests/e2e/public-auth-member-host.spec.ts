@@ -38,7 +38,7 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
 
   await page.goto("/app/host");
   await expect(
-    page.locator("main.rm-host-dashboard-desktop").getByRole("heading", { name: "운영 원장" }),
+    page.locator("main.rm-host-dashboard-desktop").getByRole("heading", { name: "모임 운영" }),
   ).toBeVisible();
 
   await installPrintSpy(page);

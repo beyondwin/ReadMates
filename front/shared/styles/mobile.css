@@ -8,6 +8,8 @@
   --m-hdr-h: 52px;
   --m-safe-top: env(safe-area-inset-top, 0px);
   --m-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --m-page-x: 18px;
+  --m-page-top: 24px;
 }
 
 @media (max-width: 768px) {
@@ -164,8 +166,30 @@
 }
 
 /* Page sections */
-.m-sec { padding: 20px 18px; }
+.m-sec { padding: 20px var(--m-page-x); }
+.m-body > .m-sec:first-child { padding-top: var(--m-page-top); }
 .m-sec + .m-sec { padding-top: 0; }
+
+@media (max-width: 768px) {
+  .page-header-compact {
+    padding: var(--m-page-top) 0 18px;
+  }
+
+  .page-header-compact > .container {
+    padding-left: var(--m-page-x);
+    padding-right: var(--m-page-x);
+  }
+}
+
+.rm-current-session-empty-header {
+  padding: 48px 0;
+}
+
+@media (max-width: 768px) {
+  .rm-current-session-empty-header {
+    padding: var(--m-page-top) 0 18px;
+  }
+}
 
 /* Eyebrow row */
 .m-eyebrow-row {
@@ -659,11 +683,11 @@
 }
 
 .mobile-only.rm-member-home-mobile {
-  padding-top: 6px;
+  padding-top: 0;
 }
 
 .mobile-only .rm-member-home-mobile__hero {
-  padding: 18px 18px 8px;
+  padding: var(--m-page-top) var(--m-page-x) 8px;
 }
 
 /* Member home mobile */
@@ -755,7 +779,7 @@
   min-width: 0;
 }
 .mobile-only .rm-current-session-mobile__hero {
-  padding: 10px 18px 18px;
+  padding: var(--m-page-top) var(--m-page-x) 18px;
 }
 .mobile-only .rm-current-session-mobile__hero-row {
   gap: 14px;
@@ -908,13 +932,14 @@
 /* Host dashboard mobile */
 .mobile-only.rm-host-dashboard-mobile {
   overflow-x: clip;
+  padding-top: 0;
 }
 .mobile-only.rm-host-dashboard-mobile,
 .mobile-only.rm-host-dashboard-mobile * {
   min-width: 0;
 }
 .mobile-only .rm-host-dashboard-mobile__hero {
-  padding: 12px 18px 16px;
+  padding: var(--m-page-top) var(--m-page-x) 8px;
 }
 .mobile-only .rm-host-dashboard-mobile__title {
   margin: 6px 0 4px;
@@ -981,6 +1006,13 @@
   border-radius: 0 !important;
 }
 
+@media (max-width: 768px) {
+  .rm-host-members-page__body {
+    padding-left: var(--m-page-x);
+    padding-right: var(--m-page-x);
+  }
+}
+
 /* Host session editor */
 .rm-host-session-editor__content {
   padding: 36px 0 80px;
@@ -1004,7 +1036,7 @@
     min-width: 0;
   }
   .rm-host-session-editor .page-header-compact {
-    padding: 10px 0 14px;
+    padding: var(--m-page-top) 0 14px;
   }
   .rm-host-session-editor .page-header-compact .h1 {
     font-size: 24px;

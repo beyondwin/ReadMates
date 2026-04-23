@@ -7,10 +7,10 @@ export function HostMembersRoute() {
   const members = useLoaderData() as HostMemberListItem[];
 
   return (
-    <main>
+    <main className="rm-host-members-page">
       <section className="page-header-compact">
         <div className="container">
-          <p className="eyebrow">운영 · 멤버 관리</p>
+          <div className="eyebrow">운영 · 멤버 관리</div>
           <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
             멤버 관리
           </h1>
@@ -19,7 +19,7 @@ export function HostMembersRoute() {
           </p>
         </div>
       </section>
-      <section className="container" style={{ paddingTop: 24, paddingBottom: 72 }}>
+      <section className="container rm-host-members-page__body" style={{ paddingTop: 24, paddingBottom: 72 }}>
         <HostMembers initialMembers={members} actions={hostMembersActions} />
       </section>
     </main>

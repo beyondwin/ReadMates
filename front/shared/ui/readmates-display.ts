@@ -68,6 +68,15 @@ export function formatDateOnlyLabel(value: string | null | undefined, fallback =
   return isValidDateOnly(year, month, day) ? dateOnlyLabel(year, month, day) : fallback;
 }
 
+export function formatMobileTodayLabel(now = new Date()) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(now);
+}
+
 export function formatDeadlineLabel(value: string | null | undefined, fallback = "마감 미정") {
   const text = displayText(value, fallback);
   if (text === fallback) {

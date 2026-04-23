@@ -190,7 +190,7 @@ export const routes: RouteObject[] = [
         element: <HostDashboardRouteElement />,
         loader: hostDashboardLoader,
         errorElement: <HostRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="운영 원장을 불러오는 중" variant="host" />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
       },
       {
         path: "members",
