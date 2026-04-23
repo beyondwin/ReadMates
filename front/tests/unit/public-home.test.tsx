@@ -67,7 +67,8 @@ describe("PublicHome", () => {
     expect(container.querySelector(".public-note-list")).not.toHaveTextContent("가난한 찰리의 연감");
     expect(container.querySelector(".public-note-list")).toHaveTextContent("지대넓얕 무한");
     expect(container.querySelector(".public-record-list")).toHaveTextContent("가난한 찰리의 연감");
-    expect(container.querySelector(".public-record-list")).toHaveTextContent("No.6");
+    expect(container.querySelector(".public-record-list")).not.toHaveTextContent("No.6");
+    expect(container.querySelectorAll(".public-record-list .public-archive-row__cover img")).toHaveLength(2);
     expect(container.querySelector(".public-record-list")).toHaveTextContent("지대넓얕 무한");
     expect(screen.getAllByText("공개 요약").length).toBeGreaterThan(0);
     expect(screen.getAllByText("하이라이트 3").length).toBeGreaterThan(0);
@@ -81,12 +82,35 @@ describe("PublicHome", () => {
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/login"]')).toHaveTextContent("기존 멤버 로그인");
     expect(container.querySelector('a[href="/login"]')).not.toHaveTextContent("초대 수락하기");
-    expect(screen.getByRole("link", { name: "최근 공개 기록" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute(
       "href",
       "/records",
     );
     expect(container.innerHTML).not.toContain("물고기는 존재하지 않는다");
     expect(container.innerHTML).not.toContain("session-13");
+  });
+
+  it("limits the home public record list to the latest three sessions", () => {
+    const sessions = [6, 5, 4, 3].map((sessionNumber) => ({
+      ...publicClubFixture.recentSessions[0],
+      sessionId: `session-${sessionNumber}`,
+      sessionNumber,
+      bookTitle: `Book ${sessionNumber}`,
+      bookImageUrl: `https://example.com/book-${sessionNumber}.jpg`,
+    }));
+
+    const { container } = render(<PublicHome data={{ ...publicClubFixture, recentSessions: sessions }} />);
+
+    const recordList = container.querySelector(".public-record-list") as HTMLElement;
+    const scoped = within(recordList);
+
+    expect(scoped.getAllByRole("link")).toHaveLength(3);
+    expect(scoped.getByText("Book 6")).toBeInTheDocument();
+    expect(scoped.getByText("Book 5")).toBeInTheDocument();
+    expect(scoped.getByText("Book 4")).toBeInTheDocument();
+    expect(scoped.queryByText("Book 3")).not.toBeInTheDocument();
+    expect(recordList).not.toHaveTextContent("No.6");
+    expect(recordList.querySelectorAll(".public-archive-row__cover img")).toHaveLength(3);
   });
 
   it("encodes public session links containing spaces and slashes", () => {

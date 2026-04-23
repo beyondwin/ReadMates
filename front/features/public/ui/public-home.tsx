@@ -91,7 +91,14 @@ function ArchiveRecordRow({ session }: { session: PublicSessionListItemView }) {
 
   return (
     <Link to={sessionHref(session)} className="rm-record-row public-archive-row">
-      <span className="mono tiny public-archive-row__number">No.{session.sessionNumber}</span>
+      <BookCover
+        title={display.title}
+        author={display.author}
+        imageUrl={session.bookImageUrl}
+        width={48}
+        className="public-archive-row__cover"
+        decorative
+      />
       <span className="public-archive-row__main">
         <span className="editorial public-archive-row__title">{display.title}</span>
         <span className="small public-archive-row__meta">
@@ -174,6 +181,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
   const secondarySessions = latestSession
     ? data.recentSessions.filter((session) => session.sessionId !== latestSession.sessionId)
     : data.recentSessions;
+  const publicRecordPreviewSessions = data.recentSessions.slice(0, 3);
   const { clubName, tagline, about, stats } = getPublicClubDisplay(data);
 
   return (
@@ -325,13 +333,13 @@ export default function PublicHome({ data }: PublicHomeProps) {
               </h2>
             </div>
             <Link to="/records" className="public-records-link">
-              최근 공개 기록
+              전체 보기
               <span aria-hidden>→</span>
             </Link>
           </div>
-          {data.recentSessions.length > 0 ? (
+          {publicRecordPreviewSessions.length > 0 ? (
             <div className="public-record-list">
-              {data.recentSessions.map((session) => (
+              {publicRecordPreviewSessions.map((session) => (
                 <ArchiveRecordRow key={session.sessionId} session={session} />
               ))}
             </div>

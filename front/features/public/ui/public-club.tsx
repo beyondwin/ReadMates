@@ -23,7 +23,14 @@ function PublicRecordLink({ session }: { session: PublicSessionListItemView }) {
 
   return (
     <Link to={sessionHref(session)} className="rm-record-row public-archive-row">
-      <span className="mono tiny public-archive-row__number">No.{session.sessionNumber}</span>
+      <BookCover
+        title={display.title}
+        author={display.author}
+        imageUrl={session.bookImageUrl}
+        width={48}
+        className="public-archive-row__cover"
+        decorative
+      />
       <span className="public-archive-row__main">
         <span className="editorial public-archive-row__title">{display.title}</span>
         <span className="small public-archive-row__meta">
@@ -76,6 +83,7 @@ function LatestRecordPanel({ session }: { session: PublicSessionListItemView | n
 
 export default function PublicClub({ data }: PublicClubProps) {
   const latestSession = data.recentSessions[0] ?? null;
+  const publicRecordPreviewSessions = data.recentSessions.slice(0, 3);
   const { clubName, tagline, about, stats } = getPublicClubDisplay(data);
   const memberCount = stats.members;
   const overviewItems = [
@@ -211,9 +219,9 @@ export default function PublicClub({ data }: PublicClubProps) {
             <div className="small">총 {data.recentSessions.length}개의 공개 기록</div>
           </div>
 
-          {data.recentSessions.length > 0 ? (
+          {publicRecordPreviewSessions.length > 0 ? (
             <div className="public-record-list">
-              {data.recentSessions.map((session) => (
+              {publicRecordPreviewSessions.map((session) => (
                 <PublicRecordLink key={session.sessionId} session={session} />
               ))}
             </div>
