@@ -1,5 +1,11 @@
-package com.readmates.session.application
+package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.HostSessionDeletionCounts
+import com.readmates.session.application.HostSessionDeletionNotAllowedException
+import com.readmates.session.application.HostSessionDeletionPreviewResponse
+import com.readmates.session.application.HostSessionDeletionResponse
+import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.requireHost
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
@@ -17,7 +23,7 @@ private data class HostSessionDeletionTarget(
 )
 
 @Repository
-class HostSessionDeletionRepository(
+class HostSessionDeletionQueries(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) {
     fun previewOpenSessionDeletion(member: CurrentMember, sessionId: UUID): HostSessionDeletionPreviewResponse {

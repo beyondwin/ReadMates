@@ -1,5 +1,18 @@
-package com.readmates.session.application
+package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.BoardHighlight
+import com.readmates.session.application.BoardLongReview
+import com.readmates.session.application.BoardOneLineReview
+import com.readmates.session.application.CurrentSessionBoard
+import com.readmates.session.application.CurrentSessionCheckin
+import com.readmates.session.application.CurrentSessionDetail
+import com.readmates.session.application.CurrentSessionLongReview
+import com.readmates.session.application.CurrentSessionNotOpenException
+import com.readmates.session.application.CurrentSessionOneLineReview
+import com.readmates.session.application.CurrentSessionPayload
+import com.readmates.session.application.CurrentSessionQuestion
+import com.readmates.session.application.SessionAttendee
+import com.readmates.session.application.port.out.LoadCurrentSessionPort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
@@ -13,10 +26,10 @@ import java.time.LocalTime
 import java.util.UUID
 
 @Repository
-class CurrentSessionRepository(
+class JdbcCurrentSessionAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    fun findCurrentSession(member: CurrentMember): CurrentSessionPayload {
+) : LoadCurrentSessionPort {
+    override fun loadCurrentSession(member: CurrentMember): CurrentSessionPayload {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return CurrentSessionPayload(null)
         val session = jdbcTemplate.query(
             """

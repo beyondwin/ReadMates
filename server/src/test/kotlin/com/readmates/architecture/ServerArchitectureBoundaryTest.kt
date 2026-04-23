@@ -17,6 +17,7 @@ class ServerArchitectureBoundaryTest {
         "com.readmates.archive.adapter.in.web..",
         "com.readmates.feedback.adapter.in.web..",
         "com.readmates.auth.adapter.in.web..",
+        "com.readmates.shared.adapter.in.web..",
     )
 
     private val migratedApplicationPackages = arrayOf(
@@ -25,6 +26,7 @@ class ServerArchitectureBoundaryTest {
         "com.readmates.publication.application..",
         "com.readmates.archive.application..",
         "com.readmates.feedback.application..",
+        "com.readmates.auth.application..",
     )
 
     @Test
@@ -59,6 +61,20 @@ class ServerArchitectureBoundaryTest {
             .resideInAnyPackage(
                 "..adapter.in.web..",
                 "..adapter.out.persistence..",
+            )
+            .check(importedClasses)
+    }
+
+    @Test
+    fun `migrated application packages do not depend on jdbc or dao frameworks`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage(*migratedApplicationPackages)
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "org.springframework.jdbc..",
+                "org.springframework.dao..",
             )
             .check(importedClasses)
     }

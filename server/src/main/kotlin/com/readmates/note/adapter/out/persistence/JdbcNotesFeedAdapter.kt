@@ -1,7 +1,8 @@
-package com.readmates.archive.application
+package com.readmates.note.adapter.out.persistence
 
-import com.readmates.note.api.NoteFeedItem
-import com.readmates.note.api.NoteSessionItem
+import com.readmates.note.application.model.NoteFeedResult
+import com.readmates.note.application.model.NoteSessionResult
+import com.readmates.note.application.port.out.LoadNotesFeedPort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import org.springframework.beans.factory.ObjectProvider
@@ -12,10 +13,10 @@ import java.time.LocalDate
 import java.util.UUID
 
 @Repository
-class NotesFeedQueryRepository(
+class JdbcNotesFeedAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    fun findNoteSessions(clubId: UUID): List<NoteSessionItem> {
+) : LoadNotesFeedPort {
+    override fun loadNoteSessions(clubId: UUID): List<NoteSessionResult> {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
 
         return jdbcTemplate.query(
@@ -97,7 +98,7 @@ class NotesFeedQueryRepository(
                 val longReviewCount = resultSet.getInt("long_review_count")
                 val highlightCount = resultSet.getInt("highlight_count")
 
-                NoteSessionItem(
+                NoteSessionResult(
                     sessionId = resultSet.uuid("id").toString(),
                     sessionNumber = resultSet.getInt("number"),
                     bookTitle = resultSet.getString("book_title"),
@@ -113,7 +114,7 @@ class NotesFeedQueryRepository(
         )
     }
 
-    fun findNotesFeed(clubId: UUID): List<NoteFeedItem> {
+    override fun loadNotesFeed(clubId: UUID): List<NoteFeedResult> {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
 
         return jdbcTemplate.query(
@@ -240,7 +241,7 @@ class NotesFeedQueryRepository(
               text
             limit 120
             """.trimIndent(),
-            { resultSet, _ -> resultSet.toNoteFeedItem() },
+            { resultSet, _ -> resultSet.toNoteFeedResult() },
             clubId.dbString(),
             clubId.dbString(),
             clubId.dbString(),
@@ -248,7 +249,7 @@ class NotesFeedQueryRepository(
         )
     }
 
-    fun findNotesFeedForSession(clubId: UUID, sessionId: UUID): List<NoteFeedItem> {
+    override fun loadNotesFeedForSession(clubId: UUID, sessionId: UUID): List<NoteFeedResult> {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
 
         return jdbcTemplate.query(
@@ -378,7 +379,7 @@ class NotesFeedQueryRepository(
               author_name,
               text
             """.trimIndent(),
-            { resultSet, _ -> resultSet.toNoteFeedItem() },
+            { resultSet, _ -> resultSet.toNoteFeedResult() },
             clubId.dbString(),
             sessionId.dbString(),
             clubId.dbString(),
@@ -390,11 +391,11 @@ class NotesFeedQueryRepository(
         )
     }
 
-    private fun ResultSet.toNoteFeedItem(): NoteFeedItem {
+    private fun ResultSet.toNoteFeedResult(): NoteFeedResult {
         val authorName = getString("author_name")
         val authorShortNameSource = getString("author_short_name_source")
 
-        return NoteFeedItem(
+        return NoteFeedResult(
             sessionId = uuid("session_id").toString(),
             sessionNumber = getInt("session_number"),
             bookTitle = getString("book_title"),
@@ -406,4 +407,13 @@ class NotesFeedQueryRepository(
         )
     }
 
+    private fun shortNameFor(displayName: String): String = when (displayName) {
+        "김호스트" -> "호스트"
+        "안멤버1" -> "멤버1"
+        "최멤버2" -> "멤버2"
+        "김멤버3" -> "멤버3"
+        "송멤버4" -> "멤버4"
+        "이멤버5" -> "멤버5"
+        else -> displayName
+    }
 }

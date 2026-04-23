@@ -1,6 +1,21 @@
-package com.readmates.session.application
+package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.CurrentSessionNotOpenException
+import com.readmates.session.application.InvalidQuestionSetException
+import com.readmates.session.application.model.CheckinResult
+import com.readmates.session.application.model.LongReviewResult
+import com.readmates.session.application.model.OneLineReviewResult
+import com.readmates.session.application.model.QuestionResult
 import com.readmates.session.application.model.ReplaceQuestionCommandItem
+import com.readmates.session.application.model.ReplaceQuestionsCommand
+import com.readmates.session.application.model.ReplaceQuestionsResult
+import com.readmates.session.application.model.RsvpResult
+import com.readmates.session.application.model.SaveCheckinCommand
+import com.readmates.session.application.model.SaveLongReviewCommand
+import com.readmates.session.application.model.SaveOneLineReviewCommand
+import com.readmates.session.application.model.SaveQuestionCommand
+import com.readmates.session.application.model.UpdateRsvpCommand
+import com.readmates.session.application.port.out.SessionParticipationWritePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
@@ -17,10 +32,55 @@ private data class CurrentQuestionTarget(
 )
 
 @Repository
-class SessionParticipationRepository(
+class JdbcSessionParticipationWriteAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
-) {
-    fun updateRsvp(member: CurrentMember, status: String): Map<String, String> {
+) : SessionParticipationWritePort {
+    override fun updateRsvp(command: UpdateRsvpCommand): RsvpResult {
+        val result = updateMemberRsvp(command.member, command.status)
+        return RsvpResult(status = result.getValue("status"))
+    }
+
+    override fun saveCheckin(command: SaveCheckinCommand): CheckinResult {
+        val result = saveMemberCheckin(command.member, command.readingProgress)
+        return CheckinResult(readingProgress = result.getValue("readingProgress") as Int)
+    }
+
+    override fun saveQuestion(command: SaveQuestionCommand): QuestionResult {
+        val result = saveMemberQuestion(command.member, command.priority, command.text, command.draftThought)
+        return QuestionResult(
+            priority = result.getValue("priority") as Int,
+            text = result.getValue("text") as String,
+            draftThought = result["draftThought"] as String?,
+        )
+    }
+
+    @Transactional
+    override fun replaceQuestions(command: ReplaceQuestionsCommand): ReplaceQuestionsResult {
+        val result = replaceMemberQuestions(command.member, command.questions)
+        @Suppress("UNCHECKED_CAST")
+        val questions = result.getValue("questions") as List<Map<String, Any?>>
+        return ReplaceQuestionsResult(
+            questions = questions.map { question ->
+                QuestionResult(
+                    priority = question.getValue("priority") as Int,
+                    text = question.getValue("text") as String,
+                    draftThought = question["draftThought"] as String?,
+                )
+            },
+        )
+    }
+
+    override fun saveOneLineReview(command: SaveOneLineReviewCommand): OneLineReviewResult {
+        val result = saveMemberOneLineReview(command.member, command.text)
+        return OneLineReviewResult(text = result.getValue("text"))
+    }
+
+    override fun saveLongReview(command: SaveLongReviewCommand): LongReviewResult {
+        val result = saveMemberLongReview(command.member, command.body)
+        return LongReviewResult(body = result.getValue("body"))
+    }
+
+    private fun updateMemberRsvp(member: CurrentMember, status: String): Map<String, String> {
         requireWritableMember(member)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -52,7 +112,7 @@ class SessionParticipationRepository(
         return mapOf("status" to status)
     }
 
-    fun saveCheckin(member: CurrentMember, readingProgress: Int): Map<String, Any> {
+    private fun saveMemberCheckin(member: CurrentMember, readingProgress: Int): Map<String, Any> {
         requireWritableMember(member)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -98,7 +158,7 @@ class SessionParticipationRepository(
         return mapOf("readingProgress" to readingProgress)
     }
 
-    fun saveQuestion(member: CurrentMember, priority: Int, text: String, draftThought: String?): Map<String, Any?> {
+    private fun saveMemberQuestion(member: CurrentMember, priority: Int, text: String, draftThought: String?): Map<String, Any?> {
         requireWritableMember(member)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -152,7 +212,7 @@ class SessionParticipationRepository(
     }
 
     @Transactional
-    fun replaceQuestions(member: CurrentMember, replacements: List<ReplaceQuestionCommandItem>): Map<String, Any> {
+    private fun replaceMemberQuestions(member: CurrentMember, replacements: List<ReplaceQuestionCommandItem>): Map<String, Any> {
         requireWritableMember(member)
         val questions = replacements.map { it.copy(text = it.text.trim()) }
         if (
@@ -240,7 +300,7 @@ class SessionParticipationRepository(
         )
     }
 
-    fun saveOneLineReview(member: CurrentMember, text: String): Map<String, String> {
+    private fun saveMemberOneLineReview(member: CurrentMember, text: String): Map<String, String> {
         requireWritableMember(member)
         val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
@@ -276,7 +336,7 @@ class SessionParticipationRepository(
         return mapOf("text" to text)
     }
 
-    fun saveLongReview(member: CurrentMember, body: String): Map<String, String> {
+    private fun saveMemberLongReview(member: CurrentMember, body: String): Map<String, String> {
         requireWritableMember(member)
         val jdbcTemplate = jdbcTemplate()
         val target = jdbcTemplate.query(
