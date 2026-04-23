@@ -124,7 +124,7 @@ function SummaryExcerpt({ session }: { session: PublicSessionListItemView }) {
 
 function ReadingRhythm() {
   const rhythm = [
-    ["읽기 전", "각자의 질문을 준비하고 우선순위를 매깁니다."],
+    ["모임 전", "책을 읽고 각자 나누고 싶은 질문을 준비합니다."],
     ["모임 중", "정답보다 서로의 해석이 어디서 갈라지는지 듣습니다."],
     ["모임 후", "공개 가능한 요약, 하이라이트, 한줄평만 기록으로 발행합니다."],
   ];
@@ -307,7 +307,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
               </PublicGuestOnlyActions>
             </div>
             <p className="tiny" style={{ margin: "14px 0 0", color: "var(--text-3)" }}>
-              기존 멤버는 Google 계정으로 로그인합니다. 새 멤버 참여는 호스트가 보낸 초대 링크가 있을 때만 열립니다.
+              새 멤버 참여는 호스트가 보낸 초대 링크가 있을 때만 열립니다.
             </p>
           </div>
         </div>
