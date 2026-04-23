@@ -6,8 +6,8 @@ import {
   MIN_QUESTION_INPUT_COUNT,
 } from "@/features/current-session/model/current-session-form-model";
 import type {
-  BoardCheckin,
   BoardHighlight,
+  BoardOneLineReview,
   BoardQuestion,
   CurrentSession,
   CurrentSessionInternalLinkProps,
@@ -86,8 +86,6 @@ export function MobileCurrentSessionBoard({
   rsvp,
   readingProgress,
   onReadingProgressChange,
-  checkinNote,
-  onCheckinNoteChange,
   questionInputs,
   questionValidationMessage,
   onQuestionChange,
@@ -120,8 +118,6 @@ export function MobileCurrentSessionBoard({
   rsvp: CurrentSession["myRsvpStatus"];
   readingProgress: number;
   onReadingProgressChange: (value: number) => void;
-  checkinNote: string;
-  onCheckinNoteChange: (value: string) => void;
   questionInputs: QuestionInput[];
   questionValidationMessage: string;
   onQuestionChange: (index: number, value: string) => void;
@@ -222,7 +218,6 @@ export function MobileCurrentSessionBoard({
           session={session}
           rsvp={rsvp}
           readingProgress={readingProgress}
-          checkinNote={checkinNote}
           writtenQuestionCount={writtenQuestionCount}
         />
       ) : null}
@@ -233,8 +228,6 @@ export function MobileCurrentSessionBoard({
             rsvp={rsvp}
             readingProgress={readingProgress}
             onReadingProgressChange={onReadingProgressChange}
-            checkinNote={checkinNote}
-            onCheckinNoteChange={onCheckinNoteChange}
             questionInputs={questionInputs}
             questionValidationMessage={questionValidationMessage}
             onQuestionChange={onQuestionChange}
@@ -300,7 +293,7 @@ function MobileViewerMemberNotice() {
       <div className="m-card-quiet" role="note">
         <div className="eyebrow">둘러보기 멤버</div>
         <p className="small" style={{ margin: "6px 0 0" }}>
-          전체 세션은 읽을 수 있어요. RSVP, 체크인, 질문, 서평 저장은 정식 멤버에게 열립니다.
+          전체 세션은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 저장은 정식 멤버에게 열립니다.
         </p>
       </div>
     </section>
@@ -311,13 +304,11 @@ function MobileViewerPrepSegment({
   session,
   rsvp,
   readingProgress,
-  checkinNote,
   writtenQuestionCount,
 }: {
   session: CurrentSession;
   rsvp: CurrentSession["myRsvpStatus"];
   readingProgress: number;
-  checkinNote: string;
   writtenQuestionCount: number;
 }) {
   return (
@@ -333,7 +324,7 @@ function MobileViewerPrepSegment({
           </p>
           <div className="rm-current-session-mobile__meta-grid" style={{ marginTop: 14 }}>
             <MobileReadOnlyStat label="RSVP" value={rsvpLabel(rsvp)} />
-            <MobileReadOnlyStat label="읽기 기록" value={`${readingProgress}%`} />
+            <MobileReadOnlyStat label="읽기 진행률" value={`${readingProgress}%`} />
             <MobileReadOnlyStat label="토론 질문" value={`${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`} />
             <MobileReadOnlyStat label="피드백 문서" value="정식 멤버 전환 후" />
           </div>
@@ -342,12 +333,12 @@ function MobileViewerPrepSegment({
 
       <section className="m-sec">
         <div className="m-card-quiet">
-          <div className="eyebrow">보존된 읽기 기록</div>
+          <div className="eyebrow">읽기 진행률</div>
           <div className="h4 editorial" style={{ marginTop: 6 }}>
             {readingProgress}%
           </div>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0", whiteSpace: "pre-wrap" }}>
-            {checkinNote.trim() || "아직 남긴 체크인 메모가 없습니다."}
+            진행률은 내 준비 상태와 호스트 운영 확인에 사용됩니다.
           </p>
         </div>
       </section>
@@ -375,8 +366,6 @@ function MobilePrepSegment({
   rsvp,
   readingProgress,
   onReadingProgressChange,
-  checkinNote,
-  onCheckinNoteChange,
   questionInputs,
   questionValidationMessage,
   onQuestionChange,
@@ -395,8 +384,6 @@ function MobilePrepSegment({
   rsvp: CurrentSession["myRsvpStatus"];
   readingProgress: number;
   onReadingProgressChange: (value: number) => void;
-  checkinNote: string;
-  onCheckinNoteChange: (value: string) => void;
   questionInputs: QuestionInput[];
   questionValidationMessage: string;
   onQuestionChange: (index: number, value: string) => void;
@@ -446,7 +433,7 @@ function MobilePrepSegment({
 
       <section className="m-sec">
         <div className="eyebrow" style={{ marginBottom: 10 }}>
-          읽기 체크인
+          읽기 진행률
         </div>
         <div className="m-card">
           <div className="m-row-between">
@@ -457,7 +444,7 @@ function MobilePrepSegment({
               </span>
             </div>
             <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-              다른 멤버에게도 보여요
+              운영 확인용
             </span>
           </div>
           <label className="label" htmlFor="mobile-checkin-progress" style={{ marginTop: 12 }}>
@@ -474,23 +461,10 @@ function MobilePrepSegment({
             onChange={(event) => onReadingProgressChange(Number(event.target.value))}
             style={{ marginTop: 14 }}
           />
-          <label className="label" htmlFor="mobile-checkin-note" style={{ marginTop: 14 }}>
-            체크인 메모
-          </label>
-          <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-            다른 멤버에게 보이는 짧은 읽기 기록입니다.
-          </p>
-          <textarea
-            id="mobile-checkin-note"
-            className="m-textarea"
-            rows={3}
-            value={checkinNote}
-            disabled={!canWrite}
-            onChange={(event) => onCheckinNoteChange(event.target.value)}
-            placeholder="멈춘 장면이나 떠오른 질문이 있다면 짧게 기록해 주세요."
-            style={{ marginTop: 14 }}
-          />
           <div className="rm-current-session-mobile__save-row">
+            <span className="tiny" style={{ color: "var(--text-3)" }}>
+              내 준비 상태와 호스트 운영 확인에 사용됩니다.
+            </span>
             <SaveFeedback scope="checkin" status={checkinSaveStatus} />
             <button
               type="button"
@@ -499,7 +473,7 @@ function MobilePrepSegment({
               aria-disabled={!canWrite || checkinSaveStatus === "saving"}
               onClick={onSaveCheckin}
             >
-              체크인 저장
+              진행률 저장
             </button>
           </div>
         </div>
@@ -644,12 +618,12 @@ function MobileBoardSegment({ session }: { session: CurrentSession }) {
 
       <section className="m-sec">
         <div className="m-eyebrow-row">
-          <span className="eyebrow">읽기 흔적</span>
+          <span className="eyebrow">한줄평</span>
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            {session.board.checkins.length}
+            {session.board.oneLineReviews.length}
           </span>
         </div>
-        <MobileCheckinList checkins={session.board.checkins} />
+        <MobileOneLineReviewList oneLineReviews={session.board.oneLineReviews} />
       </section>
 
       <section className="m-sec">
@@ -697,31 +671,21 @@ function MobileQuestionList({ questions }: { questions: BoardQuestion[] }) {
   );
 }
 
-function MobileCheckinList({ checkins }: { checkins: BoardCheckin[] }) {
-  if (checkins.length === 0) {
+function MobileOneLineReviewList({ oneLineReviews }: { oneLineReviews: BoardOneLineReview[] }) {
+  if (oneLineReviews.length === 0) {
     return <MobileEmptyBoardState />;
   }
 
   return (
-    <div className="m-list">
-      {checkins.map((checkin) => (
-        <div key={`${checkin.authorName}-${checkin.note}`} className="m-list-row rm-current-session-mobile__checkin-row">
-          <AvatarChip name={checkin.authorName} fallbackInitial={checkin.authorShortName} label={checkin.authorName} size={28} />
-          <div style={{ minWidth: 0 }}>
-            <div className="m-row-between" style={{ gap: 10 }}>
-              <span className="body" style={{ fontSize: 14, fontWeight: 500 }}>
-                {checkin.authorName}
-              </span>
-              <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-                {checkin.readingProgress}%
-              </span>
-            </div>
-            <div className="m-progress" style={{ marginTop: 7 }}>
-              <span style={{ width: `${checkin.readingProgress}%` }} />
-            </div>
-            <div className="tiny rm-current-session-mobile__line-clamp">{checkin.note}</div>
+    <div className="rm-current-session-mobile__card-stack">
+      {oneLineReviews.map((review) => (
+        <article key={`${review.authorName}-${review.text}`} className="m-card">
+          <div className="body editorial rm-current-session-mobile__board-text">{review.text}</div>
+          <div className="m-row" style={{ gap: 8, marginTop: 10, color: "var(--text-3)" }}>
+            <AvatarChip name={review.authorName} fallbackInitial={review.authorShortName} label={review.authorName} size={24} />
+            <span className="tiny">{review.authorName}</span>
           </div>
-        </div>
+        </article>
       ))}
     </div>
   );
@@ -794,7 +758,7 @@ function MobileRecordsSegment({
             한줄평 내용
           </label>
           <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-            모임 뒤 공개 기록에 남길 수 있는 한 문장입니다.
+            세션 참여자에게 보이는 한 문장입니다.
           </p>
           <input
             id="mobile-one-line-review"
@@ -806,7 +770,7 @@ function MobileRecordsSegment({
           />
           <div className="rm-current-session-mobile__save-row">
             <span className="tiny" style={{ color: "var(--text-3)" }}>
-              모임 종료 후 공개 · 이전까지는 본인만
+              세션 참여자 공개
             </span>
             <div className="m-row" style={{ gap: 10, justifyContent: "flex-end" }}>
               <SaveFeedback scope="oneLineReview" status={oneLineReviewSaveStatus} />
