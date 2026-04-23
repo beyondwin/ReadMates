@@ -79,19 +79,3 @@ export type MemberHomeNoteFeedItem = {
   kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
   text: string;
 };
-
-export type MemberHomeMyPageResponse = {
-  displayName: string;
-  shortName: string;
-  email: string;
-  role: MemberHomeMemberRole;
-  membershipStatus: MemberHomeMembershipStatus;
-  clubName: string | null;
-  joinedAt: string;
-  sessionCount: number;
-  totalSessionCount: number;
-  recentAttendances: Array<{
-    sessionNumber: number;
-    attended: boolean;
-  }>;
-};
