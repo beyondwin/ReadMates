@@ -146,7 +146,7 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
 
 function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 감상">
+    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 감상" showAiAssistedLabel>
       <div className="rm-notes-oneliner-grid">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-oneliner-card">
@@ -161,7 +161,7 @@ function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
 
 function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`하이라이트 · ${items.length}`} title="남은 문장들">
+    <FeedSection eyebrow={`하이라이트 · ${items.length}`} title="남은 문장들" showAiAssistedLabel>
       <div className="rm-notes-highlight-list">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-highlight-row">
@@ -174,14 +174,31 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
   );
 }
 
-function FeedSection({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+function FeedSection({
+  eyebrow,
+  title,
+  children,
+  showAiAssistedLabel = false,
+}: {
+  eyebrow: string;
+  title: string;
+  children: React.ReactNode;
+  showAiAssistedLabel?: boolean;
+}) {
   return (
     <section style={{ paddingBottom: "44px" }}>
-      <div className="row" style={{ marginBottom: "20px", gap: "14px", alignItems: "baseline" }}>
-        <span className="eyebrow">{eyebrow}</span>
-        <h2 className="h3 editorial rm-notes-section-title" style={{ margin: 0 }}>
-          {title}
-        </h2>
+      <div className="row-between" style={{ marginBottom: "20px", gap: "18px", alignItems: "baseline" }}>
+        <div className="row" style={{ gap: "14px", alignItems: "baseline", flexWrap: "wrap", minWidth: 0 }}>
+          <span className="eyebrow">{eyebrow}</span>
+          <h2 className="h3 editorial rm-notes-section-title" style={{ margin: 0 }}>
+            {title}
+          </h2>
+        </div>
+        {showAiAssistedLabel ? (
+          <span className="tiny mono" style={{ color: "var(--text-3)", flex: "0 0 auto", whiteSpace: "nowrap" }}>
+            AI-assisted
+          </span>
+        ) : null}
       </div>
       {children}
     </section>

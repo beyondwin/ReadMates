@@ -294,6 +294,7 @@ describe("NotesFeedPage", () => {
     expect(screen.queryByRole("button", { name: removedLabel("읽기 ", "흔적") })).not.toBeInTheDocument();
     expect(screen.queryByText(removedLabel("읽기 ", "흔적 5"))).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "남은 문장들" })).toBeInTheDocument();
+    expect(screen.getAllByText("AI-assisted")).toHaveLength(2);
     const highlightRow = screen
       .getByText("다학문적 사고는 더 안전한 판단을 만들기도 하지만 실행을 늦추는 부담이 되기도 했다.")
       .closest(".rm-notes-highlight-row");
