@@ -107,13 +107,13 @@ export function CurrentSessionEmpty({
         <div className="container">
           <div className="rm-empty-state" style={{ padding: "34px" }}>
             <p className="eyebrow" style={{ margin: 0 }}>
-              현재 세션 작업대
+              세션 준비
             </p>
             <h1 className="h1 editorial" style={{ margin: "8px 0 4px" }}>
               아직 열린 세션이 없습니다
             </h1>
             <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              새 세션이 등록되면 RSVP, 읽기 진행률, 토론 질문 작업대가 열립니다.
+              새 세션이 등록되면 참석 여부, 읽기 진행률, 질문 작성이 열립니다.
             </p>
             {auth?.role === "HOST" ? (
               <InternalLink href="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
@@ -404,12 +404,12 @@ export function CurrentSessionBoard({
         <section style={{ padding: "28px 0 24px" }} aria-labelledby="current-session-prep-heading">
           <div className="container">
             <div style={{ marginBottom: "18px" }}>
-              <span className="eyebrow">읽기 진행률 · 출석 · 질문</span>
+              <span className="eyebrow">현재 세션</span>
               <h2 id="current-session-prep-heading" className="h3 editorial" style={{ margin: "6px 0 0" }}>
-                내 준비 작업대
+                세션 준비
               </h2>
               <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-                읽기 진행률, RSVP, 토론 질문을 세션 전에 바로 정리합니다.
+                참석 여부, 읽은 분량, 질문을 모임 전에 정리합니다.
               </p>
             </div>
 
@@ -433,7 +433,7 @@ export function CurrentSessionBoard({
 
                   <section aria-labelledby="attendance-rsvp-heading">
                     <div className="eyebrow" id="attendance-rsvp-heading" style={{ marginBottom: "10px" }}>
-                      출석과 RSVP
+                      참석 여부
                     </div>
                     <RsvpPanel rsvp={rsvp} saveStatus={saveStatuses.rsvp} onRsvp={handleRsvp} />
                   </section>
