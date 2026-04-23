@@ -374,7 +374,7 @@ function MobileArchiveSectionIntro({ view }: { view: ArchiveView }) {
   const meta = selectedArchiveSectionMeta(view);
 
   return (
-    <section style={{ padding: "8px 18px 14px" }}>
+    <section style={{ padding: "8px 18px 0px" }}>
       <div className="m-card-quiet" style={{ padding: "14px 16px" }}>
         <div className="eyebrow">{meta.eyebrow}</div>
         <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
