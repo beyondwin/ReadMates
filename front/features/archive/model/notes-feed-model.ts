@@ -1,6 +1,6 @@
-export type FeedFilter = "all" | "questions" | "oneliners" | "highlights";
+export type FeedFilter = "all" | "highlights" | "oneliners" | "reviews" | "questions";
 
-export type NoteFeedKind = "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
+export type NoteFeedKind = "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
 
 export type NoteFeedItem = {
   sessionId: string;
@@ -20,19 +20,21 @@ export type NoteSessionItem = {
   date: string;
   questionCount: number;
   oneLinerCount: number;
+  longReviewCount: number;
   highlightCount: number;
   totalCount: number;
 };
 
 export const noteFeedFilters: Array<{ key: FeedFilter; label: string }> = [
   { key: "all", label: "전체" },
-  { key: "questions", label: "질문" },
-  { key: "oneliners", label: "한줄평" },
   { key: "highlights", label: "하이라이트" },
+  { key: "oneliners", label: "한줄평" },
+  { key: "reviews", label: "서평" },
+  { key: "questions", label: "질문" },
 ];
 
 export function feedFilterFromSearchParam(value: string | null): FeedFilter {
-  if (value === "questions" || value === "oneliners" || value === "highlights") {
+  if (value === "questions" || value === "oneliners" || value === "reviews" || value === "highlights") {
     return value;
   }
 
@@ -86,7 +88,11 @@ export function sessionHref(session: NoteSessionItem, filter: FeedFilter) {
 }
 
 export function sessionRecordSummary(session: NoteSessionItem) {
-  return `기록 ${session.totalCount}`;
+  return `기록 ${noteCountOrZero(session.totalCount)}`;
+}
+
+export function noteCountOrZero(count: unknown) {
+  return typeof count === "number" && Number.isFinite(count) ? count : 0;
 }
 
 export function sessionMatchesQuery(session: NoteSessionItem, query: string) {
@@ -149,6 +155,10 @@ export function noteKindLabel(item: Pick<NoteFeedItem, "kind">) {
     return "하이라이트";
   }
 
+  if (item.kind === "LONG_REVIEW") {
+    return "서평";
+  }
+
   return "기록";
 }
 
@@ -163,6 +173,10 @@ export function filterKind(filter: FeedFilter): NoteFeedKind | null {
 
   if (filter === "oneliners") {
     return "ONE_LINE_REVIEW";
+  }
+
+  if (filter === "reviews") {
+    return "LONG_REVIEW";
   }
 
   if (filter === "highlights") {

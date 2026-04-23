@@ -34,6 +34,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-05-20",
     questionCount: 0,
     oneLinerCount: 0,
+    longReviewCount: 0,
     highlightCount: 0,
     totalCount: 0,
   },
@@ -44,6 +45,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2026-04-15",
     questionCount: 4,
     oneLinerCount: 5,
+    longReviewCount: 0,
     highlightCount: 3,
     totalCount: 12,
   },
@@ -54,6 +56,7 @@ const noteSessions: NoteSessionItem[] = [
     date: "2025-11-26",
     questionCount: 1,
     oneLinerCount: 0,
+    longReviewCount: 0,
     highlightCount: 0,
     totalCount: 1,
   },
@@ -221,10 +224,10 @@ describe("NotesPage", () => {
   it("passes the URL note filter through to the feed page", async () => {
     mockNotesBff();
 
-    renderNotesPage("session-6", "questions");
+    renderNotesPage("session-6", "reviews");
     const props = await latestNotesProps();
 
-    expect(props.initialFilter).toBe("questions");
+    expect(props.initialFilter).toBe("reviews");
   });
 
   it("falls back invalid sessionId to the first session with records", async () => {
@@ -253,6 +256,7 @@ describe("NotesPage", () => {
       ...session,
       questionCount: 0,
       oneLinerCount: 0,
+      longReviewCount: 0,
       highlightCount: 0,
       totalCount: 0,
     }));

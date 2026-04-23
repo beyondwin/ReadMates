@@ -31,6 +31,7 @@ data class NoteSessionItem(
     val date: String,
     val questionCount: Int,
     val oneLinerCount: Int,
+    val longReviewCount: Int,
     val highlightCount: Int,
     val totalCount: Int,
 )

@@ -5,6 +5,7 @@ import {
   filterKind,
   itemKey,
   noteFeedFilters,
+  noteCountOrZero,
   noteKindLabel,
   sessionNumberLabel,
 } from "@/features/archive/model/notes-feed-model";
@@ -13,30 +14,62 @@ import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 export type { FeedFilter };
 
-export function NotesFilterBar({ filter, onFilterChange }: { filter: FeedFilter; onFilterChange: (filter: FeedFilter) => void }) {
+export function NotesFilterBar({
+  filter,
+  onFilterChange,
+  selectedSession,
+}: {
+  filter: FeedFilter;
+  onFilterChange: (filter: FeedFilter) => void;
+  selectedSession: NoteSessionItem | null;
+}) {
   return (
     <div className="row" style={{ marginTop: "24px", gap: "6px", flexWrap: "wrap" }} aria-label="클럽 노트 필터">
-      {noteFeedFilters.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          aria-pressed={filter === item.key}
-          onClick={() => onFilterChange(item.key)}
-          style={{
-            height: "32px",
-            padding: "0 14px",
-            fontSize: "13px",
-            borderRadius: "999px",
-            border: `1px solid ${filter === item.key ? "var(--text)" : "var(--line)"}`,
-            background: filter === item.key ? "var(--text)" : "transparent",
-            color: filter === item.key ? "var(--bg)" : "var(--text-2)",
-          }}
-        >
-          {item.label}
-        </button>
-      ))}
+      {noteFeedFilters.map((item) => {
+        const count = selectedSession ? noteFilterCount(selectedSession, item.key) : null;
+
+        return (
+          <button
+            key={item.key}
+            type="button"
+            aria-pressed={filter === item.key}
+            onClick={() => onFilterChange(item.key)}
+            style={{
+              height: "32px",
+              padding: "0 14px",
+              fontSize: "13px",
+              borderRadius: "999px",
+              border: `1px solid ${filter === item.key ? "var(--text)" : "var(--line)"}`,
+              background: filter === item.key ? "var(--text)" : "transparent",
+              color: filter === item.key ? "var(--bg)" : "var(--text-2)",
+            }}
+          >
+            {count === null ? item.label : `${item.label} ${count}`}
+          </button>
+        );
+      })}
     </div>
   );
+}
+
+function noteFilterCount(session: NoteSessionItem, filter: FeedFilter) {
+  if (filter === "highlights") {
+    return noteCountOrZero(session.highlightCount);
+  }
+
+  if (filter === "oneliners") {
+    return noteCountOrZero(session.oneLinerCount);
+  }
+
+  if (filter === "reviews") {
+    return noteCountOrZero(session.longReviewCount);
+  }
+
+  if (filter === "questions") {
+    return noteCountOrZero(session.questionCount);
+  }
+
+  return noteCountOrZero(session.totalCount);
 }
 
 export function FeedSections({
@@ -68,9 +101,10 @@ export function FeedSections({
   return (
     <>
       <NotesFeedListStyles />
-      {(filter === "all" || filter === "questions") && <FeedQuestions items={byKind(items, "QUESTION")} />}
-      {(filter === "all" || filter === "oneliners") && <FeedOneLiners items={byKind(items, "ONE_LINE_REVIEW")} />}
       {(filter === "all" || filter === "highlights") && <FeedHighlights items={byKind(items, "HIGHLIGHT")} />}
+      {(filter === "all" || filter === "oneliners") && <FeedOneLiners items={byKind(items, "ONE_LINE_REVIEW")} />}
+      {(filter === "all" || filter === "reviews") && <FeedLongReviews items={byKind(items, "LONG_REVIEW")} />}
+      {(filter === "all" || filter === "questions") && <FeedQuestions items={byKind(items, "QUESTION")} />}
     </>
   );
 }
@@ -133,6 +167,29 @@ function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
               {item.text}
             </div>
             <FeedAuthorRow item={item} rightLabel={`${sessionNumberLabel(item)} · ${formatDateOnlyLabel(item.date)}`} markerSize={20} style={{ marginTop: "14px" }} />
+          </article>
+        ))}
+      </div>
+    </FeedSection>
+  );
+}
+
+function FeedLongReviews({ items }: { items: NoteFeedItem[] }) {
+  return (
+    <FeedSection eyebrow={`서평 · ${items.length}`} title="길게 남긴 서평">
+      <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
+        {items.map((item, index) => (
+          <article
+            key={itemKey(item)}
+            style={{
+              padding: "24px 0",
+              borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
+            }}
+          >
+            <div className="body editorial" style={{ fontSize: "17px", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>
+              {item.text}
+            </div>
+            <FeedAuthorRow item={item} rightLabel={`${sessionNumberLabel(item)} · ${noteKindLabel(item)}`} markerSize={22} style={{ gap: "10px", marginTop: "14px" }} />
           </article>
         ))}
       </div>
