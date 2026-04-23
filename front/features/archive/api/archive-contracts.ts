@@ -33,10 +33,7 @@ export type MemberArchiveQuestionItem = {
 };
 
 export type MemberArchiveCheckinItem = {
-  authorName: string;
-  authorShortName: string;
   readingProgress: number;
-  note: string;
 };
 
 export type MemberArchiveOneLinerItem = {
@@ -78,7 +75,7 @@ export type MemberArchiveSessionDetailResponse = {
   publicSummary: string | null;
   publicHighlights: MemberArchiveHighlightItem[];
   clubQuestions: MemberArchiveQuestionItem[];
-  clubCheckins: MemberArchiveCheckinItem[];
+  clubOneLiners: MemberArchiveOneLinerItem[];
   publicOneLiners: MemberArchiveOneLinerItem[];
   myQuestions: MemberArchiveQuestionItem[];
   myCheckin: MemberArchiveCheckinItem | null;
@@ -125,7 +122,7 @@ export type NoteFeedItem = {
   date: string;
   authorName: string | null;
   authorShortName: string | null;
-  kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT" | "CHECKIN";
+  kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
   text: string;
 };
 
@@ -137,7 +134,6 @@ export type NoteSessionItem = {
   questionCount: number;
   oneLinerCount: number;
   highlightCount: number;
-  checkinCount: number;
   totalCount: number;
 };
 

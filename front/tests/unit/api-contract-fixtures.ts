@@ -3,6 +3,7 @@ import type { FeedbackDocumentResponse } from "@/features/feedback/api/feedback-
 import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type {
+  CurrentSessionResponse as HostCurrentSessionResponse,
   HostInvitationListItem,
   HostMemberListItem,
   HostSessionDetailResponse,
@@ -88,7 +89,6 @@ export const currentSessionContractFixture = {
     myRsvpStatus: "NO_RESPONSE",
     myCheckin: {
       readingProgress: 72,
-      note: "API에서 온 내 체크인",
     },
     myQuestions: [
       {
@@ -122,12 +122,11 @@ export const currentSessionContractFixture = {
           authorShortName: "우",
         },
       ],
-      checkins: [
+      oneLineReviews: [
         {
           authorName: "김호스트",
           authorShortName: "우",
-          readingProgress: 88,
-          note: "API에서 온 체크인",
+          text: "API에서 온 공동 한줄평",
         },
       ],
       highlights: [
@@ -160,6 +159,8 @@ export const currentSessionContractFixture = {
   },
 } satisfies CurrentSessionResponse;
 
+export const hostCurrentSessionContractFixture = currentSessionContractFixture satisfies HostCurrentSessionResponse;
+
 export const archiveSessionDetailContractFixture = {
   sessionId: "00000000-0000-0000-0000-000000000301",
   sessionNumber: 1,
@@ -190,12 +191,11 @@ export const archiveSessionDetailContractFixture = {
       authorShortName: "수",
     },
   ],
-  clubCheckins: [
+  clubOneLiners: [
     {
-      authorName: "박민지",
-      authorShortName: "민",
-      readingProgress: 100,
-      note: "그래프를 볼 때 감정이 먼저 움직이는 장면이 많았습니다.",
+      authorName: "김호스트",
+      authorShortName: "우",
+      text: "낙관이 아니라 정확함의 문제였다.",
     },
   ],
   publicOneLiners: [
@@ -215,10 +215,7 @@ export const archiveSessionDetailContractFixture = {
     },
   ],
   myCheckin: {
-    authorName: "이멤버5",
-    authorShortName: "수",
     readingProgress: 100,
-    note: "완독했고 데이터 해석 습관을 점검하고 싶습니다.",
   },
   myOneLineReview: {
     text: "정확하게 보는 태도도 꾸준한 연습이 필요했다.",

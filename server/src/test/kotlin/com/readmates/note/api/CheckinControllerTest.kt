@@ -25,8 +25,7 @@ class CheckinControllerTest(
             content =
                 """
                 {
-                  "readingProgress": 101,
-                  "note": "범위를 벗어난 체크인"
+                  "readingProgress": 101
                 }
                 """.trimIndent()
         }.andExpect {

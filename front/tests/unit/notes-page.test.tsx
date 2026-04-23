@@ -35,7 +35,6 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 0,
     oneLinerCount: 0,
     highlightCount: 0,
-    checkinCount: 0,
     totalCount: 0,
   },
   {
@@ -46,8 +45,7 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 4,
     oneLinerCount: 5,
     highlightCount: 3,
-    checkinCount: 5,
-    totalCount: 17,
+    totalCount: 12,
   },
   {
     sessionId: "session-1",
@@ -57,7 +55,6 @@ const noteSessions: NoteSessionItem[] = [
     questionCount: 1,
     oneLinerCount: 0,
     highlightCount: 0,
-    checkinCount: 0,
     totalCount: 1,
   },
 ];
@@ -257,7 +254,6 @@ describe("NotesPage", () => {
       questionCount: 0,
       oneLinerCount: 0,
       highlightCount: 0,
-      checkinCount: 0,
       totalCount: 0,
     }));
 

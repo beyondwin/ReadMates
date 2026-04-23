@@ -59,11 +59,10 @@ class ArchiveControllerDbTest(
                 jsonPath("$.clubQuestions[0].draftThought") { value(null) }
                 jsonPath("$.clubQuestions[*].authorName") { value(hasItem("김호스트")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("호스트")) }
-                jsonPath("$.clubCheckins.length()") { value(greaterThan(0)) }
-                jsonPath("$.clubCheckins[*].authorName") { value(hasItem("김호스트")) }
-                jsonPath("$.clubCheckins[*].authorShortName") { value(hasItem("호스트")) }
-                jsonPath("$.clubCheckins[*].readingProgress") { value(hasItem(100)) }
-                jsonPath("$.clubCheckins[*].note") { value(everyItem(not(emptyOrNullString()))) }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
+                jsonPath("$.clubOneLiners.length()") { value(greaterThan(0)) }
+                jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("김호스트")) }
+                jsonPath("$.clubOneLiners[*].text") { value(everyItem(not(emptyOrNullString()))) }
                 jsonPath("$.publicOneLiners.length()") { value(greaterThan(0)) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("김호스트")) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(hasItem("호스트")) }
@@ -74,10 +73,10 @@ class ArchiveControllerDbTest(
                 jsonPath("$.myQuestions[0].draftThought") { value(null) }
                 jsonPath("$.myQuestions[*].authorName") { value(hasItem("이멤버5")) }
                 jsonPath("$.myQuestions[*].authorShortName") { value(hasItem("멤버5")) }
-                jsonPath("$.myCheckin.authorName") { value("이멤버5") }
-                jsonPath("$.myCheckin.authorShortName") { value("멤버5") }
+                jsonPath("$.myCheckin.authorName") { doesNotExist() }
+                jsonPath("$.myCheckin.authorShortName") { doesNotExist() }
                 jsonPath("$.myCheckin.readingProgress") { value(100) }
-                jsonPath("$.myCheckin.note") { value(not(emptyOrNullString())) }
+                jsonPath(removedJsonPath("$.my", "Checkin.", "note")) { doesNotExist() }
                 jsonPath("$.myOneLineReview.text") { exists() }
                 jsonPath("$.myLongReview") { value(null) }
                 jsonPath("$.feedbackDocument.available") { value(true) }
@@ -133,6 +132,31 @@ class ArchiveControllerDbTest(
                 jsonPath("$.feedbackDocument.readable") { value(true) }
                 jsonPath("$.feedbackDocument.sourceText") { doesNotExist() }
                 jsonPath("$.feedbackDocument.body") { doesNotExist() }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_SESSION6_MEMBER5_ONE_LINER_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_SESSION6_MEMBER5_ONE_LINER_PUBLIC_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `archive member detail includes session visible one-liners only in club list`() {
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
+                jsonPath("$.clubOneLiners[*].text") { value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")) }
+                jsonPath("$.publicOneLiners[*].text") { value(not(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다."))) }
             }
     }
 
@@ -223,15 +247,40 @@ class ArchiveControllerDbTest(
                     value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다.")))
                 }
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("최멤버2"))) }
-                jsonPath("$.clubCheckins[*].authorName") { value(not(hasItem("최멤버2"))) }
+                jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
+                jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
                 jsonPath("$.clubQuestions[*].text") { value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?"))) }
-                jsonPath("$.clubCheckins[*].note") { value(not(hasItem("전기의 효용과 정의의 주장을 중심으로 질문을 정리했습니다."))) }
+                jsonPath("$.clubOneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
                 jsonPath("$.publicOneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
             }
     }
 
     companion object {
+        private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val MARK_SESSION6_MEMBER5_ONE_LINER_SESSION_SQL = """
+            update one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            set one_line_reviews.visibility = 'SESSION'
+            where one_line_reviews.session_id = '00000000-0000-0000-0000-000000000306'
+              and one_line_reviews.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'member5@example.com';
+        """
+
+        private const val RESET_SESSION6_MEMBER5_ONE_LINER_PUBLIC_SQL = """
+            update one_line_reviews
+            join memberships on memberships.id = one_line_reviews.membership_id
+              and memberships.club_id = one_line_reviews.club_id
+            join users on users.id = memberships.user_id
+            set one_line_reviews.visibility = 'PUBLIC'
+            where one_line_reviews.session_id = '00000000-0000-0000-0000-000000000306'
+              and one_line_reviews.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'member5@example.com';
+        """
+
         private const val MARK_SESSION6_MEMBER2_REMOVED_SQL = """
             update session_participants
             join memberships on memberships.id = session_participants.membership_id

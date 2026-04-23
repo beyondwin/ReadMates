@@ -877,8 +877,8 @@ class HostSessionControllerDbTest(
         )
         jdbcTemplate.update(
             """
-            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress, note)
-            values ('00000000-0000-0000-0000-000000009703', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000009777', ?, 80, '삭제될 체크인')
+            insert into reading_checkins (id, club_id, session_id, membership_id, reading_progress)
+            values ('00000000-0000-0000-0000-000000009703', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000009777', ?, 80)
             """.trimIndent(),
             memberMembershipId,
         )

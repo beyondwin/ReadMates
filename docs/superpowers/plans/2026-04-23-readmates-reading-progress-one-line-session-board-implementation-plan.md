@@ -84,7 +84,7 @@ Do not change unrelated public-home or login-card work that is currently dirty i
 - Modify: `server/src/main/resources/db/dev/R__readmates_dev_seed.sql`
 - Test: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
-- [ ] **Step 1: Write the failing migration metadata test**
+- [x] **Step 1: Write the failing migration metadata test**
 
 Add these assertions inside `mysql baseline creates auth session and feedback document tables` in `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`, after the `participantColumns` assertion:
 
@@ -115,7 +115,7 @@ assertTrue(oneLineVisibilityConstraints.any { row ->
 })
 ```
 
-- [ ] **Step 2: Run the focused migration test and verify it fails**
+- [x] **Step 2: Run the focused migration test and verify it fails**
 
 Run:
 
@@ -125,7 +125,7 @@ Run:
 
 Expected: FAIL because `reading_checkins.note` still exists and the `one_line_reviews_visibility_check` constraint does not contain `SESSION`.
 
-- [ ] **Step 3: Add the MySQL migration**
+- [x] **Step 3: Add the MySQL migration**
 
 Create `server/src/main/resources/db/mysql/migration/V12__reading_progress_one_line_session_visibility.sql`:
 
@@ -141,7 +141,7 @@ alter table one_line_reviews
   check (visibility in ('PRIVATE', 'PUBLIC', 'SESSION'));
 ```
 
-- [ ] **Step 4: Add the base migration**
+- [x] **Step 4: Add the base migration**
 
 Create `server/src/main/resources/db/migration/V9__reading_progress_one_line_session_visibility.sql`:
 
@@ -157,7 +157,7 @@ alter table one_line_reviews
   check (visibility in ('PRIVATE', 'PUBLIC', 'SESSION'));
 ```
 
-- [ ] **Step 5: Update dev seed checkin inserts**
+- [x] **Step 5: Update dev seed checkin inserts**
 
 In both seed files, change every `insert into reading_checkins` statement from this shape:
 
@@ -173,7 +173,7 @@ insert into reading_checkins (id, club_id, session_id, membership_id, reading_pr
 
 For each corresponding `select` or `values` row, remove the final note expression and keep `reading_progress` as the last inserted value.
 
-- [ ] **Step 6: Keep seeded one-line reviews explicitly public**
+- [x] **Step 6: Keep seeded one-line reviews explicitly public**
 
 In both seed files, ensure existing one-line review seed rows still write `PUBLIC` explicitly:
 
@@ -183,7 +183,7 @@ In both seed files, ensure existing one-line review seed rows still write `PUBLI
 
 The seed rows represent public historical records and must not become `SESSION`.
 
-- [ ] **Step 7: Run migration and seed tests**
+- [x] **Step 7: Run migration and seed tests**
 
 Run:
 
@@ -195,7 +195,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit schema changes**
+- [x] **Step 8: Commit schema changes**
 
 Run:
 
@@ -222,7 +222,7 @@ git commit -m "feat: migrate reading progress and one-line visibility"
 - Test: `server/src/test/kotlin/com/readmates/note/api/CheckinControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/note/api/MemberActionControllerDbTest.kt`
 
-- [ ] **Step 1: Update service unit test expectation first**
+- [x] **Step 1: Update service unit test expectation first**
 
 In `SessionMemberWriteServiceTest.kt`, replace the checkin test with:
 
@@ -248,7 +248,7 @@ override fun saveCheckin(command: SaveCheckinCommand) =
         .also { calls += "saveCheckin:${command.readingProgress}" }
 ```
 
-- [ ] **Step 2: Update controller DB test payloads first**
+- [x] **Step 2: Update controller DB test payloads first**
 
 In `MemberActionControllerDbTest.kt`, replace checkin JSON request bodies with:
 
@@ -274,7 +274,7 @@ val readingProgress = jdbcTemplate.queryForObject(
 assertEquals(80, readingProgress)
 ```
 
-- [ ] **Step 3: Run focused failing backend tests**
+- [x] **Step 3: Run focused failing backend tests**
 
 Run:
 
@@ -287,7 +287,7 @@ Run:
 
 Expected: FAIL with compile errors because command/result/request classes still require `note`.
 
-- [ ] **Step 4: Update command and result models**
+- [x] **Step 4: Update command and result models**
 
 Replace the checkin data classes:
 
@@ -304,7 +304,7 @@ data class CheckinResult(
 )
 ```
 
-- [ ] **Step 5: Update CheckinController DTOs**
+- [x] **Step 5: Update CheckinController DTOs**
 
 Replace checkin request/response in `CheckinController.kt`:
 
@@ -329,7 +329,7 @@ return CheckinResponse(result.readingProgress)
 
 Remove the unused `jakarta.validation.constraints.NotBlank` import.
 
-- [ ] **Step 6: Update repository saveCheckin**
+- [x] **Step 6: Update repository saveCheckin**
 
 Replace `saveCheckin` in `SessionParticipationRepository.kt` with:
 
@@ -381,7 +381,7 @@ fun saveCheckin(member: CurrentMember, readingProgress: Int): Map<String, Any> {
 }
 ```
 
-- [ ] **Step 7: Update persistence adapter**
+- [x] **Step 7: Update persistence adapter**
 
 Replace the checkin adapter method:
 
@@ -394,7 +394,7 @@ override fun saveCheckin(command: SaveCheckinCommand): CheckinResult {
 }
 ```
 
-- [ ] **Step 8: Save one-line reviews as SESSION**
+- [x] **Step 8: Save one-line reviews as SESSION**
 
 In `SessionParticipationRepository.saveOneLineReview`, replace both occurrences of `'PRIVATE'` in the insert/select block with `'SESSION'`.
 
@@ -404,7 +404,7 @@ Use this selected value:
 select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'SESSION'
 ```
 
-- [ ] **Step 9: Add DB assertion for one-line visibility**
+- [x] **Step 9: Add DB assertion for one-line visibility**
 
 In `MemberActionControllerDbTest.kt`, after saving one-line review, query visibility:
 
@@ -424,7 +424,7 @@ val oneLineReviewVisibility = jdbcTemplate.query(
 assertEquals("SESSION", oneLineReviewVisibility)
 ```
 
-- [ ] **Step 10: Run focused backend tests**
+- [x] **Step 10: Run focused backend tests**
 
 Run:
 
@@ -437,7 +437,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit checkin write contract**
+- [x] **Step 11: Commit checkin write contract**
 
 Run:
 
@@ -462,7 +462,7 @@ git commit -m "feat: store reading progress without checkin notes"
 - Modify: `server/src/main/kotlin/com/readmates/session/application/CurrentSessionRepository.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerDbTest.kt`
 
-- [ ] **Step 1: Update current-session DB test expectations first**
+- [x] **Step 1: Update current-session DB test expectations first**
 
 In `CurrentSessionControllerDbTest.kt`, update assertions that inspect checkins:
 
@@ -482,7 +482,7 @@ Add an assertion in the removed participant test:
 jsonPath("$.currentSession.board.oneLineReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
 ```
 
-- [ ] **Step 2: Run focused current session test and verify it fails**
+- [x] **Step 2: Run focused current session test and verify it fails**
 
 Run:
 
@@ -492,7 +492,7 @@ Run:
 
 Expected: FAIL because the response still has `board.checkins` and lacks `board.oneLineReviews`.
 
-- [ ] **Step 3: Update application response models**
+- [x] **Step 3: Update application response models**
 
 In `SessionApplicationModels.kt`, replace current-session checkin and board model declarations with:
 
@@ -516,7 +516,7 @@ data class BoardOneLineReview(
 
 Remove the `BoardCheckin` data class.
 
-- [ ] **Step 4: Update my checkin query**
+- [x] **Step 4: Update my checkin query**
 
 In `CurrentSessionRepository.findMyCheckin`, replace the selected columns and mapper:
 
@@ -533,7 +533,7 @@ CurrentSessionCheckin(
 )
 ```
 
-- [ ] **Step 5: Replace board checkin query with board one-line query**
+- [x] **Step 5: Replace board checkin query with board one-line query**
 
 Delete `findBoardCheckins` and add:
 
@@ -570,7 +570,7 @@ private fun findBoardOneLineReviews(jdbcTemplate: JdbcTemplate, sessionId: UUID,
     )
 ```
 
-- [ ] **Step 6: Wire current-session board**
+- [x] **Step 6: Wire current-session board**
 
 In `toCurrentSessionDetail`, replace board construction with:
 
@@ -582,7 +582,7 @@ board = CurrentSessionBoard(
 )
 ```
 
-- [ ] **Step 7: Run focused current-session backend test**
+- [x] **Step 7: Run focused current-session backend test**
 
 Run:
 
@@ -592,7 +592,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit current-session contract**
+- [x] **Step 8: Commit current-session contract**
 
 Run:
 
@@ -616,7 +616,7 @@ git commit -m "feat: expose one-line reviews on current session board"
 - Test: `server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerDbTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/publication/api/PublicControllerDbTest.kt`
 
-- [ ] **Step 1: Update notes feed tests first**
+- [x] **Step 1: Update notes feed tests first**
 
 In `ArchiveAndNotesDbTest.kt`, update note session count assertions for session 6:
 
@@ -649,7 +649,7 @@ jsonPath("$[*].kind") {
 }
 ```
 
-- [ ] **Step 2: Update archive detail tests first**
+- [x] **Step 2: Update archive detail tests first**
 
 In `ArchiveControllerDbTest.kt` and `ArchiveAndNotesDbTest.kt`, replace `clubCheckins` expectations with absence and `clubOneLiners` expectations:
 
@@ -660,7 +660,7 @@ jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("김호스트")) }
 jsonPath("$.clubOneLiners[*].text") { value(everyItem(not(emptyOrNullString()))) }
 ```
 
-- [ ] **Step 3: Run focused archive tests and verify failures**
+- [x] **Step 3: Run focused archive tests and verify failures**
 
 Run:
 
@@ -672,7 +672,7 @@ Run:
 
 Expected: FAIL because response contracts still include `checkinCount`, `CHECKIN`, and `clubCheckins`.
 
-- [ ] **Step 4: Update archive API models**
+- [x] **Step 4: Update archive API models**
 
 In `ArchiveController.kt`, remove:
 
@@ -696,7 +696,7 @@ data class MemberArchiveCheckinItem(
 )
 ```
 
-- [ ] **Step 5: Update archive session detail query**
+- [x] **Step 5: Update archive session detail query**
 
 In `ArchiveSessionQueryRepository.findArchiveSessionDetail`, replace:
 
@@ -751,7 +751,7 @@ private fun findArchiveClubOneLiners(
     )
 ```
 
-- [ ] **Step 6: Update my checkin archive query**
+- [x] **Step 6: Update my checkin archive query**
 
 In `findArchiveMyCheckin`, remove `reading_checkins.note` from the select and mapper:
 
@@ -769,7 +769,7 @@ MemberArchiveCheckinItem(
 )
 ```
 
-- [ ] **Step 7: Remove CHECKIN from notes feed models**
+- [x] **Step 7: Remove CHECKIN from notes feed models**
 
 In `NotesFeedQueryRepository.findNoteSessions`, remove the `checkin_count` subquery and construct:
 
@@ -788,7 +788,7 @@ NoteSessionItem(
 
 Remove both `CHECKIN` union branches from `findNotesFeed` and `findNotesFeedForSession`. Remove the corresponding SQL arguments so each query passes only the remaining question, one-line, and highlight arguments.
 
-- [ ] **Step 8: Verify public query boundary**
+- [x] **Step 8: Verify public query boundary**
 
 Run this search:
 
@@ -798,7 +798,7 @@ rg -n "one_line_reviews\\.visibility = 'PUBLIC'" server/src/main/kotlin/com/read
 
 Expected: every public one-line review query still includes `one_line_reviews.visibility = 'PUBLIC'`.
 
-- [ ] **Step 9: Run focused backend archive/public tests**
+- [x] **Step 9: Run focused backend archive/public tests**
 
 Run:
 
@@ -811,7 +811,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit notes/archive contract**
+- [x] **Step 10: Commit notes/archive contract**
 
 Run:
 
@@ -842,7 +842,7 @@ git commit -m "feat: remove checkins from member notes and archive"
 - Test: `front/tests/unit/current-session-actions.test.ts`
 - Test: `front/tests/unit/current-session-model.test.ts`
 
-- [ ] **Step 1: Update current-session action tests first**
+- [x] **Step 1: Update current-session action tests first**
 
 In `front/tests/unit/current-session-actions.test.ts`, update checkin assertions to expect no `note` in the body:
 
@@ -864,7 +864,7 @@ Update route action payload test for checkin:
 ["checkin", { intent: "checkin", readingProgress: 35 }],
 ```
 
-- [ ] **Step 2: Update board tab model test first**
+- [x] **Step 2: Update board tab model test first**
 
 In `current-session-model.test.ts`, replace the board tab expectation:
 
@@ -882,7 +882,7 @@ expect(
 ]);
 ```
 
-- [ ] **Step 3: Run focused frontend contract tests and verify failures**
+- [x] **Step 3: Run focused frontend contract tests and verify failures**
 
 Run:
 
@@ -892,7 +892,7 @@ pnpm --dir front exec vitest run tests/unit/current-session-actions.test.ts test
 
 Expected: FAIL because the API still requires `note` and board tabs still use `checkins`.
 
-- [ ] **Step 4: Update current-session contract types**
+- [x] **Step 4: Update current-session contract types**
 
 In both `current-session-contracts.ts` and `current-session-types.ts`, replace checkin and board shapes:
 
@@ -929,7 +929,7 @@ Replace `BoardCheckin` export with:
 export type BoardOneLineReview = CurrentSession["board"]["oneLineReviews"][number];
 ```
 
-- [ ] **Step 5: Update checkin API functions**
+- [x] **Step 5: Update checkin API functions**
 
 In `current-session-api.ts`, replace:
 
@@ -964,7 +964,7 @@ In `current-session-data.ts`, remove `note` from `CurrentSessionActionPayload` a
 const response = await saveCurrentSessionCheckin(readingProgress);
 ```
 
-- [ ] **Step 6: Update view-model board tabs**
+- [x] **Step 6: Update view-model board tabs**
 
 In `current-session-view-model.ts`, update types:
 
@@ -988,7 +988,7 @@ return [
 ] satisfies Array<{ key: CurrentSessionBoardTab; label: string; count: number }>;
 ```
 
-- [ ] **Step 7: Update archive and notes contract types**
+- [x] **Step 7: Update archive and notes contract types**
 
 In `archive-contracts.ts`, remove `CHECKIN` from `NoteFeedItem["kind"]`, remove `checkinCount` from `NoteSessionItem`, remove `clubCheckins`, and add:
 
@@ -1016,7 +1016,7 @@ export const noteFeedFilters: Array<{ key: FeedFilter; label: string }> = [
 
 Remove `checkins` handling from `feedFilterFromSearchParam`, `noteKindLabel`, and `filterKind`.
 
-- [ ] **Step 8: Update shared fixtures**
+- [x] **Step 8: Update shared fixtures**
 
 In `api-contract-fixtures.ts`, update `currentSessionContractFixture`:
 
@@ -1055,7 +1055,7 @@ myCheckin: {
 },
 ```
 
-- [ ] **Step 9: Run focused frontend contract tests**
+- [x] **Step 9: Run focused frontend contract tests**
 
 Run:
 
@@ -1068,7 +1068,7 @@ pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit frontend contracts**
+- [x] **Step 10: Commit frontend contracts**
 
 Run:
 
@@ -1097,7 +1097,7 @@ git commit -m "feat: update frontend progress and one-line contracts"
 - Modify: `front/features/current-session/ui/current-session-mobile.tsx`
 - Test: `front/tests/unit/current-session.test.tsx`
 
-- [ ] **Step 1: Update current-session UI tests first**
+- [x] **Step 1: Update current-session UI tests first**
 
 In `current-session.test.tsx`, add or update assertions:
 
@@ -1127,7 +1127,7 @@ expect(fetchMock).toHaveBeenCalledWith(
 );
 ```
 
-- [ ] **Step 2: Run current-session tests and verify failures**
+- [x] **Step 2: Run current-session tests and verify failures**
 
 Run:
 
@@ -1137,7 +1137,7 @@ pnpm --dir front exec vitest run tests/unit/current-session.test.tsx
 
 Expected: FAIL because checkin memo UI and read-trace board still render.
 
-- [ ] **Step 3: Update CurrentSessionBoard state and actions**
+- [x] **Step 3: Update CurrentSessionBoard state and actions**
 
 In `current-session-page.tsx`, remove:
 
@@ -1163,7 +1163,7 @@ Update `CurrentSessionSaveActions`:
 saveCheckin: (readingProgress: number) => Promise<void>;
 ```
 
-- [ ] **Step 4: Update desktop CheckinPanel**
+- [x] **Step 4: Update desktop CheckinPanel**
 
 In `current-session-panels.tsx`, change props:
 
@@ -1204,7 +1204,7 @@ Change button text:
 진행률 저장
 ```
 
-- [ ] **Step 5: Add desktop one-line board component**
+- [x] **Step 5: Add desktop one-line board component**
 
 In `current-session-panels.tsx`, add:
 
@@ -1237,7 +1237,7 @@ export function BoardOneLineReviews({ oneLineReviews }: { oneLineReviews: BoardO
 
 Import `BoardOneLineReview` from `current-session-types`.
 
-- [ ] **Step 6: Wire desktop board tab rendering**
+- [x] **Step 6: Wire desktop board tab rendering**
 
 In `current-session-page.tsx`, replace checkins rendering:
 
@@ -1247,7 +1247,7 @@ In `current-session-page.tsx`, replace checkins rendering:
 
 Remove the `BoardCheckins` import and add `BoardOneLineReviews`.
 
-- [ ] **Step 7: Update one-line review input copy**
+- [x] **Step 7: Update one-line review input copy**
 
 In `OneLineReviewPanel`, replace helper copy:
 
@@ -1261,7 +1261,7 @@ Replace footer copy:
 세션 참여자 공개
 ```
 
-- [ ] **Step 8: Update mobile props and progress card**
+- [x] **Step 8: Update mobile props and progress card**
 
 In `current-session-mobile.tsx`, remove `checkinNote` props and handlers from `MobileCurrentSessionBoard`, `MobilePrepSegment`, and `MobileViewerPrepSegment`.
 
@@ -1279,7 +1279,7 @@ Remove the note label, helper, and textarea. Use save button text:
 진행률 저장
 ```
 
-- [ ] **Step 9: Add mobile one-line board list**
+- [x] **Step 9: Add mobile one-line board list**
 
 Add:
 
@@ -1319,7 +1319,7 @@ In `MobileBoardSegment`, remove the read-trace section and add:
 </section>
 ```
 
-- [ ] **Step 10: Update mobile one-line copy**
+- [x] **Step 10: Update mobile one-line copy**
 
 In `MobileRecordsSegment`, replace:
 
@@ -1333,7 +1333,7 @@ and footer:
 세션 참여자 공개
 ```
 
-- [ ] **Step 11: Run current-session UI tests**
+- [x] **Step 11: Run current-session UI tests**
 
 Run:
 
@@ -1343,7 +1343,7 @@ pnpm --dir front exec vitest run tests/unit/current-session.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 12: Commit current-session UI**
+- [x] **Step 12: Commit current-session UI**
 
 Run:
 
@@ -1375,7 +1375,7 @@ git commit -m "feat: show participant one-liners in current session"
 - Test: `front/tests/unit/member-session-detail-page.test.tsx`
 - Test: `front/tests/unit/host-dashboard.test.tsx`
 
-- [ ] **Step 1: Update notes feed UI tests first**
+- [x] **Step 1: Update notes feed UI tests first**
 
 In `notes-feed-page.test.tsx`, remove expectations for `읽기 흔적 5` and add:
 
@@ -1386,7 +1386,7 @@ expect(screen.queryByText("읽기 흔적 5")).not.toBeInTheDocument();
 
 Update record totals that previously included checkins by subtracting `checkinCount`.
 
-- [ ] **Step 2: Update member archive detail tests first**
+- [x] **Step 2: Update member archive detail tests first**
 
 In `member-session-detail-page.test.tsx`, replace checkin list expectations with:
 
@@ -1395,7 +1395,7 @@ expect(screen.queryByText("체크인")).not.toBeInTheDocument();
 expect(screen.getByText("낙관이 아니라 정확함의 문제였다.")).toBeInTheDocument();
 ```
 
-- [ ] **Step 3: Run focused frontend surface tests and verify failures**
+- [x] **Step 3: Run focused frontend surface tests and verify failures**
 
 Run:
 
@@ -1410,7 +1410,7 @@ pnpm --dir front exec vitest run \
 
 Expected: FAIL because surfaces still render checkin feed labels and archive checkin records.
 
-- [ ] **Step 4: Remove CHECKIN from member home feed labels**
+- [x] **Step 4: Remove CHECKIN from member home feed labels**
 
 In `member-home-records.tsx`, remove the `CHECKIN` branch from `noteKindLabel`. For unknown kinds, keep:
 
@@ -1430,7 +1430,7 @@ where:
 const readingProgress = session?.myCheckin ? 1 : 0;
 ```
 
-- [ ] **Step 5: Update member current session prep labels**
+- [x] **Step 5: Update member current session prep labels**
 
 In `member-home-current-session.tsx`, change the prep step label:
 
@@ -1449,7 +1449,7 @@ Change action tile label:
 <MobileActionTile label="읽기 진행률" sub={`${readingProgress}%`} href="/app/session/current" icon="02" />
 ```
 
-- [ ] **Step 6: Remove checkin filter and section from notes feed**
+- [x] **Step 6: Remove checkin filter and section from notes feed**
 
 In `notes-feed-list.tsx`, remove `FeedCheckins` and the render line:
 
@@ -1465,7 +1465,7 @@ Update header copy in `notes-feed-page.tsx`:
 
 In `notes-session-filter.tsx`, ensure summary text no longer references `checkinCount`. Use `sessionRecordSummary(session)` from the model.
 
-- [ ] **Step 7: Update archive model helpers**
+- [x] **Step 7: Update archive model helpers**
 
 In `archive-model.ts`, update `MemberArchiveSessionDetail`:
 
@@ -1488,7 +1488,7 @@ Update `hasClubRecords` to use:
 return session.publicHighlights.length > 0 || session.clubQuestions.length > 0 || session.clubOneLiners.length > 0;
 ```
 
-- [ ] **Step 8: Update archive detail UI**
+- [x] **Step 8: Update archive detail UI**
 
 In `member-session-detail-page.tsx`, update `ClubRecords` desktop groups:
 
@@ -1532,7 +1532,7 @@ function ReadingProgressRecord({ checkin }: { checkin: MemberArchiveCheckinItem 
 
 Delete `CheckinList`.
 
-- [ ] **Step 9: Update host dashboard copy**
+- [x] **Step 9: Update host dashboard copy**
 
 In `host-dashboard-model.ts`, change session metric label:
 
@@ -1556,7 +1556,7 @@ desktopHint: "읽기 상태 확인",
 mobileHint: "읽기 상태 확인",
 ```
 
-- [ ] **Step 10: Run focused frontend surface tests**
+- [x] **Step 10: Run focused frontend surface tests**
 
 Run:
 
@@ -1571,7 +1571,7 @@ pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 11: Commit frontend surface cleanup**
+- [x] **Step 11: Commit frontend surface cleanup**
 
 Run:
 
@@ -1601,7 +1601,7 @@ git commit -m "feat: remove read traces from member surfaces"
 - Modify test files found by the searches in this task.
 - Modify source files found by the searches in this task.
 
-- [ ] **Step 1: Search for removed contract fields**
+- [x] **Step 1: Search for removed contract fields**
 
 Run:
 
@@ -1611,7 +1611,7 @@ rg -n "board\\.checkins|clubCheckins|checkinCount|NoteFeedKind.*CHECKIN|kind: \"
 
 Expected: no matches for removed contract fields. Matches for deletion preview counts or table names are acceptable only when they refer to destructive session deletion metadata, not user-facing read traces.
 
-- [ ] **Step 2: Fix remaining removed-contract matches**
+- [x] **Step 2: Fix remaining removed-contract matches**
 
 For each non-acceptable match from Step 1, update it to the new contract:
 
@@ -1627,7 +1627,7 @@ readingProgress
 
 or remove the checkin feed reference if the file is a notes/archive/public surface.
 
-- [ ] **Step 3: Search public boundary**
+- [x] **Step 3: Search public boundary**
 
 Run:
 
@@ -1637,7 +1637,7 @@ rg -n "visibility in \\('SESSION', 'PUBLIC'\\)|visibility = 'SESSION'" server/sr
 
 Expected: no matches. Public code must use only `visibility = 'PUBLIC'` for one-line reviews.
 
-- [ ] **Step 4: Run focused backend suite**
+- [x] **Step 4: Run focused backend suite**
 
 Run:
 
@@ -1656,7 +1656,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Run focused frontend suite**
+- [x] **Step 5: Run focused frontend suite**
 
 Run:
 
@@ -1677,7 +1677,7 @@ pnpm --dir front exec vitest run \
 
 Expected: PASS.
 
-- [ ] **Step 6: Run build/lint smoke**
+- [x] **Step 6: Run build/lint smoke**
 
 Run:
 
@@ -1688,7 +1688,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 7: Run full backend test if Docker is available**
+- [x] **Step 7: Run full backend test if Docker is available**
 
 Run:
 
@@ -1698,7 +1698,7 @@ Run:
 
 Expected: PASS. If Docker/Testcontainers is unavailable, keep the focused backend results and record the Docker blocker in the final implementation summary.
 
-- [ ] **Step 8: Final commit**
+- [x] **Step 8: Final commit**
 
 Run:
 

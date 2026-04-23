@@ -27,10 +27,10 @@ export async function updateCurrentSessionRsvp(status: RsvpStatus) {
   );
 }
 
-export async function saveCurrentSessionCheckin(readingProgress: CheckinRequest["readingProgress"], note: CheckinRequest["note"]) {
+export async function saveCurrentSessionCheckin(readingProgress: CheckinRequest["readingProgress"]) {
   return readmatesFetchResponse(
     "/api/sessions/current/checkin",
-    jsonRequest({ method: "PUT" }, { readingProgress, note }),
+    jsonRequest({ method: "PUT" }, { readingProgress }),
   );
 }
 

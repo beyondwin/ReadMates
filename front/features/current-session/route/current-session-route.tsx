@@ -34,8 +34,7 @@ async function requireSuccessfulSave(responsePromise: Promise<Response>, message
 
 const currentSessionSaveActions = {
   updateRsvp: (status) => requireSuccessfulSave(updateRsvp(status), "RSVP update failed"),
-  saveCheckin: (readingProgress, note) =>
-    requireSuccessfulSave(saveCheckin(readingProgress, note), "Checkin save failed"),
+  saveCheckin: (readingProgress) => requireSuccessfulSave(saveCheckin(readingProgress), "Checkin save failed"),
   saveQuestions: (questions) => requireSuccessfulSave(saveQuestions(questions), "Questions save failed"),
   saveLongReview: (body) => requireSuccessfulSave(saveLongReview(body), "Long review save failed"),
   saveOneLineReview: (text) => requireSuccessfulSave(saveOneLineReview(text), "One-line review save failed"),

@@ -73,7 +73,6 @@ export type CurrentSessionResponse = {
     myRsvpStatus: RsvpStatus;
     myCheckin: null | {
       readingProgress: number;
-      note: string;
     };
     myQuestions: Array<{
       priority: number;
@@ -96,11 +95,10 @@ export type CurrentSessionResponse = {
         authorName: string;
         authorShortName: string;
       }>;
-      checkins: Array<{
+      oneLineReviews: Array<{
         authorName: string;
         authorShortName: string;
-        readingProgress: number;
-        note: string;
+        text: string;
       }>;
       highlights: Array<{
         text: string;

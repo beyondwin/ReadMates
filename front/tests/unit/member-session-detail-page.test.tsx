@@ -329,15 +329,14 @@ describe("MemberSessionDetailPage", () => {
     expect(screen.getAllByText("이 회차에 남긴 내 질문이나 서평이 없습니다.").length).toBeGreaterThan(0);
   });
 
-  it("uses surname avatars for checkins and public one-line records", () => {
+  it("removes club checkins and shows club one-line records", () => {
     renderDetail({
       ...readableSession,
-      clubCheckins: [
+      clubOneLiners: [
         {
           authorName: "김호스트",
           authorShortName: "호스트",
-          readingProgress: 100,
-          note: "완독했습니다.",
+          text: "낙관이 아니라 정확함의 문제였다.",
         },
       ],
       publicOneLiners: [
@@ -349,6 +348,8 @@ describe("MemberSessionDetailPage", () => {
       ],
     });
 
+    expect(screen.queryByText("체크인")).not.toBeInTheDocument();
+    expect(screen.getAllByText("낙관이 아니라 정확함의 문제였다.").length).toBeGreaterThan(0);
     const authorAvatars = screen.getAllByLabelText("김호스트");
     expect(authorAvatars.length).toBeGreaterThan(0);
     expect(authorAvatars.every((avatar) => avatar.textContent === "김")).toBe(true);

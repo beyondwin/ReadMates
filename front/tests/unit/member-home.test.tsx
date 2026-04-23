@@ -47,7 +47,7 @@ const current: CurrentSessionResponse = {
     myLongReview: null,
     board: {
       questions: [],
-      checkins: [],
+      oneLineReviews: [],
       highlights: [],
     },
     attendees: [
@@ -139,7 +139,7 @@ describe("MemberHome", () => {
     expect(mobileView.queryByText("current")).not.toBeInTheDocument();
 
     expect(mobileView.getByRole("link", { name: /RSVP/ })).toHaveAttribute("href", "/app/session/current");
-    expect(mobileView.getByRole("link", { name: /읽기 체크인/ })).toHaveAttribute("href", "/app/session/current");
+    expect(mobileView.getByRole("link", { name: /읽기 진행률/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /질문 쓰기/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /한줄평/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /모임 링크 열기/ })).toHaveAttribute(
@@ -170,9 +170,9 @@ describe("MemberHome", () => {
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
     expect(desktop.getByText("둘러보기 멤버")).toBeInTheDocument();
-    expect(desktop.getByText("세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.")).toBeInTheDocument();
+    expect(desktop.getByText("세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성이 열립니다.")).toBeInTheDocument();
     expect(mobile.getAllByText("둘러보기 멤버").length).toBeGreaterThan(0);
-    expect(mobile.getAllByText("세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 체크인, 질문 작성이 열립니다.").length).toBeGreaterThan(0);
+    expect(mobile.getAllByText("세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성이 열립니다.").length).toBeGreaterThan(0);
     expect(mobile.getByText("읽기 전용")).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: /세션 읽기/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobile.queryByRole("link", { name: /질문 쓰기/ })).not.toBeInTheDocument();
@@ -296,7 +296,6 @@ describe("MemberHome", () => {
             ...current.currentSession!,
             myCheckin: {
               readingProgress: 0,
-              note: "0%로 저장한 체크인",
             },
           },
         }}

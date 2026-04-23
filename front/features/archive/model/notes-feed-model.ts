@@ -1,6 +1,6 @@
-export type FeedFilter = "all" | "questions" | "oneliners" | "highlights" | "checkins";
+export type FeedFilter = "all" | "questions" | "oneliners" | "highlights";
 
-export type NoteFeedKind = "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT" | "CHECKIN";
+export type NoteFeedKind = "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
 
 export type NoteFeedItem = {
   sessionId: string;
@@ -21,7 +21,6 @@ export type NoteSessionItem = {
   questionCount: number;
   oneLinerCount: number;
   highlightCount: number;
-  checkinCount: number;
   totalCount: number;
 };
 
@@ -30,11 +29,10 @@ export const noteFeedFilters: Array<{ key: FeedFilter; label: string }> = [
   { key: "questions", label: "질문" },
   { key: "oneliners", label: "한줄평" },
   { key: "highlights", label: "하이라이트" },
-  { key: "checkins", label: "읽기 흔적" },
 ];
 
 export function feedFilterFromSearchParam(value: string | null): FeedFilter {
-  if (value === "questions" || value === "oneliners" || value === "highlights" || value === "checkins") {
+  if (value === "questions" || value === "oneliners" || value === "highlights") {
     return value;
   }
 
@@ -151,7 +149,7 @@ export function noteKindLabel(item: Pick<NoteFeedItem, "kind">) {
     return "하이라이트";
   }
 
-  return "읽기 흔적";
+  return "기록";
 }
 
 export function byKind(items: NoteFeedItem[], kind: NoteFeedKind) {
@@ -169,10 +167,6 @@ export function filterKind(filter: FeedFilter): NoteFeedKind | null {
 
   if (filter === "highlights") {
     return "HIGHLIGHT";
-  }
-
-  if (filter === "checkins") {
-    return "CHECKIN";
   }
 
   return null;
