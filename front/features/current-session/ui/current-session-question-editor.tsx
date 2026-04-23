@@ -90,7 +90,7 @@ export function QuestionEditor({
         <span className={isMobile ? "tiny" : "small"} style={{ color: validationMessage ? "var(--danger)" : "var(--text-3)" }}>
           {validationMessage || "저장하면 공동 보드에 반영돼요"}
         </span>
-        <div className={isMobile ? "m-row" : "row"} style={{ gap: "10px", justifyContent: "flex-end" }}>
+        <div className={isMobile ? "m-row rm-current-session-mobile__question-actions" : "row"} style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="question" status={saveStatus} />
           {canAddQuestion ? (
             <button type="button" className="btn btn-ghost btn-sm" onClick={onAddQuestion}>

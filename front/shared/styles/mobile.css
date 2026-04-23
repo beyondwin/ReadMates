@@ -977,6 +977,17 @@
   min-width: 0 !important;
   text-align: left !important;
 }
+.mobile-only .rm-current-session-mobile__question-actions {
+  margin-left: auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  max-width: 100%;
+  text-align: right;
+}
+.mobile-only .rm-current-session-mobile__question-actions > .tiny[role="status"] {
+  min-width: 0 !important;
+  text-align: right !important;
+}
 .mobile-only .rm-current-session-mobile__meta-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
