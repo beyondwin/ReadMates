@@ -38,7 +38,7 @@ export const archiveReportReturnTarget: ReadmatesReturnTarget = {
 
 export const publicRecordsReturnTarget: ReadmatesReturnTarget = {
   href: "/records",
-  label: "공개 기록 색인",
+  label: "공개 기록",
 };
 
 export const hostDashboardReturnTarget: ReadmatesReturnTarget = {

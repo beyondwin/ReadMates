@@ -28,7 +28,7 @@ test("desktop public and host pages show the expected top navigation", async ({ 
 
   await page.goto("/records");
   await expect(page).toHaveURL(/\/records$/);
-  await expect(page.getByRole("heading", { name: "공개 기록 색인" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "공개 기록" })).toBeVisible();
   const firstPublicRecord = page.locator(".public-record-index-row").first();
   await expect(firstPublicRecord).toBeVisible();
   const firstPublicRecordTitle = await firstPublicRecord.locator(".public-record-index-row__title").innerText();
@@ -153,7 +153,7 @@ test("mobile public record detail returns to the public records index without du
   await expect(page.getByRole("heading", { name: firstPublicRecordTitle })).toBeVisible();
   await expect(page.getByRole("banner").getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/records");
   await expect(
-    page.locator(".public-session-record__header").getByRole("link", { name: /공개 기록 색인/ }),
+    page.locator(".public-session-record__header").getByRole("link", { name: /공개 기록/ }),
   ).toHaveCount(0);
 
   await page.getByRole("banner").getByRole("link", { name: "뒤로" }).click();

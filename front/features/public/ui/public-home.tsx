@@ -145,7 +145,7 @@ function ReadingRhythm() {
 function PublicRecordGuide({ hasPublishedRecords }: { hasPublishedRecords: boolean }) {
   const guide = [
     ["첫 화면", "가장 최근에 발행한 기록을 대표 자료로 먼저 보여줍니다."],
-    ["최근 색인", "발행된 공개 기록은 번호순으로 이어지는 색인에서 다시 확인할 수 있습니다."],
+    ["기록 목록", "발행된 공개 기록은 번호순으로 이어지는 목록에서 다시 확인할 수 있습니다."],
     ["멤버 공간", "참여자 전용 피드백과 개인 노트는 정식 멤버 공간에만 남깁니다."],
   ];
 
@@ -162,7 +162,7 @@ function PublicRecordGuide({ hasPublishedRecords }: { hasPublishedRecords: boole
       </div>
       <div className="public-membership-panel__actions">
         <Link to="/records" className="btn btn-primary">
-          {hasPublishedRecords ? "공개 기록 색인 보기" : "공개 기록 준비 중"}
+          {hasPublishedRecords ? "공개 기록 보기" : "공개 기록 준비 중"}
         </Link>
       </div>
     </div>
@@ -214,10 +214,10 @@ export default function PublicHome({ data }: PublicHomeProps) {
         <div className="container public-grid-2">
           <div>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              공개 아카이브
+              공개 기록
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
-              공개 기록은 색인으로 이어집니다
+              공개한 모임 기록을 모았습니다
             </h2>
           </div>
           <div className="public-record-facts">
@@ -318,10 +318,10 @@ export default function PublicHome({ data }: PublicHomeProps) {
           <div className="row-between public-section-head">
             <div>
               <div className="eyebrow" style={{ marginBottom: 8 }}>
-                공개 아카이브
+                공개 기록
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
-                공개 기록 색인
+                공개 기록
               </h2>
             </div>
             <Link to="/records" className="public-records-link">

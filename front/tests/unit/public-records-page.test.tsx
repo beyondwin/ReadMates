@@ -99,7 +99,7 @@ describe("PublicRecordsPage", () => {
 
     renderRecordsRoute();
 
-    expect(await screen.findByRole("heading", { name: "최근 공개 기록 색인" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "최근 공개 기록" })).toBeInTheDocument();
     expect(screen.queryByText("session target")).not.toBeInTheDocument();
     expect(screen.getByText("최근 1개 공개 기록")).toBeInTheDocument();
     expect(screen.getByText("전체 공개 모임 8회 중 공개된 최근 기록")).toBeInTheDocument();
@@ -151,7 +151,7 @@ describe("PublicRecordsPage", () => {
     await user.click(link);
 
     expect(screen.getByTestId("return-to")).toHaveTextContent("/records");
-    expect(screen.getByTestId("return-label")).toHaveTextContent("공개 기록 색인");
+    expect(screen.getByTestId("return-label")).toHaveTextContent("공개 기록");
     expect(JSON.parse(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY) ?? "{}")).toEqual({
       pathname: "/records",
       search: "",
