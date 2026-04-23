@@ -6,6 +6,7 @@ import { AvatarChip } from "./avatar-chip";
 import { usePublicAuthAction, type PublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
+import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
 export type TopNavVariant = "guest" | "member" | "host";
 
@@ -158,8 +159,13 @@ function TopNavFrame({
             ))}
           </nav>
           {workspaceAction ? (
-            <Link to={workspaceAction.href} className="btn btn-ghost btn-sm">
-              {workspaceAction.label}
+            <Link
+              to={workspaceAction.href}
+              className="rm-workspace-switch"
+              aria-label={workspaceAction.label}
+              title={workspaceAction.label}
+            >
+              <WorkspaceSwitchIcon size={17} />
             </Link>
           ) : null}
           {memberName ? (

@@ -147,10 +147,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.m-hdr-link--icon {
+  width: 44px;
+  max-width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--r-3);
+  color: var(--text-2);
+  background: transparent;
+}
+.m-hdr-link--icon svg {
+  flex-shrink: 0;
+}
 .m-hdr--host .m-hdr-link {
   color: var(--accent);
   background: color-mix(in oklch, var(--accent-soft), var(--bg) 34%);
   border-color: var(--accent-line);
+}
+.m-hdr--host .m-hdr-link--icon {
+  color: var(--text-2);
+  background: transparent;
+  border-color: var(--line);
 }
 .m-hdr-brand:active,
 .m-hdr-back:active,

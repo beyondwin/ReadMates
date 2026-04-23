@@ -15,6 +15,7 @@ import { usePublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
 import { TabIcon, type TabIconName } from "./mobile-tab-bar";
+import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
 
@@ -105,6 +106,7 @@ type HeaderAction = {
   href: string;
   label: string;
   ariaLabel?: string;
+  icon?: "workspace-switch";
 };
 
 function appBackTarget(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string, state: unknown): HeaderBackTarget | null {
@@ -181,6 +183,7 @@ function HeaderShell({
   rightAction?: HeaderAction | null;
 }) {
   const brandHref = workspace === "host" ? "/app/host" : workspace === "member" ? "/app" : "/";
+  const actionTitle = rightAction?.ariaLabel ?? rightAction?.label;
 
   return (
     <header className={`m-hdr m-hdr--${workspace}`} data-workspace={workspace}>
@@ -208,8 +211,13 @@ function HeaderShell({
       </div>
       <div className="m-hdr-side m-hdr-side--right">
         {rightAction ? (
-          <Link to={rightAction.href} className="m-hdr-link" aria-label={rightAction.ariaLabel}>
-            {rightAction.label}
+          <Link
+            to={rightAction.href}
+            className={`m-hdr-link${rightAction.icon ? " m-hdr-link--icon" : ""}`}
+            aria-label={rightAction.ariaLabel}
+            title={actionTitle}
+          >
+            {rightAction.icon === "workspace-switch" ? <WorkspaceSwitchIcon /> : rightAction.label}
           </Link>
         ) : null}
       </div>
@@ -247,6 +255,7 @@ function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHost
       href: "/app",
       label: "멤버",
       ariaLabel: READMATES_WORKSPACE_LABELS.memberWorkspaceReturn,
+      icon: "workspace-switch",
     };
   }
 
@@ -255,6 +264,7 @@ function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHost
       href: "/app/host",
       label: "운영",
       ariaLabel: READMATES_WORKSPACE_LABELS.hostWorkspace,
+      icon: "workspace-switch",
     };
   }
 
