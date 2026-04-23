@@ -163,7 +163,7 @@ describe("MemberHome", () => {
 
   it("renders the mobile session number before the days-until label", () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-04-30T00:00:00+09:00"));
+    vi.setSystemTime(new Date(2026, 3, 30));
 
     const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
     const metaLine = container.querySelector(".rm-member-home-mobile .rm-member-session-card__meta-line");
