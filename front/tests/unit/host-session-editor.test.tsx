@@ -164,7 +164,7 @@ describe("HostSessionEditor", () => {
     render(<HostSessionEditorForTest session={null} />);
 
     expect(screen.getByRole("heading", { name: "새 세션 만들기" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "운영으로" })).toHaveAttribute("href", "/app/host");
+    expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "새 세션 만들기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
     expect(screen.getByText("세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.")).toBeVisible();
@@ -292,7 +292,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByText("업로드 완료")).toBeInTheDocument();
     expect(screen.getByText("251126 1차.md")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "미리보기" })).toHaveAttribute("href", "/app/feedback/session-1");
-    expect(screen.getByRole("link", { name: "운영으로" })).toHaveAttribute("href", "/app/host");
+    expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "교체" })).toBeInTheDocument();
     expect(screen.queryByText(`${retiredPersonalFeedbackReportLabel} (HTML)`)).not.toBeInTheDocument();
     expect(screen.queryByText("HTML 파일을 드래그하거나 클릭해 업로드")).not.toBeInTheDocument();
