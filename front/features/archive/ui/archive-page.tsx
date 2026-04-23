@@ -203,45 +203,41 @@ function ArchiveDesktop({
     <>
       <section className="page-header-compact">
         <div className="container">
-          <div className="row-between" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
-            <div>
-              <p className="eyebrow" style={{ margin: 0 }}>
-                아카이브
-              </p>
-              <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-                기록 저장소
-              </h1>
-              <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                지난 모임과 내가 쓴 문장들을 회고합니다. 속도감보다 축적감.
-              </p>
-            </div>
-            <div
-              className="row"
-              style={{ gap: "6px", flexWrap: "wrap" }}
-              aria-label="아카이브 탭"
-              onKeyDown={(event) => handleArchiveTabKeyDown(event, view, setView, "desktop")}
-            >
-              {archiveTabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  id={`archive-desktop-tab-${tab.key}`}
-                  type="button"
-                  aria-pressed={view === tab.key}
-                  onClick={() => setView(tab.key)}
-                  style={{
-                    height: "32px",
-                    padding: "0 14px",
-                    fontSize: "13px",
-                    borderRadius: "999px",
-                    background: view === tab.key ? "var(--accent-soft)" : "transparent",
-                    color: view === tab.key ? "var(--accent)" : "var(--text-2)",
-                    border: `1px solid ${view === tab.key ? "var(--accent-line)" : "var(--line)"}`,
-                  }}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+          <p className="eyebrow" style={{ margin: 0 }}>
+            아카이브
+          </p>
+          <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
+            기록 저장소
+          </h1>
+          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+            지난 모임과 내가 쓴 문장들을 회고합니다. 속도감보다 축적감.
+          </p>
+          <div
+            className="row"
+            style={{ marginTop: "24px", gap: "6px", flexWrap: "wrap" }}
+            aria-label="아카이브 탭"
+            onKeyDown={(event) => handleArchiveTabKeyDown(event, view, setView, "desktop")}
+          >
+            {archiveTabs.map((tab) => (
+              <button
+                key={tab.key}
+                id={`archive-desktop-tab-${tab.key}`}
+                type="button"
+                aria-pressed={view === tab.key}
+                onClick={() => setView(tab.key)}
+                style={{
+                  height: "32px",
+                  padding: "0 14px",
+                  fontSize: "13px",
+                  borderRadius: "999px",
+                  background: view === tab.key ? "var(--accent-soft)" : "transparent",
+                  color: view === tab.key ? "var(--accent)" : "var(--text-2)",
+                  border: `1px solid ${view === tab.key ? "var(--accent-line)" : "var(--line)"}`,
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
       </section>
