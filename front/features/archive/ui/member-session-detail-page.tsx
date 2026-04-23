@@ -64,14 +64,13 @@ export function MemberSessionDetailUnavailablePage({
 }: {
   returnTarget?: ReadmatesReturnTarget;
 }) {
+  void returnTarget;
+
   return (
     <main className="rm-member-session-detail-page">
       <div className="desktop-only">
         <section className="page-header-compact">
           <div className="container">
-            <Link to={returnTarget.href} className="btn btn-quiet btn-sm">
-              {returnTarget.label}
-            </Link>
             <div className="surface-quiet" style={{ padding: 28, marginTop: 20 }}>
               <p className="eyebrow" style={{ margin: 0 }}>
                 세션 없음
@@ -120,10 +119,7 @@ function MemberSessionDetailDesktop({
     <>
       <section className="page-header-compact">
         <div className="container">
-          <div className="row-between" style={{ alignItems: "center", flexWrap: "wrap" }}>
-            <Link to={returnTarget.href} className="btn btn-quiet btn-sm">
-              {returnTarget.label}
-            </Link>
+          <div className="row" style={{ justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
             <nav className="row" style={{ gap: 6, flexWrap: "wrap" }} aria-label="세션 상세 섹션">
               {segmentLinks.map((link) => (
                 <a key={link.key} href={`#${link.key}`} className="badge">

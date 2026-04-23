@@ -75,7 +75,7 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(desktop.getByText("아카이브 세션 · No.01 · 2025.11.26")).toBeInTheDocument();
     expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "아카이브로" })).toHaveAttribute("href", "/app/archive?view=sessions");
+    expect(desktop.queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "요약" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "클럽 기록" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "내 기록" })).toBeInTheDocument();
@@ -102,7 +102,7 @@ describe("MemberSessionDetailPage", () => {
     }
   });
 
-  it("uses archive route state for the visible return target", async () => {
+  it("does not render the archive return link above the session detail", async () => {
     installRouterRequestShim();
     vi.stubGlobal(
       "fetch",
@@ -165,10 +165,7 @@ describe("MemberSessionDetailPage", () => {
     const { container } = render(<RouterProvider router={router} />);
 
     expect((await screen.findAllByText("팩트풀니스")).length).toBeGreaterThan(0);
-    expect(getDesktop(container).getByRole("link", { name: "아카이브로" })).toHaveAttribute(
-      "href",
-      "/app/archive?view=reviews",
-    );
+    expect(getDesktop(container).queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
   });
 
   it("passes session-detail return state to feedback actions while preserving archive return state", async () => {
