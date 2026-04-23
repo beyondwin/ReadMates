@@ -44,10 +44,10 @@ class LegacySessionParticipationWriteAdapter(
     }
 
     override fun replaceQuestions(command: ReplaceQuestionsCommand): ReplaceQuestionsResult {
-        repository.replaceQuestions(command.member, command.texts)
+        repository.replaceQuestions(command.member, command.questions)
         return ReplaceQuestionsResult(
-            questions = command.texts.mapIndexed { index, text ->
-                QuestionResult(priority = index + 1, text = text.trim(), draftThought = null)
+            questions = command.questions.sortedBy { it.priority }.map { question ->
+                QuestionResult(priority = question.priority, text = question.text.trim(), draftThought = null)
             },
         )
     }

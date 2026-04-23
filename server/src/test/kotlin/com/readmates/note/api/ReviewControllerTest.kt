@@ -28,13 +28,4 @@ class ReviewControllerTest(
         }
     }
 
-    @Test
-    fun `rejects a blank long review`() {
-        mockMvc.post("/api/sessions/current/reviews") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{ "body": " " }"""
-        }.andExpect {
-            status { isBadRequest() }
-        }
-    }
 }

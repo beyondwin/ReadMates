@@ -62,14 +62,19 @@ data class CurrentSessionLongReview(
 
 data class CurrentSessionBoard(
     val questions: List<CurrentSessionQuestion>,
-    val oneLineReviews: List<BoardOneLineReview>,
-    val highlights: List<BoardHighlight>,
+    val longReviews: List<BoardLongReview>,
 )
 
 data class BoardOneLineReview(
     val authorName: String,
     val authorShortName: String,
     val text: String,
+)
+
+data class BoardLongReview(
+    val authorName: String,
+    val authorShortName: String,
+    val body: String,
 )
 
 data class BoardHighlight(

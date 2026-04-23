@@ -21,7 +21,12 @@ data class SaveQuestionCommand(
 
 data class ReplaceQuestionsCommand(
     val member: CurrentMember,
-    val texts: List<String>,
+    val questions: List<ReplaceQuestionCommandItem>,
+)
+
+data class ReplaceQuestionCommandItem(
+    val priority: Int,
+    val text: String,
 )
 
 data class SaveOneLineReviewCommand(

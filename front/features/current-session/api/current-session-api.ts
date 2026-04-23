@@ -6,7 +6,7 @@ import type {
   RsvpStatus,
 } from "@/features/current-session/api/current-session-contracts";
 
-type QuestionListItem = Pick<CreateQuestionRequest, "text">;
+type QuestionListItem = Pick<CreateQuestionRequest, "priority" | "text">;
 
 function jsonRequest(init: Omit<RequestInit, "headers" | "body">, body: unknown): RequestInit {
   return {

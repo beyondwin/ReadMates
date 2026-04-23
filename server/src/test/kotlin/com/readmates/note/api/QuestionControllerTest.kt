@@ -221,7 +221,7 @@ class QuestionControllerTest(
     }
 
     @Test
-    fun `rejects fewer than two replacement questions`() {
+    fun `accepts a single replacement question while preserving its priority`() {
         mockMvc.put("/api/sessions/current/questions") {
             with(user("member5@example.com"))
             with(csrf())
@@ -230,13 +230,43 @@ class QuestionControllerTest(
                 """
                 {
                   "questions": [
-                    { "text": "질문 1" }
+                    { "priority": 2, "text": "질문 2" }
                   ]
                 }
                 """.trimIndent()
         }.andExpect {
-            status { isBadRequest() }
+            status { isOk() }
+            jsonPath("$.questions[0].priority") { value(2) }
+            jsonPath("$.questions[0].text") { value("질문 2") }
         }
+
+        val rows = savedQuestions()
+        require(rows.size == 1)
+        check(rows[0]["priority"] == 2)
+        check(rows[0]["text"] == "질문 2")
+    }
+
+    @Test
+    fun `accepts an empty replacement question list`() {
+        seedFiveQuestions()
+
+        mockMvc.put("/api/sessions/current/questions") {
+            with(user("member5@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "questions": []
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.questions.length()") { value(0) }
+        }
+
+        val rows = savedQuestions()
+        require(rows.isEmpty())
     }
 
     @Test

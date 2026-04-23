@@ -37,11 +37,11 @@ describe("current session form model", () => {
 
     const savedPriority = Math.max(1, MAX_QUESTION_INPUT_COUNT - 1);
     expect(normalizeInitialQuestionInputs([{ priority: savedPriority, text: "저장된 질문" }])).toEqual([
-      { clientId: `saved-${savedPriority}`, text: "저장된 질문" },
-      ...Array.from({ length: MIN_QUESTION_INPUT_COUNT - 1 }, (_, index) => ({
-        clientId: `empty-${index + 2}`,
+      ...Array.from({ length: savedPriority - 1 }, (_, index) => ({
+        clientId: `empty-${index + 1}`,
         text: "",
       })),
+      { clientId: `saved-${savedPriority}`, text: "저장된 질문" },
     ]);
   });
 
@@ -56,21 +56,20 @@ describe("current session form model", () => {
     expect(createAddedQuestionInput(inputs.length, 123456)).toEqual({ clientId: "added-123456-3", text: "" });
   });
 
-  it("builds trimmed save payloads and returns the existing validation messages", () => {
+  it("builds trimmed save payloads and allows fewer than two questions", () => {
     const payload = buildQuestionPayload([
       { clientId: "q1", text: "  첫 질문  " },
       { clientId: "q2", text: "" },
       { clientId: "q3", text: "  둘째 질문\n" },
     ]);
 
-    expect(payload).toEqual([{ text: "첫 질문" }, { text: "둘째 질문" }]);
+    expect(payload).toEqual([
+      { priority: 1, text: "첫 질문" },
+      { priority: 3, text: "둘째 질문" },
+    ]);
     expect(getQuestionPayloadValidationMessage(payload)).toBe("");
-    const tooFewQuestions = Array.from({ length: MIN_QUESTION_INPUT_COUNT - 1 }, (_, index) => ({
-      text: `질문 ${index + 1}`,
-    }));
-    expect(getQuestionPayloadValidationMessage(tooFewQuestions)).toBe(
-      `질문은 최소 ${MIN_QUESTION_INPUT_COUNT}개 작성해 주세요.`,
-    );
+    expect(getQuestionPayloadValidationMessage([{ priority: 2, text: "질문 1" }])).toBe("");
+    expect(getQuestionPayloadValidationMessage([])).toBe("");
   });
 
   it("returns min and max question input validation messages", () => {
@@ -148,13 +147,11 @@ describe("current session view model", () => {
     expect(
       getCurrentSessionBoardTabs({
         questions: [{ id: 1 }, { id: 2 }],
-        oneLineReviews: [{ id: 1 }],
-        highlights: [],
+        longReviews: [{ id: 1 }],
       }),
     ).toEqual([
       { key: "questions", label: "질문 · 2", count: 2 },
-      { key: "oneLineReviews", label: "한줄평 · 1", count: 1 },
-      { key: "highlights", label: "하이라이트 · 0", count: 0 },
+      { key: "longReviews", label: "서평 · 1", count: 1 },
     ]);
 
     expect(getCurrentSessionFeedbackAccessState(true)).toEqual({

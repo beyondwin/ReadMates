@@ -1,13 +1,9 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import { Icon, SaveFeedback } from "@/features/current-session/ui/current-session-primitives";
 import { QuestionEditor, type QuestionInput } from "@/features/current-session/ui/current-session-question-editor";
-import {
-  MAX_QUESTION_INPUT_COUNT,
-  MIN_QUESTION_INPUT_COUNT,
-} from "@/features/current-session/model/current-session-form-model";
+import { MAX_QUESTION_INPUT_COUNT } from "@/features/current-session/model/current-session-form-model";
 import type {
-  BoardHighlight,
-  BoardOneLineReview,
+  BoardLongReview,
   BoardQuestion,
   CurrentSession,
   CurrentSessionInternalLinkProps,
@@ -518,7 +514,7 @@ function MobilePrepMeta({
     {
       label: "질문",
       value: `${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`,
-      ok: writtenQuestionCount >= MIN_QUESTION_INPUT_COUNT,
+      ok: writtenQuestionCount > 0,
     },
   ];
 
@@ -622,22 +618,12 @@ function MobileBoardSegment({ session }: { session: CurrentSession }) {
 
       <section className="m-sec">
         <div className="m-eyebrow-row">
-          <span className="eyebrow">한줄평</span>
+          <span className="eyebrow">서평</span>
           <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            {session.board.oneLineReviews.length}
+            {session.board.longReviews.length}
           </span>
         </div>
-        <MobileOneLineReviewList oneLineReviews={session.board.oneLineReviews} />
-      </section>
-
-      <section className="m-sec">
-        <div className="m-eyebrow-row">
-          <span className="eyebrow">하이라이트</span>
-          <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            {session.board.highlights.length}
-          </span>
-        </div>
-        <MobileHighlightList highlights={session.board.highlights} />
+        <MobileLongReviewList longReviews={session.board.longReviews} />
       </section>
     </>
   );
@@ -675,38 +661,19 @@ function MobileQuestionList({ questions }: { questions: BoardQuestion[] }) {
   );
 }
 
-function MobileOneLineReviewList({ oneLineReviews }: { oneLineReviews: BoardOneLineReview[] }) {
-  if (oneLineReviews.length === 0) {
+function MobileLongReviewList({ longReviews }: { longReviews: BoardLongReview[] }) {
+  if (longReviews.length === 0) {
     return <MobileEmptyBoardState />;
   }
 
   return (
     <div className="rm-current-session-mobile__card-stack">
-      {oneLineReviews.map((review) => (
-        <article key={`${review.authorName}-${review.text}`} className="m-card">
-          <div className="body editorial rm-current-session-mobile__board-text">{review.text}</div>
+      {longReviews.map((review) => (
+        <article key={`${review.authorName}-${review.body}`} className="m-card">
+          <div className="body editorial rm-current-session-mobile__board-text">{review.body}</div>
           <div className="m-row" style={{ gap: 8, marginTop: 10, color: "var(--text-3)" }}>
             <AvatarChip name={review.authorName} fallbackInitial={review.authorShortName} label={review.authorName} size={24} />
             <span className="tiny">{review.authorName}</span>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function MobileHighlightList({ highlights }: { highlights: BoardHighlight[] }) {
-  if (highlights.length === 0) {
-    return <MobileEmptyBoardState />;
-  }
-
-  return (
-    <div className="rm-current-session-mobile__card-stack">
-      {highlights.map((highlight) => (
-        <article key={`${highlight.sortOrder}-${highlight.text}`} className="m-card-quiet">
-          <div className="body editorial rm-current-session-mobile__board-text">{highlight.text}</div>
-          <div className="tiny mono" style={{ color: "var(--text-3)", marginTop: 10 }}>
-            #{highlight.sortOrder}
           </div>
         </article>
       ))}

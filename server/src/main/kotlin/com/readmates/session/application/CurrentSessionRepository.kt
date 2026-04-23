@@ -276,6 +276,49 @@ class CurrentSessionRepository(
             member.membershipId.dbString(),
         )
 
+    private fun findBoardLongReviews(
+        jdbcTemplate: JdbcTemplate,
+        sessionId: UUID,
+        member: CurrentMember,
+    ): List<BoardLongReview> =
+        jdbcTemplate.query(
+            """
+            select
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name,
+              long_reviews.body
+            from long_reviews
+            join memberships on memberships.id = long_reviews.membership_id
+              and memberships.club_id = long_reviews.club_id
+            join users on users.id = memberships.user_id
+            join session_participants on session_participants.session_id = long_reviews.session_id
+              and session_participants.club_id = long_reviews.club_id
+              and session_participants.membership_id = long_reviews.membership_id
+              and session_participants.participation_status = 'ACTIVE'
+            where long_reviews.session_id = ?
+              and long_reviews.club_id = ?
+              and exists (
+                select 1
+                from session_participants requester_participants
+                where requester_participants.session_id = long_reviews.session_id
+                  and requester_participants.club_id = long_reviews.club_id
+                  and requester_participants.membership_id = ?
+                  and requester_participants.participation_status = 'ACTIVE'
+              )
+            order by long_reviews.created_at, users.name
+            """.trimIndent(),
+            { resultSet, _ ->
+                BoardLongReview(
+                    authorName = resultSet.getString("author_name"),
+                    authorShortName = resultSet.getString("author_short_name"),
+                    body = resultSet.getString("body"),
+                )
+            },
+            sessionId.dbString(),
+            member.clubId.dbString(),
+            member.membershipId.dbString(),
+        )
+
     private fun findBoardHighlights(jdbcTemplate: JdbcTemplate, sessionId: UUID, clubId: UUID): List<BoardHighlight> =
         jdbcTemplate.query(
             """
@@ -342,8 +385,7 @@ class CurrentSessionRepository(
             myLongReview = findMyLongReview(jdbcTemplate, sessionId, member),
             board = CurrentSessionBoard(
                 questions = findQuestions(jdbcTemplate, sessionId, member.clubId),
-                oneLineReviews = findBoardOneLineReviews(jdbcTemplate, sessionId, member),
-                highlights = findBoardHighlights(jdbcTemplate, sessionId, member.clubId),
+                longReviews = findBoardLongReviews(jdbcTemplate, sessionId, member),
             ),
         )
     }

@@ -1,8 +1,7 @@
 import { type CSSProperties } from "react";
 import { Icon, SaveFeedback } from "@/features/current-session/ui/current-session-primitives";
 import type {
-  BoardHighlight,
-  BoardOneLineReview,
+  BoardLongReview,
   BoardQuestion,
   CurrentSession,
   CurrentSessionInternalLinkProps,
@@ -12,7 +11,6 @@ import type {
 } from "@/features/current-session/ui/current-session-types";
 import {
   MAX_QUESTION_INPUT_COUNT,
-  MIN_QUESTION_INPUT_COUNT,
 } from "@/features/current-session/model/current-session-form-model";
 import { getCurrentSessionFeedbackAccessState } from "@/features/current-session/model/current-session-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
@@ -215,7 +213,7 @@ export function MyStatusCard({
     {
       label: "질문",
       value: `${writtenQuestionCount}/${MAX_QUESTION_INPUT_COUNT}`,
-      ok: writtenQuestionCount >= MIN_QUESTION_INPUT_COUNT,
+      ok: writtenQuestionCount > 0,
     },
     { label: "한줄평", value: hasOneLineReview ? "작성 완료" : "기록 전", ok: hasOneLineReview },
     { label: "피드백 문서", value: "세션 후", ok: false },
@@ -464,16 +462,16 @@ export function BoardQuestions({ questions }: { questions: BoardQuestion[] }) {
   );
 }
 
-export function BoardOneLineReviews({ oneLineReviews }: { oneLineReviews: BoardOneLineReview[] }) {
-  if (oneLineReviews.length === 0) {
+export function BoardLongReviews({ longReviews }: { longReviews: BoardLongReview[] }) {
+  if (longReviews.length === 0) {
     return <EmptyBoardState />;
   }
 
   return (
     <div className="grid-2" style={{ minWidth: 0 }}>
-      {oneLineReviews.map((review) => (
+      {longReviews.map((review) => (
         <article
-          key={`${review.authorName}-${review.text}`}
+          key={`${review.authorName}-${review.body}`}
           style={{
             padding: "22px",
             background: "var(--bg)",
@@ -483,35 +481,11 @@ export function BoardOneLineReviews({ oneLineReviews }: { oneLineReviews: BoardO
           }}
         >
           <p className="body editorial" style={{ fontSize: "17px", margin: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>
-            {review.text}
+            {review.body}
           </p>
           <div className="row tiny" style={{ marginTop: 12, gap: 8, color: "var(--text-3)", minWidth: 0 }}>
             <AvatarChip name={review.authorName} fallbackInitial={review.authorShortName} label={review.authorName} size={22} />
             <span style={{ minWidth: 0, overflowWrap: "anywhere", wordBreak: "break-word" }}>{review.authorName}</span>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-export function BoardHighlights({ highlights }: { highlights: BoardHighlight[] }) {
-  if (highlights.length === 0) {
-    return <EmptyBoardState />;
-  }
-
-  return (
-    <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-      {highlights.map((highlight, index) => (
-        <article
-          key={`${highlight.sortOrder}-${highlight.text}`}
-          style={{ padding: "28px 0", borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)" }}
-        >
-          <div className="quote editorial" style={{ fontSize: "20px", maxWidth: "780px" }}>
-            {highlight.text}
-          </div>
-          <div className="row" style={{ marginTop: "12px", gap: "10px" }}>
-            <span className="small mono">#{highlight.sortOrder}</span>
           </div>
         </article>
       ))}

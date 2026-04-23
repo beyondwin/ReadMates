@@ -60,7 +60,10 @@ describe("current session actions", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await saveCurrentSessionCheckin(72);
-    await saveCurrentSessionQuestions([{ text: "first question" }, { text: "second question" }]);
+    await saveCurrentSessionQuestions([
+      { priority: 1, text: "first question" },
+      { priority: 2, text: "second question" },
+    ]);
     await saveCurrentSessionLongReview("long review");
     await saveCurrentSessionOneLineReview("one line");
     await updateCurrentSessionRsvp("GOING");
@@ -73,7 +76,12 @@ describe("current session actions", () => {
     expectJsonRequest(fetchMock, 2, {
       path: "/api/bff/api/sessions/current/questions",
       method: "PUT",
-      body: { questions: [{ text: "first question" }, { text: "second question" }] },
+      body: {
+        questions: [
+          { priority: 1, text: "first question" },
+          { priority: 2, text: "second question" },
+        ],
+      },
     });
     expectJsonRequest(fetchMock, 3, {
       path: "/api/bff/api/sessions/current/reviews",
@@ -98,7 +106,10 @@ describe("current session actions", () => {
 
     await saveCheckin(72);
     await saveQuestion(1, "single question", "draft thought");
-    await saveQuestions([{ text: "first question" }, { text: "second question" }]);
+    await saveQuestions([
+      { priority: 1, text: "first question" },
+      { priority: 2, text: "second question" },
+    ]);
     await saveLongReview("long review");
     await saveOneLineReview("one line");
     await updateRsvp("GOING");
@@ -116,7 +127,12 @@ describe("current session actions", () => {
     expectJsonRequest(fetchMock, 3, {
       path: "/api/bff/api/sessions/current/questions",
       method: "PUT",
-      body: { questions: [{ text: "first question" }, { text: "second question" }] },
+      body: {
+        questions: [
+          { priority: 1, text: "first question" },
+          { priority: 2, text: "second question" },
+        ],
+      },
     });
     expectJsonRequest(fetchMock, 4, {
       path: "/api/bff/api/sessions/current/reviews",
@@ -149,7 +165,7 @@ describe("current session actions", () => {
   it.each([
     ["rsvp", { intent: "rsvp", status: "GOING" }],
     ["checkin", { intent: "checkin", readingProgress: 35 }],
-    ["questions", { intent: "questions", questions: [{ text: "blocked question" }] }],
+    ["questions", { intent: "questions", questions: [{ priority: 2, text: "blocked question" }] }],
     ["longReview", { intent: "longReview", body: "blocked review" }],
     ["oneLineReview", { intent: "oneLineReview", text: "blocked line" }],
   ])("returns failed backend responses from the %s route action", async (_intent, payload) => {

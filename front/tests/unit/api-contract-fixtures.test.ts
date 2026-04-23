@@ -27,15 +27,19 @@ describe("API contract fixtures", () => {
     expect(feedbackDocumentContractFixture.participants[0]?.revealingQuote.quote).toBeTruthy();
   });
 
-  it("represents the reading progress and one-line contract migration", () => {
+  it("represents the reading progress and shared review contract migration", () => {
     const currentSession = currentSessionContractFixture.currentSession;
 
     expect(currentSession?.myCheckin).toHaveProperty("readingProgress", 72);
     expect(currentSession?.myCheckin).not.toHaveProperty("note");
-    expect(currentSession?.board.oneLineReviews).toHaveLength(1);
+    expect(currentSession?.board.longReviews).toHaveLength(1);
+    expect(currentSession?.board).not.toHaveProperty("oneLineReviews");
+    expect(currentSession?.board).not.toHaveProperty("highlights");
     expect(currentSession?.board).not.toHaveProperty("checkins");
     expect(hostCurrentSessionContractFixture.currentSession?.myCheckin).not.toHaveProperty("note");
-    expect(hostCurrentSessionContractFixture.currentSession?.board.oneLineReviews).toHaveLength(1);
+    expect(hostCurrentSessionContractFixture.currentSession?.board.longReviews).toHaveLength(1);
+    expect(hostCurrentSessionContractFixture.currentSession?.board).not.toHaveProperty("oneLineReviews");
+    expect(hostCurrentSessionContractFixture.currentSession?.board).not.toHaveProperty("highlights");
     expect(hostCurrentSessionContractFixture.currentSession?.board).not.toHaveProperty("checkins");
 
     expect(archiveSessionDetailContractFixture.clubOneLiners).toHaveLength(1);

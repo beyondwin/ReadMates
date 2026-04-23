@@ -48,4 +48,4 @@ class InvalidMembershipIdException : RuntimeException("Invalid membership id")
 class InvalidSessionScheduleException : RuntimeException("Session end time must be after start time")
 
 @ResponseStatus(HttpStatus.BAD_REQUEST)
-class InvalidQuestionSetException : RuntimeException("Questions must include 2 to 5 non-empty items")
+class InvalidQuestionSetException : RuntimeException("Questions must include up to 5 non-empty items")

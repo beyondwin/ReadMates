@@ -3,6 +3,7 @@ package com.readmates.session.application.service
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.session.application.model.ReplaceQuestionsCommand
+import com.readmates.session.application.model.ReplaceQuestionCommandItem
 import com.readmates.session.application.model.ReplaceQuestionsResult
 import com.readmates.session.application.model.SaveCheckinCommand
 import com.readmates.session.application.model.SaveQuestionCommand
@@ -53,11 +54,18 @@ class SessionMemberWriteServiceTest {
         val service = SessionMemberWriteService(port)
 
         val result = service.replaceQuestions(
-            ReplaceQuestionsCommand(member, listOf("첫 질문", "둘째 질문")),
+            ReplaceQuestionsCommand(
+                member,
+                listOf(
+                    ReplaceQuestionCommandItem(priority = 1, text = "첫 질문"),
+                    ReplaceQuestionCommandItem(priority = 3, text = "셋째 질문"),
+                ),
+            ),
         )
 
-        assertEquals(listOf("첫 질문", "둘째 질문"), result.questions.map { it.text })
-        assertEquals("replaceQuestions:첫 질문|둘째 질문", port.calls.single())
+        assertEquals(listOf("첫 질문", "셋째 질문"), result.questions.map { it.text })
+        assertEquals(listOf(1, 3), result.questions.map { it.priority })
+        assertEquals("replaceQuestions:1:첫 질문|3:셋째 질문", port.calls.single())
     }
 
     private class RecordingSessionParticipationWritePort : SessionParticipationWritePort {
@@ -76,9 +84,11 @@ class SessionMemberWriteServiceTest {
                 .also { calls += "saveQuestion:${command.priority}:${command.text}" }
 
         override fun replaceQuestions(command: ReplaceQuestionsCommand) =
-            ReplaceQuestionsResult(command.texts.mapIndexed { index, text ->
-                com.readmates.session.application.model.QuestionResult(index + 1, text, null)
-            }).also { calls += "replaceQuestions:${command.texts.joinToString("|")}" }
+            ReplaceQuestionsResult(command.questions.map { question ->
+                com.readmates.session.application.model.QuestionResult(question.priority, question.text, null)
+            }).also {
+                calls += "replaceQuestions:${command.questions.joinToString("|") { question -> "${question.priority}:${question.text}" }}"
+            }
 
         override fun saveOneLineReview(command: com.readmates.session.application.model.SaveOneLineReviewCommand) =
             com.readmates.session.application.model.OneLineReviewResult(command.text)

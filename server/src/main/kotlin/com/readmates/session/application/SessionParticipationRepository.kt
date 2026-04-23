@@ -1,5 +1,6 @@
 package com.readmates.session.application
 
+import com.readmates.session.application.model.ReplaceQuestionCommandItem
 import com.readmates.shared.db.dbString
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
@@ -151,10 +152,14 @@ class SessionParticipationRepository(
     }
 
     @Transactional
-    fun replaceQuestions(member: CurrentMember, texts: List<String>): Map<String, Any> {
+    fun replaceQuestions(member: CurrentMember, replacements: List<ReplaceQuestionCommandItem>): Map<String, Any> {
         requireWritableMember(member)
-        val questions = texts.map { it.trim() }
-        if (questions.size !in 2..5 || questions.any { it.isEmpty() }) {
+        val questions = replacements.map { it.copy(text = it.text.trim()) }
+        if (
+            questions.size > 5 ||
+            questions.any { it.priority !in 1..5 || it.text.isEmpty() } ||
+            questions.map { it.priority }.distinct().size != questions.size
+        ) {
             throw InvalidQuestionSetException()
         }
 
@@ -201,7 +206,7 @@ class SessionParticipationRepository(
             target.membershipId,
         )
 
-        questions.forEachIndexed { index, question ->
+        questions.sortedBy { it.priority }.forEach { question ->
             jdbcTemplate.update(
                 """
                 insert into questions (
@@ -219,16 +224,16 @@ class SessionParticipationRepository(
                 target.clubId,
                 target.sessionId,
                 target.membershipId,
-                index + 1,
-                question,
+                question.priority,
+                question.text,
             )
         }
 
         return mapOf(
-            "questions" to questions.mapIndexed { index, question ->
+            "questions" to questions.sortedBy { it.priority }.map { question ->
                 mapOf(
-                    "priority" to index + 1,
-                    "text" to question,
+                    "priority" to question.priority,
+                    "text" to question.text,
                     "draftThought" to null,
                 )
             },
@@ -274,10 +279,12 @@ class SessionParticipationRepository(
     fun saveLongReview(member: CurrentMember, body: String): Map<String, String> {
         requireWritableMember(member)
         val jdbcTemplate = jdbcTemplate()
-        val updated = jdbcTemplate.update(
+        val target = jdbcTemplate.query(
             """
-            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
-            select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'PRIVATE'
+            select
+              current_session.id as session_id,
+              current_session.club_id as club_id,
+              session_participants.membership_id as membership_id
             from (
               select id, club_id
               from sessions
@@ -290,15 +297,47 @@ class SessionParticipationRepository(
               and session_participants.club_id = current_session.club_id
               and session_participants.membership_id = ?
               and session_participants.participation_status = 'ACTIVE'
+            """.trimIndent(),
+            { resultSet, _ ->
+                CurrentQuestionTarget(
+                    sessionId = resultSet.getString("session_id"),
+                    clubId = resultSet.getString("club_id"),
+                    membershipId = resultSet.getString("membership_id"),
+                )
+            },
+            member.clubId.dbString(),
+            member.membershipId.dbString(),
+        ).firstOrNull() ?: throwCurrentSessionWriteException(jdbcTemplate, member)
+
+        if (body.isBlank()) {
+            jdbcTemplate.update(
+                """
+                delete from long_reviews
+                where club_id = ?
+                  and session_id = ?
+                  and membership_id = ?
+                """.trimIndent(),
+                target.clubId,
+                target.sessionId,
+                target.membershipId,
+            )
+            return mapOf("body" to "")
+        }
+
+        val updated = jdbcTemplate.update(
+            """
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
+            values (?, ?, ?, ?, ?, 'PRIVATE')
             on duplicate key update
               body = values(body),
               visibility = values(visibility),
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
+            target.clubId,
+            target.sessionId,
+            target.membershipId,
             body,
-            member.clubId.dbString(),
-            member.membershipId.dbString(),
         )
         if (updated == 0) {
             throwCurrentSessionWriteException(jdbcTemplate, member)

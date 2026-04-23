@@ -3,7 +3,6 @@ import { SaveFeedback } from "@/features/current-session/ui/current-session-prim
 import type { SaveState } from "@/features/current-session/ui/current-session-types";
 import {
   MAX_QUESTION_INPUT_COUNT,
-  MIN_QUESTION_INPUT_COUNT,
   canAddQuestionInput,
   canRemoveQuestionInput,
 } from "@/features/current-session/model/current-session-form-model";
@@ -89,10 +88,7 @@ export function QuestionEditor({
 
       <div className={isMobile ? "rm-current-session-mobile__save-row" : "row-between"} style={{ marginTop: isMobile ? 14 : 16 }}>
         <span className={isMobile ? "tiny" : "small"} style={{ color: validationMessage ? "var(--danger)" : "var(--text-3)" }}>
-          {validationMessage ||
-            (writtenQuestionCount < MIN_QUESTION_INPUT_COUNT
-              ? `질문 ${MIN_QUESTION_INPUT_COUNT - writtenQuestionCount}개 더 필요`
-              : "저장하면 공동 보드에 반영돼요")}
+          {validationMessage || "저장하면 공동 보드에 반영돼요"}
         </span>
         <div className={isMobile ? "m-row" : "row"} style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="question" status={saveStatus} />
@@ -134,7 +130,7 @@ export function QuestionEditor({
             이번 달 내 질문
           </div>
           <p className="small" style={{ color: "var(--text-3)", margin: "6px 0 0" }}>
-            최소 {MIN_QUESTION_INPUT_COUNT}개, 최대 {MAX_QUESTION_INPUT_COUNT}개까지 준비해 주세요.
+            최대 {MAX_QUESTION_INPUT_COUNT}개까지 준비해 주세요.
           </p>
         </div>
         <span className="tiny mono" style={{ color: "var(--text-3)" }}>

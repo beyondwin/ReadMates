@@ -91,11 +91,14 @@ function numberValue(value: unknown) {
   return null;
 }
 
-function questionPayload(value: unknown): Array<{ text: string }> | null {
+function questionPayload(value: unknown): Array<{ priority: number; text: string }> | null {
   if (Array.isArray(value)) {
     const questions = value
       .filter((question): question is { text: unknown } => typeof question === "object" && question !== null && "text" in question)
-      .map((question) => ({ text: stringValue(question.text) }));
+      .map((question, index) => ({
+        priority: typeof (question as { priority?: unknown }).priority === "number" ? (question as { priority: number }).priority : index + 1,
+        text: stringValue(question.text),
+      }));
 
     return questions.length === value.length ? questions : null;
   }
@@ -123,7 +126,7 @@ async function actionPayloadFromRequest(request: Request): Promise<CurrentSessio
     intent: formData.get("intent"),
     status: formData.get("status"),
     readingProgress: formData.get("readingProgress"),
-    questions: formData.get("questions") ?? formData.getAll("question").map((question) => ({ text: question })),
+    questions: formData.get("questions") ?? formData.getAll("question").map((question, index) => ({ priority: index + 1, text: question })),
     body: formData.get("body"),
     text: formData.get("text"),
   };

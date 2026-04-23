@@ -76,17 +76,12 @@ class CurrentSessionControllerDbTest(
             on duplicate key update reading_progress = values(reading_progress);
             """,
             """
-            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
             select '00000000-0000-0000-0000-000000009004', memberships.club_id, '00000000-0000-0000-0000-000000000777', memberships.id,
-                   '현재 세션 hydrate 한줄평', 'SESSION'
+                   '현재 세션 hydrate 서평', 'PRIVATE'
             from memberships join users on users.id = memberships.user_id
             where users.email = 'member1@example.com'
-            on duplicate key update text = values(text), visibility = values(visibility);
-            """,
-            """
-            insert into highlights (id, club_id, session_id, text, sort_order)
-            values ('00000000-0000-0000-0000-000000009003', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000777', '현재 세션 hydrate 하이라이트', 0)
-            on duplicate key update text = values(text);
+            on duplicate key update body = values(body), visibility = values(visibility);
             """,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -132,18 +127,18 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.board.questions[0].text") { value("현재 세션 hydrate 질문") }
             jsonPath("$.currentSession.board.questions[0].draftThought") { value("hydrate 초안") }
             jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
-            jsonPath("$.currentSession.board.oneLineReviews.length()") { value(greaterThan(0)) }
-            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '현재 세션 hydrate 한줄평')].authorName") {
+            jsonPath("$.currentSession.board.oneLineReviews") { doesNotExist() }
+            jsonPath("$.currentSession.board.highlights") { doesNotExist() }
+            jsonPath("$.currentSession.board.longReviews.length()") { value(greaterThan(0)) }
+            jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorName") {
                 value(hasItem("안멤버1"))
             }
-            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '현재 세션 hydrate 한줄평')].authorShortName") {
+            jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorShortName") {
                 value(hasItem("멤버1"))
             }
-            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '현재 세션 hydrate 한줄평')].text") {
-                value(hasItem("현재 세션 hydrate 한줄평"))
+            jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].body") {
+                value(hasItem("현재 세션 hydrate 서평"))
             }
-            jsonPath("$.currentSession.board.highlights[0].text") { value("현재 세션 hydrate 하이라이트") }
-            jsonPath("$.currentSession.board.highlights[0].sortOrder") { value(0) }
             jsonPath("$.currentSession.attendees[0].membershipId") { exists() }
             jsonPath("$.currentSession.attendees[0].displayName") { value("김호스트") }
             jsonPath("$.currentSession.attendees[0].shortName") { value("호스트") }
@@ -203,28 +198,28 @@ class CurrentSessionControllerDbTest(
             on duplicate key update reading_progress = values(reading_progress);
             """,
             """
-            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
             select '00000000-0000-0000-0000-000000009013', memberships.club_id, '00000000-0000-0000-0000-000000000778', memberships.id,
-                   '제외된 참가자의 한줄평', 'SESSION'
+                   '제외된 참가자의 서평', 'PRIVATE'
             from memberships join users on users.id = memberships.user_id
             where users.email = 'member5@example.com'
-            on duplicate key update text = values(text), visibility = values(visibility);
+            on duplicate key update body = values(body), visibility = values(visibility);
             """,
             """
-            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
             select '00000000-0000-0000-0000-000000009014', memberships.club_id, '00000000-0000-0000-0000-000000000778', memberships.id,
-                   '활성 호스트의 세션 한줄평', 'SESSION'
+                   '활성 호스트의 서평', 'PRIVATE'
             from memberships join users on users.id = memberships.user_id
             where users.email = 'host@example.com'
-            on duplicate key update text = values(text), visibility = values(visibility);
+            on duplicate key update body = values(body), visibility = values(visibility);
             """,
             """
-            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
             select '00000000-0000-0000-0000-000000009015', memberships.club_id, '00000000-0000-0000-0000-000000000778', memberships.id,
-                   '활성 멤버의 공개 한줄평', 'PUBLIC'
+                   '활성 멤버의 공개 서평', 'PUBLIC'
             from memberships join users on users.id = memberships.user_id
             where users.email = 'member1@example.com'
-            on duplicate key update text = values(text), visibility = values(visibility);
+            on duplicate key update body = values(body), visibility = values(visibility);
             """,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -235,7 +230,7 @@ class CurrentSessionControllerDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `removed current-session participant cannot see active board one-line reviews`() {
+    fun `removed current-session participant cannot see active board long reviews`() {
         mockMvc.get("/api/sessions/current") {
             with(user("member5@example.com"))
         }.andExpect {
@@ -246,10 +241,10 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.myQuestions.length()") { value(0) }
             jsonPath("$.currentSession.board.questions.length()") { value(0) }
             jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
-            jsonPath("$.currentSession.board.oneLineReviews.length()") { value(0) }
-            jsonPath("$.currentSession.board.oneLineReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
-            jsonPath("$.currentSession.board.oneLineReviews[*].text") { value(not(hasItem("활성 호스트의 세션 한줄평"))) }
-            jsonPath("$.currentSession.board.oneLineReviews[*].text") { value(not(hasItem("활성 멤버의 공개 한줄평"))) }
+            jsonPath("$.currentSession.board.longReviews.length()") { value(0) }
+            jsonPath("$.currentSession.board.longReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
+            jsonPath("$.currentSession.board.longReviews[*].body") { value(not(hasItem("활성 호스트의 서평"))) }
+            jsonPath("$.currentSession.board.longReviews[*].body") { value(not(hasItem("활성 멤버의 공개 서평"))) }
             jsonPath("$.currentSession.attendees.length()") { value(2) }
             jsonPath("$.currentSession.attendees[0].displayName") { value("김호스트") }
         }
@@ -298,12 +293,12 @@ class CurrentSessionControllerDbTest(
             on duplicate key update text = values(text), draft_thought = values(draft_thought);
             """,
             """
-            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            insert into long_reviews (id, club_id, session_id, membership_id, body, visibility)
             select '00000000-0000-0000-0000-000000009022', memberships.club_id, '00000000-0000-0000-0000-000000000779', memberships.id,
-                   '탈퇴 회원 기존 한줄평', 'SESSION'
+                   '탈퇴 회원 기존 서평', 'PRIVATE'
             from memberships join users on users.id = memberships.user_id
             where users.email = 'member1@example.com'
-            on duplicate key update text = values(text), visibility = values(visibility);
+            on duplicate key update body = values(body), visibility = values(visibility);
             """,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -329,14 +324,14 @@ class CurrentSessionControllerDbTest(
                 value(hasItem("탈퇴한 멤버"))
             }
             jsonPath("$.currentSession.board.questions[*].authorShortName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '탈퇴 회원 기존 한줄평')].authorName") {
+            jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorName") {
                 value(hasItem("탈퇴한 멤버"))
             }
-            jsonPath("$.currentSession.board.oneLineReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
-            jsonPath("$.currentSession.board.oneLineReviews[?(@.text == '탈퇴 회원 기존 한줄평')].authorShortName") {
+            jsonPath("$.currentSession.board.longReviews[*].authorName") { value(not(hasItem("안멤버1"))) }
+            jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorShortName") {
                 value(hasItem("탈퇴한 멤버"))
             }
-            jsonPath("$.currentSession.board.oneLineReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
+            jsonPath("$.currentSession.board.longReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
             jsonPath("$.currentSession.attendees[*].displayName") { value(hasItem("탈퇴한 멤버")) }
             jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("안멤버1"))) }
             jsonPath("$.currentSession.attendees[*].shortName") { value(hasItem("탈퇴한 멤버")) }
