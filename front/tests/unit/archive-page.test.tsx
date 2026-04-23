@@ -456,6 +456,40 @@ describe("ArchivePage", () => {
     expect(scoped.queryByText("feedback-6-suhan.html")).not.toBeInTheDocument();
   });
 
+  it("navigates when clicking the mobile feedback document row content", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <MemoryRouter initialEntries={["/app/archive?view=report"]}>
+        <Routes>
+          <Route
+            path="/app/archive"
+            element={
+              <ArchivePage
+                sessions={seededSessions}
+                questions={seededQuestions}
+                reviews={seededReviews}
+                reports={seededReports}
+                initialView="report"
+              />
+            }
+          />
+          <Route path="/app/feedback/:sessionId" element={<LocationStateEcho />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const mobile = within(container.querySelector(".rm-archive-mobile") as HTMLElement);
+    const reportTitle = mobile.getByText("팩트풀니스");
+    const reportRow = reportTitle.closest("a.m-list-row");
+
+    expect(reportRow).not.toBeNull();
+    expect(reportRow).toHaveAttribute("href", "/app/feedback/session-1");
+
+    await user.click(reportTitle);
+
+    expect(screen.getByTestId("return-to")).toHaveTextContent("/app/archive?view=report");
+    expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로 돌아가기");
+  });
+
   it("moves archive tab selection with keyboard arrow keys", async () => {
     const user = userEvent.setup();
     const { container } = render(
