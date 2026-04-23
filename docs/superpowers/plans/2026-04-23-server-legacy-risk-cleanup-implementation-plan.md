@@ -441,23 +441,31 @@ git commit -m "refactor: extract auth session and account persistence"
 - Create JDBC adapters under `auth.adapter.out.persistence`.
 - Modify auth tests as needed.
 
-- [ ] **Step 1: Extract invitation persistence**
+- [x] **Step 1: Extract invitation persistence**
 
 Move invitation list/create/revoke/preview/accept SQL and row mapping behind an outbound port. Keep token handling and application decisions in `InvitationService`.
 
-- [ ] **Step 2: Extract member approval persistence**
+- Result: created `HostInvitationStorePort` and `JdbcHostInvitationStoreAdapter`. Invitation list/create/revoke/preview/accept SQL, membership upsert/current-member lookup, current-session insert, active-member check, and MySQL invitation lock handling moved behind the port. `InvitationService` retains host checks, token generation/hash use, effective-status/can-revoke/can-reissue decisions, Google-account flow, email matching, app-base-url handling, and transaction boundaries.
+
+- [x] **Step 2: Extract member approval persistence**
 
 Move pending-viewer lookup, activation/deactivation writes, and current-session helper SQL behind an outbound port. Keep host authorization and decision rules in `MemberApprovalService`.
 
-- [ ] **Step 3: Extract member lifecycle persistence**
+- Result: created `MemberApprovalStorePort` and `JdbcMemberApprovalStoreAdapter`. Pending-viewer listing, activation/deactivation writes, current-session helper insert, and post-write member lookup moved behind the port. `MemberApprovalService` retains host authorization and not-found decision handling.
+
+- [x] **Step 3: Extract member lifecycle persistence**
 
 Move member list, suspend/restore/deactivate, current-session add/remove, active-host locking/counting, and attendance membership SQL behind an outbound port. Keep lifecycle validation and policy decisions in `MemberLifecycleService`.
 
-- [ ] **Step 4: Extract pending approval read persistence**
+- Result: created `MemberLifecycleStorePort` and `JdbcMemberLifecycleStoreAdapter`. Member list, status writes, `for update` membership lookup, current-session add/remove writes, active-host locking/counting, and current-session lookup moved behind the port. `MemberLifecycleService` retains role/status validation, last-host policy, self-mutation checks, and current-session policy decisions.
+
+- [x] **Step 4: Extract pending approval read persistence**
 
 Move pending approval read SQL behind an outbound port. Keep response assembly in the application layer unless the data shape is pure row mapping.
 
-- [ ] **Step 5: Validate auth operational behavior**
+- Result: created `PendingApprovalStorePort` and `JdbcPendingApprovalStoreAdapter`. Pending approval club/session SQL moved behind the port. `PendingApprovalReadService` retains viewer authorization and response assembly.
+
+- [x] **Step 5: Validate auth operational behavior**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.auth.api.*'
@@ -467,12 +475,19 @@ rg -n "JdbcTemplate|query\\(|queryForObject|org\\.springframework\\.jdbc" server
 
 Expected: no Spring JDBC imports or query calls remain under `auth.application`.
 
-- [ ] **Step 6: Commit auth operational persistence extraction**
+- Result: validation passed.
+  - `./server/gradlew -p server test --tests 'com.readmates.auth.api.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 4 executed, 2 up-to-date).
+  - `./server/gradlew -p server test --tests 'com.readmates.architecture.*'` passed (BUILD SUCCESSFUL, 6 actionable tasks: 1 executed, 5 up-to-date).
+  - `rg -n "JdbcTemplate|query\\(|queryForObject|org\\.springframework\\.jdbc" server/src/main/kotlin/com/readmates/auth/application` returned no hits.
+
+- [x] **Step 6: Commit auth operational persistence extraction**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
 git commit -m "refactor: extract auth operational persistence"
 ```
+
+- Result: Task 6 changes committed by the implementation worker with message `refactor: extract auth operational persistence`.
 
 ## Task 7: Strengthen Architecture Boundary Tests
 
