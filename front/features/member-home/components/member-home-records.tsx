@@ -7,8 +7,6 @@ import type {
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
 
-type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
-
 function noteKindLabel(kind: string) {
   if (kind === "QUESTION") {
     return "질문";
