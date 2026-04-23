@@ -139,7 +139,10 @@ export function HostSessionDeletionPreviewDialog({
           </p>
         ) : null}
 
-        <div className="actions" style={{ marginTop: "22px", justifyContent: "flex-end" }}>
+        <div
+          className="actions"
+          style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "22px", justifyContent: "flex-end" }}
+        >
           <button
             ref={cancelButtonRef}
             className="btn btn-ghost btn-sm"
