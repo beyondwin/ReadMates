@@ -16,6 +16,8 @@
 
 스크립트는 먼저 `.tmp`가 저장소 안의 `.tmp`로 해석되는지 확인합니다. 그 다음 `.tmp/public-release-candidate.staging.*` 아래에 staging tree를 만들고, 검증을 통과한 뒤에만 기존 `.tmp/public-release-candidate`를 교체합니다. 빌드가 실패하면 이전에 성공한 후보는 그대로 남습니다.
 
+복사 전 preflight에서는 승인된 source root의 `.envrc*` loader 파일과 symlink를 거부합니다. `.envrc`는 secret을 직접 담지 않더라도 로컬 환경을 자동으로 불러올 수 있으므로 공개 후보 manifest에 포함하지 않습니다.
+
 공개 릴리즈 후보 manifest는 명시적으로 관리합니다. 주요 포함 범위는 다음과 같습니다.
 
 - `.github/workflows/ci.yml`
@@ -33,7 +35,7 @@
 
 디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `front/output`, `front/node_modules`, `front/dist`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. provider state, screenshot, private planning docs, `design`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
 
-루트 `.env.example`만 의도적으로 포함되는 environment file입니다. 필수 파일과 디렉터리 root는 symlink일 수 없고, 승인된 source root 안에서 발견되는 symlink도 복사 전에 거부합니다. staging 후보 검증 단계에서도 승인된 manifest 밖의 경로, 금지 경로, symlink가 남아 있으면 실패합니다.
+루트 `.env.example`만 의도적으로 포함되는 environment file입니다. 필수 파일과 디렉터리 root는 symlink일 수 없고, 승인된 source root 안에서 발견되는 symlink도 복사 전에 거부합니다. staging 후보 검증 단계에서도 승인된 manifest 밖의 경로, 금지 경로, `.envrc*`, symlink가 남아 있으면 실패합니다.
 
 성공하면 후보 경로와 후속 확인 명령을 출력합니다. 루트 `.gitleaks.toml`이 있으면 후보에 함께 포함되어, 공개 전 같은 custom scanner rule을 사용할 수 있습니다.
 
