@@ -23,7 +23,8 @@ describe("API contract fixtures", () => {
     expect(archiveSessionDetailContractFixture.feedbackDocument.readable).toBe(true);
     expect(hostSessionDetailContractFixture.feedbackDocument.uploaded).toBe(true);
     expect(hostSessionDetailContractFixture.publication).toEqual(hostSessionPublicationContractFixture);
-    expect(hostSessionPublicationContractFixture.isPublic).toBe(true);
+    expect(hostSessionPublicationContractFixture.visibility).toBe("PUBLIC");
+    expect(hostSessionPublicationContractFixture).not.toHaveProperty("isPublic");
     expect(feedbackDocumentContractFixture.participants[0]?.revealingQuote.quote).toBeTruthy();
   });
 

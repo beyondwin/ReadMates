@@ -155,44 +155,45 @@ class PublicControllerDbTest(
     @Test
     @Sql(
         statements = [
-            CLEANUP_NON_PUBLIC_SESSION_SQL,
-            """
-            insert into sessions (
-              id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
-              session_date, start_time, end_time, location_label, question_deadline_at, state
-            )
-            values (
-              '00000000-0000-0000-0000-000000000999',
-              '00000000-0000-0000-0000-000000000001',
-              99, '99회차 · 비공개 테스트 책', '비공개 테스트 책', '비공개 테스트 저자', null, null, null,
-              '2026-12-31', '20:00', '22:00', '온라인',
-              '2026-12-30 14:59:00.000000', 'PUBLISHED'
-            );
-            """,
-            """
-            insert into public_session_publications (
-              id, club_id, session_id, public_summary, is_public, published_at
-            )
-            values (
-              '00000000-0000-0000-0000-000000001999',
-              '00000000-0000-0000-0000-000000000001',
-              '00000000-0000-0000-0000-000000000999',
-              '공개되지 않은 테스트 요약입니다.',
-              false,
-              null
-            );
-            """,
+            CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
+            INSERT_PUBLIC_OPEN_SESSION_SQL,
+            INSERT_PUBLIC_OPEN_PUBLICATION_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
     )
     @Sql(
         statements = [
-            CLEANUP_NON_PUBLIC_SESSION_SQL,
+            CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `public surfaces exclude published non-public session`() {
-        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000999")
+    fun `public club includes public open session`() {
+        mockMvc.get("/api/public/club")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.stats.sessions") { value(7) }
+                jsonPath("$.stats.books") { value(7) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(hasItem("외부 공개 테스트 책")) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
+            INSERT_MEMBER_PUBLISHED_SESSION_SQL,
+            INSERT_MEMBER_PUBLISHED_PUBLICATION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public surfaces hide member visible published session`() {
+        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000997")
             .andExpect {
                 status { isNotFound() }
             }
@@ -202,7 +203,37 @@ class PublicControllerDbTest(
                 status { isOk() }
                 jsonPath("$.stats.sessions") { value(6) }
                 jsonPath("$.stats.books") { value(6) }
-                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("비공개 테스트 책"))) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("멤버 공개 테스트 책"))) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
+            INSERT_HOST_ONLY_PUBLISHED_SESSION_SQL,
+            INSERT_HOST_ONLY_PUBLISHED_PUBLICATION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public surfaces hide host only published session`() {
+        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000996")
+            .andExpect {
+                status { isNotFound() }
+            }
+
+        mockMvc.get("/api/public/club")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.stats.sessions") { value(6) }
+                jsonPath("$.stats.books") { value(6) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("호스트 공개 테스트 책"))) }
             }
     }
 
@@ -268,11 +299,106 @@ class PublicControllerDbTest(
               and users.email = 'member2@example.com';
         """
 
-        private const val CLEANUP_NON_PUBLIC_SESSION_SQL = """
+        private const val CLEANUP_VISIBILITY_TEST_SESSIONS_SQL = """
             delete from public_session_publications
-            where session_id = '00000000-0000-0000-0000-000000000999';
+            where session_id in (
+              '00000000-0000-0000-0000-000000000998',
+              '00000000-0000-0000-0000-000000000997',
+              '00000000-0000-0000-0000-000000000996'
+            );
             delete from sessions
-            where id = '00000000-0000-0000-0000-000000000999';
+            where id in (
+              '00000000-0000-0000-0000-000000000998',
+              '00000000-0000-0000-0000-000000000997',
+              '00000000-0000-0000-0000-000000000996'
+            );
+        """
+
+        private const val INSERT_PUBLIC_OPEN_SESSION_SQL = """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
+              session_date, start_time, end_time, location_label, question_deadline_at, state
+            )
+            values (
+              '00000000-0000-0000-0000-000000000998',
+              '00000000-0000-0000-0000-000000000001',
+              98, '98회차 · 외부 공개 테스트 책', '외부 공개 테스트 책', '외부 공개 테스트 저자', null, null, null,
+              '2026-12-30', '20:00', '22:00', '온라인',
+              '2026-12-29 14:59:00.000000', 'OPEN'
+            );
+        """
+
+        private const val INSERT_PUBLIC_OPEN_PUBLICATION_SQL = """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, published_at
+            )
+            values (
+              '00000000-0000-0000-0000-000000001998',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000998',
+              '외부 공개 테스트 요약입니다.',
+              true,
+              'PUBLIC',
+              '2026-04-25 00:00:00.000000'
+            );
+        """
+
+        private const val INSERT_MEMBER_PUBLISHED_SESSION_SQL = """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
+              session_date, start_time, end_time, location_label, question_deadline_at, state
+            )
+            values (
+              '00000000-0000-0000-0000-000000000997',
+              '00000000-0000-0000-0000-000000000001',
+              97, '97회차 · 멤버 공개 테스트 책', '멤버 공개 테스트 책', '멤버 공개 테스트 저자', null, null, null,
+              '2026-12-29', '20:00', '22:00', '온라인',
+              '2026-12-28 14:59:00.000000', 'PUBLISHED'
+            );
+        """
+
+        private const val INSERT_MEMBER_PUBLISHED_PUBLICATION_SQL = """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, published_at
+            )
+            values (
+              '00000000-0000-0000-0000-000000001997',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000997',
+              '멤버 공개 테스트 요약입니다.',
+              true,
+              'MEMBER',
+              '2026-04-25 00:00:00.000000'
+            );
+        """
+
+        private const val INSERT_HOST_ONLY_PUBLISHED_SESSION_SQL = """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
+              session_date, start_time, end_time, location_label, question_deadline_at, state
+            )
+            values (
+              '00000000-0000-0000-0000-000000000996',
+              '00000000-0000-0000-0000-000000000001',
+              96, '96회차 · 호스트 공개 테스트 책', '호스트 공개 테스트 책', '호스트 공개 테스트 저자', null, null, null,
+              '2026-12-28', '20:00', '22:00', '온라인',
+              '2026-12-27 14:59:00.000000', 'PUBLISHED'
+            );
+        """
+
+        private const val INSERT_HOST_ONLY_PUBLISHED_PUBLICATION_SQL = """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, published_at
+            )
+            values (
+              '00000000-0000-0000-0000-000000001996',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000996',
+              '호스트 공개 테스트 요약입니다.',
+              true,
+              'HOST_ONLY',
+              '2026-04-25 00:00:00.000000'
+            );
         """
 
         @JvmStatic

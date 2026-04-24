@@ -2,6 +2,8 @@ package com.readmates.session.api
 
 import com.readmates.support.MySqlTestContainer
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -17,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
     delete from feedback_reports
@@ -524,6 +527,83 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host saves session record visibility and compatibility publication columns`() {
+        createSessionSeven()
+
+        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "멤버에게만 공유할 테스트 기록입니다.",
+                  "visibility": "MEMBER"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.publicSummary") { value("멤버에게만 공유할 테스트 기록입니다.") }
+            jsonPath("$.visibility") { value("MEMBER") }
+            jsonPath("$.isPublic") { doesNotExist() }
+            jsonPath("$.published") { doesNotExist() }
+        }
+
+        val memberPublication = findPublicationRow()
+        assertEquals("MEMBER", memberPublication["visibility"])
+        assertEquals(false, memberPublication["is_public"])
+        assertNull(memberPublication["published_at"])
+
+        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "모두에게 공개할 테스트 기록입니다.",
+                  "visibility": "PUBLIC"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.publicSummary") { value("모두에게 공개할 테스트 기록입니다.") }
+            jsonPath("$.visibility") { value("PUBLIC") }
+            jsonPath("$.isPublic") { doesNotExist() }
+            jsonPath("$.published") { doesNotExist() }
+        }
+
+        val publicPublication = findPublicationRow()
+        assertEquals("PUBLIC", publicPublication["visibility"])
+        assertEquals(true, publicPublication["is_public"])
+        assertNotNull(publicPublication["published_at"])
+
+        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "호스트만 볼 테스트 기록입니다.",
+                  "visibility": "HOST_ONLY"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.publicSummary") { value("호스트만 볼 테스트 기록입니다.") }
+            jsonPath("$.visibility") { value("HOST_ONLY") }
+            jsonPath("$.isPublic") { doesNotExist() }
+            jsonPath("$.published") { doesNotExist() }
+        }
+
+        val hostOnlyPublication = findPublicationRow()
+        assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
+        assertEquals(false, hostOnlyPublication["is_public"])
+        assertNull(hostOnlyPublication["published_at"])
+    }
+
+    @Test
     fun `host cannot preview or delete session outside own club`() {
         createOutsideClubSession()
 
@@ -933,6 +1013,15 @@ class HostSessionControllerDbTest(
             "select count(*) from $tableName where $whereClause",
             Int::class.java,
         ) ?: 0
+
+    private fun findPublicationRow(): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select visibility, is_public, published_at
+            from public_session_publications
+            where session_id = '00000000-0000-0000-0000-000000009777'
+            """.trimIndent(),
+        )
 
     companion object {
         @JvmStatic

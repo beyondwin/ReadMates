@@ -208,14 +208,16 @@ export type HostDashboardResponse = {
   }>;
 };
 
+export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
+
 export type HostSessionPublication = {
   publicSummary: string;
-  isPublic: boolean;
+  visibility: SessionRecordVisibility;
 };
 
 export type HostSessionPublicationRequest = {
   publicSummary: string;
-  isPublic: boolean;
+  visibility: SessionRecordVisibility;
 };
 
 export type HostSessionDetailResponse = {

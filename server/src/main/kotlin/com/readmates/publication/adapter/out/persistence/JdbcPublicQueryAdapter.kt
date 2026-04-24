@@ -52,8 +52,7 @@ class JdbcPublicQueryAdapter(
             join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
             where sessions.id = ?
-              and sessions.state = 'PUBLISHED'
-              and public_session_publications.is_public = true
+              and public_session_publications.visibility = 'PUBLIC'
             """.trimIndent(),
             { rs, _ ->
                 PublicSessionDetailResult(
@@ -81,8 +80,7 @@ class JdbcPublicQueryAdapter(
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
-                  and sessions.state = 'PUBLISHED'
-                  and public_session_publications.is_public = true
+                  and public_session_publications.visibility = 'PUBLIC'
                 """.trimIndent(),
                 Int::class.java,
                 clubId.dbString(),
@@ -94,8 +92,7 @@ class JdbcPublicQueryAdapter(
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
-                  and sessions.state = 'PUBLISHED'
-                  and public_session_publications.is_public = true
+                  and public_session_publications.visibility = 'PUBLIC'
                 """.trimIndent(),
                 Int::class.java,
                 clubId.dbString(),
@@ -148,8 +145,7 @@ class JdbcPublicQueryAdapter(
             join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
             where sessions.club_id = ?
-              and sessions.state = 'PUBLISHED'
-              and public_session_publications.is_public = true
+              and public_session_publications.visibility = 'PUBLIC'
             order by sessions.number desc
             limit 6
             """.trimIndent(),

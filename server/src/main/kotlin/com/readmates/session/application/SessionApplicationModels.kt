@@ -1,6 +1,5 @@
 package com.readmates.session.application
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import com.readmates.session.domain.SessionParticipationStatus
 
 data class CurrentSessionPayload(
@@ -136,10 +135,15 @@ data class HostSessionFeedbackDocument(
     val uploadedAt: String?,
 )
 
+enum class SessionRecordVisibility {
+    HOST_ONLY,
+    MEMBER,
+    PUBLIC,
+}
+
 data class HostSessionPublication(
     val publicSummary: String,
-    @get:JsonProperty("isPublic")
-    val isPublic: Boolean,
+    val visibility: SessionRecordVisibility,
 )
 
 data class HostSessionDeletionPreviewResponse(
@@ -179,7 +183,5 @@ data class HostAttendanceResponse(
 data class HostPublicationResponse(
     val sessionId: String,
     val publicSummary: String,
-    @get:JsonProperty("isPublic")
-    val isPublic: Boolean,
-    val published: Boolean = isPublic,
+    val visibility: SessionRecordVisibility,
 )

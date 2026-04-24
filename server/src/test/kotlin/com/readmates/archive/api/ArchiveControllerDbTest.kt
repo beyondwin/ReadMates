@@ -93,6 +93,57 @@ class ArchiveControllerDbTest(
     }
 
     @Test
+    @Sql(
+        statements = [
+            CLEANUP_ARCHIVE_PUBLICATION_VISIBILITY_SESSIONS_SQL,
+            INSERT_ARCHIVE_PUBLICATION_VISIBILITY_SESSIONS_SQL,
+            INSERT_ARCHIVE_PUBLICATION_VISIBILITY_PUBLICATIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_ARCHIVE_PUBLICATION_VISIBILITY_SESSIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `member archive exposes member and public summaries but only marks public records as published`() {
+        mockMvc.get("/api/archive/sessions") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[?(@.sessionNumber == 998)].published") { value(hasItem(false)) }
+                jsonPath("$[?(@.sessionNumber == 997)].published") { value(hasItem(false)) }
+                jsonPath("$[?(@.sessionNumber == 996)].published") { value(hasItem(true)) }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000998") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.publicSummary") { value(null) }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000997") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.publicSummary") { value("멤버 공개 아카이브 테스트 요약입니다.") }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000996") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.publicSummary") { value("전체 공개 아카이브 테스트 요약입니다.") }
+            }
+    }
+
+    @Test
     fun `archive session detail locks feedback document for member who did not attend`() {
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
             with(user("member1@example.com"))
@@ -439,6 +490,133 @@ class ArchiveControllerDbTest(
             join users on users.id = memberships.user_id
             where sessions.id = '00000000-0000-0000-0000-000000000906'
               and users.email = 'member5@example.com';
+        """
+
+        private const val CLEANUP_ARCHIVE_PUBLICATION_VISIBILITY_SESSIONS_SQL = """
+            delete from public_session_publications
+            where session_id in (
+              '00000000-0000-0000-0000-000000000998',
+              '00000000-0000-0000-0000-000000000997',
+              '00000000-0000-0000-0000-000000000996'
+            );
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-000000000998',
+              '00000000-0000-0000-0000-000000000997',
+              '00000000-0000-0000-0000-000000000996'
+            );
+        """
+
+        private const val INSERT_ARCHIVE_PUBLICATION_VISIBILITY_SESSIONS_SQL = """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              book_translator,
+              book_link,
+              book_image_url,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              question_deadline_at,
+              state
+            )
+            values
+            (
+              '00000000-0000-0000-0000-000000000998',
+              '00000000-0000-0000-0000-000000000001',
+              998,
+              '998회차 · 호스트 전용 아카이브 테스트 책',
+              '호스트 전용 아카이브 테스트 책',
+              '호스트 전용 아카이브 테스트 저자',
+              null,
+              null,
+              null,
+              '2026-12-30',
+              '20:00',
+              '22:00',
+              '온라인',
+              '2026-12-29 14:59:00.000000',
+              'PUBLISHED'
+            ),
+            (
+              '00000000-0000-0000-0000-000000000997',
+              '00000000-0000-0000-0000-000000000001',
+              997,
+              '997회차 · 멤버 공개 아카이브 테스트 책',
+              '멤버 공개 아카이브 테스트 책',
+              '멤버 공개 아카이브 테스트 저자',
+              null,
+              null,
+              null,
+              '2026-12-29',
+              '20:00',
+              '22:00',
+              '온라인',
+              '2026-12-28 14:59:00.000000',
+              'PUBLISHED'
+            ),
+            (
+              '00000000-0000-0000-0000-000000000996',
+              '00000000-0000-0000-0000-000000000001',
+              996,
+              '996회차 · 전체 공개 아카이브 테스트 책',
+              '전체 공개 아카이브 테스트 책',
+              '전체 공개 아카이브 테스트 저자',
+              null,
+              null,
+              null,
+              '2026-12-28',
+              '20:00',
+              '22:00',
+              '온라인',
+              '2026-12-27 14:59:00.000000',
+              'PUBLISHED'
+            );
+        """
+
+        private const val INSERT_ARCHIVE_PUBLICATION_VISIBILITY_PUBLICATIONS_SQL = """
+            insert into public_session_publications (
+              id,
+              club_id,
+              session_id,
+              public_summary,
+              is_public,
+              visibility,
+              published_at
+            )
+            values
+            (
+              '00000000-0000-0000-0000-000000001998',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000998',
+              '호스트 전용 아카이브 테스트 요약입니다.',
+              false,
+              'HOST_ONLY',
+              null
+            ),
+            (
+              '00000000-0000-0000-0000-000000001997',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000997',
+              '멤버 공개 아카이브 테스트 요약입니다.',
+              false,
+              'MEMBER',
+              null
+            ),
+            (
+              '00000000-0000-0000-0000-000000001996',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000996',
+              '전체 공개 아카이브 테스트 요약입니다.',
+              true,
+              'PUBLIC',
+              '2026-04-25 00:00:00.000000'
+            );
         """
 
         @JvmStatic
