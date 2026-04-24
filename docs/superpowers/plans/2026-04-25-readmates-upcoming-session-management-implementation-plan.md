@@ -199,7 +199,7 @@ git commit -m "feat: add session visibility column"
 - Modify: `server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt`
 - Modify: `server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt`
 
-- [ ] **Step 1: Write failing service delegation tests**
+- [x] **Step 1: Write failing service delegation tests**
 
 In `HostSessionCommandServiceTest`, add tests that prove the service delegates list, visibility, open, and upcoming calls:
 
@@ -276,7 +276,7 @@ override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> {
 }
 ```
 
-- [ ] **Step 2: Run the service test to verify it fails**
+- [x] **Step 2: Run the service test to verify it fails**
 
 Run:
 
@@ -286,7 +286,7 @@ Run:
 
 Expected: FAIL because the new commands, models, and port methods do not exist.
 
-- [ ] **Step 3: Add application models**
+- [x] **Step 3: Add application models**
 
 In `SessionApplicationModels.kt`, ensure `SessionRecordVisibility` exists once and add `visibility` to `CreatedSessionResponse` and `HostSessionDetailResponse`:
 
@@ -339,7 +339,7 @@ data class UpcomingSessionItem(
 )
 ```
 
-- [ ] **Step 4: Add command model**
+- [x] **Step 4: Add command model**
 
 In `HostSessionCommands.kt`, add:
 
@@ -351,7 +351,7 @@ data class UpdateHostSessionVisibilityCommand(
 )
 ```
 
-- [ ] **Step 5: Extend inbound and outbound ports**
+- [x] **Step 5: Extend inbound and outbound ports**
 
 In `HostSessionUseCases.kt`, extend `ManageHostSessionUseCase` and add a member query port:
 
@@ -381,7 +381,7 @@ fun open(command: HostSessionIdCommand): HostSessionDetailResponse
 fun upcoming(member: CurrentMember): List<UpcomingSessionItem>
 ```
 
-- [ ] **Step 6: Extend the service**
+- [x] **Step 6: Extend the service**
 
 Update `HostSessionCommandService` to implement `ListUpcomingSessionsUseCase` and delegate:
 
@@ -397,7 +397,7 @@ override fun open(command: HostSessionIdCommand) = port.open(command)
 override fun upcoming(member: CurrentMember) = port.upcoming(member)
 ```
 
-- [ ] **Step 7: Fix test fixture response construction**
+- [x] **Step 7: Fix test fixture response construction**
 
 Where tests construct `CreatedSessionResponse` or `HostSessionDetailResponse`, add:
 
@@ -407,7 +407,7 @@ visibility = SessionRecordVisibility.HOST_ONLY,
 
 Use `SessionRecordVisibility.MEMBER` in visibility-specific fixture assertions.
 
-- [ ] **Step 8: Run the service test to verify it passes**
+- [x] **Step 8: Run the service test to verify it passes**
 
 Run:
 
@@ -417,13 +417,26 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/session/application \
-  server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt
+  server/src/main/kotlin/com/readmates/session/adapter/out/persistence/JdbcHostSessionWriteAdapter.kt \
+  server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt \
+  server/src/test/kotlin/com/readmates/session/api/HostDashboardControllerTest.kt \
+  docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md
 git commit -m "feat: extend session management contracts"
 ```
+
+**Task 2 checkpoint:**
+- Task: Task 2, Extend Server Session Contracts.
+- Changed files: `server/src/main/kotlin/com/readmates/session/application/SessionApplicationModels.kt`, `server/src/main/kotlin/com/readmates/session/application/model/HostSessionCommands.kt`, `server/src/main/kotlin/com/readmates/session/application/port/in/HostSessionUseCases.kt`, `server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionWritePort.kt`, `server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt`, `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/JdbcHostSessionWriteAdapter.kt`, `server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt`, `server/src/test/kotlin/com/readmates/session/api/HostDashboardControllerTest.kt`, `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`.
+- Key decision: Kept Task 2 mostly contract-only, but removed unsafe default visibility values from session response models and made the current JDBC create/detail paths map visibility explicitly so existing host detail/update routes cannot silently report `HOST_ONLY`.
+- Review issues/resolution: resolved the Task 2 review finding where `JdbcHostSessionWriteAdapter.findHostSession` omitted `sessions.visibility`; added a host detail regression test that sets a session row to `MEMBER` and expects the API to return `visibility = MEMBER`.
+- Verification: red `./server/gradlew -p server test --tests com.readmates.session.application.service.HostSessionCommandServiceTest --rerun-tasks` failed at `:compileTestKotlin` with missing `HostSessionListItem`, `UpcomingSessionItem`, `UpdateHostSessionVisibilityCommand`, and service/port methods; green same command passed with `BUILD SUCCESSFUL in 3s`; review red `./server/gradlew -p server test --tests 'com.readmates.session.api.HostDashboardControllerTest.host detail returns session record visibility' --rerun-tasks` failed at `HostDashboardControllerTest.kt:688`; review green same command passed with `BUILD SUCCESSFUL in 12s`; `./server/gradlew -p server test --tests com.readmates.session.application.service.HostSessionCommandServiceTest --rerun-tasks` passed with `BUILD SUCCESSFUL in 3s`; `./server/gradlew -p server compileKotlin --rerun-tasks` passed with `BUILD SUCCESSFUL in 1s`.
+- Remaining risk: New host list, visibility update, open transition, and upcoming-session persistence methods intentionally throw until Task 3 implements the adapter behavior.
+- Next task note: Task 3 should implement controller and JDBC behavior for list, visibility, open, and upcoming sessions.
+- Worktree/branch: `upcoming-session-management-20260425` worktree, `codex/upcoming-session-management-20260425`.
 
 ---
 

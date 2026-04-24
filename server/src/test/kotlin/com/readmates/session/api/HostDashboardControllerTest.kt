@@ -670,6 +670,26 @@ class HostDashboardControllerTest(
     }
 
     @Test
+    fun `host detail returns session record visibility`() {
+        val sessionId = createSessionSeven()
+        jdbcTemplate.update(
+            """
+            update sessions
+            set visibility = 'MEMBER'
+            where id = ?
+            """.trimIndent(),
+            sessionId,
+        )
+
+        mockMvc.get("/api/host/sessions/$sessionId") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.visibility") { value("MEMBER") }
+        }
+    }
+
+    @Test
     fun `saving public visibility for a closed session keeps it closed and clears publish pending`() {
         val sessionId = createSessionSeven()
         jdbcTemplate.update(

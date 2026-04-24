@@ -10,12 +10,16 @@ import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
+import com.readmates.session.application.HostSessionListItem
+import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
+import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.shared.security.CurrentMember
@@ -46,6 +50,48 @@ class HostSessionCommandServiceTest {
 
         assertEquals(command.title, result.title)
         assertEquals("create:${command.title}", port.calls.single())
+    }
+
+    @Test
+    fun `service delegates host session list`() {
+        val port = RecordingHostSessionWritePort()
+        val service = HostSessionCommandService(port)
+
+        service.list(host)
+
+        assertEquals(host, port.listHost)
+    }
+
+    @Test
+    fun `service delegates visibility update`() {
+        val port = RecordingHostSessionWritePort()
+        val service = HostSessionCommandService(port)
+        val command = UpdateHostSessionVisibilityCommand(host, UUID.randomUUID(), SessionRecordVisibility.MEMBER)
+
+        service.updateVisibility(command)
+
+        assertEquals(command, port.visibilityCommand)
+    }
+
+    @Test
+    fun `service delegates open transition`() {
+        val port = RecordingHostSessionWritePort()
+        val service = HostSessionCommandService(port)
+        val command = HostSessionIdCommand(host, UUID.randomUUID())
+
+        service.open(command)
+
+        assertEquals(command, port.openCommand)
+    }
+
+    @Test
+    fun `service delegates upcoming sessions`() {
+        val port = RecordingHostSessionWritePort()
+        val service = HostSessionCommandService(port)
+
+        service.upcoming(host)
+
+        assertEquals(host, port.upcomingMember)
     }
 
     @Test
@@ -93,6 +139,15 @@ class HostSessionCommandServiceTest {
 
     private class RecordingHostSessionWritePort : HostSessionWritePort {
         val calls = mutableListOf<String>()
+        var listHost: CurrentMember? = null
+        var visibilityCommand: UpdateHostSessionVisibilityCommand? = null
+        var openCommand: HostSessionIdCommand? = null
+        var upcomingMember: CurrentMember? = null
+
+        override fun list(host: CurrentMember): List<HostSessionListItem> {
+            listHost = host
+            return emptyList()
+        }
 
         override fun create(command: HostSessionCommand) =
             CreatedSessionResponse(
@@ -111,6 +166,7 @@ class HostSessionCommandServiceTest {
                 meetingUrl = command.meetingUrl,
                 meetingPasscode = command.meetingPasscode,
                 state = "OPEN",
+                visibility = SessionRecordVisibility.HOST_ONLY,
             ).also { calls += "create:${command.title}" }
 
         override fun detail(command: HostSessionIdCommand) =
@@ -118,6 +174,16 @@ class HostSessionCommandServiceTest {
 
         override fun update(command: UpdateHostSessionCommand) =
             hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" }
+
+        override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
+            visibilityCommand = command
+            return hostSessionDetail(command.sessionId).copy(visibility = command.visibility)
+        }
+
+        override fun open(command: HostSessionIdCommand): HostSessionDetailResponse {
+            openCommand = command
+            return hostSessionDetail(command.sessionId).copy(state = "OPEN")
+        }
 
         override fun deletionPreview(command: HostSessionIdCommand) =
             HostSessionDeletionPreviewResponse(
@@ -158,6 +224,11 @@ class HostSessionCommandServiceTest {
                 feedbackPending = 0,
             ).also { calls += "dashboard:${host.email}" }
 
+        override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> {
+            upcomingMember = member
+            return emptyList()
+        }
+
         private fun hostSessionDetail(sessionId: UUID) = HostSessionDetailResponse(
             sessionId = sessionId.toString(),
             sessionNumber = 7,
@@ -181,6 +252,7 @@ class HostSessionCommandServiceTest {
                 fileName = null,
                 uploadedAt = null,
             ),
+            visibility = SessionRecordVisibility.HOST_ONLY,
         )
 
         private fun emptyDeletionCounts() = HostSessionDeletionCounts(

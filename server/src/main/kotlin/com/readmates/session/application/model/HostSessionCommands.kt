@@ -31,6 +31,12 @@ data class UpdateHostSessionCommand(
     val session: HostSessionCommand,
 )
 
+data class UpdateHostSessionVisibilityCommand(
+    val host: CurrentMember,
+    val sessionId: UUID,
+    val visibility: SessionRecordVisibility,
+)
+
 data class AttendanceEntryCommand(
     val membershipId: String,
     val attendanceStatus: String,

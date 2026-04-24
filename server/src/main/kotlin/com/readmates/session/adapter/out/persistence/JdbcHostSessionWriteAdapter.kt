@@ -229,6 +229,7 @@ class JdbcHostSessionWriteAdapter(
             meetingUrl = meetingUrl,
             meetingPasscode = meetingPasscode,
             state = state,
+            visibility = SessionRecordVisibility.HOST_ONLY,
         )
     }
 
@@ -374,7 +375,8 @@ class JdbcHostSessionWriteAdapter(
               location_label,
               meeting_url,
               meeting_passcode,
-              state
+              state,
+              visibility
             from sessions
             where id = ?
               and club_id = ?
@@ -397,6 +399,7 @@ class JdbcHostSessionWriteAdapter(
                     meetingPasscode = resultSet.getString("meeting_passcode"),
                     publication = null,
                     state = resultSet.getString("state"),
+                    visibility = SessionRecordVisibility.valueOf(resultSet.getString("visibility")),
                     attendees = emptyList(),
                     feedbackDocument = HostSessionFeedbackDocument(
                         uploaded = false,
