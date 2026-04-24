@@ -79,9 +79,8 @@ describe("member app access helpers", () => {
     expect(canUseHostApp(anonymousAuth)).toBe(false);
   });
 
-  it("allows only authenticated active hosts to edit their own profile", () => {
-    expect(canEditOwnProfile(authForStatus("ACTIVE", { role: "HOST" }))).toBe(true);
-
+  it("blocks all users from editing their own profile", () => {
+    expect(canEditOwnProfile(authForStatus("ACTIVE", { role: "HOST" }))).toBe(false);
     expect(canEditOwnProfile(authForStatus("ACTIVE", { role: "MEMBER" }))).toBe(false);
     expect(canEditOwnProfile(authForStatus("VIEWER", { role: "HOST" }))).toBe(false);
     expect(canEditOwnProfile(authForStatus("SUSPENDED", { role: "HOST" }))).toBe(false);

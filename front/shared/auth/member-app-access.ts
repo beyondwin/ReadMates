@@ -16,7 +16,8 @@ export function canUseHostApp(auth: AuthMeResponse) {
 }
 
 export function canEditOwnProfile(auth: AuthMeResponse) {
-  return canUseHostApp(auth);
+  void auth;
+  return false;
 }
 
 export function canUseMemberApp(auth: AuthMeResponse) {
