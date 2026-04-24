@@ -3,8 +3,10 @@ package com.readmates.auth.adapter.`in`.web
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
+import com.readmates.auth.application.service.MemberProfileError
 import com.readmates.auth.application.service.MemberProfileException
 import com.readmates.shared.security.emailOrNull
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -47,14 +49,40 @@ class MemberProfileController(
     @ExceptionHandler(MemberProfileException::class)
     fun handleMemberProfileException(exception: MemberProfileException): ResponseEntity<MemberProfileErrorResponse> =
         ResponseEntity
-            .status(exception.error.status)
+            .status(exception.error.httpStatus())
             .body(
                 MemberProfileErrorResponse(
                     code = exception.error.code,
-                    message = exception.error.message,
+                    message = exception.error.responseMessage(),
                 ),
             )
 
     private fun MemberProfileUpdateRequest.toCommand(): UpdateMemberProfileCommand =
         UpdateMemberProfileCommand(shortName = shortName)
+
+    private fun MemberProfileError.httpStatus(): HttpStatus =
+        when (this) {
+            MemberProfileError.AUTHENTICATION_REQUIRED -> HttpStatus.UNAUTHORIZED
+            MemberProfileError.HOST_ROLE_REQUIRED,
+            MemberProfileError.MEMBERSHIP_NOT_ALLOWED -> HttpStatus.FORBIDDEN
+            MemberProfileError.MEMBER_NOT_FOUND -> HttpStatus.NOT_FOUND
+            MemberProfileError.SHORT_NAME_REQUIRED,
+            MemberProfileError.SHORT_NAME_TOO_LONG,
+            MemberProfileError.SHORT_NAME_INVALID,
+            MemberProfileError.SHORT_NAME_RESERVED -> HttpStatus.BAD_REQUEST
+            MemberProfileError.SHORT_NAME_DUPLICATE -> HttpStatus.CONFLICT
+        }
+
+    private fun MemberProfileError.responseMessage(): String =
+        when (this) {
+            MemberProfileError.AUTHENTICATION_REQUIRED -> "Authentication required"
+            MemberProfileError.HOST_ROLE_REQUIRED -> "Host role required"
+            MemberProfileError.MEMBERSHIP_NOT_ALLOWED -> "Membership is not allowed to edit profile"
+            MemberProfileError.MEMBER_NOT_FOUND -> "Member not found"
+            MemberProfileError.SHORT_NAME_REQUIRED -> "Short name is required"
+            MemberProfileError.SHORT_NAME_TOO_LONG -> "Short name must be 20 characters or fewer"
+            MemberProfileError.SHORT_NAME_INVALID -> "Short name is invalid"
+            MemberProfileError.SHORT_NAME_RESERVED -> "Short name is reserved"
+            MemberProfileError.SHORT_NAME_DUPLICATE -> "Short name is already used in this club"
+        }
 }

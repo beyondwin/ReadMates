@@ -10,7 +10,6 @@ import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.auth.application.toHostMemberListItem
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.Locale
@@ -143,24 +142,20 @@ class MemberProfileService(
     }
 }
 
-class MemberProfileException(val error: MemberProfileError) : RuntimeException(error.message)
+class MemberProfileException(val error: MemberProfileError) : RuntimeException(error.code)
 
-enum class MemberProfileError(
-    val status: HttpStatus,
-    val code: String,
-    val message: String,
-) {
-    AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "Authentication required"),
-    HOST_ROLE_REQUIRED(HttpStatus.FORBIDDEN, "HOST_ROLE_REQUIRED", "Host role required"),
-    MEMBERSHIP_NOT_ALLOWED(
-        HttpStatus.FORBIDDEN,
-        "MEMBERSHIP_NOT_ALLOWED",
-        "Membership is not allowed to edit profile",
-    ),
-    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Member not found"),
-    SHORT_NAME_REQUIRED(HttpStatus.BAD_REQUEST, "SHORT_NAME_REQUIRED", "Short name is required"),
-    SHORT_NAME_TOO_LONG(HttpStatus.BAD_REQUEST, "SHORT_NAME_TOO_LONG", "Short name must be 20 characters or fewer"),
-    SHORT_NAME_INVALID(HttpStatus.BAD_REQUEST, "SHORT_NAME_INVALID", "Short name is invalid"),
-    SHORT_NAME_RESERVED(HttpStatus.BAD_REQUEST, "SHORT_NAME_RESERVED", "Short name is reserved"),
-    SHORT_NAME_DUPLICATE(HttpStatus.CONFLICT, "SHORT_NAME_DUPLICATE", "Short name is already used in this club"),
+enum class MemberProfileError {
+    AUTHENTICATION_REQUIRED,
+    HOST_ROLE_REQUIRED,
+    MEMBERSHIP_NOT_ALLOWED,
+    MEMBER_NOT_FOUND,
+    SHORT_NAME_REQUIRED,
+    SHORT_NAME_TOO_LONG,
+    SHORT_NAME_INVALID,
+    SHORT_NAME_RESERVED,
+    SHORT_NAME_DUPLICATE,
+    ;
+
+    val code: String
+        get() = name
 }
