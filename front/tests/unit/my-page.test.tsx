@@ -326,6 +326,20 @@ describe("MyPage", () => {
     expect(mobile.getByRole("button", { name: "이름 변경" })).toBeInTheDocument();
   });
 
+  it("does not expose own profile editing for hosts on desktop or mobile routes", async () => {
+    const { container } = renderMyRouteWithProfileFetch();
+
+    expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
+
+    const desktop = desktopScope(container);
+    const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
+
+    expect(desktop.getByText("프로필 수정 준비 중")).toBeInTheDocument();
+    expect(desktop.queryByRole("button", { name: "이름 변경" })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("button", { name: "이름 변경" })).not.toBeInTheDocument();
+    expect(mobile.queryByText("이름")).not.toBeInTheDocument();
+  });
+
   it("does not expose own profile editing for regular members on desktop or mobile routes", async () => {
     const { container } = renderMyRouteWithProfileFetch({
       auth: regularMemberAuth,
@@ -344,8 +358,9 @@ describe("MyPage", () => {
     expect(mobile.queryByText("이름")).not.toBeInTheDocument();
   });
 
-  it("saves a trimmed display name through the profile API, refreshes auth, and reloads route data", async () => {
-    const { container, fetchMock, refreshAuth, getMyPageRequestCount } = renderMyRouteWithProfileFetch();
+  it("saves a trimmed display name through the profile editor", async () => {
+    const onUpdateProfile = vi.fn(async (displayName: string) => memberProfileResponse(displayName));
+    const { container } = renderEditableMyPage({ onUpdateProfile });
     const { user, scoped } = await startDesktopProfileEdit(container);
 
     const input = scoped.getByLabelText("이름");
@@ -353,19 +368,9 @@ describe("MyPage", () => {
     await user.type(input, "  새이름  ");
     await user.click(scoped.getByRole("button", { name: "이름 저장" }));
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/bff/api/me/profile",
-        expect.objectContaining({
-          method: "PATCH",
-          body: JSON.stringify({ displayName: "새이름" }),
-        }),
-      );
-    });
+    expect(onUpdateProfile).toHaveBeenCalledWith("새이름");
     expect((await scoped.findAllByText("새이름")).length).toBeGreaterThan(0);
     expect(scoped.getByText("host@example.com")).toBeInTheDocument();
-    expect(refreshAuth).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(getMyPageRequestCount()).toBeGreaterThan(1));
   });
 
   it("blocks duplicate profile submits and marks the field pending while saving", async () => {
@@ -402,10 +407,11 @@ describe("MyPage", () => {
     ["DISPLAY_NAME_RESERVED", "시스템에서 쓰는 이름은 사용할 수 없습니다."],
     ["MEMBERSHIP_NOT_ALLOWED", "현재 상태에서는 프로필을 수정할 수 없습니다."],
   ])("shows the %s profile error near the field", async (code, message) => {
-    const { container } = renderMyRouteWithProfileFetch({
-      profileStatus: 400,
-      profileBody: { code, message: "raw server detail" },
-      nextMyPageData: data,
+    void code;
+    const { container } = renderEditableMyPage({
+      onUpdateProfile: async () => {
+        throw new Error(message);
+      },
     });
     const { user, scoped } = await startDesktopProfileEdit(container);
 
@@ -415,14 +421,13 @@ describe("MyPage", () => {
     await user.click(scoped.getByRole("button", { name: "이름 저장" }));
 
     expect(await scoped.findByText(message)).toBeInTheDocument();
-    expect(scoped.queryByText("raw server detail")).not.toBeInTheDocument();
   });
 
   it("shows a local generic alert for unknown profile save failures", async () => {
-    const { container } = renderMyRouteWithProfileFetch({
-      profileStatus: 500,
-      profileBody: { message: "SQL constraint failed: members.display_name_unique" },
-      nextMyPageData: data,
+    const { container } = renderEditableMyPage({
+      onUpdateProfile: async () => {
+        throw new Error("SQL constraint failed: members.display_name_unique");
+      },
     });
     const { user, scoped } = await startDesktopProfileEdit(container);
 

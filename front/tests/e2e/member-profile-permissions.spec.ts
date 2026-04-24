@@ -95,6 +95,14 @@ test("host edits a same-club member display name and sees the row update", async
   const updatedDisplayName = uniqueDisplayName("Host");
 
   await loginWithGoogleFixture(page, hostEmail);
+  await page.goto("/app/me");
+
+  await expect(page.getByRole("heading", { name: "계정과 기록", level: 1 })).toBeVisible();
+  const myPagePersonalSettings = page.locator("section").filter({ has: page.getByRole("heading", { name: "개인 설정" }) });
+  await expect(myPagePersonalSettings.getByText("호스트", { exact: true }).first()).toBeVisible();
+  await expect(myPagePersonalSettings.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(myPagePersonalSettings.getByRole("textbox", { name: "이름" })).toHaveCount(0);
+
   await page.goto("/app/host/members");
 
   await expect(page.getByRole("heading", { name: "멤버 관리", level: 1 })).toBeVisible();
