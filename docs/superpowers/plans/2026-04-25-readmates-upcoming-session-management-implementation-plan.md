@@ -1260,7 +1260,7 @@ git commit -m "fix: hide draft and host only records"
 - Modify: `front/tests/unit/host-dashboard.test.tsx`
 - Modify: `front/tests/unit/member-home.test.tsx`
 
-- [ ] **Step 1: Write failing loader tests**
+- [x] **Step 1: Write failing loader tests**
 
 In `host-dashboard.test.tsx`, add a loader test:
 
@@ -1312,7 +1312,7 @@ it("loads upcoming sessions for member home", async () => {
 });
 ```
 
-- [ ] **Step 2: Run frontend tests to verify failures**
+- [x] **Step 2: Run frontend tests to verify failures**
 
 Run:
 
@@ -1322,7 +1322,7 @@ pnpm --dir front test -- host-dashboard.test.tsx member-home.test.tsx
 
 Expected: FAIL because loader data does not include upcoming/host session lists.
 
-- [ ] **Step 3: Add host contracts and API calls**
+- [x] **Step 3: Add host contracts and API calls**
 
 In `host-contracts.ts`, add:
 
@@ -1371,7 +1371,7 @@ export function openHostSession(sessionId: string) {
 }
 ```
 
-- [ ] **Step 4: Add member upcoming contracts and API**
+- [x] **Step 4: Add member upcoming contracts and API**
 
 In `member-home-contracts.ts`, add:
 
@@ -1399,7 +1399,7 @@ export function fetchMemberHomeUpcomingSessions() {
 }
 ```
 
-- [ ] **Step 5: Extend route loaders**
+- [x] **Step 5: Extend route loaders**
 
 In `host-dashboard-data.ts`, fetch `hostSessions`:
 
@@ -1450,7 +1450,7 @@ For disallowed access, return:
 upcomingSessions: [],
 ```
 
-- [ ] **Step 6: Pass new props from route pages**
+- [x] **Step 6: Pass new props from route pages**
 
 In `front/src/pages/app-home.tsx`, pass:
 
@@ -1464,7 +1464,7 @@ In `HostDashboardRoute`, pass:
 hostSessions={loaderData.hostSessions}
 ```
 
-- [ ] **Step 7: Run frontend tests**
+- [x] **Step 7: Run frontend tests**
 
 Run:
 
@@ -1474,7 +1474,7 @@ pnpm --dir front test -- host-dashboard.test.tsx member-home.test.tsx
 
 Expected: PASS for the loader-level tests after the new route data fields are returned.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add front/features/host/api/host-contracts.ts \
@@ -1488,6 +1488,16 @@ git add front/features/host/api/host-contracts.ts \
   front/tests/unit/member-home.test.tsx
 git commit -m "feat: load upcoming session data"
 ```
+
+**Task 5 checkpoint:**
+- Task: Task 5, Add Frontend API Contracts and Loaders.
+- Changed files: `front/features/host/api/host-contracts.ts`, `front/features/host/api/host-api.ts`, `front/features/host/route/host-dashboard-data.ts`, `front/features/host/route/host-dashboard-route.tsx`, `front/features/host/components/host-dashboard.tsx`, `front/features/member-home/api/member-home-contracts.ts`, `front/features/member-home/api/member-home-api.ts`, `front/features/member-home/route/member-home-data.ts`, `front/features/member-home/components/member-home.tsx`, `front/src/pages/app-home.tsx`, `front/tests/unit/host-dashboard.test.tsx`, `front/tests/unit/member-home.test.tsx`, `front/tests/unit/api-contract-fixtures.ts`, `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`.
+- Key decisions: kept new BFF calls in feature-owned API modules; extended route loaders to fetch host session lists and member upcoming sessions in parallel with existing dashboard/home data; added route-to-component prop pass-through with optional no-op component props so Task 6/7 can render the data without introducing UI scope here.
+- Review issues/resolution: Task 5 spec review found custom `HostDashboardActions` test objects missing the new visibility/open handlers and the member loader test missing an explicit `/api/sessions/upcoming` fetch assertion. Resolved by extending the custom action objects from the shared noop action set, tightening one fetch mock signature used for call inspection, and asserting the upcoming-session fetch call. Self-review found the compatibility props triggered lint unused-variable errors; resolved by explicitly consuming the props without rendering them.
+- Verification: initial `pnpm --dir front test -- host-dashboard.test.tsx member-home.test.tsx` could not run because frontend dependencies were not linked; after `pnpm --dir front install`, the same command failed as expected with `hostSessions` and `upcomingSessions` undefined. Green `pnpm --dir front test -- host-dashboard.test.tsx member-home.test.tsx` passed with 44 test files and 482 tests. During spec-review fixes, one run of the same test command failed in unrelated `auth-context.test.tsx`; rerunning the same command passed with 44 test files and 482 tests. `pnpm --dir front lint` passed after the test mock signature fix. `pnpm --dir front build` passed.
+- Remaining risk: host dashboard and member home only receive the new data; actual management/upcoming UI rendering remains for Task 6 and Task 7.
+- Next task notes: Task 6 can render `hostSessions` and wire `updateSessionVisibility`/`openSession`; Task 7 can render `upcomingSessions` on member home.
+- Worktree/branch: `upcoming-session-management-20260425` worktree, `codex/upcoming-session-management-20260425`.
 
 ---
 

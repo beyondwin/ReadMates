@@ -1,7 +1,12 @@
 import { Link } from "@/src/app/router-link";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { hostDashboardReturnTarget, readmatesReturnState } from "@/src/app/route-continuity";
-import type { CurrentSessionResponse, HostDashboardResponse } from "@/features/host/api/host-contracts";
+import type {
+  CurrentSessionResponse,
+  HostDashboardResponse,
+  HostSessionListItem,
+  SessionRecordVisibility,
+} from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   getHostDashboardChecklist,
@@ -83,6 +88,8 @@ export type HostDashboardActions = {
     membershipId: string,
     action: HostDashboardMissingMemberAction,
   ) => Promise<void>;
+  updateSessionVisibility: (sessionId: string, visibility: SessionRecordVisibility) => Promise<void>;
+  openSession: (sessionId: string) => Promise<void>;
 };
 
 const newSessionHref = "/app/host/sessions/new";
@@ -158,13 +165,17 @@ export default function HostDashboard({
   auth,
   current,
   data,
+  hostSessions = [],
   actions,
 }: {
   auth?: AuthMeResponse;
   current?: CurrentSessionResponse;
   data: HostDashboardResponse;
+  hostSessions?: HostSessionListItem[];
   actions: HostDashboardActions;
 }) {
+  void hostSessions;
+
   const hostName = auth?.displayName ?? "호스트";
   const session = current?.currentSession ?? null;
   const hasCurrentSession = session !== null;

@@ -79,3 +79,17 @@ export type MemberHomeNoteFeedItem = {
   kind: "QUESTION" | "ONE_LINE_REVIEW" | "HIGHLIGHT";
   text: string;
 };
+
+export type MemberHomeUpcomingSession = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor: string;
+  bookImageUrl: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locationLabel: string;
+  visibility: "MEMBER" | "PUBLIC";
+};

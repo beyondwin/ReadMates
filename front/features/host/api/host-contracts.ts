@@ -210,6 +210,25 @@ export type HostDashboardResponse = {
 
 export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
 
+export type HostSessionListItem = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor: string;
+  bookImageUrl: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locationLabel: string;
+  state: SessionState;
+  visibility: SessionRecordVisibility;
+};
+
+export type HostSessionVisibilityRequest = {
+  visibility: SessionRecordVisibility;
+};
+
 export type HostSessionPublication = {
   publicSummary: string;
   visibility: SessionRecordVisibility;
@@ -235,6 +254,7 @@ export type HostSessionDetailResponse = {
   startTime: string;
   endTime: string;
   questionDeadlineAt: string;
+  visibility: SessionRecordVisibility;
   publication: HostSessionPublication | null;
   state: SessionState;
   attendees: Array<{
@@ -308,6 +328,7 @@ export type CreatedSessionResponse = {
   endTime: string;
   questionDeadlineAt: string;
   state: SessionState;
+  visibility: SessionRecordVisibility;
 };
 
 export type HostAttendanceUpdate = {

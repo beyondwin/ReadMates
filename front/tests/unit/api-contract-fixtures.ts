@@ -248,6 +248,7 @@ export const hostSessionDetailContractFixture = {
   locationLabel: "온라인",
   meetingUrl: "https://meet.google.com/readmates-factfulness",
   meetingPasscode: "fact",
+  visibility: "PUBLIC",
   publication: hostSessionPublicationContractFixture,
   state: "CLOSED",
   attendees: [

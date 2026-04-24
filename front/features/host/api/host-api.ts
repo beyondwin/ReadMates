@@ -13,8 +13,10 @@ import type {
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
   HostSessionDetailResponse,
+  HostSessionListItem,
   HostSessionPublicationRequest,
   HostSessionRequest,
+  HostSessionVisibilityRequest,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
   UpdateHostMemberProfileRequest,
@@ -27,6 +29,10 @@ export function fetchHostCurrentSession() {
 
 export function fetchHostDashboard() {
   return readmatesFetch<HostDashboardResponse>("/api/host/dashboard");
+}
+
+export function fetchHostSessions() {
+  return readmatesFetch<HostSessionListItem[]>("/api/host/sessions");
 }
 
 export function fetchHostSessionDetail(sessionId: string) {
@@ -75,6 +81,20 @@ export function saveHostSessionPublication(sessionId: string, request: HostSessi
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
   });
+}
+
+export function saveHostSessionVisibility(sessionId: string, request: HostSessionVisibilityRequest) {
+  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/visibility`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+}
+
+export function openHostSession(sessionId: string) {
+  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/open`, {
+    method: "POST",
+  }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function uploadHostSessionFeedbackDocument(sessionId: string, formData: FormData) {
