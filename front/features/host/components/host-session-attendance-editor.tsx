@@ -8,7 +8,7 @@ import { rsvpLabel } from "@/shared/ui/readmates-display";
 type HostSessionAttendanceAttendee = {
   membershipId: string;
   displayName: string;
-  shortName: string;
+  accountName: string;
   rsvpStatus: RsvpStatus;
   attendanceStatus: AttendanceStatus;
   participationStatus?: SessionParticipationStatus;
@@ -69,7 +69,7 @@ export function HostSessionAttendanceEditor({
               alignItems: "center",
             }}
           >
-            <AvatarChip name={attendee.displayName} fallbackInitial={attendee.shortName} label={attendee.displayName} size={24} />
+            <AvatarChip name={attendee.displayName} fallbackInitial={attendee.displayName} label={attendee.displayName} size={24} />
             <span className="body" style={{ fontSize: "14px" }}>
               {attendee.displayName}
             </span>

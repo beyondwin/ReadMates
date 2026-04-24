@@ -108,7 +108,7 @@ export type CurrentSessionResponse = {
     attendees: Array<{
       membershipId: string;
       displayName: string;
-      shortName: string;
+      accountName: string;
       role: MemberRole;
       rsvpStatus: RsvpStatus;
       attendanceStatus: AttendanceStatus;
@@ -145,7 +145,7 @@ export type ViewerMember = {
   userId: string;
   email: string;
   displayName: string;
-  shortName: string;
+  accountName: string;
   profileImageUrl: string | null;
   status: MembershipStatus;
   createdAt: string;
@@ -156,7 +156,7 @@ export type HostMemberListItem = {
   userId: string;
   email: string;
   displayName: string;
-  shortName: string;
+  accountName: string;
   profileImageUrl: string | null;
   role: MemberRole;
   status: MembershipStatus;
@@ -171,15 +171,15 @@ export type HostMemberListItem = {
 };
 
 export type UpdateHostMemberProfileRequest = {
-  shortName: string;
+  displayName: string;
 };
 
 export type HostMemberProfileErrorCode =
-  | "SHORT_NAME_REQUIRED"
-  | "SHORT_NAME_TOO_LONG"
-  | "SHORT_NAME_INVALID"
-  | "SHORT_NAME_RESERVED"
-  | "SHORT_NAME_DUPLICATE"
+  | "DISPLAY_NAME_REQUIRED"
+  | "DISPLAY_NAME_TOO_LONG"
+  | "DISPLAY_NAME_INVALID"
+  | "DISPLAY_NAME_RESERVED"
+  | "DISPLAY_NAME_DUPLICATE"
   | "HOST_ROLE_REQUIRED"
   | "MEMBER_NOT_FOUND"
   | "MEMBERSHIP_NOT_ALLOWED";
@@ -238,7 +238,7 @@ export type HostSessionDetailResponse = {
   attendees: Array<{
     membershipId: string;
     displayName: string;
-    shortName: string;
+    accountName: string;
     rsvpStatus: RsvpStatus;
     attendanceStatus: AttendanceStatus;
     participationStatus?: SessionParticipationStatus;

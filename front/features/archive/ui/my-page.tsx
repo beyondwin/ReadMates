@@ -5,7 +5,6 @@ import {
   clubDisplayName,
   feedbackReportActionLabel,
   formatJoinedMonth,
-  identityLine,
   membershipIdentityLabel,
   profileSaveErrorMessage,
 } from "@/features/archive/model/archive-model";
@@ -23,11 +22,11 @@ const notifications = [
 ];
 
 const profileFailureMessages = new Set([
-  profileSaveErrorMessage("SHORT_NAME_REQUIRED"),
-  profileSaveErrorMessage("SHORT_NAME_TOO_LONG"),
-  profileSaveErrorMessage("SHORT_NAME_INVALID"),
-  profileSaveErrorMessage("SHORT_NAME_RESERVED"),
-  profileSaveErrorMessage("SHORT_NAME_DUPLICATE"),
+  profileSaveErrorMessage("DISPLAY_NAME_REQUIRED"),
+  profileSaveErrorMessage("DISPLAY_NAME_TOO_LONG"),
+  profileSaveErrorMessage("DISPLAY_NAME_INVALID"),
+  profileSaveErrorMessage("DISPLAY_NAME_RESERVED"),
+  profileSaveErrorMessage("DISPLAY_NAME_DUPLICATE"),
   profileSaveErrorMessage("MEMBERSHIP_NOT_ALLOWED"),
   profileSaveErrorMessage(null),
 ]);
@@ -44,10 +43,10 @@ type MyPageProps = {
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile?: boolean;
-  onUpdateProfile?: (shortName: string) => Promise<ProfileUpdateResult>;
+  onUpdateProfile?: (displayName: string) => Promise<ProfileUpdateResult>;
 };
 
-type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "shortName">;
+type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "accountName">;
 
 export type LogoutControlComponent = (props: {
   className?: string;
@@ -73,17 +72,17 @@ export default function MyPage({
   const profileData = profileOverride ? { ...data, ...profileOverride } : data;
   const profileUpdateEnabled = canEditProfile && onUpdateProfile ? true : false;
 
-  async function submitProfileUpdate(shortName: string) {
+  async function submitProfileUpdate(displayName: string) {
     if (!onUpdateProfile) {
       throw new Error(profileSaveErrorMessage(null));
     }
 
-    const profile = await onUpdateProfile(shortName);
+    const profile = await onUpdateProfile(displayName);
     setProfileOverrideState({
       sourceData: data,
       profile: {
         displayName: profile.displayName,
-        shortName: profile.shortName,
+        accountName: profile.accountName,
       },
     });
     return profile;
@@ -136,7 +135,7 @@ function MyDesktop({
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile: boolean;
-  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
+  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 }) {
   return (
     <>
@@ -191,14 +190,14 @@ function MyMobile({
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile: boolean;
-  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
+  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 }) {
   return (
     <div className="rm-my-mobile m-body">
       <section style={{ padding: "24px 18px 8px" }}>
         <div className="m-card">
           <div className="m-row" style={{ gap: 14 }}>
-            <AvatarChip name={data.displayName} fallbackInitial={data.shortName} label={data.displayName} size={56} />
+            <AvatarChip name={data.displayName} fallbackInitial={data.displayName} label={data.displayName} size={56} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className="h3 editorial">{data.displayName}</div>
               <div className="small">{data.email}</div>
@@ -503,7 +502,7 @@ function AccountSection({
       <SectionHeader eyebrow="멤버 정체성" title="계정" />
       <div className="surface" style={{ padding: "26px" }}>
         <div className="row" style={{ gap: "16px" }}>
-          <AvatarChip name={data.displayName} fallbackInitial={data.shortName} label={data.displayName} size={52} />
+          <AvatarChip name={data.displayName} fallbackInitial={data.displayName} label={data.displayName} size={52} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="h4 editorial">{data.displayName}</div>
             <div className="small">{data.email}</div>
@@ -511,7 +510,7 @@ function AccountSection({
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
             <span
               className="tiny"
-              aria-label={canEditProfile ? "표시 이름 편집 가능" : "프로필 수정 준비 중"}
+              aria-label={canEditProfile ? "이름 편집 가능" : "프로필 수정 준비 중"}
               style={{ color: "var(--text-3)", flexShrink: 0 }}
             >
               {canEditProfile ? "프로필 수정 가능" : "프로필 수정 준비 중"}
@@ -800,18 +799,17 @@ function ProfileNameEditor({
 }: {
   data: MyPageProfile;
   canEditProfile?: boolean;
-  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
+  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
   variant: "desktop" | "mobile";
 }) {
   const inputId = useId();
   const errorId = useId();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ sourceShortName: data.shortName, value: data.shortName });
+  const [draft, setDraft] = useState({ sourceDisplayName: data.displayName, value: data.displayName });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const profileName = identityLine(data);
-  const value = draft.sourceShortName === data.shortName ? draft.value : data.shortName;
+  const value = draft.sourceDisplayName === data.displayName ? draft.value : data.displayName;
 
   async function submitProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -827,7 +825,7 @@ function ProfileNameEditor({
 
     try {
       const profile = await onUpdateProfile(trimmedValue);
-      setDraft({ sourceShortName: profile.shortName, value: profile.shortName });
+      setDraft({ sourceDisplayName: profile.displayName, value: profile.displayName });
       setEditing(false);
     } catch (profileError) {
       setError(profileFailureMessage(profileError));
@@ -879,7 +877,7 @@ function ProfileNameEditor({
           <form onSubmit={submitProfile} style={formStyle}>
             <div style={{ minWidth: 0 }}>
               <label htmlFor={inputId} className="body" style={{ display: "block", fontSize: "14px" }}>
-                표시 이름
+                이름
               </label>
               <input
                 id={inputId}
@@ -887,7 +885,7 @@ function ProfileNameEditor({
                 value={value}
                 disabled={saving}
                 aria-describedby={error ? errorId : undefined}
-                onChange={(event) => setDraft({ sourceShortName: data.shortName, value: event.currentTarget.value })}
+                onChange={(event) => setDraft({ sourceDisplayName: data.displayName, value: event.currentTarget.value })}
                 style={{
                   width: "100%",
                   minWidth: 0,
@@ -901,7 +899,7 @@ function ProfileNameEditor({
                 </div>
               ) : null}
             </div>
-            <button type="submit" className="btn btn-primary btn-sm" aria-label="표시 이름 저장" disabled={saving}>
+            <button type="submit" className="btn btn-primary btn-sm" aria-label="이름 저장" disabled={saving}>
               {saving ? "저장 중" : "저장"}
             </button>
             <button
@@ -911,7 +909,7 @@ function ProfileNameEditor({
               onClick={() => {
                 setEditing(false);
                 setError(null);
-                setDraft({ sourceShortName: data.shortName, value: data.shortName });
+                setDraft({ sourceDisplayName: data.displayName, value: data.displayName });
               }}
             >
               취소
@@ -921,15 +919,15 @@ function ProfileNameEditor({
           <div style={bodyStyle}>
             <div style={{ minWidth: 0 }}>
               <div className="body" style={{ fontSize: "14px" }}>
-                표시 이름
+                이름
               </div>
-              <div className="tiny">{profileName}</div>
+              <div className="tiny">{data.displayName}</div>
             </div>
             {canEditProfile ? (
               <button
                 type="button"
                 className="btn btn-quiet btn-sm"
-                aria-label="표시 이름 변경"
+                aria-label="이름 변경"
                 onClick={() => {
                   setEditing(true);
                   setError(null);
@@ -939,7 +937,7 @@ function ProfileNameEditor({
                 <span>변경</span>
               </button>
             ) : (
-              <span className="tiny" aria-label="표시 이름 변경 준비 중" style={{ color: "var(--text-3)" }}>
+              <span className="tiny" aria-label="이름 변경 준비 중" style={{ color: "var(--text-3)" }}>
                 변경 준비 중
               </span>
             )}
@@ -957,7 +955,7 @@ function PreferencesSection({
 }: {
   data: MyPageProfile;
   canEditProfile: boolean;
-  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
+  onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
 }) {
   const preferences = [
     { label: "기록 공개 범위", sub: "클럽 내부 전체", icon: "eye" as const },

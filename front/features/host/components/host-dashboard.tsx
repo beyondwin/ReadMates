@@ -397,7 +397,7 @@ export default function HostDashboard({
                               <span className="row" style={{ gap: "10px" }}>
                                 <AvatarChip
                                   name={member.displayName}
-                                  fallbackInitial={member.shortName}
+                                  fallbackInitial={member.displayName}
                                   label={member.displayName}
                                   size={22}
                                 />
@@ -678,7 +678,7 @@ function MobileHostDashboard({
 
               return (
                 <div key={member.membershipId} className="m-list-row rm-host-dashboard-mobile__member-row">
-                  <AvatarChip name={member.displayName} fallbackInitial={member.shortName} label={member.displayName} size={24} />
+                  <AvatarChip name={member.displayName} fallbackInitial={member.displayName} label={member.displayName} size={24} />
                   <span className="body" style={{ fontSize: "13.5px" }}>
                     {member.displayName}
                   </span>

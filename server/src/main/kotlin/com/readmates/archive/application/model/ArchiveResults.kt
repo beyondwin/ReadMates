@@ -103,7 +103,7 @@ data class MemberArchiveFeedbackDocumentStatusResult(
 
 data class MyPageResult(
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val email: String,
     val role: String,
     val membershipStatus: String,

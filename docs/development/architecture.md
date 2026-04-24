@@ -126,14 +126,14 @@ ReadMates의 사용자 상태는 membership status와 role을 함께 봅니다.
 
 ## 멤버 프로필과 표시 이름
 
-ReadMates에서 화면에 표시되는 짧은 이름은 현재 클럽 membership에 붙은 `shortName`입니다. 기존 `users.short_name`은 legacy/user 기본값으로 남아 있지만, 운영 화면과 API는 `memberships.short_name`을 우선 사용합니다.
+ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다. `displayName`은 현재 클럽 membership에 붙은 이름이며, 현재 스키마에서는 기존 `memberships.short_name` 컬럼에 저장합니다. Google 계정이나 초대에서 온 원본 이름은 `accountName`으로만 다루고, 멤버를 식별할 때는 `email`을 우선 보여줍니다.
 
 프로필 수정 API는 두 개입니다.
 
-- `PATCH /api/me/profile`: 인증된 사용자가 본인 membership의 `shortName`을 수정합니다. `VIEWER`, `ACTIVE`, `SUSPENDED`처럼 멤버 앱을 읽을 수 있는 상태에서만 허용합니다.
-- `PATCH /api/host/members/{membershipId}/profile`: 활성 호스트가 같은 클럽 멤버의 `shortName`을 수정합니다. 호스트 멤버 목록 row를 갱신할 수 있도록 `HostMemberListItem` 형태를 반환합니다.
+- `PATCH /api/me/profile`: 인증된 사용자가 본인 membership의 `displayName`을 수정합니다. `VIEWER`, `ACTIVE`, `SUSPENDED`처럼 멤버 앱을 읽을 수 있는 상태에서만 허용합니다.
+- `PATCH /api/host/members/{membershipId}/profile`: 활성 호스트가 같은 클럽 멤버의 `displayName`을 수정합니다. 호스트 멤버 목록 row를 갱신할 수 있도록 `HostMemberListItem` 형태를 반환합니다.
 
-서버는 표시 이름을 trim한 뒤 필수값, 20자 이하, 제어문자, 이메일 형태, URL/domain 형태, 예약어(`탈퇴한 멤버`, `관리자`, `호스트`, `운영자`)를 검증합니다. 같은 클럽 안의 `shortName` 중복은 `memberships(club_id, short_name)` unique constraint와 application-level lock/check로 막습니다. 공개 문서와 seed에는 실제 멤버 이름 대신 public-safe sample name만 둡니다.
+서버는 표시 이름을 trim한 뒤 필수값, 20자 이하, 제어문자, 이메일 형태, URL/domain 형태, 예약어(`탈퇴한 멤버`, `관리자`, `호스트`, `운영자`)를 검증합니다. 같은 클럽 안의 `displayName` 중복은 현재 `memberships(club_id, short_name)` unique constraint와 application-level lock/check로 막습니다. 공개 문서와 seed에는 실제 멤버 이름 대신 public-safe sample name만 둡니다.
 
 ## 공개 기록과 비공개 기록 경계
 

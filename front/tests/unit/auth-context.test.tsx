@@ -24,7 +24,7 @@ const viewerAuth: AuthMeResponse = {
   clubId: "club-id",
   email: "viewer@example.com",
   displayName: "둘러보기 멤버",
-  shortName: "둘러보기",
+  accountName: "둘러보기",
   role: "MEMBER",
   membershipStatus: "VIEWER",
   approvalState: "VIEWER",
@@ -48,7 +48,7 @@ const activeHostAuth: AuthMeResponse = {
   membershipId: "membership-host",
   email: "host@example.com",
   displayName: "김호스트",
-  shortName: "호스트",
+  accountName: "호스트",
   role: "HOST",
 };
 
@@ -114,7 +114,7 @@ function AuthRefreshProbe() {
 
   return (
     <>
-      <div data-testid="short-name">{state.auth.shortName}</div>
+      <div data-testid="short-name">{state.auth.displayName}</div>
       <button type="button" onClick={() => void refreshAuth()}>
         refresh auth
       </button>
@@ -134,7 +134,7 @@ function ImmediateRefreshProbe() {
     return <div data-testid="short-name">loading</div>;
   }
 
-  return <div data-testid="short-name">{state.auth.shortName}</div>;
+  return <div data-testid="short-name">{state.auth.displayName}</div>;
 }
 
 async function resolveAuthRequest(deferred: Deferred<Response>, auth: AuthMeResponse) {
@@ -239,11 +239,11 @@ describe("AuthProvider", () => {
     expect(fetchMock).toHaveBeenLastCalledWith("/api/bff/api/auth/logout", { method: "POST" });
   });
 
-  it("refreshes the auth payload and updates the current short name", async () => {
+  it("refreshes the auth payload and updates the current display name", async () => {
     const user = userEvent.setup();
     const refreshedAuth: AuthMeResponse = {
       ...activeMemberAuth,
-      shortName: "새이름",
+      displayName: "새이름",
     };
     const fetchMock = vi.fn().mockResolvedValueOnce(authResponse(activeMemberAuth)).mockResolvedValueOnce(authResponse(refreshedAuth));
     vi.stubGlobal("fetch", fetchMock);
@@ -254,7 +254,7 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.shortName ?? "");
+    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.displayName ?? "");
 
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
 
@@ -266,8 +266,8 @@ describe("AuthProvider", () => {
     const user = userEvent.setup();
     const firstRefresh = createDeferred<Response>();
     const secondRefresh = createDeferred<Response>();
-    const staleAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "이전" };
-    const latestAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "최신" };
+    const staleAuth: AuthMeResponse = { ...activeMemberAuth, displayName: "이전" };
+    const latestAuth: AuthMeResponse = { ...activeMemberAuth, displayName: "최신" };
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(authResponse(activeMemberAuth))
@@ -281,7 +281,7 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.shortName ?? "");
+    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.displayName ?? "");
 
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
@@ -298,7 +298,7 @@ describe("AuthProvider", () => {
     const user = userEvent.setup();
     const firstRefresh = createDeferred<Response>();
     const secondRefresh = createDeferred<Response>();
-    const latestAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "최신" };
+    const latestAuth: AuthMeResponse = { ...activeMemberAuth, displayName: "최신" };
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(authResponse(activeMemberAuth))
@@ -312,7 +312,7 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.shortName ?? "");
+    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.displayName ?? "");
 
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
@@ -328,8 +328,8 @@ describe("AuthProvider", () => {
   it("does not let the initial auth response overwrite a newer refresh", async () => {
     const initialFetch = createDeferred<Response>();
     const refreshFetch = createDeferred<Response>();
-    const staleAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "초기" };
-    const latestAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "최신" };
+    const staleAuth: AuthMeResponse = { ...activeMemberAuth, displayName: "초기" };
+    const latestAuth: AuthMeResponse = { ...activeMemberAuth, displayName: "최신" };
     const fetchMock = vi.fn().mockReturnValueOnce(initialFetch.promise).mockReturnValueOnce(refreshFetch.promise);
     vi.stubGlobal("fetch", fetchMock);
 

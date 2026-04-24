@@ -58,7 +58,7 @@ class MemberProfileController(
             )
 
     private fun MemberProfileUpdateRequest.toCommand(): UpdateMemberProfileCommand =
-        UpdateMemberProfileCommand(shortName = shortName)
+        UpdateMemberProfileCommand(displayName = displayName)
 
     private fun MemberProfileError.httpStatus(): HttpStatus =
         when (this) {
@@ -66,11 +66,11 @@ class MemberProfileController(
             MemberProfileError.HOST_ROLE_REQUIRED,
             MemberProfileError.MEMBERSHIP_NOT_ALLOWED -> HttpStatus.FORBIDDEN
             MemberProfileError.MEMBER_NOT_FOUND -> HttpStatus.NOT_FOUND
-            MemberProfileError.SHORT_NAME_REQUIRED,
-            MemberProfileError.SHORT_NAME_TOO_LONG,
-            MemberProfileError.SHORT_NAME_INVALID,
-            MemberProfileError.SHORT_NAME_RESERVED -> HttpStatus.BAD_REQUEST
-            MemberProfileError.SHORT_NAME_DUPLICATE -> HttpStatus.CONFLICT
+            MemberProfileError.DISPLAY_NAME_REQUIRED,
+            MemberProfileError.DISPLAY_NAME_TOO_LONG,
+            MemberProfileError.DISPLAY_NAME_INVALID,
+            MemberProfileError.DISPLAY_NAME_RESERVED -> HttpStatus.BAD_REQUEST
+            MemberProfileError.DISPLAY_NAME_DUPLICATE -> HttpStatus.CONFLICT
         }
 
     private fun MemberProfileError.responseMessage(): String =
@@ -79,10 +79,10 @@ class MemberProfileController(
             MemberProfileError.HOST_ROLE_REQUIRED -> "Host role required"
             MemberProfileError.MEMBERSHIP_NOT_ALLOWED -> "Membership is not allowed to edit profile"
             MemberProfileError.MEMBER_NOT_FOUND -> "Member not found"
-            MemberProfileError.SHORT_NAME_REQUIRED -> "Short name is required"
-            MemberProfileError.SHORT_NAME_TOO_LONG -> "Short name must be 20 characters or fewer"
-            MemberProfileError.SHORT_NAME_INVALID -> "Short name is invalid"
-            MemberProfileError.SHORT_NAME_RESERVED -> "Short name is reserved"
-            MemberProfileError.SHORT_NAME_DUPLICATE -> "Short name is already used in this club"
+            MemberProfileError.DISPLAY_NAME_REQUIRED -> "Display name is required"
+            MemberProfileError.DISPLAY_NAME_TOO_LONG -> "Display name must be 20 characters or fewer"
+            MemberProfileError.DISPLAY_NAME_INVALID -> "Display name is invalid"
+            MemberProfileError.DISPLAY_NAME_RESERVED -> "Display name is reserved"
+            MemberProfileError.DISPLAY_NAME_DUPLICATE -> "Display name is already used in this club"
         }
 }

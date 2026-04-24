@@ -536,7 +536,9 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.displayName") { value("이멤버5") }
+                jsonPath("$.displayName") { value("멤버5") }
+                jsonPath("$.accountName") { value("이멤버5") }
+                jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.email") { value("member5@example.com") }
                 jsonPath("$.role") { value("MEMBER") }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }

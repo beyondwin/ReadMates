@@ -18,8 +18,8 @@ const auth: AuthMeResponse = {
   membershipId: "membership-1",
   clubId: "club-1",
   email: "member5@example.com",
-  displayName: "이멤버5",
-  shortName: "수",
+  displayName: "수",
+  accountName: "이멤버5",
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
@@ -54,8 +54,8 @@ const current: CurrentSessionResponse = {
     attendees: [
       {
         membershipId: "member-1",
-        displayName: "이멤버5",
-        shortName: "수",
+        displayName: "수",
+        accountName: "이멤버5",
         role: "MEMBER",
         rsvpStatus: "GOING",
         attendanceStatus: "UNKNOWN",
@@ -207,56 +207,56 @@ describe("MemberHome", () => {
             attendees: [
               {
                 membershipId: "member-1",
-                displayName: "이멤버5",
-                shortName: "수",
+                displayName: "수",
+                accountName: "이멤버5",
                 role: "MEMBER",
                 rsvpStatus: "GOING",
                 attendanceStatus: "UNKNOWN",
               },
               {
                 membershipId: "member-2",
-                displayName: "김호스트",
-                shortName: "호스트",
+                displayName: "호스트",
+                accountName: "김호스트",
                 role: "HOST",
                 rsvpStatus: "GOING",
                 attendanceStatus: "UNKNOWN",
               },
               {
                 membershipId: "member-3",
-                displayName: "송멤버4",
-                shortName: "멤버4",
+                displayName: "멤버4",
+                accountName: "송멤버4",
                 role: "MEMBER",
                 rsvpStatus: "NO_RESPONSE",
                 attendanceStatus: "UNKNOWN",
               },
               {
                 membershipId: "member-4",
-                displayName: "안멤버1",
-                shortName: "멤버1",
+                displayName: "멤버1",
+                accountName: "안멤버1",
                 role: "MEMBER",
                 rsvpStatus: "NO_RESPONSE",
                 attendanceStatus: "UNKNOWN",
               },
               {
                 membershipId: "member-5",
-                displayName: "김멤버3",
-                shortName: "멤버3",
+                displayName: "멤버3",
+                accountName: "김멤버3",
                 role: "MEMBER",
                 rsvpStatus: "NO_RESPONSE",
                 attendanceStatus: "UNKNOWN",
               },
               {
                 membershipId: "member-6",
-                displayName: "최멤버2",
-                shortName: "멤버2",
+                displayName: "멤버2",
+                accountName: "최멤버2",
                 role: "MEMBER",
                 rsvpStatus: "NO_RESPONSE",
                 attendanceStatus: "UNKNOWN",
               },
               {
                 membershipId: "member-removed",
-                displayName: "제외멤버",
-                shortName: "제외",
+                displayName: "제외",
+                accountName: "제외멤버",
                 role: "MEMBER",
                 rsvpStatus: "GOING",
                 attendanceStatus: "UNKNOWN",
@@ -378,8 +378,8 @@ describe("MemberHome", () => {
               current.currentSession!.attendees[0],
               {
                 membershipId: "member-2",
-                displayName: "김멤버3",
-                shortName: "멤버3",
+                displayName: "멤버3",
+                accountName: "김멤버3",
                 role: "MEMBER",
                 rsvpStatus: "NO_RESPONSE",
                 attendanceStatus: "UNKNOWN",
@@ -391,12 +391,12 @@ describe("MemberHome", () => {
       />,
     );
 
-    const attendingChip = screen.getByLabelText("이멤버5 · 참석");
-    const pendingChip = screen.getByLabelText("김멤버3 · 미응답");
+    const attendingChip = screen.getByLabelText("수 · 참석");
+    const pendingChip = screen.getByLabelText("멤버3 · 미응답");
 
     expect(attendingChip).toHaveAttribute("data-rsvp-status", "GOING");
-    expect(attendingChip).toHaveTextContent("이");
-    expect(pendingChip).toHaveTextContent("김");
+    expect(attendingChip).toHaveTextContent("수");
+    expect(pendingChip).toHaveTextContent("멤");
   });
 
   it("uses the shared MAYBE RSVP label in roster labels", () => {
@@ -409,8 +409,8 @@ describe("MemberHome", () => {
             attendees: [
               {
                 membershipId: "member-maybe",
-                displayName: "박미정",
-                shortName: "미",
+                displayName: "미",
+                accountName: "박미정",
                 role: "MEMBER",
                 rsvpStatus: "MAYBE",
                 attendanceStatus: "UNKNOWN",
@@ -422,7 +422,7 @@ describe("MemberHome", () => {
       />,
     );
 
-    expect(screen.getByLabelText("박미정 · 미정")).toHaveAttribute("data-rsvp-status", "MAYBE");
+    expect(screen.getByLabelText("미 · 미정")).toHaveAttribute("data-rsvp-status", "MAYBE");
   });
 
   it("does not repeat the host workspace switch inside member home content", () => {

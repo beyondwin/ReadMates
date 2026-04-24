@@ -21,7 +21,7 @@ class CurrentMemberArgumentResolverTest {
         clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
         email = "member@example.com",
         displayName = "멤버",
-        shortName = "멤버",
+        accountName = "김멤버",
         role = MembershipRole.MEMBER,
         membershipStatus = MembershipStatus.ACTIVE,
     )

@@ -116,7 +116,7 @@ function mockNotesBff({
             clubId: "club-id",
             email: "member@example.com",
             displayName: "이멤버5",
-            shortName: "멤버",
+            accountName: "멤버",
             role: "MEMBER",
             membershipStatus: "ACTIVE",
             approvalState: "ACTIVE",

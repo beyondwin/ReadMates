@@ -17,7 +17,7 @@ const authenticatedMember = {
   clubId: "club-1",
   email: "member@example.com",
   displayName: "이멤버5",
-  shortName: "수",
+  accountName: "수",
   role: "MEMBER",
 };
 

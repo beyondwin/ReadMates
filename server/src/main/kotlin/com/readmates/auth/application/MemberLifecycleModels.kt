@@ -24,7 +24,7 @@ data class HostMemberListItem(
     val userId: String,
     val email: String,
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val profileImageUrl: String?,
     val role: MembershipRole,
     val status: MembershipStatus,

@@ -129,7 +129,7 @@ fun MemberArchiveFeedbackDocumentStatusResult.toWebDto() =
 fun MyPageResult.toWebDto() =
     MyPageResponse(
         displayName = displayName,
-        shortName = shortName,
+        accountName = accountName,
         email = email,
         role = role,
         membershipStatus = membershipStatus,

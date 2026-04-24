@@ -31,8 +31,8 @@ const currentSessionData: CurrentSessionResponse = {
           ...currentSessionContractFixture.currentSession.attendees,
           {
             membershipId: "member-removed",
-            displayName: "제외된 멤버",
-            shortName: "제외",
+            displayName: "제외",
+            accountName: "제외",
             role: "MEMBER",
             rsvpStatus: "GOING",
             attendanceStatus: "UNKNOWN",
@@ -60,8 +60,8 @@ const routeAuthFixture = {
   membershipId: "membership-active-member",
   clubId: "club-id",
   email: "member@example.com",
-  displayName: "이멤버5",
-  shortName: "멤버",
+  displayName: "멤버",
+  accountName: "이멤버5",
   role: "MEMBER",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
@@ -293,9 +293,9 @@ describe("CurrentSession", () => {
     );
     expect(within(desktop).getByText("Passcode currentpass")).toBeInTheDocument();
     expect(within(desktop).getByText("참석자 · 1/2")).toBeInTheDocument();
-    expect(within(desktop).getAllByText("김호스트").length).toBeGreaterThan(0);
-    expect(within(desktop).getAllByText("이멤버5").length).toBeGreaterThan(0);
-    expect(within(desktop).queryByText("제외된 멤버")).not.toBeInTheDocument();
+    expect(within(desktop).getAllByText("우").length).toBeGreaterThan(0);
+    expect(within(desktop).getAllByText("수").length).toBeGreaterThan(0);
+    expect(within(desktop).queryByText("제외")).not.toBeInTheDocument();
     expect(within(desktop).getByDisplayValue("72")).toBeInTheDocument();
     expect(within(desktop).queryByLabelText(removedLabel("체크", "인 메모"))).not.toBeInTheDocument();
     expect(within(desktop).getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
@@ -427,7 +427,7 @@ describe("CurrentSession", () => {
     }
     expect(within(mobile).getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
     expect(within(mobile).getByText("참석자 · 1/2")).toBeInTheDocument();
-    expect(within(mobile).queryByText("제외된 멤버")).not.toBeInTheDocument();
+    expect(within(mobile).queryByText("제외")).not.toBeInTheDocument();
 
     const ids = Array.from(container.querySelectorAll("[id]"), (element) => element.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -466,8 +466,8 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByText("Passcode currentpass")).toBeInTheDocument();
     expect(desktopScope.getByText("녹음을 원하지 않으면 모임 중 언제든 알려 주세요.")).toBeInTheDocument();
     expect(desktopScope.getByText("음성만 · 자동 정리 참고용")).toBeInTheDocument();
-    expect(desktopScope.getAllByTitle("김호스트")[0]).toHaveTextContent("김");
-    expect(desktopScope.getAllByTitle("이멤버5")[0]).toHaveTextContent("이");
+    expect(desktopScope.getAllByTitle("우")[0]).toHaveTextContent("우");
+    expect(desktopScope.getAllByTitle("수")[0]).toHaveTextContent("수");
   });
 
   it("omits the meeting action when no meeting details are registered", () => {

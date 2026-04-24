@@ -35,7 +35,7 @@ export type HostMembersActions = {
     path: HostMemberLifecyclePath,
     body?: MemberLifecycleRequest,
   ) => Promise<JsonResponse<MemberLifecycleResponse>>;
-  submitProfile: (membershipId: string, shortName: string) => Promise<JsonResponse<HostMemberProfileResponse>>;
+  submitProfile: (membershipId: string, displayName: string) => Promise<JsonResponse<HostMemberProfileResponse>>;
   submitViewerAction: (membershipId: string, action: HostViewerAction) => Promise<ViewerMember>;
 };
 
@@ -78,11 +78,11 @@ const currentSessionLabels: Record<SessionParticipationStatus, string> = {
 
 const memberActionPendingReason = "멤버 상태 업데이트를 처리하는 중입니다.";
 const hostProfileNotEditableMessage = "수정할 수 없는 멤버입니다.";
-const hostProfileUnknownErrorMessage = "표시 이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+const hostProfileUnknownErrorMessage = "이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 const hostProfileFailureMessages = new Set([
-  "표시 이름을 입력해 주세요.",
-  "표시 이름은 20자 이하로 입력해 주세요.",
-  "표시 이름으로 쓸 수 없는 형식입니다.",
+  "이름을 입력해 주세요.",
+  "이름은 20자 이하로 입력해 주세요.",
+  "이름으로 쓸 수 없는 형식입니다.",
   "시스템에서 쓰는 이름은 사용할 수 없습니다.",
   "같은 클럽에서 이미 쓰고 있는 이름입니다.",
   hostProfileNotEditableMessage,
@@ -306,15 +306,15 @@ function hostProfileErrorMessage(status: number, code: HostMemberProfileErrorCod
   }
 
   switch (code) {
-    case "SHORT_NAME_REQUIRED":
-      return "표시 이름을 입력해 주세요.";
-    case "SHORT_NAME_TOO_LONG":
-      return "표시 이름은 20자 이하로 입력해 주세요.";
-    case "SHORT_NAME_INVALID":
-      return "표시 이름으로 쓸 수 없는 형식입니다.";
-    case "SHORT_NAME_RESERVED":
+    case "DISPLAY_NAME_REQUIRED":
+      return "이름을 입력해 주세요.";
+    case "DISPLAY_NAME_TOO_LONG":
+      return "이름은 20자 이하로 입력해 주세요.";
+    case "DISPLAY_NAME_INVALID":
+      return "이름으로 쓸 수 없는 형식입니다.";
+    case "DISPLAY_NAME_RESERVED":
       return "시스템에서 쓰는 이름은 사용할 수 없습니다.";
-    case "SHORT_NAME_DUPLICATE":
+    case "DISPLAY_NAME_DUPLICATE":
       return "같은 클럽에서 이미 쓰고 있는 이름입니다.";
     case "HOST_ROLE_REQUIRED":
     case "MEMBER_NOT_FOUND":
@@ -494,7 +494,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
     }
   };
 
-  const submitProfile = async (member: HostMemberListItem, shortName: string) => {
+  const submitProfile = async (member: HostMemberListItem, displayName: string) => {
     if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
       return;
     }
@@ -504,7 +504,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
     setMessage(null);
 
     try {
-      const response = await actions.submitProfile(member.membershipId, shortName);
+      const response = await actions.submitProfile(member.membershipId, displayName);
       if (!response.ok) {
         throw new Error(hostProfileErrorMessage(response.status, await hostProfileErrorCodeFromResponse(response)));
       }
@@ -513,7 +513,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
       setMembers((current) =>
         current.map((item) => (item.membershipId === updatedMember.membershipId ? updatedMember : item)),
       );
-      setMessage({ kind: "status", text: "표시 이름을 저장했습니다." });
+      setMessage({ kind: "status", text: "이름을 저장했습니다." });
     } catch (error) {
       throw new Error(profileFailureMessage(error));
     } finally {
@@ -539,7 +539,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
       <MemberActionButton
         action="profile"
         member={member}
-        label="표시 이름 변경"
+        label="이름 변경"
         disabled={rowPending}
         reason={profileReason}
         onClick={(event) => openProfileDialog(member, event.currentTarget)}
@@ -779,7 +779,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
           member={profileDialog.member}
           submitting={pendingActions.has(actionKey(profileDialog.member, "profile"))}
           onClose={closeProfileDialog}
-          onSubmit={(shortName) => submitProfile(profileDialog.member, shortName)}
+          onSubmit={(displayName) => submitProfile(profileDialog.member, displayName)}
         />
       ) : null}
     </div>
@@ -910,9 +910,6 @@ function MemberList({
               <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>
                 {renderMeta(member)}
               </p>
-              <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
-                @{member.shortName}
-              </div>
             </div>
             <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
               {renderProfileAction(member)}
@@ -969,12 +966,12 @@ function HostMemberProfileDialog({
   member: HostMemberListItem;
   submitting: boolean;
   onClose: () => void;
-  onSubmit: (shortName: string) => Promise<void>;
+  onSubmit: (displayName: string) => Promise<void>;
 }) {
   const titleId = `member-profile-title-${member.membershipId}`;
-  const inputId = `member-profile-short-name-${member.membershipId}`;
+  const inputId = `member-profile-display-name-${member.membershipId}`;
   const errorId = `member-profile-error-${member.membershipId}`;
-  const [value, setValue] = useState(member.shortName);
+  const [value, setValue] = useState(member.displayName);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -1077,16 +1074,16 @@ function HostMemberProfileDialog({
         style={{ width: "min(420px, 100%)", padding: "24px" }}
       >
         <h2 id={titleId} style={{ margin: 0 }}>
-          {member.displayName} 표시 이름 수정
+          {member.displayName} 이름 수정
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 18px" }}>
-          멤버 목록과 세션 기록에 표시되는 짧은 이름입니다.
+          앱에서 멤버를 부르는 이름입니다.
         </p>
 
         <form onSubmit={handleSubmit} className="stack" style={{ "--stack": "16px" } as CSSProperties}>
           <div>
             <label htmlFor={inputId} className="label">
-              표시 이름
+              이름
             </label>
             <input
               ref={inputRef}
@@ -1109,7 +1106,7 @@ function HostMemberProfileDialog({
             <button ref={cancelButtonRef} className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={onClose}>
               취소
             </button>
-            <button className="btn btn-primary btn-sm" type="submit" aria-label="표시 이름 저장" disabled={busy}>
+            <button className="btn btn-primary btn-sm" type="submit" aria-label="이름 저장" disabled={busy}>
               {busy ? "저장 중" : "저장"}
             </button>
           </div>

@@ -13,7 +13,6 @@ import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.requireHost
-import com.readmates.session.application.shortNameFor
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
@@ -646,7 +645,8 @@ class JdbcHostSessionWriteAdapter(
             """
             select
               memberships.id as membership_id,
-              users.name as display_name,
+              coalesce(memberships.short_name, users.name) as display_name,
+              users.name as account_name,
               session_participants.rsvp_status,
               session_participants.attendance_status,
               session_participants.participation_status
@@ -661,11 +661,10 @@ class JdbcHostSessionWriteAdapter(
               users.name
             """.trimIndent(),
             { resultSet, _ ->
-                val displayName = resultSet.getString("display_name")
                 HostSessionAttendee(
                     membershipId = resultSet.uuid("membership_id").toString(),
-                    displayName = displayName,
-                    shortName = shortNameFor(displayName),
+                    displayName = resultSet.getString("display_name"),
+                    accountName = resultSet.getString("account_name"),
                     rsvpStatus = resultSet.getString("rsvp_status"),
                     attendanceStatus = resultSet.getString("attendance_status"),
                     participationStatus = SessionParticipationStatus.valueOf(resultSet.getString("participation_status")),

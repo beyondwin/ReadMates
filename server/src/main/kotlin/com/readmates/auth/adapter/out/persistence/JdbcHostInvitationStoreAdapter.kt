@@ -327,8 +327,8 @@ class JdbcHostInvitationStoreAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               users.email,
-              users.name as display_name,
-              memberships.short_name,
+              users.name as account_name,
+              coalesce(memberships.short_name, users.name) as display_name,
               memberships.role,
               memberships.status as membership_status
             from memberships
@@ -338,14 +338,13 @@ class JdbcHostInvitationStoreAdapter(
               and memberships.status = 'ACTIVE'
             """.trimIndent(),
             { resultSet, _ ->
-                val displayName = resultSet.getString("display_name")
                 CurrentMember(
                     userId = resultSet.uuid("user_id"),
                     membershipId = resultSet.uuid("membership_id"),
                     clubId = resultSet.uuid("club_id"),
                     email = resultSet.getString("email").lowercase(Locale.ROOT),
-                    displayName = displayName,
-                    shortName = resultSet.getString("short_name") ?: displayName,
+                    displayName = resultSet.getString("display_name"),
+                    accountName = resultSet.getString("account_name"),
                     role = MembershipRole.valueOf(resultSet.getString("role")),
                     membershipStatus = MembershipStatus.valueOf(resultSet.getString("membership_status")),
                 )

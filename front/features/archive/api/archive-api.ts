@@ -65,8 +65,8 @@ export async function fetchMyPage() {
   return readmatesFetch<MyPageResponse>("/api/app/me");
 }
 
-export async function updateMyProfile(shortName: string) {
-  const request: UpdateMemberProfileRequest = { shortName };
+export async function updateMyProfile(displayName: string) {
+  const request: UpdateMemberProfileRequest = { displayName };
 
   return readmatesFetchResponse(
     "/api/me/profile",

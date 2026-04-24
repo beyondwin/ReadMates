@@ -15,7 +15,7 @@ data class CurrentMember(
     val clubId: UUID,
     val email: String,
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val role: MembershipRole,
     val membershipStatus: MembershipStatus = MembershipStatus.ACTIVE,
 ) {
