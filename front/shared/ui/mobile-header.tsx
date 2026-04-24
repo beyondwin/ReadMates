@@ -138,7 +138,6 @@ function appBackTarget(variant: Exclude<MobileHeaderVariant, "guest">, pathname:
       href: target.href,
       state: target.state,
       label: "뒤로",
-      ...(variant === "host" ? { icon: "archive" as const } : {}),
     };
   }
 
