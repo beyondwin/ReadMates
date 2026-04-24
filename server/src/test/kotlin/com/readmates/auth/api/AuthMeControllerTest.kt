@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
@@ -19,11 +20,13 @@ import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import java.util.UUID
 
 @SpringBootTest(
@@ -243,6 +246,32 @@ class AuthMeControllerTest(
             jsonPath("$.authenticated") { value(true) }
             jsonPath("$.membershipStatus") { value("ACTIVE") }
             jsonPath("$.approvalState") { value("ACTIVE") }
+        }
+    }
+
+    @Test
+    fun `auth me returns updated short name after profile mutation`() {
+        val email = uniqueLifecycleEmail("profile.authme")
+        val cookie = loginAsLifecycleUser(email, "ACTIVE")
+
+        mockMvc.patch("/api/me/profile") {
+            cookie(cookie)
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"shortName":"UpdatedMe"}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.get("/api/auth/me") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.authenticated") { value(true) }
+            jsonPath("$.email") { value(email) }
+            jsonPath("$.shortName") { value("UpdatedMe") }
         }
     }
 

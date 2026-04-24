@@ -31,6 +31,12 @@ data class CurrentMember(
             MembershipStatus.ACTIVE,
             MembershipStatus.SUSPENDED,
         )
+    val canEditOwnProfile: Boolean
+        get() = membershipStatus in setOf(
+            MembershipStatus.VIEWER,
+            MembershipStatus.ACTIVE,
+            MembershipStatus.SUSPENDED,
+        )
 }
 
 data class GoogleOidcIdentity(
