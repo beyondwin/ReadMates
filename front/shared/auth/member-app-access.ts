@@ -1,5 +1,24 @@
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
+export function canReadMemberContent(auth: AuthMeResponse) {
+  return (
+    auth.authenticated &&
+    (auth.membershipStatus === "VIEWER" || auth.membershipStatus === "ACTIVE" || auth.membershipStatus === "SUSPENDED")
+  );
+}
+
+export function canWriteMemberActivity(auth: AuthMeResponse) {
+  return auth.authenticated && auth.membershipStatus === "ACTIVE" && auth.approvalState === "ACTIVE";
+}
+
+export function canUseHostApp(auth: AuthMeResponse) {
+  return canWriteMemberActivity(auth) && auth.role === "HOST";
+}
+
+export function canEditOwnProfile(auth: AuthMeResponse) {
+  return canReadMemberContent(auth);
+}
+
 export function canUseMemberApp(auth: AuthMeResponse) {
-  return auth.approvalState === "VIEWER" || auth.approvalState === "ACTIVE" || auth.approvalState === "SUSPENDED";
+  return canReadMemberContent(auth);
 }

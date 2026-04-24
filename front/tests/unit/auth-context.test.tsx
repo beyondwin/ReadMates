@@ -103,6 +103,24 @@ function AuthAwareLogoutButton() {
   return <LogoutButton onLoggedOut={markLoggedOut} />;
 }
 
+function AuthRefreshProbe() {
+  const state = useAuth();
+  const { refreshAuth } = useAuthActions();
+
+  if (state.status === "loading") {
+    return <div data-testid="short-name">loading</div>;
+  }
+
+  return (
+    <>
+      <div data-testid="short-name">{state.auth.shortName}</div>
+      <button type="button" onClick={() => void refreshAuth()}>
+        refresh auth
+      </button>
+    </>
+  );
+}
+
 function renderGuard(element: React.ReactElement) {
   render(
     <AuthProvider>
@@ -186,6 +204,29 @@ describe("AuthProvider", () => {
     expect(location.href).toBe("/login");
     expect(fetchMock).toHaveBeenLastCalledWith("/api/bff/api/auth/logout", { method: "POST" });
   });
+
+  it("refreshes the auth payload and updates the current short name", async () => {
+    const user = userEvent.setup();
+    const refreshedAuth: AuthMeResponse = {
+      ...activeMemberAuth,
+      shortName: "새이름",
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce(authResponse(activeMemberAuth)).mockResolvedValueOnce(authResponse(refreshedAuth));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthRefreshProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.shortName ?? "");
+
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+
+    expect(await screen.findByTestId("short-name")).toHaveTextContent("새이름");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/bff/api/auth/me", { cache: "no-store" });
+  });
 });
 
 describe("route guards", () => {
@@ -238,6 +279,19 @@ describe("route guards", () => {
     expect(screen.queryByText("protected app")).not.toBeInTheDocument();
   });
 
+  it("redirects anonymous member app routes to login", async () => {
+    mockAuthFetch(anonymousAuth);
+
+    renderGuard(
+      <RequireMemberApp>
+        <main>member app boundary</main>
+      </RequireMemberApp>,
+    );
+
+    expect(await screen.findByText("login page")).toBeInTheDocument();
+    expect(screen.queryByText("member app boundary")).not.toBeInTheDocument();
+  });
+
   it("allows viewer members through member app routes", async () => {
     mockAuthFetch(viewerAuth);
 
@@ -252,7 +306,7 @@ describe("route guards", () => {
     expect(screen.queryByText("활성 멤버만 이용할 수 있습니다.")).not.toBeInTheDocument();
   });
 
-  it("blocks inactive users on active-member routes without redirecting to app home", async () => {
+  it("blocks inactive users on member routes without rendering child routes", async () => {
     mockAuthFetch(inactiveMemberAuth);
 
     renderGuard(
@@ -261,7 +315,10 @@ describe("route guards", () => {
       </RequireMemberApp>,
     );
 
-    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "공개 홈" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "클럽 소개" })).toHaveAttribute("href", "/about");
+    expect(screen.getByRole("button", { name: "로그아웃" })).toBeInTheDocument();
     expect(screen.queryByText("member app")).not.toBeInTheDocument();
     expect(screen.queryByText("active member app")).not.toBeInTheDocument();
   });
@@ -294,6 +351,22 @@ describe("route guards", () => {
 
   it("redirects non-active hosts away from host routes", async () => {
     mockAuthFetch(viewerHostAuth);
+
+    renderGuard(
+      <RequireHost>
+        <main>host app</main>
+      </RequireHost>,
+    );
+
+    expect(await screen.findByText("member app")).toBeInTheDocument();
+    expect(screen.queryByText("host app")).not.toBeInTheDocument();
+  });
+
+  it("requires active host membership status for host routes", async () => {
+    mockAuthFetch({
+      ...activeHostAuth,
+      membershipStatus: "INACTIVE",
+    });
 
     renderGuard(
       <RequireHost>
