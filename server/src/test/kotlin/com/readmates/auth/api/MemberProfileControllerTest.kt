@@ -5,6 +5,7 @@ import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -17,6 +18,10 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.patch
 import java.util.UUID
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import javax.sql.DataSource
 
 @SpringBootTest(
     properties = [
@@ -31,6 +36,7 @@ class MemberProfileControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
+    @param:Autowired private val dataSource: DataSource,
 ) {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
@@ -205,6 +211,71 @@ class MemberProfileControllerTest(
             status { isOk() }
             jsonPath("$.shortName") { value("Mine") }
         }
+    }
+
+    @Test
+    fun `own profile duplicate check waits for club profile name lock`() {
+        val email = insertProfileMember("self.race", "ACTIVE", shortName = "RaceMine")
+        val otherMembershipId = membershipIdForEmail(
+            insertProfileMember("self.race.other", "ACTIVE", shortName = "RaceOther"),
+        )
+        val cookie = sessionCookieForEmail(email)
+        val executor = Executors.newSingleThreadExecutor()
+
+        dataSource.connection.use { connection ->
+            connection.autoCommit = false
+            try {
+                connection.prepareStatement(
+                    """
+                    select id
+                    from clubs
+                    where id = '00000000-0000-0000-0000-000000000001'
+                    for update
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.executeQuery().use { resultSet ->
+                        resultSet.next()
+                    }
+                }
+
+                val updateStatus = executor.submit<Int> {
+                    mockMvc.patch("/api/me/profile") {
+                        cookie(cookie)
+                        header("X-Readmates-Bff-Secret", "test-bff-secret")
+                        header("Origin", "http://localhost:3000")
+                        with(csrf())
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"shortName":"RaceTaken"}"""
+                    }.andReturn().response.status
+                }
+
+                assertThrows(TimeoutException::class.java) {
+                    updateStatus.get(300, TimeUnit.MILLISECONDS)
+                }
+
+                connection.prepareStatement(
+                    """
+                    update users
+                    join memberships on memberships.user_id = users.id
+                    set users.short_name = 'RaceTaken',
+                        users.updated_at = utc_timestamp(6)
+                    where memberships.id = ?
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, otherMembershipId)
+                    statement.executeUpdate()
+                }
+                connection.commit()
+
+                assertEquals(409, updateStatus.get(5, TimeUnit.SECONDS))
+            } finally {
+                runCatching { connection.rollback() }
+                executor.shutdownNow()
+            }
+        }
+
+        assertEquals("RaceMine", shortNameForEmail(email))
+        assertEquals("RaceTaken", shortNameForMembership(otherMembershipId))
     }
 
     @Test

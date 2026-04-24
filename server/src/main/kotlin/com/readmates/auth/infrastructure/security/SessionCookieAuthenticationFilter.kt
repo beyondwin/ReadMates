@@ -49,6 +49,15 @@ class SessionCookieAuthenticationFilter(
                                 emptyList(),
                             )
                         }
+                } else if (request.isAuthMeGet()) {
+                    authenticatedMemberResolver.resolveProfileByUserId(session.userId)
+                        ?.let { profileMember ->
+                            UsernamePasswordAuthenticationToken(
+                                profileMember,
+                                null,
+                                emptyList(),
+                            )
+                        }
                 } else {
                     null
                 }
@@ -72,4 +81,7 @@ class SessionCookieAuthenticationFilter(
 
     private fun HttpServletRequest.isOwnProfilePatch(): Boolean =
         method == "PATCH" && requestURI == "/api/me/profile"
+
+    private fun HttpServletRequest.isAuthMeGet(): Boolean =
+        method == "GET" && requestURI == "/api/auth/me"
 }
