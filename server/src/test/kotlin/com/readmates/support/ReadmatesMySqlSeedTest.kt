@@ -24,6 +24,22 @@ class ReadmatesMySqlSeedTest(
         assertEquals(1, jdbcTemplate.queryForObject("select count(*) from clubs where slug = 'reading-sai'", Int::class.java))
         assertEquals(1, jdbcTemplate.queryForObject("select count(*) from memberships where role = 'HOST' and status = 'ACTIVE'", Int::class.java))
         assertEquals(6, jdbcTemplate.queryForObject("select count(*) from sessions where state = 'PUBLISHED'", Int::class.java))
+        assertEquals(
+            6,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from public_session_publications
+                join sessions on sessions.id = public_session_publications.session_id
+                  and sessions.club_id = public_session_publications.club_id
+                join clubs on clubs.id = sessions.club_id
+                where clubs.slug = 'reading-sai'
+                  and sessions.number in (1, 2, 3, 4, 5, 6)
+                  and public_session_publications.visibility = 'PUBLIC'
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
     }
 
     companion object {
