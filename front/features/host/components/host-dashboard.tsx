@@ -196,7 +196,7 @@ export default function HostDashboard({
           <div className="container">
             <div className="row-between" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
               <div>
-                <div className="eyebrow">{hostName}님</div>
+                <div className="eyebrow">운영</div>
                 <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
                   모임 운영
                 </h1>
