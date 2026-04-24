@@ -1,6 +1,7 @@
 package com.readmates.auth.application.service
 
 import com.readmates.auth.application.HostMemberListItem
+import com.readmates.auth.application.model.MemberProfile
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
@@ -23,7 +24,7 @@ class MemberProfileService(
     override fun updateOwnProfile(
         authenticationEmail: String?,
         command: UpdateMemberProfileCommand,
-    ): CurrentMember {
+    ): MemberProfile {
         val email = authenticationEmail
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
@@ -39,16 +40,24 @@ class MemberProfileService(
         val shortName = validateShortName(command.shortName)
         updateShortName(member.clubId, member.membershipId, shortName)
         return memberProfileStore.findProfileMemberByEmail(email)
-            ?.toCurrentMember()
+            ?.toMemberProfile()
             ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
     }
 
     @Transactional
     override fun updateMemberProfile(
-        host: CurrentMember,
+        authenticationEmail: String?,
         membershipId: UUID,
         command: UpdateMemberProfileCommand,
     ): HostMemberListItem {
+        val email = authenticationEmail
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.lowercase(Locale.ROOT)
+            ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
+        val host = memberProfileStore.findProfileMemberByEmail(email)
+            ?.toCurrentMember()
+            ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
         if (!host.isHost) {
             throw MemberProfileException(MemberProfileError.HOST_ROLE_REQUIRED)
         }
@@ -107,6 +116,14 @@ class MemberProfileService(
             shortName = shortName,
             role = role,
             membershipStatus = status,
+        )
+
+    private fun MemberProfileRow.toMemberProfile(): MemberProfile =
+        MemberProfile(
+            membershipId = membershipId,
+            displayName = displayName,
+            shortName = shortName,
+            profileImageUrl = profileImageUrl,
         )
 
     private companion object {

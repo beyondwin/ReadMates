@@ -34,6 +34,7 @@ class JdbcMemberProfileStoreAdapter(
               users.email,
               users.name as display_name,
               users.short_name,
+              users.profile_image_url,
               memberships.role,
               memberships.status
             from users
@@ -58,6 +59,7 @@ class JdbcMemberProfileStoreAdapter(
               users.email,
               users.name as display_name,
               users.short_name,
+              users.profile_image_url,
               memberships.role,
               memberships.status
             from memberships
@@ -151,6 +153,7 @@ class JdbcMemberProfileStoreAdapter(
             email = getString("email"),
             displayName = getString("display_name"),
             shortName = getString("short_name"),
+            profileImageUrl = getString("profile_image_url"),
             role = MembershipRole.valueOf(getString("role")),
             status = MembershipStatus.valueOf(getString("status")),
         )

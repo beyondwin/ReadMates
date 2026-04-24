@@ -11,6 +11,7 @@ data class MemberProfileRow(
     val email: String,
     val displayName: String,
     val shortName: String,
+    val profileImageUrl: String?,
     val role: MembershipRole,
     val status: MembershipStatus,
 )
