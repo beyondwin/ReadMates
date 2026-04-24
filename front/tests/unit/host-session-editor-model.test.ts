@@ -8,12 +8,13 @@ import {
   hydrateHostSessionFormValues,
   initialAttendanceStatuses,
   initialFeedbackDocumentStatus,
-  initialPublicationMode,
   initialPublicationSummary,
+  initialRecordVisibility,
   questionDeadlineIsoFromSessionDate,
   questionDeadlineLabelForForm,
   questionDeadlineLabelFromIso,
   questionDeadlineLabelFromSessionDate,
+  recordVisibilityLabel,
   type HostSessionEditorSession,
   type HostSessionFormValues,
 } from "@/features/host/model/host-session-editor-model";
@@ -34,7 +35,7 @@ const session: HostSessionEditorSession = {
   questionDeadlineAt: "2025-11-25T14:59:00Z",
   publication: {
     publicSummary: "저장된 공개 요약입니다.",
-    isPublic: false,
+    visibility: "MEMBER",
   },
   state: "OPEN",
   attendees: [
@@ -75,7 +76,7 @@ describe("host session editor model", () => {
       date: "2026-05-20",
       startTime: "20:00",
     });
-    expect(initialPublicationMode(null)).toBe("internal");
+    expect(initialRecordVisibility(null)).toBe("HOST_ONLY");
     expect(initialPublicationSummary(null)).toBe("");
     expect(initialFeedbackDocumentStatus(null)).toEqual({ uploaded: false, fileName: null, uploadedAt: null });
   });
@@ -93,7 +94,7 @@ describe("host session editor model", () => {
       date: "2025-11-26",
       startTime: "19:15",
     });
-    expect(initialPublicationMode(session)).toBe("draft");
+    expect(initialRecordVisibility(session)).toBe("MEMBER");
     expect(initialPublicationSummary(session)).toBe("저장된 공개 요약입니다.");
     expect(initialAttendanceStatuses(session.attendees)).toEqual({
       "membership-host": "ATTENDED",
@@ -127,11 +128,15 @@ describe("host session editor model", () => {
       meetingPasscode: "trimmed",
       questionDeadlineAt: "2026-05-19T23:59:00+09:00",
     });
-    expect(buildPublicationRequest("  공개 요약입니다.  ", "public")).toEqual({
-      publicSummary: "공개 요약입니다.",
-      isPublic: true,
+    expect(buildPublicationRequest("  기록 요약입니다.  ", "MEMBER")).toEqual({
+      publicSummary: "기록 요약입니다.",
+      visibility: "MEMBER",
     });
-    expect(buildPublicationRequest("   ", "draft")).toBeNull();
+    expect(buildPublicationRequest("  기록 요약입니다.  ", "MEMBER")).not.toHaveProperty("isPublic");
+    expect(buildPublicationRequest("   ", "PUBLIC")).toBeNull();
+    expect(recordVisibilityLabel("HOST_ONLY")).toBe("호스트 전용");
+    expect(recordVisibilityLabel("MEMBER")).toBe("멤버 공개");
+    expect(recordVisibilityLabel("PUBLIC")).toBe("외부 공개");
   });
 
   it("preserves deadline defaults and existing-session deadline semantics", () => {
