@@ -54,27 +54,27 @@ class ArchiveControllerDbTest(
                 jsonPath("$.publicHighlights.length()") { value(greaterThan(0)) }
                 jsonPath("$.publicHighlights[*].text") { value(everyItem(not(emptyOrNullString()))) }
                 jsonPath("$.publicHighlights[*].sortOrder") { value(hasItem(0)) }
-                jsonPath("$.publicHighlights[*].authorName") { value(hasItems("이멤버5", "최멤버2", "김호스트")) }
+                jsonPath("$.publicHighlights[*].authorName") { value(hasItems("멤버5", "멤버2", "호스트")) }
                 jsonPath("$.publicHighlights[*].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
                 jsonPath("$.clubQuestions.length()") { value(greaterThan(0)) }
                 jsonPath("$.clubQuestions[*].priority") { value(hasItems(1, 2)) }
                 jsonPath("$.clubQuestions[*].text") { value(everyItem(not(emptyOrNullString()))) }
                 jsonPath("$.clubQuestions[0].draftThought") { value(null) }
-                jsonPath("$.clubQuestions[*].authorName") { value(hasItem("김호스트")) }
+                jsonPath("$.clubQuestions[*].authorName") { value(hasItem("호스트")) }
                 jsonPath("$.clubQuestions[*].authorShortName") { value(hasItem("호스트")) }
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners.length()") { value(greaterThan(0)) }
-                jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("김호스트")) }
+                jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("호스트")) }
                 jsonPath("$.clubOneLiners[*].text") { value(everyItem(not(emptyOrNullString()))) }
                 jsonPath("$.publicOneLiners.length()") { value(greaterThan(0)) }
-                jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("김호스트")) }
+                jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("호스트")) }
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(hasItem("호스트")) }
                 jsonPath("$.publicOneLiners[*].text") { value(everyItem(not(emptyOrNullString()))) }
                 jsonPath("$.myQuestions.length()") { value(greaterThan(0)) }
                 jsonPath("$.myQuestions[*].priority") { value(hasItems(1, 2)) }
                 jsonPath("$.myQuestions[*].text") { value(everyItem(not(emptyOrNullString()))) }
                 jsonPath("$.myQuestions[0].draftThought") { value(null) }
-                jsonPath("$.myQuestions[*].authorName") { value(hasItem("이멤버5")) }
+                jsonPath("$.myQuestions[*].authorName") { value(hasItem("멤버5")) }
                 jsonPath("$.myQuestions[*].authorShortName") { value(hasItem("멤버5")) }
                 jsonPath("$.myCheckin.authorName") { doesNotExist() }
                 jsonPath("$.myCheckin.authorShortName") { doesNotExist() }
@@ -287,10 +287,10 @@ class ArchiveControllerDbTest(
                 jsonPath("$.publicHighlights[*].text") {
                     value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다.")))
                 }
-                jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("최멤버2"))) }
+                jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("멤버2"))) }
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
-                jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
-                jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("최멤버2"))) }
+                jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("멤버2"))) }
+                jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("멤버2"))) }
                 jsonPath("$.clubQuestions[*].text") { value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?"))) }
                 jsonPath("$.clubOneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
                 jsonPath("$.publicOneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }

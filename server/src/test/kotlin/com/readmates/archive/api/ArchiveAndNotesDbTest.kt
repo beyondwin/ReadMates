@@ -407,8 +407,52 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItems("이멤버5", "최멤버2", "김호스트")) }
+                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItems("멤버5", "멤버2", "호스트")) }
                 jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            RENAME_MEMBER5_DISPLAY_NAME_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_MEMBER5_DISPLAY_NAME_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `archive detail and notes feed author names use the latest member display name`() {
+        mockMvc.get("/api/notes/feed") {
+            param("sessionId", "00000000-0000-0000-0000-000000000306")
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[?(@.kind == 'QUESTION')].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$[?(@.kind == 'ONE_LINE_REVIEW')].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$[*].authorName") { value(not(hasItem("이멤버5"))) }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.publicHighlights[*].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.clubQuestions[*].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.clubOneLiners[*].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.publicOneLiners[*].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.myQuestions[*].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.publicHighlights[*].authorName") { value(not(hasItem("이멤버5"))) }
+                jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("이멤버5"))) }
+                jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("이멤버5"))) }
+                jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("이멤버5"))) }
+                jsonPath("$.myQuestions[*].authorName") { value(not(hasItem("이멤버5"))) }
             }
     }
 
@@ -705,6 +749,21 @@ class ArchiveAndNotesDbTest(
             join users on users.id = memberships.user_id
             set memberships.status = 'ACTIVE'
             where users.email = 'member1@example.com'
+              and memberships.club_id = '00000000-0000-0000-0000-000000000001';
+        """
+
+        private const val RENAME_MEMBER5_DISPLAY_NAME_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.short_name = '새멤버5'
+            where users.email = 'member5@example.com'
+              and memberships.club_id = '00000000-0000-0000-0000-000000000001';
+        """
+        private const val RESET_MEMBER5_DISPLAY_NAME_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.short_name = '멤버5'
+            where users.email = 'member5@example.com'
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """
 

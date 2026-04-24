@@ -362,7 +362,7 @@ class JdbcArchiveQueryAdapter(
             select
               highlights.text,
               highlights.sort_order,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
             from highlights
             left join memberships on memberships.id = highlights.membership_id
@@ -402,7 +402,7 @@ class JdbcArchiveQueryAdapter(
               questions.priority,
               questions.text,
               questions.draft_thought,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
             from questions
             join memberships on memberships.id = questions.membership_id
@@ -414,7 +414,7 @@ class JdbcArchiveQueryAdapter(
               and session_participants.participation_status = 'ACTIVE'
             where questions.club_id = ?
               and questions.session_id = ?
-            order by questions.priority, users.name, questions.created_at
+            order by questions.priority, author_name, questions.created_at
             """.trimIndent(),
             { resultSet, _ ->
                 MemberArchiveQuestionResult(
@@ -437,7 +437,7 @@ class JdbcArchiveQueryAdapter(
         jdbcTemplate.query(
             """
             select
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               one_line_reviews.text
             from one_line_reviews
@@ -451,7 +451,7 @@ class JdbcArchiveQueryAdapter(
             where one_line_reviews.club_id = ?
               and one_line_reviews.session_id = ?
               and one_line_reviews.visibility in ('SESSION', 'PUBLIC')
-            order by one_line_reviews.created_at, users.name
+            order by one_line_reviews.created_at, author_name
             """.trimIndent(),
             { resultSet, _ ->
                 MemberArchiveOneLinerResult(
@@ -472,7 +472,7 @@ class JdbcArchiveQueryAdapter(
         jdbcTemplate.query(
             """
             select
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               one_line_reviews.text
             from one_line_reviews
@@ -486,7 +486,7 @@ class JdbcArchiveQueryAdapter(
             where one_line_reviews.club_id = ?
               and one_line_reviews.session_id = ?
               and one_line_reviews.visibility = 'PUBLIC'
-            order by one_line_reviews.created_at, users.name
+            order by one_line_reviews.created_at, author_name
             """.trimIndent(),
             { resultSet, _ ->
                 MemberArchiveOneLinerResult(
@@ -506,7 +506,11 @@ class JdbcArchiveQueryAdapter(
     ): List<MemberArchiveQuestionResult> =
         jdbcTemplate.query(
             """
-            select questions.priority, questions.text, questions.draft_thought, users.name as author_name
+            select
+              questions.priority,
+              questions.text,
+              questions.draft_thought,
+              coalesce(memberships.short_name, users.name) as author_name
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id

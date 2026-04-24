@@ -1,6 +1,6 @@
 # ReadMates
 
-ReadMates는 소규모 정기 독서모임의 세션 준비, 참여 관리, 기록 공개, 피드백 문서 열람을 하나의 흐름으로 묶은 invite-only 풀스택 웹 서비스입니다.
+ReadMates는 정기 독서모임의 세션 준비, 참여 관리, 기록 공개, 피드백 문서 열람을 하나의 흐름으로 묶은 멤버십 풀스택 웹 서비스입니다.
 
 - Demo: [https://readmates.pages.dev](https://readmates.pages.dev)
 - Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`
