@@ -324,7 +324,7 @@ describe("HostDashboard", () => {
     const mobile = getMobileView(container);
 
     expect(desktop.getByText("모임 운영")).toBeInTheDocument();
-    expect(desktop.getByText("호스트님")).toBeInTheDocument();
+    expect(desktop.getByText("운영")).toBeInTheDocument();
     expect(desktop.getAllByText("확인 필요").length).toBeGreaterThan(0);
     expect(desktop.getByText("세션 준비 문서")).toBeInTheDocument();
     expect(desktop.getByText("운영 일정")).toBeInTheDocument();
