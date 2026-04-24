@@ -58,19 +58,19 @@ describe("PublicClub", () => {
     expect(within(overview).getByText("음성 기록 · AI 피드백 참고용")).toBeInTheDocument();
 
     expect(screen.getByRole("heading", { name: "작게 읽고, 분명하게 남깁니다" })).toBeInTheDocument();
+    expect(screen.getByText("모임의 약속")).toBeInTheDocument();
     expect(screen.getByText("참여, 피드백 문서, 개인 노트는 정식 멤버 공간에만 남깁니다.")).toBeInTheDocument();
     expect(screen.getByText("호스트 안내")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "호스트의 글" })).toBeInTheDocument();
     expect(screen.getByText("김호스트")).toBeInTheDocument();
     expect(screen.getByLabelText("김호스트")).toBeInTheDocument();
     expect(screen.getByText("호스트 · 2025.11~")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "기존 멤버 로그인" })).toHaveAttribute("href", "/login");
+    expect(screen.getByText("멤버십")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "정식 멤버만 참여할 수 있습니다" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
     expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/records");
-    const inviteCta = screen.getByRole("button", { name: /초대 수락하기/ });
-    expect(inviteCta).toBeDisabled();
-    expect(inviteCta).toHaveAttribute("aria-disabled", "true");
-    expect(inviteCta).toHaveTextContent("초대 메일의 개인 링크에서만 열립니다.");
-    expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("초대받은 독자는 호스트가 보낸 초대 링크에서 수락 절차를 시작합니다.")).not.toBeInTheDocument();
     expect(container).not.toHaveTextContent("Sessions");
     expect(container).not.toHaveTextContent("Books");
     expect(container).not.toHaveTextContent("Latest");
@@ -145,7 +145,7 @@ describe("PublicClub", () => {
     render(<PublicClub data={publicClubFixture} />);
 
     await waitFor(() => {
-      expect(screen.queryByRole("link", { name: "기존 멤버 로그인" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "로그인" })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     });

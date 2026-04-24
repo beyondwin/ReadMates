@@ -2,7 +2,7 @@ import { Link } from "@/features/public/ui/public-link";
 import type { PublicClubView, PublicSessionListItemView } from "@/features/public/model/public-display-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
-import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public-auth-action";
+import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { getPublicClubDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE, STATIC_OPERATION_INTRO } from "@/features/public/model/public-copy";
 
@@ -134,7 +134,7 @@ export default function PublicClub({ data }: PublicClubProps) {
         <div className="container public-grid-2">
           <div>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              규칙과 cadence
+              모임의 약속
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
               작게 읽고, 분명하게 남깁니다
@@ -184,7 +184,7 @@ export default function PublicClub({ data }: PublicClubProps) {
               멤버십
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
-              초대받은 사람만 참여할 수 있습니다
+              정식 멤버만 참여할 수 있습니다
             </h2>
             <p className="body" style={{ marginTop: 14, color: "var(--text-2)" }}>
               {PUBLIC_MEMBERSHIP_NOTE}
@@ -192,14 +192,10 @@ export default function PublicClub({ data }: PublicClubProps) {
             <div className="public-actions">
               <PublicGuestOnlyActions>
                 <Link to="/login" className="btn btn-primary">
-                  기존 멤버 로그인
+                  로그인
                 </Link>
-                <PublicInviteGuidance />
               </PublicGuestOnlyActions>
             </div>
-            <p className="tiny" style={{ margin: "14px 0 0", color: "var(--text-3)" }}>
-              초대받은 독자는 호스트가 보낸 초대 링크에서 수락 절차를 시작합니다.
-            </p>
           </div>
           <LatestRecordPanel session={latestSession} />
         </div>
