@@ -74,7 +74,7 @@ Frontend tests:
 - Create: `server/src/main/resources/db/migration/V10__session_visibility.sql`
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
-- [ ] **Step 1: Write the failing MySQL migration test**
+- [x] **Step 1: Write the failing MySQL migration test**
 
 Add this assertion block inside `mysql baseline creates auth session and feedback document tables` after the existing visibility constraint assertions:
 
@@ -107,7 +107,7 @@ assertTrue(sessionVisibilityConstraints.any { row ->
 })
 ```
 
-- [ ] **Step 2: Run migration test to verify it fails**
+- [x] **Step 2: Run migration test to verify it fails**
 
 Run:
 
@@ -117,7 +117,7 @@ Run:
 
 Expected: FAIL because `sessions.visibility` does not exist.
 
-- [ ] **Step 3: Create the MySQL migration**
+- [x] **Step 3: Create the MySQL migration**
 
 Create `server/src/main/resources/db/mysql/migration/V15__session_visibility.sql`:
 
@@ -139,7 +139,7 @@ alter table sessions
   check (visibility in ('HOST_ONLY', 'MEMBER', 'PUBLIC'));
 ```
 
-- [ ] **Step 4: Create the base migration**
+- [x] **Step 4: Create the base migration**
 
 Create `server/src/main/resources/db/migration/V10__session_visibility.sql`:
 
@@ -158,7 +158,7 @@ alter table sessions
   check (visibility in ('HOST_ONLY', 'MEMBER', 'PUBLIC'));
 ```
 
-- [ ] **Step 5: Run migration test to verify it passes**
+- [x] **Step 5: Run migration test to verify it passes**
 
 Run:
 
@@ -168,7 +168,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/resources/db/mysql/migration/V15__session_visibility.sql \
@@ -176,6 +176,16 @@ git add server/src/main/resources/db/mysql/migration/V15__session_visibility.sql
   server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt
 git commit -m "feat: add session visibility column"
 ```
+
+**Task 1 checkpoint:**
+- Task: Task 1, Add `sessions.visibility` Schema.
+- Changed files: `server/src/main/resources/db/mysql/migration/V15__session_visibility.sql`, `server/src/main/resources/db/migration/V10__session_visibility.sql`, `server/src/main/resources/db/mysql/dev/R__readmates_dev_seed.sql`, `server/src/main/resources/db/dev/R__readmates_dev_seed.sql`, `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`, `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`.
+- Key decision: Promote to `PUBLIC` only when the session is `PUBLISHED` and its publication is public; otherwise keep `CLOSED`/`PUBLISHED` member-visible and `DRAFT`/`OPEN` host-only. Base migration uses `public_session_publications.is_public`; MySQL migration uses `public_session_publications.visibility`.
+- Review issues/resolution: resolved base migration public-publication backfill, MySQL draft/open publication promotion, dev seed session visibility consistency, and added a MySQL seed visibility assertion.
+- Verification: `./server/gradlew -p server test --tests com.readmates.support.MySqlFlywayMigrationTest` failed before migrations with `AssertionFailedError` at `MySqlFlywayMigrationTest.kt:109`; review regression assertion failed before seed fixes with `AssertionFailedError` at `MySqlFlywayMigrationTest.kt:150`; `./server/gradlew -p server test --tests com.readmates.support.MySqlFlywayMigrationTest --rerun-tasks` passed after review fixes with `BUILD SUCCESSFUL in 11s`.
+- Remaining risk: Only schema and migration coverage changed; application reads/writes for the new column remain for later tasks.
+- Next task note: Task 2 should add server contracts using `SessionRecordVisibility`.
+- Worktree/branch: `upcoming-session-management-20260425` worktree, `codex/upcoming-session-management-20260425`.
 
 ---
 

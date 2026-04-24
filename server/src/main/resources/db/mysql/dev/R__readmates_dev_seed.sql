@@ -104,7 +104,8 @@ insert into sessions (
   meeting_url,
   meeting_passcode,
   question_deadline_at,
-  state
+  state,
+  visibility
 )
 with seed as (
   select 301 as id_suffix, 1 as number, '1회차 · 팩트풀니스' as title, '팩트풀니스' as book_title, '한스 로슬링' as book_author, '이창신' as book_translator, 'https://www.aladin.co.kr/shop/wproduct.aspx?ItemId=373510599' as book_link, 'https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg' as book_image_url, '2025-11-26' as session_date, '2025-11-25 14:59:00.000000' as question_deadline_at
@@ -137,7 +138,8 @@ resolved as (
     null as meeting_url,
     null as meeting_passcode,
     seed.question_deadline_at,
-    'PUBLISHED' as state
+    'PUBLISHED' as state,
+    'PUBLIC' as visibility
   from seed
   join clubs on clubs.slug = 'reading-sai'
 )
@@ -158,7 +160,8 @@ select
   meeting_url,
   meeting_passcode,
   question_deadline_at,
-  state
+  state,
+  visibility
 from resolved
 on duplicate key update
   title = values(title),
@@ -174,7 +177,8 @@ on duplicate key update
   meeting_url = values(meeting_url),
   meeting_passcode = values(meeting_passcode),
   question_deadline_at = values(question_deadline_at),
-  state = values(state);
+  state = values(state),
+  visibility = values(visibility);
 
 insert into session_feedback_documents (id, club_id, session_id, version, source_text, file_name, content_type, file_size)
 with seed as (

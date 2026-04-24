@@ -101,7 +101,8 @@ resolved as (
     null::varchar(1000) as meeting_url,
     null::varchar(255) as meeting_passcode,
     seed.question_deadline_at,
-    'PUBLISHED' as state
+    'PUBLISHED' as state,
+    'PUBLIC' as visibility
   from seed
   join clubs on clubs.slug = 'reading-sai'
 )
@@ -122,7 +123,8 @@ insert into sessions (
   meeting_url,
   meeting_passcode,
   question_deadline_at,
-  state
+  state,
+  visibility
 )
 select
   ('00000000-0000-0000-0000-' || lpad(id_suffix::text, 12, '0'))::uuid,
@@ -141,7 +143,8 @@ select
   meeting_url,
   meeting_passcode,
   question_deadline_at,
-  state
+  state,
+  visibility
 from resolved
 on conflict (club_id, number) do update set
   title = excluded.title,
@@ -157,7 +160,8 @@ on conflict (club_id, number) do update set
   meeting_url = excluded.meeting_url,
   meeting_passcode = excluded.meeting_passcode,
   question_deadline_at = excluded.question_deadline_at,
-  state = excluded.state;
+  state = excluded.state,
+  visibility = excluded.visibility;
 
 with seed(id_suffix, session_number, version, file_name, content_type, source_text) as (
   values

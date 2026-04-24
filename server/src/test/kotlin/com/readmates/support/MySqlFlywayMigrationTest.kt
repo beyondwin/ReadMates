@@ -96,6 +96,58 @@ class MySqlFlywayMigrationTest(
                 row["CHECK_CLAUSE"].toString().contains("PUBLIC") &&
                 row["CHECK_CLAUSE"].toString().contains("PRIVATE")
         })
+
+        val sessionVisibilityColumns = jdbcTemplate.queryForList(
+            """
+            select column_name, column_default, is_nullable
+            from information_schema.columns
+            where table_schema = database()
+              and table_name = 'sessions'
+              and column_name = 'visibility'
+            """.trimIndent(),
+        )
+        assertEquals(1, sessionVisibilityColumns.size)
+        assertEquals("NO", sessionVisibilityColumns.first()["IS_NULLABLE"])
+
+        val sessionVisibilityConstraints = jdbcTemplate.queryForList(
+            """
+            select constraint_name, check_clause
+            from information_schema.check_constraints
+            where constraint_schema = database()
+              and constraint_name = 'sessions_visibility_check'
+            """.trimIndent(),
+        )
+        assertTrue(sessionVisibilityConstraints.any { row ->
+            val clause = row["CHECK_CLAUSE"].toString()
+            clause.contains("HOST_ONLY") &&
+                clause.contains("MEMBER") &&
+                clause.contains("PUBLIC")
+        })
+
+        val publishedPublicSeedCount = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from sessions
+            join public_session_publications on public_session_publications.session_id = sessions.id
+            where sessions.state = 'PUBLISHED'
+              and public_session_publications.visibility = 'PUBLIC'
+            """.trimIndent(),
+            Int::class.java,
+        )
+        assertTrue(requireNotNull(publishedPublicSeedCount) > 0)
+
+        val publicSeedSessionVisibilityMismatchCount = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from sessions
+            join public_session_publications on public_session_publications.session_id = sessions.id
+            where sessions.state = 'PUBLISHED'
+              and public_session_publications.visibility = 'PUBLIC'
+              and sessions.visibility <> 'PUBLIC'
+            """.trimIndent(),
+            Int::class.java,
+        )
+        assertEquals(0, publicSeedSessionVisibilityMismatchCount)
     }
 
     @Test
