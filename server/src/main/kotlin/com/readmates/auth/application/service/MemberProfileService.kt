@@ -37,7 +37,7 @@ class MemberProfileService(
         }
 
         val shortName = validateShortName(command.shortName)
-        updateShortName(member.clubId, member.membershipId, shortName)
+        updateOwnShortName(member.clubId, member.membershipId, shortName)
         return memberProfileStore.findProfileMemberByEmail(email)
             ?.toMemberProfile()
             ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
@@ -82,6 +82,28 @@ class MemberProfileService(
             throw MemberProfileException(MemberProfileError.SHORT_NAME_DUPLICATE)
         }
         if (!memberProfileStore.updateShortName(clubId, membershipId, shortName)) {
+            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        }
+    }
+
+    private fun updateOwnShortName(clubId: UUID, membershipId: UUID, shortName: String) {
+        if (!memberProfileStore.lockClubProfileNames(clubId)) {
+            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        }
+        val currentMember = memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        if (!currentMember.toCurrentMember().canEditOwnProfile) {
+            throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
+        }
+        if (memberProfileStore.shortNameExistsInClub(clubId, shortName, membershipId)) {
+            throw MemberProfileException(MemberProfileError.SHORT_NAME_DUPLICATE)
+        }
+        if (!memberProfileStore.updateOwnShortName(clubId, membershipId, shortName)) {
+            val updatedMember = memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+            if (!updatedMember.toCurrentMember().canEditOwnProfile) {
+                throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
+            }
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
     }

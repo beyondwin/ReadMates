@@ -22,6 +22,7 @@ interface MemberProfileStorePort {
     fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID): MemberProfileRow?
     fun lockClubProfileNames(clubId: UUID): Boolean
     fun shortNameExistsInClub(clubId: UUID, shortName: String, excludingMembershipId: UUID): Boolean
+    fun updateOwnShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean
     fun updateShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean
     fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow?
 }
