@@ -81,10 +81,10 @@ describe("PublicHome", () => {
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByText("기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다")).toBeInTheDocument();
     expect(screen.getByText("읽는사이는 초대 기반 모임입니다. 기록은 누구나 읽을 수 있고, 참여 권한은 초대 수락 또는 호스트 승인 뒤 열립니다.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute("href", "/login");
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
-    expect(container.querySelector('a[href="/login"]')).toHaveTextContent("로그인");
+    expect(container.querySelector('a[href="/login"]')).toHaveTextContent("시작하기");
     expect(container.querySelector('a[href="/login"]')).not.toHaveTextContent("초대 수락하기");
     expect(screen.getByText("기록 아카이브")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "공개된 모임 기록", level: 2 })).toBeInTheDocument();
