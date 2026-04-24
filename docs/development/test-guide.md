@@ -48,8 +48,8 @@ pnpm --dir front test:e2e
 
 - 기본 frontend port는 `PLAYWRIGHT_PORT`가 없으면 `3100`입니다.
 - 기본 backend origin은 `READMATES_API_BASE_URL`이 없으면 `http://127.0.0.1:18080`입니다.
-- E2E backend는 `SPRING_PROFILES_ACTIVE=dev`, `READMATES_FLYWAY_LOCATIONS=classpath:db/mysql/migration,classpath:db/mysql/dev`, `READMATES_BFF_SECRET=e2e-secret`로 실행됩니다.
-- E2E database 기본값은 `READMATES_E2E_DB_HOST=127.0.0.1`, `READMATES_E2E_DB_PORT=3306`, `READMATES_E2E_DB_USER=readmates`, `READMATES_E2E_DB_PASSWORD=readmates`, `READMATES_E2E_DB_NAME=readmates_e2e`입니다.
+- E2E backend는 `SPRING_PROFILES_ACTIVE=dev`, `READMATES_FLYWAY_LOCATIONS=classpath:db/mysql/migration,classpath:db/mysql/dev`, BFF secret placeholder로 실행됩니다.
+- E2E database 연결은 `READMATES_E2E_DB_HOST`, `READMATES_E2E_DB_PORT`, `READMATES_E2E_DB_USER`, `READMATES_E2E_DB_PASSWORD`, `READMATES_E2E_DB_NAME`으로 조정할 수 있습니다. 공개 문서에서는 정확한 로컬 DB 이름 대신 placeholder를 사용합니다.
 - Playwright config는 `mysql` CLI로 E2E database를 생성하므로 로컬 MySQL server와 MySQL client가 필요합니다.
 
 기본 `compose.yml`의 MySQL을 쓴다면 먼저 실행합니다.
@@ -63,11 +63,13 @@ docker compose up -d mysql
 ```bash
 READMATES_E2E_DB_HOST=127.0.0.1 \
 READMATES_E2E_DB_PORT=3306 \
-READMATES_E2E_DB_USER=readmates \
-READMATES_E2E_DB_PASSWORD=readmates \
-READMATES_E2E_DB_NAME=readmates_e2e \
+READMATES_E2E_DB_USER='<e2e-db-user>' \
+READMATES_E2E_DB_PASSWORD='<e2e-db-password>' \
+READMATES_E2E_DB_NAME='<e2e-db-name>' \
 pnpm --dir front test:e2e
 ```
+
+예정 세션 흐름을 확인하는 E2E는 호스트가 `DRAFT` 세션을 만들고, `MEMBER` 공개로 바꾼 뒤, 멤버 홈의 `/api/sessions/upcoming` 표시와 `OPEN` 전환을 함께 검증합니다.
 
 멤버 표시 이름과 권한 경계만 빠르게 확인하려면 관련 E2E spec을 직접 지정할 수 있습니다.
 

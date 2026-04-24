@@ -18,7 +18,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 ## 주요 구조 문서
 
 - 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
-- 서버 current member 해석, 현재 세션 조회, 멤버 세션 쓰기, 호스트 세션 쓰기, 멤버 프로필/표시 이름 경계는 [architecture.md](architecture.md)의 "서버 내부 구조"와 "멤버 프로필과 표시 이름" 섹션을 기준으로 합니다.
+- 서버 current member 해석, 현재/예정 세션 조회, 멤버 세션 쓰기, 호스트 세션 쓰기, 세션 공개 범위, 멤버 프로필/표시 이름 경계는 [architecture.md](architecture.md)의 "서버 내부 구조", "현재/예정 세션과 공개 범위", "멤버 프로필과 표시 이름" 섹션을 기준으로 합니다.
 - 작업자는 루트 [../../AGENTS.md](../../AGENTS.md)에서 task별 agent guide를 먼저 고르고, 프런트엔드 패키지 안에서는 [../../front/AGENTS.md](../../front/AGENTS.md)의 패키지 지침도 함께 확인합니다.
 - `docs/superpowers` 아래 문서는 과거 설계와 구현 계획의 기록입니다. 현재 동작의 source of truth는 이 디렉터리와 실제 코드, 테스트, 배포 스크립트입니다.
 
