@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
@@ -25,6 +26,9 @@ class PasswordAuthController(
             ?.firstOrNull { it.name == logoutAuthSessionUseCase.sessionCookieName }
             ?.value
 
+        request.getSession(false)?.invalidate()
+        SecurityContextHolder.clearContext()
         response.addHeader(HttpHeaders.SET_COOKIE, logoutAuthSessionUseCase.logout(rawToken))
+        response.addHeader(HttpHeaders.SET_COOKIE, logoutAuthSessionUseCase.clearedServletSessionCookie())
     }
 }

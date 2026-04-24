@@ -22,6 +22,7 @@ export type MobileHeaderVariant = "guest" | "member" | "host";
 type MobileHeaderProps = {
   variant: MobileHeaderVariant;
   showHostEntry?: boolean;
+  authenticated?: boolean;
 };
 
 function publicTitle(pathname: string) {
@@ -225,10 +226,10 @@ function HeaderShell({
   );
 }
 
-function GuestMobileHeader() {
+function GuestMobileHeader({ authenticated }: { authenticated?: boolean }) {
   const location = useLocation();
   const pathname = location.pathname;
-  const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login });
+  const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login }, authenticated);
   const isEntryRoute = pathname === "/login" || pathname.startsWith("/invite/");
   const publicSessionReturnTarget = pathname.startsWith("/sessions/")
     ? readPublicReadmatesReturnTarget(location.state, publicRecordsReturnTarget)
@@ -292,9 +293,9 @@ function AppMobileHeader({
   );
 }
 
-export function MobileHeader({ variant, showHostEntry }: MobileHeaderProps) {
+export function MobileHeader({ variant, showHostEntry, authenticated }: MobileHeaderProps) {
   if (variant === "guest") {
-    return <GuestMobileHeader />;
+    return <GuestMobileHeader authenticated={authenticated} />;
   }
 
   return <AppMobileHeader variant={variant} showHostEntry={showHostEntry} />;
