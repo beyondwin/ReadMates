@@ -12,8 +12,8 @@ describe("LoginRoute", () => {
   it("shows only the Google login action outside dev login mode", () => {
     render(<LoginRoute />);
 
-    expect(screen.getByText("Private reading room")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "읽는사이 멤버 입장" })).toBeVisible();
+    expect(screen.getByText("멤버 전용 공간")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "읽는사이 함께하기" })).toBeVisible();
     expect(screen.getByText(/Google 계정으로 읽는사이 멤버 공간에 입장합니다/)).toBeVisible();
     expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
       "href",

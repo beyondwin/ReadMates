@@ -115,7 +115,7 @@ function renderFeedbackRoute(
         errorElement: <FeedbackRouteError />,
         hydrateFallbackElement: <div>피드백 문서를 불러오는 중</div>,
       },
-      { path: "/login", element: <main><h1>읽는사이 멤버 입장</h1></main> },
+      { path: "/login", element: <main><h1>읽는사이 함께하기</h1></main> },
     ],
     { initialEntries: [path] },
   );
@@ -171,7 +171,7 @@ describe("Feedback document routes", () => {
 
     renderFeedbackRoute("/app/feedback/session-1");
 
-    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "읽는사이 함께하기" })).toBeInTheDocument();
     expect(globalThis.fetch).not.toHaveBeenCalledWith(
       "/api/bff/api/sessions/session-1/feedback-document",
       expect.anything(),
