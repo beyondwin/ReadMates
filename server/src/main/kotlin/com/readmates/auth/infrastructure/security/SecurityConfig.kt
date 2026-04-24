@@ -59,6 +59,8 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/(suspend|restore|deactivate)$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/current-session/(add|remove)$")),
                     methodAndPath("POST", Regex("^/api/me/membership/leave$")),
+                    methodAndPath("PATCH", Regex("^/api/me/profile$")),
+                    methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$")),
                     methodAndPath("POST", Regex("^/api/invitations/[^/]+/accept$")),
                     methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$")),
                 )
@@ -84,6 +86,9 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.GET, "/api/notes/**").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/app/me").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer").hasRole("VIEWER")
+                    .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$"))).permitAll()
+                    .requestMatchers(methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$")))
+                    .hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers("/api/host/**").hasRole("HOST")
                     .requestMatchers(HttpMethod.GET, "/api/feedback-documents/me").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(RegexRequestMatcher("^/api/sessions/[^/]+/feedback-document$", "GET"))

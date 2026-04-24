@@ -4,10 +4,8 @@ import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
-import com.readmates.auth.application.port.out.HostMemberListRow
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
-import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -185,36 +183,6 @@ class MemberLifecycleService(
         memberLifecycleStore.findHostMemberListItem(currentMember.clubId, membershipId)
             ?.toHostMemberListItem(currentMember.membershipId)
             ?: throw lifecycleNotFound()
-
-    private fun HostMemberListRow.toHostMemberListItem(currentMembershipId: UUID): HostMemberListItem {
-        val isSelf = membershipId == currentMembershipId
-        val isMutableMember = role == MembershipRole.MEMBER && !isSelf
-        return HostMemberListItem(
-            membershipId = membershipId.toString(),
-            userId = userId.toString(),
-            email = email,
-            displayName = displayName,
-            shortName = shortName,
-            profileImageUrl = profileImageUrl,
-            role = role,
-            status = status,
-            joinedAt = joinedAt?.toString(),
-            createdAt = createdAt.toString(),
-            currentSessionParticipationStatus = participationStatus,
-            canSuspend = isMutableMember && status == MembershipStatus.ACTIVE,
-            canRestore = isMutableMember && status == MembershipStatus.SUSPENDED,
-            canDeactivate = isMutableMember &&
-                status in setOf(MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED, MembershipStatus.VIEWER),
-            canAddToCurrentSession = isMutableMember &&
-                currentSessionId != null &&
-                status == MembershipStatus.ACTIVE &&
-                participationStatus != SessionParticipationStatus.ACTIVE,
-            canRemoveFromCurrentSession = isMutableMember &&
-                currentSessionId != null &&
-                status == MembershipStatus.ACTIVE &&
-                participationStatus == SessionParticipationStatus.ACTIVE,
-        )
-    }
 
     private fun requireHost(member: CurrentMember) {
         if (!member.isHost) {
