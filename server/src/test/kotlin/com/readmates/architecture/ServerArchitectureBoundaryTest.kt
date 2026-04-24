@@ -80,6 +80,20 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `member profile application service does not depend on web status types`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.auth.application.service..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "org.springframework.http..",
+                "org.springframework.web..",
+            )
+            .check(importedClasses)
+    }
+
+    @Test
     fun `domain classes do not depend on adapters or web and jdbc frameworks`() {
         noClasses()
             .that()

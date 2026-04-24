@@ -2,6 +2,7 @@ package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.application.AuthSessionService
 import com.readmates.auth.application.AuthenticatedMemberResolver
+import com.readmates.shared.security.CurrentMember
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -28,26 +29,47 @@ class SessionCookieAuthenticationFilter(
             ?.takeIf { it.isNotBlank() }
 
         if (rawToken != null && SecurityContextHolder.getContext().authentication == null) {
-            val member = authSessionService.findValidSession(rawToken)
+            val session = authSessionService.findValidSession(rawToken)
                 ?.takeUnless { it.revoked }
-                ?.let { authenticatedMemberResolver.resolveByUserId(it.userId) }
 
-            if (member != null) {
-                val roleAuthority = if (member.isViewer) {
-                    "ROLE_VIEWER"
+            if (session != null) {
+                val member = authenticatedMemberResolver.resolveByUserId(session.userId)
+                val authentication = if (member != null) {
+                    UsernamePasswordAuthenticationToken(
+                        member.email,
+                        null,
+                        listOf(SimpleGrantedAuthority(member.roleAuthority())),
+                    )
+                } else if (request.isOwnProfilePatch()) {
+                    authenticatedMemberResolver.resolveProfileByUserId(session.userId)
+                        ?.let { profileMember ->
+                            UsernamePasswordAuthenticationToken(
+                                profileMember.email,
+                                null,
+                                emptyList(),
+                            )
+                        }
                 } else {
-                    "ROLE_${member.role}"
+                    null
                 }
-                val authentication = UsernamePasswordAuthenticationToken(
-                    member.email,
-                    null,
-                    listOf(SimpleGrantedAuthority(roleAuthority)),
-                )
-                authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
-                SecurityContextHolder.getContext().authentication = authentication
+
+                if (authentication != null) {
+                    authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
+                    SecurityContextHolder.getContext().authentication = authentication
+                }
             }
         }
 
         filterChain.doFilter(request, response)
     }
+
+    private fun CurrentMember.roleAuthority(): String =
+        if (isViewer) {
+            "ROLE_VIEWER"
+        } else {
+            "ROLE_$role"
+        }
+
+    private fun HttpServletRequest.isOwnProfilePatch(): Boolean =
+        method == "PATCH" && requestURI == "/api/me/profile"
 }

@@ -49,6 +49,30 @@ class JdbcMemberProfileStoreAdapter(
         ).firstOrNull()
     }
 
+    override fun findProfileMemberByUserId(userId: UUID): MemberProfileRow? =
+        jdbcTemplate().query(
+            """
+            select
+              memberships.id as membership_id,
+              users.id as user_id,
+              memberships.club_id,
+              users.email,
+              users.name as display_name,
+              users.short_name,
+              users.profile_image_url,
+              memberships.role,
+              memberships.status
+            from users
+            join memberships on memberships.user_id = users.id
+            where users.id = ?
+              and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
+            order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
+            limit 1
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toMemberProfileRow() },
+            userId.dbString(),
+        ).firstOrNull()
+
     override fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID): MemberProfileRow? =
         jdbcTemplate().query(
             """

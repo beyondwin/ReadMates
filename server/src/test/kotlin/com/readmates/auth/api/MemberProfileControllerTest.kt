@@ -12,7 +12,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
@@ -126,9 +125,10 @@ class MemberProfileControllerTest(
     fun `left and inactive members receive membership not allowed for own profile updates`() {
         listOf("LEFT", "INACTIVE").forEach { status ->
             val email = insertProfileMember("self.${status.lowercase()}", status, shortName = "Blocked$status")
+            val cookie = sessionCookieForEmail(email)
 
             mockMvc.patch("/api/me/profile") {
-                with(user(email).roles("MEMBER"))
+                cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
                 with(csrf())

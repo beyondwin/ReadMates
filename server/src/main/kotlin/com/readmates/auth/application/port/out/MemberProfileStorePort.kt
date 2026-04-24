@@ -18,6 +18,7 @@ data class MemberProfileRow(
 
 interface MemberProfileStorePort {
     fun findProfileMemberByEmail(email: String): MemberProfileRow?
+    fun findProfileMemberByUserId(userId: UUID): MemberProfileRow?
     fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID): MemberProfileRow?
     fun shortNameExistsInClub(clubId: UUID, shortName: String, excludingMembershipId: UUID): Boolean
     fun updateShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean
