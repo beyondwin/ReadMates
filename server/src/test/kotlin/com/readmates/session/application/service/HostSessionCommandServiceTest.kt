@@ -147,8 +147,8 @@ class HostSessionCommandServiceTest {
             HostPublicationResponse(
                 sessionId = command.sessionId.toString(),
                 publicSummary = command.publicSummary,
-                isPublic = command.isPublic,
-            ).also { calls += "upsertPublication:${command.sessionId}:${command.isPublic}" }
+                visibility = command.visibility,
+            ).also { calls += "upsertPublication:${command.sessionId}:${command.visibility}" }
 
         override fun dashboard(host: CurrentMember) =
             HostDashboardResult(

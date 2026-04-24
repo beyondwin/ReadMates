@@ -1,5 +1,6 @@
 package com.readmates.session.adapter.`in`.web
 
+import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
 import com.readmates.shared.security.CurrentMember
@@ -14,10 +15,10 @@ import java.util.UUID
 
 data class PublicationRequest(
     @field:NotBlank val publicSummary: String,
-    val isPublic: Boolean,
+    val visibility: SessionRecordVisibility,
 ) {
     fun toCommand(host: CurrentMember, sessionId: UUID): UpsertPublicationCommand =
-        UpsertPublicationCommand(host, sessionId, publicSummary, isPublic)
+        UpsertPublicationCommand(host, sessionId, publicSummary.trim(), visibility)
 }
 
 @RestController

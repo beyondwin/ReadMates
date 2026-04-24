@@ -230,7 +230,7 @@ export const archiveSessionDetailContractFixture = {
 
 export const hostSessionPublicationContractFixture = {
   publicSummary: "데이터를 읽는 태도와 대화의 균형을 공개 요약으로 남겼습니다.",
-  isPublic: true,
+  visibility: "PUBLIC",
 } satisfies HostSessionPublication;
 
 export const hostSessionDetailContractFixture = {

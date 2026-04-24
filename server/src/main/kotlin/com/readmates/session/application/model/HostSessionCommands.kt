@@ -1,5 +1,6 @@
 package com.readmates.session.application.model
 
+import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
@@ -45,5 +46,5 @@ data class UpsertPublicationCommand(
     val host: CurrentMember,
     val sessionId: UUID,
     val publicSummary: String,
-    val isPublic: Boolean,
+    val visibility: SessionRecordVisibility,
 )

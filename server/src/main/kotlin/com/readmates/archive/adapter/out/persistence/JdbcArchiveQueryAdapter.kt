@@ -48,7 +48,7 @@ class JdbcArchiveQueryAdapter(
               current_participant.attendance_status as my_attendance_status,
               sum(case when session_participants.attendance_status = 'ATTENDED' then 1 else 0 end) as attendance,
               count(session_participants.id) as total,
-              coalesce(public_session_publications.is_public, false) as published,
+              coalesce(public_session_publications.visibility = 'PUBLIC', false) as published,
               latest_feedback_document.created_at as feedback_document_uploaded_at
             from sessions
             left join session_participants current_participant on current_participant.session_id = sessions.id
@@ -89,7 +89,7 @@ class JdbcArchiveQueryAdapter(
               sessions.session_date,
               sessions.state,
               current_participant.attendance_status,
-              public_session_publications.is_public,
+              public_session_publications.visibility,
               latest_feedback_document.created_at
             order by sessions.number desc
             """.trimIndent(),
@@ -135,7 +135,7 @@ class JdbcArchiveQueryAdapter(
               ) as total,
               current_participant.attendance_status as my_attendance_status,
               case
-                when coalesce(public_session_publications.is_public, false)
+                when public_session_publications.visibility in ('MEMBER', 'PUBLIC')
                   then public_session_publications.public_summary
                 else null
               end as public_summary
