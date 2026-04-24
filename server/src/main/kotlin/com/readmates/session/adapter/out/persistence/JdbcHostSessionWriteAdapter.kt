@@ -12,6 +12,7 @@ import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
+import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.requireHost
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
@@ -269,13 +270,8 @@ class JdbcHostSessionWriteAdapter(
             left join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
             where sessions.club_id = ?
-              and (
-                sessions.state = 'CLOSED'
-                or (
-                  sessions.state = 'PUBLISHED'
-                  and coalesce(public_session_publications.is_public, false) = false
-                )
-              )
+              and sessions.state in ('CLOSED', 'PUBLISHED')
+              and public_session_publications.session_id is null
             """.trimIndent(),
             Int::class.java,
             member.clubId.dbString(),
@@ -552,6 +548,7 @@ class JdbcHostSessionWriteAdapter(
     ): HostPublicationResponse {
         requireHostSession(command.host, command.sessionId)
         val jdbcTemplate = jdbcTemplate()
+        val isPublic = command.visibility == SessionRecordVisibility.PUBLIC
         jdbcTemplate.update(
             """
             insert into public_session_publications (
@@ -560,9 +557,11 @@ class JdbcHostSessionWriteAdapter(
               session_id,
               public_summary,
               is_public,
+              visibility,
               published_at
             )
             values (
+              ?,
               ?,
               ?,
               ?,
@@ -573,6 +572,7 @@ class JdbcHostSessionWriteAdapter(
             on duplicate key update
               public_summary = values(public_summary),
               is_public = values(is_public),
+              visibility = values(visibility),
               published_at = values(published_at),
               updated_at = utc_timestamp(6)
             """.trimIndent(),
@@ -580,28 +580,15 @@ class JdbcHostSessionWriteAdapter(
             command.host.clubId.dbString(),
             command.sessionId.dbString(),
             command.publicSummary,
-            command.isPublic,
-            command.isPublic,
+            isPublic,
+            command.visibility.name,
+            isPublic,
         )
-        if (command.isPublic) {
-            jdbcTemplate.update(
-                """
-                update sessions
-                set state = 'PUBLISHED',
-                    updated_at = utc_timestamp(6)
-                where id = ?
-                  and club_id = ?
-                  and state = 'CLOSED'
-                """.trimIndent(),
-                command.sessionId.dbString(),
-                command.host.clubId.dbString(),
-            )
-        }
 
         return HostPublicationResponse(
             sessionId = command.sessionId.toString(),
             publicSummary = command.publicSummary,
-            isPublic = command.isPublic,
+            visibility = command.visibility,
         )
     }
 
@@ -714,7 +701,7 @@ class JdbcHostSessionWriteAdapter(
             """
             select
               public_summary,
-              is_public
+              visibility
             from public_session_publications
             where session_id = ?
               and club_id = ?
@@ -723,7 +710,7 @@ class JdbcHostSessionWriteAdapter(
             { resultSet, _ ->
                 HostSessionPublication(
                     publicSummary = resultSet.getString("public_summary"),
-                    isPublic = resultSet.getBoolean("is_public"),
+                    visibility = SessionRecordVisibility.valueOf(resultSet.getString("visibility")),
                 )
             },
             sessionId.dbString(),

@@ -409,14 +409,16 @@ class HostDashboardControllerTest(
                 """
                 {
                   "publicSummary": "7회차 공개 요약입니다.",
-                  "isPublic": true
+                  "visibility": "PUBLIC"
                 }
                 """.trimIndent()
         }.andExpect {
             status { isOk() }
             jsonPath("$.sessionId") { value(sessionId) }
             jsonPath("$.publicSummary") { value("7회차 공개 요약입니다.") }
-            jsonPath("$.isPublic") { value(true) }
+            jsonPath("$.visibility") { value("PUBLIC") }
+            jsonPath("$.isPublic") { doesNotExist() }
+            jsonPath("$.published") { doesNotExist() }
         }
 
         mockMvc.get("/api/host/sessions/$sessionId") {
@@ -424,7 +426,8 @@ class HostDashboardControllerTest(
         }.andExpect {
             status { isOk() }
             jsonPath("$.publication.publicSummary") { value("7회차 공개 요약입니다.") }
-            jsonPath("$.publication.isPublic") { value(true) }
+            jsonPath("$.publication.visibility") { value("PUBLIC") }
+            jsonPath("$.publication.isPublic") { doesNotExist() }
         }
 
         val attendees = findFirstTwoSessionAttendees(UUID.fromString(sessionId))
@@ -667,7 +670,7 @@ class HostDashboardControllerTest(
     }
 
     @Test
-    fun `publishing a closed session marks it published and clears publish pending`() {
+    fun `saving public visibility for a closed session keeps it closed and clears publish pending`() {
         val sessionId = createSessionSeven()
         jdbcTemplate.update(
             """
@@ -692,13 +695,15 @@ class HostDashboardControllerTest(
                 """
                 {
                   "publicSummary": "닫힌 세션 공개 요약입니다.",
-                  "isPublic": true
+                  "visibility": "PUBLIC"
                 }
                 """.trimIndent()
         }.andExpect {
             status { isOk() }
             jsonPath("$.sessionId") { value(sessionId) }
-            jsonPath("$.isPublic") { value(true) }
+            jsonPath("$.visibility") { value("PUBLIC") }
+            jsonPath("$.isPublic") { doesNotExist() }
+            jsonPath("$.published") { doesNotExist() }
         }
 
         val sessionState = jdbcTemplate.queryForObject(
@@ -706,7 +711,7 @@ class HostDashboardControllerTest(
             String::class.java,
             sessionId,
         )
-        assertEquals("PUBLISHED", sessionState)
+        assertEquals("CLOSED", sessionState)
 
         mockMvc.get("/api/host/dashboard") {
             with(user("host@example.com"))
@@ -763,7 +768,7 @@ class HostDashboardControllerTest(
                 """
                 {
                   "publicSummary": "공개 요약",
-                  "isPublic": true
+                  "visibility": "PUBLIC"
                 }
                 """.trimIndent()
         }.andExpect {
@@ -990,7 +995,7 @@ class HostDashboardControllerTest(
                 """
                 {
                   "publicSummary": " ",
-                  "isPublic": true
+                  "visibility": "PUBLIC"
                 }
                 """.trimIndent()
         }.andExpect {
