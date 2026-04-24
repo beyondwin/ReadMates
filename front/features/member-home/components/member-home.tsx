@@ -16,6 +16,7 @@ import type {
   MemberHomeAuth as AuthMeResponse,
   MemberHomeCurrentSessionResponse as CurrentSessionResponse,
   MemberHomeNoteFeedItem as NoteFeedItem,
+  MemberHomeUpcomingSession,
 } from "@/features/member-home/api/member-home-contracts";
 import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 
@@ -33,11 +34,15 @@ export default function MemberHome({
   auth,
   current,
   noteFeedItems,
+  upcomingSessions = [],
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
   noteFeedItems: NoteFeedItem[];
+  upcomingSessions?: MemberHomeUpcomingSession[];
 }) {
+  void upcomingSessions;
+
   const currentSession = current.currentSession;
   const memberName = auth.displayName ?? "멤버";
   const isViewer = auth.membershipStatus === "VIEWER";

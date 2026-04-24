@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import MemberHome from "@/features/member-home/components/member-home";
+import { memberHomeLoader } from "@/features/member-home/route/member-home-data";
 import type {
   MemberHomeAuth as AuthMeResponse,
   MemberHomeCurrentSessionResponse as CurrentSessionResponse,
@@ -9,6 +10,7 @@ import type {
 
 afterEach(cleanup);
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -93,7 +95,30 @@ function getDesktopView(container: HTMLElement) {
   return within(desktop as HTMLElement);
 }
 
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 describe("MemberHome", () => {
+  it("loads upcoming sessions for member home", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(auth));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
+      if (url === "/api/bff/api/notes/feed") return Promise.resolve(jsonResponse(noteFeedItems));
+      if (url === "/api/bff/api/sessions/upcoming") return Promise.resolve(jsonResponse([]));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const data = await memberHomeLoader();
+
+    expect(data.upcomingSessions).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/upcoming", expect.objectContaining({}));
+  });
+
   it("renders the mobile-first member home flow with real action links", () => {
     const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
 

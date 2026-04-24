@@ -11,6 +11,7 @@ export function HostDashboardRoute({ auth }: { auth?: AuthMeResponse }) {
       auth={auth}
       current={loaderData.current}
       data={loaderData.data}
+      hostSessions={loaderData.hostSessions}
       actions={hostDashboardActions}
     />
   );

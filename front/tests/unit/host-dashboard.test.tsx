@@ -140,6 +140,8 @@ const current: CurrentSessionResponse = {
 
 const noopHostDashboardActions = {
   updateCurrentSessionParticipation: vi.fn(async () => undefined),
+  updateSessionVisibility: vi.fn(async () => undefined),
+  openSession: vi.fn(async () => undefined),
 } satisfies HostDashboardActions;
 
 type HostDashboardProps = Parameters<typeof HostDashboard>[0];
@@ -174,6 +176,13 @@ function expectDisabledActionInViews(
 
 function authResponse(auth: AuthMeResponse) {
   return new Response(JSON.stringify(auth), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
@@ -230,7 +239,10 @@ describe("HostDashboard", () => {
     ["suspended", { ...hostAuth, membershipStatus: "SUSPENDED", approvalState: "ACTIVE" } satisfies AuthMeResponse],
   ])("redirects %s hosts with active-looking approval before calling host endpoints", async (_state, auth) => {
     for (const [, runLoader] of hostLoaderCases) {
-      const fetchMock = vi.fn(() => Promise.resolve(authResponse(auth)));
+      const fetchMock = vi.fn((input: RequestInfo | URL) => {
+        void input;
+        return Promise.resolve(authResponse(auth));
+      });
       vi.stubGlobal("fetch", fetchMock);
 
       await expectLoaderRedirect(runLoader, "/app");
@@ -258,15 +270,36 @@ describe("HostDashboard", () => {
         return Promise.resolve(new Response(JSON.stringify(dashboard), { status: 200 }));
       }
 
+      if (url === "/api/bff/api/host/sessions") {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+
       return Promise.resolve(new Response(JSON.stringify({ message: "unexpected request" }), { status: 404 }));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader()).resolves.toEqual({ current, data: dashboard });
+    await expect(hostDashboardLoader()).resolves.toEqual({ current, data: dashboard, hostSessions: [] });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/dashboard", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({ cache: "no-store" }));
+  });
+
+  it("loads host session list for the dashboard", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
+      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const data = await hostDashboardLoader();
+
+    expect(data.hostSessions).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({}));
   });
 
   it("shows no-session fallbacks when there is no current session and no pending work", () => {
@@ -499,6 +532,7 @@ describe("HostDashboard", () => {
   it("adds a missing member to the current session from the dashboard alert", async () => {
     const user = userEvent.setup();
     const actions = {
+      ...noopHostDashboardActions,
       updateCurrentSessionParticipation: vi.fn(async () => undefined),
     } satisfies HostDashboardActions;
     const { container } = render(
@@ -523,6 +557,7 @@ describe("HostDashboard", () => {
   it("marks a missing member for next session from the dashboard alert", async () => {
     const user = userEvent.setup();
     const actions = {
+      ...noopHostDashboardActions,
       updateCurrentSessionParticipation: vi.fn(async () => undefined),
     } satisfies HostDashboardActions;
     const { container } = render(
