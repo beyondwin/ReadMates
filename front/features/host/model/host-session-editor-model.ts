@@ -1,7 +1,6 @@
 export type HostSessionAttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type HostSessionState = "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
-export type HostSessionPublicationMode = "internal" | "draft" | "public";
-export type HostSessionPublicationAction = "draft" | "public";
+export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
 
 export type HostSessionFormValues = {
   title: string;
@@ -47,7 +46,7 @@ export type HostSessionEditorSession = {
   questionDeadlineAt: string;
   publication: {
     publicSummary: string;
-    isPublic: boolean;
+    visibility: SessionRecordVisibility;
   } | null;
   state: HostSessionState;
   attendees: Array<{
@@ -65,7 +64,7 @@ export type HostSessionFeedbackDocumentStatus = {
 
 export type HostSessionPublicationRequest = {
   publicSummary: string;
-  isPublic: boolean;
+  visibility: SessionRecordVisibility;
 };
 
 export type HostSessionDestructiveActionAvailability = {
@@ -240,21 +239,51 @@ export function buildHostSessionRequest(
 
 export function initialPublicationMode(
   session?: Pick<HostSessionEditorSession, "publication"> | null,
-): HostSessionPublicationMode {
+): "internal" | "draft" | "public" {
   if (!session?.publication) {
     return "internal";
   }
 
-  return session.publication.isPublic ? "public" : "draft";
+  return initialRecordVisibility(session) === "PUBLIC" ? "public" : "draft";
+}
+
+export function initialRecordVisibility(
+  session?: Pick<HostSessionEditorSession, "publication"> | null,
+): SessionRecordVisibility {
+  return session?.publication?.visibility ?? "HOST_ONLY";
 }
 
 export function initialPublicationSummary(session?: Pick<HostSessionEditorSession, "publication"> | null) {
   return session?.publication?.publicSummary ?? "";
 }
 
+export function recordVisibilityLabel(visibility: SessionRecordVisibility) {
+  if (visibility === "MEMBER") {
+    return "멤버 공개";
+  }
+
+  if (visibility === "PUBLIC") {
+    return "외부 공개";
+  }
+
+  return "호스트 전용";
+}
+
+export function recordVisibilityDescription(visibility: SessionRecordVisibility) {
+  if (visibility === "MEMBER") {
+    return "멤버 앱 안에서 볼 수 있지만 공개 기록 목록에는 나오지 않습니다.";
+  }
+
+  if (visibility === "PUBLIC") {
+    return "멤버 앱과 공개 기록 목록에 표시됩니다.";
+  }
+
+  return "호스트 편집 화면에서만 볼 수 있습니다.";
+}
+
 export function buildPublicationRequest(
   summary: string,
-  action: HostSessionPublicationAction,
+  visibility: SessionRecordVisibility,
 ): HostSessionPublicationRequest | null {
   const publicSummary = summary.trim();
   if (!publicSummary) {
@@ -263,7 +292,7 @@ export function buildPublicationRequest(
 
   return {
     publicSummary,
-    isPublic: action === "public",
+    visibility,
   };
 }
 
