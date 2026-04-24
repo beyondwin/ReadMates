@@ -1075,8 +1075,9 @@ git commit -m "feat: manage upcoming session state"
 - Modify: `server/src/main/kotlin/com/readmates/note/adapter/out/persistence/JdbcNotesFeedAdapter.kt`
 - Modify: `server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerDbTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`
+- Modify: `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`
 
-- [ ] **Step 1: Write archive regression test**
+- [x] **Step 1: Write archive regression test**
 
 In `ArchiveControllerDbTest`, add:
 
@@ -1122,7 +1123,7 @@ private fun insertArchiveVisibilitySession(number: Int, state: String, visibilit
 }
 ```
 
-- [ ] **Step 2: Write notes regression test**
+- [x] **Step 2: Write notes regression test**
 
 In `ArchiveAndNotesDbTest`, add a test that inserts a `PUBLISHED + HOST_ONLY` session with a public one-liner and asserts it is not returned:
 
@@ -1182,7 +1183,7 @@ delete from one_line_reviews where id = '00000000-0000-0000-0000-000000009091';
 delete from sessions where id = '00000000-0000-0000-0000-000000009090';
 ```
 
-- [ ] **Step 3: Run archive/notes tests to verify failures**
+- [x] **Step 3: Run archive/notes tests to verify failures**
 
 Run:
 
@@ -1192,7 +1193,7 @@ Run:
 
 Expected: FAIL until filters include `sessions.visibility`.
 
-- [ ] **Step 4: Add archive filters**
+- [x] **Step 4: Add archive filters**
 
 In `JdbcArchiveQueryAdapter`, add this condition to archive list and detail session queries:
 
@@ -1203,7 +1204,7 @@ and sessions.visibility in ('MEMBER', 'PUBLIC')
 
 Keep public detail queries stricter through publication visibility where already used.
 
-- [ ] **Step 5: Add notes filters**
+- [x] **Step 5: Add notes filters**
 
 In `JdbcNotesFeedAdapter`, add:
 
@@ -1214,7 +1215,7 @@ and sessions.visibility in ('MEMBER', 'PUBLIC')
 
 to member-facing notes session/feed queries. Do not loosen public API one-line visibility rules.
 
-- [ ] **Step 6: Run archive/notes tests**
+- [x] **Step 6: Run archive/notes tests**
 
 Run:
 
@@ -1224,15 +1225,26 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/archive/adapter/out/persistence/JdbcArchiveQueryAdapter.kt \
   server/src/main/kotlin/com/readmates/note/adapter/out/persistence/JdbcNotesFeedAdapter.kt \
   server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerDbTest.kt \
-  server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt
+  server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt \
+  docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md
 git commit -m "fix: hide draft and host only records"
 ```
+
+**Task 4 checkpoint:**
+- Task: Task 4, Enforce Archive and Notes Visibility Filters.
+- Changed files: `server/src/main/kotlin/com/readmates/archive/adapter/out/persistence/JdbcArchiveQueryAdapter.kt`, `server/src/main/kotlin/com/readmates/note/adapter/out/persistence/JdbcNotesFeedAdapter.kt`, `server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerDbTest.kt`, `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`, `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`.
+- Key decisions: archive list/detail queries now require `sessions.state in ('CLOSED', 'PUBLISHED')` and `sessions.visibility in ('MEMBER', 'PUBLIC')`; member-facing notes sessions/feed queries now require `PUBLISHED` plus `MEMBER`/`PUBLIC` session visibility; public note item visibility rules remain unchanged.
+- Review issues/resolution: code quality review found the notes regression only covered `/api/notes/sessions`, did not protect `/api/notes/feed` or session-specific feed filters because the host-only note lacked an active participant, and archive detail filtering lacked direct coverage. Resolved by adding an active participant to the host-only note fixture, asserting `/api/notes/sessions`, `/api/notes/feed`, and `/api/notes/feed?sessionId=...` all exclude it, and asserting host-only archive detail returns not found. Self-review found older DB fixtures that omitted `sessions.visibility` while expecting member-readable rows; resolved by making those fixture rows explicitly `MEMBER` or `PUBLIC` according to the scenario.
+- Verification: initial red `./server/gradlew -p server test --tests com.readmates.archive.api.ArchiveControllerDbTest --tests com.readmates.archive.api.ArchiveAndNotesDbTest` failed with 30 tests run and the two new visibility regression tests failing; green same command passed with `BUILD SUCCESSFUL in 12s`. Review red check with archive detail/feed predicates temporarily removed, `./server/gradlew -p server test --tests 'com.readmates.archive.api.ArchiveControllerDbTest.archive excludes draft and host only sessions' --tests 'com.readmates.archive.api.ArchiveAndNotesDbTest.notes surfaces exclude host only published records' --rerun-tasks`, failed with 2 tests run and 2 failed. Review green `./server/gradlew -p server test --tests com.readmates.archive.api.ArchiveControllerDbTest --tests com.readmates.archive.api.ArchiveAndNotesDbTest --rerun-tasks` passed with `BUILD SUCCESSFUL in 13s`.
+- Remaining risk: only the targeted archive/notes DB suite ran for this task; full server test suite remains broader coverage.
+- Next task notes: downstream frontend/public-release work should rely on `sessions.visibility` as the member-facing source of truth and avoid exposing `HOST_ONLY` records through archive or notes surfaces.
+- Worktree/branch: `upcoming-session-management-20260425` worktree, `codex/upcoming-session-management-20260425`.
 
 ---
 

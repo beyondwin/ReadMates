@@ -90,6 +90,7 @@ class JdbcNotesFeedAdapter(
             from sessions
             where sessions.club_id = ?
               and sessions.state = 'PUBLISHED'
+              and sessions.visibility in ('MEMBER', 'PUBLIC')
             order by sessions.number desc
             """.trimIndent(),
             { resultSet, _ ->
@@ -145,6 +146,7 @@ class JdbcNotesFeedAdapter(
                 and session_participants.participation_status = 'ACTIVE'
               where questions.club_id = ?
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
 
               union all
 
@@ -173,6 +175,7 @@ class JdbcNotesFeedAdapter(
               where long_reviews.club_id = ?
                 and long_reviews.visibility = 'PUBLIC'
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
 
               union all
 
@@ -201,6 +204,7 @@ class JdbcNotesFeedAdapter(
               where one_line_reviews.club_id = ?
                 and one_line_reviews.visibility = 'PUBLIC'
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
 
               union all
 
@@ -227,6 +231,7 @@ class JdbcNotesFeedAdapter(
                 and session_participants.membership_id = highlights.membership_id
               where highlights.club_id = ?
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
                 and (
                   highlights.membership_id is null
                   or session_participants.participation_status = 'ACTIVE'
@@ -281,6 +286,7 @@ class JdbcNotesFeedAdapter(
               where questions.club_id = ?
                 and sessions.id = ?
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
 
               union all
 
@@ -310,6 +316,7 @@ class JdbcNotesFeedAdapter(
                 and sessions.id = ?
                 and long_reviews.visibility = 'PUBLIC'
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
 
               union all
 
@@ -339,6 +346,7 @@ class JdbcNotesFeedAdapter(
                 and sessions.id = ?
                 and one_line_reviews.visibility = 'PUBLIC'
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
 
               union all
 
@@ -366,6 +374,7 @@ class JdbcNotesFeedAdapter(
               where highlights.club_id = ?
                 and sessions.id = ?
                 and sessions.state = 'PUBLISHED'
+                and sessions.visibility in ('MEMBER', 'PUBLIC')
                 and (
                   highlights.membership_id is null
                   or session_participants.participation_status = 'ACTIVE'

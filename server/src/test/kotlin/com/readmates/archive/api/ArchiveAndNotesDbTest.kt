@@ -228,6 +228,88 @@ class ArchiveAndNotesDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_HOST_ONLY_PUBLISHED_NOTE_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_HOST_ONLY_PUBLISHED_NOTE_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `notes surfaces exclude host only published records`() {
+        insertHostOnlyPublishedSessionWithOneLine(number = 90)
+
+        mockMvc.get("/api/notes/sessions") {
+            with(user("member1@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(90))) }
+        }
+
+        mockMvc.get("/api/notes/feed") {
+            with(user("member1@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(90))) }
+            jsonPath("$[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
+        }
+
+        mockMvc.get("/api/notes/feed") {
+            param("sessionId", HOST_ONLY_PUBLISHED_NOTE_SESSION_ID)
+            with(user("member1@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(0) }
+            jsonPath("$[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
+        }
+    }
+
+    private fun insertHostOnlyPublishedSessionWithOneLine(number: Int) {
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator,
+              book_link, book_image_url, session_date, start_time, end_time,
+              location_label, meeting_url, meeting_passcode, question_deadline_at,
+              state, visibility
+            )
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
+              null, null, null, '2026-09-16', '20:00:00', '22:00:00',
+              '온라인', null, null, '2026-09-15 14:59:00.000000', 'PUBLISHED', 'HOST_ONLY')
+            """.trimIndent(),
+            HOST_ONLY_PUBLISHED_NOTE_SESSION_ID,
+            number,
+            "${number}회차 · 호스트 전용",
+            "호스트 전용 책 $number",
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status
+            )
+            values (?, '00000000-0000-0000-0000-000000000001', ?, '00000000-0000-0000-0000-000000000202',
+              'GOING', 'ATTENDED', 'ACTIVE')
+            """.trimIndent(),
+            HOST_ONLY_PUBLISHED_NOTE_PARTICIPANT_ID,
+            HOST_ONLY_PUBLISHED_NOTE_SESSION_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, '00000000-0000-0000-0000-000000000202',
+              ?, 'PUBLIC')
+            """.trimIndent(),
+            HOST_ONLY_PUBLISHED_NOTE_REVIEW_ID,
+            HOST_ONLY_PUBLISHED_NOTE_SESSION_ID,
+            HOST_ONLY_PUBLISHED_NOTE_TEXT,
+        )
+    }
+
+    @Test
+    @Sql(
+        statements = [
             CLEANUP_NOTE_FEED_LONG_REVIEWS_SQL,
             INSERT_NOTE_FEED_LONG_REVIEWS_SQL,
         ],
@@ -629,7 +711,8 @@ class ArchiveAndNotesDbTest(
               meeting_url,
               meeting_passcode,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             select
               '00000000-0000-0000-0000-000000009991',
@@ -648,7 +731,8 @@ class ArchiveAndNotesDbTest(
               null,
               null,
               '2030-03-31 14:59:00.000000',
-              'DRAFT'
+              'DRAFT',
+              'MEMBER'
             from clubs
             where clubs.id = '00000000-0000-0000-0000-000000000001';
         """
@@ -671,7 +755,8 @@ class ArchiveAndNotesDbTest(
               meeting_url,
               meeting_passcode,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             select
               '00000000-0000-0000-0000-000000009992',
@@ -690,7 +775,8 @@ class ArchiveAndNotesDbTest(
               null,
               null,
               '2030-02-28 14:59:00.000000',
-              'OPEN'
+              'OPEN',
+              'PUBLIC'
             from clubs
             where clubs.id = '00000000-0000-0000-0000-000000000001';
         """
@@ -713,7 +799,8 @@ class ArchiveAndNotesDbTest(
               meeting_url,
               meeting_passcode,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             select
               '00000000-0000-0000-0000-000000009993',
@@ -732,7 +819,8 @@ class ArchiveAndNotesDbTest(
               null,
               null,
               '2030-01-31 14:59:00.000000',
-              'CLOSED'
+              'CLOSED',
+              'MEMBER'
             from clubs
             where clubs.id = '00000000-0000-0000-0000-000000000001';
         """
@@ -833,6 +921,19 @@ class ArchiveAndNotesDbTest(
               and memberships.user_id = users.id
             where sessions.id = '00000000-0000-0000-0000-000000000306';
         """
+
+        private const val CLEANUP_HOST_ONLY_PUBLISHED_NOTE_SESSION_SQL = """
+            delete from session_participants
+            where id = '00000000-0000-0000-0000-000000009092';
+            delete from one_line_reviews
+            where id = '00000000-0000-0000-0000-000000009091';
+            delete from sessions
+            where id = '00000000-0000-0000-0000-000000009090';
+        """
+        private const val HOST_ONLY_PUBLISHED_NOTE_SESSION_ID = "00000000-0000-0000-0000-000000009090"
+        private const val HOST_ONLY_PUBLISHED_NOTE_REVIEW_ID = "00000000-0000-0000-0000-000000009091"
+        private const val HOST_ONLY_PUBLISHED_NOTE_PARTICIPANT_ID = "00000000-0000-0000-0000-000000009092"
+        private const val HOST_ONLY_PUBLISHED_NOTE_TEXT = "호스트 전용 기록은 클럽 노트에 나오면 안 됩니다."
 
         private const val PUBLIC_NOTE_FEED_LONG_REVIEW_TEXT = "공개 서평은 클럽 노트에서 함께 읽을 수 있습니다."
         private const val PRIVATE_NOTE_FEED_LONG_REVIEW_TEXT = "비공개 서평은 클럽 노트에서 제외됩니다."

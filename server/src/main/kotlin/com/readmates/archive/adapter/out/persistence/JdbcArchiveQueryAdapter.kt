@@ -79,6 +79,7 @@ class JdbcArchiveQueryAdapter(
               and latest_feedback_document.club_id = sessions.club_id
             where sessions.club_id = ?
               and sessions.state in ('CLOSED', 'PUBLISHED')
+              and sessions.visibility in ('MEMBER', 'PUBLIC')
             group by
               sessions.id,
               sessions.number,
@@ -149,6 +150,7 @@ class JdbcArchiveQueryAdapter(
             where sessions.id = ?
               and sessions.club_id = ?
               and sessions.state in ('CLOSED', 'PUBLISHED')
+              and sessions.visibility in ('MEMBER', 'PUBLIC')
             """.trimIndent(),
             { resultSet, _ ->
                 val sessionUuid = resultSet.uuid("id")

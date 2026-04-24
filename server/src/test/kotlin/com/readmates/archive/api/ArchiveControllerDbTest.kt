@@ -8,10 +8,12 @@ import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -21,6 +23,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get a
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -30,7 +33,19 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 @AutoConfigureMockMvc
 class ArchiveControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
+    @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
+    private val createdArchiveVisibilitySessionIds = linkedSetOf<String>()
+
+    @AfterEach
+    fun cleanupCreatedArchiveVisibilityRows() {
+        try {
+            deleteWhereIn("sessions", "id", createdArchiveVisibilitySessionIds)
+        } finally {
+            createdArchiveVisibilitySessionIds.clear()
+        }
+    }
+
     @Test
     fun `archive session detail returns attended member detail with feedback status`() {
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
@@ -172,6 +187,62 @@ class ArchiveControllerDbTest(
                 jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.title") { value(hasItem("독서모임 6차 피드백")) }
                 jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.uploadedAt") { exists() }
             }
+    }
+
+    @Test
+    fun `archive excludes draft and host only sessions`() {
+        insertArchiveVisibilitySession(number = 88, state = "DRAFT", visibility = "MEMBER")
+        val hostOnlySessionId = insertArchiveVisibilitySession(number = 89, state = "CLOSED", visibility = "HOST_ONLY")
+
+        mockMvc.get("/api/archive/sessions") {
+            with(user("member1@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(88))) }
+            jsonPath("$[*].sessionNumber") { value(not(hasItem(89))) }
+        }
+
+        mockMvc.get("/api/archive/sessions/$hostOnlySessionId") {
+            with(user("member1@example.com"))
+        }.andExpect {
+            status { isNotFound() }
+        }
+    }
+
+    private fun insertArchiveVisibilitySession(number: Int, state: String, visibility: String): String {
+        val sessionId = UUID.randomUUID().toString()
+        createdArchiveVisibilitySessionIds.add(sessionId)
+
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator,
+              book_link, book_image_url, session_date, start_time, end_time,
+              location_label, meeting_url, meeting_passcode, question_deadline_at,
+              state, visibility
+            )
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
+              null, null, null, '2026-08-15', '20:00:00', '22:00:00',
+              '온라인', null, null, '2026-08-14 14:59:00.000000', ?, ?)
+            """.trimIndent(),
+            sessionId,
+            number,
+            "${number}회차 · 필터 테스트",
+            "필터 책 $number",
+            state,
+            visibility,
+        )
+
+        return sessionId
+    }
+
+    private fun deleteWhereIn(table: String, column: String, ids: Collection<String>) {
+        if (ids.isEmpty()) return
+        val placeholders = ids.joinToString(",") { "?" }
+        jdbcTemplate.update(
+            "delete from $table where $column in ($placeholders)",
+            *ids.toTypedArray(),
+        )
     }
 
     @Test
@@ -448,7 +519,8 @@ class ArchiveControllerDbTest(
               end_time,
               location_label,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             values (
               '00000000-0000-0000-0000-000000000906',
@@ -465,7 +537,8 @@ class ArchiveControllerDbTest(
               '22:00',
               '온라인',
               '2026-12-30 14:59:00.000000',
-              'OPEN'
+              'OPEN',
+              'PUBLIC'
             );
         """
 
@@ -523,7 +596,8 @@ class ArchiveControllerDbTest(
               end_time,
               location_label,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             values
             (
@@ -541,7 +615,8 @@ class ArchiveControllerDbTest(
               '22:00',
               '온라인',
               '2026-12-29 14:59:00.000000',
-              'PUBLISHED'
+              'PUBLISHED',
+              'MEMBER'
             ),
             (
               '00000000-0000-0000-0000-000000000997',
@@ -558,7 +633,8 @@ class ArchiveControllerDbTest(
               '22:00',
               '온라인',
               '2026-12-28 14:59:00.000000',
-              'PUBLISHED'
+              'PUBLISHED',
+              'MEMBER'
             ),
             (
               '00000000-0000-0000-0000-000000000996',
@@ -575,7 +651,8 @@ class ArchiveControllerDbTest(
               '22:00',
               '온라인',
               '2026-12-27 14:59:00.000000',
-              'PUBLISHED'
+              'PUBLISHED',
+              'PUBLIC'
             );
         """
 
