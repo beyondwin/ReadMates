@@ -237,16 +237,6 @@ export function buildHostSessionRequest(
   };
 }
 
-export function initialPublicationMode(
-  session?: Pick<HostSessionEditorSession, "publication"> | null,
-): "internal" | "draft" | "public" {
-  if (!session?.publication) {
-    return "internal";
-  }
-
-  return initialRecordVisibility(session) === "PUBLIC" ? "public" : "draft";
-}
-
 export function initialRecordVisibility(
   session?: Pick<HostSessionEditorSession, "publication"> | null,
 ): SessionRecordVisibility {
