@@ -15,10 +15,14 @@ type AuthMeProbe = {
   authenticated?: boolean;
 };
 
-export function usePublicAuthenticated() {
-  const [authenticated, setAuthenticated] = useState(false);
+export function usePublicAuthenticated(authenticatedOverride?: boolean) {
+  const [probedAuthenticated, setProbedAuthenticated] = useState(false);
 
   useEffect(() => {
+    if (authenticatedOverride !== undefined) {
+      return;
+    }
+
     let cancelled = false;
 
     async function loadAuthState() {
@@ -34,8 +38,8 @@ export function usePublicAuthenticated() {
 
         const auth = (await response.json()) as AuthMeProbe;
 
-        if (!cancelled && auth.authenticated === true) {
-          setAuthenticated(true);
+        if (!cancelled) {
+          setProbedAuthenticated(auth.authenticated === true);
         }
       } catch {
         // Keep the public login link when auth probing is unavailable.
@@ -47,13 +51,13 @@ export function usePublicAuthenticated() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [authenticatedOverride]);
 
-  return authenticated;
+  return authenticatedOverride ?? probedAuthenticated;
 }
 
-export function usePublicAuthAction(fallbackAction: PublicAuthAction): PublicAuthAction {
-  const authenticated = usePublicAuthenticated();
+export function usePublicAuthAction(fallbackAction: PublicAuthAction, authenticatedOverride?: boolean): PublicAuthAction {
+  const authenticated = usePublicAuthenticated(authenticatedOverride);
 
   return authenticated ? authenticatedAction : fallbackAction;
 }

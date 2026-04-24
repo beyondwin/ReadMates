@@ -5,6 +5,7 @@ import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -50,12 +51,26 @@ class PasswordAuthControllerTest(
         )
         val cookie = Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
 
-        mockMvc.post("/api/auth/logout") {
+        val result = mockMvc.post("/api/auth/logout") {
             cookie(cookie)
         }.andExpect {
             status { isNoContent() }
             cookie { maxAge(AuthSessionService.COOKIE_NAME, 0) }
-        }
+        }.andReturn()
+
+        val setCookieHeaders = result.response.getHeaders("Set-Cookie")
+        assertTrue(
+            setCookieHeaders.any {
+                it.startsWith("${AuthSessionService.COOKIE_NAME}=;") && it.contains("Max-Age=0")
+            },
+            "Expected readmates_session clearing cookie",
+        )
+        assertTrue(
+            setCookieHeaders.any {
+                it.startsWith("JSESSIONID=;") && it.contains("Max-Age=0")
+            },
+            "Expected JSESSIONID clearing cookie",
+        )
 
         val revokedAt = jdbcTemplate.queryForObject(
             "select revoked_at from auth_sessions where session_token_hash = ?",

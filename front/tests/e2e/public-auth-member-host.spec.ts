@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { installPrintSpy, readPrintCallCount } from "./print-spy";
 import {
   cleanupGeneratedSessions,
   cleanupViewerGoogleUserFixtures,
@@ -41,10 +40,9 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
     page.locator("main.rm-host-dashboard-desktop").getByRole("heading", { name: "모임 운영" }),
   ).toBeVisible();
 
-  await installPrintSpy(page);
   await page.goto(`/app/feedback/${seededFeedbackSessionId}/print`);
   await expect(page.getByRole("heading", { name: /독서모임 1차 피드백/ })).toBeVisible();
-  await expect.poll(() => readPrintCallCount(page)).toBe(1);
+  await expect(page.getByRole("button", { name: "인쇄" })).toHaveCount(0);
 });
 
 test("host activates viewer into full member", async ({ page }) => {

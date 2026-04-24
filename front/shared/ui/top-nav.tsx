@@ -21,6 +21,7 @@ type TopNavProps = {
   variant?: TopNavVariant;
   memberName?: string | null;
   showHostEntry?: boolean;
+  authenticated?: boolean;
 };
 
 const guestLinks: NavLink[] = [
@@ -190,9 +191,9 @@ function guestLinksWithAction(authAction: PublicAuthAction): NavLink[] {
   );
 }
 
-function GuestTopNav() {
+function GuestTopNav({ authenticated }: { authenticated?: boolean }) {
   const pathname = useLocation().pathname;
-  const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login });
+  const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login }, authenticated);
 
   return (
     <TopNavFrame
@@ -229,9 +230,9 @@ function AppTopNav({
   );
 }
 
-export function TopNav({ variant = "guest", memberName, showHostEntry }: TopNavProps) {
+export function TopNav({ variant = "guest", memberName, showHostEntry, authenticated }: TopNavProps) {
   if (variant === "guest") {
-    return <GuestTopNav />;
+    return <GuestTopNav authenticated={authenticated} />;
   }
 
   return <AppTopNav variant={variant} memberName={memberName} showHostEntry={showHostEntry} />;

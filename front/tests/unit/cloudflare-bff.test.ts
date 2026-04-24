@@ -115,6 +115,36 @@ describe("Cloudflare BFF function", () => {
     expect(response.headers.get("set-cookie")).toBe("readmates.sid=next");
   });
 
+  it("forwards multiple logout Set-Cookie headers", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const upstream = new Response(null, { status: 204 });
+        Object.defineProperty(upstream.headers, "getSetCookie", {
+          value: () => [
+            "readmates_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax",
+            "JSESSIONID=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax",
+          ],
+        });
+        return upstream;
+      }),
+    );
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/logout", {
+          method: "POST",
+          headers: { Origin: "https://readmates.pages.dev" },
+        }),
+        { path: ["api", "auth", "logout"] },
+      ),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("set-cookie")).toContain("readmates_session=;");
+    expect(response.headers.get("set-cookie")).toContain("JSESSIONID=;");
+  });
+
   it("rejects non-api paths without calling upstream", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

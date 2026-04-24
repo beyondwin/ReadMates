@@ -32,13 +32,16 @@ function RouteOutlet() {
 }
 
 export function PublicRouteLayout() {
+  const state = useAuth();
+  const authenticated = state.status === "ready" ? state.auth.authenticated : undefined;
+
   return (
     <div className="public-shell m-app">
       <div className="desktop-only">
-        <TopNav />
+        <TopNav authenticated={authenticated} />
       </div>
       <div className="mobile-only">
-        <PublicMobileHeader />
+        <PublicMobileHeader authenticated={authenticated} />
       </div>
       <div className="rm-route-stage">
         <RouteOutlet />

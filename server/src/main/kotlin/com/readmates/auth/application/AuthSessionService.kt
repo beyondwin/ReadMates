@@ -87,6 +87,17 @@ class AuthSessionService(
     fun clearedSessionCookie(): String =
         cookieBuilder("", Duration.ZERO).build().toString()
 
+    override fun clearedServletSessionCookie(): String =
+        ResponseCookie
+            .from(SERVLET_SESSION_COOKIE_NAME, "")
+            .httpOnly(true)
+            .secure(secureCookie)
+            .sameSite("Lax")
+            .path("/")
+            .maxAge(Duration.ZERO)
+            .build()
+            .toString()
+
     fun hashToken(rawToken: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(rawToken.toByteArray(Charsets.UTF_8))
         return HexFormat.of().formatHex(digest)
@@ -109,6 +120,7 @@ class AuthSessionService(
 
     companion object {
         const val COOKIE_NAME = "readmates_session"
+        private const val SERVLET_SESSION_COOKIE_NAME = "JSESSIONID"
         private val SESSION_TTL: Duration = Duration.ofDays(14)
         private const val MAX_USER_AGENT_LENGTH = 500
     }

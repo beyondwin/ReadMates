@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PublicRouteLayout } from "@/src/app/layouts";
+import { AuthContext, anonymousAuth, type AuthState } from "@/src/app/auth-state";
 import { Link } from "@/src/app/router-link";
 import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public-auth-action";
 import { PublicMobileHeader } from "@/shared/ui/public-mobile-header";
@@ -43,6 +44,14 @@ function renderAt(pathname: string, element: ReactElement) {
   render(<MemoryRouter initialEntries={[pathname]}>{element}</MemoryRouter>);
 }
 
+function renderWithAuth(pathname: string, authState: AuthState, element: ReactElement) {
+  render(
+    <AuthContext.Provider value={authState}>
+      <MemoryRouter initialEntries={[pathname]}>{element}</MemoryRouter>
+    </AuthContext.Provider>,
+  );
+}
+
 describe("public navigation auth state", () => {
   it("keeps the desktop login link for guests", async () => {
     mockAuthMe(false);
@@ -61,6 +70,24 @@ describe("public navigation auth state", () => {
     const appLink = await screen.findByRole("link", { name: "멤버 화면" });
     expect(appLink).toHaveAttribute("href", "/app");
     expect(screen.queryByRole("link", { name: "로그인" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the public top navigation logged out when the app auth context is anonymous", async () => {
+    mockAuthMe(true);
+
+    renderWithAuth(
+      "/login",
+      { status: "ready", auth: anonymousAuth },
+      <Routes>
+        <Route element={<PublicRouteLayout />}>
+          <Route path="/login" element={<main>login page</main>} />
+        </Route>
+      </Routes>,
+    );
+
+    const loginLink = await screen.findByRole("link", { name: "로그인" });
+    expect(loginLink).toHaveAttribute("href", "/login");
+    expect(screen.queryByRole("link", { name: "멤버 화면" })).not.toBeInTheDocument();
   });
 
   it("keeps the mobile back link on login for guests", async () => {
