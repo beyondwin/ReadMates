@@ -79,9 +79,7 @@ test.afterEach(() => {
   resetSeededProfiles();
 });
 
-test("member edits own profile display name and sees it update in-session", async ({ page }) => {
-  const updatedDisplayName = uniqueDisplayName("Me");
-
+test("member cannot edit own profile display name from my page", async ({ page }) => {
   await loginWithGoogleFixture(page, selfEditMemberEmail);
   await page.goto("/app/me");
 
@@ -89,27 +87,8 @@ test("member edits own profile display name and sees it update in-session", asyn
   const personalSettings = page.locator("section").filter({ has: page.getByRole("heading", { name: "개인 설정" }) });
   await expect(personalSettings.getByText("멤버5", { exact: true }).first()).toBeVisible();
   await expect(personalSettings.getByText("@멤버5")).toHaveCount(0);
-
-  await personalSettings.getByRole("button", { name: "이름 변경" }).click();
-  await personalSettings.getByRole("textbox", { name: "이름" }).fill(`  ${updatedDisplayName}  `);
-
-  const profileResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "PATCH" &&
-      response.url().includes("/api/bff/api/me/profile") &&
-      response.status() === 200,
-  );
-  await personalSettings.getByRole("button", { name: "이름 저장" }).click();
-  await profileResponse;
-
-  await expect(personalSettings.getByText(updatedDisplayName, { exact: true }).first()).toBeVisible();
-  await expect(personalSettings.getByText(`@${updatedDisplayName}`)).toHaveCount(0);
-
-  const authState = await page.evaluate(async () => {
-    const response = await fetch("/api/bff/api/auth/me", { cache: "no-store" });
-    return response.json() as Promise<{ displayName: string | null }>;
-  });
-  expect(authState.displayName).toBe(updatedDisplayName);
+  await expect(personalSettings.getByRole("button", { name: "이름 변경" })).toHaveCount(0);
+  await expect(personalSettings.getByRole("textbox", { name: "이름" })).toHaveCount(0);
 });
 
 test("host edits a same-club member display name and sees the row update", async ({ page }) => {
