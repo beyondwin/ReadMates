@@ -1,5 +1,6 @@
 package com.readmates.auth.application.port.out
 
+import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
@@ -11,6 +12,7 @@ interface MemberAccountStorePort {
     fun findActiveMemberByUserId(userId: String): CurrentMember?
     fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember?
     fun findAnyUserIdByEmail(email: String): UUID?
+    fun findMembershipStatusByUserId(userId: UUID): MembershipStatus?
     fun connectGoogleSubject(userId: UUID, googleSubjectId: String, profileImageUrl: String?): Boolean
 
     fun createGoogleUser(

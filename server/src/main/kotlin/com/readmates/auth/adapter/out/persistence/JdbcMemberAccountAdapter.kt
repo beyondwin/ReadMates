@@ -112,6 +112,21 @@ class JdbcMemberAccountAdapter(
         ).firstOrNull()
     }
 
+    override fun findMembershipStatusByUserId(userId: UUID): MembershipStatus? {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
+        return jdbcTemplate.query(
+            """
+            select memberships.status
+            from memberships
+            where memberships.user_id = ?
+            order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
+            limit 1
+            """.trimIndent(),
+            { resultSet, _ -> MembershipStatus.valueOf(resultSet.getString("status")) },
+            userId.dbString(),
+        ).firstOrNull()
+    }
+
     override fun connectGoogleSubject(userId: UUID, googleSubjectId: String, profileImageUrl: String?): Boolean {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return false
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }

@@ -118,6 +118,38 @@ class GoogleOAuthLoginSessionTest(
     }
 
     @Test
+    fun `left google member redirects to membership left login error and clears auth state`() {
+        createGoogleMember(
+            googleSubjectId = "google-oauth-left-member",
+            email = "oauth.left@example.com",
+            displayName = "OAuth Left Member",
+            status = "LEFT",
+        )
+        val servletSession = securitySession()
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication = TestingAuthenticationToken(
+            googleOidcUser(
+                googleSubjectId = "google-oauth-left-member",
+                email = "oauth.left@example.com",
+                name = "OAuth Left Member",
+            ),
+            "credentials",
+        )
+        SecurityContextHolder.getContext().authentication = authentication
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/login?error=membership-left", response.redirectedUrl)
+        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
+        assertNotNull(setCookie)
+        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}=;"))
+        assertTrue(servletSession.isInvalid)
+        assertNull(SecurityContextHolder.getContext().authentication)
+    }
+
+    @Test
     fun `successful google invite login accepts invitation and issues readmates session`() {
         val token = createInvitation(
             token = "oauthInviteAcceptToken00000000000000000000000000",
@@ -261,11 +293,13 @@ class GoogleOAuthLoginSessionTest(
               where email in (
                 'oauth.session@example.com',
                 'oauth.owner@example.com',
-                'oauth.other@example.com'
+                'oauth.other@example.com',
+                'oauth.left@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
                    'google-oauth-conflict-subject',
+                   'google-oauth-left-member',
                    'google-oauth-invited',
                    'google-oauth-invite-mismatch'
                  )
@@ -280,6 +314,7 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.session@example.com',
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
+                'oauth.left@example.com',
                 'oauth.invited@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
@@ -287,6 +322,7 @@ class GoogleOAuthLoginSessionTest(
                  or users.google_subject_id in (
                    'google-oauth-session-existing',
                    'google-oauth-conflict-subject',
+                   'google-oauth-left-member',
                    'google-oauth-invited',
                    'google-oauth-invite-mismatch'
                  )
@@ -309,6 +345,7 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.session@example.com',
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
+                'oauth.left@example.com',
                 'oauth.invited@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
@@ -316,6 +353,7 @@ class GoogleOAuthLoginSessionTest(
                  or google_subject_id in (
                    'google-oauth-session-existing',
                    'google-oauth-conflict-subject',
+                   'google-oauth-left-member',
                    'google-oauth-invited',
                    'google-oauth-invite-mismatch'
                  )
@@ -326,6 +364,7 @@ class GoogleOAuthLoginSessionTest(
               'oauth.session@example.com',
               'oauth.owner@example.com',
               'oauth.other@example.com',
+              'oauth.left@example.com',
               'oauth.invited@example.com',
               'oauth.invite.owner@example.com',
               'oauth.invite.other@example.com'
@@ -333,6 +372,7 @@ class GoogleOAuthLoginSessionTest(
                or google_subject_id in (
                  'google-oauth-session-existing',
                  'google-oauth-conflict-subject',
+                 'google-oauth-left-member',
                  'google-oauth-invited',
                  'google-oauth-invite-mismatch'
                );
@@ -345,7 +385,12 @@ class GoogleOAuthLoginSessionTest(
         }
     }
 
-    private fun createGoogleMember(googleSubjectId: String, email: String, displayName: String) {
+    private fun createGoogleMember(
+        googleSubjectId: String,
+        email: String,
+        displayName: String,
+        status: String = "ACTIVE",
+    ) {
         jdbcTemplate.update(
             """
             insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
@@ -364,13 +409,14 @@ class GoogleOAuthLoginSessionTest(
               clubs.id,
               users.id,
               'MEMBER',
-              'ACTIVE',
+              ?,
               utc_timestamp(6),
               users.short_name
             from clubs
             join users on users.email = ?
             where clubs.slug = 'reading-sai'
             """.trimIndent(),
+            status,
             email,
         )
     }

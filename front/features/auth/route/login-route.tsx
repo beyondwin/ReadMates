@@ -24,6 +24,17 @@ function isDevLoginEnabled() {
   );
 }
 
+function loginErrorMessage(search: string) {
+  const error = new URLSearchParams(search).get("error");
+  if (error === "membership-left") {
+    return "이전 멤버십이 종료된 계정입니다. 다시 참여하려면 호스트의 새 초대가 필요합니다.";
+  }
+  if (error === "google") {
+    return "Google 로그인에 실패했습니다. 가입했던 Gmail 계정인지 확인한 뒤 다시 시도해 주세요.";
+  }
+  return null;
+}
+
 export function LoginRouteContent() {
   const loginAsDevAccount = useCallback(async (email: string) => {
     const response = await submitDevLogin(email);
@@ -38,6 +49,7 @@ export function LoginRouteContent() {
   return (
     <LoginCard
       devAccounts={devAccounts}
+      initialError={loginErrorMessage(globalThis.location.search)}
       showDevLogin={isDevLoginEnabled()}
       onDevLogin={loginAsDevAccount}
     />
