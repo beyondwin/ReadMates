@@ -61,21 +61,20 @@ class MemberProfileService(
             throw MemberProfileException(MemberProfileError.HOST_ROLE_REQUIRED)
         }
 
-        val target = memberProfileStore.findProfileMemberInClubForUpdate(host.clubId, membershipId)
-            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        if (target.status !in PROFILE_EDIT_TARGET_STATUSES) {
-            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        }
-
         val shortName = validateShortName(command.shortName)
-        updateShortName(host.clubId, target.membershipId, shortName)
-        return memberProfileStore.findHostMemberListItem(host.clubId, target.membershipId)
+        updateHostShortName(host.clubId, membershipId, shortName)
+        return memberProfileStore.findHostMemberListItem(host.clubId, membershipId)
             ?.toHostMemberListItem(host.membershipId)
             ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
     }
 
-    private fun updateShortName(clubId: UUID, membershipId: UUID, shortName: String) {
+    private fun updateHostShortName(clubId: UUID, membershipId: UUID, shortName: String) {
         if (!memberProfileStore.lockClubProfileNames(clubId)) {
+            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        }
+        val target = memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        if (target.status !in PROFILE_EDIT_TARGET_STATUSES) {
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
         if (memberProfileStore.shortNameExistsInClub(clubId, shortName, membershipId)) {
