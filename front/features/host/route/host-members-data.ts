@@ -1,6 +1,7 @@
 import {
   fetchHostMembers,
   submitHostMemberLifecycle,
+  submitHostMemberProfile,
   submitHostViewerAction,
 } from "@/features/host/api/host-api";
 import type { HostMembersActions } from "@/features/host/components/host-members";
@@ -15,5 +16,6 @@ export async function hostMembersLoader() {
 export const hostMembersActions = {
   loadMembers: fetchHostMembers,
   submitLifecycle: submitHostMemberLifecycle,
+  submitProfile: submitHostMemberProfile,
   submitViewerAction: submitHostViewerAction,
 } satisfies HostMembersActions;

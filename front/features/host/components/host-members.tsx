@@ -1,6 +1,7 @@
 import { Link } from "@/src/app/router-link";
 import {
   type CSSProperties,
+  type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -11,6 +12,8 @@ import {
 } from "react";
 import type {
   CurrentSessionPolicy,
+  HostMemberProfileErrorCode,
+  HostMemberProfileResponse,
   HostMemberListItem,
   MembershipStatus,
   MemberLifecycleRequest,
@@ -32,6 +35,7 @@ export type HostMembersActions = {
     path: HostMemberLifecyclePath,
     body?: MemberLifecycleRequest,
   ) => Promise<JsonResponse<MemberLifecycleResponse>>;
+  submitProfile: (membershipId: string, shortName: string) => Promise<JsonResponse<HostMemberProfileResponse>>;
   submitViewerAction: (membershipId: string, action: HostViewerAction) => Promise<ViewerMember>;
 };
 
@@ -47,6 +51,7 @@ type MemberRowsState = {
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
 type MemberTab = "active" | "viewer" | "suspended" | "inactive" | "invitations";
 type LifecycleDialog = null | { action: "suspend" | "deactivate"; member: HostMemberListItem };
+type ProfileDialog = null | { member: HostMemberListItem };
 type ViewerAction = HostViewerAction;
 
 const tabs: Array<{ key: MemberTab; label: string }> = [
@@ -72,6 +77,17 @@ const currentSessionLabels: Record<SessionParticipationStatus, string> = {
 };
 
 const memberActionPendingReason = "멤버 상태 업데이트를 처리하는 중입니다.";
+const hostProfileNotEditableMessage = "수정할 수 없는 멤버입니다.";
+const hostProfileUnknownErrorMessage = "표시 이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+const hostProfileFailureMessages = new Set([
+  "표시 이름을 입력해 주세요.",
+  "표시 이름은 20자 이하로 입력해 주세요.",
+  "표시 이름으로 쓸 수 없는 형식입니다.",
+  "시스템에서 쓰는 이름은 사용할 수 없습니다.",
+  "같은 클럽에서 이미 쓰고 있는 이름입니다.",
+  hostProfileNotEditableMessage,
+  hostProfileUnknownErrorMessage,
+]);
 
 const statusBadgeLabels: Record<MembershipStatus, string> = {
   INVITED: "초대됨",
@@ -235,6 +251,10 @@ function disabledViewerDeactivateReason(member: HostMemberListItem, rowPending: 
   return "이 멤버는 현재 정책상 둘러보기 해제할 수 없습니다.";
 }
 
+function disabledProfileReason(rowPending: boolean) {
+  return rowPending ? memberActionPendingReason : null;
+}
+
 function disabledRestoreReason(member: HostMemberListItem, rowPending: boolean) {
   if (rowPending) {
     return memberActionPendingReason;
@@ -265,6 +285,54 @@ function isMembershipPending(membershipId: string, pendingActions: Set<string>) 
   return false;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function hostProfileErrorCodeFromResponse(response: Response): Promise<HostMemberProfileErrorCode | null> {
+  try {
+    const body: unknown = await response.json();
+    const code = isRecord(body) ? body.code : null;
+
+    return typeof code === "string" ? (code as HostMemberProfileErrorCode) : null;
+  } catch {
+    return null;
+  }
+}
+
+function hostProfileErrorMessage(status: number, code: HostMemberProfileErrorCode | null) {
+  if (status === 403 || status === 404) {
+    return hostProfileNotEditableMessage;
+  }
+
+  switch (code) {
+    case "SHORT_NAME_REQUIRED":
+      return "표시 이름을 입력해 주세요.";
+    case "SHORT_NAME_TOO_LONG":
+      return "표시 이름은 20자 이하로 입력해 주세요.";
+    case "SHORT_NAME_INVALID":
+      return "표시 이름으로 쓸 수 없는 형식입니다.";
+    case "SHORT_NAME_RESERVED":
+      return "시스템에서 쓰는 이름은 사용할 수 없습니다.";
+    case "SHORT_NAME_DUPLICATE":
+      return "같은 클럽에서 이미 쓰고 있는 이름입니다.";
+    case "HOST_ROLE_REQUIRED":
+    case "MEMBER_NOT_FOUND":
+    case "MEMBERSHIP_NOT_ALLOWED":
+      return hostProfileNotEditableMessage;
+    default:
+      return hostProfileUnknownErrorMessage;
+  }
+}
+
+function profileFailureMessage(error: unknown) {
+  if (error instanceof Error && hostProfileFailureMessages.has(error.message)) {
+    return error.message;
+  }
+
+  return hostProfileUnknownErrorMessage;
+}
+
 export default function HostMembers({ initialMembers, actions }: HostMembersProps) {
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
     source: initialMembers,
@@ -273,6 +341,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
   const members = memberRowsState.source === initialMembers ? memberRowsState.members : initialMembers;
   const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
+  const [profileDialog, setProfileDialog] = useState<ProfileDialog>(null);
   const [dialogPolicy, setDialogPolicy] = useState<CurrentSessionPolicy>("APPLY_NOW");
   const [pendingActions, setPendingActions] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
@@ -313,6 +382,16 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
     setDialog(nextDialog);
   };
 
+  const openProfileDialog = (member: HostMemberListItem, trigger: HTMLElement) => {
+    if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
+      return;
+    }
+
+    dialogTriggerRef.current = trigger;
+    setMessage(null);
+    setProfileDialog({ member });
+  };
+
   const setActionPending = (key: string, isPending: boolean) => {
     const nextPendingActions = new Set(pendingActionsRef.current);
     if (isPending) {
@@ -327,6 +406,12 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
 
   const closeDialog = () => {
     setDialog(null);
+    dialogTriggerRef.current?.focus();
+    dialogTriggerRef.current = null;
+  };
+
+  const closeProfileDialog = () => {
+    setProfileDialog(null);
     dialogTriggerRef.current?.focus();
     dialogTriggerRef.current = null;
   };
@@ -409,6 +494,33 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
     }
   };
 
+  const submitProfile = async (member: HostMemberListItem, shortName: string) => {
+    if (isMembershipPending(member.membershipId, pendingActionsRef.current)) {
+      return;
+    }
+
+    const key = actionKey(member, "profile");
+    setActionPending(key, true);
+    setMessage(null);
+
+    try {
+      const response = await actions.submitProfile(member.membershipId, shortName);
+      if (!response.ok) {
+        throw new Error(hostProfileErrorMessage(response.status, await hostProfileErrorCodeFromResponse(response)));
+      }
+
+      const updatedMember = (await response.json()) as HostMemberProfileResponse;
+      setMembers((current) =>
+        current.map((item) => (item.membershipId === updatedMember.membershipId ? updatedMember : item)),
+      );
+      setMessage({ kind: "status", text: "표시 이름을 저장했습니다." });
+    } catch (error) {
+      throw new Error(profileFailureMessage(error));
+    } finally {
+      setActionPending(key, false);
+    }
+  };
+
   const confirmDialog = async () => {
     if (!dialog) {
       return;
@@ -417,6 +529,22 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
     const path = dialog.action === "suspend" ? "/suspend" : "/deactivate";
     await submitLifecycle(dialog.member, path, { currentSessionPolicy: dialogPolicy });
     closeDialog();
+  };
+
+  const renderProfileAction = (member: HostMemberListItem) => {
+    const rowPending = isMembershipPending(member.membershipId, pendingActions);
+    const profileReason = disabledProfileReason(rowPending);
+
+    return (
+      <MemberActionButton
+        action="profile"
+        member={member}
+        label="표시 이름 변경"
+        disabled={rowPending}
+        reason={profileReason}
+        onClick={(event) => openProfileDialog(member, event.currentTarget)}
+      />
+    );
   };
 
   return (
@@ -497,6 +625,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
             emptyText="활성 멤버가 없습니다."
             sectionDescription="정식 멤버입니다. 이번 세션 참여 여부와 정지/탈퇴 처리를 함께 관리합니다."
             renderMeta={memberMeta}
+            renderProfileAction={renderProfileAction}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
               const suspendReason = disabledSuspendReason(member, rowPending);
@@ -533,6 +662,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
             emptyText="둘러보기 멤버가 없습니다."
             sectionDescription="Google로 들어온 둘러보기 멤버입니다. 정식 멤버로 승인하거나 둘러보기 상태를 해제합니다."
             renderMeta={requestMeta}
+            renderProfileAction={renderProfileAction}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
               const activateReason = disabledViewerActivationReason(rowPending);
@@ -569,6 +699,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
             emptyText="정지된 멤버가 없습니다."
             sectionDescription="정지된 멤버는 기록은 보존되지만 새 RSVP, 질문, 체크인, 리뷰 작성이 제한됩니다."
             renderMeta={joinedMeta}
+            renderProfileAction={renderProfileAction}
             renderActions={(member) => {
               const rowPending = isMembershipPending(member.membershipId, pendingActions);
               const restoreReason = disabledRestoreReason(member, rowPending);
@@ -605,6 +736,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
             emptyText="탈퇴 또는 비활성 멤버가 없습니다."
             sectionDescription="탈퇴/비활성 멤버의 과거 기록은 보존되고 새 참여는 열리지 않습니다."
             renderMeta={joinedMeta}
+            renderProfileAction={renderProfileAction}
             renderActions={() => <span className="badge">기록 보존</span>}
           />
         ) : null}
@@ -639,6 +771,15 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
           onPolicyChange={setDialogPolicy}
           onClose={closeDialog}
           onConfirm={() => void confirmDialog()}
+        />
+      ) : null}
+
+      {profileDialog ? (
+        <HostMemberProfileDialog
+          member={profileDialog.member}
+          submitting={pendingActions.has(actionKey(profileDialog.member, "profile"))}
+          onClose={closeProfileDialog}
+          onSubmit={(shortName) => submitProfile(profileDialog.member, shortName)}
         />
       ) : null}
     </div>
@@ -726,12 +867,14 @@ function MemberList({
   emptyText,
   sectionDescription,
   renderMeta,
+  renderProfileAction,
   renderActions,
 }: {
   members: HostMemberListItem[];
   emptyText: string;
   sectionDescription: string;
   renderMeta: (member: HostMemberListItem) => string;
+  renderProfileAction: (member: HostMemberListItem) => ReactNode;
   renderActions: (member: HostMemberListItem) => ReactNode;
 }) {
   if (members.length === 0) {
@@ -767,8 +910,12 @@ function MemberList({
               <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>
                 {renderMeta(member)}
               </p>
+              <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
+                @{member.shortName}
+              </div>
             </div>
             <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              {renderProfileAction(member)}
               {renderActions(member)}
             </div>
           </div>
@@ -808,6 +955,165 @@ function MemberCount({
       </div>
       <div className="tiny" style={{ marginTop: 4 }}>
         {helper}
+      </div>
+    </div>
+  );
+}
+
+function HostMemberProfileDialog({
+  member,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  member: HostMemberListItem;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (shortName: string) => Promise<void>;
+}) {
+  const titleId = `member-profile-title-${member.membershipId}`;
+  const inputId = `member-profile-short-name-${member.membershipId}`;
+  const errorId = `member-profile-error-${member.membershipId}`;
+  const [value, setValue] = useState(member.shortName);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const busy = saving || submitting;
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      if (!busy) {
+        event.preventDefault();
+        onClose();
+      }
+      return;
+    }
+
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const focusableElements = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ) ?? [],
+    );
+
+    if (focusableElements.length === 0) {
+      event.preventDefault();
+      dialogRef.current?.focus();
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    const activeElement = document.activeElement;
+    const focusIsInsideDialog = activeElement instanceof Node && Boolean(dialogRef.current?.contains(activeElement));
+
+    if (event.shiftKey) {
+      if (activeElement === firstElement || !focusIsInsideDialog) {
+        event.preventDefault();
+        lastElement.focus();
+      }
+      return;
+    }
+
+    if (activeElement === lastElement || !focusIsInsideDialog) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  };
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (savingRef.current || submitting) {
+      return;
+    }
+
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+
+    try {
+      await onSubmit(value.trim());
+      onClose();
+    } catch (profileError) {
+      setError(profileFailureMessage(profileError));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      role="presentation"
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(22, 24, 29, 0.46)",
+        zIndex: 70,
+        display: "grid",
+        placeItems: "center",
+        padding: "20px",
+      }}
+    >
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="surface"
+        tabIndex={-1}
+        onKeyDown={handleKeyDown}
+        style={{ width: "min(420px, 100%)", padding: "24px" }}
+      >
+        <h2 id={titleId} style={{ margin: 0 }}>
+          {member.displayName} 표시 이름 수정
+        </h2>
+        <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 18px" }}>
+          멤버 목록과 세션 기록에 표시되는 짧은 이름입니다.
+        </p>
+
+        <form onSubmit={handleSubmit} className="stack" style={{ "--stack": "16px" } as CSSProperties}>
+          <div>
+            <label htmlFor={inputId} className="label">
+              표시 이름
+            </label>
+            <input
+              ref={inputRef}
+              id={inputId}
+              className="input"
+              value={value}
+              disabled={busy}
+              aria-describedby={error ? errorId : undefined}
+              onChange={(event) => setValue(event.currentTarget.value)}
+              style={{ width: "100%", marginTop: 8 }}
+            />
+            {error ? (
+              <div id={errorId} role="alert" className="tiny" style={{ color: "var(--danger)", marginTop: 8 }}>
+                {error}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="actions" style={{ justifyContent: "flex-end" }}>
+            <button ref={cancelButtonRef} className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={onClose}>
+              취소
+            </button>
+            <button className="btn btn-primary btn-sm" type="submit" aria-label="표시 이름 저장" disabled={busy}>
+              {busy ? "저장 중" : "저장"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

@@ -170,6 +170,22 @@ export type HostMemberListItem = {
   canRemoveFromCurrentSession: boolean;
 };
 
+export type UpdateHostMemberProfileRequest = {
+  shortName: string;
+};
+
+export type HostMemberProfileErrorCode =
+  | "SHORT_NAME_REQUIRED"
+  | "SHORT_NAME_TOO_LONG"
+  | "SHORT_NAME_INVALID"
+  | "SHORT_NAME_RESERVED"
+  | "SHORT_NAME_DUPLICATE"
+  | "HOST_ROLE_REQUIRED"
+  | "MEMBER_NOT_FOUND"
+  | "MEMBERSHIP_NOT_ALLOWED";
+
+export type HostMemberProfileResponse = HostMemberListItem;
+
 export type MemberLifecycleRequest = {
   currentSessionPolicy: CurrentSessionPolicy;
 };

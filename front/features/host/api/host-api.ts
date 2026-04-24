@@ -9,6 +9,7 @@ import type {
   HostInvitationListItem,
   HostInvitationResponse,
   HostMemberListItem,
+  HostMemberProfileResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
   HostSessionDetailResponse,
@@ -16,6 +17,7 @@ import type {
   HostSessionRequest,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
+  UpdateHostMemberProfileRequest,
   ViewerMember,
 } from "./host-contracts";
 
@@ -101,6 +103,16 @@ export function submitHostViewerAction(membershipId: string, action: "activate" 
   return readmatesFetch<ViewerMember>(`/api/host/members/${encodeURIComponent(membershipId)}/${action}`, {
     method: "POST",
   });
+}
+
+export function submitHostMemberProfile(membershipId: string, shortName: string) {
+  const request: UpdateHostMemberProfileRequest = { shortName };
+
+  return readmatesFetchResponse(`/api/host/members/${encodeURIComponent(membershipId)}/profile`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  }) as Promise<Response & { json(): Promise<HostMemberProfileResponse> }>;
 }
 
 export function fetchHostInvitations() {
