@@ -197,13 +197,15 @@ function hostSessionEditorLoaderForTest() {
   } as unknown as Parameters<typeof hostSessionEditorLoader>[0]);
 }
 
+const hostLoaderCases: Array<[string, () => Promise<unknown>]> = [
+  ["dashboard", () => hostDashboardLoader()],
+  ["members", () => hostMembersLoader()],
+  ["invitations", () => hostInvitationsLoader()],
+  ["session editor", hostSessionEditorLoaderForTest],
+];
+
 describe("HostDashboard", () => {
-  it.each([
-    ["dashboard", () => hostDashboardLoader()],
-    ["members", () => hostMembersLoader()],
-    ["invitations", () => hostInvitationsLoader()],
-    ["session editor", hostSessionEditorLoaderForTest],
-  ])("redirects anonymous users before calling %s host endpoints", async (_name, runLoader) => {
+  it.each(hostLoaderCases)("redirects anonymous users before calling %s host endpoints", async (_name, runLoader) => {
     const fetchMock = vi.fn().mockResolvedValue(authResponse(anonymousAuth));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -213,12 +215,7 @@ describe("HostDashboard", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/bff/api/host/"))).toBe(false);
   });
 
-  it.each([
-    ["dashboard", () => hostDashboardLoader()],
-    ["members", () => hostMembersLoader()],
-    ["invitations", () => hostInvitationsLoader()],
-    ["session editor", hostSessionEditorLoaderForTest],
-  ])("redirects non-host users before calling %s host endpoints", async (_name, runLoader) => {
+  it.each(hostLoaderCases)("redirects non-host users before calling %s host endpoints", async (_name, runLoader) => {
     const fetchMock = vi.fn().mockResolvedValue(authResponse(memberAuth));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -226,6 +223,50 @@ describe("HostDashboard", () => {
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/bff/api/host/"))).toBe(false);
+  });
+
+  it.each([
+    ["viewer", { ...hostAuth, membershipStatus: "VIEWER", approvalState: "ACTIVE" } satisfies AuthMeResponse],
+    ["suspended", { ...hostAuth, membershipStatus: "SUSPENDED", approvalState: "ACTIVE" } satisfies AuthMeResponse],
+  ])("redirects %s hosts with active-looking approval before calling host endpoints", async (_state, auth) => {
+    for (const [, runLoader] of hostLoaderCases) {
+      const fetchMock = vi.fn(() => Promise.resolve(authResponse(auth)));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expectLoaderRedirect(runLoader, "/app");
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/bff/api/host/"))).toBe(false);
+      expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/bff/api/sessions/current")).toBe(false);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("allows active hosts to load the host dashboard endpoints", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(authResponse(hostAuth));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        return Promise.resolve(new Response(JSON.stringify(current), { status: 200 }));
+      }
+
+      if (url === "/api/bff/api/host/dashboard") {
+        return Promise.resolve(new Response(JSON.stringify(dashboard), { status: 200 }));
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({ message: "unexpected request" }), { status: 404 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(hostDashboardLoader()).resolves.toEqual({ current, data: dashboard });
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/dashboard", expect.objectContaining({ cache: "no-store" }));
   });
 
   it("shows no-session fallbacks when there is no current session and no pending work", () => {

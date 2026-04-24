@@ -1,6 +1,7 @@
 import { redirect } from "react-router-dom";
 import { readmatesFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { canUseHostApp } from "@/shared/auth/member-app-access";
 
 export async function requireHostLoaderAuth(): Promise<AuthMeResponse> {
   const auth = await readmatesFetch<AuthMeResponse>("/api/auth/me");
@@ -9,7 +10,7 @@ export async function requireHostLoaderAuth(): Promise<AuthMeResponse> {
     throw redirect("/login");
   }
 
-  if (auth.role !== "HOST" || auth.approvalState !== "ACTIVE") {
+  if (!canUseHostApp(auth)) {
     throw redirect("/app");
   }
 
