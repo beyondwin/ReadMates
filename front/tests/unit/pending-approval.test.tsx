@@ -38,7 +38,7 @@ describe("PendingApprovalPage", () => {
 
     expect(screen.getByText("둘러보기 멤버")).toBeInTheDocument();
     expect(screen.getByText("승인 대기")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "읽을 수 있는 공간은 열렸고, 참여는 승인 뒤 열립니다." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "기록은 읽을 수 있고, 참여 기능은 승인 뒤 열립니다." })).toBeInTheDocument();
     expect(screen.getByText("viewer@example.com")).toBeInTheDocument();
     expect(screen.getAllByText("VIEWER")).toHaveLength(2);
     expect(screen.getByText("초대 링크를 받았다면 해당 링크에서 같은 Google 계정으로 수락해 주세요.")).toBeInTheDocument();

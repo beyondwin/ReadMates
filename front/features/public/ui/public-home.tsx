@@ -48,7 +48,7 @@ function EmptySecondaryPublicRecords() {
     <div className="rm-empty-state public-empty-record">
       <div className="eyebrow">공개 기록</div>
       <h2 className="h3 editorial" style={{ margin: "10px 0 0" }}>
-        대표 기록 외 추가 공개 기록은 아직 없습니다
+        아직 더 공개된 기록은 없습니다
       </h2>
       <p className="body" style={{ margin: "12px 0 0" }}>
         다음 공개 기록이 발행되면 최근 대표 기록 아래의 노트와 색인에도 이어서 표시됩니다.

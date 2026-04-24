@@ -280,7 +280,7 @@ function MobileViewerMemberNotice() {
       <div className="m-card-quiet" role="note">
         <div className="eyebrow">둘러보기 멤버</div>
         <p className="small" style={{ margin: "6px 0 0" }}>
-          세션 기록은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 저장은 정식 멤버에게 열립니다.
+          세션 기록은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다.
         </p>
       </div>
     </section>
@@ -304,10 +304,10 @@ function MobileViewerPrepSegment({
         <div className="m-card">
           <div className="eyebrow">읽기 전용 세션 상세</div>
           <div className="h4 editorial" style={{ marginTop: 6 }}>
-            기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다
+            기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다
           </div>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-            둘러보기 멤버는 쓰기 기능 없이 기존 기록과 공동 보드를 확인합니다.
+            둘러보기 멤버는 기존 기록과 공동 보드를 읽기 전용으로 확인합니다.
           </p>
           <div className="rm-current-session-mobile__meta-grid" style={{ marginTop: 14 }}>
             <MobileReadOnlyStat label="RSVP" value={rsvpLabel(rsvp)} />
@@ -571,7 +571,7 @@ function MobilePrepMeta({
           <div className="m-row" style={{ gap: 8 }}>
             <Icon name="mic" size={14} style={{ color: "var(--text-3)" }} />
             <span className="tiny" style={{ color: "var(--text-3)" }}>
-              원치 않으시면 모임 중 언제든 말씀해 주세요.
+              녹음을 원하지 않으면 모임 중 언제든 알려 주세요.
             </span>
           </div>
         </div>
@@ -730,7 +730,7 @@ function MobileRecordsSegment({
             value={longReview}
             disabled={!canWrite}
             onChange={(event) => onLongReviewChange(event.target.value)}
-            placeholder="완독 후든, 모임 이후든, 시간이 흐른 뒤에라도 이 책에 대해 남기고 싶은 문장을 천천히 적어 주세요."
+            placeholder="완독 후, 모임 이후, 시간이 지난 뒤에 떠오른 문장을 적어 주세요."
           />
           <div className="rm-current-session-mobile__save-row" style={{ justifyContent: "flex-end" }}>
             <div className="m-row" style={{ gap: 10, justifyContent: "flex-end" }}>
@@ -800,7 +800,7 @@ function MobileViewerRecordsSegment({ longReview, oneLineReview }: { longReview:
         <div className="m-card-quiet rm-locked-state" role="note">
           <div className="eyebrow">피드백 문서 접근</div>
           <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-            피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 업로드 여부와 접근 제한만 확인할 수 있어요.
+            피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
           </p>
         </div>
       </section>

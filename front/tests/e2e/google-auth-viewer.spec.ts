@@ -117,7 +117,7 @@ test("uninvited google login becomes read-only viewer who can browse sessions", 
   await expect(page.getByText("No.06").first()).toBeVisible();
 
   await page.goto("/app/session/current");
-  await expect(page.getByText("정식 멤버가 되면 RSVP와 질문 작성이 열립니다.").first()).toBeVisible();
+  await expect(page.getByText("정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "참석" })).toHaveCount(0);
 
   const hostDashboardStatus = await page.evaluate(async () => {

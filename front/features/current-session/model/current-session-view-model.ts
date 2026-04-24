@@ -1,6 +1,6 @@
-export const SUSPENDED_MEMBER_NOTICE = "멤버십이 일시 정지되어 새 활동을 저장할 수 없습니다.";
-export const VIEWER_MEMBER_NOTICE = "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성이 열립니다.";
-export const VIEWER_MEMBER_SHORT_NOTICE = "정식 멤버가 되면 참여와 작성이 열립니다.";
+export const SUSPENDED_MEMBER_NOTICE = "멤버십이 일시 정지되어 새 기록을 남길 수 없습니다.";
+export const VIEWER_MEMBER_NOTICE = "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.";
+export const VIEWER_MEMBER_SHORT_NOTICE = "정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.";
 
 export type CurrentSessionAccessAuth = {
   membershipStatus: string | null;

@@ -577,7 +577,7 @@ function ViewerMemberNotice({ message }: { message: string }) {
         {message}
       </p>
       <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
-        정식 멤버가 되면 RSVP와 질문 작성이 열립니다.
+        정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.
       </p>
     </div>
   );
@@ -619,10 +619,10 @@ function ViewerSessionReadOnly({
       <section className="surface" aria-labelledby="viewer-session-detail-heading" style={{ padding: "28px" }}>
         <div className="eyebrow">읽기 전용 세션 상세</div>
         <h2 id="viewer-session-detail-heading" className="h4 editorial" style={{ margin: "6px 0 0" }}>
-          기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다
+          기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평 저장을 할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.
+          둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평을 저장할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.
         </p>
         <div className="grid-2" style={{ marginTop: "18px" }}>
           <ReadOnlyMetric label="RSVP" value={rsvpLabel(rsvp)} />
@@ -689,7 +689,7 @@ function ViewerSessionReadOnly({
       <section className="surface-quiet rm-locked-state" role="note" style={{ padding: "22px" }}>
         <div className="eyebrow">피드백 문서 접근</div>
         <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-          피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 업로드 여부와 접근 제한만 확인할 수 있어요.
+          피드백 문서는 참석한 정식 멤버에게 열립니다. 둘러보기 상태에서는 문서 등록 여부와 접근 제한만 확인할 수 있어요.
         </p>
       </section>
     </div>

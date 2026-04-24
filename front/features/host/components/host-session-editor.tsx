@@ -196,8 +196,8 @@ export default function HostSessionEditor({
   const primarySaveLabel = isNewSession ? "새 세션 만들기" : "변경 사항 저장";
   const saveButtonLabel = saveState === "saving" ? "변경사항을 저장하는 중" : primarySaveLabel;
   const saveGuidance = isNewSession
-    ? "세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다."
-    : "세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.";
+    ? "세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 공개 설정과 피드백 문서는 각 섹션에서 따로 저장합니다."
+    : "세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 공개 설정과 피드백 문서는 각 섹션에서 따로 저장합니다.";
   const showReturnLink =
     returnTarget.href !== hostDashboardReturnTarget.href || returnTarget.label !== hostDashboardReturnTarget.label;
   const feedbackPreviewState = session
@@ -602,7 +602,7 @@ export default function HostSessionEditor({
               style={{ "--stack": "28px" } as CSSProperties}
             >
               <Panel
-                eyebrow="책 · 세션 identity"
+                eyebrow="책 · 세션 정보"
                 title="책과 세션 이름"
                 mobileSection="basic"
                 panelId="host-editor-panel-basic-info"
@@ -770,7 +770,7 @@ export default function HostSessionEditor({
               </Panel>
 
               <Panel
-                eyebrow="공개 · 발행 controls"
+                eyebrow="공개 · 발행 설정"
                 title="공개 기록 발행"
                 tone="warn"
                 mobileSection="publish"
@@ -886,8 +886,8 @@ export default function HostSessionEditor({
               </Panel>
 
               <Panel
-                eyebrow="참석 roster"
-                title="출석 확정 roster"
+                eyebrow="참석 명단"
+                title="출석 확정 명단"
                 mobileSection="attendance"
                 panelId="host-editor-panel-attendance"
                 activeMobileSection={activeMobileSection}
@@ -1077,7 +1077,7 @@ function DocumentStatePanel({
       className: feedbackDocumentUploaded ? "badge badge-ok badge-dot" : "badge",
     },
     {
-      label: "참석 roster",
+      label: "참석 명단",
       value: session ? `${session.attendees.length}명` : "세션 저장 후",
       className: session?.attendees.length ? "badge badge-ok badge-dot" : "badge",
     },

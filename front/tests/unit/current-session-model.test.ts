@@ -129,16 +129,16 @@ describe("current session view model", () => {
 
   it("selects viewer and suspended notices without changing existing Korean copy", () => {
     expect(getBlockedWriteValidationMessage({ isViewer: true })).toBe(
-      "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성이 열립니다.",
+      "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.",
     );
     expect(getBlockedWriteValidationMessage({ isViewer: false })).toBe("");
     expect(getCurrentSessionMemberNotice({ isViewer: false, isSuspended: true })).toEqual({
       kind: "suspended",
-      message: "멤버십이 일시 정지되어 새 활동을 저장할 수 없습니다.",
+      message: "멤버십이 일시 정지되어 새 기록을 남길 수 없습니다.",
     });
     expect(getCurrentSessionMemberNotice({ isViewer: true, isSuspended: false })).toEqual({
       kind: "viewer",
-      message: "정식 멤버가 되면 참여와 작성이 열립니다.",
+      message: "정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.",
     });
     expect(getCurrentSessionMemberNotice({ isViewer: false, isSuspended: false })).toBeNull();
   });

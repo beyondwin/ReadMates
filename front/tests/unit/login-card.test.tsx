@@ -13,7 +13,7 @@ describe("LoginRoute", () => {
 
     expect(screen.getByText("Private reading room")).toBeVisible();
     expect(screen.getByRole("heading", { name: "읽는사이 멤버 입장" })).toBeVisible();
-    expect(screen.getByText(/초대받은 사람과 기존 멤버가 같은 Google 계정으로 들어오는 조용한 클럽 공간입니다/)).toBeVisible();
+    expect(screen.getByText(/초대받은 멤버와 기존 멤버가 같은 Google 계정으로 입장하는 조용한 클럽 공간입니다/)).toBeVisible();
     expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",

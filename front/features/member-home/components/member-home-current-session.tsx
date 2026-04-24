@@ -246,7 +246,7 @@ export function MobileCurrentSessionCard({
           <div className="m-card-quiet" role="note" style={{ marginTop: 12 }}>
             <div className="eyebrow">둘러보기 멤버</div>
             <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-              정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성이 열립니다.
+              정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.
             </p>
           </div>
         ) : null}
@@ -312,7 +312,7 @@ export function MobileTodayActions({
         </div>
         <div className="m-card-quiet" role="note" style={{ marginBottom: 10 }}>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            세션 기록은 볼 수 있어요. 정식 멤버가 되면 참여와 작성이 열립니다.
+            세션 기록은 읽을 수 있어요. 정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.
           </p>
         </div>
         <div className="m-action-grid">
