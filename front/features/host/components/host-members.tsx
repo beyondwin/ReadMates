@@ -18,7 +18,6 @@ import type {
   MembershipStatus,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
-  SessionParticipationStatus,
   ViewerMember,
 } from "@/features/host/api/host-contracts";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
@@ -71,11 +70,6 @@ const statusLabels: Record<MembershipStatus, string> = {
   INACTIVE: "비활성",
 };
 
-const currentSessionLabels: Record<SessionParticipationStatus, string> = {
-  ACTIVE: "이번 세션 참여 중",
-  REMOVED: "이번 세션 제외됨",
-};
-
 const memberActionPendingReason = "멤버 상태 업데이트를 처리하는 중입니다.";
 const hostProfileNotEditableMessage = "수정할 수 없는 멤버입니다.";
 const hostProfileUnknownErrorMessage = "이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
@@ -99,10 +93,7 @@ const statusBadgeLabels: Record<MembershipStatus, string> = {
 };
 
 function memberMeta(member: HostMemberListItem) {
-  const sessionLabel = member.currentSessionParticipationStatus
-    ? currentSessionLabels[member.currentSessionParticipationStatus]
-    : "이번 세션 없음";
-  return `${member.email} · ${statusLabels[member.status]} · ${sessionLabel}`;
+  return `${member.email} · ${statusLabels[member.status]}`;
 }
 
 function requestMeta(member: HostMemberListItem) {
@@ -112,6 +103,11 @@ function requestMeta(member: HostMemberListItem) {
 function joinedMeta(member: HostMemberListItem) {
   const joined = member.joinedAt ? `참여 ${formatDateOnlyLabel(member.joinedAt)}` : `요청 ${formatDateOnlyLabel(member.createdAt)}`;
   return `${member.email} · ${statusLabels[member.status]} · ${joined}`;
+}
+
+function inactiveMeta(member: HostMemberListItem) {
+  const joined = member.joinedAt ? `참여 ${formatDateOnlyLabel(member.joinedAt)}` : `요청 ${formatDateOnlyLabel(member.createdAt)}`;
+  return `${member.email} · ${joined}`;
 }
 
 function statusBadgeClass(status: MembershipStatus) {
@@ -179,9 +175,7 @@ function handleMemberTabKeyDown(
 
 function disabledCurrentSessionReason(member: HostMemberListItem, isParticipating: boolean) {
   if (isParticipating) {
-    return member.role === "HOST"
-      ? "호스트는 현재 세션에서 제외할 수 없습니다."
-      : "이 멤버는 현재 정책상 이번 세션에서 제외할 수 없습니다.";
+    return member.role === "HOST" ? null : "이 멤버는 현재 정책상 이번 세션에서 제외할 수 없습니다.";
   }
 
   if (member.status !== "ACTIVE") {
@@ -201,7 +195,7 @@ function disabledSuspendReason(member: HostMemberListItem, rowPending: boolean) 
   }
 
   if (member.role === "HOST") {
-    return "호스트는 정지할 수 없습니다.";
+    return null;
   }
 
   if (member.status !== "ACTIVE") {
@@ -221,7 +215,7 @@ function disabledDeactivateReason(member: HostMemberListItem, rowPending: boolea
   }
 
   if (member.role === "HOST") {
-    return "호스트는 탈퇴 처리할 수 없습니다.";
+    return null;
   }
 
   if (member.status === "LEFT" || member.status === "INACTIVE") {
@@ -735,7 +729,7 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
             members={inactiveMembers}
             emptyText="탈퇴 또는 비활성 멤버가 없습니다."
             sectionDescription="탈퇴/비활성 멤버의 과거 기록은 보존되고 새 참여는 열리지 않습니다."
-            renderMeta={joinedMeta}
+            renderMeta={inactiveMeta}
             renderProfileAction={renderProfileAction}
             renderActions={() => <span className="badge">기록 보존</span>}
           />
@@ -837,7 +831,7 @@ function CurrentSessionAction({
   const isParticipating = member.currentSessionParticipationStatus === "ACTIVE";
   const path: HostMemberLifecyclePath = isParticipating ? "/current-session/remove" : "/current-session/add";
   const enabled = isParticipating ? member.canRemoveFromCurrentSession : member.canAddToCurrentSession;
-  const label = isParticipating ? "이번 세션 제외" : "이번 세션 추가";
+  const label = isParticipating ? "세션 제외" : "이번 세션 추가";
   const rowPending = isMembershipPending(member.membershipId, pendingActions);
   const reasonId = `current-session-action-reason-${member.membershipId}`;
   const reason = rowPending ? memberActionPendingReason : !enabled ? disabledCurrentSessionReason(member, isParticipating) : null;
@@ -1071,13 +1065,13 @@ function HostMemberProfileDialog({
         className="surface"
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        style={{ width: "min(420px, 100%)", padding: "24px" }}
+        style={{ width: "min(420px, calc(100vw - 40px))", padding: "24px" }}
       >
         <h2 id={titleId} style={{ margin: 0 }}>
           {member.displayName} 이름 수정
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 18px" }}>
-          앱에서 멤버를 부르는 이름입니다.
+          멤버 홈과 모임 기록에 표시되는 이름입니다.
         </p>
 
         <form onSubmit={handleSubmit} className="stack" style={{ "--stack": "16px" } as CSSProperties}>
@@ -1102,7 +1096,7 @@ function HostMemberProfileDialog({
             ) : null}
           </div>
 
-          <div className="actions" style={{ justifyContent: "flex-end" }}>
+          <div className="actions" style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
             <button ref={cancelButtonRef} className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={onClose}>
               취소
             </button>
