@@ -46,7 +46,7 @@ describe("SessionIdentity", () => {
     expect(screen.getByText("문서 있음")).toBeVisible();
   });
 
-  it("labels a draft new session", () => {
+  it("labels a draft new session as upcoming", () => {
     render(
       <SessionIdentity
         sessionNumber={8}
@@ -57,9 +57,9 @@ describe("SessionIdentity", () => {
       />,
     );
 
-    expect(screen.getByLabelText("No.08 · 새 세션 초안 · 비공개")).toBeVisible();
+    expect(screen.getByLabelText("No.08 · 예정 세션 · 예정")).toBeVisible();
     expect(screen.getByText("No.08")).toBeVisible();
-    expect(screen.getByText("새 세션 초안")).toBeVisible();
-    expect(screen.getByText("비공개")).toBeVisible();
+    expect(screen.getByText("예정 세션")).toBeVisible();
+    expect(screen.getByText("예정")).toBeVisible();
   });
 });

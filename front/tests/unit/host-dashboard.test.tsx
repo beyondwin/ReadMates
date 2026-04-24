@@ -8,7 +8,11 @@ import {
   hostMembersLoader,
   hostSessionEditorLoader,
 } from "@/features/host";
-import type { CurrentSessionResponse, HostDashboardResponse } from "@/features/host/api/host-contracts";
+import type {
+  CurrentSessionResponse,
+  HostDashboardResponse,
+  HostSessionListItem,
+} from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 afterEach(() => {
@@ -138,6 +142,72 @@ const current: CurrentSessionResponse = {
   },
 };
 
+const noCurrent: CurrentSessionResponse = {
+  currentSession: null,
+};
+
+const hostSessions = [
+  {
+    sessionId: "session-7",
+    sessionNumber: 7,
+    title: "7회차 · 테스트 책",
+    bookTitle: "테스트 책",
+    bookAuthor: "테스트 저자",
+    bookImageUrl: null,
+    date: "2026-05-20",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "온라인",
+    state: "OPEN",
+    visibility: "MEMBER",
+  },
+  {
+    sessionId: "session-8",
+    sessionNumber: 8,
+    title: "8회차 · 다음 책",
+    bookTitle: "다음 책",
+    bookAuthor: "다음 저자",
+    bookImageUrl: null,
+    date: "2026-06-17",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "강남",
+    state: "DRAFT",
+    visibility: "HOST_ONLY",
+  },
+] satisfies HostSessionListItem[];
+
+const twoDraftHostSessions = [
+  {
+    sessionId: "session-8",
+    sessionNumber: 8,
+    title: "8회차 · 다음 책",
+    bookTitle: "다음 책",
+    bookAuthor: "다음 저자",
+    bookImageUrl: null,
+    date: "2026-06-17",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "강남",
+    state: "DRAFT",
+    visibility: "HOST_ONLY",
+  },
+  {
+    sessionId: "session-9",
+    sessionNumber: 9,
+    title: "9회차 · 그 다음 책",
+    bookTitle: "그 다음 책",
+    bookAuthor: "다음 다음 저자",
+    bookImageUrl: null,
+    date: "2026-07-15",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "온라인",
+    state: "DRAFT",
+    visibility: "MEMBER",
+  },
+] satisfies HostSessionListItem[];
+
 const noopHostDashboardActions = {
   updateCurrentSessionParticipation: vi.fn(async () => undefined),
   updateSessionVisibility: vi.fn(async () => undefined),
@@ -148,9 +218,13 @@ type HostDashboardProps = Parameters<typeof HostDashboard>[0];
 
 function HostDashboardForTest({
   actions,
+  hostSessions: testHostSessions = [],
   ...props
-}: Omit<HostDashboardProps, "actions"> & { actions?: HostDashboardActions }) {
-  return <HostDashboard {...props} actions={actions ?? noopHostDashboardActions} />;
+}: Omit<HostDashboardProps, "actions" | "hostSessions"> & {
+  actions?: HostDashboardActions;
+  hostSessions?: HostSessionListItem[];
+}) {
+  return <HostDashboard {...props} hostSessions={testHostSessions} actions={actions ?? noopHostDashboardActions} />;
 }
 
 function getDesktopView(container: HTMLElement) {
@@ -186,6 +260,17 @@ function jsonResponse(body: unknown) {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function deferredAction() {
+  let resolve!: () => void;
+  let reject!: (error?: unknown) => void;
+  const promise = new Promise<void>((resolver, rejecter) => {
+    resolve = resolver;
+    reject = rejecter;
+  });
+
+  return { promise, resolve, reject };
 }
 
 async function expectLoaderRedirect(runLoader: () => Promise<unknown>, location: string) {
@@ -300,6 +385,221 @@ describe("HostDashboard", () => {
 
     expect(data.hostSessions).toEqual([]);
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({}));
+  });
+
+  it("renders upcoming session management on desktop and mobile", () => {
+    const { container } = render(
+      <HostDashboardForTest auth={hostAuth} current={noCurrent} data={dashboard} hostSessions={hostSessions} />,
+    );
+
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+
+    expect(desktop.getAllByText("예정 세션").length).toBeGreaterThan(0);
+    expect(desktop.getByText("다음 책")).toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: /멤버 공개/ })).toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
+    expect(mobile.getAllByText("예정 세션").length).toBeGreaterThan(0);
+    expect(mobile.getByText("다음 책")).toBeInTheDocument();
+  });
+
+  it("calls visibility and open actions from upcoming session rows", async () => {
+    const user = userEvent.setup();
+    const actions = {
+      ...noopHostDashboardActions,
+      updateSessionVisibility: vi.fn(async () => undefined),
+      openSession: vi.fn(async () => undefined),
+    } satisfies HostDashboardActions;
+
+    render(
+      <HostDashboardForTest auth={hostAuth} current={noCurrent} data={dashboard} hostSessions={hostSessions} actions={actions} />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
+    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", "MEMBER");
+
+    await user.click(screen.getAllByRole("button", { name: /현재로 시작/ })[0]);
+    expect(actions.openSession).toHaveBeenCalledWith("session-8");
+  });
+
+  it("disables upcoming visibility action while pending and flips local state on success", async () => {
+    const user = userEvent.setup();
+    const visibilityUpdate = deferredAction();
+    const actions = {
+      ...noopHostDashboardActions,
+      updateSessionVisibility: vi.fn(() => visibilityUpdate.promise),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest auth={hostAuth} current={current} data={dashboard} hostSessions={hostSessions} actions={actions} />,
+    );
+    const desktop = getDesktopView(container);
+
+    await user.click(desktop.getByRole("button", { name: /멤버 공개/ }));
+
+    expect(desktop.getByRole("button", { name: /처리 중/ })).toBeDisabled();
+    expect(actions.updateSessionVisibility).toHaveBeenCalledWith("session-8", "MEMBER");
+
+    visibilityUpdate.resolve();
+
+    await waitFor(() => expect(desktop.getByRole("button", { name: /비공개/ })).toBeInTheDocument());
+    expect(desktop.queryByRole("button", { name: /처리 중/ })).not.toBeInTheDocument();
+  });
+
+  it("disables all upcoming controls while an upcoming action is pending", async () => {
+    const user = userEvent.setup();
+    const visibilityUpdate = deferredAction();
+    const actions = {
+      ...noopHostDashboardActions,
+      updateSessionVisibility: vi.fn(() => visibilityUpdate.promise),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest
+        auth={hostAuth}
+        current={noCurrent}
+        data={dashboard}
+        hostSessions={twoDraftHostSessions}
+        actions={actions}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+
+    await user.click(desktop.getByRole("button", { name: /멤버 공개/ }));
+
+    const desktopRemaining = desktop.getByText("그 다음 책").closest(".row-between");
+    const mobileRemaining = mobile.getByText("그 다음 책").closest(".m-card-quiet");
+    expect(desktopRemaining).not.toBeNull();
+    expect(mobileRemaining).not.toBeNull();
+    expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /비공개/ })).toBeDisabled();
+    expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /현재로 시작/ })).toBeDisabled();
+    expect(within(mobileRemaining as HTMLElement).getByRole("button", { name: /비공개/ })).toBeDisabled();
+    expect(within(mobileRemaining as HTMLElement).getByRole("button", { name: /현재로 시작/ })).toBeDisabled();
+
+    visibilityUpdate.resolve();
+
+    await waitFor(() =>
+      expect(within(desktopRemaining as HTMLElement).getByRole("button", { name: /비공개/ })).toBeEnabled(),
+    );
+  });
+
+  it("disables upcoming open action while pending and removes the draft on success", async () => {
+    const user = userEvent.setup();
+    const openSession = deferredAction();
+    const actions = {
+      ...noopHostDashboardActions,
+      openSession: vi.fn(() => openSession.promise),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest auth={hostAuth} current={noCurrent} data={dashboard} hostSessions={hostSessions} actions={actions} />,
+    );
+    const desktop = getDesktopView(container);
+
+    await user.click(desktop.getByRole("button", { name: /현재로 시작/ }));
+
+    expect(desktop.getByRole("button", { name: /처리 중/ })).toBeDisabled();
+    expect(actions.openSession).toHaveBeenCalledWith("session-8");
+    expect(screen.getAllByText("다음 책")).toHaveLength(2);
+
+    openSession.resolve();
+
+    await waitFor(() => expect(screen.queryByText("다음 책")).not.toBeInTheDocument());
+    expect(screen.getAllByText("아직 등록된 예정 세션이 없습니다.")).toHaveLength(2);
+  });
+
+  it("disables remaining upcoming open actions after a draft opens successfully", async () => {
+    const user = userEvent.setup();
+    const openSession = deferredAction();
+    const actions = {
+      ...noopHostDashboardActions,
+      openSession: vi.fn(() => openSession.promise),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest
+        auth={hostAuth}
+        current={noCurrent}
+        data={emptyDashboard}
+        hostSessions={twoDraftHostSessions}
+        actions={actions}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+
+    await user.click(desktop.getAllByRole("button", { name: /현재로 시작/ })[0]);
+
+    expect(actions.openSession).toHaveBeenCalledWith("session-8");
+
+    openSession.resolve();
+
+    await waitFor(() => expect(desktop.queryByText("다음 책")).not.toBeInTheDocument());
+    expect(desktop.getByText("그 다음 책")).toBeInTheDocument();
+    expect(desktop.queryByRole("button", { name: /현재로 시작/ })).not.toBeInTheDocument();
+    expect(desktop.getByRole("button", { name: /현재 세션 있음/ })).toBeDisabled();
+    expect(mobile.getByRole("button", { name: /현재 세션 있음/ })).toBeDisabled();
+    expect(mobile.getAllByText("완료").length).toBeGreaterThanOrEqual(4);
+    expect(screen.getAllByText("현재 세션 시작됨")).toHaveLength(2);
+
+    await user.click(desktop.getByRole("button", { name: /현재 세션 있음/ }));
+
+    expect(actions.openSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables upcoming open action while a current session exists", async () => {
+    const user = userEvent.setup();
+    const actions = {
+      ...noopHostDashboardActions,
+      openSession: vi.fn(async () => undefined),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest auth={hostAuth} current={current} data={dashboard} hostSessions={hostSessions} actions={actions} />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+    const desktopStart = desktop.getByRole("button", { name: /현재 세션 있음/ });
+    const mobileStart = mobile.getByRole("button", { name: /현재 세션 있음/ });
+
+    expect(desktopStart).toBeDisabled();
+    expect(desktopStart).toHaveAttribute("title", "현재 세션이 있습니다.");
+    expect(mobileStart).toBeDisabled();
+    expect(mobileStart).toHaveAttribute("title", "현재 세션이 있습니다.");
+
+    await user.click(desktopStart);
+
+    expect(actions.openSession).not.toHaveBeenCalled();
+  });
+
+  it("shows a compact error when an upcoming action fails", async () => {
+    const user = userEvent.setup();
+    const actions = {
+      ...noopHostDashboardActions,
+      updateSessionVisibility: vi.fn(async () => {
+        throw new Error("visibility failed");
+      }),
+    } satisfies HostDashboardActions;
+
+    render(<HostDashboardForTest auth={hostAuth} current={current} data={dashboard} hostSessions={hostSessions} actions={actions} />);
+
+    await user.click(screen.getAllByRole("button", { name: /멤버 공개/ })[0]);
+
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.map((alert) => alert.textContent)).toEqual(["저장하지 못했습니다", "저장하지 못했습니다"]);
+    expect(screen.getAllByRole("button", { name: /멤버 공개/ })[0]).toBeEnabled();
+  });
+
+  it("keeps mobile upcoming cards operational with visibility, open, and edit controls", () => {
+    const { container } = render(
+      <HostDashboardForTest auth={hostAuth} current={noCurrent} data={dashboard} hostSessions={hostSessions} />,
+    );
+    const mobile = getMobileView(container);
+    const nextBookCard = mobile.getByText("다음 책").closest(".m-card-quiet");
+
+    expect(nextBookCard).not.toBeNull();
+    expect(within(nextBookCard as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toBeInTheDocument();
+    expect(within(nextBookCard as HTMLElement).getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
+    expect(within(nextBookCard as HTMLElement).getByRole("link", { name: "편집 · 다음 책" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/session-8/edit",
+    );
   });
 
   it("shows no-session fallbacks when there is no current session and no pending work", () => {

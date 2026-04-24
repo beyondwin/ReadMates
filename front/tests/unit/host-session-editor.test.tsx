@@ -404,8 +404,11 @@ describe("HostSessionEditor", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("피드백 문서 업로드에 실패했습니다"));
   });
 
-  it("posts a new session through the BFF and redirects to current session", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+  it("posts a new session through the BFF and redirects to the created session editor", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ sessionId: "created-session-8" }),
+    });
     const location = { href: "" };
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", location);
@@ -442,11 +445,14 @@ describe("HostSessionEditor", () => {
         }),
       })),
     );
-    expect(location.href).toBe("/app/session/current");
+    expect(location.href).toBe("/app/host/sessions/created-session-8/edit");
   });
 
   it("posts custom book and meeting fields from the new-session editor", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ sessionId: "created-session-8" }),
+    });
     const location = { href: "" };
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", location);
@@ -488,7 +494,7 @@ describe("HostSessionEditor", () => {
         }),
       })),
     );
-    expect(location.href).toBe("/app/session/current");
+    expect(location.href).toBe("/app/host/sessions/created-session-8/edit");
   });
 
   it("patches the existing session with the persisted non-default start time when editing", async () => {
