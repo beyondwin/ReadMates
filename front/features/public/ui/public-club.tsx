@@ -45,44 +45,7 @@ function PublicRecordLink({ session }: { session: PublicSessionListItemView }) {
   );
 }
 
-function LatestRecordPanel({ session }: { session: PublicSessionListItemView | null }) {
-  if (!session) {
-    return (
-      <div className="rm-empty-state public-empty-record">
-        <div className="eyebrow">공개 기록</div>
-        <div className="h3 editorial" style={{ marginTop: 10 }}>
-          아직 발행된 공개 기록이 없습니다
-        </div>
-        <p className="body" style={{ margin: "12px 0 0" }}>
-          공개 가능한 모임 기록이 정리되면 이곳에서 먼저 확인할 수 있습니다.
-        </p>
-      </div>
-    );
-  }
-
-  const display = sessionDisplay(session);
-
-  return (
-    <Link to={sessionHref(session)} className="rm-document-panel public-club-latest">
-      <BookCover title={display.title} author={display.author} imageUrl={session.bookImageUrl} width={88} />
-      <div>
-        <div className="eyebrow">최근 공개 기록 · No.{session.sessionNumber}</div>
-        <div className="h3 editorial" style={{ marginTop: 8 }}>
-          {display.title}
-        </div>
-        <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
-          {display.author} · {display.date}
-        </p>
-        <p className="body" style={{ margin: "14px 0 0", color: "var(--text-2)" }}>
-          {display.summary}
-        </p>
-      </div>
-    </Link>
-  );
-}
-
 export default function PublicClub({ data }: PublicClubProps) {
-  const latestSession = data.recentSessions[0] ?? null;
   const publicRecordPreviewSessions = data.recentSessions.slice(0, 3);
   const { clubName, tagline, about, stats } = getPublicClubDisplay(data);
   const memberCount = stats.members;
@@ -177,19 +140,19 @@ export default function PublicClub({ data }: PublicClubProps) {
         </div>
       </section>
 
-      <section className="public-section">
-        <div className="container public-grid-2">
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 8 }}>
-              멤버십
+      <section className="public-section public-section--subtle">
+        <div className="container container-sm">
+          <div className="rm-document-panel public-membership-panel">
+            <div className="eyebrow" style={{ marginBottom: 12 }}>
+              함께 읽기
             </div>
-            <h2 className="h2 editorial" style={{ margin: 0 }}>
-              정식 멤버만 참여할 수 있습니다
+            <h2 className="h3 editorial" style={{ margin: 0 }}>
+              기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다
             </h2>
-            <p className="body" style={{ marginTop: 14, color: "var(--text-2)" }}>
+            <p className="body" style={{ color: "var(--text-2)", marginTop: 12, maxWidth: 520 }}>
               {PUBLIC_MEMBERSHIP_NOTE}
             </p>
-            <div className="public-actions">
+            <div className="public-membership-panel__actions">
               <PublicGuestOnlyActions>
                 <Link to="/login" className="btn btn-primary">
                   로그인
@@ -197,7 +160,6 @@ export default function PublicClub({ data }: PublicClubProps) {
               </PublicGuestOnlyActions>
             </div>
           </div>
-          <LatestRecordPanel session={latestSession} />
         </div>
       </section>
 

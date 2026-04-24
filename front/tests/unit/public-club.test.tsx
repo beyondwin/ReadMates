@@ -65,10 +65,12 @@ describe("PublicClub", () => {
     expect(screen.getByText("김호스트")).toBeInTheDocument();
     expect(screen.getByLabelText("김호스트")).toBeInTheDocument();
     expect(screen.getByText("호스트 · 2025.11~")).toBeInTheDocument();
-    expect(screen.getByText("멤버십")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "정식 멤버만 참여할 수 있습니다" })).toBeInTheDocument();
+    expect(screen.getByText("함께 읽기")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
     expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/records");
+    expect(screen.queryByText("멤버십")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "정식 멤버만 참여할 수 있습니다" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByText("초대받은 독자는 호스트가 보낸 초대 링크에서 수락 절차를 시작합니다.")).not.toBeInTheDocument();
     expect(container).not.toHaveTextContent("Sessions");
@@ -149,7 +151,7 @@ describe("PublicClub", () => {
       expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     });
-    expect(screen.getByRole("link", { name: /최근 공개 기록/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /가난한 찰리의 연감/ })).toHaveAttribute(
       "href",
       "/sessions/00000000-0000-0000-0000-000000000306",
     );
