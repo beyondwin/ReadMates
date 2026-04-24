@@ -279,6 +279,69 @@ class MemberProfileControllerTest(
     }
 
     @Test
+    fun `own profile update rejects membership status changed to left while waiting for profile name lock`() {
+        val email = insertProfileMember("self.status.race", "ACTIVE", shortName = "StatusRaceMine")
+        val membershipId = membershipIdForEmail(email)
+        val cookie = sessionCookieForEmail(email)
+        val executor = Executors.newSingleThreadExecutor()
+
+        dataSource.connection.use { connection ->
+            connection.autoCommit = false
+            try {
+                connection.prepareStatement(
+                    """
+                    select id
+                    from clubs
+                    where id = '00000000-0000-0000-0000-000000000001'
+                    for update
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.executeQuery().use { resultSet ->
+                        resultSet.next()
+                    }
+                }
+
+                val updateResult = executor.submit<Pair<Int, String>> {
+                    val response = mockMvc.patch("/api/me/profile") {
+                        cookie(cookie)
+                        header("X-Readmates-Bff-Secret", "test-bff-secret")
+                        header("Origin", "http://localhost:3000")
+                        with(csrf())
+                        contentType = MediaType.APPLICATION_JSON
+                        content = """{"shortName":"StatusRaceAfter"}"""
+                    }.andReturn().response
+                    response.status to response.contentAsString
+                }
+
+                assertThrows(TimeoutException::class.java) {
+                    updateResult.get(300, TimeUnit.MILLISECONDS)
+                }
+
+                connection.prepareStatement(
+                    """
+                    update memberships
+                    set status = 'LEFT'
+                    where id = ?
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, membershipId)
+                    statement.executeUpdate()
+                }
+                connection.commit()
+
+                val (status, body) = updateResult.get(5, TimeUnit.SECONDS)
+                assertEquals(403, status)
+                org.hamcrest.MatcherAssert.assertThat(body, org.hamcrest.Matchers.containsString("MEMBERSHIP_NOT_ALLOWED"))
+            } finally {
+                runCatching { connection.rollback() }
+                executor.shutdownNow()
+            }
+        }
+
+        assertEquals("StatusRaceMine", shortNameForEmail(email))
+    }
+
+    @Test
     fun `host updates same club member profile and receives host member list item`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
         val targetMembershipIds = listOf("VIEWER", "ACTIVE", "SUSPENDED", "LEFT", "INACTIVE")
