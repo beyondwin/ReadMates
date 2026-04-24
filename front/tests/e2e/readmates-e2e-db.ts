@@ -189,7 +189,8 @@ insert into memberships (
   user_id,
   role,
   status,
-  joined_at
+  joined_at,
+  short_name
 )
 select
   ${sqlString(membershipId)},
@@ -197,7 +198,8 @@ select
   users.id,
   'MEMBER',
   'VIEWER',
-  null
+  null,
+  ${sqlString(shortName)}
 from users
 where lower(users.email) = ${sqlString(normalizedEmail)}
   and not exists (
@@ -278,7 +280,8 @@ insert into memberships (
   user_id,
   role,
   status,
-  joined_at
+  joined_at,
+  short_name
 )
 select
   ${sqlString(membershipId)},
@@ -286,7 +289,8 @@ select
   users.id,
   invitations.role,
   'ACTIVE',
-  utc_timestamp(6)
+  utc_timestamp(6),
+  users.short_name
 from invitations
 join users on lower(users.email) = lower(invitations.invited_email)
 where invitations.token_hash = ${sqlString(tokenHash)}

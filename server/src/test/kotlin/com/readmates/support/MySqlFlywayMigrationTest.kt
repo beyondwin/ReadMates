@@ -1,14 +1,17 @@
 package com.readmates.support
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
+import java.util.UUID
 
 @SpringBootTest
 @TestPropertySource(
@@ -35,9 +38,11 @@ class MySqlFlywayMigrationTest(
         assertEquals(3, tableCount)
         assertEquals("YES", columnValue("users", "password_hash", "is_nullable"))
         assertEquals("NO", columnValue("users", "short_name", "is_nullable"))
+        assertEquals("NO", columnValue("memberships", "short_name", "is_nullable"))
         assertEquals("NO", columnValue("invitations", "invited_name", "is_nullable"))
         assertEquals("longtext", columnValue("session_feedback_documents", "source_text", "data_type"))
         assertEquals(1, uniqueIndexCount("auth_sessions", "session_token_hash"))
+        assertEquals(1, uniqueIndexCount("memberships", "short_name"))
         assertEquals("invited_by_membership_id,club_id", foreignKeyColumns("invitations", "invitations_inviter_fk"))
         assertEquals("memberships:id,club_id", foreignKeyReference("invitations", "invitations_inviter_fk"))
 
@@ -91,6 +96,87 @@ class MySqlFlywayMigrationTest(
                 row["CHECK_CLAUSE"].toString().contains("PUBLIC") &&
                 row["CHECK_CLAUSE"].toString().contains("PRIVATE")
         })
+    }
+
+    @Test
+    fun `mysql enforces unique short names within a club for out of band profile writes`() {
+        val suffix = UUID.randomUUID().toString().take(8)
+        val clubId = UUID.randomUUID().toString()
+        val firstUserId = UUID.randomUUID().toString()
+        val secondUserId = UUID.randomUUID().toString()
+        val firstMembershipId = UUID.randomUUID().toString()
+        val secondMembershipId = UUID.randomUUID().toString()
+        val firstShortName = "ClaimA$suffix"
+        val secondShortName = "ClaimB$suffix"
+
+        try {
+            jdbcTemplate.update(
+                """
+                insert into clubs (id, slug, name, tagline, about)
+                values (?, ?, '테스트 클럽', '테스트 클럽', '테스트 클럽입니다.')
+                """.trimIndent(),
+                clubId,
+                "claim-$suffix",
+            )
+            insertProfileUser(firstUserId, "claim-a-$suffix@example.com", "Claim A", firstShortName)
+            insertProfileUser(secondUserId, "claim-b-$suffix@example.com", "Claim B", secondShortName)
+            insertMembership(firstMembershipId, clubId, firstUserId, firstShortName)
+            insertMembership(secondMembershipId, clubId, secondUserId, secondShortName)
+
+            assertThrows(DataIntegrityViolationException::class.java) {
+                jdbcTemplate.update(
+                    """
+                    update memberships
+                    set short_name = ?,
+                        updated_at = utc_timestamp(6)
+                    where id = ?
+                    """.trimIndent(),
+                    firstShortName,
+                    secondMembershipId,
+                )
+            }
+        } finally {
+            deleteWhereIn("memberships", "id", setOf(firstMembershipId, secondMembershipId))
+            deleteWhereIn("users", "id", setOf(firstUserId, secondUserId))
+            deleteWhereIn("clubs", "id", setOf(clubId))
+        }
+    }
+
+    private fun insertProfileUser(
+        userId: String,
+        email: String,
+        name: String,
+        shortName: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+            values (?, ?, ?, ?, ?, 'GOOGLE')
+            """.trimIndent(),
+            userId,
+            "google-claim-$userId",
+            email,
+            name,
+            shortName,
+        )
+    }
+
+    private fun insertMembership(
+        membershipId: String,
+        clubId: String,
+        userId: String,
+        shortName: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), ?)
+            """.trimIndent(),
+            membershipId,
+            clubId,
+            userId,
+            shortName,
+        )
     }
 
     private fun columnValue(
@@ -159,6 +245,18 @@ class MySqlFlywayMigrationTest(
         tableName,
         constraintName,
     ) ?: error("Foreign key $tableName.$constraintName does not exist")
+
+    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+        if (values.isEmpty()) {
+            return
+        }
+
+        val placeholders = values.joinToString(", ") { "?" }
+        jdbcTemplate.update(
+            "delete from $tableName where $columnName in ($placeholders)",
+            *values.toTypedArray(),
+        )
+    }
 
     companion object {
         @JvmStatic

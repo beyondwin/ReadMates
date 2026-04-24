@@ -619,7 +619,7 @@ class HostSessionControllerDbTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             values
               (
                 '00000000-0000-0000-0000-000000019211',
@@ -627,7 +627,8 @@ class HostSessionControllerDbTest(
                 '00000000-0000-0000-0000-000000019111',
                 'MEMBER',
                 'SUSPENDED',
-                utc_timestamp(6)
+                utc_timestamp(6),
+                '정지'
               ),
               (
                 '00000000-0000-0000-0000-000000019212',
@@ -635,7 +636,8 @@ class HostSessionControllerDbTest(
                 '00000000-0000-0000-0000-000000019112',
                 'MEMBER',
                 'LEFT',
-                utc_timestamp(6)
+                utc_timestamp(6),
+                '탈퇴'
               ),
               (
                 '00000000-0000-0000-0000-000000019213',
@@ -643,7 +645,8 @@ class HostSessionControllerDbTest(
                 '00000000-0000-0000-0000-000000019113',
                 'MEMBER',
                 'INACTIVE',
-                utc_timestamp(6)
+                utc_timestamp(6),
+                '비활성'
               )
             """.trimIndent(),
         )
@@ -728,14 +731,15 @@ class HostSessionControllerDbTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             values (
               '00000000-0000-0000-0000-000000019201',
               '00000000-0000-0000-0000-000000019001',
               '00000000-0000-0000-0000-000000019101',
               'HOST',
               'ACTIVE',
-              utc_timestamp(6)
+              utc_timestamp(6),
+              '외부'
             )
             """.trimIndent(),
         )

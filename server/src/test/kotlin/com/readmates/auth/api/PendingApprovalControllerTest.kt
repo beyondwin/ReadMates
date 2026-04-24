@@ -168,8 +168,8 @@ class PendingApprovalControllerTest(
 
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, ?, ?, 'MEMBER', ?, if(? = 'ACTIVE', utc_timestamp(6), null))
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, ?, ?, 'MEMBER', ?, if(? = 'ACTIVE', utc_timestamp(6), null), 'Pending')
             """.trimIndent(),
             membershipId,
             clubId,

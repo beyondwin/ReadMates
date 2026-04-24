@@ -86,7 +86,7 @@ class JdbcCurrentSessionAdapter(
             select
               memberships.id as membership_id,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as display_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as short_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as short_name,
               memberships.role,
               session_participants.rsvp_status,
               session_participants.attendance_status
@@ -164,7 +164,7 @@ class JdbcCurrentSessionAdapter(
               questions.text,
               questions.draft_thought,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
             from questions
             join memberships on memberships.id = questions.membership_id
               and memberships.club_id = questions.club_id
@@ -254,7 +254,7 @@ class JdbcCurrentSessionAdapter(
             """
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               one_line_reviews.text
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id
@@ -298,7 +298,7 @@ class JdbcCurrentSessionAdapter(
             """
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               long_reviews.body
             from long_reviews
             join memberships on memberships.id = long_reviews.membership_id

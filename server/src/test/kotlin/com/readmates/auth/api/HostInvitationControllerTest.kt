@@ -261,14 +261,15 @@ class HostInvitationControllerTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             select
               uuid(),
               '00000000-0000-0000-0000-000000000001',
               users.id,
               'MEMBER',
               'ACTIVE',
-              utc_timestamp(6)
+              utc_timestamp(6),
+              users.short_name
             from users
             where users.email = ?
             on duplicate key update

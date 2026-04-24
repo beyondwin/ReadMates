@@ -358,14 +358,15 @@ class GoogleOAuthLoginSessionTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             select
               uuid(),
               clubs.id,
               users.id,
               'MEMBER',
               'ACTIVE',
-              utc_timestamp(6)
+              utc_timestamp(6),
+              users.short_name
             from clubs
             join users on users.email = ?
             where clubs.slug = 'reading-sai'

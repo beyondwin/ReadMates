@@ -121,21 +121,23 @@ class DevLoginControllerTest(
         )
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             select
               '00000000-0000-0000-0000-000000009902',
               clubs.id,
               users.id,
               'MEMBER',
               'ACTIVE',
-              utc_timestamp(6)
+              utc_timestamp(6),
+              users.short_name
             from clubs
             join users on users.email = 'active.nonseed@example.com'
             where clubs.slug = 'reading-sai'
             on duplicate key update
               role = values(role),
               status = values(status),
-              joined_at = values(joined_at)
+              joined_at = values(joined_at),
+              short_name = values(short_name)
             """.trimIndent(),
         )
 

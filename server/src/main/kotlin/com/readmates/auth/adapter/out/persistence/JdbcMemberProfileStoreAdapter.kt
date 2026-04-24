@@ -33,7 +33,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               users.profile_image_url,
               memberships.role,
               memberships.status
@@ -58,7 +58,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               users.profile_image_url,
               memberships.role,
               memberships.status
@@ -82,7 +82,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               users.profile_image_url,
               memberships.role,
               memberships.status
@@ -118,7 +118,7 @@ class JdbcMemberProfileStoreAdapter(
             join users on users.id = memberships.user_id
             where memberships.club_id = ?
               and memberships.id <> ?
-              and users.short_name = ?
+              and memberships.short_name = ?
             limit 1
             for update
             """.trimIndent(),
@@ -131,10 +131,9 @@ class JdbcMemberProfileStoreAdapter(
     override fun updateOwnShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean =
         jdbcTemplate().update(
             """
-            update users
-            join memberships on memberships.user_id = users.id
-            set users.short_name = ?,
-                users.updated_at = utc_timestamp(6)
+            update memberships
+            set memberships.short_name = ?,
+                memberships.updated_at = utc_timestamp(6)
             where memberships.id = ?
               and memberships.club_id = ?
               and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED')
@@ -147,10 +146,9 @@ class JdbcMemberProfileStoreAdapter(
     override fun updateShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean =
         jdbcTemplate().update(
             """
-            update users
-            join memberships on memberships.user_id = users.id
-            set users.short_name = ?,
-                users.updated_at = utc_timestamp(6)
+            update memberships
+            set memberships.short_name = ?,
+                memberships.updated_at = utc_timestamp(6)
             where memberships.id = ?
               and memberships.club_id = ?
               and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
@@ -168,7 +166,7 @@ class JdbcMemberProfileStoreAdapter(
               users.id as user_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               users.profile_image_url,
               memberships.role,
               memberships.status,

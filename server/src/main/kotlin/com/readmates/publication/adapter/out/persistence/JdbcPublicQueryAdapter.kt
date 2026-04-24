@@ -176,7 +176,7 @@ class JdbcPublicQueryAdapter(
               highlights.text,
               highlights.sort_order,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
             from highlights
             left join memberships on memberships.id = highlights.membership_id
               and memberships.club_id = highlights.club_id
@@ -209,7 +209,7 @@ class JdbcPublicQueryAdapter(
             """
             select
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(users.short_name, users.name) end as author_short_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               one_line_reviews.text
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id

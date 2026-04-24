@@ -255,11 +255,10 @@ class MemberProfileControllerTest(
 
                 connection.prepareStatement(
                     """
-                    update users
-                    join memberships on memberships.user_id = users.id
-                    set users.short_name = 'RaceTaken',
-                        users.updated_at = utc_timestamp(6)
-                    where memberships.id = ?
+                    update memberships
+                    set short_name = 'RaceTaken',
+                        updated_at = utc_timestamp(6)
+                    where id = ?
                     """.trimIndent(),
                 ).use { statement ->
                     statement.setString(1, otherMembershipId)
@@ -454,12 +453,13 @@ class MemberProfileControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', ?, utc_timestamp(6))
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', ?, utc_timestamp(6), ?)
             """.trimIndent(),
             membershipId,
             userId,
             status,
+            shortName,
         )
         createdMembershipIds += membershipId
         return email
@@ -494,13 +494,14 @@ class MemberProfileControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6))
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?)
             """.trimIndent(),
             membershipId,
             clubId,
             userId,
             status,
+            shortName,
         )
         createdMembershipIds += membershipId
         return email
@@ -535,7 +536,12 @@ class MemberProfileControllerTest(
 
     private fun shortNameForEmail(email: String): String =
         jdbcTemplate.queryForObject(
-            "select short_name from users where email = ?",
+            """
+            select memberships.short_name
+            from memberships
+            join users on users.id = memberships.user_id
+            where users.email = ?
+            """.trimIndent(),
             String::class.java,
             email,
         ) ?: error("Expected short name for $email")
@@ -543,9 +549,8 @@ class MemberProfileControllerTest(
     private fun shortNameForMembership(membershipId: String): String =
         jdbcTemplate.queryForObject(
             """
-            select users.short_name
+            select memberships.short_name
             from memberships
-            join users on users.id = memberships.user_id
             where memberships.id = ?
             """.trimIndent(),
             String::class.java,
