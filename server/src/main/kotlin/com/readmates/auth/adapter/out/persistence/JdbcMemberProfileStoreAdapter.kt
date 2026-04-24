@@ -98,21 +98,35 @@ class JdbcMemberProfileStoreAdapter(
             clubId.dbString(),
         ).firstOrNull()
 
-    override fun shortNameExistsInClub(clubId: UUID, shortName: String, excludingMembershipId: UUID): Boolean =
-        (jdbcTemplate().queryForObject(
+    override fun lockClubProfileNames(clubId: UUID): Boolean =
+        jdbcTemplate().query(
             """
-            select count(*)
+            select clubs.id
+            from clubs
+            where clubs.id = ?
+            for update
+            """.trimIndent(),
+            { _, _ -> true },
+            clubId.dbString(),
+        ).firstOrNull() == true
+
+    override fun shortNameExistsInClub(clubId: UUID, shortName: String, excludingMembershipId: UUID): Boolean =
+        jdbcTemplate().query(
+            """
+            select memberships.id
             from memberships
             join users on users.id = memberships.user_id
             where memberships.club_id = ?
               and memberships.id <> ?
               and users.short_name = ?
+            limit 1
+            for update
             """.trimIndent(),
-            Int::class.java,
+            { _, _ -> true },
             clubId.dbString(),
             excludingMembershipId.dbString(),
             shortName,
-        ) ?: 0) > 0
+        ).firstOrNull() == true
 
     override fun updateShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean =
         jdbcTemplate().update(

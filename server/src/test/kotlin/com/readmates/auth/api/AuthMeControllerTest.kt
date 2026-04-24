@@ -166,6 +166,45 @@ class AuthMeControllerTest(
     }
 
     @Test
+    fun `auth me returns blocked session-cookie members without member host or viewer roles`() {
+        listOf("LEFT", "INACTIVE").forEach { status ->
+            val email = uniqueLifecycleEmail("blocked.${status.lowercase()}")
+            val cookie = loginAsLifecycleUser(email, status)
+
+            mockMvc.get("/api/auth/me") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.email") { value(email) }
+                jsonPath("$.membershipStatus") { value(status) }
+                jsonPath("$.approvalState") { value("INACTIVE") }
+            }
+
+            SecurityContextHolder.clearContext()
+            try {
+                val request = MockHttpServletRequest("GET", "/api/auth/me")
+                request.setCookies(cookie)
+                val response = MockHttpServletResponse()
+
+                sessionCookieAuthenticationFilter.doFilter(request, response, MockFilterChain())
+
+                val authentication = SecurityContextHolder.getContext().authentication
+                    ?: error("Expected $status member session to authenticate for auth state")
+                val authorities = authentication.authorities
+                    .map { it.authority }
+                    .toSet()
+                assertEquals(emptySet<String>(), authorities)
+                assertFalse("ROLE_MEMBER" in authorities)
+                assertFalse("ROLE_HOST" in authorities)
+                assertFalse("ROLE_VIEWER" in authorities)
+            } finally {
+                SecurityContextHolder.clearContext()
+            }
+        }
+    }
+
+    @Test
     fun `member authority refresh strips stale member roles from viewer users`() {
         val viewerEmail = uniqueViewerEmail()
         loginAsGoogleViewerUser(viewerEmail)

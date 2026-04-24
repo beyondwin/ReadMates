@@ -75,6 +75,9 @@ class MemberProfileService(
     }
 
     private fun updateShortName(clubId: UUID, membershipId: UUID, shortName: String) {
+        if (!memberProfileStore.lockClubProfileNames(clubId)) {
+            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        }
         if (memberProfileStore.shortNameExistsInClub(clubId, shortName, membershipId)) {
             throw MemberProfileException(MemberProfileError.SHORT_NAME_DUPLICATE)
         }
