@@ -38,12 +38,12 @@ export function LoginCard({
       <p className="eyebrow">Private reading room</p>
       <h1 className="h1 editorial">읽는사이 멤버 입장</h1>
       <p className="body auth-card__lede">
-        초대받은 멤버와 기존 멤버가 같은 Google 계정으로 입장하는 조용한 클럽 공간입니다. 초대 링크가 없다면
-        둘러보기 멤버로 시작하고, 호스트 전환 뒤 참여 권한이 열립니다.
+        Google 계정으로 읽는사이 멤버 공간에 입장합니다. 초대 링크가 없다면 둘러보기 멤버로 시작하고, 호스트 승인 뒤
+        참여 권한이 열립니다.
       </p>
       <div className="auth-card__actions auth-card__actions--primary">
         <a className="btn btn-primary btn-lg" href="/oauth2/authorization/google">
-          Google로 멤버 공간 열기
+          시작하기
         </a>
       </div>
       {error ? (

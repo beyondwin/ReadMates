@@ -97,7 +97,7 @@ describe("SPA router", () => {
     render(<RouterProvider router={router} />);
 
     expect(screen.getByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Google로 멤버 공간 열기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
     );
