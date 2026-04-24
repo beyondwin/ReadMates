@@ -3,6 +3,23 @@ export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "
 export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionState = "DRAFT" | "OPEN" | "PUBLISHED" | "CLOSED";
 export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
+export type MemberProfileErrorCode =
+  | "SHORT_NAME_DUPLICATE"
+  | "SHORT_NAME_REQUIRED"
+  | "SHORT_NAME_TOO_LONG"
+  | "SHORT_NAME_INVALID"
+  | "SHORT_NAME_RESERVED"
+  | "MEMBERSHIP_NOT_ALLOWED";
+
+export type UpdateMemberProfileRequest = {
+  shortName: string;
+};
+
+export type MemberProfileResponse = {
+  displayName: string;
+  shortName: string;
+  email: string;
+};
 
 export type ArchiveSessionItem = {
   sessionId: string;

@@ -1,6 +1,7 @@
 import { LogoutButton } from "@/features/auth/route/logout-button";
 import { MyPageRoute } from "@/features/archive/route/my-page-route";
-import { useAuthActions } from "@/src/app/auth-state";
+import { canEditOwnProfile } from "@/shared/auth/member-app-access";
+import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import type { LogoutControlComponent } from "@/features/archive/ui/my-page";
 
 const MyPageLogoutButton: LogoutControlComponent = (props) => {
@@ -10,5 +11,15 @@ const MyPageLogoutButton: LogoutControlComponent = (props) => {
 };
 
 export default function MyRoutePage() {
-  return <MyPageRoute LogoutButtonComponent={MyPageLogoutButton} />;
+  const authState = useAuth();
+  const { refreshAuth } = useAuthActions();
+  const canEditProfile = authState.status === "ready" && canEditOwnProfile(authState.auth);
+
+  return (
+    <MyPageRoute
+      LogoutButtonComponent={MyPageLogoutButton}
+      canEditProfile={canEditProfile}
+      onProfileUpdated={refreshAuth}
+    />
+  );
 }

@@ -3,6 +3,8 @@ import type {
   ArchiveSessionItem,
   CurrentSessionPolicy,
   FeedbackDocumentListItem,
+  MemberProfileResponse,
+  UpdateMemberProfileRequest,
   MemberArchiveSessionDetailResponse,
   MyArchiveQuestionItem,
   MyArchiveReviewItem,
@@ -61,6 +63,15 @@ export async function fetchMemberArchiveSession(sessionId: string) {
 
 export async function fetchMyPage() {
   return readmatesFetch<MyPageResponse>("/api/app/me");
+}
+
+export async function updateMyProfile(shortName: string) {
+  const request: UpdateMemberProfileRequest = { shortName };
+
+  return readmatesFetchResponse(
+    "/api/me/profile",
+    jsonRequest({ method: "PATCH" }, request),
+  ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
 }
 
 export async function fetchNoteSessions() {
