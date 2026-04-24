@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useState } from "react";
+import { type CSSProperties, type FormEvent, type ReactNode, useId, useRef, useState } from "react";
 import type { FeedbackDocumentListItem, MyPageProfile } from "@/features/archive/model/archive-model";
 import {
   attendanceSummary,
@@ -7,6 +7,7 @@ import {
   formatJoinedMonth,
   identityLine,
   membershipIdentityLabel,
+  profileSaveErrorMessage,
 } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
 import { appFeedbackHref, readmatesReturnState } from "@/features/archive/ui/archive-route-continuity";
@@ -21,6 +22,16 @@ const notifications = [
   { label: "다른 멤버의 서평 공개", sub: "같은 책에 한해" },
 ];
 
+const profileFailureMessages = new Set([
+  profileSaveErrorMessage("SHORT_NAME_REQUIRED"),
+  profileSaveErrorMessage("SHORT_NAME_TOO_LONG"),
+  profileSaveErrorMessage("SHORT_NAME_INVALID"),
+  profileSaveErrorMessage("SHORT_NAME_RESERVED"),
+  profileSaveErrorMessage("SHORT_NAME_DUPLICATE"),
+  profileSaveErrorMessage("MEMBERSHIP_NOT_ALLOWED"),
+  profileSaveErrorMessage(null),
+]);
+
 function feedbackReportTotalLabel(total: number) {
   return `전체 ${total}개`;
 }
@@ -32,7 +43,11 @@ type MyPageProps = {
   questionCount: number;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
+  canEditProfile?: boolean;
+  onUpdateProfile?: (shortName: string) => Promise<ProfileUpdateResult>;
 };
+
+type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "shortName" | "email">;
 
 export type LogoutControlComponent = (props: {
   className?: string;
@@ -47,27 +62,51 @@ export default function MyPage({
   questionCount,
   LogoutButtonComponent,
   onLeaveMembership,
+  canEditProfile = false,
+  onUpdateProfile,
 }: MyPageProps) {
+  const [profileOverrideState, setProfileOverrideState] = useState<{
+    sourceData: MyPageProfile;
+    profile: ProfileUpdateResult;
+  } | null>(null);
+  const profileOverride = profileOverrideState?.sourceData === data ? profileOverrideState.profile : null;
+  const profileData = profileOverride ? { ...data, ...profileOverride } : data;
+  const profileUpdateEnabled = canEditProfile && onUpdateProfile ? true : false;
+
+  async function submitProfileUpdate(shortName: string) {
+    if (!onUpdateProfile) {
+      throw new Error(profileSaveErrorMessage(null));
+    }
+
+    const profile = await onUpdateProfile(shortName);
+    setProfileOverrideState({ sourceData: data, profile });
+    return profile;
+  }
+
   return (
     <main className="rm-my-page">
       <div className="desktop-only">
         <MyDesktop
-          data={data}
+          data={profileData}
           reports={reports}
           reviewCount={reviewCount}
           questionCount={questionCount}
           LogoutButtonComponent={LogoutButtonComponent}
           onLeaveMembership={onLeaveMembership}
+          canEditProfile={profileUpdateEnabled}
+          onUpdateProfile={submitProfileUpdate}
         />
       </div>
       <div className="mobile-only">
         <MyMobile
-          data={data}
+          data={profileData}
           reports={reports}
           reviewCount={reviewCount}
           questionCount={questionCount}
           LogoutButtonComponent={LogoutButtonComponent}
           onLeaveMembership={onLeaveMembership}
+          canEditProfile={profileUpdateEnabled}
+          onUpdateProfile={submitProfileUpdate}
         />
       </div>
     </main>
@@ -81,6 +120,8 @@ function MyDesktop({
   questionCount,
   LogoutButtonComponent,
   onLeaveMembership,
+  canEditProfile,
+  onUpdateProfile,
 }: {
   data: MyPageProfile;
   reports: FeedbackDocumentListItem[];
@@ -88,6 +129,8 @@ function MyDesktop({
   questionCount: number;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
+  canEditProfile: boolean;
+  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
 }) {
   return (
     <>
@@ -108,7 +151,7 @@ function MyDesktop({
       <section style={{ padding: "28px 0 80px" }}>
         <div className="container" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.1fr) minmax(320px, 1fr)", gap: "56px" }}>
           <div className="stack" style={{ "--stack": "44px" } as CSSProperties}>
-            <AccountSection data={data} LogoutButtonComponent={LogoutButtonComponent} />
+            <AccountSection data={data} LogoutButtonComponent={LogoutButtonComponent} canEditProfile={canEditProfile} />
             <RhythmSection data={data} reviewCount={reviewCount} questionCount={questionCount} />
             <WritingSection reviewCount={reviewCount} questionCount={questionCount} />
             <FeedbackReports reports={reports} />
@@ -116,7 +159,7 @@ function MyDesktop({
 
           <div className="stack" style={{ "--stack": "36px" } as CSSProperties}>
             <NotificationsSection />
-            <PreferencesSection data={data} />
+            <PreferencesSection data={data} canEditProfile={canEditProfile} onUpdateProfile={onUpdateProfile} />
             <DangerZone onLeaveMembership={onLeaveMembership} />
           </div>
         </div>
@@ -132,6 +175,8 @@ function MyMobile({
   questionCount,
   LogoutButtonComponent,
   onLeaveMembership,
+  canEditProfile,
+  onUpdateProfile,
 }: {
   data: MyPageProfile;
   reports: FeedbackDocumentListItem[];
@@ -139,6 +184,8 @@ function MyMobile({
   questionCount: number;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
+  canEditProfile: boolean;
+  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
 }) {
   return (
     <div className="rm-my-mobile m-body">
@@ -151,6 +198,13 @@ function MyMobile({
               <div className="small">{data.email}</div>
             </div>
           </div>
+          {canEditProfile ? (
+            <ProfileNameEditor
+              data={data}
+              onUpdateProfile={onUpdateProfile}
+              variant="mobile"
+            />
+          ) : null}
           <dl
             aria-label="멤버 정보"
             style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12, margin: "16px 0 0" }}
@@ -432,9 +486,11 @@ function Icon({ name, size = 16 }: { name: IconName; size?: number }) {
 function AccountSection({
   data,
   LogoutButtonComponent,
+  canEditProfile,
 }: {
   data: MyPageProfile;
   LogoutButtonComponent: LogoutControlComponent;
+  canEditProfile: boolean;
 }) {
   return (
     <section>
@@ -447,8 +503,12 @@ function AccountSection({
             <div className="small">{data.email}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-            <span className="tiny" aria-label="프로필 수정 준비 중" style={{ color: "var(--text-3)", flexShrink: 0 }}>
-              프로필 수정 준비 중
+            <span
+              className="tiny"
+              aria-label={canEditProfile ? "표시 이름 편집 가능" : "프로필 수정 준비 중"}
+              style={{ color: "var(--text-3)", flexShrink: 0 }}
+            >
+              {canEditProfile ? "프로필 수정 가능" : "프로필 수정 준비 중"}
             </span>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
               <LogoutButtonComponent className="btn btn-ghost btn-sm" style={{ color: "var(--text-3)" }}>
@@ -716,9 +776,184 @@ function NotificationsSection() {
   );
 }
 
-function PreferencesSection({ data }: { data: MyPageProfile }) {
+function profileFailureMessage(error: unknown) {
+  const message = error instanceof Error ? error.message.trim() : "";
+
+  if (profileFailureMessages.has(message)) {
+    return message;
+  }
+
+  return profileSaveErrorMessage(null);
+}
+
+function ProfileNameEditor({
+  data,
+  canEditProfile = true,
+  onUpdateProfile,
+  variant,
+}: {
+  data: MyPageProfile;
+  canEditProfile?: boolean;
+  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
+  variant: "desktop" | "mobile";
+}) {
+  const inputId = useId();
+  const errorId = useId();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState({ sourceShortName: data.shortName, value: data.shortName });
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const profileName = identityLine(data);
+  const value = draft.sourceShortName === data.shortName ? draft.value : data.shortName;
+
+  async function submitProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (savingRef.current || !canEditProfile) {
+      return;
+    }
+
+    const trimmedValue = value.trim();
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const profile = await onUpdateProfile(trimmedValue);
+      setDraft({ sourceShortName: profile.shortName, value: profile.shortName });
+      setEditing(false);
+    } catch (profileError) {
+      setError(profileFailureMessage(profileError));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
+  const rowStyle: CSSProperties =
+    variant === "desktop"
+      ? {
+          display: "grid",
+          gridTemplateColumns: "28px minmax(0, 1fr)",
+          gap: "14px",
+          padding: "16px 18px",
+          alignItems: "center",
+        }
+      : {
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr)",
+          gap: "10px",
+          marginTop: "14px",
+          padding: "13px 14px",
+          border: "1px solid var(--line-soft)",
+          background: "var(--bg-sub)",
+          borderRadius: "8px",
+        };
+
+  const bodyStyle: CSSProperties =
+    variant === "desktop"
+      ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "14px", alignItems: "center" }
+      : { display: "grid", gap: "10px" };
+
+  const formStyle: CSSProperties =
+    variant === "desktop"
+      ? { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "8px", alignItems: "end" }
+      : { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto auto", gap: "8px", alignItems: "end" };
+
+  return (
+    <div style={rowStyle}>
+      {variant === "desktop" ? (
+        <span aria-hidden style={{ color: "var(--text-3)" }}>
+          <Icon name="me" size={16} />
+        </span>
+      ) : null}
+      <div style={{ minWidth: 0 }}>
+        {editing ? (
+          <form onSubmit={submitProfile} style={formStyle}>
+            <div style={{ minWidth: 0 }}>
+              <label htmlFor={inputId} className="body" style={{ display: "block", fontSize: "14px" }}>
+                표시 이름
+              </label>
+              <input
+                id={inputId}
+                className="input"
+                value={value}
+                disabled={saving}
+                aria-describedby={error ? errorId : undefined}
+                onChange={(event) => setDraft({ sourceShortName: data.shortName, value: event.currentTarget.value })}
+                style={{
+                  width: "100%",
+                  minWidth: 0,
+                  marginTop: "7px",
+                  height: variant === "desktop" ? "36px" : "40px",
+                }}
+              />
+              {error ? (
+                <div id={errorId} role="alert" className="tiny" style={{ color: "var(--danger)", marginTop: "7px" }}>
+                  {error}
+                </div>
+              ) : null}
+            </div>
+            <button type="submit" className="btn btn-primary btn-sm" aria-label="표시 이름 저장" disabled={saving}>
+              {saving ? "저장 중" : "저장"}
+            </button>
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm"
+              disabled={saving}
+              onClick={() => {
+                setEditing(false);
+                setError(null);
+                setDraft({ sourceShortName: data.shortName, value: data.shortName });
+              }}
+            >
+              취소
+            </button>
+          </form>
+        ) : (
+          <div style={bodyStyle}>
+            <div style={{ minWidth: 0 }}>
+              <div className="body" style={{ fontSize: "14px" }}>
+                표시 이름
+              </div>
+              <div className="tiny">{profileName}</div>
+            </div>
+            {canEditProfile ? (
+              <button
+                type="button"
+                className="btn btn-quiet btn-sm"
+                aria-label="표시 이름 변경"
+                onClick={() => {
+                  setEditing(true);
+                  setError(null);
+                }}
+              >
+                <Icon name="edit" size={13} />
+                <span>변경</span>
+              </button>
+            ) : (
+              <span className="tiny" aria-label="표시 이름 변경 준비 중" style={{ color: "var(--text-3)" }}>
+                변경 준비 중
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PreferencesSection({
+  data,
+  canEditProfile,
+  onUpdateProfile,
+}: {
+  data: MyPageProfile;
+  canEditProfile: boolean;
+  onUpdateProfile: (shortName: string) => Promise<ProfileUpdateResult>;
+}) {
   const preferences = [
-    { label: "표시 이름", sub: identityLine(data), icon: "me" as const },
     { label: "기록 공개 범위", sub: "클럽 내부 전체", icon: "eye" as const },
     { label: "언어", sub: "한국어", icon: "settings" as const },
   ];
@@ -727,6 +962,12 @@ function PreferencesSection({ data }: { data: MyPageProfile }) {
     <section>
       <SectionHeader eyebrow="읽기 전용 설정" title="개인 설정" />
       <div className="surface" style={{ padding: "4px" }}>
+        <ProfileNameEditor
+          data={data}
+          canEditProfile={canEditProfile}
+          onUpdateProfile={onUpdateProfile}
+          variant="desktop"
+        />
         {preferences.map((preference, index) => (
           <div
             key={preference.label}
@@ -735,7 +976,7 @@ function PreferencesSection({ data }: { data: MyPageProfile }) {
               gridTemplateColumns: "28px minmax(0, 1fr) auto",
               gap: "14px",
               padding: "16px 18px",
-              borderTop: index > 0 ? "1px solid var(--line-soft)" : "none",
+              borderTop: index >= 0 ? "1px solid var(--line-soft)" : "none",
               alignItems: "center",
             }}
           >

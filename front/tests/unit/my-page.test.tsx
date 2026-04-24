@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { CSSProperties, ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes, useLocation } from "react-router-dom";
@@ -6,6 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FeedbackDocumentListItem, MyPageResponse } from "@/features/archive/api/archive-contracts";
 import { myPageLoader } from "@/features/archive/route/my-page-data";
 import MyPage from "@/features/archive/ui/my-page";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { AuthActionsContext, AuthContext } from "@/src/app/auth-state";
 import MyRoutePage from "@/src/pages/my-page";
 
 afterEach(() => {
@@ -14,6 +16,28 @@ afterEach(() => {
 });
 
 type MyPageProps = Parameters<typeof MyPage>[0];
+
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason?: unknown) => void;
+};
+
+type EditableMyPageProps = MyPageProps & {
+  canEditProfile: boolean;
+  onUpdateProfile: (shortName: string) => Promise<MyPageResponse>;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+}
 
 function TestLogoutButton({
   className,
@@ -86,6 +110,19 @@ const data: MyPageResponse = {
   ],
 };
 
+const activeAuth: AuthMeResponse = {
+  authenticated: true,
+  userId: "member-user",
+  membershipId: "member-membership",
+  clubId: "club-id",
+  email: data.email,
+  displayName: data.displayName,
+  shortName: data.shortName,
+  role: data.role,
+  membershipStatus: data.membershipStatus,
+  approvalState: "ACTIVE",
+};
+
 const reports: FeedbackDocumentListItem[] = [
   {
     sessionId: "session-1",
@@ -113,6 +150,104 @@ function renderMyPage(overrides: Partial<MyPageProps> = {}) {
   return render(<MyPage {...props} />);
 }
 
+function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
+  const props: EditableMyPageProps = {
+    data,
+    reports,
+    reviewCount: 3,
+    questionCount: 7,
+    LogoutButtonComponent: TestLogoutButton,
+    onLeaveMembership: testLeaveMembership,
+    canEditProfile: true,
+    onUpdateProfile: async (shortName: string) => ({ ...data, shortName }),
+    ...overrides,
+  };
+
+  return render(<MyPage {...props} />);
+}
+
+function renderMyRouteWithProfileFetch({
+  auth = activeAuth,
+  profileStatus = 200,
+  profileBody = { ...data, shortName: "새이름" },
+  nextMyPageData = { ...data, shortName: "새이름" },
+}: {
+  auth?: AuthMeResponse;
+  profileStatus?: number;
+  profileBody?: unknown;
+  nextMyPageData?: MyPageResponse;
+} = {}) {
+  installRouterRequestShim();
+  const refreshAuth = vi.fn().mockResolvedValue(undefined);
+  let myPageRequestCount = 0;
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = input.toString();
+
+    if (url === "/api/bff/api/auth/me") {
+      return Promise.resolve(jsonResponse(auth));
+    }
+
+    if (url === "/api/bff/api/app/me") {
+      myPageRequestCount += 1;
+      return Promise.resolve(jsonResponse(myPageRequestCount > 1 ? nextMyPageData : data));
+    }
+
+    if (url === "/api/bff/api/feedback-documents/me") {
+      return Promise.resolve(jsonResponse(reports));
+    }
+
+    if (url === "/api/bff/api/archive/me/questions") {
+      return Promise.resolve(jsonResponse(new Array(7).fill(null)));
+    }
+
+    if (url === "/api/bff/api/archive/me/reviews") {
+      return Promise.resolve(jsonResponse(new Array(3).fill(null)));
+    }
+
+    if (url === "/api/bff/api/me/profile") {
+      return Promise.resolve(jsonResponse(profileBody, profileStatus));
+    }
+
+    return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/app/me",
+        element: <MyRoutePage />,
+        loader: myPageLoader,
+        hydrateFallbackElement: <div>내 공간을 불러오는 중</div>,
+      },
+    ],
+    { initialEntries: ["/app/me"] },
+  );
+
+  const view = render(
+    <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth }}>
+      <AuthContext.Provider value={{ status: "ready", auth }}>
+        <RouterProvider router={router} />
+      </AuthContext.Provider>
+    </AuthActionsContext.Provider>,
+  );
+
+  return {
+    ...view,
+    fetchMock,
+    refreshAuth,
+    getMyPageRequestCount: () => myPageRequestCount,
+  };
+}
+
+async function startDesktopProfileEdit(container: HTMLElement) {
+  const user = userEvent.setup();
+  expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
+  const scoped = desktopScope(container);
+  await user.click(scoped.getByRole("button", { name: "표시 이름 변경" }));
+  return { user, scoped };
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -138,6 +273,127 @@ function LocationStateEcho() {
 }
 
 describe("MyPage", () => {
+  it("shows editable profile identity details on desktop", () => {
+    const { container } = renderEditableMyPage();
+    const scoped = desktopScope(container);
+
+    expect(scoped.getByText("김호스트")).toBeInTheDocument();
+    expect(scoped.getByText("host@example.com")).toBeInTheDocument();
+    expect(scoped.getByText("@우")).toBeInTheDocument();
+    expect(scoped.getByRole("button", { name: "표시 이름 변경" })).toBeInTheDocument();
+  });
+
+  it("exposes the same profile edit capability on mobile", () => {
+    const { container } = renderEditableMyPage();
+    const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
+
+    expect(mobile.getByText("김호스트")).toBeInTheDocument();
+    expect(mobile.getByText("host@example.com")).toBeInTheDocument();
+    expect(mobile.getByText("@우")).toBeInTheDocument();
+    expect(mobile.getByRole("button", { name: "표시 이름 변경" })).toBeInTheDocument();
+  });
+
+  it("saves a trimmed short name through the profile API, refreshes auth, and reloads route data", async () => {
+    const { container, fetchMock, refreshAuth, getMyPageRequestCount } = renderMyRouteWithProfileFetch();
+    const { user, scoped } = await startDesktopProfileEdit(container);
+
+    const input = scoped.getByLabelText("표시 이름");
+    await user.clear(input);
+    await user.type(input, "  새이름  ");
+    await user.click(scoped.getByRole("button", { name: "표시 이름 저장" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/bff/api/me/profile",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ shortName: "새이름" }),
+        }),
+      );
+    });
+    expect(await scoped.findByText("@새이름")).toBeInTheDocument();
+    expect(refreshAuth).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(getMyPageRequestCount()).toBeGreaterThan(1));
+  });
+
+  it("blocks duplicate profile submits and marks the field pending while saving", async () => {
+    const deferred = createDeferred<MyPageResponse>();
+    const onUpdateProfile = vi.fn(() => deferred.promise);
+    const user = userEvent.setup();
+    const { container } = renderEditableMyPage({ onUpdateProfile });
+    const scoped = desktopScope(container);
+
+    await user.click(scoped.getByRole("button", { name: "표시 이름 변경" }));
+    const input = scoped.getByLabelText("표시 이름");
+    await user.clear(input);
+    await user.type(input, "새이름");
+    const saveButton = scoped.getByRole("button", { name: "표시 이름 저장" });
+    await user.dblClick(saveButton);
+
+    expect(onUpdateProfile).toHaveBeenCalledTimes(1);
+    expect(onUpdateProfile).toHaveBeenCalledWith("새이름");
+    expect(input).toBeDisabled();
+    expect(saveButton).toBeDisabled();
+    expect(saveButton).toHaveTextContent("저장 중");
+
+    await act(async () => {
+      deferred.resolve({ ...data, shortName: "새이름" });
+      await deferred.promise;
+    });
+  });
+
+  it.each([
+    ["SHORT_NAME_DUPLICATE", "같은 클럽에서 이미 쓰고 있는 이름입니다."],
+    ["SHORT_NAME_REQUIRED", "표시 이름을 입력해 주세요."],
+    ["SHORT_NAME_TOO_LONG", "표시 이름은 20자 이하로 입력해 주세요."],
+    ["SHORT_NAME_INVALID", "표시 이름으로 쓸 수 없는 형식입니다."],
+    ["SHORT_NAME_RESERVED", "시스템에서 쓰는 이름은 사용할 수 없습니다."],
+    ["MEMBERSHIP_NOT_ALLOWED", "현재 상태에서는 프로필을 수정할 수 없습니다."],
+  ])("shows the %s profile error near the field", async (code, message) => {
+    const { container } = renderMyRouteWithProfileFetch({
+      profileStatus: 400,
+      profileBody: { code, message: "raw server detail" },
+      nextMyPageData: data,
+    });
+    const { user, scoped } = await startDesktopProfileEdit(container);
+
+    const input = scoped.getByLabelText("표시 이름");
+    await user.clear(input);
+    await user.type(input, "새이름");
+    await user.click(scoped.getByRole("button", { name: "표시 이름 저장" }));
+
+    expect(await scoped.findByText(message)).toBeInTheDocument();
+    expect(scoped.queryByText("raw server detail")).not.toBeInTheDocument();
+  });
+
+  it("shows a local generic alert for unknown profile save failures", async () => {
+    const { container } = renderMyRouteWithProfileFetch({
+      profileStatus: 500,
+      profileBody: { message: "SQL constraint failed: members.short_name_unique" },
+      nextMyPageData: data,
+    });
+    const { user, scoped } = await startDesktopProfileEdit(container);
+
+    const input = scoped.getByLabelText("표시 이름");
+    await user.clear(input);
+    await user.type(input, "새이름");
+    await user.click(scoped.getByRole("button", { name: "표시 이름 저장" }));
+
+    expect(await scoped.findByRole("alert")).toHaveTextContent(
+      "표시 이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    expect(scoped.queryByText(/SQL constraint failed/)).not.toBeInTheDocument();
+  });
+
+  it("does not expose profile editing or send profile requests when profile editing is not allowed", () => {
+    const onUpdateProfile = vi.fn();
+    const { container } = renderEditableMyPage({ canEditProfile: false, onUpdateProfile });
+    const scoped = desktopScope(container);
+
+    expect(scoped.queryByRole("button", { name: "표시 이름 변경" })).not.toBeInTheDocument();
+    expect(onUpdateProfile).not.toHaveBeenCalled();
+  });
+
   it("shows account, rhythm, and feedback document sections", () => {
     const { container } = renderMyPage();
     const scoped = desktopScope(container);
@@ -364,8 +620,8 @@ describe("MyPage", () => {
     const { container } = renderMyPage();
     const scoped = desktopScope(container);
 
-    expect(scoped.getByText("김호스트 · @host")).toBeInTheDocument();
-    expect(scoped.queryByText("김호스트 · host@example.com · @host")).not.toBeInTheDocument();
+    expect(scoped.getByText("@우")).toBeInTheDocument();
+    expect(scoped.queryByText("김호스트 · host@example.com · @우")).not.toBeInTheDocument();
     expect(scoped.getByText("프로필 수정 준비 중")).toBeInTheDocument();
     expect(scoped.getAllByText("변경 준비 중")).toHaveLength(3);
     expect(scoped.getByLabelText("표시 이름 변경 준비 중")).toBeInTheDocument();
