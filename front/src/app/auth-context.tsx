@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import { anonymousAuth, AuthContext, type AuthState } from "@/src/app/auth-state";
+import { anonymousAuth, AuthActionsContext, AuthContext, type AuthState } from "@/src/app/auth-state";
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<AuthState>({ status: "loading" });
@@ -31,7 +31,16 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
-  const value = useMemo(() => state, [state]);
+  const actions = useMemo(
+    () => ({
+      markLoggedOut: () => setState({ status: "ready", auth: anonymousAuth }),
+    }),
+    [],
+  );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthActionsContext.Provider value={actions}>
+      <AuthContext.Provider value={state}>{children}</AuthContext.Provider>
+    </AuthActionsContext.Provider>
+  );
 }
