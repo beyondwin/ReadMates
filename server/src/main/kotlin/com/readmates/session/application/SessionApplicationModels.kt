@@ -34,7 +34,7 @@ data class CurrentSessionDetail(
 data class SessionAttendee(
     val membershipId: String,
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val role: String,
     val rsvpStatus: String,
     val attendanceStatus: String,
@@ -124,7 +124,7 @@ data class HostSessionDetailResponse(
 data class HostSessionAttendee(
     val membershipId: String,
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val rsvpStatus: String,
     val attendanceStatus: String,
     val participationStatus: SessionParticipationStatus = SessionParticipationStatus.ACTIVE,

@@ -39,7 +39,7 @@ export default function MemberHome({
   noteFeedItems: NoteFeedItem[];
 }) {
   const currentSession = current.currentSession;
-  const memberName = auth.shortName ?? auth.displayName ?? "멤버";
+  const memberName = auth.displayName ?? "멤버";
   const isViewer = auth.membershipStatus === "VIEWER";
 
   return (

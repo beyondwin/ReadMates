@@ -377,7 +377,7 @@ export function RosterList({ session }: { session: CurrentSession }) {
         {attendees.map((member) => (
           <div key={member.membershipId} className="row-between">
             <span className="row" style={{ gap: "10px" }}>
-              <AvatarChip name={member.displayName} fallbackInitial={member.shortName} label={member.displayName} rsvpStatus={member.rsvpStatus} size={24} />
+              <AvatarChip name={member.displayName} fallbackInitial={member.displayName} label={member.displayName} rsvpStatus={member.rsvpStatus} size={24} />
               <span className="body" style={{ fontSize: "13.5px" }}>
                 {member.displayName}
                 {member.role === "HOST" ? (

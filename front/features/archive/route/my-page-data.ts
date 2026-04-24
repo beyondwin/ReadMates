@@ -18,7 +18,7 @@ export type MyPageRouteData = {
 function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
   return {
     displayName: auth.displayName ?? "",
-    shortName: auth.shortName ?? "",
+    accountName: auth.accountName ?? "",
     email: auth.email ?? "",
     role: auth.role ?? "MEMBER",
     membershipStatus: auth.membershipStatus ?? "INACTIVE",

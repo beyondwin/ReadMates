@@ -85,8 +85,8 @@ class JdbcCurrentSessionAdapter(
             """
             select
               memberships.id as membership_id,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as display_name,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as short_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as display_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as account_name,
               memberships.role,
               session_participants.rsvp_status,
               session_participants.attendance_status
@@ -104,7 +104,7 @@ class JdbcCurrentSessionAdapter(
                 SessionAttendee(
                     membershipId = resultSet.uuid("membership_id").toString(),
                     displayName = resultSet.getString("display_name"),
-                    shortName = resultSet.getString("short_name"),
+                    accountName = resultSet.getString("account_name"),
                     role = resultSet.getString("role"),
                     rsvpStatus = resultSet.getString("rsvp_status"),
                     attendanceStatus = resultSet.getString("attendance_status"),
@@ -163,7 +163,7 @@ class JdbcCurrentSessionAdapter(
               questions.priority,
               questions.text,
               questions.draft_thought,
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name
             from questions
             join memberships on memberships.id = questions.membership_id
@@ -253,7 +253,7 @@ class JdbcCurrentSessionAdapter(
         jdbcTemplate.query(
             """
             select
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               one_line_reviews.text
             from one_line_reviews
@@ -297,7 +297,7 @@ class JdbcCurrentSessionAdapter(
         jdbcTemplate.query(
             """
             select
-              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
+              case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               long_reviews.body
             from long_reviews

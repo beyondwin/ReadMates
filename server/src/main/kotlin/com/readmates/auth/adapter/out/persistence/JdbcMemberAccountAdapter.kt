@@ -53,8 +53,8 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               users.email,
-              users.name as display_name,
-              memberships.short_name,
+              users.name as account_name,
+              coalesce(memberships.short_name, users.name) as display_name,
               memberships.role,
               memberships.status as membership_status
             from users
@@ -80,8 +80,8 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               users.email,
-              users.name as display_name,
-              memberships.short_name,
+              users.name as account_name,
+              coalesce(memberships.short_name, users.name) as display_name,
               memberships.role,
               memberships.status as membership_status
             from users
@@ -173,7 +173,7 @@ class JdbcMemberAccountAdapter(
                 normalizedSubject,
                 normalizedEmail,
                 normalizedName,
-                shortNameFor(normalizedName),
+                defaultDisplayNameFor(normalizedName),
                 normalizedProfileImageUrl,
             )
         } catch (exception: DuplicateKeyException) {
@@ -199,7 +199,7 @@ class JdbcMemberAccountAdapter(
             ?: normalizedEmail.substringBefore("@").takeIf { it.isNotEmpty() }
             ?: "Google User"
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
-        val shortName = shortNameFor(normalizedName)
+        val memberDisplayName = defaultDisplayNameFor(normalizedName)
         val userId = UUID.randomUUID()
         val membershipId = UUID.randomUUID()
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
@@ -215,7 +215,7 @@ class JdbcMemberAccountAdapter(
                 normalizedSubject,
                 normalizedEmail,
                 normalizedName,
-                shortName,
+                memberDisplayName,
                 normalizedProfileImageUrl,
             )
 
@@ -235,7 +235,7 @@ class JdbcMemberAccountAdapter(
                 """.trimIndent(),
                 membershipId.dbString(),
                 userId.dbString(),
-                shortName,
+                memberDisplayName,
             )
         } catch (exception: DuplicateKeyException) {
             throw MemberAccountDuplicateException(exception)
@@ -254,8 +254,8 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               users.email,
-              users.name as display_name,
-              memberships.short_name,
+              users.name as account_name,
+              coalesce(memberships.short_name, users.name) as display_name,
               memberships.role,
               memberships.status as membership_status
             from users
@@ -312,7 +312,7 @@ class JdbcMemberAccountAdapter(
             ?.takeIf { it.isNotEmpty() }
             ?: normalizedEmail.substringBefore("@").takeIf { it.isNotEmpty() }
             ?: "Google User"
-        val shortName = shortNameFor(normalizedName)
+        val memberDisplayName = defaultDisplayNameFor(normalizedName)
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         if (googleSubjectBelongsToDifferentEmail(jdbcTemplate, normalizedSubject, normalizedEmail)) {
@@ -335,7 +335,7 @@ class JdbcMemberAccountAdapter(
             normalizedSubject,
             normalizedEmail,
             normalizedName,
-            shortName,
+            memberDisplayName,
             normalizedProfileImageUrl,
         )
         val storedUser = findUserSubjectByEmail(jdbcTemplate, normalizedEmail) ?: return null
@@ -364,7 +364,7 @@ class JdbcMemberAccountAdapter(
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
-            shortName,
+            memberDisplayName,
             normalizedEmail,
         )
 
@@ -385,8 +385,8 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               users.email,
-              users.name as display_name,
-              memberships.short_name,
+              users.name as account_name,
+              coalesce(memberships.short_name, users.name) as display_name,
               memberships.role,
               memberships.status as membership_status
             from users
@@ -442,19 +442,19 @@ class JdbcMemberAccountAdapter(
             clubId = uuid("club_id"),
             email = getString("email").lowercase(Locale.ROOT),
             displayName = displayName,
-            shortName = getString("short_name") ?: shortNameFor(displayName),
+            accountName = getString("account_name"),
             role = MembershipRole.valueOf(getString("role")),
             membershipStatus = MembershipStatus.valueOf(getString("membership_status")),
         )
     }
 
-    private fun shortNameFor(displayName: String): String = when (displayName) {
+    private fun defaultDisplayNameFor(accountName: String): String = when (accountName) {
         "김호스트" -> "호스트"
         "안멤버1" -> "멤버1"
         "최멤버2" -> "멤버2"
         "김멤버3" -> "멤버3"
         "송멤버4" -> "멤버4"
         "이멤버5" -> "멤버5"
-        else -> displayName
+        else -> accountName
     }
 }

@@ -4,21 +4,21 @@ export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type SessionState = "DRAFT" | "OPEN" | "PUBLISHED" | "CLOSED";
 export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
 export type MemberProfileErrorCode =
-  | "SHORT_NAME_DUPLICATE"
-  | "SHORT_NAME_REQUIRED"
-  | "SHORT_NAME_TOO_LONG"
-  | "SHORT_NAME_INVALID"
-  | "SHORT_NAME_RESERVED"
+  | "DISPLAY_NAME_DUPLICATE"
+  | "DISPLAY_NAME_REQUIRED"
+  | "DISPLAY_NAME_TOO_LONG"
+  | "DISPLAY_NAME_INVALID"
+  | "DISPLAY_NAME_RESERVED"
   | "MEMBERSHIP_NOT_ALLOWED";
 
 export type UpdateMemberProfileRequest = {
-  shortName: string;
+  displayName: string;
 };
 
 export type MemberProfileResponse = {
   membershipId: string;
   displayName: string;
-  shortName: string;
+  accountName: string;
   profileImageUrl: string | null;
 };
 
@@ -160,7 +160,7 @@ export type NoteSessionItem = {
 
 export type MyPageResponse = {
   displayName: string;
-  shortName: string;
+  accountName: string;
   email: string;
   role: MemberRole;
   membershipStatus: MembershipStatus;

@@ -592,7 +592,7 @@ function MobilePrepMeta({
           {attendees.map((member) => (
             <div key={member.membershipId} className="m-row-between">
               <span className="m-row" style={{ gap: 10 }}>
-                <AvatarChip name={member.displayName} fallbackInitial={member.shortName} label={member.displayName} rsvpStatus={member.rsvpStatus} size={24} />
+                <AvatarChip name={member.displayName} fallbackInitial={member.displayName} label={member.displayName} rsvpStatus={member.rsvpStatus} size={24} />
                 <span className="body" style={{ fontSize: 13.5 }}>
                   {member.displayName}
                 </span>

@@ -10,7 +10,7 @@ data class MemberProfileRow(
     val clubId: UUID,
     val email: String,
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val profileImageUrl: String?,
     val role: MembershipRole,
     val status: MembershipStatus,
@@ -21,8 +21,8 @@ interface MemberProfileStorePort {
     fun findProfileMemberByUserId(userId: UUID): MemberProfileRow?
     fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID): MemberProfileRow?
     fun lockClubProfileNames(clubId: UUID): Boolean
-    fun shortNameExistsInClub(clubId: UUID, shortName: String, excludingMembershipId: UUID): Boolean
-    fun updateOwnShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean
-    fun updateShortName(clubId: UUID, membershipId: UUID, shortName: String): Boolean
+    fun displayNameExistsInClub(clubId: UUID, displayName: String, excludingMembershipId: UUID): Boolean
+    fun updateOwnDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean
+    fun updateDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean
     fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow?
 }

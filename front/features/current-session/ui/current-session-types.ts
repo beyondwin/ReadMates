@@ -66,7 +66,7 @@ export type CurrentSession = {
   attendees: Array<{
     membershipId: string;
     displayName: string;
-    shortName: string;
+    accountName: string;
     role: CurrentSessionMemberRole;
     rsvpStatus: RsvpStatus;
     attendanceStatus: AttendanceStatus;

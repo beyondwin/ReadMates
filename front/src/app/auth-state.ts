@@ -15,7 +15,7 @@ export const anonymousAuth: AuthMeResponse = {
   clubId: null,
   email: null,
   displayName: null,
-  shortName: null,
+  accountName: null,
   role: null,
   membershipStatus: null,
   approvalState: "ANONYMOUS",

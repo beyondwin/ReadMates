@@ -42,12 +42,12 @@ export function MyPageRoute({
   const data = useLoaderData() as MyPageRouteData;
   const revalidator = useRevalidator();
   const submitProfileUpdate = useCallback(
-    async (shortName: string): Promise<MemberProfileResponse> => {
+    async (displayName: string): Promise<MemberProfileResponse> => {
       if (!canEditProfile) {
         throw new Error(profileSaveErrorMessage("MEMBERSHIP_NOT_ALLOWED"));
       }
 
-      const response = await updateMyProfile(shortName);
+      const response = await updateMyProfile(displayName);
 
       if (!response.ok) {
         throw new Error(profileSaveErrorMessage(await profileErrorCodeFromResponse(response)));

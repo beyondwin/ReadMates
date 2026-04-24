@@ -9,7 +9,7 @@ export type AuthMeResponse = {
   clubId: string | null;
   email: string | null;
   displayName: string | null;
-  shortName: string | null;
+  accountName: string | null;
   role: MemberRole | null;
   membershipStatus: MembershipStatus | null;
   approvalState: ApprovalState;

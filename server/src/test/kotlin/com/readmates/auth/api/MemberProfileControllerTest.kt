@@ -61,7 +61,7 @@ class MemberProfileControllerTest(
     }
 
     @Test
-    fun `member updates own short name after trimming input`() {
+    fun `member updates own display name after trimming input`() {
         val email = insertProfileMember(
             "self.active",
             "ACTIVE",
@@ -77,12 +77,13 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"  After  "}"""
+            content = """{"displayName":"  After  "}"""
         }.andExpect {
             status { isOk() }
             jsonPath("$.membershipId") { value(membershipId) }
-            jsonPath("$.displayName") { value("self.active") }
-            jsonPath("$.shortName") { value("After") }
+            jsonPath("$.displayName") { value("After") }
+            jsonPath("$.accountName") { value("self.active") }
+            jsonPath("$.shortName") { doesNotExist() }
             jsonPath("$.profileImageUrl") { value("https://cdn.example.test/profiles/self-active.png") }
             jsonPath("$.authenticated") { doesNotExist() }
             jsonPath("$.email") { doesNotExist() }
@@ -93,7 +94,7 @@ class MemberProfileControllerTest(
     }
 
     @Test
-    fun `viewer updates own short name`() {
+    fun `viewer updates own display name`() {
         val email = insertProfileMember("self.viewer", "VIEWER", shortName = "ViewerBefore")
         val cookie = sessionCookieForEmail(email)
 
@@ -103,10 +104,11 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"ViewerAfter"}"""
+            content = """{"displayName":"ViewerAfter"}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.shortName") { value("ViewerAfter") }
+            jsonPath("$.displayName") { value("ViewerAfter") }
+            jsonPath("$.shortName") { doesNotExist() }
         }
 
         assertEquals("ViewerAfter", shortNameForEmail(email))
@@ -119,7 +121,7 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"NoSession"}"""
+            content = """{"displayName":"NoSession"}"""
         }.andExpect {
             status { isUnauthorized() }
             jsonPath("$.code") { value("AUTHENTICATION_REQUIRED") }
@@ -139,7 +141,7 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"shortName":"ShouldNotStore"}"""
+                content = """{"displayName":"ShouldNotStore"}"""
             }.andExpect {
                 status { isForbidden() }
                 jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
@@ -151,18 +153,18 @@ class MemberProfileControllerTest(
     }
 
     @Test
-    fun `own profile short name validation returns structured errors`() {
+    fun `own profile display name validation returns structured errors`() {
         val email = insertProfileMember("self.validation", "ACTIVE", shortName = "Original")
         val cookie = sessionCookieForEmail(email)
         val cases = listOf(
-            "" to "SHORT_NAME_REQUIRED",
-            "   " to "SHORT_NAME_REQUIRED",
-            "123456789012345678901" to "SHORT_NAME_TOO_LONG",
-            "name@example.com" to "SHORT_NAME_INVALID",
-            "https://example.com/me" to "SHORT_NAME_INVALID",
-            "example.com" to "SHORT_NAME_INVALID",
-            "line\nbreak" to "SHORT_NAME_INVALID",
-            "관리자" to "SHORT_NAME_RESERVED",
+            "" to "DISPLAY_NAME_REQUIRED",
+            "   " to "DISPLAY_NAME_REQUIRED",
+            "123456789012345678901" to "DISPLAY_NAME_TOO_LONG",
+            "name@example.com" to "DISPLAY_NAME_INVALID",
+            "https://example.com/me" to "DISPLAY_NAME_INVALID",
+            "example.com" to "DISPLAY_NAME_INVALID",
+            "line\nbreak" to "DISPLAY_NAME_INVALID",
+            "관리자" to "DISPLAY_NAME_RESERVED",
         )
 
         cases.forEach { (shortName, code) ->
@@ -172,7 +174,7 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"shortName":${jsonString(shortName)}}"""
+                content = """{"displayName":${jsonString(shortName)}}"""
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value(code) }
@@ -183,7 +185,7 @@ class MemberProfileControllerTest(
     }
 
     @Test
-    fun `duplicate own short name is rejected within same club except current value`() {
+    fun `duplicate own display name is rejected within same club except current value`() {
         val email = insertProfileMember("self.duplicate", "ACTIVE", shortName = "Mine")
         insertProfileMember("self.taken", "ACTIVE", shortName = "Taken")
         val cookie = sessionCookieForEmail(email)
@@ -194,10 +196,10 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"Taken"}"""
+            content = """{"displayName":"Taken"}"""
         }.andExpect {
             status { isConflict() }
-            jsonPath("$.code") { value("SHORT_NAME_DUPLICATE") }
+            jsonPath("$.code") { value("DISPLAY_NAME_DUPLICATE") }
         }
 
         mockMvc.patch("/api/me/profile") {
@@ -206,10 +208,11 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"Mine"}"""
+            content = """{"displayName":"Mine"}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.shortName") { value("Mine") }
+            jsonPath("$.displayName") { value("Mine") }
+            jsonPath("$.shortName") { doesNotExist() }
         }
     }
 
@@ -245,7 +248,7 @@ class MemberProfileControllerTest(
                         header("Origin", "http://localhost:3000")
                         with(csrf())
                         contentType = MediaType.APPLICATION_JSON
-                        content = """{"shortName":"RaceTaken"}"""
+                        content = """{"displayName":"RaceTaken"}"""
                     }.andReturn().response.status
                 }
 
@@ -307,7 +310,7 @@ class MemberProfileControllerTest(
                         header("Origin", "http://localhost:3000")
                         with(csrf())
                         contentType = MediaType.APPLICATION_JSON
-                        content = """{"shortName":"StatusRaceAfter"}"""
+                        content = """{"displayName":"StatusRaceAfter"}"""
                     }.andReturn().response
                     response.status to response.contentAsString
                 }
@@ -355,11 +358,12 @@ class MemberProfileControllerTest(
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"shortName":"$newShortName"}"""
+                content = """{"displayName":"$newShortName"}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.membershipId") { value(membershipId) }
-                jsonPath("$.shortName") { value(newShortName) }
+                jsonPath("$.displayName") { value(newShortName) }
+                jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.status") { value(status) }
                 jsonPath("$.canDeactivate") { exists() }
             }
@@ -379,7 +383,7 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"ShouldNotStore"}"""
+            content = """{"displayName":"ShouldNotStore"}"""
         }.andExpect {
             status { isForbidden() }
             jsonPath("$.code") { value("HOST_ROLE_REQUIRED") }
@@ -397,7 +401,7 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"NoSession"}"""
+            content = """{"displayName":"NoSession"}"""
         }.andExpect {
             status { isUnauthorized() }
             jsonPath("$.code") { value("AUTHENTICATION_REQUIRED") }
@@ -420,7 +424,7 @@ class MemberProfileControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"ShouldNotStore"}"""
+            content = """{"displayName":"ShouldNotStore"}"""
         }.andExpect {
             status { isNotFound() }
             jsonPath("$.code") { value("MEMBER_NOT_FOUND") }
@@ -544,7 +548,7 @@ class MemberProfileControllerTest(
             """.trimIndent(),
             String::class.java,
             email,
-        ) ?: error("Expected short name for $email")
+        ) ?: error("Expected display name for $email")
 
     private fun shortNameForMembership(membershipId: String): String =
         jdbcTemplate.queryForObject(
@@ -555,7 +559,7 @@ class MemberProfileControllerTest(
             """.trimIndent(),
             String::class.java,
             membershipId,
-        ) ?: error("Expected short name for $membershipId")
+        ) ?: error("Expected display name for $membershipId")
 
     private fun jsonString(value: String): String =
         "\"${value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\""

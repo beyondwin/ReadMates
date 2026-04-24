@@ -36,7 +36,7 @@ class AuthenticatedMemberResolver(
             clubId = clubId,
             email = email.lowercase(Locale.ROOT),
             displayName = displayName,
-            shortName = shortName,
+            accountName = accountName,
             role = role,
             membershipStatus = status,
         )

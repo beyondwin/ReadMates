@@ -73,7 +73,8 @@ class AuthMeControllerTest(
                 jsonPath("$.clubId") { value(null) }
                 jsonPath("$.email") { value(null) }
                 jsonPath("$.displayName") { value(null) }
-                jsonPath("$.shortName") { value(null) }
+                jsonPath("$.accountName") { value(null) }
+                jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.role") { value(null) }
                 jsonPath("$.membershipStatus") { value(null) }
                 jsonPath("$.approvalState") { value("ANONYMOUS") }
@@ -93,8 +94,9 @@ class AuthMeControllerTest(
                 jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000001") }
                 jsonPath("$.email") { value("member5@example.com") }
                 jsonPath("$.role") { value("MEMBER") }
-                jsonPath("$.displayName") { value("이멤버5") }
-                jsonPath("$.shortName") { value("멤버5") }
+                jsonPath("$.displayName") { value("멤버5") }
+                jsonPath("$.accountName") { value("이멤버5") }
+                jsonPath("$.shortName") { doesNotExist() }
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
             }
@@ -289,7 +291,7 @@ class AuthMeControllerTest(
     }
 
     @Test
-    fun `auth me returns updated short name after profile mutation`() {
+    fun `auth me returns updated display name after profile mutation`() {
         val email = uniqueLifecycleEmail("profile.authme")
         val cookie = loginAsLifecycleUser(email, "ACTIVE")
 
@@ -299,7 +301,7 @@ class AuthMeControllerTest(
             header("Origin", "http://localhost:3000")
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content = """{"shortName":"UpdatedMe"}"""
+            content = """{"displayName":"UpdatedMe"}"""
         }.andExpect {
             status { isOk() }
         }
@@ -310,7 +312,8 @@ class AuthMeControllerTest(
             status { isOk() }
             jsonPath("$.authenticated") { value(true) }
             jsonPath("$.email") { value(email) }
-            jsonPath("$.shortName") { value("UpdatedMe") }
+            jsonPath("$.displayName") { value("UpdatedMe") }
+            jsonPath("$.shortName") { doesNotExist() }
         }
     }
 

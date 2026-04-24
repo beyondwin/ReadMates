@@ -71,7 +71,7 @@ export function AppRouteLayout() {
         : "member";
   const mobileVariant = mobileWorkspace;
   const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
-  const memberName = auth?.displayName ?? auth?.shortName ?? null;
+  const memberName = auth?.displayName ?? null;
   const activeHostKey = isActiveHost && mobileWorkspace === "host" ? auth.membershipId : null;
   const [hostCurrentSession, setHostCurrentSession] = useState<{
     hostKey: string | null;

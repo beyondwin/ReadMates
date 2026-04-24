@@ -60,7 +60,7 @@ export type MemberHomeCurrentSessionResponse = {
     attendees: Array<{
       membershipId: string;
       displayName: string;
-      shortName: string;
+      accountName: string;
       role: MemberHomeMemberRole;
       rsvpStatus: RsvpStatus;
       attendanceStatus: AttendanceStatus;

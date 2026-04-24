@@ -9,7 +9,7 @@ data class ViewerMemberRow(
     val userId: UUID,
     val email: String,
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val profileImageUrl: String?,
     val status: MembershipStatus,
     val createdAt: OffsetDateTime,

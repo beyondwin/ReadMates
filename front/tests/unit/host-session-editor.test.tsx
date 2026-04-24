@@ -304,7 +304,7 @@ describe("HostSessionEditor", () => {
   it("renders attendance and the session feedback document from the host session detail API payload", () => {
     render(<HostSessionEditorForTest session={session} />);
 
-    expect(screen.getAllByText("김호스트")).not.toHaveLength(0);
+    expect(screen.getAllByText("우")).not.toHaveLength(0);
     expect(screen.getByText("피드백 문서")).toBeInTheDocument();
     expect(screen.getByLabelText("피드백 문서 파일")).toHaveAttribute("accept", ".md,.txt");
     expect(screen.getByText("업로드 완료")).toBeInTheDocument();
@@ -314,8 +314,8 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("button", { name: "교체" })).toBeInTheDocument();
     expect(screen.queryByText(`${retiredPersonalFeedbackReportLabel} (HTML)`)).not.toBeInTheDocument();
     expect(screen.queryByText("HTML 파일을 드래그하거나 클릭해 업로드")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "김호스트 리포트 열기 준비중" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "이멤버5 리포트 업로드 준비중" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "우 리포트 열기 준비중" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "수 리포트 업로드 준비중" })).not.toBeInTheDocument();
     expect(screen.queryByText("이멤버14")).not.toBeInTheDocument();
     expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
   });
@@ -680,7 +680,7 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={session} />);
 
-    const absentToggle = screen.getByRole("button", { name: "이멤버5 불참" });
+    const absentToggle = screen.getByRole("button", { name: "수 불참" });
     expect(absentToggle).toHaveAttribute("aria-pressed", "false");
 
     await user.click(absentToggle);
@@ -693,7 +693,7 @@ describe("HostSessionEditor", () => {
       })),
     );
     expect(absentToggle).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows removed participants in a separate collapsed attendance section", () => {
@@ -705,8 +705,8 @@ describe("HostSessionEditor", () => {
             ...session.attendees,
             {
               membershipId: "membership-removed",
-              displayName: "제외된 멤버",
-              shortName: "제외",
+              displayName: "제외",
+              accountName: "제외된 멤버",
               rsvpStatus: "GOING",
               attendanceStatus: "UNKNOWN",
               participationStatus: "REMOVED",
@@ -716,7 +716,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.queryByText("제외된 멤버")).not.toBeInTheDocument();
+    expect(screen.queryByText("제외")).not.toBeInTheDocument();
     expect(screen.getAllByText("제외된 참가자 1명").length).toBeGreaterThan(0);
   });
 
@@ -743,7 +743,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "이멤버5 참석" }));
+    await user.click(screen.getByRole("button", { name: "수 참석" }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
         cache: "no-store",
@@ -751,11 +751,11 @@ describe("HostSessionEditor", () => {
         body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ATTENDED" }]),
       })),
     );
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    await user.click(screen.getByRole("button", { name: "수 불참" }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "true");
 
     firstAttendanceSave.resolve({ ok: true });
 
@@ -770,8 +770,8 @@ describe("HostSessionEditor", () => {
 
     secondAttendanceSave.resolve({ ok: true });
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true"));
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "false");
+    await waitFor(() => expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "false");
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
@@ -798,7 +798,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "이멤버5 참석" }));
+    await user.click(screen.getByRole("button", { name: "수 참석" }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
         cache: "no-store",
@@ -806,11 +806,11 @@ describe("HostSessionEditor", () => {
         body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ATTENDED" }]),
       })),
     );
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    await user.click(screen.getByRole("button", { name: "수 불참" }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "true");
 
     firstAttendanceSave.resolve({ ok: true });
 
@@ -825,8 +825,8 @@ describe("HostSessionEditor", () => {
     secondAttendanceSave.resolve({ ok: false });
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("출석 저장에 실패했습니다"));
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("rolls back to the last committed attendance status when the latest coalesced write fails", async () => {
@@ -852,7 +852,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "이멤버5 참석" }));
+    await user.click(screen.getByRole("button", { name: "수 참석" }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenNthCalledWith(1, "/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
         cache: "no-store",
@@ -860,11 +860,11 @@ describe("HostSessionEditor", () => {
         body: JSON.stringify([{ membershipId: "membership-suhan", attendanceStatus: "ATTENDED" }]),
       })),
     );
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "true");
 
-    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    await user.click(screen.getByRole("button", { name: "수 불참" }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "true");
 
     firstAttendanceSave.resolve({ ok: false });
 
@@ -880,8 +880,8 @@ describe("HostSessionEditor", () => {
     secondAttendanceSave.resolve({ ok: false });
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("출석 저장에 실패했습니다"));
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("rolls back an optimistic attendance update when the save request rejects", async () => {
@@ -891,7 +891,7 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={session} />);
 
-    await user.click(screen.getByRole("button", { name: "이멤버5 불참" }));
+    await user.click(screen.getByRole("button", { name: "수 불참" }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/attendance", expect.objectContaining({
         cache: "no-store",
@@ -901,8 +901,8 @@ describe("HostSessionEditor", () => {
     );
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("출석 저장에 실패했습니다"));
-    expect(screen.getByRole("button", { name: "이멤버5 참석" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "이멤버5 불참" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("previews and deletes an open session from the danger modal", async () => {

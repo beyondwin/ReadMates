@@ -106,7 +106,7 @@ data class MemberArchiveFeedbackDocumentStatus(
 
 data class MyPageResponse(
     val displayName: String,
-    val shortName: String,
+    val accountName: String,
     val email: String,
     val role: String,
     val membershipStatus: String,

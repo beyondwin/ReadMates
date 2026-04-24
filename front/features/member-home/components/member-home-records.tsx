@@ -215,7 +215,7 @@ export function RosterSummary({ current }: { current: CurrentSessionResponse }) 
             <AvatarChip
               key={member.membershipId}
               name={member.displayName}
-              fallbackInitial={member.shortName}
+              fallbackInitial={member.displayName}
               label={`${member.displayName} · ${rsvpLabel(member.rsvpStatus)}`}
               rsvpStatus={member.rsvpStatus}
               size={26}

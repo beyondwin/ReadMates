@@ -73,7 +73,7 @@ export type FeedbackDocumentListItem = {
 
 export type MyPageProfile = {
   displayName: string;
-  shortName: string;
+  accountName: string;
   email: string;
   role: MemberRole;
   membershipStatus: MembershipStatus;
@@ -162,7 +162,7 @@ const SESSION_YEAR_GROUP_PATTERN = /^(\d{4})(?:-(\d{2})(?:-(\d{2})(?:(?:T|\s).*)
 const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const DATE_PREFIX_PATTERN = /^(\d{4})-(\d{2})-(\d{2})(?=[T\s])/;
 const JOINED_MONTH_PATTERN = /^(\d{4})-(\d{2})$/;
-const UNKNOWN_PROFILE_SAVE_ERROR_MESSAGE = "표시 이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+const UNKNOWN_PROFILE_SAVE_ERROR_MESSAGE = "이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 
 export const archiveTabs: Array<{ key: ArchiveView; label: string }> = [
   { key: "sessions", label: "세션" },
@@ -560,23 +560,17 @@ export function membershipJoinedLine(data: MyPageProfile) {
   return joinedMonth === "합류 전" ? `${membershipIdentityLabel(data)} · 합류 전` : `${membershipIdentityLabel(data)} · ${joinedMonth} 합류`;
 }
 
-export function identityLine(data: Pick<MyPageProfile, "displayName" | "email" | "shortName">) {
-  const shortName = data.shortName.trim();
-  const localPart = data.email.split("@")[0] || data.displayName;
-  return `@${shortName || localPart}`;
-}
-
 export function profileSaveErrorMessage(code: string | null | undefined) {
   switch (code) {
-    case "SHORT_NAME_REQUIRED":
-      return "표시 이름을 입력해 주세요.";
-    case "SHORT_NAME_TOO_LONG":
-      return "표시 이름은 20자 이하로 입력해 주세요.";
-    case "SHORT_NAME_INVALID":
-      return "표시 이름으로 쓸 수 없는 형식입니다.";
-    case "SHORT_NAME_RESERVED":
+    case "DISPLAY_NAME_REQUIRED":
+      return "이름을 입력해 주세요.";
+    case "DISPLAY_NAME_TOO_LONG":
+      return "이름은 20자 이하로 입력해 주세요.";
+    case "DISPLAY_NAME_INVALID":
+      return "이름으로 쓸 수 없는 형식입니다.";
+    case "DISPLAY_NAME_RESERVED":
       return "시스템에서 쓰는 이름은 사용할 수 없습니다.";
-    case "SHORT_NAME_DUPLICATE":
+    case "DISPLAY_NAME_DUPLICATE":
       return "같은 클럽에서 이미 쓰고 있는 이름입니다.";
     case "MEMBERSHIP_NOT_ALLOWED":
       return "현재 상태에서는 프로필을 수정할 수 없습니다.";

@@ -48,8 +48,9 @@ class DevLoginControllerTest(
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.email") { value("host@example.com") }
                 jsonPath("$.role") { value("HOST") }
-                jsonPath("$.displayName") { value("김호스트") }
-                jsonPath("$.shortName") { value("호스트") }
+                jsonPath("$.displayName") { value("호스트") }
+                jsonPath("$.accountName") { value("김호스트") }
+                jsonPath("$.shortName") { doesNotExist() }
             }
     }
 
@@ -199,8 +200,9 @@ class DevLoginControllerTest(
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.email") { value("host@example.com") }
                 jsonPath("$.role") { value("HOST") }
-                jsonPath("$.displayName") { value("김호스트") }
-                jsonPath("$.shortName") { value("호스트") }
+                jsonPath("$.displayName") { value("호스트") }
+                jsonPath("$.accountName") { value("김호스트") }
+                jsonPath("$.shortName") { doesNotExist() }
             }
     }
 

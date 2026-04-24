@@ -257,7 +257,7 @@ class JdbcArchiveQueryAdapter(
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
             ?: return MyPageResult(
                 displayName = currentMember.displayName,
-                shortName = currentMember.shortName,
+                accountName = currentMember.accountName,
                 email = currentMember.email,
                 role = currentMember.role.name,
                 membershipStatus = currentMember.membershipStatus.name,
@@ -325,7 +325,7 @@ class JdbcArchiveQueryAdapter(
             { resultSet, _ ->
                 MyPageResult(
                     displayName = currentMember.displayName,
-                    shortName = currentMember.shortName,
+                    accountName = currentMember.accountName,
                     email = currentMember.email,
                     role = currentMember.role.name,
                     membershipStatus = currentMember.membershipStatus.name,
@@ -340,7 +340,7 @@ class JdbcArchiveQueryAdapter(
             currentMember.clubId.dbString(),
         ).firstOrNull() ?: MyPageResult(
             displayName = currentMember.displayName,
-            shortName = currentMember.shortName,
+            accountName = currentMember.accountName,
             email = currentMember.email,
             role = currentMember.role.name,
             membershipStatus = currentMember.membershipStatus.name,

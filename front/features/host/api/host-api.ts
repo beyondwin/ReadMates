@@ -105,8 +105,8 @@ export function submitHostViewerAction(membershipId: string, action: "activate" 
   });
 }
 
-export function submitHostMemberProfile(membershipId: string, shortName: string) {
-  const request: UpdateHostMemberProfileRequest = { shortName };
+export function submitHostMemberProfile(membershipId: string, displayName: string) {
+  const request: UpdateHostMemberProfileRequest = { displayName };
 
   return readmatesFetchResponse(`/api/host/members/${encodeURIComponent(membershipId)}/profile`, {
     method: "PATCH",

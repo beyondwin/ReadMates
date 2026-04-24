@@ -94,13 +94,14 @@ class ViewerSecurityTest(
 
     @Test
     fun `viewer can read member home`() {
-        val cookie = viewerSessionCookie("viewer.home")
+        val cookie = viewerSessionCookie("viewer.home", membershipDisplayName = "Viewer Home")
 
         mockMvc.get("/api/app/me") {
             cookie(cookie)
         }.andExpect {
             status { isOk() }
-            jsonPath("$.displayName") { value("Viewer Member") }
+            jsonPath("$.displayName") { value("Viewer Home") }
+            jsonPath("$.accountName") { value("Viewer Member") }
             jsonPath("$.email") { exists() }
             jsonPath("$.role") { value("MEMBER") }
             jsonPath("$.membershipStatus") { value("VIEWER") }
@@ -161,7 +162,7 @@ class ViewerSecurityTest(
         assertEquals("Feedback documents require active membership", exception.reason)
     }
 
-    private fun viewerSessionCookie(emailPrefixOrAddress: String): Cookie {
+    private fun viewerSessionCookie(emailPrefixOrAddress: String, membershipDisplayName: String? = null): Cookie {
         val email = if (emailPrefixOrAddress.contains("@")) {
             emailPrefixOrAddress
         } else {
@@ -169,7 +170,7 @@ class ViewerSecurityTest(
         }
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
-        val shortName = "Viewer${userId.take(8)}"
+        val displayName = membershipDisplayName ?: "Viewer${userId.take(8)}"
 
         jdbcTemplate.update(
             """
@@ -179,7 +180,7 @@ class ViewerSecurityTest(
             userId,
             "google-viewer-security-$userId",
             email,
-            shortName,
+            displayName,
         )
         createdUserIds += userId
 
@@ -190,7 +191,7 @@ class ViewerSecurityTest(
             """.trimIndent(),
             membershipId,
             userId,
-            shortName,
+            displayName,
         )
         createdMembershipIds += membershipId
 

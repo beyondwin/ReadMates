@@ -21,7 +21,7 @@ function sqlString(value: string) {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function uniqueShortName(prefix: string) {
+function uniqueDisplayName(prefix: string) {
   uniqueCounter += 1;
   return `${prefix}${Date.now().toString(36)}${uniqueCounter}`;
 }
@@ -45,6 +45,12 @@ set short_name = case lower(email)
   end,
   updated_at = utc_timestamp(6)
 where lower(email) in (${seededEmails.map(sqlString).join(", ")});
+
+update memberships
+join users on users.id = memberships.user_id
+set memberships.short_name = users.short_name,
+    memberships.updated_at = utc_timestamp(6)
+where lower(users.email) in (${seededEmails.map(sqlString).join(", ")});
 `);
 }
 
@@ -73,18 +79,19 @@ test.afterEach(() => {
   resetSeededProfiles();
 });
 
-test("member edits own profile short name and sees it update in-session", async ({ page }) => {
-  const updatedShortName = uniqueShortName("Me");
+test("member edits own profile display name and sees it update in-session", async ({ page }) => {
+  const updatedDisplayName = uniqueDisplayName("Me");
 
   await loginWithGoogleFixture(page, selfEditMemberEmail);
   await page.goto("/app/me");
 
   await expect(page.getByRole("heading", { name: "계정과 기록", level: 1 })).toBeVisible();
   const personalSettings = page.locator("section").filter({ has: page.getByRole("heading", { name: "개인 설정" }) });
-  await expect(personalSettings.getByText("@멤버5")).toBeVisible();
+  await expect(personalSettings.getByText("멤버5", { exact: true }).first()).toBeVisible();
+  await expect(personalSettings.getByText("@멤버5")).toHaveCount(0);
 
-  await personalSettings.getByRole("button", { name: "표시 이름 변경" }).click();
-  await personalSettings.getByRole("textbox", { name: "표시 이름" }).fill(`  ${updatedShortName}  `);
+  await personalSettings.getByRole("button", { name: "이름 변경" }).click();
+  await personalSettings.getByRole("textbox", { name: "이름" }).fill(`  ${updatedDisplayName}  `);
 
   const profileResponse = page.waitForResponse(
     (response) =>
@@ -92,20 +99,21 @@ test("member edits own profile short name and sees it update in-session", async 
       response.url().includes("/api/bff/api/me/profile") &&
       response.status() === 200,
   );
-  await personalSettings.getByRole("button", { name: "표시 이름 저장" }).click();
+  await personalSettings.getByRole("button", { name: "이름 저장" }).click();
   await profileResponse;
 
-  await expect(personalSettings.getByText(`@${updatedShortName}`)).toBeVisible();
+  await expect(personalSettings.getByText(updatedDisplayName, { exact: true }).first()).toBeVisible();
+  await expect(personalSettings.getByText(`@${updatedDisplayName}`)).toHaveCount(0);
 
   const authState = await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/auth/me", { cache: "no-store" });
-    return response.json() as Promise<{ shortName: string | null }>;
+    return response.json() as Promise<{ displayName: string | null }>;
   });
-  expect(authState.shortName).toBe(updatedShortName);
+  expect(authState.displayName).toBe(updatedDisplayName);
 });
 
-test("host edits a same-club member short name and sees the row update", async ({ page }) => {
-  const updatedShortName = uniqueShortName("Host");
+test("host edits a same-club member display name and sees the row update", async ({ page }) => {
+  const updatedDisplayName = uniqueDisplayName("Host");
 
   await loginWithGoogleFixture(page, hostEmail);
   await page.goto("/app/host/members");
@@ -114,11 +122,12 @@ test("host edits a same-club member short name and sees the row update", async (
   await page.getByRole("tab", { name: "활성 멤버" }).click();
 
   const memberRow = page.getByRole("article").filter({ hasText: hostTargetMemberEmail });
-  await expect(memberRow).toContainText("@멤버4");
+  await expect(memberRow).toContainText("멤버4");
+  await expect(memberRow).not.toContainText("@멤버4");
 
-  await memberRow.getByRole("button", { name: "표시 이름 변경" }).click();
-  const dialog = page.getByRole("dialog", { name: /표시 이름 수정/ });
-  await dialog.getByRole("textbox", { name: "표시 이름" }).fill(updatedShortName);
+  await memberRow.getByRole("button", { name: "이름 변경" }).click();
+  const dialog = page.getByRole("dialog", { name: /이름 수정/ });
+  await dialog.getByRole("textbox", { name: "이름" }).fill(updatedDisplayName);
 
   const profileResponse = page.waitForResponse(
     (response) =>
@@ -127,11 +136,12 @@ test("host edits a same-club member short name and sees the row update", async (
       response.url().includes("/profile") &&
       response.status() === 200,
   );
-  await dialog.getByRole("button", { name: "표시 이름 저장" }).click();
+  await dialog.getByRole("button", { name: "이름 저장" }).click();
   await profileResponse;
 
-  await expect(page.getByRole("status")).toContainText("표시 이름을 저장했습니다.");
-  await expect(memberRow).toContainText(`@${updatedShortName}`);
+  await expect(page.getByRole("status")).toContainText("이름을 저장했습니다.");
+  await expect(memberRow).toContainText(updatedDisplayName);
+  await expect(memberRow).not.toContainText(`@${updatedDisplayName}`);
 });
 
 test("viewer can read member routes but cannot use current-session write actions or host routes", async ({ page }) => {

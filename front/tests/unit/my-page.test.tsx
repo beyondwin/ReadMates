@@ -29,7 +29,7 @@ type Deferred<T> = {
 
 type EditableMyPageProps = MyPageProps & {
   canEditProfile: boolean;
-  onUpdateProfile: (shortName: string) => Promise<MemberProfileResponse>;
+  onUpdateProfile: (displayName: string) => Promise<MemberProfileResponse>;
 };
 
 function createDeferred<T>(): Deferred<T> {
@@ -95,8 +95,8 @@ async function testLeaveMembership() {
 }
 
 const data: MyPageResponse = {
-  displayName: "김호스트",
-  shortName: "우",
+  displayName: "우",
+  accountName: "김호스트",
   email: "host@example.com",
   role: "HOST",
   membershipStatus: "ACTIVE",
@@ -121,17 +121,17 @@ const activeAuth: AuthMeResponse = {
   clubId: "club-id",
   email: data.email,
   displayName: data.displayName,
-  shortName: data.shortName,
+  accountName: data.accountName,
   role: data.role,
   membershipStatus: data.membershipStatus,
   approvalState: "ACTIVE",
 };
 
-function memberProfileResponse(shortName: string): MemberProfileResponse {
+function memberProfileResponse(displayName: string): MemberProfileResponse {
   return {
     membershipId: "member-membership",
-    displayName: data.displayName,
-    shortName,
+    displayName,
+    accountName: data.accountName,
     profileImageUrl: null,
   };
 }
@@ -172,7 +172,7 @@ function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
     LogoutButtonComponent: TestLogoutButton,
     onLeaveMembership: testLeaveMembership,
     canEditProfile: true,
-    onUpdateProfile: async (shortName: string) => memberProfileResponse(shortName),
+    onUpdateProfile: async (displayName: string) => memberProfileResponse(displayName),
     ...overrides,
   };
 
@@ -183,7 +183,7 @@ function renderMyRouteWithProfileFetch({
   auth = activeAuth,
   profileStatus = 200,
   profileBody = memberProfileResponse("새이름"),
-  nextMyPageData = { ...data, shortName: "새이름" },
+  nextMyPageData = { ...data, displayName: "새이름" },
 }: {
   auth?: AuthMeResponse;
   profileStatus?: number;
@@ -257,7 +257,7 @@ async function startDesktopProfileEdit(container: HTMLElement) {
   const user = userEvent.setup();
   expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
   const scoped = desktopScope(container);
-  await user.click(scoped.getByRole("button", { name: "표시 이름 변경" }));
+  await user.click(scoped.getByRole("button", { name: "이름 변경" }));
   return { user, scoped };
 }
 
@@ -290,41 +290,43 @@ describe("MyPage", () => {
     const { container } = renderEditableMyPage();
     const scoped = desktopScope(container);
 
-    expect(scoped.getByText("김호스트")).toBeInTheDocument();
+    expect(scoped.getAllByText("우").length).toBeGreaterThan(0);
     expect(scoped.getByText("host@example.com")).toBeInTheDocument();
-    expect(scoped.getByText("@우")).toBeInTheDocument();
-    expect(scoped.getByRole("button", { name: "표시 이름 변경" })).toBeInTheDocument();
+    expect(scoped.queryByText("김호스트")).not.toBeInTheDocument();
+    expect(scoped.queryByText("@우")).not.toBeInTheDocument();
+    expect(scoped.getByRole("button", { name: "이름 변경" })).toBeInTheDocument();
   });
 
   it("exposes the same profile edit capability on mobile", () => {
     const { container } = renderEditableMyPage();
     const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
 
-    expect(mobile.getByText("김호스트")).toBeInTheDocument();
+    expect(mobile.getAllByText("우").length).toBeGreaterThan(0);
     expect(mobile.getByText("host@example.com")).toBeInTheDocument();
-    expect(mobile.getByText("@우")).toBeInTheDocument();
-    expect(mobile.getByRole("button", { name: "표시 이름 변경" })).toBeInTheDocument();
+    expect(mobile.queryByText("김호스트")).not.toBeInTheDocument();
+    expect(mobile.queryByText("@우")).not.toBeInTheDocument();
+    expect(mobile.getByRole("button", { name: "이름 변경" })).toBeInTheDocument();
   });
 
-  it("saves a trimmed short name through the profile API, refreshes auth, and reloads route data", async () => {
+  it("saves a trimmed display name through the profile API, refreshes auth, and reloads route data", async () => {
     const { container, fetchMock, refreshAuth, getMyPageRequestCount } = renderMyRouteWithProfileFetch();
     const { user, scoped } = await startDesktopProfileEdit(container);
 
-    const input = scoped.getByLabelText("표시 이름");
+    const input = scoped.getByLabelText("이름");
     await user.clear(input);
     await user.type(input, "  새이름  ");
-    await user.click(scoped.getByRole("button", { name: "표시 이름 저장" }));
+    await user.click(scoped.getByRole("button", { name: "이름 저장" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/bff/api/me/profile",
         expect.objectContaining({
           method: "PATCH",
-          body: JSON.stringify({ shortName: "새이름" }),
+          body: JSON.stringify({ displayName: "새이름" }),
         }),
       );
     });
-    expect(await scoped.findByText("@새이름")).toBeInTheDocument();
+    expect((await scoped.findAllByText("새이름")).length).toBeGreaterThan(0);
     expect(scoped.getByText("host@example.com")).toBeInTheDocument();
     expect(refreshAuth).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(getMyPageRequestCount()).toBeGreaterThan(1));
@@ -337,11 +339,11 @@ describe("MyPage", () => {
     const { container } = renderEditableMyPage({ onUpdateProfile });
     const scoped = desktopScope(container);
 
-    await user.click(scoped.getByRole("button", { name: "표시 이름 변경" }));
-    const input = scoped.getByLabelText("표시 이름");
+    await user.click(scoped.getByRole("button", { name: "이름 변경" }));
+    const input = scoped.getByLabelText("이름");
     await user.clear(input);
     await user.type(input, "새이름");
-    const saveButton = scoped.getByRole("button", { name: "표시 이름 저장" });
+    const saveButton = scoped.getByRole("button", { name: "이름 저장" });
     await user.dblClick(saveButton);
 
     expect(onUpdateProfile).toHaveBeenCalledTimes(1);
@@ -357,11 +359,11 @@ describe("MyPage", () => {
   });
 
   it.each([
-    ["SHORT_NAME_DUPLICATE", "같은 클럽에서 이미 쓰고 있는 이름입니다."],
-    ["SHORT_NAME_REQUIRED", "표시 이름을 입력해 주세요."],
-    ["SHORT_NAME_TOO_LONG", "표시 이름은 20자 이하로 입력해 주세요."],
-    ["SHORT_NAME_INVALID", "표시 이름으로 쓸 수 없는 형식입니다."],
-    ["SHORT_NAME_RESERVED", "시스템에서 쓰는 이름은 사용할 수 없습니다."],
+    ["DISPLAY_NAME_DUPLICATE", "같은 클럽에서 이미 쓰고 있는 이름입니다."],
+    ["DISPLAY_NAME_REQUIRED", "이름을 입력해 주세요."],
+    ["DISPLAY_NAME_TOO_LONG", "이름은 20자 이하로 입력해 주세요."],
+    ["DISPLAY_NAME_INVALID", "이름으로 쓸 수 없는 형식입니다."],
+    ["DISPLAY_NAME_RESERVED", "시스템에서 쓰는 이름은 사용할 수 없습니다."],
     ["MEMBERSHIP_NOT_ALLOWED", "현재 상태에서는 프로필을 수정할 수 없습니다."],
   ])("shows the %s profile error near the field", async (code, message) => {
     const { container } = renderMyRouteWithProfileFetch({
@@ -371,10 +373,10 @@ describe("MyPage", () => {
     });
     const { user, scoped } = await startDesktopProfileEdit(container);
 
-    const input = scoped.getByLabelText("표시 이름");
+    const input = scoped.getByLabelText("이름");
     await user.clear(input);
     await user.type(input, "새이름");
-    await user.click(scoped.getByRole("button", { name: "표시 이름 저장" }));
+    await user.click(scoped.getByRole("button", { name: "이름 저장" }));
 
     expect(await scoped.findByText(message)).toBeInTheDocument();
     expect(scoped.queryByText("raw server detail")).not.toBeInTheDocument();
@@ -383,18 +385,18 @@ describe("MyPage", () => {
   it("shows a local generic alert for unknown profile save failures", async () => {
     const { container } = renderMyRouteWithProfileFetch({
       profileStatus: 500,
-      profileBody: { message: "SQL constraint failed: members.short_name_unique" },
+      profileBody: { message: "SQL constraint failed: members.display_name_unique" },
       nextMyPageData: data,
     });
     const { user, scoped } = await startDesktopProfileEdit(container);
 
-    const input = scoped.getByLabelText("표시 이름");
+    const input = scoped.getByLabelText("이름");
     await user.clear(input);
     await user.type(input, "새이름");
-    await user.click(scoped.getByRole("button", { name: "표시 이름 저장" }));
+    await user.click(scoped.getByRole("button", { name: "이름 저장" }));
 
     expect(await scoped.findByRole("alert")).toHaveTextContent(
-      "표시 이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+      "이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
     );
     expect(scoped.queryByText(/SQL constraint failed/)).not.toBeInTheDocument();
   });
@@ -404,7 +406,7 @@ describe("MyPage", () => {
     const { container } = renderEditableMyPage({ canEditProfile: false, onUpdateProfile });
     const scoped = desktopScope(container);
 
-    expect(scoped.queryByRole("button", { name: "표시 이름 변경" })).not.toBeInTheDocument();
+    expect(scoped.queryByRole("button", { name: "이름 변경" })).not.toBeInTheDocument();
     expect(onUpdateProfile).not.toHaveBeenCalled();
   });
 
@@ -416,7 +418,8 @@ describe("MyPage", () => {
     expect(scoped.queryByText("My")).not.toBeInTheDocument();
     expect(scoped.queryByText("내 서가 · 계정")).not.toBeInTheDocument();
     expect(scoped.getByText("계정")).toBeInTheDocument();
-    expect(scoped.getByText("김호스트")).toBeInTheDocument();
+    expect(scoped.getAllByText("우").length).toBeGreaterThan(0);
+    expect(scoped.queryByText("김호스트")).not.toBeInTheDocument();
     expect(scoped.getByText("host@example.com")).toBeInTheDocument();
     expect(scoped.getByText("호스트")).toBeInTheDocument();
     expect(scoped.getByText("읽는사이")).toBeInTheDocument();
@@ -466,7 +469,8 @@ describe("MyPage", () => {
     const scoped = within(mobile as HTMLElement);
 
     expect(scoped.queryByText("내 서가 · 계정")).not.toBeInTheDocument();
-    expect(scoped.getByText("김호스트")).toBeInTheDocument();
+    expect(scoped.getAllByText("우").length).toBeGreaterThan(0);
+    expect(scoped.queryByText("김호스트")).not.toBeInTheDocument();
     expect(scoped.getByText("host@example.com")).toBeInTheDocument();
     expect(scoped.getByText("6")).toBeInTheDocument();
     expect(scoped.getByText("참석")).toBeInTheDocument();
@@ -612,7 +616,7 @@ describe("MyPage", () => {
     expect(scoped.getByText("책·일정·미팅 URL")).toBeInTheDocument();
     expect(scoped.getByText("질문 마감 전날 알림")).toBeInTheDocument();
     expect(scoped.getByText("개인 설정")).toBeInTheDocument();
-    expect(scoped.getByText("표시 이름")).toBeInTheDocument();
+    expect(scoped.getByText("이름")).toBeInTheDocument();
     expect(scoped.getByText("기록 공개 범위")).toBeInTheDocument();
     expect(scoped.getByText("클럽 탈퇴 · 내 기록은 유지, 내 이름은 비공개 처리됩니다.")).toBeInTheDocument();
   });
@@ -634,14 +638,15 @@ describe("MyPage", () => {
     const { container } = renderMyPage();
     const scoped = desktopScope(container);
 
-    expect(scoped.getByText("@우")).toBeInTheDocument();
+    expect(scoped.getAllByText("우").length).toBeGreaterThan(0);
     expect(scoped.queryByText("김호스트 · host@example.com · @우")).not.toBeInTheDocument();
+    expect(scoped.queryByText("@우")).not.toBeInTheDocument();
     expect(scoped.getByText("프로필 수정 준비 중")).toBeInTheDocument();
     expect(scoped.getAllByText("변경 준비 중")).toHaveLength(3);
-    expect(scoped.getByLabelText("표시 이름 변경 준비 중")).toBeInTheDocument();
+    expect(scoped.getByLabelText("이름 변경 준비 중")).toBeInTheDocument();
     expect(scoped.getByLabelText("기록 공개 범위 변경 준비 중")).toBeInTheDocument();
     expect(scoped.getByLabelText("언어 변경 준비 중")).toBeInTheDocument();
-    expect(scoped.queryByRole("button", { name: "표시 이름 변경" })).not.toBeInTheDocument();
+    expect(scoped.queryByRole("button", { name: "이름 변경" })).not.toBeInTheDocument();
     expect(scoped.queryByRole("button", { name: "기록 공개 범위 변경" })).not.toBeInTheDocument();
     expect(scoped.queryByRole("button", { name: "언어 변경" })).not.toBeInTheDocument();
     expect(scoped.getByRole("button", { name: "탈퇴" })).toBeInTheDocument();
@@ -650,8 +655,8 @@ describe("MyPage", () => {
   it("derives viewer identity without a hard-coded club name", () => {
     const viewerData: MyPageResponse = {
       ...data,
-      displayName: "Viewer Member",
-      shortName: "Viewer",
+      displayName: "Viewer",
+      accountName: "Viewer Member",
       email: "viewer@example.com",
       role: "MEMBER",
       membershipStatus: "VIEWER",
@@ -796,8 +801,8 @@ describe("MyPage", () => {
             membershipId: "member-membership",
             clubId: "club-id",
             email: "member@example.com",
-            displayName: "이멤버5",
-            shortName: "멤버",
+            displayName: "멤버",
+            accountName: "이멤버5",
             role: "MEMBER",
             membershipStatus: "ACTIVE",
             approvalState: "ACTIVE",

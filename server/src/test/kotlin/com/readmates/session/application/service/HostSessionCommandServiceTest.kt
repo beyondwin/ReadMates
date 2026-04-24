@@ -30,7 +30,7 @@ class HostSessionCommandServiceTest {
         clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
         email = "host@example.com",
         displayName = "호스트",
-        shortName = "호스트",
+        accountName = "김호스트",
         role = MembershipRole.HOST,
         membershipStatus = MembershipStatus.ACTIVE,
     )

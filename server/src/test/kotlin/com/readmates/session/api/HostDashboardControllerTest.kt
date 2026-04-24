@@ -353,8 +353,9 @@ class HostDashboardControllerTest(
             jsonPath("$.state") { value("OPEN") }
             jsonPath("$.attendees.length()") { value(6) }
             jsonPath("$.attendees[0].membershipId") { exists() }
-            jsonPath("$.attendees[0].displayName") { value("김호스트") }
-            jsonPath("$.attendees[0].shortName") { value("호스트") }
+            jsonPath("$.attendees[0].displayName") { value("호스트") }
+            jsonPath("$.attendees[0].accountName") { value("김호스트") }
+            jsonPath("$.attendees[0].shortName") { doesNotExist() }
             jsonPath("$.attendees[0].rsvpStatus") { value("NO_RESPONSE") }
             jsonPath("$.attendees[0].attendanceStatus") { value("UNKNOWN") }
             jsonPath("$.attendees[0].participationStatus") { value("ACTIVE") }

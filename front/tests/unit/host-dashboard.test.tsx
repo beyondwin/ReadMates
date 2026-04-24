@@ -39,7 +39,7 @@ const hostAuth: AuthMeResponse = {
   clubId: "club-1",
   email: "host@example.com",
   displayName: "김호스트",
-  shortName: "우",
+  accountName: "우",
   role: "HOST",
   membershipStatus: "ACTIVE",
   approvalState: "ACTIVE",
@@ -51,7 +51,7 @@ const memberAuth: AuthMeResponse = {
   membershipId: "membership-member",
   email: "member@example.com",
   displayName: "이멤버",
-  shortName: "멤",
+  accountName: "멤",
   role: "MEMBER",
 };
 
@@ -62,7 +62,7 @@ const anonymousAuth: AuthMeResponse = {
   clubId: null,
   email: null,
   displayName: null,
-  shortName: null,
+  accountName: null,
   role: null,
   membershipStatus: null,
   approvalState: "ANONYMOUS",
@@ -121,7 +121,7 @@ const current: CurrentSessionResponse = {
       {
         membershipId: "membership-host",
         displayName: "김호스트",
-        shortName: "우",
+        accountName: "우",
         role: "HOST",
         rsvpStatus: "GOING",
         attendanceStatus: "UNKNOWN",
@@ -129,7 +129,7 @@ const current: CurrentSessionResponse = {
       {
         membershipId: "membership-member",
         displayName: "안멤버1",
-        shortName: "멤버1",
+        accountName: "멤버1",
         role: "MEMBER",
         rsvpStatus: "NO_RESPONSE",
         attendanceStatus: "UNKNOWN",

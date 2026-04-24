@@ -12,7 +12,7 @@ const viewerAuth: AuthMeResponse = {
   clubId: "club-id",
   email: "viewer@example.com",
   displayName: "둘러보기 멤버",
-  shortName: "둘러보기",
+  accountName: "둘러보기",
   role: "MEMBER",
   membershipStatus: "VIEWER",
   approvalState: "VIEWER",
