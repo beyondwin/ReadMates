@@ -5,6 +5,7 @@ export type AuthState = { status: "loading" } | { status: "ready"; auth: AuthMeR
 
 export type AuthActions = {
   markLoggedOut: () => void;
+  refreshAuth: () => Promise<void>;
 };
 
 export const anonymousAuth: AuthMeResponse = {
@@ -23,6 +24,7 @@ export const anonymousAuth: AuthMeResponse = {
 export const AuthContext = createContext<AuthState>({ status: "loading" });
 export const AuthActionsContext = createContext<AuthActions>({
   markLoggedOut: () => {},
+  refreshAuth: async () => {},
 });
 
 export function useAuth() {

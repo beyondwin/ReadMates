@@ -303,7 +303,7 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
     expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
   });
 
@@ -351,7 +351,7 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
     expectNoMemberHomeChildDataFetch(fetchMock);
   });
 
@@ -478,7 +478,7 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByText("활성 멤버만 이용할 수 있습니다.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
     expectNoArchiveChildDataFetch(fetchMock);
   });
 });
