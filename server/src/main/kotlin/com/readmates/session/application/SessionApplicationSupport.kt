@@ -36,6 +36,9 @@ class HostSessionParticipantNotFoundException : RuntimeException("Host session p
 @ResponseStatus(HttpStatus.CONFLICT)
 class HostSessionDeletionNotAllowedException : RuntimeException("Only open sessions can be deleted")
 
+@ResponseStatus(HttpStatus.CONFLICT)
+class HostSessionOpenNotAllowedException : RuntimeException("Only draft sessions can be opened")
+
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 class InvalidMembershipIdException : RuntimeException("Invalid membership id")
 

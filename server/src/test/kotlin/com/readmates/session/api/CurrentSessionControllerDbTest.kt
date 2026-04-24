@@ -8,12 +8,14 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -23,11 +25,36 @@ import org.springframework.test.web.servlet.get
 @AutoConfigureMockMvc
 class CurrentSessionControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
+    @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
     @Test
     fun `returns empty current session when only seeded sessions exist`() {
         mockMvc.get("/api/sessions/current") {
             with(user("member5@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.currentSession") { value(null) }
+        }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_GENERATED_SESSIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_GENERATED_SESSIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `draft upcoming sessions do not appear as current session`() {
+        insertDraftSession(number = 77, visibility = "MEMBER")
+
+        mockMvc.get("/api/sessions/current") {
+            with(user("member1@example.com"))
         }.andExpect {
             status { isOk() }
             jsonPath("$.currentSession") { value(null) }
@@ -340,6 +367,30 @@ class CurrentSessionControllerDbTest(
             jsonPath("$.currentSession.attendees[*].accountName") { value(not(hasItem("안멤버1"))) }
             jsonPath("$.currentSession.attendees[*].shortName") { doesNotExist() }
         }
+    }
+
+    private fun insertDraftSession(number: Int, visibility: String) {
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator,
+              book_link, book_image_url, session_date, start_time, end_time,
+              location_label, meeting_url, meeting_passcode, question_deadline_at,
+              state, visibility
+            )
+            values (
+              ?, '00000000-0000-0000-0000-000000000001', ?, ?,
+              ?, '테스트 저자', null, null, null, '2026-07-15',
+              '20:00:00', '22:00:00', '온라인', null, null,
+              '2026-07-14 14:59:00.000000', 'DRAFT', ?
+            )
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            number,
+            "${number}회차 · 예정",
+            "예정 책 $number",
+            visibility,
+        )
     }
 
     companion object {

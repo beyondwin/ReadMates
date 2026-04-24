@@ -6,13 +6,16 @@ import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionAttendee
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
+import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.requireHost
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
@@ -21,6 +24,7 @@ import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
+import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.session.domain.SessionParticipationStatus
@@ -34,6 +38,7 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.sql.ResultSet
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -62,7 +67,40 @@ class JdbcHostSessionWriteAdapter(
 ) : HostSessionWritePort {
     @Transactional
     override fun create(command: HostSessionCommand) =
-        createOpenSession(command.host, command)
+        createDraftSession(command.host, command)
+
+    override fun list(host: CurrentMember): List<HostSessionListItem> {
+        requireHost(host)
+        return jdbcTemplate().query(
+            """
+            select id, number, title, book_title, book_author, book_image_url,
+                   session_date, start_time, end_time, location_label, state, visibility
+            from sessions
+            where club_id = ?
+            order by
+              case state when 'OPEN' then 0 when 'DRAFT' then 1 when 'CLOSED' then 2 else 3 end,
+              session_date,
+              number
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostSessionListItem() },
+            host.clubId.dbString(),
+        )
+    }
+
+    override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> =
+        jdbcTemplate().query(
+            """
+            select id, number, title, book_title, book_author, book_image_url,
+                   session_date, start_time, end_time, location_label, visibility
+            from sessions
+            where club_id = ?
+              and state = 'DRAFT'
+              and visibility in ('MEMBER', 'PUBLIC')
+            order by session_date, number
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toUpcomingSessionItem() },
+            member.clubId.dbString(),
+        )
 
     override fun detail(command: HostSessionIdCommand) =
         findHostSession(command.host, command.sessionId)
@@ -90,7 +128,99 @@ class JdbcHostSessionWriteAdapter(
         hostDashboard(host)
 
     @Transactional
-    fun createOpenSession(host: CurrentMember, request: HostSessionCommand): CreatedSessionResponse {
+    override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
+        requireHostSession(command.host, command.sessionId)
+        val jdbcTemplate = jdbcTemplate()
+        jdbcTemplate.update(
+            """
+            update sessions
+            set visibility = ?,
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            command.visibility.name,
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+        jdbcTemplate.update(
+            """
+            update public_session_publications
+            set visibility = ?,
+                is_public = ?,
+                published_at = case when ? then coalesce(published_at, utc_timestamp(6)) else null end,
+                updated_at = utc_timestamp(6)
+            where session_id = ?
+              and club_id = ?
+            """.trimIndent(),
+            command.visibility.name,
+            command.visibility == SessionRecordVisibility.PUBLIC,
+            command.visibility == SessionRecordVisibility.PUBLIC,
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+        return findHostSession(command.host, command.sessionId)
+    }
+
+    @Transactional
+    override fun open(command: HostSessionIdCommand): HostSessionDetailResponse {
+        requireHost(command.host)
+        val jdbcTemplate = jdbcTemplate()
+        jdbcTemplate.queryForObject(
+            "select id from clubs where id = ? for update",
+            String::class.java,
+            command.host.clubId.dbString(),
+        )
+        val state = jdbcTemplate.query(
+            """
+            select state
+            from sessions
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.getString("state") },
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        ).firstOrNull() ?: throw HostSessionNotFoundException()
+
+        if (state == "OPEN") {
+            return findHostSession(command.host, command.sessionId)
+        }
+        if (state != "DRAFT") {
+            throw HostSessionOpenNotAllowedException()
+        }
+
+        val openSessionCount = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from sessions
+            where club_id = ?
+              and state = 'OPEN'
+            """.trimIndent(),
+            Int::class.java,
+            command.host.clubId.dbString(),
+        ) ?: 0
+        if (openSessionCount > 0) {
+            throw OpenSessionAlreadyExistsException()
+        }
+
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'OPEN',
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+        createActiveParticipants(jdbcTemplate, command.host.clubId, command.sessionId)
+        return findHostSession(command.host, command.sessionId)
+    }
+
+    @Transactional
+    private fun createDraftSession(host: CurrentMember, request: HostSessionCommand): CreatedSessionResponse {
         requireHost(host)
 
         val jdbcTemplate = jdbcTemplate()
@@ -110,20 +240,6 @@ class JdbcHostSessionWriteAdapter(
             host.clubId.dbString(),
         )
 
-        val openSessionCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            where club_id = ?
-              and state = 'OPEN'
-            """.trimIndent(),
-            Int::class.java,
-            host.clubId.dbString(),
-        ) ?: 0
-        if (openSessionCount > 0) {
-            throw OpenSessionAlreadyExistsException()
-        }
-
         val nextNumber = jdbcTemplate.queryForObject(
             """
             select coalesce(max(number), 0) + 1
@@ -133,7 +249,8 @@ class JdbcHostSessionWriteAdapter(
             Int::class.java,
             host.clubId.dbString(),
         ) ?: 1
-        val state = "OPEN"
+        val state = "DRAFT"
+        val visibility = SessionRecordVisibility.HOST_ONLY
 
         jdbcTemplate.update(
             """
@@ -154,9 +271,10 @@ class JdbcHostSessionWriteAdapter(
               meeting_url,
               meeting_passcode,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
-            values (?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             sessionId.dbString(),
             host.clubId.dbString(),
@@ -174,44 +292,8 @@ class JdbcHostSessionWriteAdapter(
             meetingPasscode,
             questionDeadlineAt,
             state,
+            visibility.name,
         )
-
-        val activeMembershipIds = jdbcTemplate.query(
-            """
-            select id
-            from memberships
-            where club_id = ?
-              and status = 'ACTIVE'
-            order by joined_at is null, joined_at, created_at
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.uuid("id") },
-            host.clubId.dbString(),
-        )
-        activeMembershipIds.forEach { membershipId ->
-            jdbcTemplate.update(
-                """
-                insert into session_participants (
-                  id,
-                  club_id,
-                  session_id,
-                  membership_id,
-                  rsvp_status,
-                  attendance_status,
-                  participation_status
-                )
-                values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE')
-                on duplicate key update
-                  rsvp_status = values(rsvp_status),
-                  attendance_status = values(attendance_status),
-                  participation_status = values(participation_status),
-                  updated_at = utc_timestamp(6)
-                """.trimIndent(),
-                UUID.randomUUID().dbString(),
-                host.clubId.dbString(),
-                sessionId.dbString(),
-                membershipId.dbString(),
-            )
-        }
 
         return CreatedSessionResponse(
             sessionId = sessionId.toString(),
@@ -229,7 +311,7 @@ class JdbcHostSessionWriteAdapter(
             meetingUrl = meetingUrl,
             meetingPasscode = meetingPasscode,
             state = state,
-            visibility = SessionRecordVisibility.HOST_ONLY,
+            visibility = visibility,
         )
     }
 
@@ -554,6 +636,18 @@ class JdbcHostSessionWriteAdapter(
         val isPublic = command.visibility == SessionRecordVisibility.PUBLIC
         jdbcTemplate.update(
             """
+            update sessions
+            set visibility = ?,
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            command.visibility.name,
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+        jdbcTemplate.update(
+            """
             insert into public_session_publications (
               id,
               club_id,
@@ -593,6 +687,40 @@ class JdbcHostSessionWriteAdapter(
             publicSummary = command.publicSummary,
             visibility = command.visibility,
         )
+    }
+
+    private fun createActiveParticipants(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID) {
+        val activeMembershipIds = jdbcTemplate.query(
+            """
+            select id
+            from memberships
+            where club_id = ?
+              and status = 'ACTIVE'
+            order by joined_at is null, joined_at, created_at
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.uuid("id") },
+            clubId.dbString(),
+        )
+        activeMembershipIds.forEach { membershipId ->
+            jdbcTemplate.update(
+                """
+                insert into session_participants (
+                  id, club_id, session_id, membership_id,
+                  rsvp_status, attendance_status, participation_status
+                )
+                values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE')
+                on duplicate key update
+                  rsvp_status = values(rsvp_status),
+                  attendance_status = values(attendance_status),
+                  participation_status = values(participation_status),
+                  updated_at = utc_timestamp(6)
+                """.trimIndent(),
+                UUID.randomUUID().dbString(),
+                clubId.dbString(),
+                sessionId.dbString(),
+                membershipId.dbString(),
+            )
+        }
     }
 
     private fun requireHostSession(member: CurrentMember, sessionId: UUID) {
@@ -727,3 +855,32 @@ class JdbcHostSessionWriteAdapter(
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateOrThrow(jdbcTemplateProvider)
 }
+
+private fun ResultSet.toHostSessionListItem() = HostSessionListItem(
+    sessionId = uuid("id").toString(),
+    sessionNumber = getInt("number"),
+    title = getString("title"),
+    bookTitle = getString("book_title"),
+    bookAuthor = getString("book_author"),
+    bookImageUrl = getString("book_image_url"),
+    date = getObject("session_date", LocalDate::class.java).toString(),
+    startTime = getObject("start_time", LocalTime::class.java).toString(),
+    endTime = getObject("end_time", LocalTime::class.java).toString(),
+    locationLabel = getString("location_label"),
+    state = getString("state"),
+    visibility = SessionRecordVisibility.valueOf(getString("visibility")),
+)
+
+private fun ResultSet.toUpcomingSessionItem() = UpcomingSessionItem(
+    sessionId = uuid("id").toString(),
+    sessionNumber = getInt("number"),
+    title = getString("title"),
+    bookTitle = getString("book_title"),
+    bookAuthor = getString("book_author"),
+    bookImageUrl = getString("book_image_url"),
+    date = getObject("session_date", LocalDate::class.java).toString(),
+    startTime = getObject("start_time", LocalTime::class.java).toString(),
+    endTime = getObject("end_time", LocalTime::class.java).toString(),
+    locationLabel = getString("location_label"),
+    visibility = SessionRecordVisibility.valueOf(getString("visibility")),
+)

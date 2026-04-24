@@ -47,6 +47,8 @@ class SecurityConfig(
                 )
                 it.ignoringRequestMatchers(
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+$")),
+                    methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/visibility$")),
+                    methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/open$")),
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/attendance$")),
                     methodAndPath("PUT", Regex("^/api/host/sessions/[^/]+/publication$")),

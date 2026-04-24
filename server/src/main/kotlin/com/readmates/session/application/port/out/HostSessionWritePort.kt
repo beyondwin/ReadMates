@@ -18,23 +18,16 @@ import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.shared.security.CurrentMember
 
 interface HostSessionWritePort {
-    fun list(host: CurrentMember): List<HostSessionListItem> =
-        throw UnsupportedOperationException("Host session listing is not implemented yet.")
-
+    fun list(host: CurrentMember): List<HostSessionListItem>
     fun create(command: HostSessionCommand): CreatedSessionResponse
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
     fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
-    fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse =
-        throw UnsupportedOperationException("Host session visibility updates are not implemented yet.")
-
-    fun open(command: HostSessionIdCommand): HostSessionDetailResponse =
-        throw UnsupportedOperationException("Host session open transition is not implemented yet.")
-
+    fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse
+    fun open(command: HostSessionIdCommand): HostSessionDetailResponse
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
     fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse
     fun confirmAttendance(command: ConfirmAttendanceCommand): HostAttendanceResponse
     fun upsertPublication(command: UpsertPublicationCommand): HostPublicationResponse
     fun dashboard(host: CurrentMember): HostDashboardResult
-    fun upcoming(member: CurrentMember): List<UpcomingSessionItem> =
-        throw UnsupportedOperationException("Upcoming session listing is not implemented yet.")
+    fun upcoming(member: CurrentMember): List<UpcomingSessionItem>
 }

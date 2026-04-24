@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -13,6 +14,8 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
+import org.springframework.test.web.servlet.patch
+import org.springframework.test.web.servlet.post
 
 private const val CLEANUP_BFF_DELETE_SESSION_SQL = """
     delete from session_participants
@@ -65,7 +68,58 @@ class HostSessionBffSecurityTest(
         assertEquals(0, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
     }
 
+    @Test
+    fun `host visibility bff request reaches controller without spring csrf token`() {
+        createDraftSession()
+
+        mockMvc.patch("/api/host/sessions/00000000-0000-0000-0000-000000009888/visibility") {
+            with(user("host@example.com"))
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"visibility":"MEMBER"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+            jsonPath("$.visibility") { value("MEMBER") }
+        }
+    }
+
+    @Test
+    fun `host open bff request reaches controller without spring csrf token`() {
+        createDraftSession()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009888/open") {
+            with(user("host@example.com"))
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+            jsonPath("$.state") { value("OPEN") }
+        }
+
+        assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
+    }
+
+    private fun createDraftSession() {
+        createSession(state = "DRAFT", visibility = "HOST_ONLY")
+    }
+
     private fun createOpenSession() {
+        createSession(state = "OPEN", visibility = "HOST_ONLY")
+        jdbcTemplate.update(
+            """
+            insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
+            select uuid(), memberships.club_id, '00000000-0000-0000-0000-000000009888', memberships.id, 'NO_RESPONSE', 'UNKNOWN'
+            from memberships
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and memberships.status = 'ACTIVE'
+            """.trimIndent(),
+        )
+    }
+
+    private fun createSession(state: String, visibility: String) {
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -80,7 +134,8 @@ class HostSessionBffSecurityTest(
               end_time,
               location_label,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             values (
               '00000000-0000-0000-0000-000000009888',
@@ -94,18 +149,12 @@ class HostSessionBffSecurityTest(
               '22:00:00',
               '온라인',
               '2026-06-30 14:59:00',
-              'OPEN'
+              ?,
+              ?
             )
             """.trimIndent(),
-        )
-        jdbcTemplate.update(
-            """
-            insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
-            select uuid(), memberships.club_id, '00000000-0000-0000-0000-000000009888', memberships.id, 'NO_RESPONSE', 'UNKNOWN'
-            from memberships
-            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
-              and memberships.status = 'ACTIVE'
-            """.trimIndent(),
+            state,
+            visibility,
         )
     }
 
