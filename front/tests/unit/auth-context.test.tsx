@@ -1,4 +1,5 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { useEffect } from "react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -121,6 +122,39 @@ function AuthRefreshProbe() {
   );
 }
 
+function ImmediateRefreshProbe() {
+  const state = useAuth();
+  const { refreshAuth } = useAuthActions();
+
+  useEffect(() => {
+    void refreshAuth();
+  }, [refreshAuth]);
+
+  if (state.status === "loading") {
+    return <div data-testid="short-name">loading</div>;
+  }
+
+  return <div data-testid="short-name">{state.auth.shortName}</div>;
+}
+
+async function resolveAuthRequest(deferred: Deferred<Response>, auth: AuthMeResponse) {
+  await act(async () => {
+    deferred.resolve(authResponse(auth));
+    await deferred.promise;
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+async function rejectAuthRequest(deferred: Deferred<Response>, reason: unknown) {
+  await act(async () => {
+    deferred.reject(reason);
+    await deferred.promise.catch(() => undefined);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 function renderGuard(element: React.ReactElement) {
   render(
     <AuthProvider>
@@ -226,6 +260,93 @@ describe("AuthProvider", () => {
 
     expect(await screen.findByTestId("short-name")).toHaveTextContent("새이름");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/bff/api/auth/me", { cache: "no-store" });
+  });
+
+  it("keeps the newest auth state when an older refresh response resolves last", async () => {
+    const user = userEvent.setup();
+    const firstRefresh = createDeferred<Response>();
+    const secondRefresh = createDeferred<Response>();
+    const staleAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "이전" };
+    const latestAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "최신" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(authResponse(activeMemberAuth))
+      .mockReturnValueOnce(firstRefresh.promise)
+      .mockReturnValueOnce(secondRefresh.promise);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthRefreshProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.shortName ?? "");
+
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await resolveAuthRequest(secondRefresh, latestAuth);
+    expect(screen.getByTestId("short-name")).toHaveTextContent("최신");
+
+    await resolveAuthRequest(firstRefresh, staleAuth);
+    expect(screen.getByTestId("short-name")).toHaveTextContent("최신");
+  });
+
+  it("does not let an older refresh failure reset a newer successful auth state", async () => {
+    const user = userEvent.setup();
+    const firstRefresh = createDeferred<Response>();
+    const secondRefresh = createDeferred<Response>();
+    const latestAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "최신" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(authResponse(activeMemberAuth))
+      .mockReturnValueOnce(firstRefresh.promise)
+      .mockReturnValueOnce(secondRefresh.promise);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthRefreshProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.shortName ?? "");
+
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    await user.click(screen.getByRole("button", { name: "refresh auth" }));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    await resolveAuthRequest(secondRefresh, latestAuth);
+    expect(screen.getByTestId("short-name")).toHaveTextContent("최신");
+
+    await rejectAuthRequest(firstRefresh, new Error("stale network failure"));
+    expect(screen.getByTestId("short-name")).toHaveTextContent("최신");
+  });
+
+  it("does not let the initial auth response overwrite a newer refresh", async () => {
+    const initialFetch = createDeferred<Response>();
+    const refreshFetch = createDeferred<Response>();
+    const staleAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "초기" };
+    const latestAuth: AuthMeResponse = { ...activeMemberAuth, shortName: "최신" };
+    const fetchMock = vi.fn().mockReturnValueOnce(initialFetch.promise).mockReturnValueOnce(refreshFetch.promise);
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <ImmediateRefreshProbe />
+      </AuthProvider>,
+    );
+
+    expect(screen.getByTestId("short-name")).toHaveTextContent("loading");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    await resolveAuthRequest(refreshFetch, latestAuth);
+    expect(screen.getByTestId("short-name")).toHaveTextContent("최신");
+
+    await resolveAuthRequest(initialFetch, staleAuth);
+    expect(screen.getByTestId("short-name")).toHaveTextContent("최신");
   });
 });
 

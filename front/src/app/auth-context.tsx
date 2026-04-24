@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { anonymousAuth, AuthActionsContext, AuthContext, type AuthState } from "@/src/app/auth-state";
 
@@ -14,18 +14,21 @@ async function fetchAuthMe() {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<AuthState>({ status: "loading" });
+  const latestAuthRequestId = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    const requestId = latestAuthRequestId.current + 1;
+    latestAuthRequestId.current = requestId;
 
     fetchAuthMe()
       .then((auth) => {
-        if (!cancelled) {
+        if (!cancelled && latestAuthRequestId.current === requestId) {
           setState({ status: "ready", auth });
         }
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!cancelled && latestAuthRequestId.current === requestId) {
           setState({ status: "ready", auth: anonymousAuth });
         }
       });
@@ -35,19 +38,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
     };
   }, []);
 
+  const markLoggedOut = useCallback(() => {
+    latestAuthRequestId.current += 1;
+    setState({ status: "ready", auth: anonymousAuth });
+  }, []);
+
+  const refreshAuth = useCallback(async () => {
+    const requestId = latestAuthRequestId.current + 1;
+    latestAuthRequestId.current = requestId;
+
+    try {
+      const auth = await fetchAuthMe();
+      if (latestAuthRequestId.current === requestId) {
+        setState({ status: "ready", auth });
+      }
+    } catch {
+      if (latestAuthRequestId.current === requestId) {
+        setState({ status: "ready", auth: anonymousAuth });
+      }
+    }
+  }, []);
+
   const actions = useMemo(
     () => ({
-      markLoggedOut: () => setState({ status: "ready", auth: anonymousAuth }),
-      refreshAuth: async () => {
-        try {
-          const auth = await fetchAuthMe();
-          setState({ status: "ready", auth });
-        } catch {
-          setState({ status: "ready", auth: anonymousAuth });
-        }
-      },
+      markLoggedOut,
+      refreshAuth,
     }),
-    [],
+    [markLoggedOut, refreshAuth],
   );
 
   return (
