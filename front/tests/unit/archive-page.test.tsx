@@ -490,6 +490,39 @@ describe("ArchivePage", () => {
     expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로 돌아가기");
   });
 
+  it("navigates when clicking the desktop feedback document row content", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <MemoryRouter initialEntries={["/app/archive?view=report"]}>
+        <Routes>
+          <Route
+            path="/app/archive"
+            element={
+              <ArchivePage
+                sessions={seededSessions}
+                questions={seededQuestions}
+                reviews={seededReviews}
+                reports={seededReports}
+                initialView="report"
+              />
+            }
+          />
+          <Route path="/app/feedback/:sessionId" element={<LocationStateEcho />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const desktop = getDesktop(container);
+    const reportTitle = desktop.getByText("팩트풀니스");
+    const reportRow = reportTitle.closest("a");
+
+    expect(reportRow).toHaveAttribute("href", "/app/feedback/session-1");
+
+    await user.click(reportTitle);
+
+    expect(screen.getByTestId("return-to")).toHaveTextContent("/app/archive?view=report");
+    expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로 돌아가기");
+  });
+
   it("moves archive tab selection with keyboard arrow keys", async () => {
     const user = userEvent.setup();
     const { container } = render(
@@ -697,7 +730,8 @@ describe("ArchivePage", () => {
     expect(readAction).toHaveAttribute("href", "/app/feedback/session-1");
     expect(readAction).toHaveAttribute("aria-label", seededReportReadLabel);
     expect(readAction).toHaveAttribute("title", seededReportReadLabel);
-    expect(readAction).toHaveClass("btn-quiet");
+    expect(readAction).toHaveClass("rm-record-row");
+    expect(readAction).not.toHaveClass("btn-quiet");
     expect(readAction).not.toHaveClass("btn-ghost");
     expect(readAction).not.toHaveTextContent("읽기");
     expect(desktop.queryByRole("link", { name: seededReportPdfLabel })).not.toBeInTheDocument();

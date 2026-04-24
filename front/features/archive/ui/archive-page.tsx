@@ -821,21 +821,22 @@ function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListIt
     <div className="stack" style={{ "--stack": "0px", marginTop: "10px" } as CSSProperties}>
       {reports.map((report, index) => {
         const cover = reportBookCoverMeta(report, sessions);
-
-        return (
-          <article
-            key={report.sessionId}
-            style={{
-              display: "grid",
-              gridTemplateColumns: feedbackDocumentPdfDownloadsEnabled
-                ? "64px minmax(0, 1fr) auto auto"
-                : "64px minmax(0, 1fr) auto",
-              gap: "20px",
-              padding: "22px 0",
-              borderTop: index === 0 ? "0" : "1px solid var(--line-soft)",
-              alignItems: "center",
-            }}
-          >
+        const readHref = appFeedbackHref(report.sessionId);
+        const readState = archiveReturnState("report", "아카이브로 돌아가기");
+        const readLabel = feedbackReportActionLabel(report, "읽기");
+        const reportRowLinkStyle: CSSProperties = {
+          display: "grid",
+          gridTemplateColumns: "64px minmax(0, 1fr) auto",
+          gap: "20px",
+          padding: "22px 0",
+          alignItems: "center",
+          color: "inherit",
+          textDecoration: "none",
+          minWidth: 0,
+          borderTop: "0",
+        };
+        const reportRowContent = (
+          <>
             <BookCover title={report.bookTitle} author={cover.author} imageUrl={cover.imageUrl} width={48} decorative />
             <div>
               <h2 className="editorial" style={{ fontSize: "16px", margin: 0 }}>
@@ -846,26 +847,64 @@ function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListIt
                 {formatDateOnlyLabel(report.uploadedAt)} 등록
               </div>
             </div>
+            <span className="btn btn-quiet btn-sm" aria-hidden="true">
+              <ReportActionIcon name="read" />
+            </span>
+          </>
+        );
+
+        if (!feedbackDocumentPdfDownloadsEnabled) {
+          return (
+            <article
+              key={report.sessionId}
+              style={{
+                borderTop: index === 0 ? "0" : "1px solid var(--line-soft)",
+              }}
+            >
+              <Link
+                className="rm-record-row"
+                to={readHref}
+                state={readState}
+                aria-label={readLabel}
+                title={readLabel}
+                style={reportRowLinkStyle}
+              >
+                {reportRowContent}
+              </Link>
+            </article>
+          );
+        }
+
+        return (
+          <article
+            key={report.sessionId}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              gap: "12px",
+              borderTop: index === 0 ? "0" : "1px solid var(--line-soft)",
+              alignItems: "center",
+            }}
+          >
+            <Link
+              className="rm-record-row"
+              to={readHref}
+              state={readState}
+              aria-label={readLabel}
+              title={readLabel}
+              style={reportRowLinkStyle}
+            >
+              {reportRowContent}
+            </Link>
             <Link
               className="btn btn-quiet btn-sm"
-              to={appFeedbackHref(report.sessionId)}
-              state={archiveReturnState("report", "아카이브로 돌아가기")}
-              aria-label={feedbackReportActionLabel(report, "읽기")}
-              title={feedbackReportActionLabel(report, "읽기")}
+              to={appFeedbackHref(report.sessionId, true)}
+              state={readState}
+              aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
+              title={feedbackReportActionLabel(report, "PDF로 저장")}
             >
-              <ReportActionIcon name="read" />
+              <ReportActionIcon name="download" />
             </Link>
-            {feedbackDocumentPdfDownloadsEnabled ? (
-              <Link
-                className="btn btn-quiet btn-sm"
-                to={appFeedbackHref(report.sessionId, true)}
-                state={archiveReturnState("report", "아카이브로 돌아가기")}
-                aria-label={feedbackReportActionLabel(report, "PDF로 저장")}
-                title={feedbackReportActionLabel(report, "PDF로 저장")}
-              >
-                <ReportActionIcon name="download" />
-              </Link>
-            ) : null}
           </article>
         );
       })}
