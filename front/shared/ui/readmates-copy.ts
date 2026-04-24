@@ -28,9 +28,9 @@ export const READMATES_WORKSPACE_LABELS = {
 } as const;
 
 export const READMATES_MOBILE_TAB_LABELS = {
-  hostToday: "오늘",
+  hostToday: "홈",
   hostSession: "세션",
   hostSessionPending: "확인 중",
   hostMembers: "멤버",
-  hostRecords: "기록",
+  hostRecords: "아카이브",
 } as const;
