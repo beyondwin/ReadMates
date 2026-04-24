@@ -154,13 +154,19 @@ describe("current session view model", () => {
       { key: "longReviews", label: "서평 · 1", count: 1 },
     ]);
 
-    expect(getCurrentSessionFeedbackAccessState(true)).toEqual({
+    expect(getCurrentSessionFeedbackAccessState({ isViewer: true, isSuspended: false })).toEqual({
       className: "rm-locked-state",
       title: "정식 멤버에게 열립니다",
       body: "둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다.",
       canOpenArchive: false,
     });
-    expect(getCurrentSessionFeedbackAccessState(false)).toEqual({
+    expect(getCurrentSessionFeedbackAccessState({ isViewer: false, isSuspended: true })).toEqual({
+      className: "rm-locked-state",
+      title: "활성 멤버에게 열립니다",
+      body: "멤버십이 일시 정지된 동안에는 참석자 피드백 문서를 열 수 없습니다.",
+      canOpenArchive: false,
+    });
+    expect(getCurrentSessionFeedbackAccessState({ isViewer: false, isSuspended: false })).toEqual({
       className: "surface-quiet",
       title: "참석한 세션의 피드백 문서를 보존합니다",
       body: "이번 세션 피드백은 모임 이후 호스트가 업로드하면 참석자 기준으로 열립니다.",

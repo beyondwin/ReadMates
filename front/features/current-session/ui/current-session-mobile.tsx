@@ -11,7 +11,10 @@ import type {
   RsvpUpdateStatus,
   SaveState,
 } from "@/features/current-session/ui/current-session-types";
-import type { getCurrentSessionMemberNotice } from "@/features/current-session/model/current-session-view-model";
+import {
+  getCurrentSessionFeedbackAccessState,
+  type getCurrentSessionMemberNotice,
+} from "@/features/current-session/model/current-session-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
@@ -142,6 +145,7 @@ export function MobileCurrentSessionBoard({
     { key: "board", label: "공동 보드" },
   ];
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
+  const isSuspended = memberNotice?.kind === "suspended";
 
   return (
     <main className="mobile-only rm-current-session-mobile m-body" data-testid="current-session-mobile">
@@ -246,6 +250,7 @@ export function MobileCurrentSessionBoard({
             onLongReviewChange={onLongReviewChange}
             longReviewSaveStatus={longReviewSaveStatus}
             onSaveLongReview={onSaveLongReview}
+            isSuspended={isSuspended}
             canWrite={canWrite}
           />
         </SuspendedFieldset>
@@ -696,14 +701,18 @@ function MobileRecordsSegment({
   onLongReviewChange,
   longReviewSaveStatus,
   onSaveLongReview,
+  isSuspended,
   canWrite,
 }: {
   longReview: string;
   onLongReviewChange: (value: string) => void;
   longReviewSaveStatus: SaveState;
   onSaveLongReview: () => void;
+  isSuspended: boolean;
   canWrite: boolean;
 }) {
+  const feedbackAccess = getCurrentSessionFeedbackAccessState({ isViewer: false, isSuspended });
+
   return (
     <>
       <section className="m-sec">
@@ -753,9 +762,7 @@ function MobileRecordsSegment({
         <div className={canWrite ? "m-card-quiet" : "m-card-quiet rm-locked-state"} role="note">
           <div className="eyebrow">피드백 문서 접근</div>
           <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-            {canWrite
-              ? "세션 후 호스트가 피드백 문서를 업로드하면 참석자에게 열립니다."
-              : "둘러보기 멤버는 피드백 문서를 읽을 수 없습니다."}
+            {canWrite ? "세션 후 호스트가 피드백 문서를 업로드하면 참석자에게 열립니다." : feedbackAccess.body}
           </p>
         </div>
       </section>

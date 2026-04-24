@@ -309,12 +309,14 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
 
 export function FeedbackAccessPanel({
   isViewer,
+  isSuspended,
   internalLinkComponent: InternalLink = AnchorInternalLink,
 }: {
   isViewer: boolean;
+  isSuspended: boolean;
   internalLinkComponent?: InternalLinkComponent;
 }) {
-  const feedbackAccess = getCurrentSessionFeedbackAccessState(isViewer);
+  const feedbackAccess = getCurrentSessionFeedbackAccessState({ isViewer, isSuspended });
 
   return (
     <section className={feedbackAccess.className} style={{ padding: "22px" }}>

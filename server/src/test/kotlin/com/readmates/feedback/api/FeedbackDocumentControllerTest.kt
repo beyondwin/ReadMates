@@ -49,6 +49,22 @@ private const val RESET_MEMBER5_SESSION_ONE_ACTIVE_SQL = """
       and users.email = 'member5@example.com';
 """
 
+private const val MARK_MEMBER5_SUSPENDED_SQL = """
+    update memberships
+    join users on users.id = memberships.user_id
+    set memberships.status = 'SUSPENDED'
+    where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+      and users.email = 'member5@example.com';
+"""
+
+private const val RESET_MEMBER5_ACTIVE_SQL = """
+    update memberships
+    join users on users.id = memberships.user_id
+    set memberships.status = 'ACTIVE'
+    where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+      and users.email = 'member5@example.com';
+"""
+
 private const val MARK_SESSION_ONE_OPEN_SQL = """
     update sessions
     set state = 'OPEN'
@@ -204,6 +220,33 @@ class FeedbackDocumentControllerTest(
         }.andExpect {
             status { isOk() }
             jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+        }
+
+        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            MARK_MEMBER5_SUSPENDED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_MEMBER5_ACTIVE_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `suspended attended member cannot list or read feedback document`() {
+        mockMvc.get("/api/feedback-documents/me") {
+            with(user("member5@example.com"))
+        }.andExpect {
+            status { isForbidden() }
         }
 
         mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {

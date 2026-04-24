@@ -112,8 +112,8 @@ class FeedbackDocumentService(
     }
 
     private fun requireReadableFeedbackMember(currentMember: CurrentMember) {
-        if (currentMember.isViewer) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Feedback documents require full membership")
+        if (!currentMember.isActive) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Feedback documents require active membership")
         }
     }
 
