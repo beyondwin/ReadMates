@@ -257,6 +257,16 @@ describe("HostMembersPage", () => {
     expect(suspendedRow.getByText("suspended@example.com · 정지됨 · 참여 2026.04.14")).toBeInTheDocument();
     expect(suspendedRow.getByText("정지")).toBeInTheDocument();
     expect(suspendedRow.getByText("이번 세션 제외")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
+    const inactiveRow = within(screen.getByText("탈").closest("article") as HTMLElement);
+    expect(inactiveRow.getByText("left@example.com · 참여 2026.04.10")).toBeInTheDocument();
+    expect(inactiveRow.getByText("탈퇴")).toBeInTheDocument();
+    expect(inactiveRow.getByText("기록 보존")).toBeInTheDocument();
+    expect(inactiveRow.getAllByText("기록 보존")).toHaveLength(1);
+    expect(inactiveRow.queryByText("이번 세션 제외")).not.toBeInTheDocument();
+    expect(inactiveRow.queryByText("이번 세션 미포함")).not.toBeInTheDocument();
+    expect(inactiveRow.getByRole("button", { name: "이름 변경" })).toBeInTheDocument();
   });
 
   it("opens the profile edit dialog for a member display name", async () => {
@@ -730,6 +740,9 @@ describe("HostMembersPage", () => {
     await user.click(screen.getByRole("tab", { name: "탈퇴/비활성" }));
     expect(screen.getByText("둘")).toBeInTheDocument();
     expect(screen.getByText("viewer@example.com · 요청 2026.04.20")).toBeInTheDocument();
+    const inactiveViewerRow = within(screen.getByText("둘").closest("article") as HTMLElement);
+    expect(inactiveViewerRow.getByText("기록 보존")).toBeInTheDocument();
+    expect(inactiveViewerRow.queryByText("이번 세션 미포함")).not.toBeInTheDocument();
   });
 
   it("removes the viewer row locally when activation succeeds but list refresh fails", async () => {

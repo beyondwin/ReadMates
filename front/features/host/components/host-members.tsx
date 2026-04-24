@@ -138,6 +138,10 @@ function currentSessionBadge(member: HostMemberListItem) {
   return { label: "이번 세션 미포함", className: "badge" };
 }
 
+function preservedRecordBadge() {
+  return { label: "기록 보존", className: "badge" };
+}
+
 function focusMemberTab(tab: MemberTab) {
   globalThis.setTimeout(() => {
     document.getElementById(`host-members-tab-${tab}`)?.focus();
@@ -731,7 +735,8 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
             sectionDescription="탈퇴/비활성 멤버의 과거 기록은 보존되고 새 참여는 열리지 않습니다."
             renderMeta={inactiveMeta}
             renderProfileAction={renderProfileAction}
-            renderActions={() => <span className="badge">기록 보존</span>}
+            renderCurrentSessionBadge={preservedRecordBadge}
+            renderActions={() => null}
           />
         ) : null}
 
@@ -863,6 +868,7 @@ function MemberList({
   renderMeta,
   renderProfileAction,
   renderActions,
+  renderCurrentSessionBadge = currentSessionBadge,
 }: {
   members: HostMemberListItem[];
   emptyText: string;
@@ -870,6 +876,7 @@ function MemberList({
   renderMeta: (member: HostMemberListItem) => string;
   renderProfileAction: (member: HostMemberListItem) => ReactNode;
   renderActions: (member: HostMemberListItem) => ReactNode;
+  renderCurrentSessionBadge?: (member: HostMemberListItem) => { label: string; className: string };
 }) {
   if (members.length === 0) {
     return (
@@ -898,7 +905,7 @@ function MemberList({
                   {member.displayName}
                 </h2>
                 <span className={statusBadgeClass(member.status)}>{statusBadgeLabels[member.status]}</span>
-                <span className={currentSessionBadge(member).className}>{currentSessionBadge(member).label}</span>
+                <span className={renderCurrentSessionBadge(member).className}>{renderCurrentSessionBadge(member).label}</span>
                 {member.role === "HOST" ? <span className="badge badge-accent badge-dot">호스트</span> : null}
               </div>
               <p className="small" style={{ margin: "4px 0 0", color: "var(--text-2)" }}>

@@ -446,9 +446,9 @@ export default function HostInvitations({
                   <div
                     key={invitation.invitationId}
                     className="rm-ledger-row"
-                    style={{ padding: "16px 18px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 16 }}
+                    style={{ padding: "16px 18px", display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 16 }}
                   >
-                    <div>
+                    <div style={{ flex: "1 1 320px", minWidth: 0 }}>
                       <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                         <div className="body" style={{ fontSize: 14, fontWeight: 600 }}>
                           {invitation.name}
@@ -459,10 +459,7 @@ export default function HostInvitations({
                         {invitation.applyToCurrentSession ? <span className="badge">이번 세션 포함</span> : null}
                       </div>
                       <div className="small" style={{ marginTop: 2 }}>
-                        {invitation.email}
-                      </div>
-                      <div className="tiny">
-                        {statusLabels[invitation.effectiveStatus]} · 만료 {formatDateOnlyLabel(invitation.expiresAt)}
+                        {invitation.email} · 만료 {formatDateOnlyLabel(invitation.expiresAt)}
                       </div>
                       <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
                         {statusDetailLabels[invitation.effectiveStatus]}
@@ -473,7 +470,7 @@ export default function HostInvitations({
                         </div>
                       ) : null}
                     </div>
-                    <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                    <div className="row" style={{ gap: 8, flex: "0 1 auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
                       {invitation.canRevoke ? (
                         <button
                           aria-label={`${invitation.email} 초대 취소`}

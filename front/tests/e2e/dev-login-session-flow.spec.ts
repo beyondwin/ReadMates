@@ -92,5 +92,5 @@ test("host invites a new member and invite page uses Google acceptance", async (
   await page.goto("/app/host/invitations");
   await expect(page.getByText("초대테스트")).toBeVisible();
   await expect(page.getByText(invitedEmail)).toBeVisible();
-  await expect(page.getByText("대기 · 만료").first()).toBeVisible();
+  await expect(page.getByText(`${invitedEmail} · 만료`)).toBeVisible();
 });
