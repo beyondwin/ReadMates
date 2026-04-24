@@ -85,13 +85,11 @@ describe("HostInvitations", () => {
 
     expect(screen.getByText("멤버 초대 관리")).toBeInTheDocument();
     expect(screen.getByText("초대 링크 생성부터 수락, 만료, 취소 상태까지 한곳에서 확인합니다.")).toBeInTheDocument();
-    expect(screen.getByText("pending@example.com")).toBeInTheDocument();
     expect(screen.getByText("대기 멤버")).toBeInTheDocument();
-    expect(screen.getByText("accepted@example.com")).toBeInTheDocument();
     expect(screen.getByText("수락 멤버")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
-    expect(screen.getByText("대기 · 만료 2026.05.20")).toBeInTheDocument();
-    expect(screen.getByText("수락됨 · 만료 2026.05.20")).toBeInTheDocument();
+    expect(screen.getByText("pending@example.com · 만료 2026.05.20")).toBeInTheDocument();
+    expect(screen.getByText("accepted@example.com · 만료 2026.05.20")).toBeInTheDocument();
     expect(screen.getByLabelText("수락하면 이번 세션에도 추가")).toBeChecked();
     expect(screen.getByRole("button", { name: "pending@example.com 초대 취소" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "pending@example.com 초대 취소" })).toHaveTextContent(/^초대 취소$/);
@@ -403,7 +401,7 @@ describe("HostInvitations", () => {
     await user.type(screen.getByLabelText("초대 이메일"), "old@example.com");
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
     await screen.findByDisplayValue("http://localhost:3000/invite/old-token");
-    await screen.findByText("pending@example.com");
+    await screen.findByText("pending@example.com · 만료 2026.05.20");
 
     await user.click(screen.getByRole("button", { name: "pending@example.com 새 링크 발급" }));
 
@@ -457,7 +455,7 @@ describe("HostInvitations", () => {
 
     await user.click(screen.getByRole("button", { name: "displayed@example.com 초대 취소" }));
 
-    await waitFor(() => expect(screen.queryByText("displayed@example.com")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("displayed@example.com · 만료 2026.05.20")).not.toBeInTheDocument());
     expect(screen.queryByDisplayValue("http://localhost:3000/invite/displayed-token")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "초대 링크 복사" })).not.toBeInTheDocument();
   });
@@ -513,8 +511,8 @@ describe("HostInvitations", () => {
     render(<HostInvitationsForTest initialInvitations={[revokedInvitation]} />);
     await user.click(screen.getByRole("button", { name: "accepted@example.com 새 링크 발급" }));
 
-    await waitFor(() => expect(screen.getByText("대기 · 만료 2026.05.25")).toBeInTheDocument());
-    expect(screen.getByText("취소됨 · 만료 2026.05.20")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("accepted@example.com · 만료 2026.05.25")).toBeInTheDocument());
+    expect(screen.getByText("accepted@example.com · 만료 2026.05.20")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
       "/api/bff/api/host/invitations",
