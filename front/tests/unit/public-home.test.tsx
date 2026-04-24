@@ -80,7 +80,7 @@ describe("PublicHome", () => {
     expect(screen.getByText("공개 기록은 열려 있고, 참여는 초대받은 멤버에게만 열립니다")).toBeInTheDocument();
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByText("기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다")).toBeInTheDocument();
-    expect(screen.getByText("읽는사이는 초대 기반 모임입니다. 공개 기록은 누구나 읽을 수 있고, 정식 멤버 참여는 초대 링크 또는 호스트 전환으로 열립니다.")).toBeInTheDocument();
+    expect(screen.getByText("읽는사이는 초대 기반 모임입니다. 기록은 누구나 읽을 수 있고, 참여 권한은 초대 수락 또는 호스트 승인 뒤 열립니다.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
     expect(screen.queryByRole("button", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();

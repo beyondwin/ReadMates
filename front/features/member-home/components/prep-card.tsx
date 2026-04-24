@@ -154,7 +154,7 @@ export function PrepCard({
               읽기 전용
             </p>
             <p className="small" style={{ margin: "6px 0 0" }}>
-              둘러보기 멤버는 세션을 읽을 수 있고, RSVP와 읽기 진행률, 질문, 서평 저장은 정식 멤버에게 열립니다.
+              둘러보기 멤버는 세션을 읽을 수 있고, RSVP와 읽기 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다.
             </p>
           </div>
         ) : null}

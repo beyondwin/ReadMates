@@ -193,7 +193,7 @@ export default function PublicClub({ data }: PublicClubProps) {
                 아직 발행된 공개 기록이 없습니다
               </div>
               <p className="body" style={{ margin: "12px 0 0" }}>
-                기록이 없다는 상태도 의도적으로 보관합니다. 발행된 모임이 생기면 이 색인에 추가됩니다.
+                아직 발행된 기록이 없어도 이 자리는 비워 둡니다. 발행된 모임이 생기면 이 색인에 추가됩니다.
               </p>
             </div>
           )}

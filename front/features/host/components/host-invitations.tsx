@@ -469,7 +469,7 @@ export default function HostInvitations({
                       </div>
                       {invitation.effectiveStatus === "PENDING" ? (
                         <div className="tiny" style={{ marginTop: 4, color: "var(--text-3)" }}>
-                          기존 링크는 목록에서 다시 복사할 수 없습니다. 새 공유가 필요하면 새 링크 발급을 사용하세요.
+                          보안을 위해 기존 초대 링크는 다시 표시하지 않습니다. 새 공유가 필요하면 새 링크 발급을 사용하세요.
                         </div>
                       ) : null}
                     </div>

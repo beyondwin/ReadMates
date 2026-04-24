@@ -167,7 +167,7 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "새 세션 만들기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
-    expect(screen.getByText("세션 기본 정보는 새 세션 만들기로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.")).toBeVisible();
+    expect(screen.getByText("세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 공개 설정과 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
     expect(screen.queryByText("이번 세션 편집")).not.toBeInTheDocument();
   });
 
@@ -177,7 +177,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("heading", { name: "이번 세션 편집" })).toBeVisible();
     expect(screen.getByText("No.07")).toBeVisible();
     expect(screen.getByText("이번 세션")).toBeVisible();
-    expect(screen.getByText("세션 기본 정보는 변경 사항 저장으로, 공개 설정과 피드백 문서는 각 섹션의 버튼으로 따로 저장합니다.")).toBeVisible();
+    expect(screen.getByText("세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 공개 설정과 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
   });
 
   it("switches the mobile editor between basic, publish, attendance, and feedback document contexts", async () => {

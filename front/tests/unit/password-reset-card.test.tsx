@@ -12,7 +12,7 @@ describe("PasswordResetCard", () => {
   it("shows a Google-only legacy password endpoint is gone 안내 page", () => {
     render(<PasswordResetCard token="reset-token" />);
 
-    expect(screen.getByRole("heading", { name: "비밀번호 링크는 보관용 안내로 전환되었습니다." })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "비밀번호 로그인은 종료되었습니다." })).toBeInTheDocument();
     expect(screen.getByText("안내 전용")).toBeInTheDocument();
     expect(screen.getByText(/읽는사이는 현재 Google OAuth와 서버 세션으로만 입장합니다/)).toBeInTheDocument();
     expect(screen.getByText("현재 로그인")).toBeInTheDocument();

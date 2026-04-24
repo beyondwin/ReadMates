@@ -61,7 +61,7 @@ function copyForAuth(auth: AuthMeView): PendingStateCopy {
   if (approvalState === "VIEWER" || membershipStatus === "VIEWER") {
     return {
       eyebrow: "둘러보기 멤버",
-      title: "읽을 수 있는 공간은 열렸고, 참여는 승인 뒤 열립니다.",
+      title: "기록은 읽을 수 있고, 참여 기능은 승인 뒤 열립니다.",
       body: "초대 없이 Google로 로그인한 계정은 둘러보기 멤버로 시작합니다. 호스트가 정식 멤버로 전환하면 RSVP, 체크인, 질문과 서평 작성이 열립니다.",
       badge: "승인 대기",
       badgeClass: "badge-pending",

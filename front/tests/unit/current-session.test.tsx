@@ -316,7 +316,7 @@ describe("CurrentSession", () => {
     );
     const desktopScope = within(getDesktop(container));
 
-    expect(desktopScope.getByText("멤버십이 일시 정지되어 새 활동을 저장할 수 없습니다.")).toBeInTheDocument();
+    expect(desktopScope.getByText("멤버십이 일시 정지되어 새 기록을 남길 수 없습니다.")).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "진행률 저장" })).toBeDisabled();
     expect(desktopScope.getByRole("button", { name: "질문 저장" })).toBeDisabled();
     expect(desktopScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
@@ -330,10 +330,10 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     expect(desktopScope.getByText("둘러보기 멤버")).toBeVisible();
-    expect(desktopScope.getByText("기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다")).toBeVisible();
+    expect(desktopScope.getByText("기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다")).toBeVisible();
     expect(
       desktopScope.getByText(
-        "둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평 저장을 할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.",
+        "둘러보기 멤버는 RSVP, 읽기 진행률, 질문, 서평을 저장할 수 없습니다. 기존 기록과 공동 보드, 피드백 문서 접근 상태는 읽기 전용으로 확인할 수 있어요.",
       ),
     ).toBeVisible();
     expect(desktopScope.getAllByText("읽기 진행률").length).toBeGreaterThan(0);
@@ -376,9 +376,9 @@ describe("CurrentSession", () => {
 
     expect(mobileScope.getByText("둘러보기 멤버")).toBeVisible();
     expect(
-      mobileScope.getByText("세션 기록은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 저장은 정식 멤버에게 열립니다."),
+      mobileScope.getByText("세션 기록은 읽을 수 있어요. RSVP, 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다."),
     ).toBeVisible();
-    expect(mobileScope.getByText("기록은 볼 수 있고, 새 참여 기록은 정식 멤버에게 열립니다")).toBeVisible();
+    expect(mobileScope.getByText("기록은 읽을 수 있고, 새 참여 기록은 정식 멤버만 남길 수 있습니다")).toBeVisible();
     expect(mobileScope.getAllByText("읽기 진행률").length).toBeGreaterThan(0);
     expect(mobileScope.getAllByText("72%").length).toBeGreaterThan(0);
     expect(mobileScope.queryByRole("button", { name: "참석" })).not.toBeInTheDocument();
@@ -464,7 +464,7 @@ describe("CurrentSession", () => {
       "https://meet.google.com/readmates-test",
     );
     expect(desktopScope.getByText("Passcode currentpass")).toBeInTheDocument();
-    expect(desktopScope.getByText("원치 않으시면 모임 중 언제든 말씀해 주세요.")).toBeInTheDocument();
+    expect(desktopScope.getByText("녹음을 원하지 않으면 모임 중 언제든 알려 주세요.")).toBeInTheDocument();
     expect(desktopScope.getByText("음성만 · 자동 정리 참고용")).toBeInTheDocument();
     expect(desktopScope.getAllByTitle("김호스트")[0]).toHaveTextContent("김");
     expect(desktopScope.getAllByTitle("이멤버5")[0]).toHaveTextContent("이");

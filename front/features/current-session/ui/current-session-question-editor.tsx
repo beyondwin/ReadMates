@@ -88,7 +88,7 @@ export function QuestionEditor({
 
       <div className={isMobile ? "rm-current-session-mobile__save-row" : "row-between"} style={{ marginTop: isMobile ? 14 : 16 }}>
         <span className={isMobile ? "tiny" : "small"} style={{ color: validationMessage ? "var(--danger)" : "var(--text-3)" }}>
-          {validationMessage || "저장하면 공동 보드에 반영돼요"}
+          {validationMessage || "저장하면 공동 보드에 올라갑니다."}
         </span>
         <div className={isMobile ? "m-row rm-current-session-mobile__question-actions" : "row"} style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="question" status={saveStatus} />

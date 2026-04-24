@@ -16,7 +16,7 @@ export function PasswordResetCard({ token }: { token: string }) {
             <div className="eyebrow">Retired password route</div>
             <span className="badge badge-readonly">안내 전용</span>
           </div>
-          <h1 className="h2 editorial auth-card__title">비밀번호 링크는 보관용 안내로 전환되었습니다.</h1>
+          <h1 className="h2 editorial auth-card__title">비밀번호 로그인은 종료되었습니다.</h1>
           <p className="body auth-card__lede">
             읽는사이는 현재 Google OAuth와 서버 세션으로만 입장합니다. 가입했던 Gmail 계정으로 계속하면 기존 멤버
             기록이 자동으로 연결됩니다.

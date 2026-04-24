@@ -60,6 +60,6 @@ test("host suspends member and member cannot save current session activity", asy
   await memberPage.goto("/app/session/current");
 
   await expect(memberPage.getByRole("heading", { level: 1, name: lifecycleBookTitle })).toBeVisible();
-  await expect(memberPage.getByRole("note").filter({ hasText: "멤버십이 일시 정지되어 새 활동을 저장할 수 없습니다." })).toBeVisible();
+  await expect(memberPage.getByRole("note").filter({ hasText: "멤버십이 일시 정지되어 새 기록을 남길 수 없습니다." })).toBeVisible();
   await expect(memberPage.getByRole("button", { name: "질문 저장" })).toBeDisabled();
 });

@@ -36,7 +36,7 @@ export function LoginCard({
       <p className="eyebrow">Private reading room</p>
       <h1 className="h1 editorial">읽는사이 멤버 입장</h1>
       <p className="body auth-card__lede">
-        초대받은 사람과 기존 멤버가 같은 Google 계정으로 들어오는 조용한 클럽 공간입니다. 초대 링크가 없다면
+        초대받은 멤버와 기존 멤버가 같은 Google 계정으로 입장하는 조용한 클럽 공간입니다. 초대 링크가 없다면
         둘러보기 멤버로 시작하고, 호스트 전환 뒤 참여 권한이 열립니다.
       </p>
       <div className="auth-card__actions auth-card__actions--primary">

@@ -226,7 +226,7 @@ export function getHostDashboardNextOperationAction(
   if (missingMembers) {
     return {
       title: "새 멤버의 이번 세션 참여 여부 결정",
-      helper: "멤버 승인 직후 현재 세션 roster와 비교해 나온 항목입니다. 아래 알림에서 바로 처리할 수 있습니다.",
+      helper: "멤버 승인 직후 현재 세션 참석 명단과 비교해 확인된 항목입니다. 아래 알림에서 바로 처리할 수 있습니다.",
       href: null,
       label: "알림에서 처리",
       unavailableReason: "아래 멤버별 버튼으로 처리하면 이 알림에서 사라집니다.",
@@ -256,7 +256,7 @@ export function getHostDashboardNextOperationAction(
   if (checkinMissing > 0) {
     return {
       title: "읽기 진행률과 질문 작성 현황 확인",
-      helper: `읽기 진행률 미작성 ${checkinMissing}명이 있습니다. 참석 roster와 질문 수를 같이 확인하세요.`,
+      helper: `읽기 진행률 미작성 ${checkinMissing}명이 있습니다. 참석 명단과 질문 수를 같이 확인하세요.`,
       href: hostSessionEditHref(session.sessionId),
       label: "세션 문서 열기",
     };

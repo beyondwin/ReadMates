@@ -794,7 +794,7 @@ function MissingCurrentSessionMembersAlert({
             </p>
           ) : null}
           <p className="tiny" style={{ margin: "8px 0 0", color: "var(--text-3)" }}>
-            승인된 멤버 목록과 현재 세션 참석 roster를 비교한 결과입니다. 처리하면 이 알림에서 사라집니다.
+            승인된 멤버 목록과 현재 세션 참석 명단을 비교한 결과입니다. 처리하면 이 알림에서 사라집니다.
           </p>
         </div>
         {message ? (

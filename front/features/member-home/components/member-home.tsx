@@ -56,7 +56,7 @@ export default function MemberHome({
                   {memberName}님,{" "}
                   {currentSession ? (
                     <>
-                      이번 달은 <span style={{ color: "var(--accent)" }}>{currentSession.bookAuthor}</span>와 함께예요.
+                      이번 달은 <span style={{ color: "var(--accent)" }}>{currentSession.bookTitle}</span>을 함께 읽어요.
                     </>
                   ) : (
                     "다음 세션을 기다리고 있어요."
@@ -230,7 +230,7 @@ function ViewerMemberHomeNotice() {
         둘러보기 멤버
       </p>
       <p className="body" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
-        세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성이 열립니다.
+        세션 기록은 읽을 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.
       </p>
     </section>
   );
@@ -243,7 +243,7 @@ function MobileViewerMemberHomeNotice() {
         둘러보기 멤버
       </p>
       <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
-        세션 기록은 볼 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성이 열립니다.
+        세션 기록은 읽을 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.
       </p>
     </div>
   );

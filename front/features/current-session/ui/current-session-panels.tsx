@@ -184,7 +184,7 @@ export function LongReviewPanel({
         rows={4}
         value={longReview}
         onChange={(event) => onChange(event.target.value)}
-        placeholder="완독 후든, 모임 이후든, 시간이 흐른 뒤에라도 — 이 책에 대해 남기고 싶은 문장을 천천히 적어 주세요."
+        placeholder="완독 후, 모임 이후, 시간이 지난 뒤에 떠오른 문장을 적어 주세요."
       />
       <div className="row" style={{ marginTop: "12px", gap: "10px", justifyContent: "flex-end" }}>
         <SaveFeedback scope="longReview" status={saveStatus} />
@@ -300,7 +300,7 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
       <div className="row" style={{ gap: "8px" }}>
         <Icon name="mic" size={14} style={{ color: "var(--text-3)" }} />
         <span className="tiny" style={{ color: "var(--text-3)" }}>
-          원치 않으시면 모임 중 언제든 말씀해 주세요.
+          녹음을 원하지 않으면 모임 중 언제든 알려 주세요.
         </span>
       </div>
     </div>
