@@ -84,6 +84,7 @@ class SecurityConfig(
                     .requestMatchers("/api/invitations/**").permitAll()
                     .requestMatchers(methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$"))).permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/sessions/current").hasAnyRole("HOST", "MEMBER", "VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/sessions/upcoming").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/archive/**").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/notes/**").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/app/me").hasAnyRole("HOST", "MEMBER", "VIEWER")

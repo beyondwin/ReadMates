@@ -39,6 +39,7 @@ class ViewerSecurityTest(
     @param:Autowired private val getReadableFeedbackDocumentUseCase: GetReadableFeedbackDocumentUseCase,
 ) {
     private val createdSessionTokenHashes = linkedSetOf<String>()
+    private val createdSessionIds = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
 
@@ -47,11 +48,13 @@ class ViewerSecurityTest(
         try {
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
+            deleteWhereIn("sessions", "id", createdSessionIds)
             deleteWhereIn("memberships", "id", createdMembershipIds)
             deleteWhereIn("memberships", "user_id", createdUserIds)
             deleteWhereIn("users", "id", createdUserIds)
         } finally {
             createdSessionTokenHashes.clear()
+            createdSessionIds.clear()
             createdMembershipIds.clear()
             createdUserIds.clear()
             SecurityContextHolder.clearContext()
@@ -78,6 +81,23 @@ class ViewerSecurityTest(
             cookie(cookie)
         }.andExpect {
             status { isOk() }
+        }
+    }
+
+    @Test
+    fun `viewer can read member-visible upcoming sessions but not host-only drafts`() {
+        val cookie = viewerSessionCookie("viewer.upcoming")
+        val memberVisibleSessionId = insertUpcomingSession(number = 87, visibility = "MEMBER")
+        insertUpcomingSession(number = 88, visibility = "HOST_ONLY")
+
+        mockMvc.get("/api/sessions/upcoming") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(1) }
+            jsonPath("$[0].sessionId") { value(memberVisibleSessionId) }
+            jsonPath("$[0].visibility") { value("MEMBER") }
+            jsonPath("$[0].bookTitle") { value("Viewer Upcoming Member Book") }
         }
     }
 
@@ -202,6 +222,51 @@ class ViewerSecurityTest(
         )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
+    }
+
+    private fun insertUpcomingSession(number: Int, visibility: String): String {
+        val sessionId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              question_deadline_at,
+              state,
+              visibility
+            )
+            values (
+              ?,
+              '00000000-0000-0000-0000-000000000001',
+              ?,
+              ?,
+              ?,
+              'Viewer Upcoming Author',
+              '2026-08-20',
+              '20:00:00',
+              '22:00:00',
+              '온라인',
+              '2026-08-19 14:59:00',
+              'DRAFT',
+              ?
+            )
+            """.trimIndent(),
+            sessionId,
+            number,
+            "${number}회차 · Viewer Upcoming $visibility",
+            if (visibility == "HOST_ONLY") "Viewer Upcoming Host Book" else "Viewer Upcoming Member Book",
+            visibility,
+        )
+        createdSessionIds += sessionId
+        return sessionId
     }
 
     private fun viewerMemberEmail(prefix: String): String =

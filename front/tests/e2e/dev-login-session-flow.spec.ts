@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { cleanupGeneratedSessions, loginWithGoogleFixture, resetSeedGoogleLogins } from "./readmates-e2e-db";
 
 test.describe.configure({ mode: "serial" });
@@ -8,12 +8,28 @@ const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 
 function resetSessionFlowState() {
   cleanupGeneratedSessions([invitedEmail]);
-  resetSeedGoogleLogins(["host@example.com", "member5@example.com"]);
+  resetSeedGoogleLogins(["host@example.com", "member1@example.com", "member5@example.com"]);
 }
 
 function expectedGoogleInviteHref(inviteUrl: string) {
   const token = new URL(inviteUrl, appOrigin).pathname.split("/").pop() ?? "";
   return `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}`;
+}
+
+async function loginAsDevAccount(page: Page, accountName: RegExp) {
+  await page.goto("/login");
+  await page.getByRole("button", { name: accountName }).click();
+  await expect(page).toHaveURL(/\/app\/?$/);
+}
+
+async function startUpcomingSession(page: Page, bookTitle: string) {
+  await page.goto("/app/host");
+  const openResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/open") && response.status() === 200,
+  );
+  await page.getByRole("button", { name: new RegExp(`현재로 시작 · ${bookTitle}`) }).click();
+  await openResponse;
+  await page.goto("/app/session/current");
 }
 
 test.beforeEach(() => {
@@ -22,6 +38,43 @@ test.beforeEach(() => {
 
 test.afterEach(() => {
   resetSessionFlowState();
+});
+
+test("host creates member-visible upcoming session then starts it", async ({ page }) => {
+  await loginAsDevAccount(page, /호스트/);
+  await page.goto("/app/host");
+
+  await page.getByRole("link", { name: "예정 세션 만들기" }).click();
+  await page.getByLabel("세션 제목").fill("7회차 · E2E 예정 책");
+  await page.getByLabel("책 제목").fill("E2E 예정 책");
+  await page.getByLabel("저자").fill("E2E 저자");
+  await page.getByLabel("모임 날짜").fill("2026-05-20");
+  await page.getByRole("button", { name: /예정 세션 만들기|새 세션 만들기/ }).click();
+
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
+  await page.goto("/app/host");
+  const visibilityResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/visibility") && response.status() === 200,
+  );
+  await page.getByRole("button", { name: /멤버 공개 · E2E 예정 책/ }).click();
+  await visibilityResponse;
+
+  await loginAsDevAccount(page, /멤버1/);
+  await page.goto("/app");
+  await expect(page.locator(".rm-member-home-desktop").getByText("E2E 예정 책")).toBeVisible();
+
+  await loginAsDevAccount(page, /호스트/);
+  await page.goto("/app/host");
+  const openResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/open") && response.status() === 200,
+  );
+  await page.getByRole("button", { name: /현재로 시작 · E2E 예정 책/ }).click();
+  await openResponse;
+
+  await page.goto("/app/session/current");
+  await expect(
+    page.locator(".rm-current-session-desktop").getByRole("heading", { level: 1, name: "E2E 예정 책" }),
+  ).toBeVisible();
 });
 
 test("host creates session seven and member sees current session", async ({ page }) => {
@@ -34,7 +87,8 @@ test("host creates session seven and member sees current session", async ({ page
   await page.getByLabel("모임 날짜").fill("2026-05-20");
   await page.getByRole("button", { name: "새 세션 만들기" }).click();
 
-  await expect(page).toHaveURL(/\/app\/session\/current/);
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
+  await startUpcomingSession(page, "테스트 책");
   await expect(page.getByRole("heading", { level: 1, name: "테스트 책" })).toBeVisible();
   await expect(page.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
 
@@ -62,7 +116,8 @@ test("host invites a new member and invite page uses Google acceptance", async (
   await page.getByLabel("저자").fill("초대 테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
   await page.getByRole("button", { name: "새 세션 만들기" }).click();
-  await expect(page).toHaveURL(/\/app\/session\/current/);
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
+  await startUpcomingSession(page, "초대 테스트 책");
 
   await page.goto("/app/host/invitations");
   await page.getByLabel("이름").fill("초대테스트");

@@ -1988,8 +1988,9 @@ git commit -m "feat: show upcoming sessions on member home"
 
 **Files:**
 - Modify: `front/tests/e2e/dev-login-session-flow.spec.ts`
+- Follow-up verification fixes: `front/tests/e2e/member-lifecycle.spec.ts`, `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt`, `server/src/test/kotlin/com/readmates/session/api/HostDashboardControllerTest.kt`, `server/src/test/kotlin/com/readmates/auth/api/ViewerSecurityTest.kt`
 
-- [ ] **Step 1: Write failing E2E smoke**
+- [x] **Step 1: Write failing E2E smoke**
 
 In `dev-login-session-flow.spec.ts`, add:
 
@@ -2025,7 +2026,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 });
 ```
 
-- [ ] **Step 2: Run E2E smoke after implementation**
+- [x] **Step 2: Run E2E smoke after implementation**
 
 Run:
 
@@ -2035,7 +2036,9 @@ pnpm --dir front test:e2e -- dev-login-session-flow.spec.ts
 
 Expected: PASS.
 
-- [ ] **Step 3: Run server checks**
+Status note: the exact default command was attempted and is blocked by stale local Flyway checksums in the default E2E database; the same focused smoke passed with `READMATES_E2E_DB_NAME=<fresh_migrated_e2e_db>`.
+
+- [x] **Step 3: Run server checks**
 
 Run:
 
@@ -2045,7 +2048,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 4: Run frontend checks**
+- [x] **Step 4: Run frontend checks**
 
 Run:
 
@@ -2057,7 +2060,7 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 5: Run E2E**
+- [x] **Step 5: Run E2E**
 
 Run:
 
@@ -2067,7 +2070,9 @@ pnpm --dir front test:e2e
 
 Expected: PASS.
 
-- [ ] **Step 6: Run public release safety checks**
+Status note: the exact default command was attempted and is blocked by stale local Flyway checksums in the default E2E database; the full suite passed with `READMATES_E2E_DB_NAME=<fresh_migrated_e2e_db>`.
+
+- [x] **Step 6: Run public release safety checks**
 
 Because this changes public/member visibility rules, run:
 
@@ -2078,12 +2083,37 @@ Because this changes public/member visibility rules, run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit final verification updates**
+- [x] **Step 7: Commit final verification updates**
 
 ```bash
-git add front/tests/e2e/dev-login-session-flow.spec.ts
+git add front/tests/e2e/dev-login-session-flow.spec.ts \
+  front/tests/e2e/member-lifecycle.spec.ts \
+  server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt \
+  server/src/test/kotlin/com/readmates/session/api/HostDashboardControllerTest.kt \
+  server/src/test/kotlin/com/readmates/auth/api/ViewerSecurityTest.kt \
+  docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md
 git commit -m "test: cover upcoming session flow"
 ```
+
+**Task 8 checkpoint - 2026-04-25 KST**
+
+- Changed files: added upcoming-session E2E smoke in `front/tests/e2e/dev-login-session-flow.spec.ts`; updated stale lifecycle E2E draft-to-open setup in `front/tests/e2e/member-lifecycle.spec.ts`; allowed viewer/member read access to `/api/sessions/upcoming` in `SecurityConfig.kt`; updated `HostDashboardControllerTest` setup to assert create returns `DRAFT` and then open the session where current-session tests need it; added `ViewerSecurityTest` coverage proving a viewer can read member-visible upcoming sessions while `HOST_ONLY` drafts remain filtered.
+- Key decisions: waited for dev-login redirect before navigating; scoped duplicate desktop/mobile text assertions to visible desktop surfaces; preserved existing current-session E2E intent by explicitly starting drafts; used a migrated non-destructive E2E database substitute because the default local `readmates_e2e` database has stale Flyway history.
+- Review issues/resolution: code quality review requested direct server coverage for viewer upcoming access, public-safe E2E DB placeholder text, and clearer default E2E blocker notes. Added the targeted viewer security regression with red/green verification, replaced the local substitute DB name with `<fresh_migrated_e2e_db>`, and added blocker notes near the checked E2E steps.
+- Exact verification results:
+  - `pnpm --dir front test:e2e -- dev-login-session-flow.spec.ts`: BLOCKED on default local E2E DB Flyway checksum mismatch for migrations 13 and 14 during `bootRun`.
+  - `READMATES_E2E_DB_NAME=<fresh_migrated_e2e_db> pnpm --dir front test:e2e -- dev-login-session-flow.spec.ts`: PASS, 3 Chromium tests.
+  - `./server/gradlew -p server test --tests 'com.readmates.auth.api.ViewerSecurityTest.viewer can read member-visible upcoming sessions but not host-only drafts'`: RED without the `/api/sessions/upcoming` viewer allow rule, then PASS after restoring the rule.
+  - `./server/gradlew -p server clean test`: PASS, 314 tests.
+  - `pnpm --dir front lint`: PASS.
+  - `pnpm --dir front test`: PASS, 44 files / 493 tests.
+  - `pnpm --dir front build`: PASS.
+  - `pnpm --dir front test:e2e`: BLOCKED on default local E2E DB Flyway checksum mismatch for migrations 13 and 14 during `bootRun`.
+  - `READMATES_E2E_DB_NAME=<fresh_migrated_e2e_db> pnpm --dir front test:e2e`: PASS, 18 Chromium tests.
+  - `./scripts/build-public-release-candidate.sh`: PASS.
+  - `./scripts/public-release-check.sh .tmp/public-release-candidate`: PASS, gitleaks found no leaks.
+- Remaining risk: default local E2E database needs an operator-owned reset or repair before exact E2E commands can run without the substitute database; no tracked docs include local absolute paths.
+- Next notes: branch/worktree label `codex/upcoming-session-management-20260425`; Task 8 is ready for self-review and commit.
 
 ---
 
