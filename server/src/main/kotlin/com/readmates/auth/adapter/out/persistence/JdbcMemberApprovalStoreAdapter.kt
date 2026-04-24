@@ -26,7 +26,7 @@ class JdbcMemberApprovalStoreAdapter(
               users.id as user_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               users.profile_image_url,
               memberships.status,
               memberships.created_at
@@ -110,7 +110,7 @@ class JdbcMemberApprovalStoreAdapter(
               users.id as user_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               users.profile_image_url,
               memberships.status,
               memberships.created_at

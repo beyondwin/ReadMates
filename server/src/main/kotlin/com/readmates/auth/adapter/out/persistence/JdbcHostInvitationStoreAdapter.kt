@@ -260,13 +260,15 @@ class JdbcHostInvitationStoreAdapter(
         val membershipId = UUID.randomUUID()
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, ?, ?, ?, 'ACTIVE', utc_timestamp(6))
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select ?, ?, users.id, ?, 'ACTIVE', utc_timestamp(6), users.short_name
+            from users
+            where users.id = ?
             """.trimIndent(),
             membershipId.dbString(),
             clubId.dbString(),
-            userId.dbString(),
             role.name,
+            userId.dbString(),
         )
         return membershipId
     }
@@ -326,7 +328,7 @@ class JdbcHostInvitationStoreAdapter(
               clubs.id as club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               memberships.role,
               memberships.status as membership_status
             from memberships

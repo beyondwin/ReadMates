@@ -250,11 +250,12 @@ class HostMemberApprovalControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, ?)
             """.trimIndent(),
             membershipId,
             userId,
+            name,
         )
         createdMembershipIds += membershipId
         return membershipId
@@ -289,12 +290,13 @@ class HostMemberApprovalControllerTest(
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            values (?, ?, ?, 'MEMBER', 'VIEWER', null)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, ?, ?, 'MEMBER', 'VIEWER', null, ?)
             """.trimIndent(),
             membershipId,
             clubId,
             userId,
+            name,
         )
         createdMembershipIds += membershipId
         return membershipId

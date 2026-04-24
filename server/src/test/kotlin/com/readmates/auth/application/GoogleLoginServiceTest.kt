@@ -108,8 +108,8 @@ class GoogleLoginServiceTest(
                 }
                 connection.prepareStatement(
                     """
-                    insert into memberships (id, club_id, user_id, role, status, joined_at)
-                    values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null)
+                    insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+                    values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Race Viewer')
                     """.trimIndent(),
                 ).use { statement ->
                     statement.setString(1, membershipId)

@@ -54,7 +54,7 @@ class JdbcMemberAccountAdapter(
               clubs.id as club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               memberships.role,
               memberships.status as membership_status
             from users
@@ -81,7 +81,7 @@ class JdbcMemberAccountAdapter(
               clubs.id as club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               memberships.role,
               memberships.status as membership_status
             from users
@@ -199,6 +199,7 @@ class JdbcMemberAccountAdapter(
             ?: normalizedEmail.substringBefore("@").takeIf { it.isNotEmpty() }
             ?: "Google User"
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
+        val shortName = shortNameFor(normalizedName)
         val userId = UUID.randomUUID()
         val membershipId = UUID.randomUUID()
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
@@ -214,25 +215,27 @@ class JdbcMemberAccountAdapter(
                 normalizedSubject,
                 normalizedEmail,
                 normalizedName,
-                shortNameFor(normalizedName),
+                shortName,
                 normalizedProfileImageUrl,
             )
 
             jdbcTemplate.update(
                 """
-                insert into memberships (id, club_id, user_id, role, status, joined_at)
+                insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
                 select
                   ?,
                   clubs.id,
                   ?,
                   'MEMBER',
                   'VIEWER',
-                  null
+                  null,
+                  ?
                 from clubs
                 where clubs.slug = 'reading-sai'
                 """.trimIndent(),
                 membershipId.dbString(),
                 userId.dbString(),
+                shortName,
             )
         } catch (exception: DuplicateKeyException) {
             throw MemberAccountDuplicateException(exception)
@@ -252,7 +255,7 @@ class JdbcMemberAccountAdapter(
               clubs.id as club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               memberships.role,
               memberships.status as membership_status
             from users
@@ -309,6 +312,7 @@ class JdbcMemberAccountAdapter(
             ?.takeIf { it.isNotEmpty() }
             ?: normalizedEmail.substringBefore("@").takeIf { it.isNotEmpty() }
             ?: "Google User"
+        val shortName = shortNameFor(normalizedName)
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         if (googleSubjectBelongsToDifferentEmail(jdbcTemplate, normalizedSubject, normalizedEmail)) {
@@ -331,7 +335,7 @@ class JdbcMemberAccountAdapter(
             normalizedSubject,
             normalizedEmail,
             normalizedName,
-            shortNameFor(normalizedName),
+            shortName,
             normalizedProfileImageUrl,
         )
         val storedUser = findUserSubjectByEmail(jdbcTemplate, normalizedEmail) ?: return null
@@ -341,14 +345,15 @@ class JdbcMemberAccountAdapter(
 
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             select
               ?,
               clubs.id,
               users.id,
               'MEMBER',
               'ACTIVE',
-              utc_timestamp(6)
+              utc_timestamp(6),
+              ?
             from clubs
             join users on users.email = ?
             where clubs.slug = 'reading-sai'
@@ -359,6 +364,7 @@ class JdbcMemberAccountAdapter(
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
+            shortName,
             normalizedEmail,
         )
 
@@ -380,7 +386,7 @@ class JdbcMemberAccountAdapter(
               clubs.id as club_id,
               users.email,
               users.name as display_name,
-              users.short_name,
+              memberships.short_name,
               memberships.role,
               memberships.status as membership_status
             from users

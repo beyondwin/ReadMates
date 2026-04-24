@@ -317,25 +317,28 @@ class AuthMeControllerTest(
     private fun loginAsGoogleViewerUser(email: String): Cookie {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
+        val shortName = "Viewer${userId.take(8)}"
         jdbcTemplate.update(
             """
             insert into users (id, google_subject_id, email, name, short_name, auth_provider)
-            values (?, ?, ?, 'Viewer Member', 'Viewer', 'GOOGLE')
+            values (?, ?, ?, 'Viewer Member', ?, 'GOOGLE')
             """.trimIndent(),
             userId,
             "google-viewer-auth-me-$userId",
             email,
+            shortName,
         )
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            select ?, clubs.id, ?, 'MEMBER', 'VIEWER', null
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select ?, clubs.id, ?, 'MEMBER', 'VIEWER', null, ?
             from clubs
             where clubs.slug = 'reading-sai'
             """.trimIndent(),
             membershipId,
             userId,
+            shortName,
         )
         createdMembershipIds += membershipId
 
@@ -345,25 +348,28 @@ class AuthMeControllerTest(
     private fun loginAsLifecycleUser(email: String, status: String): Cookie {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
+        val shortName = "Life${userId.take(8)}"
         jdbcTemplate.update(
             """
             insert into users (id, email, name, short_name, auth_provider)
-            values (?, ?, 'Lifecycle Member', 'Lifecycle', 'PASSWORD')
+            values (?, ?, 'Lifecycle Member', ?, 'PASSWORD')
             """.trimIndent(),
             userId,
             email,
+            shortName,
         )
         createdUserIds += userId
         jdbcTemplate.update(
             """
-            insert into memberships (id, club_id, user_id, role, status, joined_at)
-            select ?, clubs.id, ?, 'MEMBER', ?, utc_timestamp(6)
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select ?, clubs.id, ?, 'MEMBER', ?, utc_timestamp(6), ?
             from clubs
             where clubs.slug = 'reading-sai'
             """.trimIndent(),
             membershipId,
             userId,
             status,
+            shortName,
         )
         createdMembershipIds += membershipId
 
