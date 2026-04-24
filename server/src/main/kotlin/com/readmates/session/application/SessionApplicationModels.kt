@@ -97,6 +97,7 @@ data class CreatedSessionResponse(
     val meetingUrl: String?,
     val meetingPasscode: String?,
     val state: String,
+    val visibility: SessionRecordVisibility,
 )
 
 data class HostSessionDetailResponse(
@@ -118,6 +119,7 @@ data class HostSessionDetailResponse(
     val state: String,
     val attendees: List<HostSessionAttendee>,
     val feedbackDocument: HostSessionFeedbackDocument,
+    val visibility: SessionRecordVisibility,
 )
 
 data class HostSessionAttendee(
@@ -140,6 +142,35 @@ enum class SessionRecordVisibility {
     MEMBER,
     PUBLIC,
 }
+
+data class HostSessionListItem(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val startTime: String,
+    val endTime: String,
+    val locationLabel: String,
+    val state: String,
+    val visibility: SessionRecordVisibility,
+)
+
+data class UpcomingSessionItem(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val startTime: String,
+    val endTime: String,
+    val locationLabel: String,
+    val visibility: SessionRecordVisibility,
+)
 
 data class HostSessionPublication(
     val publicSummary: String,

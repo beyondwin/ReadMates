@@ -4,9 +4,11 @@ import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
+import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.`in`.ConfirmAttendanceUseCase
 import com.readmates.session.application.port.`in`.GetHostDashboardUseCase
+import com.readmates.session.application.port.`in`.ListUpcomingSessionsUseCase
 import com.readmates.session.application.port.`in`.ManageHostSessionUseCase
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
 import com.readmates.session.application.port.out.HostSessionWritePort
@@ -20,7 +22,10 @@ class HostSessionCommandService(
 ) : ManageHostSessionUseCase,
     ConfirmAttendanceUseCase,
     UpsertPublicationUseCase,
+    ListUpcomingSessionsUseCase,
     GetHostDashboardUseCase {
+    override fun list(host: CurrentMember) = port.list(host)
+
     @Transactional
     override fun create(command: HostSessionCommand) = port.create(command)
 
@@ -28,6 +33,12 @@ class HostSessionCommandService(
 
     @Transactional
     override fun update(command: UpdateHostSessionCommand) = port.update(command)
+
+    @Transactional
+    override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) = port.updateVisibility(command)
+
+    @Transactional
+    override fun open(command: HostSessionIdCommand) = port.open(command)
 
     override fun deletionPreview(command: HostSessionIdCommand) = port.deletionPreview(command)
 
@@ -41,4 +52,6 @@ class HostSessionCommandService(
     override fun upsertPublication(command: UpsertPublicationCommand) = port.upsertPublication(command)
 
     override fun dashboard(host: CurrentMember) = port.dashboard(host)
+
+    override fun upcoming(member: CurrentMember) = port.upcoming(member)
 }
