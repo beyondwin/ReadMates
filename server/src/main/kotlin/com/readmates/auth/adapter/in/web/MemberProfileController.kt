@@ -4,7 +4,6 @@ import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.service.MemberProfileException
-import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.emailOrNull
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
@@ -26,21 +25,21 @@ class MemberProfileController(
     fun updateOwnProfile(
         authentication: Authentication?,
         @RequestBody request: MemberProfileUpdateRequest,
-    ): AuthMemberResponse {
-        val member = updateOwnMemberProfile.updateOwnProfile(
+    ): MemberProfileResponse {
+        val profile = updateOwnMemberProfile.updateOwnProfile(
             authentication.emailOrNull(),
             request.toCommand(),
         )
-        return AuthMemberResponse.from(member)
+        return MemberProfileResponse.from(profile)
     }
 
     @PatchMapping("/host/members/{membershipId}/profile")
     fun updateHostMemberProfile(
-        currentMember: CurrentMember,
+        authentication: Authentication?,
         @PathVariable membershipId: UUID,
         @RequestBody request: MemberProfileUpdateRequest,
     ) = updateHostMemberProfileUseCase.updateMemberProfile(
-        currentMember,
+        authentication.emailOrNull(),
         membershipId,
         request.toCommand(),
     )

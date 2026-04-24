@@ -57,8 +57,14 @@ class MemberProfileControllerTest(
 
     @Test
     fun `member updates own short name after trimming input`() {
-        val email = insertProfileMember("self.active", "ACTIVE", shortName = "Before")
+        val email = insertProfileMember(
+            "self.active",
+            "ACTIVE",
+            shortName = "Before",
+            profileImageUrl = "https://cdn.example.test/profiles/self-active.png",
+        )
         val cookie = sessionCookieForEmail(email)
+        val membershipId = membershipIdForEmail(email)
 
         mockMvc.patch("/api/me/profile") {
             cookie(cookie)
@@ -69,10 +75,13 @@ class MemberProfileControllerTest(
             content = """{"shortName":"  After  "}"""
         }.andExpect {
             status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.email") { value(email) }
+            jsonPath("$.membershipId") { value(membershipId) }
+            jsonPath("$.displayName") { value("self.active") }
             jsonPath("$.shortName") { value("After") }
-            jsonPath("$.membershipStatus") { value("ACTIVE") }
+            jsonPath("$.profileImageUrl") { value("https://cdn.example.test/profiles/self-active.png") }
+            jsonPath("$.authenticated") { doesNotExist() }
+            jsonPath("$.email") { doesNotExist() }
+            jsonPath("$.membershipStatus") { doesNotExist() }
         }
 
         assertEquals("After", shortNameForEmail(email))
@@ -93,10 +102,24 @@ class MemberProfileControllerTest(
         }.andExpect {
             status { isOk() }
             jsonPath("$.shortName") { value("ViewerAfter") }
-            jsonPath("$.membershipStatus") { value("VIEWER") }
         }
 
         assertEquals("ViewerAfter", shortNameForEmail(email))
+    }
+
+    @Test
+    fun `own profile update requires authentication with structured error`() {
+        mockMvc.patch("/api/me/profile") {
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"shortName":"NoSession"}"""
+        }.andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("AUTHENTICATION_REQUIRED") }
+            jsonPath("$.message") { value("Authentication required") }
+        }
     }
 
     @Test
@@ -233,6 +256,25 @@ class MemberProfileControllerTest(
     }
 
     @Test
+    fun `host profile update requires authentication with structured error`() {
+        val targetMembershipId = membershipIdForEmail(insertProfileMember("host.anonymous", "ACTIVE", shortName = "Blocked"))
+
+        mockMvc.patch("/api/host/members/$targetMembershipId/profile") {
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"shortName":"NoSession"}"""
+        }.andExpect {
+            status { isUnauthorized() }
+            jsonPath("$.code") { value("AUTHENTICATION_REQUIRED") }
+            jsonPath("$.message") { value("Authentication required") }
+        }
+
+        assertEquals("Blocked", shortNameForMembership(targetMembershipId))
+    }
+
+    @Test
     fun `host profile update is scoped to current club`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
         val outsideMembershipId = membershipIdForEmail(
@@ -254,20 +296,26 @@ class MemberProfileControllerTest(
         assertEquals("Outside", shortNameForMembership(outsideMembershipId))
     }
 
-    private fun insertProfileMember(prefix: String, status: String, shortName: String = prefix): String {
+    private fun insertProfileMember(
+        prefix: String,
+        status: String,
+        shortName: String = prefix,
+        profileImageUrl: String? = null,
+    ): String {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         val email = "$prefix.${UUID.randomUUID()}@example.com"
         jdbcTemplate.update(
             """
             insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (?, ?, ?, ?, ?, null, 'GOOGLE')
+            values (?, ?, ?, ?, ?, ?, 'GOOGLE')
             """.trimIndent(),
             userId,
             "google-profile-$userId",
             email,
             prefix,
             shortName,
+            profileImageUrl,
         )
         createdUserIds += userId
         jdbcTemplate.update(
