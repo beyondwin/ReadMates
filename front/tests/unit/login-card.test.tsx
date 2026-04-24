@@ -4,6 +4,7 @@ import { LoginRoute } from "@/features/auth/route/login-route";
 
 afterEach(() => {
   cleanup();
+  window.history.pushState({}, "", "/");
   vi.unstubAllEnvs();
 });
 
@@ -50,6 +51,16 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("button", { name: "김멤버3" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "송멤버4" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이멤버5" })).toBeInTheDocument();
+  });
+
+  it("shows a specific message when a left member returns from Google login", () => {
+    window.history.pushState({}, "", "/login?error=membership-left");
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "이전 멤버십이 종료된 계정입니다. 다시 참여하려면 호스트의 새 초대가 필요합니다.",
+    );
   });
 
 });

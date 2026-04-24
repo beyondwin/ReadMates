@@ -66,7 +66,12 @@ class ReadmatesOAuthSuccessHandler(
             if (exception !is GoogleLoginException && exception !is InvitationDomainException) {
                 throw exception
             }
-            redirectToLoginError(request, response)
+            val error = if (exception is GoogleLoginException) {
+                exception.redirectError
+            } else {
+                "google"
+            }
+            redirectToLoginError(request, response, error)
         }
     }
 
@@ -75,13 +80,13 @@ class ReadmatesOAuthSuccessHandler(
         response: HttpServletResponse,
         exception: AuthenticationException,
     ) {
-        redirectToLoginError(request, response)
+        redirectToLoginError(request, response, "google")
     }
 
-    private fun redirectToLoginError(request: HttpServletRequest, response: HttpServletResponse) {
+    private fun redirectToLoginError(request: HttpServletRequest, response: HttpServletResponse, error: String) {
         response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
         clearServletAuthenticationState(request)
-        response.sendRedirect("$appOrigin/login?error=google")
+        response.sendRedirect("$appOrigin/login?error=$error")
     }
 
     private fun capturedInviteToken(request: HttpServletRequest): String? {

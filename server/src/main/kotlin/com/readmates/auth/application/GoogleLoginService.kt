@@ -2,6 +2,7 @@ package com.readmates.auth.application
 
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAccountStorePort
+import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -9,9 +10,13 @@ import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.bind.annotation.ResponseStatus
 import java.util.Locale
+import java.util.UUID
 
 @ResponseStatus(HttpStatus.UNAUTHORIZED)
-class GoogleLoginException(message: String) : RuntimeException(message)
+class GoogleLoginException(
+    message: String,
+    val redirectError: String = "google",
+) : RuntimeException(message)
 
 @Service
 class GoogleLoginService(
@@ -106,6 +111,16 @@ class GoogleLoginService(
             throw GoogleLoginException("Existing user is connected to a different Google account")
         }
         return memberAccountStore.findMemberByUserIdIncludingViewer(userId)
-            ?: throw GoogleLoginException("Connected user has no membership")
+            ?: throwBlockedOrMissingMembership(userId)
+    }
+
+    private fun throwBlockedOrMissingMembership(userId: UUID): Nothing {
+        if (memberAccountStore.findMembershipStatusByUserId(userId) == MembershipStatus.LEFT) {
+            throw GoogleLoginException(
+                message = "Membership has left",
+                redirectError = "membership-left",
+            )
+        }
+        throw GoogleLoginException("Connected user has no membership")
     }
 }

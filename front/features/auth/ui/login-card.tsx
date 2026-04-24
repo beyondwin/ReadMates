@@ -9,15 +9,17 @@ export type DevAccount = {
 
 export function LoginCard({
   devAccounts = [],
+  initialError = null,
   showDevLogin = false,
   onDevLogin,
 }: {
   devAccounts?: DevAccount[];
+  initialError?: string | null;
   showDevLogin?: boolean;
   onDevLogin?: (email: string) => Promise<void>;
 }) {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
 
   const loginAsDevAccount = async (email: string) => {
     setError(null);
@@ -44,6 +46,11 @@ export function LoginCard({
           Google로 멤버 공간 열기
         </a>
       </div>
+      {error ? (
+        <p className="small auth-card__error" role="alert">
+          {error}
+        </p>
+      ) : null}
       {showDevLogin ? (
         <div className="auth-dev-panel" aria-label="로컬 개발 전용 로그인">
           <div className="row-between auth-dev-panel__head">
@@ -66,11 +73,6 @@ export function LoginCard({
               </button>
             ))}
           </div>
-          {error ? (
-            <p className="small auth-card__error" role="alert">
-              {error}
-            </p>
-          ) : null}
         </div>
       ) : null}
     </section>
