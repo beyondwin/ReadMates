@@ -16,20 +16,12 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
-import org.springframework.test.context.jdbc.SqlMergeMode
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get as requestGet
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@SqlMergeMode(SqlMergeMode.MergeMode.MERGE)
-@Sql(
-    statements = [
-        ArchiveControllerDbTest.RESET_SEED_PUBLICATION_VISIBILITY_SQL,
-    ],
-    executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
-)
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
@@ -358,16 +350,6 @@ class ArchiveControllerDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
-
-        const val RESET_SEED_PUBLICATION_VISIBILITY_SQL = """
-            update public_session_publications
-            join sessions on sessions.id = public_session_publications.session_id
-              and sessions.club_id = public_session_publications.club_id
-            join clubs on clubs.id = sessions.club_id
-            set public_session_publications.visibility = 'PUBLIC'
-            where clubs.slug = 'reading-sai'
-              and sessions.number in (1, 2, 3, 4, 5, 6);
-        """
 
         private const val MARK_SESSION6_MEMBER5_ONE_LINER_SESSION_SQL = """
             update one_line_reviews
