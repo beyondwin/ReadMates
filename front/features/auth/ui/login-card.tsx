@@ -35,8 +35,8 @@ export function LoginCard({
 
   return (
     <section className="surface auth-card auth-card--club">
-      <p className="eyebrow">Private reading room</p>
-      <h1 className="h1 editorial">읽는사이 멤버 입장</h1>
+      <p className="eyebrow">멤버 전용 공간</p>
+      <h1 className="h1 editorial">읽는사이 함께하기</h1>
       <p className="body auth-card__lede">
         Google 계정으로 읽는사이 멤버 공간에 입장합니다. 초대 링크가 없다면 둘러보기 멤버로 시작하고, 호스트 승인 뒤
         참여 권한이 열립니다.

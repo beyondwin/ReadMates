@@ -96,7 +96,7 @@ describe("SPA router", () => {
 
     render(<RouterProvider router={router} />);
 
-    expect(screen.getByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "읽는사이 함께하기" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
@@ -266,7 +266,7 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "읽는사이 함께하기" })).toBeInTheDocument();
     expect(fetchMock.mock.calls.map(([input]) => input.toString())).not.toContain("/api/bff/api/sessions/current");
   });
 
@@ -327,7 +327,7 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "읽는사이 함께하기" })).toBeInTheDocument();
     expectNoMemberHomeChildDataFetch(fetchMock);
   });
 
@@ -447,7 +447,7 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByRole("heading", { name: "읽는사이 멤버 입장" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "읽는사이 함께하기" })).toBeInTheDocument();
     expectNoArchiveChildDataFetch(fetchMock);
   });
 
