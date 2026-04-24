@@ -283,7 +283,7 @@ describe("SPA AppRouteLayout", () => {
     });
     expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
 
-    expect(screen.getAllByText("기록")).toHaveLength(2);
+    expect(screen.getAllByText("기록")).toHaveLength(1);
     const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
     expect(memberReturn).toHaveAttribute("href", "/app");
     expect(memberReturn).toHaveClass("m-hdr-link--icon");
@@ -292,18 +292,18 @@ describe("SPA AppRouteLayout", () => {
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     await waitFor(() => {
       expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
-        "오늘",
+        "홈",
         "세션",
         "멤버",
-        "기록",
+        "아카이브",
       ]);
     });
-    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
       "href",
       "/app/host/sessions/session-6/edit",
     );
-    expect(within(tabs).queryByRole("link", { name: "아카이브" })).not.toBeInTheDocument();
+    expect(within(tabs).queryByRole("link", { name: "기록" })).not.toBeInTheDocument();
   });
 
   it("keeps active hosts on host mobile chrome for feedback document routes", async () => {
@@ -352,19 +352,19 @@ describe("SPA AppRouteLayout", () => {
     expect(within(mobileHeader!).getByText("기록")).toBeInTheDocument();
     const backLink = within(mobileHeader!).getByRole("link", { name: "뒤로" });
     expect(backLink).toHaveAttribute("href", "/app/archive?view=report");
-    expect(backLink.textContent).toBe("");
-    expect(backLink).toHaveClass("m-hdr-back--icon");
+    expect(backLink.textContent).toBe("뒤로");
+    expect(backLink).not.toHaveClass("m-hdr-back--icon");
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     await waitFor(() => {
       expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
-        "오늘",
+        "홈",
         "세션",
         "멤버",
-        "기록",
+        "아카이브",
       ]);
     });
-    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
   });
 
   it("keeps host edit disabled while the current session tab target is loading", async () => {

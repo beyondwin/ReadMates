@@ -123,25 +123,25 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
 
   const tabs = page.getByRole("navigation", { name: "앱 탭" });
   await expect(tabs).toBeVisible();
-  await expect(tabs.getByRole("link")).toHaveText(["오늘", "세션", "멤버", "기록"]);
-  await expect(tabs.getByRole("link", { name: "오늘" })).toHaveAttribute("href", "/app/host");
+  await expect(tabs.getByRole("link")).toHaveText(["홈", "세션", "멤버", "아카이브"]);
+  await expect(tabs.getByRole("link", { name: "홈" })).toHaveAttribute("href", "/app/host");
   await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("href", /\/app\/host\/sessions\/(.+\/edit|new)$/);
   await expect(tabs.getByRole("link", { name: "멤버" })).toHaveAttribute("href", "/app/host/members");
-  await expect(tabs.getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/archive");
+  await expect(tabs.getByRole("link", { name: "아카이브" })).toHaveAttribute("href", "/app/archive");
   await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
   await expect(tabs.getByRole("link", { name: "호스트" })).toHaveCount(0);
   await expect(tabs.getByRole("link", { name: "이번 세션" })).toHaveCount(0);
   await expectPracticalTapTarget(tabs.getByRole("link", { name: "세션" }));
 
-  await tabs.getByRole("link", { name: "기록" }).click();
+  await tabs.getByRole("link", { name: "아카이브" }).click();
   await expect(page).toHaveURL(/\/app\/archive$/);
   await expect(mobileHeader).toContainText("기록");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveText("");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveClass(/m-hdr-link--icon/);
-  await expect(tabs.getByRole("link")).toHaveText(["오늘", "세션", "멤버", "기록"]);
-  await expect(tabs.getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
-  await expect(tabs.getByRole("link", { name: "아카이브" })).toHaveCount(0);
+  await expect(tabs.getByRole("link")).toHaveText(["홈", "세션", "멤버", "아카이브"]);
+  await expect(tabs.getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
+  await expect(tabs.getByRole("link", { name: "기록" })).toHaveCount(0);
 
   const editHref = await tabs.getByRole("link", { name: "세션" }).getAttribute("href");
   expect(editHref).toBeTruthy();
