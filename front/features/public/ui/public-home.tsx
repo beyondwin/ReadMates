@@ -1,7 +1,7 @@
 import { Link } from "@/features/public/ui/public-link";
 import type { PublicClubView, PublicSessionListItemView } from "@/features/public/model/public-display-model";
 import { BookCover } from "@/shared/ui/book-cover";
-import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public-auth-action";
+import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { getPublicClubDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE } from "@/features/public/model/public-copy";
 
@@ -303,24 +303,26 @@ export default function PublicHome({ data }: PublicHomeProps) {
               멤버십 경계
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
-              공개 기록은 열려 있고, 참여는 초대제로 운영합니다
+              공개 기록은 열려 있고, 참여는 초대받은 멤버에게만 열립니다
             </h2>
           </div>
           <div className="rm-document-panel public-membership-panel">
+            <div className="eyebrow" style={{ marginBottom: 8 }}>
+              함께 읽기
+            </div>
+            <div className="h3 editorial" style={{ margin: "0 0 12px" }}>
+              기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다
+            </div>
             <p className="body" style={{ margin: 0, color: "var(--text-2)" }}>
               {PUBLIC_MEMBERSHIP_NOTE}
             </p>
             <div className="public-membership-panel__actions">
               <PublicGuestOnlyActions>
                 <Link to="/login" className="btn btn-primary">
-                  기존 멤버 로그인
+                  로그인
                 </Link>
-                <PublicInviteGuidance />
               </PublicGuestOnlyActions>
             </div>
-            <p className="tiny" style={{ margin: "14px 0 0", color: "var(--text-3)" }}>
-              새 멤버 참여는 호스트가 보낸 초대 링크가 있을 때만 열립니다.
-            </p>
           </div>
         </div>
       </section>
