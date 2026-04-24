@@ -34,15 +34,13 @@ export default function MemberHome({
   auth,
   current,
   noteFeedItems,
-  upcomingSessions = [],
+  upcomingSessions,
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
   noteFeedItems: NoteFeedItem[];
-  upcomingSessions?: MemberHomeUpcomingSession[];
+  upcomingSessions: MemberHomeUpcomingSession[];
 }) {
-  void upcomingSessions;
-
   const currentSession = current.currentSession;
   const memberName = auth.displayName ?? "멤버";
   const isViewer = auth.membershipStatus === "VIEWER";
@@ -91,7 +89,7 @@ export default function MemberHome({
               </div>
               <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
                 <RosterSummary current={current} />
-                <NextBookHint />
+                <NextBookHint upcomingSessions={upcomingSessions} />
                 <QuickLinks />
               </div>
             </div>
@@ -103,6 +101,7 @@ export default function MemberHome({
         auth={auth}
         current={current}
         noteFeedItems={noteFeedItems}
+        upcomingSessions={upcomingSessions}
         memberName={memberName}
         isViewer={isViewer}
       />
@@ -183,12 +182,14 @@ function MobileMemberHome({
   auth,
   current,
   noteFeedItems,
+  upcomingSessions,
   memberName,
   isViewer,
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
   noteFeedItems: NoteFeedItem[];
+  upcomingSessions: MemberHomeUpcomingSession[];
   memberName: string;
   isViewer: boolean;
 }) {
@@ -222,6 +223,7 @@ function MobileMemberHome({
       </section>
 
       <MobileTodayActions session={session} isViewer={isViewer} />
+      <MobileUpcomingSessions upcomingSessions={upcomingSessions} />
       <MobileMemberActivity items={noteFeedItems.slice(0, 4)} />
       <MobileQuickLinks />
     </div>
@@ -279,16 +281,59 @@ function MobileQuickLinks() {
   );
 }
 
-function NextBookHint() {
+function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomingSession[] }) {
+  if (upcomingSessions.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="m-sec">
+      <div className="eyebrow" style={{ marginBottom: 12 }}>
+        예정 세션
+      </div>
+      <div className="rm-mobile-shortcuts">
+        {upcomingSessions.slice(0, 4).map((session) => (
+          <div key={session.sessionId} className="m-card-quiet">
+            <span className="tiny mono">No.{String(session.sessionNumber).padStart(2, "0")}</span>
+            <span className="body editorial" style={{ display: "block", fontSize: 13.5, marginTop: 6 }}>
+              {session.bookTitle}
+            </span>
+            <span className="tiny" style={{ color: "var(--text-3)" }}>
+              {session.date} · {session.locationLabel}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomingSession[] }) {
   return (
     <section>
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
         다음 달 선정
       </div>
       <div className="surface-quiet" style={{ padding: "20px" }}>
-        <div className="body" style={{ fontSize: "14px" }}>
-          아직 등록된 다음 달 후보가 없습니다.
-        </div>
+        {upcomingSessions.length > 0 ? (
+          <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
+            {upcomingSessions.slice(0, 3).map((session) => (
+              <div key={session.sessionId}>
+                <div className="tiny mono">No.{String(session.sessionNumber).padStart(2, "0")}</div>
+                <div className="body editorial" style={{ fontSize: "15px", marginTop: 4 }}>
+                  {session.bookTitle}
+                </div>
+                <div className="tiny" style={{ marginTop: 3 }}>
+                  {session.bookAuthor} · {session.date} · {session.locationLabel}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="body" style={{ fontSize: "14px" }}>
+            아직 등록된 다음 달 후보가 없습니다.
+          </div>
+        )}
       </div>
     </section>
   );

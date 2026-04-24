@@ -6,6 +6,7 @@ import type {
   MemberHomeAuth as AuthMeResponse,
   MemberHomeCurrentSessionResponse as CurrentSessionResponse,
   MemberHomeNoteFeedItem as NoteFeedItem,
+  MemberHomeUpcomingSession,
 } from "@/features/member-home/api/member-home-contracts";
 
 afterEach(cleanup);
@@ -89,6 +90,22 @@ const noteFeedItems: NoteFeedItem[] = [
   },
 ];
 
+const upcomingSessions = [
+  {
+    sessionId: "session-8",
+    sessionNumber: 8,
+    title: "8회차 · 다음 달 책",
+    bookTitle: "다음 달 책",
+    bookAuthor: "다음 저자",
+    bookImageUrl: null,
+    date: "2026-06-17",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "온라인",
+    visibility: "MEMBER",
+  },
+] satisfies MemberHomeUpcomingSession[];
+
 function getDesktopView(container: HTMLElement) {
   const desktop = container.querySelector(".rm-member-home-desktop");
   expect(desktop).not.toBeNull();
@@ -119,8 +136,35 @@ describe("MemberHome", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/upcoming", expect.objectContaining({}));
   });
 
+  it("shows member-visible upcoming sessions on desktop and mobile home", () => {
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={upcomingSessions} />,
+    );
+
+    const desktop = getDesktopView(container);
+    const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
+
+    expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
+    expect(desktop.getByText("다음 달 책")).toBeInTheDocument();
+    expect(desktop.getByText(/다음 저자/)).toBeInTheDocument();
+    expect(mobile.getByText("예정 세션")).toBeInTheDocument();
+    expect(mobile.getByText("다음 달 책")).toBeInTheDocument();
+    expect(mobile.queryByRole("link", { name: /RSVP.*다음 달 책/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps upcoming empty state when there are no upcoming sessions", () => {
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
+
+    const desktop = getDesktopView(container);
+    expect(desktop.getByText("아직 등록된 다음 달 후보가 없습니다.")).toBeInTheDocument();
+  });
+
   it("renders the mobile-first member home flow with real action links", () => {
-    const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
 
     const mobile = container.querySelector(".rm-member-home-mobile");
     expect(mobile).not.toBeNull();
@@ -162,7 +206,9 @@ describe("MemberHome", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 30));
 
-    const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
     const metaLine = container.querySelector(".rm-member-home-mobile .rm-member-session-card__meta-line");
 
     expect(metaLine).not.toBeNull();
@@ -176,7 +222,9 @@ describe("MemberHome", () => {
       approvalState: "VIEWER",
     };
 
-    const { container } = render(<MemberHome auth={viewerAuth} current={current} noteFeedItems={noteFeedItems} />);
+    const { container } = render(
+      <MemberHome auth={viewerAuth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
     const desktop = getDesktopView(container);
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
@@ -190,7 +238,9 @@ describe("MemberHome", () => {
   });
 
   it("shows the next gathering prep card", () => {
-    const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
     const desktop = getDesktopView(container);
 
     expect(desktop.getByText(/이번 세션 ·/)).toBeInTheDocument();
@@ -213,7 +263,9 @@ describe("MemberHome", () => {
   });
 
   it("aligns the desktop home header with other member tab headers", () => {
-    const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
     const desktop = container.querySelector(".rm-member-home-desktop");
     const header = desktop?.querySelector("section");
 
@@ -291,6 +343,7 @@ describe("MemberHome", () => {
           },
         }}
         noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
       />,
     );
 
@@ -319,6 +372,7 @@ describe("MemberHome", () => {
           },
         }}
         noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
       />,
     );
     const desktop = getDesktopView(container);
@@ -328,7 +382,9 @@ describe("MemberHome", () => {
   });
 
   it("shows the home dashboard sections below the prep card", () => {
-    const { container } = render(<MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} />);
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
     const desktop = getDesktopView(container);
 
     expect(desktop.getByText("클럽 흐름")).toBeInTheDocument();
@@ -351,7 +407,9 @@ describe("MemberHome", () => {
   });
 
   it("shows practical empty states when there is no current session", () => {
-    const { container } = render(<MemberHome auth={auth} current={{ currentSession: null }} noteFeedItems={[]} />);
+    const { container } = render(
+      <MemberHome auth={auth} current={{ currentSession: null }} noteFeedItems={[]} upcomingSessions={[]} />,
+    );
     const desktop = getDesktopView(container);
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
@@ -374,6 +432,7 @@ describe("MemberHome", () => {
         auth={auth}
         current={{ currentSession: { ...current.currentSession!, attendees: [] } }}
         noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
       />,
     );
 
@@ -386,7 +445,14 @@ describe("MemberHome", () => {
   });
 
   it("links host members to create a session when there is no current session", () => {
-    const { container } = render(<MemberHome auth={{ ...auth, role: "HOST" }} current={{ currentSession: null }} noteFeedItems={[]} />);
+    const { container } = render(
+      <MemberHome
+        auth={{ ...auth, role: "HOST" }}
+        current={{ currentSession: null }}
+        noteFeedItems={[]}
+        upcomingSessions={[]}
+      />,
+    );
     const desktop = getDesktopView(container);
 
     expect(desktop.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
@@ -413,6 +479,7 @@ describe("MemberHome", () => {
           },
         }}
         noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
       />,
     );
 
@@ -444,6 +511,7 @@ describe("MemberHome", () => {
           },
         }}
         noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
       />,
     );
 
@@ -451,7 +519,9 @@ describe("MemberHome", () => {
   });
 
   it("does not repeat the host workspace switch inside member home content", () => {
-    render(<MemberHome auth={{ ...auth, role: "HOST" }} current={current} noteFeedItems={noteFeedItems} />);
+    render(
+      <MemberHome auth={{ ...auth, role: "HOST" }} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
 
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "세션 운영으로" })).toHaveAttribute(

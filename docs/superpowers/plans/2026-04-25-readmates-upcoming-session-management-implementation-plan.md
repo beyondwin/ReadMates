@@ -1774,7 +1774,7 @@ git commit -m "feat: manage upcoming sessions on host dashboard"
 - Modify: `front/features/member-home/api/member-home-contracts.ts`
 - Modify: `front/tests/unit/member-home.test.tsx`
 
-- [ ] **Step 1: Write failing member home UI tests**
+- [x] **Step 1: Write failing member home UI tests**
 
 In `member-home.test.tsx`, add:
 
@@ -1821,7 +1821,7 @@ it("keeps upcoming empty state when there are no upcoming sessions", () => {
 });
 ```
 
-- [ ] **Step 2: Run member home tests to verify failure**
+- [x] **Step 2: Run member home tests to verify failure**
 
 Run:
 
@@ -1831,7 +1831,7 @@ pnpm --dir front test -- member-home.test.tsx
 
 Expected: FAIL because `upcomingSessions` prop and UI are missing.
 
-- [ ] **Step 3: Extend MemberHome props**
+- [x] **Step 3: Extend MemberHome props**
 
 In `member-home.tsx`, import `MemberHomeUpcomingSession` and update props:
 
@@ -1858,7 +1858,7 @@ Pass to mobile:
 />
 ```
 
-- [ ] **Step 4: Replace `NextBookHint` with data-backed component**
+- [x] **Step 4: Replace `NextBookHint` with data-backed component**
 
 Change call:
 
@@ -1901,7 +1901,7 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
 }
 ```
 
-- [ ] **Step 5: Add mobile upcoming section under today actions**
+- [x] **Step 5: Add mobile upcoming section under today actions**
 
 After `<MobileTodayActions session={session} isViewer={isViewer} />`, add:
 
@@ -1940,7 +1940,7 @@ function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: Member
 }
 ```
 
-- [ ] **Step 6: Update existing test renders**
+- [x] **Step 6: Update existing test renders**
 
 Every `render(<MemberHome ... />)` in `member-home.test.tsx` must pass:
 
@@ -1950,7 +1950,7 @@ upcomingSessions={[]}
 
 unless the test specifically uses `upcomingSessions`.
 
-- [ ] **Step 7: Run member home tests**
+- [x] **Step 7: Run member home tests**
 
 Run:
 
@@ -1960,12 +1960,25 @@ pnpm --dir front test -- member-home.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Update Task 7 checkpoint**
+
+Checkpoint:
+
+- Changed files: `front/features/member-home/components/member-home.tsx`, `front/tests/unit/member-home.test.tsx`, `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`.
+- Key decisions: made `MemberHome` require `upcomingSessions` now that route data is present; rendered desktop upcoming sessions in the existing next-book slot with a three-session cap; added a mobile read-only upcoming section directly after today actions with no RSVP or CTA links.
+- Review issues/resolution: self-review found no implementation issues; `MemberHomeUpcomingSession` already existed from Task 5, so no API contract edit was required.
+- Verification: red `pnpm --dir front test -- member-home.test.tsx` failed as expected because `다음 달 책` was not rendered; green `pnpm --dir front test -- member-home.test.tsx` passed with 44 test files and 493 tests; `pnpm --dir front lint` passed; `pnpm --dir front build` passed.
+- Remaining risk: no browser screenshot pass was run; unit coverage verifies the read-only desktop/mobile rendering and absence of mobile RSVP links.
+- Next task note: Task 8 should cover the end-to-end host create/start flow and member upcoming visibility.
+- Worktree/branch: `upcoming-session-management-20260425` worktree, `codex/upcoming-session-management-20260425`.
+
+- [x] **Step 9: Commit**
 
 ```bash
 git add front/features/member-home/components/member-home.tsx \
   front/features/member-home/api/member-home-contracts.ts \
-  front/tests/unit/member-home.test.tsx
+  front/tests/unit/member-home.test.tsx \
+  docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md
 git commit -m "feat: show upcoming sessions on member home"
 ```
 
