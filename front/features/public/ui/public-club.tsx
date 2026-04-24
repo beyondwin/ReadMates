@@ -155,7 +155,7 @@ export default function PublicClub({ data }: PublicClubProps) {
             <div className="public-membership-panel__actions">
               <PublicGuestOnlyActions>
                 <Link to="/login" className="btn btn-primary">
-                  로그인
+                  시작하기
                 </Link>
               </PublicGuestOnlyActions>
             </div>

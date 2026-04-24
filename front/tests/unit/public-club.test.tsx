@@ -67,7 +67,7 @@ describe("PublicClub", () => {
     expect(screen.getByText("호스트 · 2025.11~")).toBeInTheDocument();
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute("href", "/login");
     expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/records");
     expect(screen.queryByText("멤버십")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "정식 멤버만 참여할 수 있습니다" })).not.toBeInTheDocument();
