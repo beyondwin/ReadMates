@@ -47,7 +47,7 @@ class MemberLifecycleAuthTest(
     }
 
     @Test
-    fun `suspended member resolves auth me but left member does not`() {
+    fun `suspended and left members resolve auth me with blocked states`() {
         val suspendedCookie = sessionCookieForLifecycleMember("suspended.auth", "SUSPENDED")
         val leftCookie = sessionCookieForLifecycleMember("left.auth", "LEFT")
 
@@ -62,8 +62,9 @@ class MemberLifecycleAuthTest(
         mockMvc.get("/api/auth/me") { cookie(leftCookie) }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.authenticated") { value(false) }
-                jsonPath("$.approvalState") { value("ANONYMOUS") }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.membershipStatus") { value("LEFT") }
+                jsonPath("$.approvalState") { value("INACTIVE") }
             }
     }
 

@@ -158,7 +158,7 @@ class ViewerSecurityTest(
         }
 
         assertEquals(HttpStatus.FORBIDDEN, exception.statusCode)
-        assertEquals("Feedback documents require full membership", exception.reason)
+        assertEquals("Feedback documents require active membership", exception.reason)
     }
 
     private fun viewerSessionCookie(emailPrefixOrAddress: String): Cookie {
