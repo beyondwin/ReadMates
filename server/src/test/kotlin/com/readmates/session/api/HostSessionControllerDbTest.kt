@@ -18,6 +18,7 @@ import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 
@@ -132,46 +133,19 @@ class HostSessionControllerDbTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
     @Test
-    fun `host creates session seven with active member participants`() {
+    fun `host creates draft upcoming session without participants`() {
         seedNonActiveMemberships()
 
         mockMvc.post("/api/host/sessions") {
             with(user("host@example.com"))
             with(csrf())
             contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "title": "7회차 · 테스트 책",
-                  "bookTitle": "테스트 책",
-                  "bookAuthor": "테스트 저자",
-                  "bookLink": "https://example.com/books/test-book",
-                  "bookImageUrl": "https://example.com/covers/test-book.jpg",
-                  "date": "2026-05-20",
-                  "startTime": "19:30",
-                  "endTime": "21:40",
-                  "questionDeadlineAt": "2026-05-18T22:30:00+09:00",
-                  "locationLabel": "온라인",
-                  "meetingUrl": "https://meet.google.com/readmates-test",
-                  "meetingPasscode": "readmates"
-                }
-                """.trimIndent()
+            content = hostSessionRequestJson()
         }.andExpect {
             status { isCreated() }
             jsonPath("$.sessionNumber") { value(7) }
-            jsonPath("$.title") { value("7회차 · 테스트 책") }
-            jsonPath("$.bookTitle") { value("테스트 책") }
-            jsonPath("$.bookAuthor") { value("테스트 저자") }
-            jsonPath("$.bookLink") { value("https://example.com/books/test-book") }
-            jsonPath("$.bookImageUrl") { value("https://example.com/covers/test-book.jpg") }
-            jsonPath("$.date") { value("2026-05-20") }
-            jsonPath("$.startTime") { value("19:30") }
-            jsonPath("$.endTime") { value("21:40") }
-            jsonPath("$.questionDeadlineAt") { value("2026-05-18T13:30Z") }
-            jsonPath("$.locationLabel") { value("온라인") }
-            jsonPath("$.meetingUrl") { value("https://meet.google.com/readmates-test") }
-            jsonPath("$.meetingPasscode") { value("readmates") }
-            jsonPath("$.state") { value("OPEN") }
+            jsonPath("$.state") { value("DRAFT") }
+            jsonPath("$.visibility") { value("HOST_ONLY") }
         }
 
         val participantCount = jdbcTemplate.queryForObject(
@@ -182,79 +156,171 @@ class HostSessionControllerDbTest(
               and sessions.club_id = session_participants.club_id
             where sessions.club_id = '00000000-0000-0000-0000-000000000001'
               and sessions.number = 7
-              and session_participants.rsvp_status = 'NO_RESPONSE'
-              and session_participants.attendance_status = 'UNKNOWN'
             """.trimIndent(),
             Int::class.java,
         )
-        assertEquals(6, participantCount)
-        val nonActiveParticipantCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from session_participants
-            join sessions on sessions.id = session_participants.session_id
-              and sessions.club_id = session_participants.club_id
-            where sessions.club_id = '00000000-0000-0000-0000-000000000001'
-              and sessions.number = 7
-              and session_participants.membership_id in (
-                '00000000-0000-0000-0000-000000019211',
-                '00000000-0000-0000-0000-000000019212',
-                '00000000-0000-0000-0000-000000019213'
-              )
-            """.trimIndent(),
-            Int::class.java,
-        )
-        assertEquals(0, nonActiveParticipantCount)
-        val activeParticipationStatusCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from session_participants
-            join sessions on sessions.id = session_participants.session_id
-              and sessions.club_id = session_participants.club_id
-            where sessions.club_id = '00000000-0000-0000-0000-000000000001'
-              and sessions.number = 7
-              and session_participants.participation_status = 'ACTIVE'
-            """.trimIndent(),
-            Int::class.java,
-        )
-        assertEquals(6, activeParticipationStatusCount)
-        val sessionDefaults = jdbcTemplate.queryForMap(
-            """
-            select
-              cast(start_time as char) as start_time,
-              cast(end_time as char) as end_time,
-              location_label,
-              book_link,
-              book_image_url,
-              meeting_url,
-              meeting_passcode,
-              date_format(date_add(question_deadline_at, interval 9 hour), '%Y-%m-%d %H:%i') as question_deadline_at
-            from sessions
-            where club_id = '00000000-0000-0000-0000-000000000001'
-              and number = 7
-            """.trimIndent(),
-        )
-        assertEquals("19:30:00", sessionDefaults["start_time"])
-        assertEquals("21:40:00", sessionDefaults["end_time"])
-        assertEquals("온라인", sessionDefaults["location_label"])
-        assertEquals("https://example.com/books/test-book", sessionDefaults["book_link"])
-        assertEquals("https://example.com/covers/test-book.jpg", sessionDefaults["book_image_url"])
-        assertEquals("https://meet.google.com/readmates-test", sessionDefaults["meeting_url"])
-        assertEquals("readmates", sessionDefaults["meeting_passcode"])
-        assertEquals("2026-05-18 22:30", sessionDefaults["question_deadline_at"])
+        assertEquals(0, participantCount)
+    }
 
-        mockMvc.get("/api/sessions/current") {
-            with(user("member5@example.com"))
+    @Test
+    fun `host can list draft and open sessions including host only visibility`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc.get("/api/host/sessions") {
+            with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$.currentSession.sessionNumber") { value(7) }
-            jsonPath("$.currentSession.bookTitle") { value("테스트 책") }
-            jsonPath("$.currentSession.bookImageUrl") { value("https://example.com/covers/test-book.jpg") }
-            jsonPath("$.currentSession.locationLabel") { value("온라인") }
-            jsonPath("$.currentSession.meetingUrl") { value("https://meet.google.com/readmates-test") }
-            jsonPath("$.currentSession.meetingPasscode") { value("readmates") }
-            jsonPath("$.currentSession.myRsvpStatus") { value("NO_RESPONSE") }
-            jsonPath("$.currentSession.attendees.length()") { value(6) }
+            jsonPath("$[0].sessionId") { value(sessionId) }
+            jsonPath("$[0].state") { value("DRAFT") }
+            jsonPath("$[0].visibility") { value("HOST_ONLY") }
+        }
+    }
+
+    @Test
+    fun `host updates draft session visibility and member upcoming sessions include it`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"visibility":"MEMBER"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.visibility") { value("MEMBER") }
+        }
+
+        mockMvc.get("/api/sessions/upcoming") {
+            with(user("member1@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].sessionId") { value(sessionId) }
+            jsonPath("$[0].visibility") { value("MEMBER") }
+        }
+    }
+
+    @Test
+    fun `host visibility update syncs existing publication compatibility columns`() {
+        val sessionId = createDraftSessionSeven()
+        insertPublicationRow(sessionId, visibility = "MEMBER", isPublic = false, published = false)
+
+        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"visibility":"PUBLIC"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.visibility") { value("PUBLIC") }
+        }
+
+        val publicPublication = findPublicationRow(sessionId)
+        assertEquals("PUBLIC", publicPublication["visibility"])
+        assertEquals(true, publicPublication["is_public"])
+        assertNotNull(publicPublication["published_at"])
+
+        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"visibility":"HOST_ONLY"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.visibility") { value("HOST_ONLY") }
+        }
+
+        val hostOnlyPublication = findPublicationRow(sessionId)
+        assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
+        assertEquals(false, hostOnlyPublication["is_public"])
+        assertNull(hostOnlyPublication["published_at"])
+    }
+
+    @Test
+    fun `member upcoming sessions include only draft member or public sessions`() {
+        val memberSessionId = createDraftSession("7회차 · 멤버 공개 책", "멤버 공개 책", "2026-05-20")
+        updateSessionVisibility(memberSessionId, "MEMBER")
+        val publicSessionId = createDraftSession("8회차 · 공개 책", "공개 책", "2026-06-17")
+        updateSessionVisibility(publicSessionId, "PUBLIC")
+        val hostOnlySessionId = createDraftSession("9회차 · 호스트 책", "호스트 책", "2026-07-15")
+        val openSessionId = createDraftSession("10회차 · 열린 책", "열린 책", "2026-08-19")
+        updateSessionVisibility(openSessionId, "MEMBER")
+        updateSessionState(openSessionId, "OPEN")
+        val closedSessionId = createDraftSession("11회차 · 닫힌 책", "닫힌 책", "2026-09-16")
+        updateSessionVisibility(closedSessionId, "PUBLIC")
+        updateSessionState(closedSessionId, "CLOSED")
+        createOutsideClubSession(state = "DRAFT", visibility = "PUBLIC")
+
+        mockMvc.get("/api/sessions/upcoming") {
+            with(user("member1@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.length()") { value(2) }
+            jsonPath("$[0].sessionId") { value(memberSessionId) }
+            jsonPath("$[0].visibility") { value("MEMBER") }
+            jsonPath("$[1].sessionId") { value(publicSessionId) }
+            jsonPath("$[1].visibility") { value("PUBLIC") }
+        }
+
+        assertEquals("HOST_ONLY", findSessionVisibility(hostOnlySessionId))
+        assertEquals("OPEN", findSessionState(openSessionId))
+        assertEquals("CLOSED", findSessionState(closedSessionId))
+    }
+
+    @Test
+    fun `host starts draft session as open and creates active participants`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc.post("/api/host/sessions/$sessionId/open") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("OPEN") }
+        }
+
+        val participantCount = participantCountForSessionNumber(7)
+        assertEquals(6, participantCount)
+    }
+
+    @Test
+    fun `host open transition is idempotent for already open session`() {
+        createSessionSeven()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+            jsonPath("$.state") { value("OPEN") }
+        }
+
+        assertEquals(6, participantCountForSessionNumber(7))
+    }
+
+    @Test
+    fun `host cannot open closed session`() {
+        createSessionSeven()
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+    }
+
+    @Test
+    fun `host cannot open published session`() {
+        createSessionSeven()
+        updateSessionState("00000000-0000-0000-0000-000000009777", "PUBLISHED")
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
         }
     }
 
@@ -300,47 +366,22 @@ class HostSessionControllerDbTest(
     }
 
     @Test
-    fun `host cannot create another open session while one already exists`() {
-        createSessionSeven()
-
-        mockMvc.post("/api/host/sessions") {
+    fun `host cannot start another open session while one exists`() {
+        val firstSessionId = createDraftSessionSeven()
+        mockMvc.post("/api/host/sessions/$firstSessionId/open") {
             with(user("host@example.com"))
             with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "title": "8회차 · 중복 테스트",
-                  "bookTitle": "중복 책",
-                  "bookAuthor": "중복 저자",
-                  "date": "2026-06-17"
-                }
-                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }
+
+        val secondSessionId = createDraftSessionEight()
+        mockMvc.post("/api/host/sessions/$secondSessionId/open") {
+            with(user("host@example.com"))
+            with(csrf())
         }.andExpect {
             status { isConflict() }
         }
-
-        val openSessionCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            where club_id = '00000000-0000-0000-0000-000000000001'
-              and state = 'OPEN'
-            """.trimIndent(),
-            Int::class.java,
-        )
-        assertEquals(1, openSessionCount)
-
-        val generatedSessionCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            where club_id = '00000000-0000-0000-0000-000000000001'
-              and number >= 7
-            """.trimIndent(),
-            Int::class.java,
-        )
-        assertEquals(1, generatedSessionCount)
     }
 
     @Test
@@ -553,6 +594,7 @@ class HostSessionControllerDbTest(
         assertEquals("MEMBER", memberPublication["visibility"])
         assertEquals(false, memberPublication["is_public"])
         assertNull(memberPublication["published_at"])
+        assertEquals("MEMBER", findSessionVisibility("00000000-0000-0000-0000-000000009777"))
 
         mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
             with(user("host@example.com"))
@@ -577,6 +619,7 @@ class HostSessionControllerDbTest(
         assertEquals("PUBLIC", publicPublication["visibility"])
         assertEquals(true, publicPublication["is_public"])
         assertNotNull(publicPublication["published_at"])
+        assertEquals("PUBLIC", findSessionVisibility("00000000-0000-0000-0000-000000009777"))
 
         mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
             with(user("host@example.com"))
@@ -601,6 +644,7 @@ class HostSessionControllerDbTest(
         assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
         assertEquals(false, hostOnlyPublication["is_public"])
         assertNull(hostOnlyPublication["published_at"])
+        assertEquals("HOST_ONLY", findSessionVisibility("00000000-0000-0000-0000-000000009777"))
     }
 
     @Test
@@ -664,7 +708,7 @@ class HostSessionControllerDbTest(
         }.andExpect {
             status { isCreated() }
             jsonPath("$.sessionNumber") { value(7) }
-            jsonPath("$.state") { value("OPEN") }
+            jsonPath("$.state") { value("DRAFT") }
         }
     }
 
@@ -686,6 +730,72 @@ class HostSessionControllerDbTest(
             status { isNotFound() }
         }
     }
+
+    private fun hostSessionRequestJson() =
+        """
+        {
+          "title": "7회차 · 테스트 책",
+          "bookTitle": "테스트 책",
+          "bookAuthor": "테스트 저자",
+          "bookLink": "https://example.com/books/test-book",
+          "bookImageUrl": "https://example.com/covers/test-book.jpg",
+          "date": "2026-05-20",
+          "startTime": "19:30",
+          "endTime": "21:40",
+          "questionDeadlineAt": "2026-05-18T22:30:00+09:00",
+          "locationLabel": "온라인",
+          "meetingUrl": "https://meet.google.com/readmates-test",
+          "meetingPasscode": "readmates"
+        }
+        """.trimIndent()
+
+    private fun createDraftSessionSeven(): String = createDraftSession("7회차 · 테스트 책", "테스트 책", "2026-05-20")
+
+    private fun createDraftSessionEight(): String = createDraftSession("8회차 · 다음 책", "다음 책", "2026-06-17")
+
+    private fun createDraftSession(title: String, bookTitle: String, date: String): String {
+        val response = mockMvc.post("/api/host/sessions") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "title": "$title",
+                  "bookTitle": "$bookTitle",
+                  "bookAuthor": "테스트 저자",
+                  "bookLink": "https://example.com/books/test-book",
+                  "bookImageUrl": "https://example.com/covers/test-book.jpg",
+                  "date": "$date",
+                  "locationLabel": "온라인"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isCreated() }
+        }.andReturn()
+
+        return """"sessionId"\s*:\s*"([^"]+)""""
+            .toRegex()
+            .find(response.response.contentAsString)
+            ?.groupValues
+            ?.get(1)
+            ?: error("created session response did not include a sessionId")
+    }
+
+    private fun participantCountForSessionNumber(number: Int): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from session_participants
+            join sessions on sessions.id = session_participants.session_id
+              and sessions.club_id = session_participants.club_id
+            where sessions.club_id = '00000000-0000-0000-0000-000000000001'
+              and sessions.number = ?
+              and session_participants.participation_status = 'ACTIVE'
+            """.trimIndent(),
+            Int::class.java,
+            number,
+        ) ?: 0
 
     private fun seedNonActiveMemberships() {
         jdbcTemplate.update(
@@ -784,7 +894,7 @@ class HostSessionControllerDbTest(
         )
     }
 
-    private fun createOutsideClubSession() {
+    private fun createOutsideClubSession(state: String = "OPEN", visibility: String = "HOST_ONLY") {
         jdbcTemplate.update(
             """
             insert into clubs (id, slug, name, tagline, about)
@@ -837,7 +947,8 @@ class HostSessionControllerDbTest(
               end_time,
               location_label,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             values (
               '00000000-0000-0000-0000-000000019777',
@@ -851,9 +962,12 @@ class HostSessionControllerDbTest(
               '22:00:00',
               '온라인',
               '2026-05-19 14:59:00',
-              'OPEN'
+              ?,
+              ?
             )
             """.trimIndent(),
+            state,
+            visibility,
         )
     }
 
@@ -1014,13 +1128,98 @@ class HostSessionControllerDbTest(
             Int::class.java,
         ) ?: 0
 
-    private fun findPublicationRow(): Map<String, Any?> =
+    private fun insertPublicationRow(
+        sessionId: String,
+        visibility: String,
+        isPublic: Boolean,
+        published: Boolean,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id,
+              club_id,
+              session_id,
+              public_summary,
+              is_public,
+              visibility,
+              published_at
+            )
+            values (
+              uuid(),
+              '00000000-0000-0000-0000-000000000001',
+              ?,
+              '기존 공개 요약',
+              ?,
+              ?,
+              case when ? then utc_timestamp(6) else null end
+            )
+            """.trimIndent(),
+            sessionId,
+            isPublic,
+            visibility,
+            published,
+        )
+    }
+
+    private fun updateSessionVisibility(sessionId: String, visibility: String) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set visibility = ?
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            visibility,
+            sessionId,
+        )
+    }
+
+    private fun updateSessionState(sessionId: String, state: String) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = ?
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            state,
+            sessionId,
+        )
+    }
+
+    private fun findSessionVisibility(sessionId: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select visibility
+            from sessions
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            String::class.java,
+            sessionId,
+        ) ?: error("session $sessionId did not exist")
+
+    private fun findSessionState(sessionId: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select state
+            from sessions
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            String::class.java,
+            sessionId,
+        ) ?: error("session $sessionId did not exist")
+
+    private fun findPublicationRow(sessionId: String = "00000000-0000-0000-0000-000000009777"): Map<String, Any?> =
         jdbcTemplate.queryForMap(
             """
             select visibility, is_public, published_at
             from public_session_publications
-            where session_id = '00000000-0000-0000-0000-000000009777'
+            where session_id = ?
             """.trimIndent(),
+            sessionId,
         )
 
     companion object {

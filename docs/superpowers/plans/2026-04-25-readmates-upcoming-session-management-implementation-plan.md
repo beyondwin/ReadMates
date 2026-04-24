@@ -450,7 +450,7 @@ git commit -m "feat: extend session management contracts"
 - Modify: `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerDbTest.kt`
 
-- [ ] **Step 1: Write failing host creation test**
+- [x] **Step 1: Write failing host creation test**
 
 Replace the current creation test expectation in `HostSessionControllerDbTest` with the new behavior:
 
@@ -508,7 +508,7 @@ private fun hostSessionRequestJson() =
     """.trimIndent()
 ```
 
-- [ ] **Step 2: Write failing tests for list, visibility, upcoming, and open**
+- [x] **Step 2: Write failing tests for list, visibility, upcoming, and open**
 
 Add these tests to `HostSessionControllerDbTest`:
 
@@ -638,7 +638,7 @@ private fun participantCountForSessionNumber(number: Int): Int =
     ) ?: 0
 ```
 
-- [ ] **Step 3: Run host session tests to verify they fail**
+- [x] **Step 3: Run host session tests to verify they fail**
 
 Run:
 
@@ -648,7 +648,7 @@ Run:
 
 Expected: FAIL because new endpoints and new creation behavior do not exist.
 
-- [ ] **Step 4: Add web routes**
+- [x] **Step 4: Add web routes**
 
 In `HostSessionController.kt`, add request DTO and routes:
 
@@ -698,7 +698,7 @@ class UpcomingSessionController(
 }
 ```
 
-- [ ] **Step 5: Add exception for invalid open transition**
+- [x] **Step 5: Add exception for invalid open transition**
 
 In `SessionApplicationSupport.kt`, add:
 
@@ -707,7 +707,7 @@ In `SessionApplicationSupport.kt`, add:
 class HostSessionOpenNotAllowedException : RuntimeException("Only draft sessions can be opened")
 ```
 
-- [ ] **Step 6: Implement JDBC creation as draft**
+- [x] **Step 6: Implement JDBC creation as draft**
 
 In `JdbcHostSessionWriteAdapter.createOpenSession`, rename the private function to `createDraftSession`, keep the public `create` override, remove the existing open-session-count check, set:
 
@@ -734,7 +734,7 @@ Remove the `activeMembershipIds.forEach` participant creation block from create.
 visibility = visibility,
 ```
 
-- [ ] **Step 7: Implement list/upcoming/visibility/open JDBC methods**
+- [x] **Step 7: Implement list/upcoming/visibility/open JDBC methods**
 
 Add these methods to `JdbcHostSessionWriteAdapter`:
 
@@ -940,7 +940,7 @@ private fun ResultSet.toUpcomingSessionItem() = UpcomingSessionItem(
 )
 ```
 
-- [ ] **Step 8: Include visibility in detail queries**
+- [x] **Step 8: Include visibility in detail queries**
 
 In the `findHostSession` select list, add `visibility`. In `HostSessionDetailResponse`, set:
 
@@ -965,7 +965,7 @@ jdbcTemplate.update(
 )
 ```
 
-- [ ] **Step 9: Run host session tests**
+- [x] **Step 9: Run host session tests**
 
 Run:
 
@@ -975,7 +975,7 @@ Run:
 
 Expected: PASS after updating old assertions that expected creation to return `OPEN`.
 
-- [ ] **Step 10: Add current-session regression**
+- [x] **Step 10: Add current-session regression**
 
 In `CurrentSessionControllerDbTest`, add:
 
@@ -1021,7 +1021,7 @@ private fun insertDraftSession(number: Int, visibility: String) {
 }
 ```
 
-- [ ] **Step 11: Run current session test**
+- [x] **Step 11: Run current session test**
 
 Run:
 
@@ -1031,12 +1031,38 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Task 3 checkpoint**
+
+**Task 3 checkpoint:**
+- Changed files: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt`, `server/src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt`, `server/src/main/kotlin/com/readmates/session/adapter/in/web/UpcomingSessionController.kt`, `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/JdbcHostSessionWriteAdapter.kt`, `server/src/main/kotlin/com/readmates/session/application/SessionApplicationSupport.kt`, `server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionWritePort.kt`, `server/src/test/kotlin/com/readmates/session/api/HostSessionBffSecurityTest.kt`, `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`, `server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerDbTest.kt`, `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`.
+- Key decisions: host session creation now creates `DRAFT` `HOST_ONLY` sessions without participants; opening a draft session is the only path that creates active participants; only one `OPEN` session per club is enforced at open time; publication and visibility updates keep `sessions.visibility` and `public_session_publications` compatibility columns in sync.
+- Review issues/resolution: Task 3 spec review found missing DB coverage for open edge states, publication visibility sync, publication-save `sessions.visibility`, and upcoming filters. Resolved by adding focused `HostSessionControllerDbTest` coverage; existing implementation passed the new coverage without production code changes. Task 3 code quality review found new visibility/open host mutating routes missing CSRF ignore matchers for BFF calls. Resolved by adding route-specific CSRF ignore regexes and no-CSRF `HostSessionBffSecurityTest` coverage for both routes. Self-review found one compile-only mapper import gap during initial verification; resolved by importing `java.sql.ResultSet`.
+- Verification:
+  - RED: `./server/gradlew -p server test --rerun-tasks --tests com.readmates.session.api.HostSessionControllerDbTest` failed before implementation with 6 expected host-session failures.
+  - GREEN: `./server/gradlew -p server test --rerun-tasks --tests com.readmates.session.api.HostSessionControllerDbTest` passed.
+  - GREEN: `./server/gradlew -p server test --rerun-tasks --tests com.readmates.session.api.CurrentSessionControllerDbTest` passed.
+  - FINAL GREEN: `./server/gradlew -p server test --rerun-tasks --tests com.readmates.session.api.HostSessionControllerDbTest --tests com.readmates.session.api.CurrentSessionControllerDbTest` passed.
+  - DOC/CODE CHECK: `git diff --check -- docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md server/src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt server/src/main/kotlin/com/readmates/session/adapter/in/web/UpcomingSessionController.kt server/src/main/kotlin/com/readmates/session/adapter/out/persistence/JdbcHostSessionWriteAdapter.kt server/src/main/kotlin/com/readmates/session/application/SessionApplicationSupport.kt server/src/main/kotlin/com/readmates/session/application/port/out/HostSessionWritePort.kt server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerDbTest.kt` passed with no output.
+  - REVIEW GREEN: `./server/gradlew -p server test --tests com.readmates.session.api.HostSessionControllerDbTest --rerun-tasks` passed after adding the missing DB coverage.
+  - REVIEW GREEN: `./server/gradlew -p server test --tests com.readmates.session.api.CurrentSessionControllerDbTest --rerun-tasks` passed.
+  - REVIEW CHECK: `git diff --check` passed with no output.
+  - P1 RED: `./server/gradlew -p server test --tests com.readmates.session.api.HostSessionBffSecurityTest --rerun-tasks` failed before the CSRF matcher fix with 2 expected failures for the new visibility/open routes.
+  - P1 GREEN: `./server/gradlew -p server test --tests com.readmates.session.api.HostSessionBffSecurityTest --rerun-tasks` passed after the CSRF matcher fix.
+  - P1 GREEN: `./server/gradlew -p server test --tests com.readmates.session.api.HostSessionControllerDbTest --tests com.readmates.session.api.CurrentSessionControllerDbTest --rerun-tasks` passed after one transient Testcontainers Ryuk startup failure and rerun.
+  - P1 CHECK: `git diff --check` passed with no output.
+- Remaining risks: frontend e2e flows are not covered in this task; archive and notes visibility filters remain for Task 4.
+- Next task notes: Task 4 should enforce archive and notes visibility filters for `DRAFT` and `HOST_ONLY` records.
+- Current branch/worktree: branch `codex/upcoming-session-management-20260425`; worktree `upcoming-session-management-20260425`; HEAD before Task 3 commit `e3d9950`.
+
+- [x] **Step 13: Commit**
 
 ```bash
-git add server/src/main/kotlin/com/readmates/session \
+git add server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt \
+  server/src/main/kotlin/com/readmates/session \
+  server/src/test/kotlin/com/readmates/session/api/HostSessionBffSecurityTest.kt \
   server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt \
-  server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerDbTest.kt
+  server/src/test/kotlin/com/readmates/session/api/CurrentSessionControllerDbTest.kt \
+  docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md
 git commit -m "feat: manage upcoming session state"
 ```
 
