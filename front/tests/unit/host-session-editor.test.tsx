@@ -167,7 +167,7 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "새 세션 만들기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
-    expect(screen.getByText("세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 공개 설정과 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
+    expect(screen.getByText("세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
     expect(screen.queryByText("이번 세션 편집")).not.toBeInTheDocument();
   });
 
@@ -177,7 +177,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("heading", { name: "이번 세션 편집" })).toBeVisible();
     expect(screen.getByText("No.07")).toBeVisible();
     expect(screen.getByText("이번 세션")).toBeVisible();
-    expect(screen.getByText("세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 공개 설정과 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
+    expect(screen.getByText("세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
   });
 
   it("switches the mobile editor between basic, publish, attendance, and feedback document contexts", async () => {
@@ -565,25 +565,30 @@ describe("HostSessionEditor", () => {
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.anything());
   });
 
-  it("initializes publication summary and mode from the host session detail payload", () => {
+  it("initializes publication summary and visibility from the host session detail payload", () => {
     render(
       <HostSessionEditorForTest
         session={{
           ...session,
           publication: {
             publicSummary: "저장된 공개 요약입니다.",
-            isPublic: false,
+            visibility: "MEMBER",
           },
         }}
       />,
     );
 
-    expect(screen.getByLabelText("공개 요약")).toHaveValue("저장된 공개 요약입니다.");
-    expect(screen.getByText("공개 요약을 서버에 초안으로 저장").parentElement).toHaveAttribute("aria-current", "step");
-    expect(screen.queryByText("요약만 공개")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "기록 공개 범위" })).toBeVisible();
+    expect(screen.getByLabelText("기록 요약")).toHaveValue("저장된 공개 요약입니다.");
+    expect(screen.getByRole("radio", { name: /호스트 전용/ })).toBeVisible();
+    expect(screen.getByRole("radio", { name: /멤버 공개/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /외부 공개/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: "저장" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "요약 초안 저장" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "공개 기록 발행" })).not.toBeInTheDocument();
   });
 
-  it("saves a publication summary draft through the publication API without redirecting", async () => {
+  it("saves publication summary and record visibility through the publication API without redirecting", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     const location = { href: "" };
     vi.stubGlobal("fetch", fetchMock);
@@ -592,58 +597,60 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
-    await user.type(screen.getByLabelText("공개 요약"), "초안으로 남길 공개 요약입니다.");
-    await user.click(screen.getByRole("button", { name: "요약 초안 저장" }));
+    const publicationStatusRow = screen.getByText("공개 기록").closest(".row-between");
+    expect(publicationStatusRow).not.toBeNull();
+    expect(within(publicationStatusRow as HTMLElement).getByText("기록 없음")).toBeVisible();
+
+    await user.type(screen.getByLabelText("기록 요약"), "멤버에게 공유할 기록입니다.");
+    await user.click(screen.getByRole("radio", { name: /멤버 공개/ }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/publication", expect.objectContaining({
         cache: "no-store",
         method: "PUT",
         body: JSON.stringify({
-          publicSummary: "초안으로 남길 공개 요약입니다.",
-          isPublic: false,
+          publicSummary: "멤버에게 공유할 기록입니다.",
+          visibility: "MEMBER",
         }),
       })),
     );
     expect(location.href).toBe("");
-    expect(await screen.findByRole("status")).toHaveTextContent("요약 초안을 저장했습니다.");
-    expect(screen.getByText("공개 요약을 서버에 초안으로 저장").parentElement).toHaveAttribute("aria-current", "step");
+    expect(await screen.findByRole("status")).toHaveTextContent("기록 공개 범위를 저장했습니다.");
+    expect(within(publicationStatusRow as HTMLElement).getByText("멤버 공개")).toBeVisible();
   });
 
-  it("publishes a public record through the publication API without redirecting", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
-    const location = { href: "" };
+  it("disables publication editing controls while the record save is pending", async () => {
+    const saveResponse = deferredFetchResponse();
+    const fetchMock = vi.fn().mockReturnValue(saveResponse.promise);
     vi.stubGlobal("fetch", fetchMock);
-    vi.stubGlobal("location", location);
     const user = userEvent.setup();
 
     render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
-    await user.type(screen.getByLabelText("공개 요약"), "공개 페이지에 보여줄 요약입니다.");
-    await user.click(screen.getByRole("button", { name: "공개 기록 발행" }));
+    await user.type(screen.getByLabelText("기록 요약"), "저장 중에는 수정할 수 없는 기록입니다.");
+    await user.click(screen.getByRole("radio", { name: /멤버 공개/ }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/publication", expect.objectContaining({
-        cache: "no-store",
-        method: "PUT",
-        body: JSON.stringify({
-          publicSummary: "공개 페이지에 보여줄 요약입니다.",
-          isPublic: true,
-        }),
-      })),
-    );
-    expect(location.href).toBe("");
-    expect(await screen.findByRole("status")).toHaveTextContent("공개 기록을 발행했습니다.");
-    expect(screen.getByText("공개 클럽 페이지에 노출").parentElement).toHaveAttribute("aria-current", "step");
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByLabelText("기록 요약")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "저장하는 중" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /호스트 전용/ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /멤버 공개/ })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: /외부 공개/ })).toBeDisabled();
+
+    saveResponse.resolve({ ok: true });
+
+    expect(await screen.findByRole("status")).toHaveTextContent("기록 공개 범위를 저장했습니다.");
   });
 
   it("disables publication actions for unsaved new sessions and explains why", () => {
     render(<HostSessionEditorForTest />);
 
-    expect(screen.getByRole("button", { name: "요약 초안 저장" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "공개 기록 발행" })).toBeDisabled();
-    expect(screen.getByText("세션을 만든 뒤 공개 요약 초안 저장과 공개 기록 발행을 사용할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "내부 공개" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "저장" })).toBeDisabled();
+    expect(screen.getByText("세션을 만든 뒤 기록 요약과 공개 범위를 저장할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "요약 초안 저장" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "공개 기록 발행" })).not.toBeInTheDocument();
   });
 
   it("shows publication validation feedback inside the publication section without sending a request", async () => {
@@ -653,9 +660,9 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
-    await user.click(screen.getByRole("button", { name: "요약 초안 저장" }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("공개 요약을 입력한 뒤 저장해주세요.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("기록 요약을 입력한 뒤 저장해주세요.");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -666,11 +673,14 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={{ ...session, publication: null }} />);
 
-    await user.type(screen.getByLabelText("공개 요약"), "저장 실패를 확인할 공개 요약입니다.");
-    await user.click(screen.getByRole("button", { name: "공개 기록 발행" }));
+    await user.type(screen.getByLabelText("기록 요약"), "저장 실패를 확인할 공개 요약입니다.");
+    await user.click(screen.getByRole("radio", { name: /외부 공개/ }));
+    await user.click(screen.getByRole("button", { name: "저장" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("alert")).toHaveTextContent("공개 설정 저장에 실패했습니다. 요약 내용을 확인한 뒤 다시 시도해 주세요.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "기록 공개 범위 저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.",
+    );
   });
 
   it("persists attendance toggles for the edited session and updates selected state", async () => {
