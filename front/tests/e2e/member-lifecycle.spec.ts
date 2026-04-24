@@ -20,6 +20,15 @@ async function createOpenSessionThroughUi(page: Page) {
   await page.getByLabel("모임 날짜").fill("2026-05-20");
   await page.getByRole("button", { name: "새 세션 만들기" }).click();
 
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
+  await page.goto("/app/host");
+  const openResponse = page.waitForResponse(
+    (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/open") && response.status() === 200,
+  );
+  await page.getByRole("button", { name: new RegExp(`현재로 시작 · ${lifecycleBookTitle}`) }).click();
+  await openResponse;
+  await page.goto("/app/session/current");
+
   await expect(page).toHaveURL(/\/app\/session\/current/);
   await expect(page.getByRole("heading", { level: 1, name: lifecycleBookTitle })).toBeVisible();
 }
@@ -40,7 +49,7 @@ test("host suspends member and member cannot save current session activity", asy
   await page.getByRole("tab", { name: "활성 멤버" }).click();
 
   const memberRow = page.getByRole("article").filter({ hasText: lifecycleMemberEmail });
-  await expect(memberRow).toContainText("이번 세션 참여 중");
+  await expect(memberRow).toContainText("이번 세션 참여");
 
   await memberRow.getByRole("button", { name: "정지" }).click();
   const dialog = page.getByRole("dialog", { name: /정지할까요/ });

@@ -1045,15 +1045,25 @@ class HostDashboardControllerTest(
         }.andExpect {
             status { isCreated() }
             jsonPath("$.sessionNumber") { value(7) }
-            jsonPath("$.state") { value("OPEN") }
+            jsonPath("$.state") { value("DRAFT") }
         }.andReturn()
 
-        return """"sessionId"\s*:\s*"([^"]+)""""
+        val sessionId = """"sessionId"\s*:\s*"([^"]+)""""
             .toRegex()
             .find(response.response.contentAsString)
             ?.groupValues
             ?.get(1)
             ?: error("created session response did not include a sessionId")
+
+        mockMvc.post("/api/host/sessions/$sessionId/open") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("OPEN") }
+        }
+
+        return sessionId
     }
 
     private fun insertDashboardMissingMember() {
