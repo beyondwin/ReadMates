@@ -271,6 +271,26 @@ export function recordVisibilityDescription(visibility: SessionRecordVisibility)
   return "호스트 편집 화면에서만 볼 수 있습니다.";
 }
 
+export function hostSessionStateLabel(state?: HostSessionState) {
+  if (state === "OPEN") {
+    return "열림";
+  }
+
+  if (state === "PUBLISHED") {
+    return "공개됨";
+  }
+
+  if (state === "CLOSED") {
+    return "닫힘";
+  }
+
+  if (state === "DRAFT") {
+    return "예정";
+  }
+
+  return "저장 전";
+}
+
 export function buildPublicationRequest(
   summary: string,
   visibility: SessionRecordVisibility,

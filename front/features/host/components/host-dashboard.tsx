@@ -82,6 +82,14 @@ type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 type QuickActionIcon = (typeof quickActions)[number]["icon"];
 type MissingCurrentSessionMember = NonNullable<HostDashboardResponse["currentSessionMissingMembers"]>[number];
 export type HostDashboardMissingMemberAction = "add" | "remove";
+type UpcomingActionKind = "visibility" | "open";
+type UpcomingActionHandlers = {
+  updateVisibility: (sessionId: string, visibility: SessionRecordVisibility) => Promise<void>;
+  openSession: (sessionId: string) => Promise<void>;
+  isPending: (sessionId: string, action: UpcomingActionKind) => boolean;
+  isBusy: boolean;
+  canOpenSession: boolean;
+};
 
 export type HostDashboardActions = {
   updateCurrentSessionParticipation: (
@@ -165,20 +173,29 @@ export default function HostDashboard({
   auth,
   current,
   data,
-  hostSessions = [],
+  hostSessions,
   actions,
 }: {
   auth?: AuthMeResponse;
   current?: CurrentSessionResponse;
   data: HostDashboardResponse;
-  hostSessions?: HostSessionListItem[];
+  hostSessions: HostSessionListItem[];
   actions: HostDashboardActions;
 }) {
-  void hostSessions;
-
   const hostName = auth?.displayName ?? "호스트";
   const session = current?.currentSession ?? null;
-  const hasCurrentSession = session !== null;
+  const [hostSessionVisibilityOverrides, setHostSessionVisibilityOverrides] = useState<Record<string, SessionRecordVisibility>>({});
+  const [locallyOpenedSessionId, setLocallyOpenedSessionId] = useState<string | null>(null);
+  const [pendingUpcomingAction, setPendingUpcomingAction] = useState<string | null>(null);
+  const [upcomingMessage, setUpcomingMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
+  const localHostSessions = hostSessions
+    .filter((item) => item.sessionId !== locallyOpenedSessionId)
+    .map((item) => {
+      const visibility = hostSessionVisibilityOverrides[item.sessionId];
+      return visibility ? { ...item, visibility } : item;
+    });
+  const upcomingSessions = localHostSessions.filter((item) => item.state === "DRAFT").slice(0, 6);
+  const hasCurrentSession = session !== null || locallyOpenedSessionId !== null;
   const sessionSpecificEditHref = session ? hostSessionEditHref(session.sessionId) : null;
   const sessionEditHref = sessionSpecificEditHref ?? newSessionHref;
   const sessionEditState = readmatesReturnState(hostDashboardReturnTarget);
@@ -198,6 +215,58 @@ export default function HostDashboard({
       next.add(membershipId);
       return { ...current, [missingMemberKey]: Array.from(next) };
     });
+  };
+
+  const upcomingActionKey = (sessionId: string, action: UpcomingActionKind) => `${action}:${sessionId}`;
+  const isUpcomingActionPending = (sessionId: string, action: UpcomingActionKind) =>
+    pendingUpcomingAction === upcomingActionKey(sessionId, action);
+
+  const handleUpdateUpcomingVisibility = async (sessionId: string, visibility: SessionRecordVisibility) => {
+    const key = upcomingActionKey(sessionId, "visibility");
+    if (pendingUpcomingAction !== null) {
+      return;
+    }
+
+    setPendingUpcomingAction(key);
+    setUpcomingMessage({ kind: "status", text: "처리 중" });
+
+    try {
+      await actions.updateSessionVisibility(sessionId, visibility);
+      setHostSessionVisibilityOverrides((current) => ({ ...current, [sessionId]: visibility }));
+      setUpcomingMessage(null);
+    } catch {
+      setUpcomingMessage({ kind: "alert", text: "저장하지 못했습니다" });
+    } finally {
+      setPendingUpcomingAction(null);
+    }
+  };
+
+  const handleOpenUpcomingSession = async (sessionId: string) => {
+    const key = upcomingActionKey(sessionId, "open");
+    if (pendingUpcomingAction !== null || hasCurrentSession) {
+      return;
+    }
+
+    setPendingUpcomingAction(key);
+    setUpcomingMessage({ kind: "status", text: "처리 중" });
+
+    try {
+      await actions.openSession(sessionId);
+      setLocallyOpenedSessionId(sessionId);
+      setUpcomingMessage({ kind: "status", text: "현재 세션 시작됨" });
+    } catch {
+      setUpcomingMessage({ kind: "alert", text: "저장하지 못했습니다" });
+    } finally {
+      setPendingUpcomingAction(null);
+    }
+  };
+
+  const upcomingActions: UpcomingActionHandlers = {
+    updateVisibility: handleUpdateUpcomingVisibility,
+    openSession: handleOpenUpcomingSession,
+    isPending: isUpcomingActionPending,
+    isBusy: pendingUpcomingAction !== null,
+    canOpenSession: !hasCurrentSession,
   };
 
   return (
@@ -338,6 +407,32 @@ export default function HostDashboard({
                   )}
                 </article>
 
+                <section style={{ marginTop: "28px" }}>
+                  <SectionHeader
+                    eyebrow="예정 세션"
+                    title="앞으로 읽을 세션"
+                    action={
+                      <Link to={newSessionHref} className="btn btn-ghost btn-sm">
+                        예정 세션 만들기
+                      </Link>
+                    }
+                  />
+                  {upcomingSessions.length > 0 ? (
+                    <div className="surface" style={{ padding: 4 }}>
+                      {upcomingSessions.map((item) => (
+                        <UpcomingSessionRow key={item.sessionId} session={item} actions={upcomingActions} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="surface-quiet" style={{ padding: 20 }}>
+                      <div className="body" style={{ fontSize: 14 }}>
+                        아직 등록된 예정 세션이 없습니다.
+                      </div>
+                    </div>
+                  )}
+                  {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} /> : null}
+                </section>
+
                 <section style={{ marginTop: "36px" }}>
                   <SectionHeader eyebrow={HOST_DASHBOARD_LABELS.operationTimeline} title="운영 체크리스트 · 모임 전후" />
                   <ol style={{ margin: 0, padding: 0, listStyle: "none" }}>
@@ -467,8 +562,75 @@ export default function HostDashboard({
         phase={phase}
         nextAction={nextAction}
         currentMembershipId={auth?.membershipId}
+        hasCurrentSession={hasCurrentSession}
+        upcomingSessions={upcomingSessions}
+        upcomingActions={upcomingActions}
+        upcomingMessage={upcomingMessage}
       />
     </>
+  );
+}
+
+function UpcomingSessionRow({
+  session,
+  actions,
+}: {
+  session: HostSessionListItem;
+  actions: UpcomingActionHandlers;
+}) {
+  const isMemberVisible = session.visibility !== "HOST_ONLY";
+  const visibilityPending = actions.isPending(session.sessionId, "visibility");
+  const openPending = actions.isPending(session.sessionId, "open");
+  const controlsDisabled = actions.isBusy;
+  const visibilityLabel = visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "멤버 공개";
+  const openDisabled = controlsDisabled || !actions.canOpenSession;
+  const openLabel = openPending ? "처리 중" : actions.canOpenSession ? "현재로 시작" : "현재 세션 있음";
+
+  return (
+    <div
+      className="row-between"
+      style={{ gap: 12, padding: "14px 16px", borderTop: "1px solid var(--line-soft)" }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <SessionIdentity
+          sessionNumber={session.sessionNumber}
+          state={session.state}
+          date={session.date}
+          published={session.visibility === "PUBLIC"}
+          compact
+        />
+        <div className="body editorial" style={{ marginTop: 6, fontSize: 16 }}>
+          {session.bookTitle}
+        </div>
+        <div className="tiny" style={{ marginTop: 4 }}>
+          {session.bookAuthor} · {formatDateOnlyLabel(session.date)} · {session.locationLabel}
+        </div>
+      </div>
+      <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <button
+          className="btn btn-quiet btn-sm"
+          type="button"
+          disabled={controlsDisabled}
+          aria-label={`${visibilityLabel} · ${session.bookTitle}`}
+          onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
+        >
+          {visibilityLabel}
+        </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          type="button"
+          disabled={openDisabled}
+          aria-label={`${openLabel} · ${session.bookTitle}`}
+          title={actions.canOpenSession ? undefined : "현재 세션이 있습니다."}
+          onClick={() => actions.openSession(session.sessionId)}
+        >
+          {openLabel}
+        </button>
+        <Link className="btn btn-ghost btn-sm" to={hostSessionEditHref(session.sessionId)} aria-label={`편집 · ${session.bookTitle}`}>
+          편집
+        </Link>
+      </div>
+    </div>
   );
 }
 
@@ -486,6 +648,10 @@ function MobileHostDashboard({
   phase,
   nextAction,
   currentMembershipId,
+  hasCurrentSession,
+  upcomingSessions,
+  upcomingActions,
+  upcomingMessage,
 }: {
   hostName: string;
   session: CurrentSession | null;
@@ -500,6 +666,10 @@ function MobileHostDashboard({
   phase: SessionPhase;
   nextAction: NextOperationAction;
   currentMembershipId: string | null | undefined;
+  hasCurrentSession: boolean;
+  upcomingSessions: HostSessionListItem[];
+  upcomingActions: UpcomingActionHandlers;
+  upcomingMessage: null | { kind: "alert" | "status"; text: string };
 }) {
   const mobileAlerts = hostAlertMetrics(data);
 
@@ -555,7 +725,7 @@ function MobileHostDashboard({
                 >
                   {alert.value}
                 </div>
-                <span className={badgeClass(alert.value, alert.tone)}>{hostAlertStateLabel(alert.value, session !== null)}</span>
+                <span className={badgeClass(alert.value, alert.tone)}>{hostAlertStateLabel(alert.value, hasCurrentSession)}</span>
               </div>
             </div>
           ))}
@@ -627,6 +797,28 @@ function MobileHostDashboard({
             <Icon name="arrow-right" size={14} />
           </Link>
         </article>
+      </section>
+
+      <section className="m-sec">
+        <div className="m-eyebrow-row">
+          <span className="eyebrow">예정 세션</span>
+          <Link to={newSessionHref} className="tiny">
+            만들기
+          </Link>
+        </div>
+        {upcomingSessions.length > 0 ? (
+          <div
+            className="rm-host-dashboard-mobile__session-rail"
+            style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "minmax(180px, 78%)", gap: 10, overflowX: "auto" }}
+          >
+            {upcomingSessions.map((item) => (
+              <UpcomingSessionMobileCard key={item.sessionId} session={item} actions={upcomingActions} />
+            ))}
+          </div>
+        ) : (
+          <div className="m-card-quiet">아직 등록된 예정 세션이 없습니다.</div>
+        )}
+        {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} mobile /> : null}
       </section>
 
       <section className="m-sec">
@@ -736,6 +928,85 @@ function MobileHostDashboard({
         </div>
       </section>
     </main>
+  );
+}
+
+function UpcomingSessionMobileCard({
+  session,
+  actions,
+}: {
+  session: HostSessionListItem;
+  actions: UpcomingActionHandlers;
+}) {
+  const isMemberVisible = session.visibility !== "HOST_ONLY";
+  const visibilityPending = actions.isPending(session.sessionId, "visibility");
+  const openPending = actions.isPending(session.sessionId, "open");
+  const controlsDisabled = actions.isBusy;
+  const openDisabled = controlsDisabled || !actions.canOpenSession;
+  const openLabel = openPending ? "처리 중" : actions.canOpenSession ? "현재로 시작" : "현재 세션 있음";
+
+  return (
+    <div className="m-card-quiet">
+      <div className="tiny mono">No.{String(session.sessionNumber).padStart(2, "0")}</div>
+      <div className="body editorial" style={{ marginTop: 6 }}>
+        {session.bookTitle}
+      </div>
+      <div className="tiny" style={{ marginTop: 4 }}>
+        {formatDateOnlyLabel(session.date)}
+      </div>
+      <button
+        className="btn btn-primary btn-sm"
+        type="button"
+        style={{ marginTop: 10, width: "100%" }}
+        aria-label={`${openLabel} · ${session.bookTitle}`}
+        disabled={openDisabled}
+        title={actions.canOpenSession ? undefined : "현재 세션이 있습니다."}
+        onClick={() => actions.openSession(session.sessionId)}
+      >
+        {openLabel}
+      </button>
+      <div className="row" style={{ gap: 8, marginTop: 8 }}>
+        <button
+          className="btn btn-quiet btn-sm"
+          type="button"
+          style={{ flex: 1 }}
+          disabled={controlsDisabled}
+          aria-label={`${visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "멤버 공개"} · ${session.bookTitle}`}
+          onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
+        >
+          {visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "멤버 공개"}
+        </button>
+        <Link
+          className="btn btn-ghost btn-sm"
+          to={hostSessionEditHref(session.sessionId)}
+          style={{ flex: 1 }}
+          aria-label={`편집 · ${session.bookTitle}`}
+        >
+          편집
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function UpcomingActionMessage({
+  message,
+  mobile = false,
+}: {
+  message: { kind: "alert" | "status"; text: string };
+  mobile?: boolean;
+}) {
+  return (
+    <div
+      className="tiny"
+      role={message.kind}
+      style={{
+        marginTop: mobile ? 10 : 12,
+        color: message.kind === "alert" ? "var(--danger)" : "var(--text-3)",
+      }}
+    >
+      {message.text}
+    </div>
   );
 }
 

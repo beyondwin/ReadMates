@@ -1511,7 +1511,7 @@ git commit -m "feat: load upcoming session data"
 - Modify: `front/tests/unit/host-dashboard.test.tsx`
 - Modify: `front/tests/unit/host-session-editor.test.tsx`
 
-- [ ] **Step 1: Write failing host dashboard UI test**
+- [x] **Step 1: Write failing host dashboard UI test**
 
 In `host-dashboard.test.tsx`, add:
 
@@ -1564,7 +1564,7 @@ it("renders upcoming session management on desktop and mobile", () => {
 });
 ```
 
-- [ ] **Step 2: Write failing action test**
+- [x] **Step 2: Write failing action test**
 
 Add:
 
@@ -1587,7 +1587,7 @@ it("calls visibility and open actions from upcoming session rows", async () => {
 });
 ```
 
-- [ ] **Step 3: Run host dashboard test to verify failure**
+- [x] **Step 3: Run host dashboard test to verify failure**
 
 Run:
 
@@ -1597,7 +1597,7 @@ pnpm --dir front test -- host-dashboard.test.tsx
 
 Expected: FAIL because `hostSessions` UI is missing.
 
-- [ ] **Step 4: Extend HostDashboard props and actions**
+- [x] **Step 4: Extend HostDashboard props and actions**
 
 In `host-dashboard.tsx`, update action type:
 
@@ -1625,7 +1625,7 @@ const sessions = hostSessions ?? [];
 const upcomingSessions = sessions.filter((item) => item.state === "DRAFT").slice(0, 6);
 ```
 
-- [ ] **Step 5: Add desktop upcoming section**
+- [x] **Step 5: Add desktop upcoming section**
 
 Below the current session document panel, add:
 
@@ -1674,7 +1674,7 @@ function UpcomingSessionRow({ session, actions }: { session: HostSessionListItem
 }
 ```
 
-- [ ] **Step 6: Add mobile upcoming rail**
+- [x] **Step 6: Add mobile upcoming rail**
 
 In the mobile dashboard section, place after "오늘 할 일":
 
@@ -1713,7 +1713,7 @@ function UpcomingSessionMobileCard({ session, actions }: { session: HostSessionL
 }
 ```
 
-- [ ] **Step 7: Update create redirect and labels**
+- [x] **Step 7: Update create redirect and labels**
 
 In `host-session-editor.tsx`, after successful create, redirect to edit page:
 
@@ -1732,7 +1732,7 @@ if (response.ok) {
 
 In `host-session-editor-model.ts` and `session-identity.tsx`, change user-facing `DRAFT` copy from "초안/비공개" to "예정/예정 세션" where the state label is shown. Visibility labels still communicate `HOST_ONLY`.
 
-- [ ] **Step 8: Run frontend tests**
+- [x] **Step 8: Run frontend tests**
 
 Run:
 
@@ -1742,7 +1742,18 @@ pnpm --dir front test -- host-dashboard.test.tsx host-session-editor.test.tsx
 
 Expected: PASS after updating affected expectations from `/app/session/current` to the edit URL for create.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Update task checkpoint**
+
+Checkpoint:
+- Changed files: `front/features/host/components/host-dashboard.tsx`, `front/features/host/components/host-session-editor.tsx`, `front/features/host/model/host-session-editor-model.ts`, `front/features/host/route/host-dashboard-route.tsx`, `front/shared/ui/session-identity.tsx`, `front/tests/unit/host-dashboard.test.tsx`, `front/tests/unit/host-session-editor.test.tsx`, `front/tests/unit/session-identity.test.tsx`, `docs/superpowers/plans/2026-04-25-readmates-upcoming-session-management-implementation-plan.md`.
+- Key decisions: made `HostDashboard` require `hostSessions` at the component boundary while keeping test helpers defaulted to `[]`; rendered only `DRAFT` sessions in the upcoming management UI; kept small local host-session overlays in the dashboard so visibility and open actions update the upcoming list without waiting for a route reload; revalidated the host dashboard route after a draft opens; kept desktop and mobile upcoming actions concrete and compact; disabled all upcoming mutation controls while any upcoming action is pending; redirected new session creates to the created session edit page; moved host editor state labels into the model and changed DRAFT copy to upcoming language.
+- Review issues/resolution: self-review found the shared DRAFT identity copy made the dashboard UI test's exact `"예정 세션"` text query ambiguous; resolved by asserting at least one matching label while keeping title, book, and action assertions specific. Task 6 code quality/design review found upcoming actions were fire-and-forget, mobile cards lacked visibility/edit controls, and tests did not protect async behavior. Resolved by adding local pending/error state, awaiting visibility/open handlers, disabling row/card action buttons while pending, surfacing `"처리 중"` / `"저장하지 못했습니다"` with status/alert roles, flipping visibility locally on success, removing opened draft sessions locally, and adding mobile visibility/edit controls plus unit coverage. Task 6 spec re-review found the open-success local removal was implemented but not covered; resolved by adding a deferred open-action regression that checks pending disabled state and verifies the draft disappears from upcoming UI after success. Task 6 P1 re-review found `"현재로 시작"` stayed enabled while an OPEN current session existed even though the server rejects that transition; resolved by gating desktop/mobile upcoming open controls behind current-session absence, adding a handler guard, and moving successful-open tests to a no-current fixture. Follow-up P1 review found a successful open in a no-current/multiple-draft state left remaining draft start buttons enabled until reload; resolved by marking the opened session as a local current-session gate, disabling remaining draft start controls, surfacing `"현재 세션 시작됨"`, and triggering route revalidation after open. Final P2 review found non-active upcoming controls stayed enabled during a pending action and mobile alert badges ignored locally opened current-session state; resolved by adding a global upcoming busy flag, disabling all desktop/mobile upcoming mutation buttons while pending, passing `hasCurrentSession` into mobile alerts, and adding book-title aria labels to desktop upcoming row actions. Final accessibility review found mobile edit links still exposed repeated `"편집"` names; resolved by adding the same `편집 · {bookTitle}` aria-label pattern to mobile edit links and asserting it in the mobile controls test. One targeted test run hit an unrelated intermittent `auth-context.test.tsx` loading assertion; rerunning the same command passed.
+- Verification: red `pnpm --dir front test -- host-dashboard.test.tsx` failed with missing `"예정 세션"` and `"멤버 공개"` UI; red `pnpm --dir front test -- host-session-editor.test.tsx` failed because create still redirected to `/app/session/current`; red `pnpm --dir front test -- session-identity.test.tsx` failed because DRAFT still rendered `"새 세션 초안 · 비공개"`. Review red `pnpm --dir front test -- host-dashboard.test.tsx` failed with missing `"처리 중"`, missing alert, and missing mobile `"멤버 공개"` control. Spec re-review test addition first failed because the new assertion used a single `"다음 책"` query while desktop and mobile both render it; adjusted to assert both surfaces before success and absence after success. P1 re-review red `pnpm --dir front test -- host-dashboard.test.tsx` failed because the current-session fixture still exposed `"현재로 시작"` instead of disabled `"현재 세션 있음"` controls. Follow-up P1 red `pnpm --dir front test -- host-dashboard.test.tsx` failed because a remaining draft still exposed enabled `"현재로 시작"` after another draft opened. Final P2 red `pnpm --dir front test -- host-dashboard.test.tsx` failed because a remaining draft's controls stayed enabled during another draft's pending visibility update and mobile zero-count badges stayed `"대기 없음"` after local open. Final accessibility red `pnpm --dir front test -- host-dashboard.test.tsx` failed because the mobile edit link accessible name was still `"편집"` instead of `"편집 · 다음 책"`. Green `pnpm --dir front test -- host-dashboard.test.tsx host-session-editor.test.tsx session-identity.test.tsx` passed on rerun with 44 files and 484 tests. Review green `pnpm --dir front test -- host-dashboard.test.tsx host-session-editor.test.tsx` passed with 44 files and 487 tests, then passed with 44 files and 488 tests after adding open-success regression coverage. P1 re-review green `pnpm --dir front test -- host-dashboard.test.tsx` passed with 44 files and 489 tests. Follow-up P1 green `pnpm --dir front test -- host-dashboard.test.tsx` passed on rerun with 44 files and 490 tests after one unrelated intermittent `auth-context.test.tsx` assertion. Final P2 green `pnpm --dir front test -- host-dashboard.test.tsx` passed with 44 files and 491 tests. Final accessibility green `pnpm --dir front test -- host-dashboard.test.tsx` passed with 44 files and 491 tests. Final P2 requested `pnpm --dir front test -- host-dashboard.test.tsx host-session-editor.test.tsx` passed with 44 files and 491 tests. `pnpm --dir front lint` initially failed on synchronous state-setting in an effect; after removing the prop-sync effect, `pnpm --dir front lint` passed. Final P2 requested `pnpm --dir front lint`, `pnpm --dir front build`, and `git diff --check` passed.
+- Remaining risk: no browser screenshot pass was run; unit/build coverage verifies rendering and action wiring. Opening an upcoming session removes it from the upcoming list locally and triggers route revalidation, but the current-session panel can remain stale briefly until loader data returns; Task 8 E2E should cover the full flow.
+- Next task note: Task 7 can rely on DRAFT session identity now reading as upcoming when member home renders upcoming session cards.
+- Worktree/branch: `upcoming-session-management-20260425` worktree, `codex/upcoming-session-management-20260425`.
+
+- [x] **Step 10: Commit**
 
 ```bash
 git add front/features/host/components/host-dashboard.tsx \

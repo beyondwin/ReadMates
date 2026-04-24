@@ -27,20 +27,20 @@ function ddayLabel(date: string, now = new Date()) {
 }
 
 function phaseLabel(state: SessionState) {
-  if (state === "DRAFT") return "새 세션 초안";
+  if (state === "DRAFT") return "예정 세션";
   if (state === "OPEN") return "이번 세션";
   return "지난 회차";
 }
 
 function stateLabel(state: SessionState, published: boolean) {
-  if (state === "DRAFT") return "비공개";
+  if (state === "DRAFT") return "예정";
   if (state === "OPEN") return "준비 중";
   if (published) return "공개됨";
   return "정리 중";
 }
 
 function stateToneClass(value: string) {
-  if (value === "비공개") return "rm-state rm-state--locked";
+  if (value === "예정") return "rm-state rm-state--pending";
   if (value === "준비 중") return "rm-state rm-state--pending";
   if (value === "공개됨" || value === "문서 있음") return "rm-state rm-state--success";
   if (value === "정리 중") return "rm-state rm-state--readonly";

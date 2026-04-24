@@ -19,6 +19,7 @@ import {
   buildPublicationRequest,
   getDestructiveActionAvailability,
   hydrateHostSessionFormValues,
+  hostSessionStateLabel,
   initialAttendanceStatuses,
   initialFeedbackDocumentStatus,
   initialPublicationSummary,
@@ -308,7 +309,13 @@ export default function HostSessionEditor({
 
       if (response.ok) {
         setSaveState("saved");
-        globalThis.location.href = "/app/session/current";
+        if (isNewSession) {
+          const created = (await response.json()) as { sessionId: string };
+          globalThis.location.href = `/app/host/sessions/${encodeURIComponent(created.sessionId)}/edit`;
+          return;
+        }
+
+        globalThis.location.href = returnTarget.href;
         return;
       }
 
@@ -512,8 +519,8 @@ export default function HostSessionEditor({
                   />
                 ) : (
                   <div className="rm-session-identity">
-                    <span className="rm-session-identity__chip">새 세션 초안</span>
-                    <span className="rm-session-identity__chip">비공개</span>
+                    <span className="rm-session-identity__chip">새 예정 세션</span>
+                    <span className="rm-session-identity__chip">호스트 전용</span>
                   </div>
                 )}
               </div>
@@ -531,7 +538,9 @@ export default function HostSessionEditor({
                 {saveState === "saving"
                   ? "기본 정보를 저장하고 있습니다."
                   : saveState === "saved"
-                    ? "저장되었습니다. 현재 세션으로 이동합니다."
+                    ? isNewSession
+                      ? "저장되었습니다. 예정 세션 편집 화면으로 이동합니다."
+                      : "저장되었습니다. 이전 화면으로 이동합니다."
                     : saveState === "error"
                       ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
                       : "기본 정보 저장, 기록 공개 범위 저장, 피드백 문서 업로드는 각각 별도로 처리됩니다."}
@@ -1058,7 +1067,7 @@ function DocumentStatePanel({
   const rows = [
     {
       label: "문서 상태",
-      value: session ? sessionStateLabel(session.state) : "새 세션 초안",
+      value: session ? hostSessionStateLabel(session.state) : "새 예정 세션",
       className: sessionStateBadgeClass(session?.state),
     },
     {
@@ -1100,26 +1109,6 @@ function DocumentStatePanel({
       </div>
     </div>
   );
-}
-
-function sessionStateLabel(state?: HostSessionDetailResponse["state"]) {
-  if (state === "OPEN") {
-    return "열림";
-  }
-
-  if (state === "PUBLISHED") {
-    return "공개됨";
-  }
-
-  if (state === "CLOSED") {
-    return "닫힘";
-  }
-
-  if (state === "DRAFT") {
-    return "초안";
-  }
-
-  return "저장 전";
 }
 
 function sessionStateBadgeClass(state?: HostSessionDetailResponse["state"]) {
