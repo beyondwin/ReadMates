@@ -127,6 +127,22 @@ const activeAuth: AuthMeResponse = {
   approvalState: "ACTIVE",
 };
 
+const regularMemberData: MyPageResponse = {
+  ...data,
+  displayName: "멤버5",
+  accountName: "김멤버",
+  email: "member@example.com",
+  role: "MEMBER",
+};
+
+const regularMemberAuth: AuthMeResponse = {
+  ...activeAuth,
+  email: regularMemberData.email,
+  displayName: regularMemberData.displayName,
+  accountName: regularMemberData.accountName,
+  role: "MEMBER",
+};
+
 function memberProfileResponse(displayName: string): MemberProfileResponse {
   return {
     membershipId: "member-membership",
@@ -181,11 +197,13 @@ function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
 
 function renderMyRouteWithProfileFetch({
   auth = activeAuth,
+  initialMyPageData = data,
   profileStatus = 200,
   profileBody = memberProfileResponse("새이름"),
   nextMyPageData = { ...data, displayName: "새이름" },
 }: {
   auth?: AuthMeResponse;
+  initialMyPageData?: MyPageResponse;
   profileStatus?: number;
   profileBody?: unknown;
   nextMyPageData?: MyPageResponse;
@@ -202,7 +220,7 @@ function renderMyRouteWithProfileFetch({
 
     if (url === "/api/bff/api/app/me") {
       myPageRequestCount += 1;
-      return Promise.resolve(jsonResponse(myPageRequestCount > 1 ? nextMyPageData : data));
+      return Promise.resolve(jsonResponse(myPageRequestCount > 1 ? nextMyPageData : initialMyPageData));
     }
 
     if (url === "/api/bff/api/feedback-documents/me") {
@@ -306,6 +324,24 @@ describe("MyPage", () => {
     expect(mobile.queryByText("김호스트")).not.toBeInTheDocument();
     expect(mobile.queryByText("@우")).not.toBeInTheDocument();
     expect(mobile.getByRole("button", { name: "이름 변경" })).toBeInTheDocument();
+  });
+
+  it("does not expose own profile editing for regular members on desktop or mobile routes", async () => {
+    const { container } = renderMyRouteWithProfileFetch({
+      auth: regularMemberAuth,
+      initialMyPageData: regularMemberData,
+      nextMyPageData: regularMemberData,
+    });
+
+    expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
+
+    const desktop = desktopScope(container);
+    const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
+
+    expect(desktop.getByText("프로필 수정 준비 중")).toBeInTheDocument();
+    expect(desktop.queryByRole("button", { name: "이름 변경" })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("button", { name: "이름 변경" })).not.toBeInTheDocument();
+    expect(mobile.queryByText("이름")).not.toBeInTheDocument();
   });
 
   it("saves a trimmed display name through the profile API, refreshes auth, and reloads route data", async () => {
