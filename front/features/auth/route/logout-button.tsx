@@ -4,8 +4,17 @@ import { LogoutButton as LogoutButtonUi } from "@/features/auth/ui/logout-button
 
 type LogoutButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick" | "type"> & {
   redirectHref?: string;
+  onLoggedOut?: () => void;
 };
 
-export function LogoutButton(props: LogoutButtonProps) {
-  return <LogoutButtonUi {...props} onLogout={logout} />;
+export function LogoutButton({ onLoggedOut, ...props }: LogoutButtonProps) {
+  const logoutAndClearAuth = async () => {
+    const response = await logout();
+    if (response.ok || response.status === 401) {
+      onLoggedOut?.();
+    }
+    return response;
+  };
+
+  return <LogoutButtonUi {...props} onLogout={logoutAndClearAuth} />;
 }

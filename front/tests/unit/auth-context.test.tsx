@@ -1,9 +1,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
-import { useAuth } from "@/src/app/auth-state";
+import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
+import { LogoutButton } from "@/features/auth/route/logout-button";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   anonymousAuthMeContractFixture,
@@ -95,6 +97,12 @@ function AuthProbe() {
   return <div data-testid="auth-state">{state.auth.approvalState}</div>;
 }
 
+function AuthAwareLogoutButton() {
+  const { markLoggedOut } = useAuthActions();
+
+  return <LogoutButton onLoggedOut={markLoggedOut} />;
+}
+
 function renderGuard(element: React.ReactElement) {
   render(
     <AuthProvider>
@@ -151,6 +159,32 @@ describe("AuthProvider", () => {
     deferred.resolve(authResponse(activeMemberAuth));
 
     expect(await screen.findByText("protected app")).toBeInTheDocument();
+  });
+
+  it("marks the current app shell anonymous after a successful logout", async () => {
+    const user = userEvent.setup();
+    const location = { href: "" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(authResponse(activeMemberAuth))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+        <AuthAwareLogoutButton />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ACTIVE");
+
+    await user.click(screen.getByRole("button", { name: "로그아웃" }));
+
+    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    expect(location.href).toBe("/login");
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/bff/api/auth/logout", { method: "POST" });
   });
 });
 
