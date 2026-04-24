@@ -69,12 +69,21 @@ export function getCurrentSessionBoardTabs(board: CurrentSessionBoard) {
   ] satisfies Array<{ key: CurrentSessionBoardTab; label: string; count: number }>;
 }
 
-export function getCurrentSessionFeedbackAccessState(isViewer: boolean) {
-  if (isViewer) {
+export function getCurrentSessionFeedbackAccessState(access: { isViewer: boolean; isSuspended: boolean }) {
+  if (access.isViewer) {
     return {
       className: "rm-locked-state",
       title: "정식 멤버에게 열립니다",
       body: "둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다.",
+      canOpenArchive: false,
+    } as const;
+  }
+
+  if (access.isSuspended) {
+    return {
+      className: "rm-locked-state",
+      title: "활성 멤버에게 열립니다",
+      body: "멤버십이 일시 정지된 동안에는 참석자 피드백 문서를 열 수 없습니다.",
       canOpenArchive: false,
     } as const;
   }

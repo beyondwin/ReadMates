@@ -647,7 +647,7 @@ class JdbcArchiveQueryAdapter(
             )
         }
 
-        val readable = currentMember.isHost || (!currentMember.isViewer && myAttendanceStatus == "ATTENDED")
+        val readable = canReadArchiveFeedbackDocument(currentMember, myAttendanceStatus)
         return MemberArchiveFeedbackDocumentStatusResult(
             available = true,
             readable = readable,
@@ -657,12 +657,15 @@ class JdbcArchiveQueryAdapter(
         )
     }
 
+    private fun canReadArchiveFeedbackDocument(currentMember: CurrentMember, myAttendanceStatus: String?): Boolean =
+        currentMember.isHost || (currentMember.isActive && myAttendanceStatus == "ATTENDED")
+
     private fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): ArchiveSessionResult {
         val sessionNumber = getInt("number")
         val myAttendanceStatus = getString("my_attendance_status")
         val feedbackDocumentUploadedAt = utcOffsetDateTimeOrNull("feedback_document_uploaded_at")?.toString()
         val feedbackDocumentReadable = feedbackDocumentUploadedAt != null &&
-            (currentMember.isHost || (!currentMember.isViewer && myAttendanceStatus == "ATTENDED"))
+            canReadArchiveFeedbackDocument(currentMember, myAttendanceStatus)
 
         return ArchiveSessionResult(
             sessionId = uuid("id").toString(),

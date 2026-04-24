@@ -141,6 +141,44 @@ class ArchiveControllerDbTest(
     @Test
     @Sql(
         statements = [
+            MARK_MEMBER5_SUSPENDED_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            RESET_MEMBER5_ACTIVE_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `archive feedback document remains locked for suspended attended member`() {
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.myAttendanceStatus") { value("ATTENDED") }
+                jsonPath("$.feedbackDocument.available") { value(true) }
+                jsonPath("$.feedbackDocument.readable") { value(false) }
+                jsonPath("$.feedbackDocument.lockedReason") { value("NOT_ATTENDED") }
+                jsonPath("$.feedbackDocument.sourceText") { doesNotExist() }
+                jsonPath("$.feedbackDocument.body") { doesNotExist() }
+            }
+
+        mockMvc.get("/api/archive/sessions") {
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
+                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             MARK_SESSION6_MEMBER5_ONE_LINER_SESSION_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -304,6 +342,22 @@ class ArchiveControllerDbTest(
             where session_participants.session_id = '00000000-0000-0000-0000-000000000306'
               and session_participants.club_id = '00000000-0000-0000-0000-000000000001'
               and users.email = 'member2@example.com';
+        """
+
+        private const val MARK_MEMBER5_SUSPENDED_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.status = 'SUSPENDED'
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'member5@example.com';
+        """
+
+        private const val RESET_MEMBER5_ACTIVE_SQL = """
+            update memberships
+            join users on users.id = memberships.user_id
+            set memberships.status = 'ACTIVE'
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = 'member5@example.com';
         """
 
         private const val CLEANUP_UNPUBLISHED_SESSION_SQL = """
