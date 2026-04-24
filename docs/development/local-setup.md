@@ -109,7 +109,7 @@ Dev-login은 로컬 개발과 E2E fixture를 위한 흐름입니다. production 
 - `application-dev.yml`은 `readmates.dev.login-enabled=true`를 설정합니다.
 - Frontend login 화면은 production build에서는 dev-login 버튼을 숨깁니다.
 - Fixture 계정은 `host@example.com`, `member1@example.com` 같은 `example.com` 주소를 사용합니다.
-- Dev seed는 `users.short_name`과 `memberships.short_name`을 모두 채웁니다. 화면 표시와 프로필 수정은 membership 단위 `shortName`을 기준으로 동작하므로, `/app/me`와 `/app/host/members`에서 표시 이름 변경 흐름을 로컬로 확인할 수 있습니다.
+- Dev seed는 기존 account alias인 `users.short_name`과 현재 표시 이름 저장소인 `memberships.short_name`을 모두 채웁니다. 화면 표시와 프로필 수정 API는 `displayName` 필드를 주고받고 membership 단위 `memberships.short_name`을 갱신하므로, `/app/me`와 `/app/host/members`에서 표시 이름 변경 흐름을 로컬로 확인할 수 있습니다.
 
 운영 로그인은 Google OAuth 흐름입니다. 브라우저는 `/oauth2/authorization/google`로 시작하고, callback은 `/login/oauth2/code/google`로 돌아오며, Spring은 성공 시 `readmates_session` cookie를 발급합니다.
 
