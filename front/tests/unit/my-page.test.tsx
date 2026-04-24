@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import type { CSSProperties, ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FeedbackDocumentListItem, MyPageResponse } from "@/features/archive/api/archive-contracts";
+import type {
+  FeedbackDocumentListItem,
+  MemberProfileResponse,
+  MyPageResponse,
+} from "@/features/archive/api/archive-contracts";
 import { myPageLoader } from "@/features/archive/route/my-page-data";
 import MyPage from "@/features/archive/ui/my-page";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -25,7 +29,7 @@ type Deferred<T> = {
 
 type EditableMyPageProps = MyPageProps & {
   canEditProfile: boolean;
-  onUpdateProfile: (shortName: string) => Promise<MyPageResponse>;
+  onUpdateProfile: (shortName: string) => Promise<MemberProfileResponse>;
 };
 
 function createDeferred<T>(): Deferred<T> {
@@ -123,6 +127,15 @@ const activeAuth: AuthMeResponse = {
   approvalState: "ACTIVE",
 };
 
+function memberProfileResponse(shortName: string): MemberProfileResponse {
+  return {
+    membershipId: "member-membership",
+    displayName: data.displayName,
+    shortName,
+    profileImageUrl: null,
+  };
+}
+
 const reports: FeedbackDocumentListItem[] = [
   {
     sessionId: "session-1",
@@ -159,7 +172,7 @@ function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
     LogoutButtonComponent: TestLogoutButton,
     onLeaveMembership: testLeaveMembership,
     canEditProfile: true,
-    onUpdateProfile: async (shortName: string) => ({ ...data, shortName }),
+    onUpdateProfile: async (shortName: string) => memberProfileResponse(shortName),
     ...overrides,
   };
 
@@ -169,7 +182,7 @@ function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
 function renderMyRouteWithProfileFetch({
   auth = activeAuth,
   profileStatus = 200,
-  profileBody = { ...data, shortName: "새이름" },
+  profileBody = memberProfileResponse("새이름"),
   nextMyPageData = { ...data, shortName: "새이름" },
 }: {
   auth?: AuthMeResponse;
@@ -312,12 +325,13 @@ describe("MyPage", () => {
       );
     });
     expect(await scoped.findByText("@새이름")).toBeInTheDocument();
+    expect(scoped.getByText("host@example.com")).toBeInTheDocument();
     expect(refreshAuth).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(getMyPageRequestCount()).toBeGreaterThan(1));
   });
 
   it("blocks duplicate profile submits and marks the field pending while saving", async () => {
-    const deferred = createDeferred<MyPageResponse>();
+    const deferred = createDeferred<MemberProfileResponse>();
     const onUpdateProfile = vi.fn(() => deferred.promise);
     const user = userEvent.setup();
     const { container } = renderEditableMyPage({ onUpdateProfile });
@@ -337,7 +351,7 @@ describe("MyPage", () => {
     expect(saveButton).toHaveTextContent("저장 중");
 
     await act(async () => {
-      deferred.resolve({ ...data, shortName: "새이름" });
+      deferred.resolve(memberProfileResponse("새이름"));
       await deferred.promise;
     });
   });

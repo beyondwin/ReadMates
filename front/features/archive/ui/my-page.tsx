@@ -47,7 +47,7 @@ type MyPageProps = {
   onUpdateProfile?: (shortName: string) => Promise<ProfileUpdateResult>;
 };
 
-type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "shortName" | "email">;
+type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "shortName">;
 
 export type LogoutControlComponent = (props: {
   className?: string;
@@ -79,7 +79,13 @@ export default function MyPage({
     }
 
     const profile = await onUpdateProfile(shortName);
-    setProfileOverrideState({ sourceData: data, profile });
+    setProfileOverrideState({
+      sourceData: data,
+      profile: {
+        displayName: profile.displayName,
+        shortName: profile.shortName,
+      },
+    });
     return profile;
   }
 

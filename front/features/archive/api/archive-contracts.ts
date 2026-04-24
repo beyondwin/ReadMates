@@ -16,9 +16,10 @@ export type UpdateMemberProfileRequest = {
 };
 
 export type MemberProfileResponse = {
+  membershipId: string;
   displayName: string;
   shortName: string;
-  email: string;
+  profileImageUrl: string | null;
 };
 
 export type ArchiveSessionItem = {
