@@ -92,8 +92,8 @@ https://readmates.pages.dev/login/oauth2/code/google
 2. `https://readmates.pages.dev/app` 같은 deep route가 404가 아니라 SPA를 렌더링하는지 확인합니다.
 3. Google login 클릭 시 `/oauth2/authorization/google` 흐름으로 나가는지 확인합니다.
 4. 정식 멤버는 로그인 후 `/app`으로 들어가는지 확인합니다.
-5. 초대 없이 들어온 새 Google 사용자는 둘러보기 멤버 상태로 `/app/pending`에 도달하는지 확인합니다.
-6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 전환할 수 있는지 확인합니다.
+5. 초대 없이 들어온 새 Google 사용자는 로그인 성공 후 `/app`으로 redirect되고, 둘러보기 멤버 안내와 읽기 전용 멤버 화면을 볼 수 있는지 확인합니다. `/app/pending`은 둘러보기 멤버 안내용 호환 route로 남아 있어 직접 열어도 동작해야 합니다.
+6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 전환하고 멤버 표시 이름을 수정할 수 있는지 확인합니다.
 7. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있는지 확인합니다.
 8. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.
 9. 피드백 문서 `PDF로 저장` action이 숨겨져 있는지 확인합니다. 현재 `feedbackDocumentPdfDownloadsEnabled=false`라서 print route는 사용자-facing PDF 저장 흐름으로 쓰지 않습니다.

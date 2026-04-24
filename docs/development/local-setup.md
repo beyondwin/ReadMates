@@ -5,11 +5,11 @@
 ## 필수 도구
 
 - `JDK 21`
-- `Node.js`
+- `Node.js 24` 권장
 - `pnpm`
 - `Docker Compose` 또는 `MySQL 8` compatible database
 
-프론트엔드는 `front/package.json`의 `packageManager` 기준으로 `pnpm@10.33.0`을 사용합니다. 백엔드는 Gradle wrapper와 Java toolchain으로 `JDK 21`을 사용합니다.
+프론트엔드는 `front/package.json`의 `packageManager` 기준으로 `pnpm@10.33.0`을 사용합니다. CI는 Node.js 24로 frontend lint/test/build를 실행합니다. 백엔드는 Gradle wrapper와 Java toolchain으로 `JDK 21`을 사용합니다.
 
 ## 의존성 설치
 
@@ -109,6 +109,7 @@ Dev-login은 로컬 개발과 E2E fixture를 위한 흐름입니다. production 
 - `application-dev.yml`은 `readmates.dev.login-enabled=true`를 설정합니다.
 - Frontend login 화면은 production build에서는 dev-login 버튼을 숨깁니다.
 - Fixture 계정은 `host@example.com`, `member1@example.com` 같은 `example.com` 주소를 사용합니다.
+- Dev seed는 `users.short_name`과 `memberships.short_name`을 모두 채웁니다. 화면 표시와 프로필 수정은 membership 단위 `shortName`을 기준으로 동작하므로, `/app/me`와 `/app/host/members`에서 표시 이름 변경 흐름을 로컬로 확인할 수 있습니다.
 
 운영 로그인은 Google OAuth 흐름입니다. 브라우저는 `/oauth2/authorization/google`로 시작하고, callback은 `/login/oauth2/code/google`로 돌아오며, Spring은 성공 시 `readmates_session` cookie를 발급합니다.
 

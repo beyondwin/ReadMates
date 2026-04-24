@@ -2,6 +2,8 @@
 
 ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle test, 공개 릴리즈 후보 점검으로 나뉩니다.
 
+GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint/test/build를 실행하고, backend job에서 JDK 21로 `./server/gradlew -p server clean test`를 실행합니다.
+
 ## Frontend
 
 의존성 설치:
@@ -67,6 +69,12 @@ READMATES_E2E_DB_NAME=readmates_e2e \
 pnpm --dir front test:e2e
 ```
 
+멤버 표시 이름과 권한 경계만 빠르게 확인하려면 관련 E2E spec을 직접 지정할 수 있습니다.
+
+```bash
+pnpm --dir front test:e2e -- member-profile-permissions
+```
+
 ## Backend
 
 전체 backend test:
@@ -88,6 +96,15 @@ Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함
   --tests com.readmates.session.api.HostSessionControllerDbTest \
   --tests com.readmates.session.api.HostDashboardControllerTest \
   --tests com.readmates.note.api.MemberActionControllerDbTest
+```
+
+멤버 프로필이나 표시 이름 검증을 수정했다면 아래 focused command로 controller, application, migration 경계를 먼저 확인할 수 있습니다.
+
+```bash
+./server/gradlew -p server test \
+  --tests com.readmates.auth.api.MemberProfileControllerTest \
+  --tests com.readmates.auth.api.HostMemberApprovalControllerTest \
+  --tests com.readmates.support.MySqlFlywayMigrationTest
 ```
 
 ## 공개 릴리즈 후보 점검

@@ -34,6 +34,8 @@ Cloudflare 프로젝트 root가 `front`이므로 Pages Functions는 `front/funct
 /* /index.html 200
 ```
 
+`front/public/_headers`는 Vite build output으로 복사되어 public asset에 보안 헤더를 붙입니다. 현재 기준은 `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `connect-src 'self'`를 포함한 제한적인 CSP입니다. 새 외부 asset이나 API origin을 추가할 때는 실제 runtime 필요성, BFF 경계, 공개 문서 placeholder 정책을 함께 검토합니다.
+
 ## 운영 환경 변수
 
 Cloudflare Pages 운영 환경에는 아래 값을 설정합니다.
@@ -101,6 +103,7 @@ curl -sS https://readmates.pages.dev/api/bff/api/public/club
 - `/api/bff/api/auth/me`는 BFF를 통해 Spring에 도달합니다. 로그아웃 상태여도 anonymous auth state를 담은 `200`일 수 있습니다.
 - `/oauth2/authorization/google`은 Google 또는 Spring OAuth 흐름으로 redirect됩니다.
 - `/api/bff/api/public/club`은 공개 기록에 노출 가능한 club 정보만 반환해야 합니다.
+- deep route와 legacy route인 `/app/session/current`, `/app/host/members`, `/invite/<token>`, `/reset-password/<token>`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
 
 ## 비용 상태 확인
 
