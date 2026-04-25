@@ -217,7 +217,9 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
     expect(within(mobile as HTMLElement).getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
     expect(screen.queryByText("지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.")).not.toBeInTheDocument();
-    expect(desktop.getByText("AI-assisted")).toBeInTheDocument();
+    expect(screen.queryByText("SESSION RECORDS")).not.toBeInTheDocument();
+    expect(desktop.queryByText("AI-assisted")).not.toBeInTheDocument();
+    expect(desktop.getByText("함께 읽은 흔적")).toBeInTheDocument();
     const desktopSessionTab = desktop.getByRole("button", { name: "세션" });
     expect(desktopSessionTab).toBeInTheDocument();
     expect(desktopSessionTab).toHaveStyle({
@@ -697,6 +699,7 @@ describe("ArchivePage", () => {
 
     await user.click(desktop.getByRole("button", { name: "내 서평" }));
     expect(desktop.queryByText("AI-assisted")).not.toBeInTheDocument();
+    expect(desktop.getByText("다 읽고 남긴 감상")).toBeInTheDocument();
     expect(desktop.getByText("서평 · 2026-04-15")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("나")).toBeInTheDocument();
@@ -708,6 +711,7 @@ describe("ArchivePage", () => {
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
     expect(desktop.queryByText("AI-assisted")).not.toBeInTheDocument();
+    expect(desktop.getByText("읽으며 붙든 질문")).toBeInTheDocument();
     expect(desktop.getByText("Q1 · 2025.11.26")).toHaveStyle({ color: "var(--text-3)" });
     expect(desktop.queryByText("저장된 질문 Q1 · 2025.11.26")).not.toBeInTheDocument();
     expect(desktop.getByText("10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?")).toBeInTheDocument();
@@ -717,7 +721,8 @@ describe("ArchivePage", () => {
     );
 
     await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
-    expect(desktop.getByText("AI-assisted")).toBeInTheDocument();
+    expect(desktop.queryByText("AI-assisted")).not.toBeInTheDocument();
+    expect(desktop.getByText("모임 뒤의 정리")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByText("No.01 · 2025.11.26 · 2026.04.20 등록")).toBeInTheDocument();
     expect(desktop.queryByText("독서모임 1차 피드백")).not.toBeInTheDocument();
