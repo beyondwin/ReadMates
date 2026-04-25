@@ -104,10 +104,10 @@ export function SessionRail({
         />
       </div>
       <div
-        className="stack"
+        className="stack rm-notes-session-rail__list"
         style={{
           "--stack": "0px",
-          maxHeight: "560px",
+          maxHeight: "clamp(560px, calc(100dvh - 420px), 760px)",
           overflowY: "auto",
           borderTop: noteSessions.length > 0 ? "1px solid var(--line)" : 0,
         } as CSSProperties}
