@@ -95,9 +95,10 @@ https://readmates.pages.dev/login/oauth2/code/google
 5. 초대 없이 들어온 새 Google 사용자는 로그인 성공 후 `/app`으로 redirect되고, 둘러보기 멤버 안내와 읽기 전용 멤버 화면을 볼 수 있는지 확인합니다. `/app/pending`은 둘러보기 멤버 안내용 호환 route로 남아 있어 직접 열어도 동작해야 합니다.
 6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 전환하고 멤버 표시 이름을 수정할 수 있는지 확인합니다.
 7. 호스트가 `/app/host/sessions/new`에서 `DRAFT` 예정 세션을 만들고, `/app/host/sessions/:sessionId/edit`에서 공개 범위를 `MEMBER` 또는 `PUBLIC`으로 바꾼 뒤 현재 세션으로 시작할 수 있는지 확인합니다.
-8. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있고, 멤버 공개 예정 세션이 있으면 홈에서 볼 수 있는지 확인합니다.
-9. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.
-10. 피드백 문서 `PDF로 저장` action이 숨겨져 있는지 확인합니다. 현재 `feedbackDocumentPdfDownloadsEnabled=false`라서 print route는 사용자-facing PDF 저장 흐름으로 쓰지 않습니다.
+8. 호스트가 진행 중인 `OPEN` 세션을 `CLOSED`로 닫고, 공개 요약을 저장한 뒤 `PUBLISHED` 기록으로 발행할 수 있는지 확인합니다.
+9. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있고, 멤버 공개 예정 세션이 있으면 홈에서 볼 수 있는지 확인합니다.
+10. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.
+11. 피드백 문서 `PDF로 저장` action이 숨겨져 있는지 확인합니다. 현재 `feedbackDocumentPdfDownloadsEnabled=false`라서 print route는 사용자-facing PDF 저장 흐름으로 쓰지 않습니다.
 
 PDF 저장 흐름을 다시 켜는 경우에는 `front/shared/config/readmates-feature-flags.ts`를 변경한 뒤 `/app/feedback/:sessionId/print`가 데이터를 불러오고 browser print를 한 번 호출하는지 별도로 검증합니다.
 

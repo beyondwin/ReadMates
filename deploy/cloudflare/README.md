@@ -7,7 +7,7 @@ Cloudflare Pages production 자동 배포를 끄거나, GitHub Actions에서 명
 `.github/workflows/deploy-front.yml`은 `front`를 빌드한 뒤 Wrangler로 Cloudflare Pages에 직접 업로드합니다.
 
 1. GitHub repository secret에 `CLOUDFLARE_ACCOUNT_ID`와 `CLOUDFLARE_API_TOKEN`을 추가합니다.
-2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 push합니다. 예: `git push origin v1.1.0`
+2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 push합니다. 예: `git push origin v1.2.0`
 
 이 workflow는 `v*` tag push를 구독하므로 `main` push만으로는 production 배포를 실행하지 않습니다.
 

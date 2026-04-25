@@ -17,14 +17,14 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 | 변경 종류 | 예시 | 버전 |
 | --- | --- | --- |
 | 첫 공개 기준선 | 공개 사이트, 멤버 앱, 호스트 앱, OAuth, BFF, MySQL 운영 기준선 | `v1.0.0` |
-| 사용자 기능 추가 | 예정 세션, 세션 공개 범위, 새 호스트 운영 흐름 | `v1.1.0` |
-| 버그 수정 또는 문서 보강 | 배포 불일치 리포트, stale copy 수정, 작은 UX 수정 | `v1.1.1` |
+| 사용자 기능 추가 | 예정 세션, 세션 공개 범위, 세션 닫기/기록 발행 lifecycle, 새 호스트 운영 흐름 | `v1.2.0` |
+| 버그 수정 또는 문서 보강 | 배포 불일치 리포트, stale copy 수정, 작은 UX 수정 | `v1.2.1` |
 | 호환성 깨지는 변경 | auth model, URL 구조, API contract, DB 운영 구조 대규모 변경 | `v2.0.0` |
 
 ## 릴리즈 노트 구조
 
 ```markdown
-## v1.1.0 - YYYY-MM-DD
+## v1.2.0 - YYYY-MM-DD
 
 ### Highlights
 
@@ -106,20 +106,20 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    ```bash
    git add CHANGELOG.md docs/development/release-management.md
-   git commit -m "docs: add v1.1.0 release notes"
+   git commit -m "docs: add v1.2.0 release notes"
    ```
 
 6. 태그를 만듭니다.
 
    ```bash
-   git tag -a v1.1.0 -m "ReadMates v1.1.0"
+   git tag -a v1.2.0 -m "ReadMates v1.2.0"
    ```
 
 7. `main`과 release tag를 push합니다.
 
    ```bash
    git push origin main
-   git push origin v1.1.0
+   git push origin v1.2.0
    ```
 
    `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow를 시작합니다.
@@ -127,8 +127,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 8. GitHub Release를 만듭니다.
 
    ```bash
-   gh release create v1.1.0 \
-     --title "v1.1.0" \
+   gh release create v1.2.0 \
+     --title "v1.2.0" \
      --notes-file <release-note-file>
    ```
 
@@ -161,7 +161,7 @@ GitHub Releases는 태그별 public-facing 기록입니다.
 
 ReadMates에서는 아래 방식으로 관리합니다.
 
-- release title은 tag와 동일하게 둡니다. 예: `v1.1.0`
+- release title은 tag와 동일하게 둡니다. 예: `v1.2.0`
 - release body는 `CHANGELOG.md`의 해당 버전 섹션과 같은 내용을 사용합니다.
 - GitHub의 자동 생성 `What's Changed`는 참고만 하고, 최종 body에는 사용자/운영자 관점 요약을 넣습니다.
 - dependency-only 변경이 많은 프로젝트처럼 PR 목록만 나열하지 않습니다.
@@ -173,6 +173,6 @@ ReadMates에서는 아래 방식으로 관리합니다.
 
 예시:
 
-- `v1.1.1`: 운영 배포 불일치 리포트, 릴리즈 관리 문서, 작은 문서/테스트 수정
-- `v1.2.0`: 사용자가 체감하는 새 기능 추가
+- `v1.2.1`: 운영 배포 불일치 리포트, 릴리즈 관리 문서, 작은 문서/테스트 수정
+- `v1.3.0`: 사용자가 체감하는 새 기능 추가
 - `v2.0.0`: 기존 운영자가 배포 순서, DB, API client, URL을 다시 맞춰야 하는 변경
