@@ -50,6 +50,7 @@ class SecurityConfig(
                     methodAndPath("PATCH", Regex("^/api/host/sessions/[^/]+/visibility$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/open$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/close$")),
+                    methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/publish$")),
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/attendance$")),
                     methodAndPath("PUT", Regex("^/api/host/sessions/[^/]+/publication$")),

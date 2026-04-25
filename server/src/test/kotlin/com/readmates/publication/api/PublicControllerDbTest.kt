@@ -8,11 +8,17 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.MediaType
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
+import org.springframework.test.web.servlet.put
 
 @SpringBootTest(
     properties = [
@@ -22,6 +28,7 @@ import org.springframework.test.web.servlet.get
 @AutoConfigureMockMvc
 class PublicControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
+    @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
     @Test
     fun `public club returns real published sessions`() {
@@ -167,14 +174,63 @@ class PublicControllerDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `public club includes public open session`() {
+    fun `public club excludes public open session`() {
         mockMvc.get("/api/public/club")
             .andExpect {
                 status { isOk() }
-                jsonPath("$.stats.sessions") { value(7) }
-                jsonPath("$.stats.books") { value(7) }
-                jsonPath("$.recentSessions[*].bookTitle") { value(hasItem("외부 공개 테스트 책")) }
+                jsonPath("$.stats.sessions") { value(6) }
+                jsonPath("$.stats.books") { value(6) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("외부 공개 테스트 책"))) }
             }
+    }
+
+    @Test
+    @Sql(
+        statements = [
+            CLEANUP_PUBLISH_TEST_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_PUBLISH_TEST_SESSION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public records exclude closed public visibility sessions until published`() {
+        val sessionId = createSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc.put("/api/host/sessions/$sessionId/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "아직 공개 완료 전 요약입니다.",
+                  "visibility": "PUBLIC"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.get("/api/public/sessions/$sessionId").andExpect {
+            status { isNotFound() }
+        }
+
+        mockMvc.post("/api/host/sessions/$sessionId/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.get("/api/public/sessions/$sessionId").andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value(sessionId) }
+        }
     }
 
     @Test
@@ -235,6 +291,75 @@ class PublicControllerDbTest(
                 jsonPath("$.stats.books") { value(6) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("호스트 공개 테스트 책"))) }
             }
+    }
+
+    private fun createSessionSeven(): String {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              book_link,
+              book_image_url,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              meeting_url,
+              meeting_passcode,
+              question_deadline_at,
+              state
+            )
+            values (
+              ?,
+              '00000000-0000-0000-0000-000000000001',
+              7,
+              '7회차 · 공개 전환 테스트 책',
+              '공개 전환 테스트 책',
+              '공개 전환 테스트 저자',
+              'https://example.com/books/publication-test',
+              'https://example.com/covers/publication-test.jpg',
+              '2026-05-20',
+              '20:00:00',
+              '22:00:00',
+              '온라인',
+              'https://meet.google.com/readmates-test',
+              'readmates',
+              '2026-05-19 14:59:00',
+              'OPEN'
+            )
+            """.trimIndent(),
+            sessionId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
+            select uuid(), memberships.club_id, ?, memberships.id, 'NO_RESPONSE', 'UNKNOWN'
+            from memberships
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and memberships.status = 'ACTIVE'
+            """.trimIndent(),
+            sessionId,
+        )
+        return sessionId
+    }
+
+    private fun updateSessionState(sessionId: String, state: String) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = ?
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            state,
+            sessionId,
+        )
     }
 
     companion object {
@@ -312,6 +437,15 @@ class PublicControllerDbTest(
               '00000000-0000-0000-0000-000000000997',
               '00000000-0000-0000-0000-000000000996'
             );
+        """
+
+        private const val CLEANUP_PUBLISH_TEST_SESSION_SQL = """
+            delete from public_session_publications
+            where session_id = '00000000-0000-0000-0000-000000009777';
+            delete from session_participants
+            where session_id = '00000000-0000-0000-0000-000000009777';
+            delete from sessions
+            where id = '00000000-0000-0000-0000-000000009777';
         """
 
         private const val INSERT_PUBLIC_OPEN_SESSION_SQL = """

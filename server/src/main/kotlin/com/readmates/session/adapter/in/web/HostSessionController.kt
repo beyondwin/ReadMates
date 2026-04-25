@@ -80,6 +80,12 @@ class HostSessionController(
         @PathVariable sessionId: String,
     ) = manageHostSessionUseCase.close(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
+    @PostMapping("/{sessionId}/publish")
+    fun publish(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+    ) = manageHostSessionUseCase.publish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,

@@ -360,6 +360,87 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host publishes closed session with member or public publication`() {
+        createSessionSeven()
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
+
+        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "공개 전환 테스트 요약입니다.",
+                  "visibility": "PUBLIC"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("PUBLISHED") }
+            jsonPath("$.publication.visibility") { value("PUBLIC") }
+        }
+
+        assertEquals("PUBLISHED", findSessionState("00000000-0000-0000-0000-000000009777"))
+        assertNotNull(findPublicationRow("00000000-0000-0000-0000-000000009777")["published_at"])
+    }
+
+    @Test
+    fun `host cannot publish open draft host only or unpublished sessions`() {
+        createSessionSeven()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "호스트 전용 요약입니다.",
+                  "visibility": "HOST_ONLY"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+    }
+
+    @Test
     fun `host close does not overwrite session state changed before close update`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
