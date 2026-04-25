@@ -237,7 +237,7 @@ git commit -m "feat: add host session close transition"
 ```
 
 Task 1 checkpoint (2026-04-25):
-- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
 - Changed files: session application ports/service/controller/support, `JdbcHostSessionWriteAdapter`, `SecurityConfig`, `HostSessionControllerDbTest`, `HostSessionCommandServiceTest`, `HostSessionBffSecurityTest`.
 - Decisions: close uses an atomic `OPEN -> CLOSED` update with zero-row re-read; `CLOSED` is idempotent, `DRAFT`/`PUBLISHED` conflict; BFF CSRF exemption mirrors `/open`.
 - Reviews: spec review passed; quality review found non-atomic update and missing BFF CSRF coverage, both fixed in `6d4a143`.
@@ -553,7 +553,7 @@ git commit -m "feat: publish finalized session records"
 ```
 
 Task 2 checkpoint (2026-04-25):
-- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
 - Changed files: session lifecycle API/service/persistence, `JdbcPublicQueryAdapter`, `SecurityConfig`, host/public/security/service tests.
 - Decisions: publish uses a conditional `CLOSED -> PUBLISHED` transition with publication existence checks; public query surfaces require `sessions.state = 'PUBLISHED'`; BFF `/publish` mirrors `/open` and `/close` CSRF handling.
 - Reviews: spec review passed; quality review passed with minor notes that MEMBER publish/idempotent publish are not directly tested and `published_at` lifecycle meaning remains legacy-compatible.
@@ -691,7 +691,7 @@ git commit -m "test: cover closed and published record surfaces"
 ```
 
 Task 3 checkpoint (2026-04-25):
-- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
 - Changed files: `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`.
 - Decisions: regression uses an isolated inserted CLOSED/PUBLIC session with a question and flips only `sessions.state` to prove archive vs notes lifecycle behavior.
 - Reviews: spec review passed; quality review passed with a minor note that `sessionId`/`questionCount` assertions could make the final notes check more explicit.
@@ -826,7 +826,7 @@ git commit -m "feat: wire host lifecycle actions"
 ```
 
 Task 4 checkpoint (2026-04-25):
-- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
 - Changed files: `host-api.ts`, `host-session-editor-data.ts`, `host-session-editor.tsx`, `host-session-editor.test.tsx`.
 - Decisions: route actions call the new server lifecycle endpoints; editor stores the full returned session snapshot so state and publication details stay in sync after close/publish.
 - Reviews: spec review passed; quality review found stale publication response merging, fixed in `89bc557`; re-review passed.
@@ -1024,7 +1024,7 @@ git commit -m "feat: clarify host publish lifecycle"
 ```
 
 Task 5 checkpoint (2026-04-25):
-- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
 - Changed files: `host-session-editor.tsx`, `host-session-editor-model.ts`, `host-session-editor.test.tsx`, `host-session-editor-model.test.ts`.
 - Decisions: lifecycle display uses local state plus returned session snapshots; publication panel owns close/publish actions; `HOST_ONLY` is blocked before lifecycle publish while save-only remains available.
 - Reviews: spec review passed; quality review found HOST_ONLY publish conflict UX, fixed in `0f84003`; re-review passed.
@@ -1096,13 +1096,13 @@ git commit -m "fix: stabilize session lifecycle publication"
 ```
 
 Task 6 checkpoint (2026-04-25):
-- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
 - Changed files: no new code changes during full verification; this checkpoint updates task status only.
 - Verification: `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed with 44 files and 498 tests; `pnpm --dir front build` passed.
-- E2E: default `pnpm --dir front test:e2e` failed before browser tests because local `readmates_e2e` has stale Flyway checksums for migrations 13 and 14. Root-cause review found this is persisted local DB state, not current code. A rerun with granted current schema `READMATES_E2E_DB_NAME=readmates_e2e_codex_20260425133321 pnpm --dir front test:e2e` passed with 18 tests.
+- E2E: default `pnpm --dir front test:e2e` failed before browser tests because the default local e2e schema had stale Flyway history. Root-cause review found this was persisted local DB state, not current code. A rerun with a granted current e2e schema override passed with 18 tests.
 - Manual smoke: session create/open, host close, current-session removal, closed public record hidden from notes/public, publish, archive visibility, notes visibility, and public detail visibility all passed against the local app; generated smoke session was deleted afterward.
-- Background resources: session-owned `bootRun` PID 56047 on port 18080 and Vite PID 56592 on port 3100 were stopped; ports 18080 and 3100 confirmed free. Existing original-workspace 8080/5173 processes were not touched.
-- Remaining risks: the default local `readmates_e2e` schema still has stale Flyway history; use a current granted e2e schema or reset that disposable DB before relying on the default e2e command.
+- Background resources: session-owned bootRun on 18080 and Vite on 3100 were stopped.
+- Remaining risks: the default e2e schema may still have stale Flyway history; use a current granted e2e schema override or reset the disposable default schema before relying on the default e2e command.
 
 ## Self-Review
 
