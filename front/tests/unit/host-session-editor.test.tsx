@@ -20,6 +20,8 @@ const retiredPersonalFeedbackReportLabel = ["개인 피드백", "리포트"].joi
 
 const jsonHeaders = () => new Headers({ "Content-Type": "application/json" });
 
+type JsonResponse<T> = Response & { json(): Promise<T> };
+
 const hostSessionEditorTestActions = {
   loadDeletionPreview: (sessionId) =>
     fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
@@ -33,6 +35,14 @@ const hostSessionEditorTestActions = {
       headers: jsonHeaders(),
       cache: "no-store",
     }),
+  closeSession: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/close`, {
+      method: "POST",
+    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
+  publishSession: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/publish`, {
+      method: "POST",
+    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
   saveSession: (sessionId, request) =>
     fetch(
       sessionId === null
@@ -638,6 +648,59 @@ describe("HostSessionEditor", () => {
     expect(location.href).toBe("");
     expect(await screen.findByRole("status")).toHaveTextContent("기록 공개 범위를 저장했습니다.");
     expect(within(publicationStatusRow as HTMLElement).getByText("멤버 공개")).toBeVisible();
+  });
+
+  it("lets hosts close an open session from the editor", async () => {
+    const user = userEvent.setup();
+    const closeSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...openSession, state: "CLOSED" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        actions={{ ...hostSessionEditorTestActions, closeSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+
+    expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
+    expect(await screen.findByText("닫힘")).toBeInTheDocument();
+  });
+
+  it("saves publication and publishes a closed record", async () => {
+    const user = userEvent.setup();
+    const closedSession = { ...session, state: "CLOSED" as const };
+    const savePublication = vi.fn(async () => new Response("{}", { status: 200 }));
+    const publishSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...closedSession, state: "PUBLISHED" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={closedSession}
+        actions={{ ...hostSessionEditorTestActions, savePublication, publishSession }}
+      />,
+    );
+
+    await user.clear(screen.getByLabelText("기록 요약"));
+    await user.type(screen.getByLabelText("기록 요약"), "최종 공개 요약입니다.");
+    await user.click(screen.getByRole("radio", { name: /외부 공개/ }));
+    await user.click(screen.getByRole("button", { name: "기록 공개" }));
+
+    expect(savePublication).toHaveBeenCalledWith(closedSession.sessionId, {
+      publicSummary: "최종 공개 요약입니다.",
+      visibility: "PUBLIC",
+    });
+    expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
+    expect((await screen.findAllByText("공개됨")).length).toBeGreaterThan(0);
   });
 
   it("disables publication editing controls while the record save is pending", async () => {
