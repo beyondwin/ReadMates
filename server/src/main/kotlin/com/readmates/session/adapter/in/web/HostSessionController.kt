@@ -74,6 +74,12 @@ class HostSessionController(
         @PathVariable sessionId: String,
     ) = manageHostSessionUseCase.open(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
+    @PostMapping("/{sessionId}/close")
+    fun close(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+    ) = manageHostSessionUseCase.close(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,
