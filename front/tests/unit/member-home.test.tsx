@@ -211,7 +211,7 @@ describe("MemberHome", () => {
     );
     expect(mobileView.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
     expect(mobileView.queryByRole("link", { name: /아카이브/ })).not.toBeInTheDocument();
-    expect(mobileView.getByRole("link", { name: /클럽 노트/ })).toHaveAttribute("href", "/app/notes");
+    expect(mobileView.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/notes");
   });
 
   it("renders the mobile session number before the days-until label", () => {

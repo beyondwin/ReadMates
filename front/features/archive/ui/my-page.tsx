@@ -295,7 +295,7 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
           </div>
         </div>
         <Link className="btn btn-quiet btn-sm" to="/app/archive?view=report">
-          전체 보기 →
+          전체 보기
         </Link>
       </div>
       {reports.length === 0 ? (
@@ -643,7 +643,7 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
         }
         right={
           <Link className="btn btn-quiet btn-sm" to="/app/archive?view=report">
-            전체 보기 →
+            전체 보기
           </Link>
         }
       />

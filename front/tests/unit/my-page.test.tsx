@@ -471,8 +471,8 @@ describe("MyPage", () => {
     expect(scoped.getByText("내가 남긴 문장")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: /모임 전에 꺼낸 질문과 초안/ })).toHaveAttribute("href", "/app/archive?view=questions");
     expect(scoped.getByRole("link", { name: /회차별로 남긴 장문 서평/ })).toHaveAttribute("href", "/app/archive?view=reviews");
-    expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
-    expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveClass("btn", "btn-quiet", "btn-sm");
+    expect(scoped.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/archive?view=report");
+    expect(scoped.getByRole("link", { name: "전체 보기" })).toHaveClass("btn", "btn-quiet", "btn-sm");
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("2025.11")).toBeInTheDocument();
     expect(scoped.getByText("2025.11.26 · 피드백 문서")).toBeInTheDocument();
@@ -536,7 +536,7 @@ describe("MyPage", () => {
     expect(scoped.queryByText("연결 안 됨")).not.toBeInTheDocument();
     expect(scoped.queryByText("라이트")).not.toBeInTheDocument();
     expect(scoped.getByText("· 전체 1개")).toBeInTheDocument();
-    expect(scoped.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
+    expect(scoped.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/archive?view=report");
     expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
     expect(scoped.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
     expect(scoped.getByRole("link", { name: reportReadLabel })).toHaveAttribute("href", "/app/feedback/session-1");
@@ -573,9 +573,9 @@ describe("MyPage", () => {
     expect(mobile.getByText("작별하지 않는다")).toBeInTheDocument();
     expect(mobile.getByText("냉정한 이타주의자")).toBeInTheDocument();
     expect(mobile.queryByText("팩트풀니스")).not.toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "전체 보기 →" })).toHaveAttribute("href", "/app/archive?view=report");
-    expect(mobile.getByRole("link", { name: "전체 보기 →" })).toHaveClass("btn", "btn-quiet", "btn-sm");
-    expect(mobile.getByRole("link", { name: "전체 보기 →" })).not.toHaveClass("m-chip");
+    expect(mobile.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/archive?view=report");
+    expect(mobile.getByRole("link", { name: "전체 보기" })).toHaveClass("btn", "btn-quiet", "btn-sm");
+    expect(mobile.getByRole("link", { name: "전체 보기" })).not.toHaveClass("m-chip");
   });
 
   it("opens a mobile feedback document from the list row and preserves my page return state", async () => {
