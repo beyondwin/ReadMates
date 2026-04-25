@@ -299,6 +299,16 @@ img { max-width: 100%; display: block; }
   border-color: var(--accent);
 }
 .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text-2);
+  border-color: var(--line-strong);
+}
+.btn-secondary:hover {
+  background: var(--bg-sub);
+  color: var(--text);
+  border-color: color-mix(in oklch, var(--locked), var(--line-strong) 55%);
+}
 .btn-ghost {
   background: transparent;
   color: var(--text);
