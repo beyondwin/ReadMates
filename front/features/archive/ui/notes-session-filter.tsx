@@ -13,6 +13,8 @@ import {
 import { Link } from "@/features/archive/ui/archive-link";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
+const mobileSessionCardWidth = "156px";
+
 export function SelectedSessionHeader({ session }: { session: NoteSessionItem | null }) {
   const sessionNumber = session ? noteSessionNumberLabel(session) : null;
   const sessionDate = session ? formatDateOnlyLabel(session.date) : null;
@@ -203,6 +205,17 @@ export function MobileSessionPicker({
   allSessionsButtonRef: RefObject<HTMLButtonElement | null>;
 }) {
   const recentSessions = mobileRecentSessions(noteSessions, selectedSessionId);
+  const mobileSessionRailRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedSessionId) {
+      return;
+    }
+
+    const selectedSessionLink = mobileSessionRailRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+
+    selectedSessionLink?.scrollIntoView?.({ block: "nearest", inline: "start" });
+  }, [selectedSessionId, recentSessions.length]);
 
   return (
     <div className="mobile-only rm-notes-feed-page__mobile-picker">
@@ -215,7 +228,16 @@ export function MobileSessionPicker({
       {noteSessions.length === 0 ? (
         <SelectorEmptyState />
       ) : (
-        <div className="m-hscroll" style={{ padding: "0 0 6px", gap: "10px" }} aria-label="최근 세션">
+        <div
+          ref={mobileSessionRailRef}
+          className="m-hscroll"
+          style={{
+            padding: "0 0 6px",
+            gap: "10px",
+            scrollPaddingInline: 0,
+          }}
+          aria-label="최근 세션"
+        >
           {recentSessions.map((session) => {
             const selected = session.sessionId === selectedSessionId;
 
@@ -226,11 +248,12 @@ export function MobileSessionPicker({
                 aria-current={selected ? "page" : undefined}
                 aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 세션 보기`}
                 style={{
-                  minWidth: "156px",
+                  width: mobileSessionCardWidth,
                   padding: "12px",
                   border: `1px solid ${selected ? "var(--accent-line)" : "var(--line)"}`,
                   borderRadius: "var(--r-2)",
                   background: selected ? "var(--accent-soft)" : "var(--bg-raised)",
+                  scrollSnapAlign: "start",
                 }}
               >
                 <div className="row-between">
