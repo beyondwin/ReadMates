@@ -286,7 +286,7 @@ function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: Member
       <div className="rm-mobile-shortcuts">
         {upcomingSessions.slice(0, 4).map((session) => (
           <div key={session.sessionId} className="m-card-quiet">
-            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} />
+            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} tone="muted" />
             <span className="body editorial" style={{ display: "block", fontSize: 13.5, marginTop: 6 }}>
               {session.bookTitle}
             </span>
@@ -311,7 +311,7 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
           <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
             {upcomingSessions.slice(0, 3).map((session) => (
               <div key={session.sessionId}>
-                <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} />
+                <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} tone="muted" />
                 <div className="body editorial" style={{ fontSize: "15px", marginTop: 4 }}>
                   {session.bookTitle}
                 </div>

@@ -40,6 +40,20 @@ describe("SessionIdentity", () => {
     expect(screen.getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
   });
 
+  it("can render compact session timing in muted tone", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 22, 0, 0, 0));
+
+    render(<SessionTimingIdentity sessionNumber={8} date="2026-05-13" tone="muted" />);
+
+    expect(screen.getByLabelText("No.08 · D-21")).toBeVisible();
+    expect(screen.getByLabelText("No.08 · D-21")).toHaveClass("rm-session-identity--muted");
+    expect(screen.getByText("No.08")).toHaveClass("rm-session-identity__chip");
+    expect(screen.getByText("No.08")).not.toHaveClass("rm-session-identity__number", "rm-state", "rm-state--pending");
+    expect(screen.getByText("D-21")).toHaveClass("rm-session-identity__chip");
+    expect(screen.getByText("D-21")).not.toHaveClass("rm-state", "rm-state--pending");
+  });
+
   it("labels the open current session with d-day", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 22, 0, 0, 0));

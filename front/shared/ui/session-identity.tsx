@@ -14,6 +14,7 @@ type SessionTimingIdentityProps = {
   date: string;
   phaseLabel?: string;
   compact?: boolean;
+  tone?: "pending" | "muted";
 };
 
 function padSessionNumber(value: number) {
@@ -91,18 +92,36 @@ export function SessionIdentity({
   );
 }
 
-export function SessionTimingIdentity({ sessionNumber, date, phaseLabel: phase, compact = true }: SessionTimingIdentityProps) {
+export function SessionTimingIdentity({
+  sessionNumber,
+  date,
+  phaseLabel: phase,
+  compact = true,
+  tone = "pending",
+}: SessionTimingIdentityProps) {
   const number = `No.${padSessionNumber(sessionNumber)}`;
   const dday = ddayLabel(date);
+  const toneClass = tone === "muted" ? "" : "rm-state rm-state--pending";
+  const numberClass =
+    tone === "muted"
+      ? "rm-session-identity__chip"
+      : `rm-session-identity__number rm-session-identity__chip ${toneClass}`;
   const items = [
-    { value: number, className: "rm-session-identity__number rm-session-identity__chip rm-state rm-state--pending" },
-    dday ? { value: dday, className: "rm-session-identity__chip rm-state rm-state--pending" } : null,
+    { value: number, className: numberClass },
+    dday ? { value: dday, className: `rm-session-identity__chip ${toneClass}` } : null,
     phase ? { value: phase, className: "rm-session-identity__chip" } : null,
   ].filter((item): item is { value: string; className: string } => Boolean(item));
+  const className = [
+    "rm-session-identity",
+    compact ? "rm-session-identity--compact" : null,
+    tone === "muted" ? "rm-session-identity--muted" : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div
-      className={compact ? "rm-session-identity rm-session-identity--compact" : "rm-session-identity"}
+      className={className}
       role="group"
       aria-label={items.map((item) => item.value).join(" · ")}
     >

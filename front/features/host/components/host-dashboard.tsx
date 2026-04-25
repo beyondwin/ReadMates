@@ -599,7 +599,7 @@ function UpcomingSessionRow({
       style={{ gap: 12, padding: "14px 16px", borderTop: showSeparator ? "1px solid var(--line-soft)" : undefined }}
     >
       <div style={{ minWidth: 0 }}>
-        <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} />
+        <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} tone="muted" />
         <div className="body editorial" style={{ marginTop: 6, fontSize: 16 }}>
           {session.bookTitle}
         </div>
@@ -955,7 +955,7 @@ function UpcomingSessionMobileCard({
 
   return (
     <div className="m-card-quiet">
-      <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} />
+      <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} tone="muted" />
       <div className="body editorial" style={{ marginTop: 6 }}>
         {session.bookTitle}
       </div>
