@@ -841,7 +841,7 @@ Task 4 checkpoint (2026-04-25):
 - Modify `front/features/host/model/host-session-editor-model.ts`
 - Test: `front/tests/unit/host-session-editor.test.tsx`
 
-- [ ] **Step 1: Add local lifecycle state**
+- [x] **Step 1: Add local lifecycle state**
 
 In `HostSessionEditor`, add state near existing local state:
 
@@ -852,7 +852,7 @@ const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" |
 
 Replace display reads of `session.state` with `sessionState` for badges and lifecycle controls. Do not mutate `session`.
 
-- [ ] **Step 2: Add close handler**
+- [x] **Step 2: Add close handler**
 
 Add:
 
@@ -882,7 +882,7 @@ const closeSession = async () => {
 };
 ```
 
-- [ ] **Step 3: Add publish handler**
+- [x] **Step 3: Add publish handler**
 
 Add:
 
@@ -945,7 +945,7 @@ const publishRecord = async () => {
 };
 ```
 
-- [ ] **Step 4: Add buttons and copy**
+- [x] **Step 4: Add buttons and copy**
 
 In the header/status area, keep the state badge but use `sessionState`.
 
@@ -992,7 +992,7 @@ const publicationLifecycleHelp =
 
 Render that helper near `publication-summary-help`.
 
-- [ ] **Step 5: Keep labels clear**
+- [x] **Step 5: Keep labels clear**
 
 In `host-session-editor-model.ts`, change `recordVisibilityDescription("PUBLIC")` to:
 
@@ -1006,7 +1006,7 @@ Change `recordVisibilityDescription("MEMBER")` to:
 return "기록 공개를 완료하면 멤버 앱 안에서만 볼 수 있습니다.";
 ```
 
-- [ ] **Step 6: Run frontend editor tests**
+- [x] **Step 6: Run frontend editor tests**
 
 Run:
 
@@ -1016,12 +1016,21 @@ pnpm --dir front test -- host-session-editor.test.tsx host-session-editor-model.
 
 Expected: pass.
 
-- [ ] **Step 7: Commit Task 5**
+- [x] **Step 7: Commit Task 5**
 
 ```bash
 git add front/features/host/components/host-session-editor.tsx front/features/host/model/host-session-editor-model.ts front/tests/unit/host-session-editor.test.tsx front/tests/unit/host-session-editor-model.test.ts
 git commit -m "feat: clarify host publish lifecycle"
 ```
+
+Task 5 checkpoint (2026-04-25):
+- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Changed files: `host-session-editor.tsx`, `host-session-editor-model.ts`, `host-session-editor.test.tsx`, `host-session-editor-model.test.ts`.
+- Decisions: lifecycle display uses local state plus returned session snapshots; publication panel owns close/publish actions; `HOST_ONLY` is blocked before lifecycle publish while save-only remains available.
+- Reviews: spec review passed; quality review found HOST_ONLY publish conflict UX, fixed in `0f84003`; re-review passed.
+- Verification: `pnpm --dir front test -- host-session-editor.test.tsx host-session-editor-model.test.ts` passed; `pnpm --dir front lint` passed.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 5 agents were closed.
+- Remaining risks/next task notes: run full server and frontend verification; because server auth/BFF lifecycle endpoints changed, run e2e as requested.
 
 ## Task 6: Full Verification
 
