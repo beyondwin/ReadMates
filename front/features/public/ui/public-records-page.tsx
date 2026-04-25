@@ -20,16 +20,21 @@ function PublicRecordIndexRow({ session }: { session: PublicSessionListItemView 
     >
       <BookCover title={display.title} author={display.author} imageUrl={session.bookImageUrl} width={72} />
       <span className="public-record-index-row__body">
-        <span className="mono tiny">No.{session.sessionNumber} · {display.date}</span>
+        <span className="mono tiny public-record-index-row__meta" aria-label={`No.${session.sessionNumber} · ${display.date}`}>
+          <span>No.{session.sessionNumber}</span>
+          <span aria-hidden="true">·</span>
+          <span>{display.date}</span>
+        </span>
+        <span className="public-archive-row__counts public-record-index-row__counts">
+          <span>하이라이트 {display.highlightCount}</span>
+          <span aria-hidden="true">·</span>
+          <span>한줄평 {display.oneLinerCount}</span>
+        </span>
         <span className="editorial public-record-index-row__title">{display.title}</span>
-        <span className="small" style={{ color: "var(--text-2)" }}>
+        <span className="small public-record-index-row__author" style={{ color: "var(--text-2)" }}>
           {display.author}
         </span>
         <span className="body public-record-index-row__summary">{display.summary}</span>
-      </span>
-      <span className="public-archive-row__counts">
-        <span>하이라이트 {display.highlightCount}</span>
-        <span>한줄평 {display.oneLinerCount}</span>
       </span>
     </Link>
   );
@@ -61,13 +66,13 @@ export default function PublicRecordsPage({
             기록 아카이브
           </div>
           <h1 className="h1 editorial" style={{ margin: 0 }}>
-            {display.showsRecentSubset ? "최근 공개 기록" : "공개 기록"}
+            공개 기록
           </h1>
           <p className="body-lg" style={{ color: "var(--text-2)", marginTop: 16, maxWidth: 620 }}>
             {headerDescription}
           </p>
           <p className="body" style={{ color: "var(--text-2)", marginTop: 12, maxWidth: 620 }}>
-            공개 기록은 누구나 읽을 수 있고, 참여는 초대받은 멤버에게만 열려 있습니다.
+            공개 기록은 누구나 읽을 수 있고, 모임 참여는 초대받은 멤버에게만 열려 있습니다.
           </p>
         </div>
       </section>
@@ -75,21 +80,12 @@ export default function PublicRecordsPage({
       <section className="public-section">
         <div className="container container-sm">
           <div className="row-between public-section-head">
-            <div>
-              <div className="eyebrow" style={{ marginBottom: 8 }}>
-                공개 기록
-              </div>
-              <h2 className="h2 editorial" style={{ margin: 0 }}>
-                {display.showsRecentSubset ? "최근 발행된 순서대로" : "발행된 순서대로"}
+            <div className="small" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h2 className="small" style={{ margin: 0 }}>
+                발행된 기록
               </h2>
-            </div>
-            <div className="small">
-              {display.countLabel}
-              {display.showsRecentSubset ? (
-                <span style={{ display: "block", marginTop: 4, color: "var(--text-3)" }}>
-                  전체 공개 모임 {display.publicSessionCount}회 중 공개된 최근 기록
-                </span>
-              ) : null}
+              <span aria-hidden="true">·</span>
+              <span>{display.countLabel}</span>
             </div>
           </div>
 
