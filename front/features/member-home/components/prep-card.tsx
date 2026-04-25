@@ -3,6 +3,7 @@ import type { MemberHomeCurrentSessionResponse as CurrentSessionResponse } from 
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 
@@ -37,30 +38,6 @@ function prepStepsFor(session: CurrentSession) {
       done: false,
     },
   ];
-}
-
-function daysUntilPhrase(dateValue: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
-
-  if (!match) {
-    return "일정 미정";
-  }
-
-  const [, year, month, day] = match;
-  const target = new Date(Number(year), Number(month) - 1, Number(day));
-  const today = new Date();
-  const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const diffDays = Math.round((target.getTime() - normalizedToday.getTime()) / 86_400_000);
-
-  if (diffDays === 0) {
-    return "D-day";
-  }
-
-  if (diffDays > 0) {
-    return `D-${diffDays}`;
-  }
-
-  return `D+${Math.abs(diffDays)}`;
 }
 
 export function PrepCard({
@@ -98,7 +75,6 @@ export function PrepCard({
   const dateLabel = formatDateLabel(session.date, "일정 미정");
   const deadlineLabel = formatDeadlineLabel(session.questionDeadlineAt, "마감 미정");
   const locationLabel = displayText(session.locationLabel, "장소 미정");
-  const sessionTimingLabel = daysUntilPhrase(session.date);
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
   const prepSteps = prepStepsFor(session);
   const attendees = activeAttendees(session);
@@ -120,9 +96,7 @@ export function PrepCard({
           />
           <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
             <div className="rm-prep-card__meta-line">
-              <p className="eyebrow" style={{ margin: 0 }}>
-                No.{String(session.sessionNumber).padStart(2, "0")} · {sessionTimingLabel}
-              </p>
+              <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
             </div>
             <h2 className="h3 editorial rm-prep-card__title">{bookTitle}</h2>
             <p className="small" style={{ margin: "2px 0 0" }}>

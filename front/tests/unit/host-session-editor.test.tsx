@@ -186,11 +186,31 @@ describe("HostSessionEditor", () => {
   });
 
   it("labels existing open session as current session editing", () => {
-    render(<HostSessionEditorForTest session={openSession} />);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 2));
+
+    const currentOpenSession = {
+      ...openSession,
+      date: "2026-05-20",
+    };
+
+    render(<HostSessionEditorForTest session={currentOpenSession} />);
 
     expect(screen.getByRole("heading", { name: "이번 세션 편집" })).toBeVisible();
-    expect(screen.getByText("No.07")).toBeVisible();
-    expect(screen.getByText("이번 세션")).toBeVisible();
+    expect(screen.getByText("세션 운영 문서")).toBeVisible();
+    expect(screen.queryByText("세션 운영 문서 · No.7")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "No.07 · D-18 · 이번 세션" })).toBeVisible();
+    expect(screen.getByText("No.07")).toHaveClass(
+      "rm-session-identity__number",
+      "rm-session-identity__chip",
+      "rm-state",
+      "rm-state--pending",
+    );
+    expect(screen.getByText("D-18")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    expect(screen.getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
+    expect(screen.queryByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-18/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("No.07 · D-18")).not.toBeInTheDocument();
+    expect(screen.queryByText("준비 중")).not.toBeInTheDocument();
     expect(screen.getByText("세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
   });
 

@@ -397,10 +397,19 @@ describe("HostDashboard", () => {
 
     expect(desktop.getAllByText("예정 세션").length).toBeGreaterThan(0);
     expect(desktop.getByText("다음 책")).toBeInTheDocument();
-    expect(desktop.getByRole("button", { name: /멤버 공개/ })).toBeInTheDocument();
+    const desktopUpcomingRow = desktop.getByText("다음 책").closest(".row-between");
+    expect(desktopUpcomingRow).not.toBeNull();
+    expect(within(desktopUpcomingRow as HTMLElement).getByText("공개 범위")).toBeInTheDocument();
+    expect(within(desktopUpcomingRow as HTMLElement).getByText("비공개")).toBeInTheDocument();
+    expect(within(desktopUpcomingRow as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("공개");
     expect(desktop.getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
     expect(mobile.getAllByText("예정 세션").length).toBeGreaterThan(0);
     expect(mobile.getByText("다음 책")).toBeInTheDocument();
+    const mobileUpcomingCard = mobile.getByText("다음 책").closest(".m-card-quiet");
+    expect(mobileUpcomingCard).not.toBeNull();
+    expect(within(mobileUpcomingCard as HTMLElement).getByText("공개 범위")).toBeInTheDocument();
+    expect(within(mobileUpcomingCard as HTMLElement).getByText("비공개")).toBeInTheDocument();
+    expect(within(mobileUpcomingCard as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("공개");
   });
 
   it("calls visibility and open actions from upcoming session rows", async () => {
@@ -941,7 +950,7 @@ describe("HostDashboard", () => {
       cursor = next;
     }
 
-    expect(mobile.getByText("No.07 · D-3")).toBeInTheDocument();
+    expect(mobile.getByRole("group", { name: "No.07 · D-3 · 이번 세션" })).toBeInTheDocument();
     expect(mobile.queryByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).not.toBeInTheDocument();
     expect(mobile.getByText("2026.05.20 · 20:00")).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
@@ -979,7 +988,7 @@ describe("HostDashboard", () => {
 
     expect(desktop.getByText("김호스트")).toBeInTheDocument();
     expect(desktop.getByText("안멤버1")).toBeInTheDocument();
-    expect(desktop.getByText("No.07 · D-3")).toBeInTheDocument();
+    expect(desktop.getByRole("group", { name: "No.07 · D-3 · 이번 세션" })).toBeInTheDocument();
     expect(desktop.queryByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).not.toBeInTheDocument();
     expect(desktop.getByText("2026.05.20 20:00 · 온라인")).toBeInTheDocument();
     expect(desktop.getByText("질문").parentElement).toHaveTextContent("2/10");

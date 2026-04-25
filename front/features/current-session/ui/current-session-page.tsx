@@ -41,7 +41,8 @@ import {
   type CurrentSessionBoardTab,
 } from "@/features/current-session/model/current-session-view-model";
 import { BookCover } from "@/shared/ui/book-cover";
-import { formatDateLabel, formatDeadlineLabel, formatSessionKicker, rsvpLabel } from "@/shared/ui/readmates-display";
+import { formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 const emptySaveStatuses: Record<SaveScope, SaveState> = {
   rsvp: "idle",
@@ -377,9 +378,7 @@ export function CurrentSessionBoard({
               <div className="row" style={{ alignItems: "flex-start", gap: "16px", minWidth: 0 }}>
                 <BookCover title={session.bookTitle} author={session.bookAuthor} imageUrl={session.bookImageUrl} width={72} />
                 <div style={{ minWidth: 0 }}>
-                  <p className="eyebrow" style={{ margin: 0 }}>
-                    {formatSessionKicker(session.sessionNumber, session.date)}
-                  </p>
+                  <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
                   <h1 className="h1 editorial" style={{ margin: "8px 0 4px" }}>
                     {session.bookTitle}
                   </h1>

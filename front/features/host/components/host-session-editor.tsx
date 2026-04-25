@@ -32,7 +32,7 @@ import {
   type SessionRecordVisibility,
 } from "@/features/host/model/host-session-editor-model";
 import { BookCover } from "@/shared/ui/book-cover";
-import { SessionIdentity } from "@/shared/ui/session-identity";
+import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 import {
   hostDashboardReturnTarget,
   readmatesReturnState,
@@ -504,19 +504,13 @@ export default function HostSessionEditor({
                   {returnTarget.label}
                 </Link>
               ) : null}
-              <div className="eyebrow">세션 운영 문서 · {isNewSession ? "새 세션" : `No.${session.sessionNumber}`}</div>
+              <div className="eyebrow">세션 운영 문서</div>
               <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
                 {editorTitle}
               </h1>
               <div style={{ marginTop: "10px" }}>
                 {session ? (
-                  <SessionIdentity
-                    sessionNumber={session.sessionNumber}
-                    state={session.state}
-                    date={session.date}
-                    published={session.publication?.visibility === "PUBLIC"}
-                    feedbackDocumentAvailable={session.feedbackDocument.uploaded}
-                  />
+                  <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
                 ) : (
                   <div className="rm-session-identity">
                     <span className="rm-session-identity__chip">새 예정 세션</span>
