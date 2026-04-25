@@ -119,6 +119,29 @@
   max-width: 620px;
 }
 
+.rm-host-dashboard-desktop__summary {
+  padding: 8px 0 20px;
+}
+
+.rm-host-invitations-content {
+  padding: 8px 0 80px;
+}
+
+.rm-host-members-page__body {
+  padding-top: 8px;
+  padding-bottom: 72px;
+}
+
+@media (max-width: 768px) {
+  .rm-host-invitations-content {
+    padding-top: 36px;
+  }
+
+  .rm-host-members-page__body {
+    padding-top: 24px;
+  }
+}
+
 .rm-skeleton-line,
 .rm-skeleton-block,
 .rm-skeleton-dot {

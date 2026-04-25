@@ -276,7 +276,7 @@ export default function HostInvitations({
         </div>
       </section>
 
-      <section style={{ padding: "36px 0 80px" }}>
+      <section className="rm-host-invitations-content">
         <div className="container">
           <section
             className="rm-document-panel"

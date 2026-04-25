@@ -290,7 +290,7 @@ export default function HostDashboard({
           </div>
         </section>
 
-        <section style={{ padding: "36px 0 20px" }}>
+        <section className="rm-host-dashboard-desktop__summary">
           <div className="container">
             <SectionHeader eyebrow={HOST_DASHBOARD_LABELS.attention} title="운영 상태 요약" />
             {missingMembers ? (
