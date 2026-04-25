@@ -20,6 +20,7 @@
 | Spring Boot API와 Caddy 운영 | [oci-backend.md](oci-backend.md) |
 | OCI MySQL HeatWave와 백업 참고 | [oci-mysql-heatwave.md](oci-mysql-heatwave.md) |
 | 공개 저장소 보안과 공개 릴리즈 후보 검증 | [security-public-repo.md](security-public-repo.md) |
+| 2026-04-25 프론트/서버 배포 불일치 리포트 | [2026-04-25-production-version-skew-report.md](2026-04-25-production-version-skew-report.md) |
 
 ## 배포 형태
 
