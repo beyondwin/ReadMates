@@ -42,6 +42,7 @@ const HOST_DASHBOARD_LABELS = {
   memberStatus: "멤버 참여",
   publishFeedback: "공개 · 피드백",
   invitePipeline: "멤버 초대 관리",
+  nextActionSection: "우선 처리할 일",
   nextAction: "다음 운영 액션",
   quickActions: "운영 액션 목록",
 } as const;
@@ -737,7 +738,7 @@ function MobileHostDashboard({
 
       <section className="m-sec">
         <div className="eyebrow" style={{ marginBottom: 10 }}>
-          {HOST_DASHBOARD_LABELS.nextAction}
+          {HOST_DASHBOARD_LABELS.nextActionSection}
         </div>
         <NextActionCard action={nextAction} mobile />
       </section>
