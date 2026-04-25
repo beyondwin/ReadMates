@@ -20,6 +20,8 @@ const retiredPersonalFeedbackReportLabel = ["개인 피드백", "리포트"].joi
 
 const jsonHeaders = () => new Headers({ "Content-Type": "application/json" });
 
+type JsonResponse<T> = Response & { json(): Promise<T> };
+
 const hostSessionEditorTestActions = {
   loadDeletionPreview: (sessionId) =>
     fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
@@ -33,6 +35,14 @@ const hostSessionEditorTestActions = {
       headers: jsonHeaders(),
       cache: "no-store",
     }),
+  closeSession: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/close`, {
+      method: "POST",
+    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
+  publishSession: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/publish`, {
+      method: "POST",
+    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
   saveSession: (sessionId, request) =>
     fetch(
       sessionId === null
@@ -199,18 +209,13 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
     expect(screen.getByText("세션 운영 문서")).toBeVisible();
     expect(screen.queryByText("세션 운영 문서 · No.7")).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "No.07 · D-18 · 이번 세션" })).toBeVisible();
-    expect(screen.getByText("No.07")).toHaveClass(
-      "rm-session-identity__number",
-      "rm-session-identity__chip",
-      "rm-state",
-      "rm-state--pending",
-    );
+    expect(screen.getByRole("group", { name: "No.07 · 이번 세션 · 준비 중 · D-18 · 문서 있음" })).toBeVisible();
+    expect(screen.getByText("No.07")).toHaveClass("rm-session-identity__number");
+    expect(screen.getByText("준비 중")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
     expect(screen.getByText("D-18")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
     expect(screen.getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
-    expect(screen.queryByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-18/ })).not.toBeInTheDocument();
+    expect(screen.getByText("문서 있음")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--success");
     expect(screen.queryByText("No.07 · D-18")).not.toBeInTheDocument();
-    expect(screen.queryByText("준비 중")).not.toBeInTheDocument();
     expect(screen.getByText("세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
   });
 
@@ -628,6 +633,41 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("button", { name: "공개 기록 발행" })).not.toBeInTheDocument();
   });
 
+  it("does not label closed public-visibility records as published before lifecycle publish", () => {
+    render(
+      <HostSessionEditorForTest
+        session={{
+          ...session,
+          state: "CLOSED",
+          publication: {
+            publicSummary: "저장된 외부 공개 요약입니다.",
+            visibility: "PUBLIC",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 정리 중/ })).toBeVisible();
+    expect(screen.queryByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).not.toBeInTheDocument();
+  });
+
+  it("labels published member-visibility records as published in the session identity", () => {
+    render(
+      <HostSessionEditorForTest
+        session={{
+          ...session,
+          state: "PUBLISHED",
+          publication: {
+            publicSummary: "멤버에게 공개된 기록입니다.",
+            visibility: "MEMBER",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).toBeVisible();
+  });
+
   it("saves publication summary and record visibility through the publication API without redirecting", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     const location = { href: "" };
@@ -658,6 +698,103 @@ describe("HostSessionEditor", () => {
     expect(location.href).toBe("");
     expect(await screen.findByRole("status")).toHaveTextContent("기록 공개 범위를 저장했습니다.");
     expect(within(publicationStatusRow as HTMLElement).getByText("멤버 공개")).toBeVisible();
+  });
+
+  it("lets hosts close an open session from the editor", async () => {
+    const user = userEvent.setup();
+    const closedSession = { ...openSession, state: "CLOSED" as const };
+    const closeSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify(closedSession), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        actions={{ ...hostSessionEditorTestActions, closeSession }}
+      />,
+    );
+
+    expect(screen.getByText("진행 중인 세션은 먼저 마감한 뒤 기록 공개를 완료할 수 있습니다.")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+
+    expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
+    expect(await screen.findByText("닫힘")).toBeInTheDocument();
+    expect(screen.getByText("요약과 공개 대상을 확인한 뒤 기록 공개를 완료하세요.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
+  });
+
+  it("saves publication and publishes a closed record", async () => {
+    const user = userEvent.setup();
+    const closedSession = { ...session, state: "CLOSED" as const, publication: null };
+    const savePublication = vi.fn(async () => new Response("{}", { status: 200 }));
+    const publishSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({
+          ...closedSession,
+          state: "PUBLISHED",
+          publication: {
+            publicSummary: "최종 공개 요약입니다.",
+            visibility: "PUBLIC",
+          },
+        }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={closedSession}
+        actions={{ ...hostSessionEditorTestActions, savePublication, publishSession }}
+      />,
+    );
+
+    expect(screen.getByText("요약과 공개 대상을 확인한 뒤 기록 공개를 완료하세요.")).toBeVisible();
+    await user.clear(screen.getByLabelText("기록 요약"));
+    await user.type(screen.getByLabelText("기록 요약"), "최종 공개 요약입니다.");
+    await user.click(screen.getByRole("radio", { name: /외부 공개/ }));
+    await user.click(screen.getByRole("button", { name: "기록 공개" }));
+
+    expect(savePublication).toHaveBeenCalledWith(closedSession.sessionId, {
+      publicSummary: "최종 공개 요약입니다.",
+      visibility: "PUBLIC",
+    });
+    expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
+    expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).toBeVisible();
+    expect(screen.getByText("공개된 기록입니다. 공개 대상은 저장 버튼으로 변경할 수 있습니다.")).toBeVisible();
+    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(await screen.findByRole("status")).toHaveTextContent("외부 공개가 완료되었습니다.");
+  });
+
+  it("blocks publishing a closed record when host-only visibility is selected", async () => {
+    const user = userEvent.setup();
+    const closedSession = { ...session, state: "CLOSED" as const, publication: null };
+    const savePublication = vi.fn(async () => new Response("{}", { status: 200 }));
+    const publishSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...closedSession, state: "PUBLISHED" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={closedSession}
+        actions={{ ...hostSessionEditorTestActions, savePublication, publishSession }}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("기록 요약"), "호스트만 볼 수 있는 기록입니다.");
+    expect(screen.getByRole("radio", { name: /호스트 전용/ })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "기록 공개" }));
+
+    expect(savePublication).not.toHaveBeenCalled();
+    expect(publishSession).not.toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "기록 공개 전 멤버 공개 또는 외부 공개를 선택해 주세요.",
+    );
   });
 
   it("disables publication editing controls while the record save is pending", async () => {

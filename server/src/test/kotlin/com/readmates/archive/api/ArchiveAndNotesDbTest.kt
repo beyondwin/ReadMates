@@ -266,6 +266,45 @@ class ArchiveAndNotesDbTest(
         }
     }
 
+    @Test
+    fun `closed public session appears in archive but not notes until published`() {
+        val sessionId = insertClosedPublicSessionWithQuestion(number = 91)
+
+        try {
+            mockMvc.get("/api/archive/sessions") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$[*].sessionNumber") { value(hasItem(91)) }
+            }
+
+            mockMvc.get("/api/notes/sessions") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$[*].sessionNumber") { value(not(hasItem(91))) }
+            }
+
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'PUBLISHED'
+                where id = ?
+                """.trimIndent(),
+                sessionId,
+            )
+
+            mockMvc.get("/api/notes/sessions") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$[*].sessionNumber") { value(hasItem(91)) }
+            }
+        } finally {
+            cleanupClosedPublicSessionWithQuestion(sessionId)
+        }
+    }
+
     private fun insertHostOnlyPublishedSessionWithOneLine(number: Int) {
         jdbcTemplate.update(
             """
@@ -305,6 +344,64 @@ class ArchiveAndNotesDbTest(
             HOST_ONLY_PUBLISHED_NOTE_SESSION_ID,
             HOST_ONLY_PUBLISHED_NOTE_TEXT,
         )
+    }
+
+    private fun insertClosedPublicSessionWithQuestion(number: Int): String {
+        val sessionId = "00000000-0000-0000-0000-000000009091"
+        cleanupClosedPublicSessionWithQuestion(sessionId)
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator,
+              book_link, book_image_url, session_date, start_time, end_time,
+              location_label, meeting_url, meeting_passcode, question_deadline_at,
+              state, visibility
+            )
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
+              null, null, null, '2026-10-21', '20:00:00', '22:00:00',
+              '온라인', null, null, '2026-10-20 14:59:00.000000', 'CLOSED', 'PUBLIC')
+            """.trimIndent(),
+            sessionId,
+            number,
+            "${number}회차 · 닫힌 공개 테스트",
+            "닫힌 공개 테스트 책",
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status
+            )
+            values ('00000000-0000-0000-0000-000000009191', '00000000-0000-0000-0000-000000000001', ?,
+              '00000000-0000-0000-0000-000000000202', 'GOING', 'ATTENDED', 'ACTIVE')
+            """.trimIndent(),
+            sessionId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, published_at
+            )
+            values ('00000000-0000-0000-0000-000000009291', '00000000-0000-0000-0000-000000000001', ?,
+              '닫힌 공개 테스트 요약입니다.', true, 'PUBLIC', utc_timestamp(6))
+            """.trimIndent(),
+            sessionId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into questions (id, club_id, session_id, membership_id, priority, text, draft_thought)
+            values ('00000000-0000-0000-0000-000000009391', '00000000-0000-0000-0000-000000000001', ?,
+              '00000000-0000-0000-0000-000000000202', 1, '닫힌 공개 테스트 질문입니다.', null)
+            """.trimIndent(),
+            sessionId,
+        )
+        return sessionId
+    }
+
+    private fun cleanupClosedPublicSessionWithQuestion(sessionId: String) {
+        jdbcTemplate.update("delete from questions where session_id = ?", sessionId)
+        jdbcTemplate.update("delete from session_participants where session_id = ?", sessionId)
+        jdbcTemplate.update("delete from public_session_publications where session_id = ?", sessionId)
+        jdbcTemplate.update("delete from sessions where id = ?", sessionId)
     }
 
     @Test

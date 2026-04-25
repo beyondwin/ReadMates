@@ -110,7 +110,7 @@ describe("MemberSessionDetailPage", () => {
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(desktop.getByText("아카이브 세션 · No.01 · 2025.11.26")).toBeInTheDocument();
-    expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
+    expect(desktop.getByRole("group", { name: "No.01 · 지난 회차 · 정리 중 · 문서 있음" })).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
     const returnLink = desktop.getByRole("link", { name: "아카이브로 돌아가기" });
     expect(returnLink).toHaveAttribute("href", "/app/archive?view=sessions");
@@ -137,7 +137,7 @@ describe("MemberSessionDetailPage", () => {
     expect(mobile.getByText("팩트풀니스")).toBeInTheDocument();
     expect(mobile.getByText(/한스 로슬링/)).toBeInTheDocument();
     expect(mobile.getByText("No.01 · 2025.11.26")).toBeInTheDocument();
-    expect(mobile.getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
+    expect(mobile.getByRole("group", { name: "No.01 · 지난 회차 · 정리 중 · 문서 있음" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "질문" })).toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "피드백" })).not.toBeInTheDocument();
@@ -174,6 +174,29 @@ describe("MemberSessionDetailPage", () => {
       expect(scope.queryByRole("link", { name: "피드백 문서 열기" })).not.toBeInTheDocument();
       expect(scope.queryByRole("link", { name: "PDF 저장" })).not.toBeInTheDocument();
     }
+  });
+
+  it("does not label closed sessions with saved summaries as published", () => {
+    const { container } = renderDetail({
+      ...readableSession,
+      state: "CLOSED",
+      publicSummary: "멤버에게 보일 요약은 있지만 아직 공개 완료 전입니다.",
+    });
+
+    expect(getDesktop(container).getByRole("group", { name: "No.01 · 지난 회차 · 정리 중 · 문서 있음" })).toBeInTheDocument();
+    expect(getMobile(container).getByRole("group", { name: "No.01 · 지난 회차 · 정리 중 · 문서 있음" })).toBeInTheDocument();
+    expect(container).not.toHaveTextContent("공개됨");
+  });
+
+  it("labels published member sessions with saved summaries as published", () => {
+    const { container } = renderDetail({
+      ...readableSession,
+      state: "PUBLISHED",
+      publicSummary: "멤버에게 공개된 최종 기록입니다.",
+    });
+
+    expect(getDesktop(container).getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
+    expect(getMobile(container).getByRole("group", { name: "No.01 · 지난 회차 · 공개됨 · 문서 있음" })).toBeInTheDocument();
   });
 
   it("does not render the archive return link above the session detail", async () => {

@@ -69,7 +69,7 @@
 - Modify `server/src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`
 
-- [ ] **Step 1: Add failing controller tests for close transitions**
+- [x] **Step 1: Add failing controller tests for close transitions**
 
 Add these tests near the existing open transition tests in `HostSessionControllerDbTest.kt`:
 
@@ -126,7 +126,7 @@ fun `host cannot close draft or published session`() {
 }
 ```
 
-- [ ] **Step 2: Run the failing close tests**
+- [x] **Step 2: Run the failing close tests**
 
 Run:
 
@@ -136,7 +136,7 @@ Run:
 
 Expected: tests fail because `/close` does not exist.
 
-- [ ] **Step 3: Add close use-case signatures**
+- [x] **Step 3: Add close use-case signatures**
 
 In `SessionApplicationSupport.kt`, add:
 
@@ -163,7 +163,7 @@ In `HostSessionCommandService.kt`, add:
 override fun close(command: HostSessionIdCommand) = port.close(command)
 ```
 
-- [ ] **Step 4: Add the close route**
+- [x] **Step 4: Add the close route**
 
 In `HostSessionController.kt`, add:
 
@@ -175,7 +175,7 @@ fun close(
 ) = manageHostSessionUseCase.close(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 ```
 
-- [ ] **Step 5: Implement close persistence**
+- [x] **Step 5: Implement close persistence**
 
 In `JdbcHostSessionWriteAdapter.kt`, import the new exception and add:
 
@@ -219,7 +219,7 @@ override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
 }
 ```
 
-- [ ] **Step 6: Run close tests**
+- [x] **Step 6: Run close tests**
 
 Run:
 
@@ -229,12 +229,21 @@ Run:
 
 Expected: close tests pass. If conflicts are not mapped to HTTP 409, find the existing session exception handler by running `rg "HostSessionOpenNotAllowedException|OpenSessionAlreadyExistsException" server/src/main/kotlin` and add the new exception to the same mapping.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/session server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt
 git commit -m "feat: add host session close transition"
 ```
+
+Task 1 checkpoint (2026-04-25):
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
+- Changed files: session application ports/service/controller/support, `JdbcHostSessionWriteAdapter`, `SecurityConfig`, `HostSessionControllerDbTest`, `HostSessionCommandServiceTest`, `HostSessionBffSecurityTest`.
+- Decisions: close uses an atomic `OPEN -> CLOSED` update with zero-row re-read; `CLOSED` is idempotent, `DRAFT`/`PUBLISHED` conflict; BFF CSRF exemption mirrors `/open`.
+- Reviews: spec review passed; quality review found non-atomic update and missing BFF CSRF coverage, both fixed in `6d4a143`.
+- Verification: `./server/gradlew -p server test --rerun-tasks --tests "com.readmates.session.api.HostSessionControllerDbTest" --tests "*HostSessionBffSecurityTest*"` passed, 30 targeted tests.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 1 agents were closed.
+- Remaining risks/next task notes: apply the same atomic transition and BFF CSRF/security-test scrutiny to publish.
 
 ## Task 2: Publish Transition and Public Exposure Guard
 
@@ -249,7 +258,7 @@ git commit -m "feat: add host session close transition"
 - Test: `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`
 - Test: public controller DB test file found by `rg "class .*Public.*Test" server/src/test/kotlin`
 
-- [ ] **Step 1: Add failing publish transition tests**
+- [x] **Step 1: Add failing publish transition tests**
 
 Add to `HostSessionControllerDbTest.kt`:
 
@@ -336,7 +345,7 @@ fun `host cannot publish open draft host only or unpublished sessions`() {
 }
 ```
 
-- [ ] **Step 2: Run the failing publish tests**
+- [x] **Step 2: Run the failing publish tests**
 
 Run:
 
@@ -346,7 +355,7 @@ Run:
 
 Expected: tests fail because `/publish` does not exist.
 
-- [ ] **Step 3: Add publish use-case signatures**
+- [x] **Step 3: Add publish use-case signatures**
 
 In `SessionApplicationSupport.kt`, add:
 
@@ -373,7 +382,7 @@ In `HostSessionCommandService.kt`, add:
 override fun publish(command: HostSessionIdCommand) = port.publish(command)
 ```
 
-- [ ] **Step 4: Add the publish route**
+- [x] **Step 4: Add the publish route**
 
 In `HostSessionController.kt`, add:
 
@@ -385,7 +394,7 @@ fun publish(
 ) = manageHostSessionUseCase.publish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 ```
 
-- [ ] **Step 5: Implement publish persistence**
+- [x] **Step 5: Implement publish persistence**
 
 In `JdbcHostSessionWriteAdapter.kt`, import the new exception and add:
 
@@ -463,7 +472,7 @@ override fun publish(command: HostSessionIdCommand): HostSessionDetailResponse {
 
 Add `HostSessionPublishNotAllowedException` to the same 409 mapping used for open/close conflicts.
 
-- [ ] **Step 6: Gate public records on `PUBLISHED`**
+- [x] **Step 6: Gate public records on `PUBLISHED`**
 
 In `JdbcPublicQueryAdapter.kt`, add `and sessions.state = 'PUBLISHED'` to all public-facing session queries:
 
@@ -481,7 +490,7 @@ where sessions.club_id = ?
 
 Apply this to `loadSession`, `publicStats`, and `publicSessions`.
 
-- [ ] **Step 7: Add public exposure regression test**
+- [x] **Step 7: Add public exposure regression test**
 
 In the public controller DB test file, add:
 
@@ -526,7 +535,7 @@ fun `public records exclude closed public visibility sessions until published`()
 
 If the test helper methods are local to `HostSessionControllerDbTest`, copy the minimal helper logic into the public test file instead of moving shared helpers.
 
-- [ ] **Step 8: Run server lifecycle and public tests**
+- [x] **Step 8: Run server lifecycle and public tests**
 
 Run:
 
@@ -536,19 +545,28 @@ Run:
 
 Expected: all targeted tests pass.
 
-- [ ] **Step 9: Commit Task 2**
+- [x] **Step 9: Commit Task 2**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/session server/src/main/kotlin/com/readmates/publication server/src/test/kotlin/com/readmates
 git commit -m "feat: publish finalized session records"
 ```
 
+Task 2 checkpoint (2026-04-25):
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
+- Changed files: session lifecycle API/service/persistence, `JdbcPublicQueryAdapter`, `SecurityConfig`, host/public/security/service tests.
+- Decisions: publish uses a conditional `CLOSED -> PUBLISHED` transition with publication existence checks; public query surfaces require `sessions.state = 'PUBLISHED'`; BFF `/publish` mirrors `/open` and `/close` CSRF handling.
+- Reviews: spec review passed; quality review passed with minor notes that MEMBER publish/idempotent publish are not directly tested and `published_at` lifecycle meaning remains legacy-compatible.
+- Verification: `./server/gradlew -p server test --tests "com.readmates.session.api.HostSessionControllerDbTest" --tests "*Public*"` passed; extended targeted run with `HostSessionBffSecurityTest` and `HostSessionCommandServiceTest` passed.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 2 agents were closed.
+- Remaining risks/next task notes: Task 3 should verify archive and notes surfaces from the member side after the new lifecycle gate.
+
 ## Task 3: Archive and Notes Regression Coverage
 
 **Files:**
 - Modify `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`
 
-- [ ] **Step 1: Add regression test for closed vs published visibility**
+- [x] **Step 1: Add regression test for closed vs published visibility**
 
 Add:
 
@@ -655,7 +673,7 @@ private fun insertClosedPublicSessionWithQuestion(number: Int): String {
 }
 ```
 
-- [ ] **Step 2: Run archive and notes tests**
+- [x] **Step 2: Run archive and notes tests**
 
 Run:
 
@@ -665,12 +683,21 @@ Run:
 
 Expected: pass after Task 2.
 
-- [ ] **Step 3: Commit Task 3**
+- [x] **Step 3: Commit Task 3**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt
 git commit -m "test: cover closed and published record surfaces"
 ```
+
+Task 3 checkpoint (2026-04-25):
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
+- Changed files: `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`.
+- Decisions: regression uses an isolated inserted CLOSED/PUBLIC session with a question and flips only `sessions.state` to prove archive vs notes lifecycle behavior.
+- Reviews: spec review passed; quality review passed with a minor note that `sessionId`/`questionCount` assertions could make the final notes check more explicit.
+- Verification: `./server/gradlew -p server test --tests "com.readmates.archive.api.ArchiveAndNotesDbTest"` passed.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 3 agents were closed.
+- Remaining risks/next task notes: frontend tasks must avoid the unrelated original-worktree host-dashboard changes and operate only in this integration worktree.
 
 ## Task 4: Frontend API Wiring
 
@@ -680,7 +707,7 @@ git commit -m "test: cover closed and published record surfaces"
 - Modify `front/features/host/route/host-session-editor-data.ts`
 - Test: `front/tests/unit/host-session-editor.test.tsx`
 
-- [ ] **Step 1: Extend editor action type and test actions**
+- [x] **Step 1: Extend editor action type and test actions**
 
 In `HostSessionEditorActions`, add:
 
@@ -702,7 +729,7 @@ publishSession: (sessionId) =>
   }) as Promise<JsonResponse<HostSessionDetailResponse>>,
 ```
 
-- [ ] **Step 2: Add failing API tests through component behavior**
+- [x] **Step 2: Add failing API tests through component behavior**
 
 In `host-session-editor.test.tsx`, add:
 
@@ -751,7 +778,7 @@ it("saves publication and publishes a closed record", async () => {
 });
 ```
 
-- [ ] **Step 3: Run frontend tests and verify failures**
+- [x] **Step 3: Run frontend tests and verify failures**
 
 Run:
 
@@ -761,7 +788,7 @@ pnpm --dir front test -- host-session-editor.test.tsx
 
 Expected: tests fail because actions and buttons do not exist.
 
-- [ ] **Step 4: Add API functions**
+- [x] **Step 4: Add API functions**
 
 In `host-api.ts`, add:
 
@@ -791,12 +818,21 @@ closeSession: closeHostSession,
 publishSession: publishHostSession,
 ```
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 ```bash
 git add front/features/host/api/host-api.ts front/features/host/route/host-session-editor-data.ts front/features/host/components/host-session-editor.tsx front/tests/unit/host-session-editor.test.tsx
 git commit -m "feat: wire host lifecycle actions"
 ```
+
+Task 4 checkpoint (2026-04-25):
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
+- Changed files: `host-api.ts`, `host-session-editor-data.ts`, `host-session-editor.tsx`, `host-session-editor.test.tsx`.
+- Decisions: route actions call the new server lifecycle endpoints; editor stores the full returned session snapshot so state and publication details stay in sync after close/publish.
+- Reviews: spec review passed; quality review found stale publication response merging, fixed in `89bc557`; re-review passed.
+- Verification: `pnpm --dir front test -- host-session-editor.test.tsx`, `pnpm --dir front lint`, and `pnpm --dir front build` passed after `pnpm --dir front install` populated this worktree's dependencies.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 4 agents were closed.
+- Remaining risks/next task notes: Task 5 should add the fuller lifecycle UX/copy and decide how to handle HOST_ONLY publish attempts.
 
 ## Task 5: Frontend Lifecycle UX
 
@@ -805,7 +841,7 @@ git commit -m "feat: wire host lifecycle actions"
 - Modify `front/features/host/model/host-session-editor-model.ts`
 - Test: `front/tests/unit/host-session-editor.test.tsx`
 
-- [ ] **Step 1: Add local lifecycle state**
+- [x] **Step 1: Add local lifecycle state**
 
 In `HostSessionEditor`, add state near existing local state:
 
@@ -816,7 +852,7 @@ const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" |
 
 Replace display reads of `session.state` with `sessionState` for badges and lifecycle controls. Do not mutate `session`.
 
-- [ ] **Step 2: Add close handler**
+- [x] **Step 2: Add close handler**
 
 Add:
 
@@ -846,7 +882,7 @@ const closeSession = async () => {
 };
 ```
 
-- [ ] **Step 3: Add publish handler**
+- [x] **Step 3: Add publish handler**
 
 Add:
 
@@ -909,7 +945,7 @@ const publishRecord = async () => {
 };
 ```
 
-- [ ] **Step 4: Add buttons and copy**
+- [x] **Step 4: Add buttons and copy**
 
 In the header/status area, keep the state badge but use `sessionState`.
 
@@ -956,7 +992,7 @@ const publicationLifecycleHelp =
 
 Render that helper near `publication-summary-help`.
 
-- [ ] **Step 5: Keep labels clear**
+- [x] **Step 5: Keep labels clear**
 
 In `host-session-editor-model.ts`, change `recordVisibilityDescription("PUBLIC")` to:
 
@@ -970,7 +1006,7 @@ Change `recordVisibilityDescription("MEMBER")` to:
 return "기록 공개를 완료하면 멤버 앱 안에서만 볼 수 있습니다.";
 ```
 
-- [ ] **Step 6: Run frontend editor tests**
+- [x] **Step 6: Run frontend editor tests**
 
 Run:
 
@@ -980,19 +1016,28 @@ pnpm --dir front test -- host-session-editor.test.tsx host-session-editor-model.
 
 Expected: pass.
 
-- [ ] **Step 7: Commit Task 5**
+- [x] **Step 7: Commit Task 5**
 
 ```bash
 git add front/features/host/components/host-session-editor.tsx front/features/host/model/host-session-editor-model.ts front/tests/unit/host-session-editor.test.tsx front/tests/unit/host-session-editor-model.test.ts
 git commit -m "feat: clarify host publish lifecycle"
 ```
 
+Task 5 checkpoint (2026-04-25):
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
+- Changed files: `host-session-editor.tsx`, `host-session-editor-model.ts`, `host-session-editor.test.tsx`, `host-session-editor-model.test.ts`.
+- Decisions: lifecycle display uses local state plus returned session snapshots; publication panel owns close/publish actions; `HOST_ONLY` is blocked before lifecycle publish while save-only remains available.
+- Reviews: spec review passed; quality review found HOST_ONLY publish conflict UX, fixed in `0f84003`; re-review passed.
+- Verification: `pnpm --dir front test -- host-session-editor.test.tsx host-session-editor-model.test.ts` passed; `pnpm --dir front lint` passed.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 5 agents were closed.
+- Remaining risks/next task notes: run full server and frontend verification; because server auth/BFF lifecycle endpoints changed, run e2e as requested.
+
 ## Task 6: Full Verification
 
 **Files:**
 - No new code files.
 
-- [ ] **Step 1: Run server tests**
+- [x] **Step 1: Run server tests**
 
 Run:
 
@@ -1002,7 +1047,7 @@ Run:
 
 Expected: build success.
 
-- [ ] **Step 2: Run frontend checks**
+- [x] **Step 2: Run frontend checks**
 
 Run:
 
@@ -1014,7 +1059,7 @@ pnpm --dir front build
 
 Expected: all pass.
 
-- [ ] **Step 3: Run e2e if auth/BFF route behavior changed**
+- [x] **Step 3: Run e2e if auth/BFF route behavior changed**
 
 Run if implementation touched BFF route behavior or end-to-end auth flow:
 
@@ -1024,7 +1069,7 @@ pnpm --dir front test:e2e
 
 Expected: pass or unchanged known environment skip. Do not claim e2e pass unless the command completes successfully.
 
-- [ ] **Step 4: Manual smoke path**
+- [x] **Step 4: Manual smoke path**
 
 Start local app as usual, then verify:
 
@@ -1036,7 +1081,7 @@ Start local app as usual, then verify:
 6. Confirm `/app/notes?sessionId={sessionId}` shows notes only after publish.
 7. Confirm public record URL returns 404 before publish and 200 after publish.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git status --short
@@ -1049,6 +1094,15 @@ Expected: only intentional changes remain. If prior task commits were made, no e
 git add server front
 git commit -m "fix: stabilize session lifecycle publication"
 ```
+
+Task 6 checkpoint (2026-04-25):
+- Worktree/branch: `<integration-worktree>`, `codex/session-lifecycle-publication`.
+- Changed files: no new code changes during full verification; this checkpoint updates task status only.
+- Verification: `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed with 44 files and 498 tests; `pnpm --dir front build` passed.
+- E2E: default `pnpm --dir front test:e2e` failed before browser tests because the default local e2e schema had stale Flyway history. Root-cause review found this was persisted local DB state, not current code. A rerun with a granted current e2e schema override passed with 18 tests.
+- Manual smoke: session create/open, host close, current-session removal, closed public record hidden from notes/public, publish, archive visibility, notes visibility, and public detail visibility all passed against the local app; generated smoke session was deleted afterward.
+- Background resources: session-owned verification services were stopped.
+- Remaining risks: the default e2e schema may still have stale Flyway history; use a current granted e2e schema override or reset the disposable default schema before relying on the default e2e command.
 
 ## Self-Review
 

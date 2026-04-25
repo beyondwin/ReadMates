@@ -24,6 +24,8 @@ interface HostSessionWritePort {
     fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse
     fun open(command: HostSessionIdCommand): HostSessionDetailResponse
+    fun close(command: HostSessionIdCommand): HostSessionDetailResponse
+    fun publish(command: HostSessionIdCommand): HostSessionDetailResponse
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
     fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse
     fun confirmAttendance(command: ConfirmAttendanceCommand): HostAttendanceResponse

@@ -32,7 +32,7 @@ import {
   type SessionRecordVisibility,
 } from "@/features/host/model/host-session-editor-model";
 import { BookCover } from "@/shared/ui/book-cover";
-import { SessionTimingIdentity } from "@/shared/ui/session-identity";
+import { SessionIdentity } from "@/shared/ui/session-identity";
 import {
   hostDashboardReturnTarget,
   readmatesReturnState,
@@ -137,6 +137,8 @@ type JsonResponse<T> = Response & { json(): Promise<T> };
 export type HostSessionEditorActions = {
   loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
   deleteSession: (sessionId: string) => Promise<Response>;
+  closeSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
+  publishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
   savePublication: (sessionId: string, request: HostSessionPublicationRequest) => Promise<Response>;
   updateAttendance: (
@@ -171,6 +173,9 @@ export default function HostSessionEditor({
   const [summary, setSummary] = useState(() => initialPublicationSummary(session));
   const [hasPublicationRecord, setHasPublicationRecord] = useState(() => Boolean(session?.publication));
   const [recordSaveInFlight, setRecordSaveInFlight] = useState(false);
+  const [sessionState, setSessionState] = useState<HostSessionDetailResponse["state"]>(() => session?.state ?? "DRAFT");
+  const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [displaySessionSnapshot, setDisplaySessionSnapshot] = useState<HostSessionDetailResponse | null>(null);
   const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [activeMobileSection, setActiveMobileSection] = useState<MobileEditorSection>("basic");
@@ -209,7 +214,16 @@ export default function HostSessionEditor({
         state: readmatesReturnState(returnTarget),
       })
     : undefined;
-  const destructiveActionAvailability = getDestructiveActionAvailability(session);
+  const displaySession = displaySessionSnapshot ?? (session ? { ...session, state: sessionState } : session);
+  const destructiveActionAvailability = getDestructiveActionAvailability(displaySession);
+  const publicationLifecycleHelp =
+    sessionState === "OPEN"
+      ? "진행 중인 세션은 먼저 마감한 뒤 기록 공개를 완료할 수 있습니다."
+      : sessionState === "CLOSED"
+        ? "요약과 공개 대상을 확인한 뒤 기록 공개를 완료하세요."
+        : sessionState === "PUBLISHED"
+          ? "공개된 기록입니다. 공개 대상은 저장 버튼으로 변경할 수 있습니다."
+          : "세션을 만든 뒤 기록 요약과 공개 범위를 저장할 수 있습니다.";
 
   const flash = (message: string) => {
     setToast(message);
@@ -376,6 +390,101 @@ export default function HostSessionEditor({
     }
   };
 
+  const closeSession = async () => {
+    if (!session || lifecycleSaveState === "saving") {
+      return;
+    }
+
+    setLifecycleSaveState("saving");
+    try {
+      const response = await actions.closeSession(session.sessionId);
+
+      if (!response.ok) {
+        setLifecycleSaveState("error");
+        flash("세션 마감에 실패했습니다. 상태를 확인한 뒤 다시 시도해 주세요");
+        return;
+      }
+
+      const nextSession = await response.json();
+      setSessionState(nextSession.state);
+      setDisplaySessionSnapshot(nextSession);
+      setLifecycleSaveState("idle");
+      flash("세션을 마감했습니다.");
+    } catch {
+      setLifecycleSaveState("error");
+      flash("세션 마감에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요");
+    }
+  };
+
+  const publishRecord = async () => {
+    if (!session || recordSaveInFlight || lifecycleSaveState === "saving") {
+      return;
+    }
+
+    if (recordVisibility === "HOST_ONLY") {
+      setPublicationFeedback({
+        tone: "error",
+        message: "기록 공개 전 멤버 공개 또는 외부 공개를 선택해 주세요.",
+      });
+      return;
+    }
+
+    const publicationRequest = buildPublicationRequest(summary, recordVisibility);
+
+    if (!publicationRequest) {
+      setPublicationFeedback({
+        tone: "error",
+        message: "기록 요약을 입력한 뒤 공개해 주세요.",
+      });
+      return;
+    }
+
+    setRecordSaveInFlight(true);
+    setLifecycleSaveState("saving");
+    setPublicationFeedback(null);
+
+    try {
+      const saveResponse = await actions.savePublication(session.sessionId, publicationRequest);
+
+      if (!saveResponse.ok) {
+        setPublicationFeedback({
+          tone: "error",
+          message: "기록 공개 범위 저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도해 주세요.",
+        });
+        return;
+      }
+
+      const publishResponse = await actions.publishSession(session.sessionId);
+
+      if (!publishResponse.ok) {
+        setPublicationFeedback({
+          tone: "error",
+          message: "기록 공개에 실패했습니다. 세션이 마감되었는지 확인해 주세요.",
+        });
+        return;
+      }
+
+      const nextSession = await publishResponse.json();
+      setSummary(publicationRequest.publicSummary);
+      setRecordVisibility(publicationRequest.visibility);
+      setHasPublicationRecord(true);
+      setSessionState(nextSession.state);
+      setDisplaySessionSnapshot(nextSession);
+      setPublicationFeedback({
+        tone: "success",
+        message: publicationRequest.visibility === "PUBLIC" ? "외부 공개가 완료되었습니다." : "멤버 기록 공개가 완료되었습니다.",
+      });
+    } catch {
+      setPublicationFeedback({
+        tone: "error",
+        message: "기록 공개에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+      });
+    } finally {
+      setRecordSaveInFlight(false);
+      setLifecycleSaveState("idle");
+    }
+  };
+
   const updateAttendance = async (membershipId: string, attendanceStatus: AttendanceStatus) => {
     if (!session) {
       return;
@@ -509,8 +618,14 @@ export default function HostSessionEditor({
                 {editorTitle}
               </h1>
               <div style={{ marginTop: "10px" }}>
-                {session ? (
-                  <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
+                {displaySession ? (
+                  <SessionIdentity
+                    sessionNumber={displaySession.sessionNumber}
+                    state={displaySession.state}
+                    date={displaySession.date}
+                    published={displaySession.state === "PUBLISHED"}
+                    feedbackDocumentAvailable={displaySession.feedbackDocument.uploaded}
+                  />
                 ) : (
                   <div className="rm-session-identity">
                     <span className="rm-session-identity__chip">새 예정 세션</span>
@@ -830,11 +945,6 @@ export default function HostSessionEditor({
                       );
                     })}
                   </fieldset>
-                  {!session ? (
-                    <div id="publication-disabled-reason" className="marginalia">
-                      세션을 만든 뒤 기록 요약과 공개 범위를 저장할 수 있습니다.
-                    </div>
-                  ) : null}
                 </div>
                 <hr className="divider-soft" style={{ margin: "20px 0" }} />
                 <div>
@@ -854,10 +964,13 @@ export default function HostSessionEditor({
                       }
                     }}
                     placeholder="모임의 분위기와 대화의 결을 2~3문장으로 짧게."
-                    aria-describedby="publication-summary-help publication-feedback"
+                    aria-describedby="publication-summary-help publication-lifecycle-help publication-feedback"
                   />
                   <div id="publication-summary-help" className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
                     선택한 공개 범위에 맞춰 기록 화면에 반영됩니다.
+                  </div>
+                  <div id="publication-lifecycle-help" className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
+                    {publicationLifecycleHelp}
                   </div>
                 </div>
                 <div className="row" style={{ gap: "8px", flexWrap: "wrap", marginTop: "16px" }}>
@@ -865,11 +978,34 @@ export default function HostSessionEditor({
                     type="button"
                     className="btn btn-primary"
                     disabled={!session || recordSaveInFlight}
-                    aria-describedby={!session ? "publication-disabled-reason" : undefined}
+                    aria-describedby={!session ? "publication-lifecycle-help" : undefined}
                     onClick={() => void savePublication()}
                   >
                     {recordSaveInFlight ? "저장하는 중" : "저장"}
                   </button>
+                  {session && sessionState === "OPEN" ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={lifecycleSaveState === "saving"}
+                      onClick={() => void closeSession()}
+                    >
+                      {lifecycleSaveState === "saving" ? "마감하는 중" : "세션 마감"}
+                    </button>
+                  ) : null}
+                  {session && sessionState === "CLOSED" ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={recordSaveInFlight || lifecycleSaveState === "saving"}
+                      onClick={() => void publishRecord()}
+                    >
+                      {lifecycleSaveState === "saving" ? "공개하는 중" : "기록 공개"}
+                    </button>
+                  ) : null}
+                  {session && sessionState === "PUBLISHED" ? (
+                    <span className="badge badge-ok">공개 완료</span>
+                  ) : null}
                 </div>
                 {publicationFeedback ? (
                   <div
@@ -925,7 +1061,7 @@ export default function HostSessionEditor({
 
             <aside className="stack rm-host-session-editor__aside" style={{ "--stack": "20px" } as CSSProperties}>
               <DocumentStatePanel
-                session={session}
+                session={displaySession}
                 saveState={saveState}
                 recordVisibility={recordVisibility}
                 hasPublicationRecord={hasPublicationRecord}
