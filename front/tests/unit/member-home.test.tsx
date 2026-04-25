@@ -137,6 +137,9 @@ describe("MemberHome", () => {
   });
 
   it("shows member-visible upcoming sessions on desktop and mobile home", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 25, 0, 0, 0));
+
     const { container } = render(
       <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={upcomingSessions} />,
     );
@@ -147,6 +150,10 @@ describe("MemberHome", () => {
     expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
     expect(desktop.getByText("다음 달 책")).toBeInTheDocument();
     expect(desktop.getByText(/다음 저자/)).toBeInTheDocument();
+    const upcomingIdentity = desktop.getByRole("group", { name: "No.08 · D-53" });
+    expect(upcomingIdentity).toBeInTheDocument();
+    expect(within(upcomingIdentity).getByText("No.08")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    expect(within(upcomingIdentity).queryByText("예정")).not.toBeInTheDocument();
     expect(mobile.getByText("예정 세션")).toBeInTheDocument();
     expect(mobile.getByText("다음 달 책")).toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: /RSVP.*다음 달 책/ })).not.toBeInTheDocument();
