@@ -6,8 +6,6 @@ import type {
   BoardLongReview,
   BoardQuestion,
   CurrentSession,
-  CurrentSessionInternalLinkProps,
-  InternalLinkComponent,
   RsvpUpdateStatus,
   SaveState,
 } from "@/features/current-session/ui/current-session-types";
@@ -27,14 +25,6 @@ const rsvpOptions: Array<{ status: RsvpUpdateStatus; label: string }> = [
   { status: "MAYBE", label: "아직 미정" },
   { status: "DECLINED", label: "불참" },
 ];
-
-function AnchorInternalLink({ href, children, ...props }: CurrentSessionInternalLinkProps) {
-  return (
-    <a {...props} href={href}>
-      {children}
-    </a>
-  );
-}
 
 function focusMobileSessionTab(tab: MobileSessionTab) {
   globalThis.setTimeout(() => {
@@ -106,9 +96,7 @@ export function MobileCurrentSessionBoard({
   onSaveLongReview,
   isViewer,
   memberNotice,
-  isHost,
   canWrite,
-  internalLinkComponent: InternalLink = AnchorInternalLink,
 }: {
   session: CurrentSession;
   rsvp: CurrentSession["myRsvpStatus"];
@@ -135,9 +123,7 @@ export function MobileCurrentSessionBoard({
   onSaveLongReview: () => void;
   isViewer: boolean;
   memberNotice: ReturnType<typeof getCurrentSessionMemberNotice>;
-  isHost: boolean;
   canWrite: boolean;
-  internalLinkComponent?: InternalLinkComponent;
 }) {
   const tabs: Array<{ key: MobileSessionTab; label: string }> = [
     { key: "prep", label: "내 준비" },
@@ -175,11 +161,6 @@ export function MobileCurrentSessionBoard({
               </span>
             ) : null}
           </a>
-        ) : null}
-        {isHost ? (
-          <InternalLink href={`/app/host/sessions/${session.sessionId}/edit`} className="rm-current-session-mobile__host-link">
-            세션 운영으로
-          </InternalLink>
         ) : null}
       </section>
 

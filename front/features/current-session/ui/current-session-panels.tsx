@@ -357,7 +357,7 @@ export function HostContextPanel({
         이 화면에서는 멤버로 RSVP, 진행률, 질문, 서평을 남기고, 운영 화면에서 세션 정보와 참석 확정을 관리합니다.
       </p>
       <InternalLink href={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
-        세션 운영으로
+        운영 문서 열기
       </InternalLink>
     </section>
   );

@@ -581,15 +581,12 @@ describe("MemberHome", () => {
     expect(screen.getByLabelText("미 · 미정")).toHaveAttribute("data-rsvp-status", "MAYBE");
   });
 
-  it("does not repeat the host workspace switch inside member home content", () => {
+  it("does not show the host session operations shortcut inside member home content", () => {
     render(
       <MemberHome auth={{ ...auth, role: "HOST" }} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
     );
 
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "세션 운영으로" })).toHaveAttribute(
-      "href",
-      "/app/host/sessions/session-7/edit",
-    );
+    expect(screen.queryByRole("link", { name: "세션 운영으로" })).not.toBeInTheDocument();
   });
 });

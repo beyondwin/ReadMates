@@ -180,11 +180,6 @@ export function PrepCard({
         {session.meetingPasscode ? (
           <span className="tiny mono rm-prep-card__passcode">Passcode · {session.meetingPasscode}</span>
         ) : null}
-        {isHost ? (
-          <Link to={`/app/host/sessions/${session.sessionId}/edit`} className="btn btn-quiet btn-sm rm-prep-card__host-link">
-            세션 운영으로
-          </Link>
-        ) : null}
       </div>
     </article>
   );
