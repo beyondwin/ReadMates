@@ -762,8 +762,8 @@ button.rm-record-row:hover {
   background: var(--accent);
 }
 .rm-workspace-switch {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--line);
   border-radius: var(--r-2);
   color: var(--text-2);
@@ -783,6 +783,9 @@ button.rm-record-row:hover {
 }
 .rm-workspace-switch svg {
   flex-shrink: 0;
+}
+.rm-workspace-switch svg path {
+  stroke-width: 1.55;
 }
 
 /* ============================================
