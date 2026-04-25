@@ -130,10 +130,6 @@ function nextActionFor(session: NonNullable<CurrentSessionResponse["currentSessi
     return `질문 ${2 - session.myQuestions.length}개를 더 준비해 주세요.`;
   }
 
-  if (!session.myOneLineReview) {
-    return "한줄평을 한 문장으로 남겨 주세요.";
-  }
-
   return "준비가 정리되었습니다. 모임 전까지 수정할 수 있어요.";
 }
 
@@ -213,11 +209,6 @@ function MobileMemberHome({
       <section className="m-sec">
         <div className="m-eyebrow-row">
           <span className="eyebrow">이번 세션</span>
-          {session ? (
-            <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-              No.{String(session.sessionNumber).padStart(2, "0")}
-            </span>
-          ) : null}
         </div>
         <MobileCurrentSessionCard session={session} isHost={auth.role === "HOST"} isViewer={isViewer} />
       </section>

@@ -69,17 +69,16 @@ describe("host dashboard model", () => {
       status: "준비 중",
       tone: "accent",
     });
-    expect(getHostDashboardSessionMetrics(session, phase.status)).toEqual([
+    expect(getHostDashboardSessionMetrics(session)).toEqual([
       ["참석", "1/2"],
       ["읽기", "1/2"],
       ["질문", "2/10"],
-      ["상태", "준비 중"],
     ]);
   });
 
   it("derives the reading metric from myCheckin only", () => {
-    expect(getHostDashboardSessionMetrics({ ...session, myCheckin: null }, "준비 중")).toContainEqual(["읽기", "0/2"]);
-    expect(getHostDashboardSessionMetrics(session, "준비 중")).toContainEqual(["읽기", "1/2"]);
+    expect(getHostDashboardSessionMetrics({ ...session, myCheckin: null })).toContainEqual(["읽기", "0/2"]);
+    expect(getHostDashboardSessionMetrics(session)).toContainEqual(["읽기", "1/2"]);
   });
 
   it("builds D-day session phase", () => {
