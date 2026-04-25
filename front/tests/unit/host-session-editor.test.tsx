@@ -652,9 +652,10 @@ describe("HostSessionEditor", () => {
 
   it("lets hosts close an open session from the editor", async () => {
     const user = userEvent.setup();
+    const closedSession = { ...openSession, state: "CLOSED" as const };
     const closeSession = vi.fn(
       async () =>
-        new Response(JSON.stringify({ ...openSession, state: "CLOSED" }), {
+        new Response(JSON.stringify(closedSession), {
           status: 200,
         }) as JsonResponse<HostSessionDetailResponse>,
     );
@@ -666,10 +667,13 @@ describe("HostSessionEditor", () => {
       />,
     );
 
+    expect(screen.getByText("진행 중인 세션은 먼저 마감한 뒤 기록 공개를 완료할 수 있습니다.")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "세션 마감" }));
 
     expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
     expect(await screen.findByText("닫힘")).toBeInTheDocument();
+    expect(screen.getByText("요약과 공개 대상을 확인한 뒤 기록 공개를 완료하세요.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
   });
 
   it("saves publication and publishes a closed record", async () => {
@@ -697,6 +701,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
+    expect(screen.getByText("요약과 공개 대상을 확인한 뒤 기록 공개를 완료하세요.")).toBeVisible();
     await user.clear(screen.getByLabelText("기록 요약"));
     await user.type(screen.getByLabelText("기록 요약"), "최종 공개 요약입니다.");
     await user.click(screen.getByRole("radio", { name: /외부 공개/ }));
@@ -708,6 +713,9 @@ describe("HostSessionEditor", () => {
     });
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
     expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).toBeVisible();
+    expect(screen.getByText("공개된 기록입니다. 공개 대상은 저장 버튼으로 변경할 수 있습니다.")).toBeVisible();
+    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(await screen.findByRole("status")).toHaveTextContent("외부 공개가 완료되었습니다.");
   });
 
   it("disables publication editing controls while the record save is pending", async () => {
