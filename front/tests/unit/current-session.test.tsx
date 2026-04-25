@@ -449,8 +449,17 @@ describe("CurrentSession", () => {
 
     const { container } = render(<CurrentSession data={designedData} />);
     const desktopScope = within(getDesktop(container));
+    const mobileScope = within(screen.getByTestId("current-session-mobile"));
 
-    expect(desktopScope.getByText("No.14 · D-3")).toBeInTheDocument();
+    expect(desktopScope.getByRole("group", { name: "No.14 · D-3 · 이번 세션" })).toBeInTheDocument();
+    expect(desktopScope.getByText("D-3")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    const mobileIdentity = mobileScope.getByRole("group", { name: "No.14 · D-3 · 이번 세션" });
+    expect(mobileIdentity).toBeInTheDocument();
+    expect(within(mobileIdentity).getByText("D-3")).toHaveClass(
+      "rm-session-identity__chip",
+      "rm-state",
+      "rm-state--pending",
+    );
     expect(desktopScope.queryByText(/This session/i)).not.toBeInTheDocument();
     expect(desktopScope.getByText("이번 모임에 참석하시나요?")).toHaveClass("h4", "editorial");
     expect(desktopScope.getByText("어디까지 읽으셨어요?")).toHaveClass("h4", "editorial");

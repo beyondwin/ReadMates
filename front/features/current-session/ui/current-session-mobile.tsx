@@ -16,7 +16,8 @@ import {
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
-import { formatDateLabel, formatDeadlineLabel, formatSessionKicker, rsvpLabel } from "@/shared/ui/readmates-display";
+import { formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 export type MobileSessionTab = "prep" | "board" | "after";
 
@@ -138,7 +139,7 @@ export function MobileCurrentSessionBoard({
       <section className="rm-current-session-mobile__hero">
         <div className="m-row rm-current-session-mobile__hero-row">
           <div className="rm-current-session-mobile__hero-copy">
-            <div className="eyebrow">{formatSessionKicker(session.sessionNumber, session.date)}</div>
+            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
             <h1 className="h2 editorial rm-current-session-mobile__title">{session.bookTitle}</h1>
             <div className="tiny" style={{ color: "var(--text-2)" }}>
               {session.bookAuthor}

@@ -172,7 +172,8 @@ describe("MemberHome", () => {
     const mobileElement = mobile as HTMLElement;
     const mobileView = within(mobileElement);
     expect(mobileView.getByText("안녕하세요, 수님.")).toBeInTheDocument();
-    expect(mobileView.getByText("이번 세션")).toBeInTheDocument();
+    expect(mobileElement.querySelector(".m-eyebrow-row")).toHaveTextContent("이번 세션");
+    expect(mobileView.getByRole("group", { name: /No\.07 · D-\d+ · 이번 세션/ })).toBeInTheDocument();
     expect(mobileView.getByText("오늘 할 일")).toBeInTheDocument();
     expect(mobileView.getByText("멤버 활동")).toBeInTheDocument();
     expect(mobileView.queryByText("내 통계")).not.toBeInTheDocument();
@@ -212,7 +213,7 @@ describe("MemberHome", () => {
     const metaLine = container.querySelector(".rm-member-home-mobile .rm-member-session-card__meta-line");
 
     expect(metaLine).not.toBeNull();
-    expect(metaLine).toHaveTextContent("No.07 · D-20");
+    expect(within(metaLine as HTMLElement).getByRole("group", { name: "No.07 · D-20 · 이번 세션" })).toBeVisible();
   });
 
   it("keeps current-session identity to one compact line on member home", () => {
@@ -229,11 +230,10 @@ describe("MemberHome", () => {
     expect(desktopMetaLine).not.toBeNull();
     expect(mobileSectionHeader).not.toBeNull();
     expect(mobileMetaLine).not.toBeNull();
-    expect(desktopMetaLine).toHaveTextContent("No.07 · D-20");
-    expect(desktopMetaLine).not.toHaveTextContent("이번 세션");
+    expect(within(desktopMetaLine as HTMLElement).getByRole("group", { name: "No.07 · D-20 · 이번 세션" })).toBeVisible();
     expect(mobileSectionHeader).toHaveTextContent("이번 세션");
     expect(mobileSectionHeader).not.toHaveTextContent("No.07");
-    expect(mobileMetaLine).toHaveTextContent("No.07 · D-20");
+    expect(within(mobileMetaLine as HTMLElement).getByRole("group", { name: "No.07 · D-20 · 이번 세션" })).toBeVisible();
     expect(mobileMetaLine?.querySelector(".badge")).not.toBeInTheDocument();
   });
 
@@ -265,8 +265,7 @@ describe("MemberHome", () => {
     );
     const desktop = getDesktopView(container);
 
-    expect(desktop.getByText(/No\.07 ·/)).toBeInTheDocument();
-    expect(desktop.queryByText(/이번 세션 ·/)).not.toBeInTheDocument();
+    expect(desktop.getByRole("group", { name: /No\.07 · D-\d+ · 이번 세션/ })).toBeInTheDocument();
     expect(desktop.getAllByText("테스트 책").length).toBeGreaterThan(0);
     expect(desktop.getByText("지금 읽는 책")).toBeInTheDocument();
     expect(desktop.getByText("다음 할 일")).toBeInTheDocument();

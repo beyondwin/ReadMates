@@ -4,6 +4,7 @@ import type { MemberHomeCurrentSessionResponse as CurrentSessionResponse } from 
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 
@@ -40,26 +41,6 @@ function mobilePrepStepsFor(session: CurrentSession) {
       hint: "세션 후",
     },
   ];
-}
-
-function daysUntilLabel(dateValue: string) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
-
-  if (!match) {
-    return null;
-  }
-
-  const [, year, month, day] = match;
-  const target = new Date(Number(year), Number(month) - 1, Number(day));
-  const today = new Date();
-  const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const diffDays = Math.round((target.getTime() - normalizedToday.getTime()) / 86_400_000);
-
-  if (diffDays === 0) {
-    return "D-day";
-  }
-
-  return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
 }
 
 export function MobileIcon({ name, size = 18, style }: { name: MobileIconName; size?: number; style?: CSSProperties }) {
@@ -186,7 +167,6 @@ export function MobileCurrentSessionCard({
   const deadlineLabel = formatDeadlineLabel(session.questionDeadlineAt, "마감 미정");
   const locationLabel = displayText(session.locationLabel, "장소 미정");
   const meetingUrl = safeExternalHttpsUrl(session.meetingUrl);
-  const dday = daysUntilLabel(session.date);
   const attendees = activeAttendees(session);
   const attendance = {
     attended: attendees.filter((attendee) => attendee.rsvpStatus === "GOING").length,
@@ -198,10 +178,7 @@ export function MobileCurrentSessionCard({
       <div className="rm-member-session-card__head">
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="rm-member-session-card__meta-line">
-            <span className="eyebrow">
-              No.{String(session.sessionNumber).padStart(2, "0")}
-              {dday ? ` · ${dday}` : ""}
-            </span>
+            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
           </div>
           <h2 className="h3 editorial rm-member-session-card__title">{bookTitle}</h2>
           <div className="tiny" style={{ color: "var(--text-2)" }}>

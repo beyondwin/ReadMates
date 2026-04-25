@@ -9,6 +9,13 @@ type SessionIdentityProps = {
   compact?: boolean;
 };
 
+type SessionTimingIdentityProps = {
+  sessionNumber: number;
+  date: string;
+  phaseLabel?: string;
+  compact?: boolean;
+};
+
 function padSessionNumber(value: number) {
   return String(value).padStart(2, "0");
 }
@@ -72,6 +79,30 @@ export function SessionIdentity({
       data-session-state={state}
       data-published={published ? "true" : "false"}
       data-feedback-document={feedbackDocumentAvailable ? "available" : "unavailable"}
+      role="group"
+      aria-label={items.map((item) => item.value).join(" · ")}
+    >
+      {items.map((item) => (
+        <span key={item.value} className={item.className}>
+          {item.value}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export function SessionTimingIdentity({ sessionNumber, date, phaseLabel: phase, compact = true }: SessionTimingIdentityProps) {
+  const number = `No.${padSessionNumber(sessionNumber)}`;
+  const dday = ddayLabel(date);
+  const items = [
+    { value: number, className: "rm-session-identity__number rm-session-identity__chip rm-state rm-state--pending" },
+    dday ? { value: dday, className: "rm-session-identity__chip rm-state rm-state--pending" } : null,
+    phase ? { value: phase, className: "rm-session-identity__chip" } : null,
+  ].filter((item): item is { value: string; className: string } => Boolean(item));
+
+  return (
+    <div
+      className={compact ? "rm-session-identity rm-session-identity--compact" : "rm-session-identity"}
       role="group"
       aria-label={items.map((item) => item.value).join(" · ")}
     >

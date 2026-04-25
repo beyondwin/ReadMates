@@ -34,6 +34,7 @@ import {
   nonNegativeCount,
   rsvpLabel,
 } from "@/shared/ui/readmates-display";
+import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 const HOST_DASHBOARD_LABELS = {
   attention: "오늘의 운영 판단",
@@ -353,7 +354,7 @@ export default function HostDashboard({
                         width={96}
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="eyebrow">{phase.eyebrow}</div>
+                        <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
                         <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
                           {session.bookTitle}
                         </h2>
@@ -753,7 +754,7 @@ function MobileHostDashboard({
               <>
                 <div className="m-row-between" style={{ alignItems: "flex-start" }}>
                   <div>
-                    <div className="eyebrow">{phase.eyebrow}</div>
+                    <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
                     <h2 className="h4 editorial" style={{ margin: "6px 0 2px" }}>
                       {session.bookTitle}
                     </h2>

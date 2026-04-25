@@ -1,12 +1,45 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SessionIdentity } from "@/shared/ui/session-identity";
+import { SessionIdentity, SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
 describe("SessionIdentity", () => {
+  it("renders compact session timing with number and pending d-day chips only", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 22, 0, 0, 0));
+
+    render(<SessionTimingIdentity sessionNumber={7} date="2026-05-13" />);
+
+    expect(screen.getByLabelText("No.07 · D-21")).toBeVisible();
+    expect(screen.getByText("No.07")).toHaveClass(
+      "rm-session-identity__number",
+      "rm-session-identity__chip",
+      "rm-state",
+      "rm-state--pending",
+    );
+    expect(screen.getByText("D-21")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    expect(screen.queryByText("이번 세션")).not.toBeInTheDocument();
+  });
+
+  it("can append a compact current-session phase chip after d-day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 22, 0, 0, 0));
+
+    render(<SessionTimingIdentity sessionNumber={7} date="2026-05-13" phaseLabel="이번 세션" />);
+
+    expect(screen.getByLabelText("No.07 · D-21 · 이번 세션")).toBeVisible();
+    expect(screen.getByText("No.07")).toHaveClass(
+      "rm-session-identity__chip",
+      "rm-state",
+      "rm-state--pending",
+    );
+    expect(screen.getByText("D-21")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    expect(screen.getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
+  });
+
   it("labels the open current session with d-day", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 22, 0, 0, 0));
