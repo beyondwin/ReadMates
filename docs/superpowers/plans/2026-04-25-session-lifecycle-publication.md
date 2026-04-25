@@ -1101,7 +1101,7 @@ Task 6 checkpoint (2026-04-25):
 - Verification: `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed with 44 files and 498 tests; `pnpm --dir front build` passed.
 - E2E: default `pnpm --dir front test:e2e` failed before browser tests because the default local e2e schema had stale Flyway history. Root-cause review found this was persisted local DB state, not current code. A rerun with a granted current e2e schema override passed with 18 tests.
 - Manual smoke: session create/open, host close, current-session removal, closed public record hidden from notes/public, publish, archive visibility, notes visibility, and public detail visibility all passed against the local app; generated smoke session was deleted afterward.
-- Background resources: session-owned bootRun on 18080 and Vite on 3100 were stopped.
+- Background resources: session-owned verification services were stopped.
 - Remaining risks: the default e2e schema may still have stale Flyway history; use a current granted e2e schema override or reset the disposable default schema before relying on the default e2e command.
 
 ## Self-Review

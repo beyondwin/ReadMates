@@ -127,6 +127,7 @@ function MemberSessionDetailDesktop({
   returnTarget: ReadmatesReturnTarget;
 }) {
   const date = formatDateOnlyLabel(session.date);
+  const published = session.state === "PUBLISHED";
 
   return (
     <>
@@ -163,7 +164,7 @@ function MemberSessionDetailDesktop({
                   sessionNumber={session.sessionNumber}
                   state={session.state}
                   date={session.date}
-                  published={Boolean(session.publicSummary)}
+                  published={published}
                   feedbackDocumentAvailable={session.feedbackDocument.available}
                 />
               </div>
@@ -239,6 +240,7 @@ function MemberSessionDetailMobile({
   returnTarget: ReadmatesReturnTarget;
 }) {
   const date = formatDateOnlyLabel(session.date);
+  const published = session.state === "PUBLISHED";
 
   return (
     <div className="m-body">
@@ -267,7 +269,7 @@ function MemberSessionDetailMobile({
                 sessionNumber={session.sessionNumber}
                 state={session.state}
                 date={session.date}
-                published={Boolean(session.publicSummary)}
+                published={published}
                 feedbackDocumentAvailable={session.feedbackDocument.available}
                 compact
               />
