@@ -7,6 +7,8 @@ type SessionIdentityProps = {
   published: boolean;
   feedbackDocumentAvailable?: boolean;
   compact?: boolean;
+  hidePastPhaseLabel?: boolean;
+  hideFeedbackDocumentLabel?: boolean;
 };
 
 type SessionTimingIdentityProps = {
@@ -62,14 +64,17 @@ export function SessionIdentity({
   published,
   feedbackDocumentAvailable = false,
   compact = false,
+  hidePastPhaseLabel = false,
+  hideFeedbackDocumentLabel = false,
 }: SessionIdentityProps) {
   const dday = state === "OPEN" ? ddayLabel(date) : null;
+  const phase = phaseLabel(state);
   const items = [
     { value: `No.${padSessionNumber(sessionNumber)}`, className: "rm-session-identity__number" },
-    { value: phaseLabel(state), className: "rm-session-identity__chip" },
+    hidePastPhaseLabel && phase === "지난 회차" ? null : { value: phase, className: "rm-session-identity__chip" },
     { value: stateLabel(state, published), className: `rm-session-identity__chip ${stateToneClass(stateLabel(state, published))}` },
     dday ? { value: dday, className: "rm-session-identity__chip rm-state rm-state--pending" } : null,
-    feedbackDocumentAvailable
+    feedbackDocumentAvailable && !hideFeedbackDocumentLabel
       ? { value: "문서 있음", className: `rm-session-identity__chip ${stateToneClass("문서 있음")}` }
       : null,
   ].filter((item): item is { value: string; className: string } => Boolean(item));
