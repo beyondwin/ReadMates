@@ -100,7 +100,7 @@ describe("PublicRecordsPage", () => {
     renderRecordsRoute();
 
     expect(await screen.findByRole("heading", { name: "공개 기록" })).toBeInTheDocument();
-    expect(screen.getByText("기록 아카이브")).toBeInTheDocument();
+    expect(screen.getByText("기록 모음")).toBeInTheDocument();
     expect(screen.queryByText("읽는사이")).not.toBeInTheDocument();
     expect(screen.queryByText("읽는사이 · 공개 기록")).not.toBeInTheDocument();
     expect(screen.getByText("최근 발행한 책과 대화의 흔적을 모았습니다.")).toBeInTheDocument();
