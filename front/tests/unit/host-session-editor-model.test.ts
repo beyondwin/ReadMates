@@ -13,6 +13,7 @@ import {
   questionDeadlineLabelForForm,
   questionDeadlineLabelFromIso,
   questionDeadlineLabelFromSessionDate,
+  recordVisibilityDescription,
   recordVisibilityLabel,
   type HostSessionEditorSession,
   type HostSessionFormValues,
@@ -136,6 +137,8 @@ describe("host session editor model", () => {
     expect(recordVisibilityLabel("HOST_ONLY")).toBe("호스트 전용");
     expect(recordVisibilityLabel("MEMBER")).toBe("멤버 공개");
     expect(recordVisibilityLabel("PUBLIC")).toBe("외부 공개");
+    expect(recordVisibilityDescription("MEMBER")).toBe("기록 공개를 완료하면 멤버 앱 안에서만 볼 수 있습니다.");
+    expect(recordVisibilityDescription("PUBLIC")).toBe("기록 공개를 완료하면 멤버 앱과 공개 기록 목록에 표시됩니다.");
   });
 
   it("preserves deadline defaults and existing-session deadline semantics", () => {
