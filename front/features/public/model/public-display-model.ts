@@ -122,7 +122,7 @@ export function getPublicRecordsDisplay(data: PublicClubView) {
     recentCount,
     publicSessionCount,
     showsRecentSubset,
-    countLabel: showsRecentSubset ? `최근 ${recentCount}개 공개 기록` : `공개 기록 ${recentCount}개`,
+    countLabel: `총 ${publicSessionCount}개`,
   };
 }
 
