@@ -18,6 +18,8 @@ import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 
 private const val CLEANUP_BFF_DELETE_SESSION_SQL = """
+    delete from public_session_publications
+    where session_id = '00000000-0000-0000-0000-000000009888';
     delete from session_participants
     where session_id = '00000000-0000-0000-0000-000000009888';
     delete from sessions
@@ -117,6 +119,22 @@ class HostSessionBffSecurityTest(
         }
     }
 
+    @Test
+    fun `host publish bff request reaches controller without spring csrf token`() {
+        createClosedPublicSession()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009888/publish") {
+            with(user("host@example.com"))
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+            jsonPath("$.state") { value("PUBLISHED") }
+            jsonPath("$.publication.visibility") { value("PUBLIC") }
+        }
+    }
+
     private fun createDraftSession() {
         createSession(state = "DRAFT", visibility = "HOST_ONLY")
     }
@@ -130,6 +148,32 @@ class HostSessionBffSecurityTest(
             from memberships
             where memberships.club_id = '00000000-0000-0000-0000-000000000001'
               and memberships.status = 'ACTIVE'
+            """.trimIndent(),
+        )
+    }
+
+    private fun createClosedPublicSession() {
+        createSession(state = "CLOSED", visibility = "PUBLIC")
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id,
+              club_id,
+              session_id,
+              public_summary,
+              is_public,
+              visibility,
+              published_at
+            )
+            values (
+              uuid(),
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000009888',
+              'BFF 공개 전환 테스트 요약입니다.',
+              false,
+              'PUBLIC',
+              null
+            )
             """.trimIndent(),
         )
     }

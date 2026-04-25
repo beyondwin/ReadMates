@@ -96,6 +96,17 @@ class HostSessionCommandServiceTest {
     }
 
     @Test
+    fun `service delegates publish transition`() {
+        val port = RecordingHostSessionWritePort()
+        val service = HostSessionCommandService(port)
+        val command = HostSessionIdCommand(host, UUID.randomUUID())
+
+        service.publish(command)
+
+        assertEquals(command, port.publishCommand)
+    }
+
+    @Test
     fun `service delegates upcoming sessions`() {
         val port = RecordingHostSessionWritePort()
         val service = HostSessionCommandService(port)
@@ -154,6 +165,7 @@ class HostSessionCommandServiceTest {
         var visibilityCommand: UpdateHostSessionVisibilityCommand? = null
         var openCommand: HostSessionIdCommand? = null
         var closeCommand: HostSessionIdCommand? = null
+        var publishCommand: HostSessionIdCommand? = null
         var upcomingMember: CurrentMember? = null
 
         override fun list(host: CurrentMember): List<HostSessionListItem> {
@@ -200,6 +212,11 @@ class HostSessionCommandServiceTest {
         override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
             closeCommand = command
             return hostSessionDetail(command.sessionId).copy(state = "CLOSED")
+        }
+
+        override fun publish(command: HostSessionIdCommand): HostSessionDetailResponse {
+            publishCommand = command
+            return hostSessionDetail(command.sessionId).copy(state = "PUBLISHED")
         }
 
         override fun deletionPreview(command: HostSessionIdCommand) =
