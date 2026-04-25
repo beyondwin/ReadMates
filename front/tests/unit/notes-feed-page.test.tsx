@@ -293,8 +293,9 @@ describe("NotesFeedPage", () => {
     ]);
     expect(screen.queryByRole("button", { name: removedLabel("읽기 ", "흔적") })).not.toBeInTheDocument();
     expect(screen.queryByText(removedLabel("읽기 ", "흔적 5"))).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "남은 문장들" })).toBeInTheDocument();
-    expect(screen.getAllByText("AI-assisted")).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "하이라이트 · 1" })).toBeInTheDocument();
+    expect(screen.getByText("남은 문장들")).toBeInTheDocument();
+    expect(screen.queryByText("AI-assisted")).not.toBeInTheDocument();
     const highlightRow = screen
       .getByText("다학문적 사고는 더 안전한 판단을 만들기도 하지만 실행을 늦추는 부담이 되기도 했다.")
       .closest(".rm-notes-highlight-row");
@@ -302,7 +303,8 @@ describe("NotesFeedPage", () => {
     expect(highlightRow).not.toBeNull();
     expect(within(highlightRow as HTMLElement).getByText("읽는사이")).toBeInTheDocument();
     expect(within(highlightRow as HTMLElement).queryByText("No.06 · 가난한 찰리의 연감")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "짧게 남긴 감상" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "내 한줄평 · 1" })).toBeInTheDocument();
+    expect(screen.getByText("짧게 남긴 감상")).toBeInTheDocument();
     const oneLinerCard = screen
       .getByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")
       .closest(".rm-notes-oneliner-card");
@@ -311,7 +313,8 @@ describe("NotesFeedPage", () => {
     expect(within(oneLinerCard as HTMLElement).getByText("이멤버5")).toBeInTheDocument();
     expect(within(oneLinerCard as HTMLElement).queryByText("No.06 · 2026.04.15")).not.toBeInTheDocument();
     expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "지난 세션의 질문들" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "내 질문 · 1" })).toBeInTheDocument();
+    expect(screen.getByText("읽으며 붙든 질문")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "이번 달의 질문들" })).not.toBeInTheDocument();
     const rail = desktopRail();
 
@@ -376,7 +379,7 @@ describe("NotesFeedPage", () => {
     await user.click(screen.getByRole("button", { name: "하이라이트 3" }));
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=highlights");
-    expect(screen.getByText("AI-assisted")).toBeInTheDocument();
+    expect(screen.queryByText("AI-assisted")).not.toBeInTheDocument();
     expect(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" })).toHaveAttribute(
       "href",
       "/app/notes?sessionId=session-9&filter=highlights",
@@ -395,11 +398,12 @@ describe("NotesFeedPage", () => {
     expect(screen.queryByText("AI-assisted")).not.toBeInTheDocument();
   });
 
-  it("shows the AI-assisted label on oneliner note filter views", () => {
+  it("shows the oneliner detail label on oneliner note filter views", () => {
     renderNotesFilterUrlHarness("/app/notes?sessionId=session-6&filter=oneliners");
 
-    expect(screen.getByText("AI-assisted")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "짧게 남긴 감상" })).toBeInTheDocument();
+    expect(screen.queryByText("AI-assisted")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "내 한줄평 · 1" })).toBeInTheDocument();
+    expect(screen.getByText("짧게 남긴 감상")).toBeInTheDocument();
   });
 
   it("filters the desktop session rail by book title and No.06-style labels", async () => {

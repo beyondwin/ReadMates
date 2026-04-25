@@ -123,7 +123,7 @@ function NotesEmptyState({ message }: { message: string }) {
 
 function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`질문 · ${items.length}`} title="지난 세션의 질문들">
+    <FeedSection heading={`내 질문 · ${items.length}`} detail="읽으며 붙든 질문">
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
         {items.map((item, index) => (
           <article
@@ -146,7 +146,7 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
 
 function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`한줄평 · ${items.length}`} title="짧게 남긴 감상" showAiAssistedLabel>
+    <FeedSection heading={`내 한줄평 · ${items.length}`} detail="짧게 남긴 감상">
       <div className="rm-notes-oneliner-grid">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-oneliner-card">
@@ -161,7 +161,7 @@ function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
 
 function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection eyebrow={`하이라이트 · ${items.length}`} title="남은 문장들" showAiAssistedLabel>
+    <FeedSection heading={`하이라이트 · ${items.length}`} detail="남은 문장들">
       <div className="rm-notes-highlight-list">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-highlight-row">
@@ -175,30 +175,25 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
 }
 
 function FeedSection({
-  eyebrow,
-  title,
+  heading,
+  detail,
   children,
-  showAiAssistedLabel = false,
 }: {
-  eyebrow: string;
-  title: string;
+  heading: string;
+  detail: string;
   children: React.ReactNode;
-  showAiAssistedLabel?: boolean;
 }) {
   return (
     <section style={{ paddingBottom: "44px" }}>
-      <div className="row-between" style={{ marginBottom: "20px", gap: "18px", alignItems: "baseline" }}>
+      <div className="row-between" style={{ marginBottom: "20px", gap: "18px", alignItems: "baseline", flexWrap: "wrap" }}>
         <div className="row" style={{ gap: "14px", alignItems: "baseline", flexWrap: "wrap", minWidth: 0 }}>
-          <span className="eyebrow">{eyebrow}</span>
-          <h2 className="h3 editorial rm-notes-section-title" style={{ margin: 0 }}>
-            {title}
+          <h2 className="eyebrow rm-notes-section-title" style={{ margin: 0 }}>
+            {heading}
           </h2>
         </div>
-        {showAiAssistedLabel ? (
-          <span className="tiny mono" style={{ color: "var(--text-3)", flex: "0 0 auto", whiteSpace: "nowrap" }}>
-            AI-assisted
-          </span>
-        ) : null}
+        <span className="tiny mono" style={{ color: "var(--text-3)", flex: "0 0 auto", whiteSpace: "nowrap" }}>
+          {detail}
+        </span>
       </div>
       {children}
     </section>
