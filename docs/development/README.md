@@ -9,6 +9,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트와 공개 릴리즈 점검 | [test-guide.md](test-guide.md) |
 | 제품/기술 구조와 frontend route-first 경계 | [architecture.md](architecture.md) |
+| 릴리즈 관리와 CHANGELOG | [release-management.md](release-management.md), [../../CHANGELOG.md](../../CHANGELOG.md) |
 | 배포 문서 허브 | [../deploy/README.md](../deploy/README.md) |
 | Cloudflare Pages 배포 | [../deploy/cloudflare-pages.md](../deploy/cloudflare-pages.md) |
 | OCI backend 배포 | [../deploy/oci-backend.md](../deploy/oci-backend.md) |
