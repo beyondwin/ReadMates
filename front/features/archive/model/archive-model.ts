@@ -336,31 +336,31 @@ export function feedbackArchiveBadgeClass(feedbackDocument: ArchiveFeedbackDocum
 export function selectedArchiveSectionMeta(view: ArchiveView) {
   if (view === "reviews") {
     return {
-      eyebrow: "SAVED REVIEWS",
       title: "내 서평",
+      contextLabel: "다 읽고 남긴 감상",
       body: "회차별로 흩어진 감상을 한 권의 발췌 노트처럼 모았습니다.",
     };
   }
 
   if (view === "questions") {
     return {
-      eyebrow: "SAVED QUESTIONS",
       title: "내 질문",
+      contextLabel: "읽으며 붙든 질문",
       body: "모임 전에 남겼던 질문과 초안을 다시 읽을 수 있는 질문장입니다.",
     };
   }
 
   if (view === "report") {
     return {
-      eyebrow: "FEEDBACK DOCUMENTS",
       title: "피드백 문서",
+      contextLabel: "모임 뒤의 정리",
       body: "참석한 회차의 운영 피드백 문서를 보존 문서로 열람합니다.",
     };
   }
 
   return {
-    eyebrow: "SESSION RECORDS",
     title: "세션 기록",
+    contextLabel: "함께 읽은 흔적",
     body: "지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.",
   };
 }

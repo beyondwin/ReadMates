@@ -332,7 +332,6 @@ function ArchiveMobile({
 
 function ArchiveSelectedSection({ view, children }: { view: ArchiveView; children: ReactNode }) {
   const meta = selectedArchiveSectionMeta(view);
-  const showPreservedRecordLabel = view === "sessions" || view === "report";
 
   return (
     <section
@@ -354,21 +353,16 @@ function ArchiveSelectedSection({ view, children }: { view: ArchiveView; childre
         }}
       >
         <div>
-          <p className="eyebrow" style={{ margin: 0 }}>
-            {meta.eyebrow}
-          </p>
-          <h2 id={`archive-${view}-heading`} className="h2 editorial" style={{ margin: "6px 0 0" }}>
+          <h2 id={`archive-${view}-heading`} className="h2 editorial" style={{ margin: 0 }}>
             {meta.title}
           </h2>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0", maxWidth: 560 }}>
             {meta.body}
           </p>
         </div>
-        {showPreservedRecordLabel ? (
-          <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-            AI-assisted
-          </span>
-        ) : null}
+        <span className="tiny mono" style={{ color: "var(--text-3)" }}>
+          {meta.contextLabel}
+        </span>
       </div>
       {children}
     </section>
@@ -381,8 +375,7 @@ function MobileArchiveSectionIntro({ view }: { view: ArchiveView }) {
   return (
     <section style={{ padding: "8px 18px 0px" }}>
       <div className="m-card-quiet" style={{ padding: "14px 16px" }}>
-        <div className="eyebrow">{meta.eyebrow}</div>
-        <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
+        <h2 className="h3 editorial" style={{ margin: 0 }}>
           {meta.title}
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
