@@ -158,9 +158,9 @@ function ReadingRhythm() {
 
 function PublicRecordGuide({ hasPublishedRecords }: { hasPublishedRecords: boolean }) {
   const guide = [
-    ["첫 화면", "가장 최근에 발행한 기록을 대표 자료로 먼저 보여줍니다."],
-    ["기록 목록", "발행된 공개 기록은 번호순으로 이어지는 목록에서 다시 확인할 수 있습니다."],
-    ["멤버 공간", "참여자 전용 피드백과 개인 노트는 정식 멤버 공간에만 남깁니다."],
+    ["첫 화면", "가장 최근에 공개한 기록을 먼저 펼쳐, 함께 읽은 흔적을 보여줍니다."],
+    ["기록 목록", "지나간 공개 기록은 차례대로 모아 다시 읽을 수 있게 둡니다."],
+    ["멤버 공간", "피드백과 서평은 멤버 공간에만 남깁니다."],
   ];
 
   return (
@@ -226,7 +226,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
         <div className="container public-grid-2">
           <div>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              공개 기록
+              기록 안내
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
               공개한 모임 기록을 모았습니다
@@ -259,7 +259,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
         <div className="container public-grid-2">
           <div>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              클럽 리듬
+              읽는 방식
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
               우리는 이렇게 읽습니다
@@ -273,13 +273,13 @@ export default function PublicHome({ data }: PublicHomeProps) {
         <div className="container public-grid-2">
           <div>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              공개 노트
+              남기는 것
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
               기록은 대화의 일부만 남깁니다
             </h2>
             <p className="body" style={{ color: "var(--text-2)", marginTop: 14 }}>
-              비공개 준비 과정과 참석자 전용 피드백은 멤버 공간에 남기고, 외부에는 공개 가능한 요약만 발행합니다.
+              피드백과 서평은 멤버 공간에 남기고, 바깥에는 함께 읽은 흐름만 간결하게 발행합니다.
             </p>
           </div>
           {publicRecordPreviewSessions.length > 0 ? (
@@ -300,10 +300,10 @@ export default function PublicHome({ data }: PublicHomeProps) {
         <div className="container public-grid-2">
           <div>
             <div className="eyebrow" style={{ marginBottom: 8 }}>
-              멤버십 경계
+              함께 읽는 자리
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
-              공개 기록은 열려 있고, 참여는 초대받은 멤버에게만 열립니다
+              공개 기록은 누구나 읽고, 함께 읽는 자리는 초대받은 멤버와 이어갑니다
             </h2>
           </div>
           <div className="rm-document-panel public-membership-panel">
@@ -332,10 +332,10 @@ export default function PublicHome({ data }: PublicHomeProps) {
           <div className="row-between public-section-head">
             <div>
               <div className="eyebrow" style={{ marginBottom: 8 }}>
-                기록 아카이브
+                기록 모음
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
-                공개된 모임 기록
+                공개 기록
               </h2>
             </div>
             <Link to="/records" className="public-records-link">

@@ -76,8 +76,8 @@ describe("PublicHome", () => {
     expect(screen.getAllByText("공개 요약").length).toBeGreaterThan(0);
     expect(screen.getAllByText("하이라이트 3").length).toBeGreaterThan(0);
     expect(screen.getAllByText("한줄평 5").length).toBeGreaterThan(0);
-    expect(screen.getByText("멤버십 경계")).toBeInTheDocument();
-    expect(screen.getByText("공개 기록은 열려 있고, 참여는 초대받은 멤버에게만 열립니다")).toBeInTheDocument();
+    expect(screen.getByText("함께 읽는 자리")).toBeInTheDocument();
+    expect(screen.getByText("공개 기록은 누구나 읽고, 함께 읽는 자리는 초대받은 멤버와 이어갑니다")).toBeInTheDocument();
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByText("기록은 누구나 읽고, 참여는 초대받은 멤버가 합니다")).toBeInTheDocument();
     expect(screen.getByText("읽는사이는 초대 기반 모임입니다. 기록은 누구나 읽을 수 있고, 참여 권한은 초대 수락 또는 호스트 승인 뒤 열립니다.")).toBeInTheDocument();
@@ -86,8 +86,8 @@ describe("PublicHome", () => {
     expect(screen.queryByRole("link", { name: /초대 수락하기/ })).not.toBeInTheDocument();
     expect(container.querySelector('a[href="/login"]')).toHaveTextContent("시작하기");
     expect(container.querySelector('a[href="/login"]')).not.toHaveTextContent("초대 수락하기");
-    expect(screen.getByText("기록 아카이브")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "공개된 모임 기록", level: 2 })).toBeInTheDocument();
+    expect(screen.getByText("기록 모음")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "공개 기록", level: 2 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute(
       "href",
       "/records",
