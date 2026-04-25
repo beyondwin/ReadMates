@@ -57,11 +57,16 @@ describe("PublicClub", () => {
     expect(within(overview).getByText("기록 방식")).toBeInTheDocument();
     expect(within(overview).getByText("음성 기록 · AI 피드백 참고용")).toBeInTheDocument();
 
-    expect(screen.getByRole("heading", { name: "작게 읽고, 분명하게 남깁니다" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "함께 읽고, 선명하게 기록합니다" })).toBeInTheDocument();
     expect(screen.getByText("모임의 약속")).toBeInTheDocument();
     expect(screen.getByText("참여, 피드백 문서, 개인 노트는 정식 멤버 공간에만 남깁니다.")).toBeInTheDocument();
     expect(screen.getByText("호스트 안내")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "호스트의 글" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "우리가 대화를 여는 방식" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "읽는사이는 각자의 질문에서 대화를 시작하는 모임입니다. 함께 나누고 싶은 질문을 2개 이상 남겨 주세요. 우리는 각자가 남긴 질문을 꺼내 놓고, 서로의 해석이 어디서 달라지는지 천천히 살핍니다. 하나의 결론에 서둘러 닿기보다, 읽고 난 뒤의 생각이 서로에게 이어지는 시간을 중요하게 여깁니다.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("김호스트")).toBeInTheDocument();
     expect(screen.getByLabelText("김호스트")).toBeInTheDocument();
     expect(screen.getByText("호스트 · 2025.11~")).toBeInTheDocument();

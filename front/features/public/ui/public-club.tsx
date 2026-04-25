@@ -100,7 +100,7 @@ export default function PublicClub({ data }: PublicClubProps) {
               모임의 약속
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
-              작게 읽고, 분명하게 남깁니다
+              함께 읽고, 선명하게 기록합니다
             </h2>
           </div>
           <div className="public-ledger-list">
@@ -122,7 +122,7 @@ export default function PublicClub({ data }: PublicClubProps) {
               호스트 안내
             </div>
             <h2 className="h2 editorial" style={{ margin: 0 }}>
-              호스트의 글
+              우리가 대화를 여는 방식
             </h2>
           </div>
           <div className="rm-document-panel public-host-note">
