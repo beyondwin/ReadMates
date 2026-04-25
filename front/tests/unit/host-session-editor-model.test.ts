@@ -140,10 +140,10 @@ describe("host session editor model", () => {
 
   it("preserves deadline defaults and existing-session deadline semantics", () => {
     expect(questionDeadlineIsoFromSessionDate("2026-05-20")).toBe("2026-05-19T23:59:00+09:00");
-    expect(questionDeadlineLabelFromSessionDate("2026-05-20")).toBe("05-19 23:59까지 질문 제출");
-    expect(questionDeadlineLabelFromIso("2025-11-25T14:59:00Z")).toBe("11-25 23:59까지 질문 제출");
-    expect(questionDeadlineLabelForForm(session, "2025-11-26")).toBe("11-25 23:59까지 질문 제출");
-    expect(questionDeadlineLabelForForm(session, "2026-05-20")).toBe("05-19 23:59까지 질문 제출");
+    expect(questionDeadlineLabelFromSessionDate("2026-05-20")).toBe("05-19 23:59까지");
+    expect(questionDeadlineLabelFromIso("2025-11-25T14:59:00Z")).toBe("11-25 23:59까지");
+    expect(questionDeadlineLabelForForm(session, "2025-11-26")).toBe("11-25 23:59까지");
+    expect(questionDeadlineLabelForForm(session, "2026-05-20")).toBe("05-19 23:59까지");
     expect(buildHostSessionRequest(formValues, { date: "2026-05-20" })).toEqual(formValues);
     expect(buildHostSessionRequest(formValues, { date: "2026-05-13" })).toEqual({
       ...formValues,

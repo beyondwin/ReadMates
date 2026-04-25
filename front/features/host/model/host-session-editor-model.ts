@@ -169,7 +169,7 @@ function questionDeadlineLabelFromDate(deadlineDate: Date) {
   const hour = padDatePart(deadlineDate.getUTCHours());
   const minute = padDatePart(deadlineDate.getUTCMinutes());
 
-  return `${month}-${day} ${hour}:${minute}까지 질문 제출`;
+  return `${month}-${day} ${hour}:${minute}까지`;
 }
 
 export function questionDeadlineLabelFromSessionDate(value: string) {
