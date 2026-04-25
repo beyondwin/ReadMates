@@ -335,12 +335,21 @@ copy_dir() {
     --exclude='*.sql.gz' \
     --exclude='*.dump' \
     --exclude='.DS_Store' \
+    --exclude='/.wrangler/' \
+    --exclude='/.cloudflare/' \
+    --exclude='/.vercel/' \
+    --exclude='/.terraform/' \
+    --exclude='/.pulumi/' \
+    --exclude='/private/' \
+    --exclude='/screenshot/' \
+    --exclude='/screenshots/' \
     "$@" \
     "$source/" "$target/"
 }
 
 copy_manifest() {
   copy_required_file ".github/workflows/ci.yml"
+  copy_required_file ".github/workflows/deploy-front.yml"
   copy_required_file ".gitignore"
   copy_optional_file ".gitleaks.toml"
   copy_required_file ".env.example"
@@ -374,7 +383,7 @@ is_approved_manifest_path() {
   local rel="$1"
 
   case "$rel" in
-    .github|.github/workflows|.github/workflows/ci.yml) return 0 ;;
+    .github|.github/workflows|.github/workflows/ci.yml|.github/workflows/deploy-front.yml) return 0 ;;
     .gitignore|.gitleaks.toml|.env.example|README.md|compose.yml) return 0 ;;
     front|front/*) return 0 ;;
     server|server/*) return 0 ;;
