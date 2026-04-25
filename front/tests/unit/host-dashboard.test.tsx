@@ -630,11 +630,13 @@ describe("HostDashboard", () => {
 
     expect(nextBookCard).not.toBeNull();
     const visibilityButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /멤버 공개/ });
+    const openButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /현재로 시작/ });
     const editLink = within(nextBookCard as HTMLElement).getByRole("link", { name: "편집 · 다음 책" });
+    expect(openButton).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
+    expect(openButton.closest(".row")).toBe(visibilityButton.closest(".row"));
     expect(visibilityButton).toBeInTheDocument();
     expect(visibilityButton).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
     expect(editLink).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
-    expect(within(nextBookCard as HTMLElement).getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
     expect(editLink).toHaveAttribute("href", "/app/host/sessions/session-8/edit");
   });
 

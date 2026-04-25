@@ -54,6 +54,14 @@ const AGGREGATE_PUBLICATION_REASON =
   "공개 대기 건수는 여러 세션을 합산한 값이라 세션 기록에서 정확한 회차를 선택해야 합니다.";
 const AGGREGATE_FEEDBACK_REASON =
   "피드백 문서 대기 건수는 여러 세션을 합산한 값이라 세션 기록에서 정확한 회차를 선택해야 합니다.";
+const UPCOMING_MOBILE_ACTION_STYLE: CSSProperties = {
+  flex: "0 0 auto",
+  minWidth: 64,
+  paddingLeft: 10,
+  paddingRight: 10,
+  whiteSpace: "nowrap",
+  wordBreak: "keep-all",
+};
 
 const quickActions = [
   {
@@ -969,23 +977,23 @@ function UpcomingSessionMobileCard({
         </span>
         <strong style={{ color: "var(--accent)", fontWeight: 700 }}>{currentVisibilityLabel}</strong>
       </div>
-      {showOpenAction ? (
-        <button
-          className="btn btn-primary btn-sm"
-          type="button"
-          style={{ marginTop: 10, width: "100%" }}
-          aria-label={`${openLabel} · ${session.bookTitle}`}
-          disabled={controlsDisabled}
-          onClick={() => actions.openSession(session.sessionId)}
-        >
-          {openLabel}
-        </button>
-      ) : null}
-      <div className="row" style={{ gap: 8, marginTop: showOpenAction ? 8 : 12 }}>
+      <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        {showOpenAction ? (
+          <button
+            className="btn btn-primary btn-sm"
+            type="button"
+            style={UPCOMING_MOBILE_ACTION_STYLE}
+            aria-label={`${openLabel} · ${session.bookTitle}`}
+            disabled={controlsDisabled}
+            onClick={() => actions.openSession(session.sessionId)}
+          >
+            {openLabel}
+          </button>
+        ) : null}
         <button
           className="btn btn-ghost btn-sm"
           type="button"
-          style={{ flex: "0 0 auto", minWidth: 64, paddingLeft: 10, paddingRight: 10, whiteSpace: "nowrap", wordBreak: "keep-all" }}
+          style={UPCOMING_MOBILE_ACTION_STYLE}
           disabled={controlsDisabled}
           aria-label={visibilityActionAriaLabel}
           onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
@@ -995,7 +1003,7 @@ function UpcomingSessionMobileCard({
         <Link
           className="btn btn-ghost btn-sm"
           to={hostSessionEditHref(session.sessionId)}
-          style={{ flex: "0 0 auto", minWidth: 64, paddingLeft: 10, paddingRight: 10 }}
+          style={UPCOMING_MOBILE_ACTION_STYLE}
           aria-label={`편집 · ${session.bookTitle}`}
         >
           편집
