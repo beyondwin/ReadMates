@@ -362,7 +362,7 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByRole("button", { name: "참석" })).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "진행률 저장" })).toBeInTheDocument();
     expect(desktopScope.queryByText("호스트 맥락")).not.toBeInTheDocument();
-    expect(desktopScope.queryByRole("link", { name: "세션 운영으로" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "세션 운영으로" })).not.toBeInTheDocument();
   });
 
   it("mirrors viewer read-only controls on mobile current session", async () => {

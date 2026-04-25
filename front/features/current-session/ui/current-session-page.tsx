@@ -86,7 +86,6 @@ export function CurrentSessionPage({ auth, data, actions, internalLinkComponent,
       session={data.currentSession}
       auth={auth}
       actions={actions}
-      internalLinkComponent={internalLinkComponent}
       onSaveSuccess={onSaveSuccess}
     />
   );
@@ -131,13 +130,11 @@ export function CurrentSessionBoard({
   session,
   auth,
   actions,
-  internalLinkComponent = AnchorInternalLink,
   onSaveSuccess,
 }: {
   session: CurrentSession;
   auth?: CurrentSessionAuth;
   actions: CurrentSessionSaveActions;
-  internalLinkComponent?: InternalLinkComponent;
   onSaveSuccess?: () => void;
 }) {
   const [rsvp, setRsvp] = useState<CurrentSession["myRsvpStatus"]>(session.myRsvpStatus);
@@ -151,7 +148,7 @@ export function CurrentSessionBoard({
   const [mobileTab, setMobileTab] = useState<MobileSessionTab>("prep");
   const writtenQuestionCount = countWrittenQuestions(questionInputs);
   const accessState = getCurrentSessionAccessState(auth);
-  const { isViewer, isHost, canWrite } = accessState;
+  const { isViewer, canWrite } = accessState;
   const memberNotice = getCurrentSessionMemberNotice(accessState);
   const boardTabs = getCurrentSessionBoardTabs(session.board);
 
@@ -370,9 +367,7 @@ export function CurrentSessionBoard({
         onSaveLongReview={handleSaveLongReview}
         isViewer={isViewer}
         memberNotice={memberNotice}
-        isHost={isHost}
         canWrite={canWrite}
-        internalLinkComponent={internalLinkComponent}
       />
 
       <main className="desktop-only rm-current-session-desktop">
