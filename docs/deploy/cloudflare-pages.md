@@ -56,7 +56,7 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 프론트엔드 정상 배포 경로:
 
 1. GitHub `main`에 변경을 병합하고 필요한 검증을 끝냅니다.
-2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push합니다. 예: `git push origin v1.1.0`
+2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push합니다. 예: `git push origin v1.2.0`
 3. `.github/workflows/deploy-front.yml`이 tag 대상 commit에서 `front`를 빌드합니다.
 4. Wrangler가 `front/dist`와 `front/functions`를 Cloudflare Pages production으로 함께 배포합니다.
 5. [README.md](README.md)의 smoke check를 실행합니다.
@@ -103,7 +103,7 @@ curl -sS https://readmates.pages.dev/api/bff/api/public/club
 - `/app`은 `200`으로 SPA를 반환합니다.
 - `/api/bff/api/auth/me`는 BFF를 통해 Spring에 도달합니다. 로그아웃 상태여도 anonymous auth state를 담은 `200`일 수 있습니다.
 - `/oauth2/authorization/google`은 Google 또는 Spring OAuth 흐름으로 redirect됩니다.
-- `/api/bff/api/public/club`은 `PUBLIC` 공개 범위의 공개 기록에 노출 가능한 club 정보만 반환해야 합니다.
+- `/api/bff/api/public/club`은 `PUBLISHED` 상태이면서 `PUBLIC` 공개 범위인 기록에 노출 가능한 club 정보만 반환해야 합니다.
 - deep route와 legacy route인 `/app/session/current`, `/app/host`, `/app/host/sessions/new`, `/app/host/sessions/<session-id>/edit`, `/app/host/members`, `/invite/<token>`, `/reset-password/<token>`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
 
 ## 비용 상태 확인
