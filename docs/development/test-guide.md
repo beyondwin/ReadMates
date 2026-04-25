@@ -87,6 +87,8 @@ pnpm --dir front test:e2e -- member-profile-permissions
 
 Backend test suite에는 MySQL 기반 repository/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
+Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, `./server/gradlew -p server clean test`를 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
+
 Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인하고, 전환된 application package가 adapter, Spring JDBC, Spring DAO 세부사항에 의존하지 않는지 확인합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
 
 ```bash
