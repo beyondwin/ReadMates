@@ -85,7 +85,7 @@ export function FeedSections({
   const visibleItems = items.filter((item) => item.kind !== "LONG_REVIEW");
 
   if (visibleItems.length === 0) {
-    return <NotesEmptyState message="이 세션에는 아직 공개된 기록이 없습니다." />;
+    return <NotesEmptyState message="이 세션에는 해당 기록이 없습니다." />;
   }
 
   const selectedKind = filterKind(filter);
@@ -95,12 +95,16 @@ export function FeedSections({
     return <NotesEmptyState message="이 세션에는 해당 기록이 없습니다." />;
   }
 
+  const highlights = byKind(visibleItems, "HIGHLIGHT");
+  const oneLiners = byKind(visibleItems, "ONE_LINE_REVIEW");
+  const questions = byKind(visibleItems, "QUESTION");
+
   return (
     <>
       <NotesFeedListStyles />
-      {(filter === "all" || filter === "highlights") && <FeedHighlights items={byKind(visibleItems, "HIGHLIGHT")} />}
-      {(filter === "all" || filter === "oneliners") && <FeedOneLiners items={byKind(visibleItems, "ONE_LINE_REVIEW")} />}
-      {(filter === "all" || filter === "questions") && <FeedQuestions items={byKind(visibleItems, "QUESTION")} />}
+      {((filter === "all" && highlights.length > 0) || filter === "highlights") && <FeedHighlights items={highlights} />}
+      {((filter === "all" && oneLiners.length > 0) || filter === "oneliners") && <FeedOneLiners items={oneLiners} />}
+      {((filter === "all" && questions.length > 0) || filter === "questions") && <FeedQuestions items={questions} />}
     </>
   );
 }

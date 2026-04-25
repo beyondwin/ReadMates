@@ -355,6 +355,27 @@ describe("NotesFeedPage", () => {
     expect(within(desktopRail()).getByRole("link", { name: "No.10 이전 응답 모양 세션 보기" })).toHaveTextContent("기록 0");
   });
 
+  it("omits empty note sections from the all filter", () => {
+    renderNotesFeedPage({ renderItems: [selectedItems[0]] });
+
+    expect(screen.queryByRole("heading", { name: "하이라이트 · 0" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "내 한줄평 · 0" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "내 질문 · 1" })).toBeInTheDocument();
+    expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
+  });
+
+  it("shows the matching-record empty state when all visible note sections are empty", () => {
+    renderNotesFeedPage({
+      renderItems: [],
+      selectedSessionId: noteSessions[2].sessionId,
+      renderSelectedSession: noteSessions[2],
+    });
+
+    expect(screen.getByRole("heading", { name: "물고기는 존재하지 않는다" })).toBeInTheDocument();
+    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("이 세션에는 아직 공개된 기록이 없습니다.")).not.toBeInTheDocument();
+  });
+
   it("uses router navigation for desktop and mobile session filter links", async () => {
     const user = userEvent.setup();
     const { container } = renderNotesFeedPageInRouter();
@@ -547,7 +568,7 @@ describe("NotesFeedPage", () => {
     });
 
     expect(screen.getByRole("heading", { name: "물고기는 존재하지 않는다" })).toBeInTheDocument();
-    expect(screen.getByText("이 세션에는 아직 공개된 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
   });
 
   it("shows the filter empty state when the selected session has records but not for the active filter", async () => {
