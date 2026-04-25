@@ -452,6 +452,9 @@ describe("MemberHome", () => {
 
     expect(desktop.getByText("클럽 흐름")).toBeInTheDocument();
     expect(screen.getAllByText("내가 직접 넣은 질문만 최근 클럽 흐름에 보여야 합니다.").length).toBeGreaterThan(0);
+    expect(container.querySelector(".rm-member-home-desktop .rm-club-pulse-entry__header")).toBeInTheDocument();
+    expect(container.querySelector(".rm-member-home-desktop .rm-club-pulse-entry__author")).toHaveTextContent("이멤버5");
+    expect(container.querySelector(".rm-member-home-desktop .rm-club-pulse-entry__meta")).toHaveTextContent("No.07 · 질문");
     expect(screen.queryByText("분류는 세계를 이해하기 위한 도구일까요, 아니면 세계를 좁히는 습관일까요?")).not.toBeInTheDocument();
     expect(desktop.queryByText("최근에 남긴 내 기록")).not.toBeInTheDocument();
     expect(desktop.getByText("RSVP · 참석 명단")).toBeInTheDocument();

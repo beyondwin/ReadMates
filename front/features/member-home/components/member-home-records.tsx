@@ -76,18 +76,17 @@ export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
                 borderTop: index === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
               }}
             >
-              <div className="row" style={{ gap: "10px", marginBottom: "10px", color: "var(--text-3)" }}>
-                {authorName ? (
-                  <>
-                    <AvatarChip name={authorName} fallbackInitial={item.authorShortName} label={authorName} size={22} />
-                    <span className="small" style={{ color: "var(--text-2)" }}>
-                      {authorName}
-                    </span>
-                    <span className="small">·</span>
-                  </>
-                ) : null}
-                <span className="tiny mono">
-                  {noteKindLabel(item.kind)} · No.{String(item.sessionNumber).padStart(2, "0")}
+              <div className="rm-club-pulse-entry__header">
+                <div className="rm-club-pulse-entry__author">
+                  {authorName ? (
+                    <>
+                      <AvatarChip name={authorName} fallbackInitial={item.authorShortName} label={authorName} size={22} />
+                      <span className="small rm-club-pulse-entry__author-name">{authorName}</span>
+                    </>
+                  ) : null}
+                </div>
+                <span className="tiny mono rm-club-pulse-entry__meta">
+                  No.{String(item.sessionNumber).padStart(2, "0")} · {noteKindLabel(item.kind)}
                 </span>
               </div>
               <div className="body editorial" style={{ fontSize: "17px", lineHeight: 1.55 }}>

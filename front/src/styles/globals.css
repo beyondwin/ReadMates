@@ -25,6 +25,37 @@
   border: 0;
 }
 
+.rm-club-pulse-entry__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 10px;
+  color: var(--text-3);
+}
+
+.rm-club-pulse-entry__author {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.rm-club-pulse-entry__author-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rm-club-pulse-entry__meta {
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .desktop-only {
   display: block;
 }
