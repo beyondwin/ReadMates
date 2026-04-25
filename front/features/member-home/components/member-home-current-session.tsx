@@ -34,12 +34,6 @@ function mobilePrepStepsFor(session: CurrentSession) {
       hint: `${session.myQuestions.length}/5`,
     },
     {
-      id: "one",
-      label: "한줄평",
-      done: session.myOneLineReview !== null,
-      hint: session.myOneLineReview ? "완료" : "언제든",
-    },
-    {
       id: "feedback",
       label: "피드백",
       done: false,
@@ -62,10 +56,10 @@ function daysUntilLabel(dateValue: string) {
   const diffDays = Math.round((target.getTime() - normalizedToday.getTime()) / 86_400_000);
 
   if (diffDays === 0) {
-    return "오늘";
+    return "D-day";
   }
 
-  return diffDays > 0 ? `${diffDays}일 후` : `${Math.abs(diffDays)}일 전`;
+  return diffDays > 0 ? `D-${diffDays}` : `D+${Math.abs(diffDays)}`;
 }
 
 export function MobileIcon({ name, size = 18, style }: { name: MobileIconName; size?: number; style?: CSSProperties }) {
@@ -204,8 +198,10 @@ export function MobileCurrentSessionCard({
       <div className="rm-member-session-card__head">
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="rm-member-session-card__meta-line">
-            <span className="badge badge-accent badge-dot">No.{String(session.sessionNumber).padStart(2, "0")}</span>
-            {dday ? <span className="eyebrow"> · {dday}</span> : null}
+            <span className="eyebrow">
+              No.{String(session.sessionNumber).padStart(2, "0")}
+              {dday ? ` · ${dday}` : ""}
+            </span>
           </div>
           <h2 className="h3 editorial rm-member-session-card__title">{bookTitle}</h2>
           <div className="tiny" style={{ color: "var(--text-2)" }}>
@@ -335,19 +331,13 @@ export function MobileTodayActions({
       <div className="m-eyebrow-row">
         <span className="eyebrow">오늘 할 일</span>
         <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-          4개
+          3개
         </span>
       </div>
       <div className="m-action-grid">
         <MobileActionTile label="RSVP" sub={rsvpLabel(session.myRsvpStatus)} href="/app/session/current" icon="01" />
         <MobileActionTile label="읽기 진행률" sub={`${readingProgress}%`} href="/app/session/current" icon="02" />
         <MobileActionTile label="질문 쓰기" sub={`${session.myQuestions.length}/5 작성`} href="/app/session/current" icon="03" />
-        <MobileActionTile
-          label="한줄평"
-          sub={session.myOneLineReview ? "작성 완료" : "기록 전"}
-          href="/app/session/current"
-          icon="04"
-        />
       </div>
     </section>
   );

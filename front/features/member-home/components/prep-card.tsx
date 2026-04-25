@@ -32,11 +32,6 @@ function prepStepsFor(session: CurrentSession) {
       done: session.myQuestions.length > 0,
     },
     {
-      label: "한줄평",
-      hint: session.myOneLineReview ? "작성 완료" : "언제든",
-      done: session.myOneLineReview !== null,
-    },
-    {
       label: "피드백 문서",
       hint: "세션 후",
       done: false,
@@ -58,14 +53,14 @@ function daysUntilPhrase(dateValue: string) {
   const diffDays = Math.round((target.getTime() - normalizedToday.getTime()) / 86_400_000);
 
   if (diffDays === 0) {
-    return "오늘";
+    return "D-day";
   }
 
   if (diffDays > 0) {
-    return `${diffDays}일 후`;
+    return `D-${diffDays}`;
   }
 
-  return `${Math.abs(diffDays)}일 전`;
+  return `D+${Math.abs(diffDays)}`;
 }
 
 export function PrepCard({
@@ -126,9 +121,8 @@ export function PrepCard({
           <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
             <div className="rm-prep-card__meta-line">
               <p className="eyebrow" style={{ margin: 0 }}>
-                이번 세션 · {sessionTimingLabel}
+                No.{String(session.sessionNumber).padStart(2, "0")} · {sessionTimingLabel}
               </p>
-              <span className="badge badge-accent badge-dot">No.{String(session.sessionNumber).padStart(2, "0")}</span>
             </div>
             <h2 className="h3 editorial rm-prep-card__title">{bookTitle}</h2>
             <p className="small" style={{ margin: "2px 0 0" }}>

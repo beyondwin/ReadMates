@@ -157,10 +157,7 @@ export function getHostDashboardSessionPhase(
   };
 }
 
-export function getHostDashboardSessionMetrics(
-  session: HostDashboardCurrentSession,
-  statusLabel: string,
-): HostDashboardSessionMetric[] {
+export function getHostDashboardSessionMetrics(session: HostDashboardCurrentSession): HostDashboardSessionMetric[] {
   const attendeeCount = session.attendees.length;
   const goingCount = session.attendees.filter((attendee) => attendee.rsvpStatus === "GOING").length;
   const readingProgressCount = typeof session.myCheckin?.readingProgress === "number" ? 1 : 0;
@@ -171,7 +168,6 @@ export function getHostDashboardSessionMetrics(
     ["참석", `${goingCount}/${session.attendees.length}`],
     ["읽기", `${readingProgressCount}/${attendeeCount}`],
     ["질문", `${questionCount}/${questionCapacity}`],
-    ["상태", statusLabel],
   ];
 }
 

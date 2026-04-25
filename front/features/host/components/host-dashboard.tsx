@@ -34,7 +34,6 @@ import {
   nonNegativeCount,
   rsvpLabel,
 } from "@/shared/ui/readmates-display";
-import { SessionIdentity } from "@/shared/ui/session-identity";
 
 const HOST_DASHBOARD_LABELS = {
   attention: "오늘의 운영 판단",
@@ -354,15 +353,6 @@ export default function HostDashboard({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="eyebrow">{phase.eyebrow}</div>
-                        <div style={{ marginTop: "8px" }}>
-                          <SessionIdentity
-                            sessionNumber={session.sessionNumber}
-                            state="OPEN"
-                            date={session.date}
-                            published={false}
-                            compact
-                          />
-                        </div>
                         <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
                           {session.bookTitle}
                         </h2>
@@ -385,7 +375,7 @@ export default function HostDashboard({
                             gap: "16px",
                           }}
                         >
-                          {getHostDashboardSessionMetrics(session, phase.status).map(([label, value]) => (
+                          {getHostDashboardSessionMetrics(session).map(([label, value]) => (
                             <div key={label}>
                               <div className="eyebrow">{label}</div>
                               <div className="editorial" style={{ fontSize: "20px", marginTop: "4px" }}>
@@ -766,15 +756,6 @@ function MobileHostDashboard({
                     <h2 className="h4 editorial" style={{ margin: "6px 0 2px" }}>
                       {session.bookTitle}
                     </h2>
-                    <div style={{ marginTop: 6 }}>
-                      <SessionIdentity
-                        sessionNumber={session.sessionNumber}
-                        state="OPEN"
-                        date={session.date}
-                        published={false}
-                        compact
-                      />
-                    </div>
                     <div className="tiny">
                       {formatDateOnlyLabel(session.date)} · {session.startTime}
                     </div>
@@ -785,7 +766,7 @@ function MobileHostDashboard({
                   <span className={badgeClass(phase.tone === "warn" ? 1 : 0, phase.tone)}>{phase.status}</span>
                 </div>
                 <div className="rm-host-dashboard-mobile__session-metrics">
-                  {getHostDashboardSessionMetrics(session, phase.status).map(([label, value]) => (
+                  {getHostDashboardSessionMetrics(session).map(([label, value]) => (
                     <div key={label}>
                       <div className="eyebrow">{label}</div>
                       <div className="editorial" style={{ fontSize: 18, marginTop: 3, letterSpacing: 0 }}>

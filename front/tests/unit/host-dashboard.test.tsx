@@ -772,7 +772,7 @@ describe("HostDashboard", () => {
     ).toBeDisabled();
   });
 
-  it("does not derive the current-session status metric from aggregate publication backlog", () => {
+  it("keeps current-session status as a single badge independent from aggregate publication backlog", () => {
     vi.setSystemTime(new Date(2026, 4, 17, 12));
 
     const { container } = render(<HostDashboardForTest current={current} data={{ ...emptyDashboard, publishPending: 7 }} />);
@@ -784,13 +784,10 @@ describe("HostDashboard", () => {
     expect(desktopSessionCard).not.toBeNull();
     expect(mobileSessionCard).not.toBeNull();
 
-    const desktopStatusMetric = within(desktopSessionCard as HTMLElement).getByText("상태").parentElement;
-    const mobileStatusMetric = within(mobileSessionCard as HTMLElement).getByText("상태").parentElement;
-
-    expect(desktopStatusMetric).toHaveTextContent("준비 중");
-    expect(mobileStatusMetric).toHaveTextContent("준비 중");
-    expect(desktopStatusMetric).not.toHaveTextContent("대기");
-    expect(mobileStatusMetric).not.toHaveTextContent("대기");
+    expect(within(desktopSessionCard as HTMLElement).queryByText("상태")).not.toBeInTheDocument();
+    expect(within(mobileSessionCard as HTMLElement).queryByText("상태")).not.toBeInTheDocument();
+    expect(within(desktopSessionCard as HTMLElement).getAllByText("준비 중")).toHaveLength(1);
+    expect(within(mobileSessionCard as HTMLElement).getAllByText("준비 중")).toHaveLength(1);
     expect(within(desktopSessionCard as HTMLElement).queryByText("공개")).not.toBeInTheDocument();
     expect(within(mobileSessionCard as HTMLElement).queryByText("공개")).not.toBeInTheDocument();
   });
@@ -944,7 +941,7 @@ describe("HostDashboard", () => {
     }
 
     expect(mobile.getByText("No.07 · D-3")).toBeInTheDocument();
-    expect(mobile.getByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).toBeInTheDocument();
+    expect(mobile.queryByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).not.toBeInTheDocument();
     expect(mobile.getByText("2026.05.20 · 20:00")).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
     expect(current.currentSession?.myCheckin).not.toHaveProperty("note");
@@ -982,7 +979,7 @@ describe("HostDashboard", () => {
     expect(desktop.getByText("김호스트")).toBeInTheDocument();
     expect(desktop.getByText("안멤버1")).toBeInTheDocument();
     expect(desktop.getByText("No.07 · D-3")).toBeInTheDocument();
-    expect(desktop.getByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).toBeInTheDocument();
+    expect(desktop.queryByRole("group", { name: /No.07 · 이번 세션 · 준비 중 · D-3/ })).not.toBeInTheDocument();
     expect(desktop.getByText("2026.05.20 20:00 · 온라인")).toBeInTheDocument();
     expect(desktop.getByText("질문").parentElement).toHaveTextContent("2/10");
     expect(desktop.getByText("읽기").parentElement).toHaveTextContent("1/2");

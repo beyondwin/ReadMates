@@ -177,7 +177,7 @@ describe("MemberHome", () => {
     expect(mobileView.getByText("멤버 활동")).toBeInTheDocument();
     expect(mobileView.queryByText("내 통계")).not.toBeInTheDocument();
     expect(mobileView.getByText("바로가기")).toBeInTheDocument();
-    expect(mobileView.getByText("4개")).toBeInTheDocument();
+    expect(mobileView.getByText("3개")).toBeInTheDocument();
     expect(mobileView.queryByText("누적 통계")).not.toBeInTheDocument();
     expect(mobileView.queryByText(/actions/i)).not.toBeInTheDocument();
     expect(mobileView.queryByText("current")).not.toBeInTheDocument();
@@ -185,7 +185,7 @@ describe("MemberHome", () => {
     expect(mobileView.getByRole("link", { name: /RSVP/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /읽기 진행률/ })).toHaveAttribute("href", "/app/session/current");
     expect(mobileView.getByRole("link", { name: /질문 쓰기/ })).toHaveAttribute("href", "/app/session/current");
-    expect(mobileView.getByRole("link", { name: /한줄평/ })).toHaveAttribute("href", "/app/session/current");
+    expect(mobileView.queryByRole("link", { name: /한줄평/ })).not.toBeInTheDocument();
     expect(mobileView.getByRole("link", { name: /모임 링크 열기/ })).toHaveAttribute(
       "href",
       "https://meet.google.com/readmates-member",
@@ -212,7 +212,29 @@ describe("MemberHome", () => {
     const metaLine = container.querySelector(".rm-member-home-mobile .rm-member-session-card__meta-line");
 
     expect(metaLine).not.toBeNull();
-    expect(metaLine).toHaveTextContent("No.07 · 20일 후");
+    expect(metaLine).toHaveTextContent("No.07 · D-20");
+  });
+
+  it("keeps current-session identity to one compact line on member home", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 30));
+
+    const { container } = render(
+      <MemberHome auth={auth} current={current} noteFeedItems={noteFeedItems} upcomingSessions={[]} />,
+    );
+    const desktopMetaLine = container.querySelector(".rm-member-home-desktop .rm-prep-card__meta-line");
+    const mobileSectionHeader = container.querySelector(".rm-member-home-mobile .m-eyebrow-row");
+    const mobileMetaLine = container.querySelector(".rm-member-home-mobile .rm-member-session-card__meta-line");
+
+    expect(desktopMetaLine).not.toBeNull();
+    expect(mobileSectionHeader).not.toBeNull();
+    expect(mobileMetaLine).not.toBeNull();
+    expect(desktopMetaLine).toHaveTextContent("No.07 · D-20");
+    expect(desktopMetaLine).not.toHaveTextContent("이번 세션");
+    expect(mobileSectionHeader).toHaveTextContent("이번 세션");
+    expect(mobileSectionHeader).not.toHaveTextContent("No.07");
+    expect(mobileMetaLine).toHaveTextContent("No.07 · D-20");
+    expect(mobileMetaLine?.querySelector(".badge")).not.toBeInTheDocument();
   });
 
   it("shows viewer members a read-only notice on member home", () => {
@@ -243,7 +265,8 @@ describe("MemberHome", () => {
     );
     const desktop = getDesktopView(container);
 
-    expect(desktop.getByText(/이번 세션 ·/)).toBeInTheDocument();
+    expect(desktop.getByText(/No\.07 ·/)).toBeInTheDocument();
+    expect(desktop.queryByText(/이번 세션 ·/)).not.toBeInTheDocument();
     expect(desktop.getAllByText("테스트 책").length).toBeGreaterThan(0);
     expect(desktop.getByText("지금 읽는 책")).toBeInTheDocument();
     expect(desktop.getByText("다음 할 일")).toBeInTheDocument();
@@ -260,6 +283,46 @@ describe("MemberHome", () => {
       "https://meet.google.com/readmates-member",
     );
     expect(desktop.getByText("Passcode · memberpass")).toBeInTheDocument();
+  });
+
+  it("does not require one-line review before marking home prep as ready", () => {
+    const { container } = render(
+      <MemberHome
+        auth={auth}
+        current={{
+          currentSession: {
+            ...current.currentSession!,
+            myCheckin: {
+              readingProgress: 80,
+            },
+            myQuestions: [
+              {
+                priority: 1,
+                text: "첫 번째 질문입니다.",
+                draftThought: null,
+                authorName: "이멤버5",
+                authorShortName: "수",
+              },
+              {
+                priority: 2,
+                text: "두 번째 질문입니다.",
+                draftThought: null,
+                authorName: "이멤버5",
+                authorShortName: "수",
+              },
+            ],
+            myOneLineReview: null,
+          },
+        }}
+        noteFeedItems={[]}
+        upcomingSessions={[]}
+      />,
+    );
+    const desktop = getDesktopView(container);
+
+    expect(desktop.getByText("준비가 정리되었습니다. 모임 전까지 수정할 수 있어요.")).toBeInTheDocument();
+    expect(desktop.queryByText("한줄평을 한 문장으로 남겨 주세요.")).not.toBeInTheDocument();
+    expect(desktop.queryByText("한줄평")).not.toBeInTheDocument();
   });
 
   it("aligns the desktop home header with other member tab headers", () => {
