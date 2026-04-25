@@ -224,36 +224,36 @@ class JdbcHostSessionWriteAdapter(
     override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
         requireHost(command.host)
         val jdbcTemplate = jdbcTemplate()
-        val state = jdbcTemplate.query(
-            """
-            select state
-            from sessions
-            where id = ?
-              and club_id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("state") },
-            command.sessionId.dbString(),
-            command.host.clubId.dbString(),
-        ).firstOrNull() ?: throw HostSessionNotFoundException()
-
-        if (state == "CLOSED") {
-            return findHostSession(command.host, command.sessionId)
-        }
-        if (state != "OPEN") {
-            throw HostSessionCloseNotAllowedException()
-        }
-
-        jdbcTemplate.update(
+        val closedRows = jdbcTemplate.update(
             """
             update sessions
             set state = 'CLOSED',
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
+              and state = 'OPEN'
             """.trimIndent(),
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
+        if (closedRows == 0) {
+            val state = jdbcTemplate.query(
+                """
+                select state
+                from sessions
+                where id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getString("state") },
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            ).firstOrNull() ?: throw HostSessionNotFoundException()
+
+            if (state == "CLOSED") {
+                return findHostSession(command.host, command.sessionId)
+            }
+            throw HostSessionCloseNotAllowedException()
+        }
         return findHostSession(command.host, command.sessionId)
     }
 

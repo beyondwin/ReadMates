@@ -6,8 +6,11 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
@@ -21,6 +24,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
     delete from feedback_reports
@@ -353,6 +357,26 @@ class HostSessionControllerDbTest(
             jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
             jsonPath("$.state") { value("CLOSED") }
         }
+    }
+
+    @Test
+    fun `host close does not overwrite session state changed before close update`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+
+        HostSessionCloseRaceProbe.publishBeforeNextCloseUpdate(sessionId)
+        try {
+            mockMvc.post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
+        } finally {
+            HostSessionCloseRaceProbe.clear()
+        }
+
+        assertEquals("PUBLISHED", findSessionState(sessionId))
     }
 
     @Test
@@ -1274,11 +1298,66 @@ class HostSessionControllerDbTest(
             sessionId,
         )
 
+    @TestConfiguration
+    class CloseRaceJdbcTemplateConfig {
+        @Bean
+        @Primary
+        fun closeRaceJdbcTemplate(dataSource: DataSource): JdbcTemplate =
+            CloseRaceJdbcTemplate(dataSource)
+    }
+
     companion object {
         @JvmStatic
         @DynamicPropertySource
         fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
             MySqlTestContainer.registerDatasourceProperties(registry)
         }
+    }
+}
+
+private object HostSessionCloseRaceProbe {
+    private val targetSessionId = ThreadLocal<String>()
+
+    fun publishBeforeNextCloseUpdate(sessionId: String) {
+        targetSessionId.set(sessionId)
+    }
+
+    fun clear() {
+        targetSessionId.remove()
+    }
+
+    fun consumeIfMatches(sql: String, args: Array<out Any?>): String? {
+        val sessionId = targetSessionId.get() ?: return null
+        val normalizedSql = sql.trimIndent().replace(Regex("\\s+"), " ")
+        val isHostSessionCloseUpdate = normalizedSql.startsWith("update sessions set state = 'CLOSED', updated_at = utc_timestamp(6)")
+        if (!isHostSessionCloseUpdate || args.firstOrNull() != sessionId) {
+            return null
+        }
+
+        targetSessionId.remove()
+        return sessionId
+    }
+}
+
+private class CloseRaceJdbcTemplate(private val rawDataSource: DataSource) : JdbcTemplate(rawDataSource) {
+    override fun update(sql: String, vararg args: Any?): Int {
+        val sessionId = HostSessionCloseRaceProbe.consumeIfMatches(sql, args)
+        if (sessionId != null) {
+            rawDataSource.connection.use { connection ->
+                connection.autoCommit = true
+                connection.prepareStatement(
+                    """
+                    update sessions
+                    set state = 'PUBLISHED'
+                    where id = ?
+                      and club_id = '00000000-0000-0000-0000-000000000001'
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, sessionId)
+                    statement.executeUpdate()
+                }
+            }
+        }
+        return super.update(sql, *args)
     }
 }
