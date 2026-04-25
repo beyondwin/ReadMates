@@ -618,6 +618,41 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("button", { name: "공개 기록 발행" })).not.toBeInTheDocument();
   });
 
+  it("does not label closed public-visibility records as published before lifecycle publish", () => {
+    render(
+      <HostSessionEditorForTest
+        session={{
+          ...session,
+          state: "CLOSED",
+          publication: {
+            publicSummary: "저장된 외부 공개 요약입니다.",
+            visibility: "PUBLIC",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 정리 중/ })).toBeVisible();
+    expect(screen.queryByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).not.toBeInTheDocument();
+  });
+
+  it("labels published member-visibility records as published in the session identity", () => {
+    render(
+      <HostSessionEditorForTest
+        session={{
+          ...session,
+          state: "PUBLISHED",
+          publication: {
+            publicSummary: "멤버에게 공개된 기록입니다.",
+            visibility: "MEMBER",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).toBeVisible();
+  });
+
   it("saves publication summary and record visibility through the publication API without redirecting", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     const location = { href: "" };

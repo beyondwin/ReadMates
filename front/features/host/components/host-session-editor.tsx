@@ -623,7 +623,7 @@ export default function HostSessionEditor({
                     sessionNumber={displaySession.sessionNumber}
                     state={displaySession.state}
                     date={displaySession.date}
-                    published={displaySession.publication?.visibility === "PUBLIC"}
+                    published={displaySession.state === "PUBLISHED"}
                     feedbackDocumentAvailable={displaySession.feedbackDocument.uploaded}
                   />
                 ) : (
