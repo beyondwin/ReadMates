@@ -7,6 +7,9 @@ import type {
 import {
   attendanceText,
   feedbackAccessCopy,
+  feedbackArchiveBadgeClass,
+  feedbackArchiveDescription,
+  feedbackArchiveLabel,
   feedbackDocumentCardClassName,
   feedbackRailCardClassName,
   feedbackStatusText,
@@ -176,6 +179,7 @@ function MemberSessionDetailDesktop({
                 <span className="badge">
                   참석 {session.attendance}/{session.total}
                 </span>
+                <FeedbackMetaBadge feedbackDocument={session.feedbackDocument} />
               </div>
               <nav className="rm-session-detail-section-nav" aria-label="세션 상세 섹션">
                 {segmentLinks.map((link) => (
@@ -278,6 +282,7 @@ function MemberSessionDetailMobile({
               <span className="badge">
                 참석 {session.attendance}/{session.total}
               </span>
+              <FeedbackMetaBadge feedbackDocument={session.feedbackDocument} />
             </div>
           </div>
         </div>
@@ -354,6 +359,18 @@ function SummaryBlock({ summary }: { summary: string | null }) {
     <p className="body-lg" style={{ margin: 0, color: "var(--text-2)", whiteSpace: "pre-wrap" }}>
       {summary}
     </p>
+  );
+}
+
+function FeedbackMetaBadge({ feedbackDocument }: { feedbackDocument: MemberArchiveSessionDetailResponse["feedbackDocument"] }) {
+  return (
+    <span
+      className={feedbackArchiveBadgeClass(feedbackDocument)}
+      title={feedbackArchiveDescription(feedbackDocument)}
+      aria-label={feedbackArchiveDescription(feedbackDocument)}
+    >
+      {feedbackArchiveLabel(feedbackDocument)}
+    </span>
   );
 }
 
