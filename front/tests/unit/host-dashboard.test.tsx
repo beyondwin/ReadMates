@@ -602,6 +602,23 @@ describe("HostDashboard", () => {
     );
   });
 
+  it("does not double the top rule on the first desktop upcoming session row", () => {
+    const { container } = render(
+      <HostDashboardForTest auth={hostAuth} current={noCurrent} data={dashboard} hostSessions={twoDraftHostSessions} />,
+    );
+    const desktop = getDesktopView(container);
+    const upcomingSection = desktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section");
+    expect(upcomingSection).not.toBeNull();
+
+    const firstRow = within(upcomingSection as HTMLElement).getByText("다음 책").closest(".row-between");
+    const secondRow = within(upcomingSection as HTMLElement).getByText("그 다음 책").closest(".row-between");
+
+    expect(firstRow).not.toBeNull();
+    expect(secondRow).not.toBeNull();
+    expect((firstRow as HTMLElement).style.borderTop).not.toBe("1px solid var(--line-soft)");
+    expect((secondRow as HTMLElement).style.borderTop).toBe("1px solid var(--line-soft)");
+  });
+
   it("shows no-session fallbacks when there is no current session and no pending work", () => {
     const { container } = render(<HostDashboardForTest current={{ currentSession: null }} data={emptyDashboard} />);
     const desktop = getDesktopView(container);
