@@ -914,7 +914,7 @@ function ArchiveReports({ reports, sessions }: { reports: FeedbackDocumentListIt
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rm-empty-state" style={{ padding: "28px" }}>
+    <div className="rm-empty-state" style={{ margin: "36px 0 0", padding: "28px" }}>
       <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
         {message}
       </p>
