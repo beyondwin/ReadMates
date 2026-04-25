@@ -115,8 +115,8 @@ ReadMates의 사용자 상태는 membership status와 role을 함께 봅니다.
 
 | 상태/역할 | 의미 |
 | --- | --- |
-| `VIEWER` | Google 로그인은 했지만 정식 초대를 수락하지 않은 둘러보기 멤버입니다. 읽기 가능한 일부 멤버 화면은 볼 수 있지만 현재 세션 쓰기, 피드백 문서 열람, 호스트 도구는 제한됩니다. |
-| `ACTIVE` + `MEMBER` | 정식 멤버입니다. 현재 세션 참여, RSVP, 체크인, 질문, 한줄평, 장문 서평, 본인이 참석한 회차의 피드백 문서 열람이 가능합니다. |
+| `VIEWER` | Google 로그인은 했지만 정식 초대를 수락하지 않은 둘러보기 멤버입니다. 읽기 가능한 일부 멤버 화면과 멤버 공개 예정 세션은 볼 수 있지만 현재 세션 쓰기, 피드백 문서 열람, 호스트 도구는 제한됩니다. |
+| `ACTIVE` + `MEMBER` | 정식 멤버입니다. 현재 세션 참여, 멤버 공개 예정 세션 확인, RSVP, 체크인, 질문, 한줄평, 장문 서평, 본인이 참석한 회차의 피드백 문서 열람이 가능합니다. |
 | `ACTIVE` + `HOST` | 호스트입니다. 정식 멤버 권한에 운영 권한이 추가됩니다. |
 | `SUSPENDED` | 제한된 멤버 상태입니다. route guard와 API authorization에서 쓰기/운영 권한을 제한합니다. |
 | `LEFT`, `INACTIVE` | 떠났거나 비활성화된 계정 상태입니다. 멤버 앱과 쓰기 기능에서 제외됩니다. |
@@ -126,9 +126,9 @@ ReadMates의 사용자 상태는 membership status와 role을 함께 봅니다.
 
 ## 현재/예정 세션과 공개 범위
 
-ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정 `DRAFT` 세션을 함께 다룹니다. 호스트가 새 세션을 만들면 기본 상태는 `DRAFT`, 기본 공개 범위는 `HOST_ONLY`입니다. 호스트는 `/api/host/sessions`와 `/api/host/sessions/{sessionId}`에서 책/회차 metadata를 만들고 수정하며, `/api/host/sessions/{sessionId}/visibility`로 `HOST_ONLY`, `MEMBER`, `PUBLIC` 중 하나를 저장합니다.
+ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정 `DRAFT` 세션을 함께 다룹니다. 호스트가 새 세션을 만들면 기본 상태는 `DRAFT`, 기본 공개 범위는 `HOST_ONLY`입니다. 호스트는 `/api/host/sessions`와 `/api/host/sessions/{sessionId}`에서 책/회차 metadata를 만들고 수정하며, `/api/host/sessions/{sessionId}/visibility`로 `HOST_ONLY`, `MEMBER`, `PUBLIC` 중 하나를 저장합니다. 호스트 세션 목록과 상세 응답은 `state`와 `visibility`를 함께 반환하므로, 프런트엔드는 예정 세션 카드, 현재 세션 카드, 기록 공개 범위 UI를 같은 contract로 조립합니다.
 
-`sessions.visibility`가 세션 공개 범위의 DB source of truth입니다. `public_session_publications.visibility`와 legacy `is_public` 값은 공개 기록 호환 경로를 위해 동기화되지만, archive, notes, upcoming session 조회는 `sessions.visibility`를 기준으로 `HOST_ONLY` 항목을 숨깁니다. `sessions.state`는 운영 단계를 구분합니다. `DRAFT`는 예정 세션, `OPEN`은 현재 참여 세션, `PUBLISHED`는 공개/멤버 기록으로 발행된 세션입니다.
+`sessions.visibility`가 세션 공개 범위의 DB source of truth입니다. `PUT /api/host/sessions/{sessionId}/publication`은 공개 요약과 기록 공개 범위를 저장하면서 `sessions.visibility`, `public_session_publications.visibility`, legacy `is_public` 값을 함께 맞춥니다. `public_session_publications.visibility`와 legacy `is_public` 값은 공개 기록 호환 경로를 위해 남아 있지만, archive, notes, upcoming session 조회는 `sessions.visibility`를 기준으로 `HOST_ONLY` 항목을 숨깁니다. `sessions.state`는 운영 단계를 구분합니다. `DRAFT`는 예정 세션, `OPEN`은 현재 참여 세션, `PUBLISHED`는 공개/멤버 기록으로 발행된 세션입니다.
 
 호스트는 `/api/host/sessions/{sessionId}/open`으로 `DRAFT` 세션 하나를 현재 세션으로 시작합니다. 같은 클럽에 이미 `OPEN` 세션이 있으면 다른 draft를 동시에 열 수 없습니다. 이미 열린 세션에 대한 open 요청은 같은 세션 detail을 반환하고, `CLOSED`나 `PUBLISHED` 세션을 현재 세션으로 되돌리지는 않습니다.
 
@@ -150,7 +150,7 @@ ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다.
 Public route/API에는 명시적으로 공개된 데이터만 나갑니다.
 
 - 공개 사이트는 `/api/public/club`, `/api/public/sessions/{sessionId}` 같은 public API를 사용합니다.
-- 공개 기록에는 발행된 세션, 공개 가능한 하이라이트, 한줄평, 책/회차 정보만 포함합니다.
+- 공개 기록에는 `public_session_publications.visibility=PUBLIC`인 세션 요약, 공개 가능한 하이라이트, 한줄평, 책/회차 정보만 포함합니다.
 - 예정 세션 목록은 멤버 앱의 `/api/sessions/upcoming`에서만 제공하며, `HOST_ONLY` draft는 멤버, 둘러보기 멤버, archive, notes, public route/API에 노출하지 않습니다.
 - 현재 세션의 RSVP, 읽은 분량, private notes, meeting data, 피드백 문서 본문은 public API로 노출하지 않습니다.
 - 멤버 앱의 `/api/archive/**`, `/api/notes/**`, `/api/sessions/current/**`는 인증과 membership 상태를 확인합니다.

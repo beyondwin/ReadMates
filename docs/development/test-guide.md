@@ -69,7 +69,7 @@ READMATES_E2E_DB_NAME='<e2e-db-name>' \
 pnpm --dir front test:e2e
 ```
 
-예정 세션 흐름을 확인하는 E2E는 호스트가 `DRAFT` 세션을 만들고, `MEMBER` 공개로 바꾼 뒤, 멤버 홈의 `/api/sessions/upcoming` 표시와 `OPEN` 전환을 함께 검증합니다.
+예정 세션 흐름을 확인하는 `front/tests/e2e/dev-login-session-flow.spec.ts`는 호스트가 `DRAFT` 세션을 만들고, `MEMBER` 공개로 바꾼 뒤, 멤버 홈의 `/api/sessions/upcoming` 표시와 `OPEN` 전환을 함께 검증합니다.
 
 멤버 표시 이름과 권한 경계만 빠르게 확인하려면 관련 E2E spec을 직접 지정할 수 있습니다.
 
@@ -107,6 +107,17 @@ Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함
   --tests com.readmates.auth.api.MemberProfileControllerTest \
   --tests com.readmates.auth.api.HostMemberApprovalControllerTest \
   --tests com.readmates.support.MySqlFlywayMigrationTest
+```
+
+세션 공개 범위, 예정 세션, 공개 기록 노출을 수정했다면 아래 focused command가 가장 빠른 1차 확인입니다.
+
+```bash
+./server/gradlew -p server test \
+  --tests com.readmates.session.api.HostSessionControllerDbTest \
+  --tests com.readmates.publication.api.PublicControllerDbTest \
+  --tests com.readmates.archive.api.ArchiveControllerDbTest \
+  --tests com.readmates.support.MySqlFlywayMigrationTest \
+  --tests com.readmates.support.ReadmatesMySqlSeedTest
 ```
 
 ## 공개 릴리즈 후보 점검

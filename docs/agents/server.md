@@ -33,7 +33,7 @@ Security boundaries:
 
 - Browser traffic should go through Cloudflare/Vite same-origin BFF routes.
 - Server API should treat `X-Readmates-Bff-Secret`, session cookies, membership status, role, and attendance as authorization boundaries.
-- Public APIs must expose only published public records.
+- Public APIs must expose only records whose publication visibility is `PUBLIC`; do not assume `sessions.state=PUBLISHED` is the only public exposure path.
 - Password/password-reset routes are disabled operational paths; do not revive them unless explicitly requested.
 
 Checks:

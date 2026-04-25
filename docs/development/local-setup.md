@@ -44,12 +44,12 @@ port: 3306
 
 ```bash
 SPRING_PROFILES_ACTIVE=dev \
-SPRING_DATASOURCE_URL='jdbc:mysql://localhost:3306/readmates?serverTimezone=UTC' \
-SPRING_DATASOURCE_USERNAME=readmates \
-SPRING_DATASOURCE_PASSWORD=readmates \
+SPRING_DATASOURCE_URL='jdbc:mysql://localhost:3306/<local-db-name>?serverTimezone=UTC' \
+SPRING_DATASOURCE_USERNAME='<local-db-user>' \
+SPRING_DATASOURCE_PASSWORD='<local-db-password>' \
 READMATES_APP_BASE_URL=http://localhost:5173 \
 READMATES_ALLOWED_ORIGINS=http://localhost:5173 \
-READMATES_BFF_SECRET=local-dev-secret \
+READMATES_BFF_SECRET='<local-bff-secret>' \
 READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 ./server/gradlew -p server bootRun
 ```
@@ -84,7 +84,7 @@ Vite 개발 서버는 `front/vite.config.ts`의 proxy를 사용합니다. 로컬
 
 ```bash
 READMATES_API_BASE_URL=http://localhost:8080 \
-READMATES_BFF_SECRET=local-dev-secret \
+READMATES_BFF_SECRET='<local-bff-secret>' \
 VITE_ENABLE_DEV_LOGIN=true \
 pnpm --dir front dev
 ```
@@ -110,6 +110,7 @@ Dev-login은 로컬 개발과 E2E fixture를 위한 흐름입니다. production 
 - Frontend login 화면은 production build에서는 dev-login 버튼을 숨깁니다.
 - Fixture 계정은 `host@example.com`, `member1@example.com` 같은 `example.com` 주소를 사용합니다.
 - Dev seed는 기존 account alias인 `users.short_name`과 현재 표시 이름 저장소인 `memberships.short_name`을 모두 채웁니다. 화면 표시와 프로필 수정 API는 `displayName` 필드를 주고받고 membership 단위 `memberships.short_name`을 갱신하므로, `/app/me`와 `/app/host/members`에서 표시 이름 변경 흐름을 로컬로 확인할 수 있습니다.
+- Dev seed와 E2E fixture는 현재 `OPEN` 세션, 공개/멤버 기록, 호스트가 새로 만드는 `DRAFT` 예정 세션 흐름을 검증할 수 있게 구성되어 있습니다. 호스트는 `/app/host`에서 예정 세션 공개 범위를 `HOST_ONLY`, `MEMBER`, `PUBLIC`으로 바꾸고, `DRAFT`를 현재 `OPEN` 세션으로 시작하는 흐름을 확인할 수 있습니다.
 
 운영 로그인은 Google OAuth 흐름입니다. 브라우저는 `/oauth2/authorization/google`로 시작하고, callback은 `/login/oauth2/code/google`로 돌아오며, Spring은 성공 시 `readmates_session` cookie를 발급합니다.
 
