@@ -5,7 +5,7 @@ ReadMates는 정기 독서모임의 세션 준비, 참여 관리, 기록 공개,
 - Demo: [https://readmates.pages.dev](https://readmates.pages.dev)
 - Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`
 - Scope: 정기 독서모임의 현재·예정 회차 준비부터 참여 관리, 기록 공개, 피드백 문서 열람까지 아우르는 운영형 서비스
-- Highlight: Google OAuth, 서버 측 session cookie, Cloudflare BFF 보안 경계, 역할 기반 권한 제어, 피드백 문서 접근 제어, Playwright E2E, 공개 릴리즈 후보 scan
+- Highlight: Google OAuth, 서버 측 session cookie, Cloudflare BFF 보안 경계, 현재/예정 세션 공개 범위, 역할 기반 권한 제어, 피드백 문서 접근 제어, Playwright E2E, 공개 릴리즈 후보 scan
 
 이 저장소는 외부 공개를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
 
@@ -60,10 +60,10 @@ MySQL
 - Cloudflare Pages Functions BFF: SPA와 API 호출을 같은 origin으로 묶고, `/api/bff/**` 요청만 Spring `/api/**`로 전달합니다. OAuth 시작과 callback도 Pages Functions proxy를 거쳐 public demo origin에서 자연스럽게 동작합니다.
 - BFF secret과 origin/referrer 경계: Spring은 API 요청의 `X-Readmates-Bff-Secret`을 검증합니다. `POST`, `PUT`, `PATCH`, `DELETE` 요청은 허용된 `Origin` 또는 `Referer`도 요구합니다. BFF secret은 Cloudflare Pages Functions와 Spring runtime 설정에만 두고 브라우저 bundle에 넣지 않습니다.
 - 역할 기반 접근 제어: `게스트`, `둘러보기 멤버`, `정식 멤버`, `호스트` 상태에 따라 route와 API 권한을 분리합니다. 읽기 가능한 화면과 쓰기 가능한 operation을 별도로 제한합니다.
-- 현재/예정 세션 관리: `sessions.state`는 `DRAFT`, `OPEN`, `PUBLISHED` 같은 운영 단계를 구분하고, `sessions.visibility`는 `HOST_ONLY`, `MEMBER`, `PUBLIC` 공개 범위의 DB source of truth입니다. 호스트는 여러 예정 `DRAFT` 세션을 준비할 수 있지만 현재 `OPEN` 세션은 클럽당 하나만 시작할 수 있습니다.
+- 현재/예정 세션 관리: `sessions.state`는 `DRAFT`, `OPEN`, `PUBLISHED` 같은 운영 단계를 구분하고, `sessions.visibility`는 `HOST_ONLY`, `MEMBER`, `PUBLIC` 공개 범위의 DB source of truth입니다. 호스트는 여러 예정 `DRAFT` 세션을 준비하고 멤버 공개 여부를 바꿀 수 있지만, 현재 `OPEN` 세션은 클럽당 하나만 시작할 수 있습니다.
 - 멤버 프로필 경계: 화면에 쓰는 표시 이름은 API에서는 `displayName`으로 주고받고, 현재 club membership의 `memberships.short_name`에 저장합니다. 본인은 `/api/me/profile`, 호스트는 `/api/host/members/{membershipId}/profile`로 같은 클럽 멤버의 표시 이름을 정리할 수 있고, 같은 클럽 안 중복과 예약어를 서버에서 막습니다.
 - 피드백 문서 접근 제어: 호스트가 Markdown 피드백 문서를 업로드하면 서버가 파싱해 typed response로 제공합니다. 호스트는 전체 문서를 관리할 수 있고, 정식 멤버는 본인이 참석한 회차의 피드백 문서만 읽을 수 있습니다. 둘러보기 멤버와 미참석자는 locked state를 봅니다.
-- 공개 기록 경계: public route/API에는 공개로 발행된 세션과 공개 가능한 하이라이트/한줄평만 노출합니다. 멤버 홈의 예정 세션은 `/api/sessions/upcoming`에서 `MEMBER`/`PUBLIC` `DRAFT`만 반환하고, `HOST_ONLY` draft는 멤버/둘러보기 화면, archive, notes, public surface에 노출하지 않습니다. 현재 세션 참여, private notes, meeting data, feedback document 본문은 인증과 권한 검사를 통과해야 접근할 수 있습니다.
+- 공개 기록 경계: public route/API에는 `public_session_publications.visibility=PUBLIC`인 기록과 공개 가능한 하이라이트/한줄평만 노출합니다. 멤버 홈의 예정 세션은 `/api/sessions/upcoming`에서 `MEMBER`/`PUBLIC` `DRAFT`만 반환하고, `HOST_ONLY` draft는 멤버/둘러보기 화면, archive, notes, public surface에 노출하지 않습니다. 현재 세션 참여, private notes, meeting data, feedback document 본문은 인증과 권한 검사를 통과해야 접근할 수 있습니다.
 - 프론트엔드 route-first 구조: React Router route module이 loader/action, API 호출, 모델 조립, UI props assembly를 담당합니다. 실제 source root는 `front/src/app`, `front/src/pages`, `front/features`, `front/shared`이며, feature는 `api`, `model`, `route`, `ui` 책임으로 나누고 UI는 props와 callback만 받아 렌더링합니다.
 - 서버 클린 아키텍처 전환: `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface는 `adapter.in.web -> application.port.in -> application.service -> application.port.out -> adapter.out.persistence` 경계를 따릅니다. Shared health endpoint는 `shared.adapter.in.web`에 있고, disabled password/password-reset/dev-invitation endpoint는 `410 Gone` stub으로 남습니다. Boundary test는 전환된 application package의 Spring JDBC/DAO 의존과 web adapter의 persistence 세부 의존을 막습니다.
 - 공개 릴리즈 안전성: `scripts/build-public-release-candidate.sh`로 공개 릴리즈 후보를 만든 뒤 `scripts/public-release-check.sh`로 private path, local workstation path, OCI OCID, GitHub token, OpenAI/API-key-shaped token, real-looking DB/BFF/OAuth secret, Gmail 주소 등을 검사합니다.

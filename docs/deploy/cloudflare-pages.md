@@ -102,8 +102,8 @@ curl -sS https://readmates.pages.dev/api/bff/api/public/club
 - `/app`은 `200`으로 SPA를 반환합니다.
 - `/api/bff/api/auth/me`는 BFF를 통해 Spring에 도달합니다. 로그아웃 상태여도 anonymous auth state를 담은 `200`일 수 있습니다.
 - `/oauth2/authorization/google`은 Google 또는 Spring OAuth 흐름으로 redirect됩니다.
-- `/api/bff/api/public/club`은 공개 기록에 노출 가능한 club 정보만 반환해야 합니다.
-- deep route와 legacy route인 `/app/session/current`, `/app/host/members`, `/invite/<token>`, `/reset-password/<token>`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
+- `/api/bff/api/public/club`은 `PUBLIC` 공개 범위의 공개 기록에 노출 가능한 club 정보만 반환해야 합니다.
+- deep route와 legacy route인 `/app/session/current`, `/app/host`, `/app/host/sessions/new`, `/app/host/sessions/<session-id>/edit`, `/app/host/members`, `/invite/<token>`, `/reset-password/<token>`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
 
 ## 비용 상태 확인
 
