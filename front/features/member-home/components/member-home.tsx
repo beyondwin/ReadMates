@@ -19,6 +19,7 @@ import type {
   MemberHomeUpcomingSession,
 } from "@/features/member-home/api/member-home-contracts";
 import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
+import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 const quickLinks = [
   { label: "피드백 문서", sub: "회차 피드백", href: "/app/archive?view=report", icon: "notes" },
@@ -285,7 +286,7 @@ function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: Member
       <div className="rm-mobile-shortcuts">
         {upcomingSessions.slice(0, 4).map((session) => (
           <div key={session.sessionId} className="m-card-quiet">
-            <span className="tiny mono">No.{String(session.sessionNumber).padStart(2, "0")}</span>
+            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} />
             <span className="body editorial" style={{ display: "block", fontSize: 13.5, marginTop: 6 }}>
               {session.bookTitle}
             </span>
@@ -310,7 +311,7 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
           <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
             {upcomingSessions.slice(0, 3).map((session) => (
               <div key={session.sessionId}>
-                <div className="tiny mono">No.{String(session.sessionNumber).padStart(2, "0")}</div>
+                <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} />
                 <div className="body editorial" style={{ fontSize: "15px", marginTop: 4 }}>
                   {session.bookTitle}
                 </div>
