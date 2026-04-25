@@ -39,6 +39,9 @@ class HostSessionDeletionNotAllowedException : RuntimeException("Only open sessi
 @ResponseStatus(HttpStatus.CONFLICT)
 class HostSessionOpenNotAllowedException : RuntimeException("Only draft sessions can be opened")
 
+@ResponseStatus(HttpStatus.CONFLICT)
+class HostSessionCloseNotAllowedException : RuntimeException("Only open sessions can be closed")
+
 @ResponseStatus(HttpStatus.BAD_REQUEST)
 class InvalidMembershipIdException : RuntimeException("Invalid membership id")
 

@@ -4,6 +4,7 @@ import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionAttendee
+import com.readmates.session.application.HostSessionCloseNotAllowedException
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
@@ -216,6 +217,43 @@ class JdbcHostSessionWriteAdapter(
             command.host.clubId.dbString(),
         )
         createActiveParticipants(jdbcTemplate, command.host.clubId, command.sessionId)
+        return findHostSession(command.host, command.sessionId)
+    }
+
+    @Transactional
+    override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
+        requireHost(command.host)
+        val jdbcTemplate = jdbcTemplate()
+        val state = jdbcTemplate.query(
+            """
+            select state
+            from sessions
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.getString("state") },
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        ).firstOrNull() ?: throw HostSessionNotFoundException()
+
+        if (state == "CLOSED") {
+            return findHostSession(command.host, command.sessionId)
+        }
+        if (state != "OPEN") {
+            throw HostSessionCloseNotAllowedException()
+        }
+
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'CLOSED',
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
         return findHostSession(command.host, command.sessionId)
     }
 

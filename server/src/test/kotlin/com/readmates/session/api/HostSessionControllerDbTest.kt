@@ -325,6 +325,58 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host closes open session`() {
+        createSessionSeven()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+            jsonPath("$.state") { value("CLOSED") }
+        }
+
+        assertEquals("CLOSED", findSessionState("00000000-0000-0000-0000-000000009777"))
+    }
+
+    @Test
+    fun `host close transition is idempotent for already closed session`() {
+        createSessionSeven()
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+            jsonPath("$.state") { value("CLOSED") }
+        }
+    }
+
+    @Test
+    fun `host cannot close draft or published session`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc.post("/api/host/sessions/$sessionId/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        updateSessionState(sessionId, "PUBLISHED")
+
+        mockMvc.post("/api/host/sessions/$sessionId/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+    }
+
+    @Test
     fun `host session external urls must be https urls`() {
         val invalidUrlFields = listOf(
             """"bookLink": "http://example.com/books/test-book"""",

@@ -40,6 +40,9 @@ class HostSessionCommandService(
     @Transactional
     override fun open(command: HostSessionIdCommand) = port.open(command)
 
+    @Transactional
+    override fun close(command: HostSessionIdCommand) = port.close(command)
+
     override fun deletionPreview(command: HostSessionIdCommand) = port.deletionPreview(command)
 
     @Transactional
