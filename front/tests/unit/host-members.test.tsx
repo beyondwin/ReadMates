@@ -432,7 +432,7 @@ describe("HostMembersPage", () => {
     });
   });
 
-  it("keeps the member tab header and body on the shared mobile start line", async () => {
+  it("keeps the member tab header and body on shared spacing classes", async () => {
     renderHostMembersPage();
 
     expect(await screen.findByRole("tab", { name: "활성 멤버" })).toBeInTheDocument();
@@ -444,8 +444,8 @@ describe("HostMembersPage", () => {
     expect(headerEyebrow?.tagName).toBe("DIV");
     expect(contentContainer).not.toBeNull();
     expect(contentContainer).toHaveClass("rm-host-members-page__body");
-    expect(contentContainer?.style.paddingTop).toBe("24px");
-    expect(contentContainer?.style.paddingBottom).toBe("72px");
+    expect(contentContainer?.style.paddingTop).toBe("");
+    expect(contentContainer?.style.paddingBottom).toBe("");
     expect(contentContainer?.style.paddingLeft).toBe("");
     expect(contentContainer?.style.paddingRight).toBe("");
   });

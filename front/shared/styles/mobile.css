@@ -1148,6 +1148,7 @@
 
 @media (max-width: 768px) {
   .rm-host-members-page__body {
+    padding-top: 24px;
     padding-left: var(--m-page-x);
     padding-right: var(--m-page-x);
   }
@@ -1155,7 +1156,7 @@
 
 /* Host session editor */
 .rm-host-session-editor__content {
-  padding: 36px 0 80px;
+  padding: 8px 0 80px;
 }
 .rm-host-session-editor__layout {
   display: grid;
