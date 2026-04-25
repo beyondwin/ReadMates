@@ -1037,7 +1037,7 @@ Task 5 checkpoint (2026-04-25):
 **Files:**
 - No new code files.
 
-- [ ] **Step 1: Run server tests**
+- [x] **Step 1: Run server tests**
 
 Run:
 
@@ -1047,7 +1047,7 @@ Run:
 
 Expected: build success.
 
-- [ ] **Step 2: Run frontend checks**
+- [x] **Step 2: Run frontend checks**
 
 Run:
 
@@ -1059,7 +1059,7 @@ pnpm --dir front build
 
 Expected: all pass.
 
-- [ ] **Step 3: Run e2e if auth/BFF route behavior changed**
+- [x] **Step 3: Run e2e if auth/BFF route behavior changed**
 
 Run if implementation touched BFF route behavior or end-to-end auth flow:
 
@@ -1069,7 +1069,7 @@ pnpm --dir front test:e2e
 
 Expected: pass or unchanged known environment skip. Do not claim e2e pass unless the command completes successfully.
 
-- [ ] **Step 4: Manual smoke path**
+- [x] **Step 4: Manual smoke path**
 
 Start local app as usual, then verify:
 
@@ -1081,7 +1081,7 @@ Start local app as usual, then verify:
 6. Confirm `/app/notes?sessionId={sessionId}` shows notes only after publish.
 7. Confirm public record URL returns 404 before publish and 200 after publish.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git status --short
@@ -1094,6 +1094,15 @@ Expected: only intentional changes remain. If prior task commits were made, no e
 git add server front
 git commit -m "fix: stabilize session lifecycle publication"
 ```
+
+Task 6 checkpoint (2026-04-25):
+- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Changed files: no new code changes during full verification; this checkpoint updates task status only.
+- Verification: `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed with 44 files and 498 tests; `pnpm --dir front build` passed.
+- E2E: default `pnpm --dir front test:e2e` failed before browser tests because local `readmates_e2e` has stale Flyway checksums for migrations 13 and 14. Root-cause review found this is persisted local DB state, not current code. A rerun with granted current schema `READMATES_E2E_DB_NAME=readmates_e2e_codex_20260425133321 pnpm --dir front test:e2e` passed with 18 tests.
+- Manual smoke: session create/open, host close, current-session removal, closed public record hidden from notes/public, publish, archive visibility, notes visibility, and public detail visibility all passed against the local app; generated smoke session was deleted afterward.
+- Background resources: session-owned `bootRun` PID 56047 on port 18080 and Vite PID 56592 on port 3100 were stopped; ports 18080 and 3100 confirmed free. Existing original-workspace 8080/5173 processes were not touched.
+- Remaining risks: the default local `readmates_e2e` schema still has stale Flyway history; use a current granted e2e schema or reset that disposable DB before relying on the default e2e command.
 
 ## Self-Review
 
