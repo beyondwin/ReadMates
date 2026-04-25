@@ -69,7 +69,7 @@
 - Modify `server/src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`
 
-- [ ] **Step 1: Add failing controller tests for close transitions**
+- [x] **Step 1: Add failing controller tests for close transitions**
 
 Add these tests near the existing open transition tests in `HostSessionControllerDbTest.kt`:
 
@@ -126,7 +126,7 @@ fun `host cannot close draft or published session`() {
 }
 ```
 
-- [ ] **Step 2: Run the failing close tests**
+- [x] **Step 2: Run the failing close tests**
 
 Run:
 
@@ -136,7 +136,7 @@ Run:
 
 Expected: tests fail because `/close` does not exist.
 
-- [ ] **Step 3: Add close use-case signatures**
+- [x] **Step 3: Add close use-case signatures**
 
 In `SessionApplicationSupport.kt`, add:
 
@@ -163,7 +163,7 @@ In `HostSessionCommandService.kt`, add:
 override fun close(command: HostSessionIdCommand) = port.close(command)
 ```
 
-- [ ] **Step 4: Add the close route**
+- [x] **Step 4: Add the close route**
 
 In `HostSessionController.kt`, add:
 
@@ -175,7 +175,7 @@ fun close(
 ) = manageHostSessionUseCase.close(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 ```
 
-- [ ] **Step 5: Implement close persistence**
+- [x] **Step 5: Implement close persistence**
 
 In `JdbcHostSessionWriteAdapter.kt`, import the new exception and add:
 
@@ -219,7 +219,7 @@ override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
 }
 ```
 
-- [ ] **Step 6: Run close tests**
+- [x] **Step 6: Run close tests**
 
 Run:
 
@@ -229,12 +229,21 @@ Run:
 
 Expected: close tests pass. If conflicts are not mapped to HTTP 409, find the existing session exception handler by running `rg "HostSessionOpenNotAllowedException|OpenSessionAlreadyExistsException" server/src/main/kotlin` and add the new exception to the same mapping.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/session server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt
 git commit -m "feat: add host session close transition"
 ```
+
+Task 1 checkpoint (2026-04-25):
+- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Changed files: session application ports/service/controller/support, `JdbcHostSessionWriteAdapter`, `SecurityConfig`, `HostSessionControllerDbTest`, `HostSessionCommandServiceTest`, `HostSessionBffSecurityTest`.
+- Decisions: close uses an atomic `OPEN -> CLOSED` update with zero-row re-read; `CLOSED` is idempotent, `DRAFT`/`PUBLISHED` conflict; BFF CSRF exemption mirrors `/open`.
+- Reviews: spec review passed; quality review found non-atomic update and missing BFF CSRF coverage, both fixed in `6d4a143`.
+- Verification: `./server/gradlew -p server test --rerun-tasks --tests "com.readmates.session.api.HostSessionControllerDbTest" --tests "*HostSessionBffSecurityTest*"` passed, 30 targeted tests.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 1 agents were closed.
+- Remaining risks/next task notes: apply the same atomic transition and BFF CSRF/security-test scrutiny to publish.
 
 ## Task 2: Publish Transition and Public Exposure Guard
 
