@@ -113,7 +113,7 @@ describe("MemberSessionDetailPage", () => {
 
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByText(/한스 로슬링/)).toBeInTheDocument();
-    expect(desktop.getByRole("group", { name: "No.01 · 정리 중" })).toBeInTheDocument();
+    expect(desktop.getByRole("group", { name: "No.01 · 비공개" })).toBeInTheDocument();
     const desktopBadges = badgeTexts(container.querySelector(".desktop-only") as HTMLElement);
     expect(desktopBadges).toContain("2025.11.26");
     expect(desktopBadges).toContain("참석 5/6");
@@ -154,7 +154,7 @@ describe("MemberSessionDetailPage", () => {
     expect(mobileBadges).toContain("2025.11.26");
     expect(mobileBadges).toContain("참석 5/6");
     expect(mobileBadges).not.toContain("피드백 공개");
-    expect(mobile.getByRole("group", { name: "No.01 · 정리 중" })).toBeInTheDocument();
+    expect(mobile.getByRole("group", { name: "No.01 · 비공개" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "질문" })).toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "피드백" })).not.toBeInTheDocument();
@@ -200,8 +200,8 @@ describe("MemberSessionDetailPage", () => {
       publicSummary: "멤버에게 보일 요약은 있지만 아직 공개 완료 전입니다.",
     });
 
-    expect(getDesktop(container).getByRole("group", { name: "No.01 · 정리 중" })).toBeInTheDocument();
-    expect(getMobile(container).getByRole("group", { name: "No.01 · 정리 중" })).toBeInTheDocument();
+    expect(getDesktop(container).getByRole("group", { name: "No.01 · 비공개" })).toBeInTheDocument();
+    expect(getMobile(container).getByRole("group", { name: "No.01 · 비공개" })).toBeInTheDocument();
     expect(container).not.toHaveTextContent("공개됨");
   });
 
@@ -212,8 +212,8 @@ describe("MemberSessionDetailPage", () => {
       publicSummary: "멤버에게 공개된 최종 기록입니다.",
     });
 
-    expect(getDesktop(container).getByRole("group", { name: "No.01 · 공개됨" })).toBeInTheDocument();
-    expect(getMobile(container).getByRole("group", { name: "No.01 · 공개됨" })).toBeInTheDocument();
+    expect(getDesktop(container).getByRole("group", { name: "No.01 · 공개" })).toBeInTheDocument();
+    expect(getMobile(container).getByRole("group", { name: "No.01 · 공개" })).toBeInTheDocument();
   });
 
   it("does not render the archive return link above the session detail", async () => {

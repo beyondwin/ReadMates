@@ -45,16 +45,21 @@ function phaseLabel(state: SessionState) {
 function stateLabel(state: SessionState, published: boolean) {
   if (state === "DRAFT") return "예정";
   if (state === "OPEN") return "준비 중";
-  if (published) return "공개됨";
-  return "정리 중";
+  return published ? "공개" : "비공개";
 }
 
 function stateToneClass(value: string) {
   if (value === "예정") return "rm-state rm-state--pending";
   if (value === "준비 중") return "rm-state rm-state--pending";
-  if (value === "공개됨" || value === "문서 있음") return "rm-state rm-state--success";
-  if (value === "정리 중") return "rm-state rm-state--readonly";
+  if (value === "공개" || value === "문서 있음") return "rm-state rm-state--success";
+  if (value === "비공개") return "rm-state rm-state--readonly";
   return "";
+}
+
+function stateChipClass(state: SessionState, published: boolean) {
+  const label = stateLabel(state, published);
+  const dotClass = label === "공개" || label === "비공개" ? "rm-session-identity__chip--dot" : "";
+  return ["rm-session-identity__chip", stateToneClass(label), dotClass].filter(Boolean).join(" ");
 }
 
 export function SessionIdentity({
@@ -72,7 +77,7 @@ export function SessionIdentity({
   const items = [
     { value: `No.${padSessionNumber(sessionNumber)}`, className: "rm-session-identity__number" },
     hidePastPhaseLabel && phase === "지난 회차" ? null : { value: phase, className: "rm-session-identity__chip" },
-    { value: stateLabel(state, published), className: `rm-session-identity__chip ${stateToneClass(stateLabel(state, published))}` },
+    { value: stateLabel(state, published), className: stateChipClass(state, published) },
     dday ? { value: dday, className: "rm-session-identity__chip rm-state rm-state--pending" } : null,
     feedbackDocumentAvailable && !hideFeedbackDocumentLabel
       ? { value: "문서 있음", className: `rm-session-identity__chip ${stateToneClass("문서 있음")}` }
