@@ -7,7 +7,6 @@ import type {
 import {
   attendanceText,
   feedbackAccessCopy,
-  feedbackBadgeClass,
   feedbackDocumentCardClassName,
   feedbackRailCardClassName,
   feedbackStatusText,
@@ -177,8 +176,6 @@ function MemberSessionDetailDesktop({
                 <span className="badge">
                   참석 {session.attendance}/{session.total}
                 </span>
-                <span className="badge">{session.locationLabel}</span>
-                <span className={feedbackBadgeClass(session.feedbackDocument)}>{feedbackStatusText(session.feedbackDocument)}</span>
               </div>
               <nav className="rm-session-detail-section-nav" aria-label="세션 상세 섹션">
                 {segmentLinks.map((link) => (
@@ -281,7 +278,6 @@ function MemberSessionDetailMobile({
               <span className="badge">
                 참석 {session.attendance}/{session.total}
               </span>
-              <span className={feedbackBadgeClass(session.feedbackDocument)}>{feedbackStatusText(session.feedbackDocument)}</span>
             </div>
           </div>
         </div>
