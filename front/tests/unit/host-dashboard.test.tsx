@@ -589,7 +589,7 @@ describe("HostDashboard", () => {
     const desktopRow = within(desktopUpcoming as HTMLElement).getByText("다음 책").closest(".row-between");
     const mobileCard = mobile.getByText("다음 책").closest(".m-card-quiet");
 
-    expect(within(desktopRow as HTMLElement).getByRole("group", { name: "No.08 · D-53 · 예정" })).toBeInTheDocument();
+    expect(within(desktopRow as HTMLElement).getByRole("group", { name: "No.08 · D-53" })).toBeInTheDocument();
     expect(within(desktopRow as HTMLElement).getByText("No.08")).toHaveClass(
       "rm-session-identity__chip",
       "rm-state",
@@ -601,7 +601,9 @@ describe("HostDashboard", () => {
       "rm-state--pending",
     );
     expect(within(desktopRow as HTMLElement).queryByText("예정 세션")).not.toBeInTheDocument();
-    expect(within(mobileCard as HTMLElement).getByRole("group", { name: "No.08 · D-53 · 예정" })).toBeInTheDocument();
+    expect(within(desktopRow as HTMLElement).queryByText("예정")).not.toBeInTheDocument();
+    expect(within(mobileCard as HTMLElement).getByRole("group", { name: "No.08 · D-53" })).toBeInTheDocument();
+    expect(within(mobileCard as HTMLElement).queryByText("예정")).not.toBeInTheDocument();
   });
 
   it("shows a compact error when an upcoming action fails", async () => {
