@@ -123,7 +123,7 @@ function NotesEmptyState({ message }: { message: string }) {
 
 function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection heading={`내 질문 · ${items.length}`} detail="읽으며 붙든 질문">
+    <FeedSection label="내 질문" count={items.length} detail="읽으며 붙든 질문">
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
         {items.map((item, index) => (
           <article
@@ -146,7 +146,7 @@ function FeedQuestions({ items }: { items: NoteFeedItem[] }) {
 
 function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection heading={`내 한줄평 · ${items.length}`} detail="짧게 남긴 감상">
+    <FeedSection label="내 한줄평" count={items.length} detail="짧게 남긴 감상">
       <div className="rm-notes-oneliner-grid">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-oneliner-card">
@@ -161,7 +161,7 @@ function FeedOneLiners({ items }: { items: NoteFeedItem[] }) {
 
 function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
   return (
-    <FeedSection heading={`하이라이트 · ${items.length}`} detail="남은 문장들">
+    <FeedSection label="하이라이트" count={items.length} detail="남은 문장들">
       <div className="rm-notes-highlight-list">
         {items.map((item) => (
           <article key={itemKey(item)} className="rm-notes-highlight-row">
@@ -175,20 +175,30 @@ function FeedHighlights({ items }: { items: NoteFeedItem[] }) {
 }
 
 function FeedSection({
-  heading,
+  label,
+  count,
   detail,
   children,
 }: {
-  heading: string;
+  label: string;
+  count: number;
   detail: string;
   children: React.ReactNode;
 }) {
+  const accessibleHeading = `${label} · ${count}`;
+
   return (
     <section style={{ paddingBottom: "44px" }}>
       <div className="row-between" style={{ marginBottom: "20px", gap: "18px", alignItems: "baseline", flexWrap: "wrap" }}>
         <div className="row" style={{ gap: "14px", alignItems: "baseline", flexWrap: "wrap", minWidth: 0 }}>
-          <h2 className="eyebrow rm-notes-section-title" style={{ margin: 0 }}>
-            {heading}
+          <h2 className="eyebrow rm-notes-section-title" style={{ margin: 0 }} aria-label={accessibleHeading}>
+            <span>{label}</span>
+            <span className="rm-notes-section-title__dot" aria-hidden="true">
+              ·
+            </span>
+            <span className="rm-notes-section-title__count" aria-hidden="true">
+              {count}
+            </span>
           </h2>
         </div>
         <span className="tiny mono" style={{ color: "var(--text-3)", flex: "0 0 auto", whiteSpace: "nowrap" }}>
@@ -271,10 +281,26 @@ function NotesFeedListStyles() {
         background: var(--accent);
       }
 
+      .rm-notes-section-title {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 2px;
+        letter-spacing: 0;
+      }
+
+      .rm-notes-section-title__dot {
+        color: var(--text-4);
+      }
+
+      .rm-notes-section-title__count {
+        font-variant-numeric: tabular-nums;
+      }
+
       @media (max-width: 768px) {
         .rm-notes-section-title {
-          font-size: 18px;
-          line-height: 1.3;
+          gap: 2px;
+          font-size: 13px;
+          line-height: 1.25;
         }
 
         .rm-notes-question-text {
