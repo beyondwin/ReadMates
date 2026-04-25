@@ -258,7 +258,7 @@ Task 1 checkpoint (2026-04-25):
 - Test: `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`
 - Test: public controller DB test file found by `rg "class .*Public.*Test" server/src/test/kotlin`
 
-- [ ] **Step 1: Add failing publish transition tests**
+- [x] **Step 1: Add failing publish transition tests**
 
 Add to `HostSessionControllerDbTest.kt`:
 
@@ -345,7 +345,7 @@ fun `host cannot publish open draft host only or unpublished sessions`() {
 }
 ```
 
-- [ ] **Step 2: Run the failing publish tests**
+- [x] **Step 2: Run the failing publish tests**
 
 Run:
 
@@ -355,7 +355,7 @@ Run:
 
 Expected: tests fail because `/publish` does not exist.
 
-- [ ] **Step 3: Add publish use-case signatures**
+- [x] **Step 3: Add publish use-case signatures**
 
 In `SessionApplicationSupport.kt`, add:
 
@@ -382,7 +382,7 @@ In `HostSessionCommandService.kt`, add:
 override fun publish(command: HostSessionIdCommand) = port.publish(command)
 ```
 
-- [ ] **Step 4: Add the publish route**
+- [x] **Step 4: Add the publish route**
 
 In `HostSessionController.kt`, add:
 
@@ -394,7 +394,7 @@ fun publish(
 ) = manageHostSessionUseCase.publish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 ```
 
-- [ ] **Step 5: Implement publish persistence**
+- [x] **Step 5: Implement publish persistence**
 
 In `JdbcHostSessionWriteAdapter.kt`, import the new exception and add:
 
@@ -472,7 +472,7 @@ override fun publish(command: HostSessionIdCommand): HostSessionDetailResponse {
 
 Add `HostSessionPublishNotAllowedException` to the same 409 mapping used for open/close conflicts.
 
-- [ ] **Step 6: Gate public records on `PUBLISHED`**
+- [x] **Step 6: Gate public records on `PUBLISHED`**
 
 In `JdbcPublicQueryAdapter.kt`, add `and sessions.state = 'PUBLISHED'` to all public-facing session queries:
 
@@ -490,7 +490,7 @@ where sessions.club_id = ?
 
 Apply this to `loadSession`, `publicStats`, and `publicSessions`.
 
-- [ ] **Step 7: Add public exposure regression test**
+- [x] **Step 7: Add public exposure regression test**
 
 In the public controller DB test file, add:
 
@@ -535,7 +535,7 @@ fun `public records exclude closed public visibility sessions until published`()
 
 If the test helper methods are local to `HostSessionControllerDbTest`, copy the minimal helper logic into the public test file instead of moving shared helpers.
 
-- [ ] **Step 8: Run server lifecycle and public tests**
+- [x] **Step 8: Run server lifecycle and public tests**
 
 Run:
 
@@ -545,12 +545,21 @@ Run:
 
 Expected: all targeted tests pass.
 
-- [ ] **Step 9: Commit Task 2**
+- [x] **Step 9: Commit Task 2**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/session server/src/main/kotlin/com/readmates/publication server/src/test/kotlin/com/readmates
 git commit -m "feat: publish finalized session records"
 ```
+
+Task 2 checkpoint (2026-04-25):
+- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Changed files: session lifecycle API/service/persistence, `JdbcPublicQueryAdapter`, `SecurityConfig`, host/public/security/service tests.
+- Decisions: publish uses a conditional `CLOSED -> PUBLISHED` transition with publication existence checks; public query surfaces require `sessions.state = 'PUBLISHED'`; BFF `/publish` mirrors `/open` and `/close` CSRF handling.
+- Reviews: spec review passed; quality review passed with minor notes that MEMBER publish/idempotent publish are not directly tested and `published_at` lifecycle meaning remains legacy-compatible.
+- Verification: `./server/gradlew -p server test --tests "com.readmates.session.api.HostSessionControllerDbTest" --tests "*Public*"` passed; extended targeted run with `HostSessionBffSecurityTest` and `HostSessionCommandServiceTest` passed.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 2 agents were closed.
+- Remaining risks/next task notes: Task 3 should verify archive and notes surfaces from the member side after the new lifecycle gate.
 
 ## Task 3: Archive and Notes Regression Coverage
 
