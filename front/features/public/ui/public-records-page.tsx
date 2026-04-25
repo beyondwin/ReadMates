@@ -63,7 +63,7 @@ export default function PublicRecordsPage({
       <section className="page-header">
         <div className="container container-sm">
           <div className="eyebrow" style={{ marginBottom: 14 }}>
-            기록 아카이브
+            기록 모음
           </div>
           <h1 className="h1 editorial" style={{ margin: 0 }}>
             공개 기록
