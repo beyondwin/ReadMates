@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildHostSessionRequest,
   buildPublicationRequest,
-  defaultBookLink,
   defaultHostSessionFormValues,
   getDestructiveActionAvailability,
   hydrateHostSessionFormValues,
@@ -63,17 +62,17 @@ const formValues: HostSessionFormValues = {
 };
 
 describe("host session editor model", () => {
-  it("builds new session defaults from the next third Wednesday", () => {
+  it("builds new session defaults from today's date with empty title and book link", () => {
     expect(defaultHostSessionFormValues(new Date(2026, 3, 21))).toEqual({
-      title: "7회차 모임 · ",
+      title: "",
       bookTitle: "",
       bookAuthor: "",
-      bookLink: defaultBookLink,
+      bookLink: "",
       bookImageUrl: "",
       locationLabel: "온라인",
       meetingUrl: "",
       meetingPasscode: "",
-      date: "2026-05-20",
+      date: "2026-04-21",
       startTime: "20:00",
     });
     expect(initialRecordVisibility(null)).toBe("HOST_ONLY");

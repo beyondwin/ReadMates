@@ -128,11 +128,11 @@ afterEach(() => {
 });
 
 describe("HostSessionEditor", () => {
-  it("calculates the default session date as the next third Wednesday", () => {
-    expect(defaultSessionDateFrom(new Date(2026, 3, 21))).toBe("2026-05-20");
+  it("calculates the default session date as today", () => {
+    expect(defaultSessionDateFrom(new Date(2026, 3, 21))).toBe("2026-04-21");
     expect(defaultSessionDateFrom(new Date(2026, 4, 20))).toBe("2026-05-20");
-    expect(defaultSessionDateFrom(new Date(2026, 4, 21))).toBe("2026-06-17");
-    expect(defaultSessionDateFrom(new Date(2026, 11, 17))).toBe("2027-01-20");
+    expect(defaultSessionDateFrom(new Date(2026, 4, 21))).toBe("2026-05-21");
+    expect(defaultSessionDateFrom(new Date(2026, 11, 17))).toBe("2026-12-17");
   });
 
   it("builds host session payloads without changing deadline semantics", () => {
@@ -167,8 +167,22 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "새 세션 만들기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
+    const bookAndSessionPanel = screen.getByRole("heading", { name: "책과 모임" }).closest("section");
+    expect(bookAndSessionPanel).not.toBeNull();
+    expect(within(bookAndSessionPanel as HTMLElement).getByText("기본 정보")).toBeVisible();
     expect(screen.getByText("세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
     expect(screen.queryByText("이번 세션 편집")).not.toBeInTheDocument();
+  });
+
+  it("shows helpful hints for the new-session title and book fields", () => {
+    render(<HostSessionEditorForTest session={null} />);
+
+    expect(screen.getByLabelText("세션 제목")).toHaveAttribute(
+      "placeholder",
+      "예: 8회차 모임 · 물고기는 존재하지 않는다",
+    );
+    expect(screen.getByLabelText("책 제목")).toHaveAttribute("placeholder", "예: 물고기는 존재하지 않는다");
+    expect(screen.getByLabelText("저자")).toHaveAttribute("placeholder", "예: 룰루 밀러");
   });
 
   it("labels existing open session as current session editing", () => {
@@ -286,14 +300,14 @@ describe("HostSessionEditor", () => {
     vi.useRealTimers();
 
     const user = userEvent.setup();
-    expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-05-20");
+    expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-04-21");
     expect(screen.getByLabelText("시작 시간")).toHaveValue("20:00");
-    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("05-19 23:59까지 질문 제출");
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("04-20 23:59까지 질문 제출");
 
     await user.clear(screen.getByLabelText("시작 시간"));
     await user.type(screen.getByLabelText("시작 시간"), "18:45");
 
-    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("05-19 23:59까지 질문 제출");
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("04-20 23:59까지 질문 제출");
 
     await user.clear(screen.getByLabelText("모임 날짜"));
     await user.type(screen.getByLabelText("모임 날짜"), "2026-01-01");
@@ -434,7 +448,7 @@ describe("HostSessionEditor", () => {
           title: "7회차 모임 · 새 책",
           bookTitle: "새 책",
           bookAuthor: "새 저자",
-          bookLink: "https://product.kyobobook.co.kr/detail/S000001947832",
+          bookLink: "",
           bookImageUrl: "",
           locationLabel: "온라인",
           meetingUrl: "",
