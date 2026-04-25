@@ -194,18 +194,18 @@ export default function HostSessionEditor({
   const attendanceWriteStatesRef = useRef<Record<string, AttendanceWriteState>>({});
   const deadline = questionDeadlineLabelForForm(session, date);
   const isNewSession = session === null || session === undefined;
-  const editorTitle = isNewSession ? "새 세션 만들기" : "이번 세션 편집";
-  const primarySaveLabel = isNewSession ? "새 세션 만들기" : "변경 사항 저장";
-  const saveButtonLabel = saveState === "saving" ? "변경사항을 저장하는 중" : primarySaveLabel;
+  const editorTitle = isNewSession ? "세션 문서 만들기" : "세션 문서 편집";
+  const primarySaveLabel = isNewSession ? "세션 문서 저장" : "변경 사항 저장";
+  const saveButtonLabel = saveState === "saving" ? (isNewSession ? "세션 문서를 저장하는 중" : "변경사항을 저장하는 중") : primarySaveLabel;
   const saveGuidance = isNewSession
-    ? "세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다."
+    ? "책, 일정, 장소, 링크를 저장하면 예정 세션 문서가 생성됩니다. 기록 공개 범위와 피드백 문서는 생성 후 각 섹션에서 따로 저장합니다."
     : "세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.";
   const showReturnLink =
     returnTarget.href !== hostDashboardReturnTarget.href || returnTarget.label !== hostDashboardReturnTarget.label;
   const feedbackPreviewState = session
     ? readmatesReturnState({
         href: `/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`,
-        label: "세션 편집으로",
+        label: "세션 문서로",
         state: readmatesReturnState(returnTarget),
       })
     : undefined;
@@ -533,7 +533,7 @@ export default function HostSessionEditor({
                   ? "기본 정보를 저장하고 있습니다."
                   : saveState === "saved"
                     ? isNewSession
-                      ? "저장되었습니다. 예정 세션 편집 화면으로 이동합니다."
+                      ? "저장되었습니다. 세션 문서 편집 화면으로 이동합니다."
                       : "저장되었습니다. 이전 화면으로 이동합니다."
                     : saveState === "error"
                       ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."

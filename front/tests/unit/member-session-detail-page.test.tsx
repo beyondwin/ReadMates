@@ -451,7 +451,7 @@ describe("MemberSessionDetailPage", () => {
     });
 
     const desktop = getDesktop(container);
-    expect(desktop.getByRole("link", { name: "세션 편집" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute(
       "href",
       "/app/host/sessions/00000000-0000-0000-0000-000000000301/edit",
     );

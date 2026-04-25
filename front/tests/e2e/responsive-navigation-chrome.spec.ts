@@ -54,7 +54,7 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await hostEntry.click();
   await expect(page).toHaveURL(/\/app\/host$/);
   await expect(appNav.getByRole("link", { name: "운영" })).toHaveAttribute("aria-current", "page");
-  await expect(appNav.getByRole("link", { name: "세션 편집" })).toBeVisible();
+  await expect(appNav.getByRole("link", { name: "세션 문서" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "멤버 초대" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "멤버 승인" })).toBeVisible();
 
@@ -207,7 +207,7 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
   await page.goto("/app/host");
   await expect(page).toHaveURL(/\/app\/host$/);
   await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
-  await page.getByRole("link", { name: /세션 문서 편집|새 세션 만들기/ }).first().click();
+  await page.getByRole("link", { name: /세션 문서 편집|세션 문서 만들기/ }).first().click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(.+\/edit|new)$/);
   await expect(page.getByRole("banner").getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
 

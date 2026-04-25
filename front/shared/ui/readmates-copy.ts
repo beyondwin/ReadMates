@@ -15,7 +15,7 @@ export const READMATES_NAV_LABELS = {
   },
   host: {
     operations: "운영",
-    sessionEditor: "세션 편집",
+    sessionEditor: "세션 문서",
     invitations: "멤버 초대",
     memberApproval: "멤버 승인",
   },

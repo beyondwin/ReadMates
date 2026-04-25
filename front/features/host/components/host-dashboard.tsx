@@ -340,7 +340,7 @@ export default function HostDashboard({
                   title={phase.title}
                   action={
                     <Link to={sessionEditHref} state={sessionEditState} className="btn btn-ghost btn-sm">
-                      {session ? "세션 문서 편집" : "새 세션 만들기"}
+                      {session ? "세션 문서 편집" : "세션 문서 만들기"}
                     </Link>
                   }
                 />
@@ -405,8 +405,8 @@ export default function HostDashboard({
                     eyebrow="예정 세션"
                     title="앞으로 읽을 세션"
                     action={
-                      <Link to={newSessionHref} className="btn btn-quiet btn-sm">
-                        예정 세션 만들기
+                      <Link to={newSessionHref} className="btn btn-ghost btn-sm">
+                        세션 문서 만들기
                       </Link>
                     }
                   />
@@ -795,7 +795,7 @@ function MobileHostDashboard({
             )}
           </div>
           <Link to={sessionEditHref} state={sessionEditState} className="btn btn-primary rm-host-dashboard-mobile__session-cta">
-            <span>{session ? "세션 문서 편집" : "새 세션 만들기"}</span>
+            <span>{session ? "세션 문서 편집" : "세션 문서 만들기"}</span>
             <Icon name="arrow-right" size={14} />
           </Link>
         </article>
@@ -805,7 +805,7 @@ function MobileHostDashboard({
         <div className="m-eyebrow-row">
           <span className="eyebrow">예정 세션</span>
           <Link to={newSessionHref} className="tiny">
-            만들기
+            문서 만들기
           </Link>
         </div>
         {upcomingSessions.length > 0 ? (

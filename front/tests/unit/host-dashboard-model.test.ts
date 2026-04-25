@@ -48,7 +48,7 @@ describe("host dashboard model", () => {
     expect(getHostDashboardNextOperationAction(null, emptyDashboard, null)).toMatchObject({
       title: "새 세션 문서 만들기",
       href: null,
-      unavailableReason: "아래 세션 준비 문서에서 새 세션 만들기를 사용하세요.",
+      unavailableReason: "아래 세션 준비 문서에서 세션 문서 만들기를 사용하세요.",
     });
     expect(getHostDashboardChecklist(null, emptyDashboard).find((item) => item.id === "session-basics")).toMatchObject({
       state: "guidance",

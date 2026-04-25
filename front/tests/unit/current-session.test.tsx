@@ -262,11 +262,11 @@ describe("CurrentSession", () => {
   it("shows the no-session create action only for hosts", () => {
     const { rerender } = render(<CurrentSession auth={activeMemberAuthFixture} data={{ currentSession: null }} />);
 
-    expect(screen.queryByRole("link", { name: "새 세션 만들기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "세션 문서 만들기" })).not.toBeInTheDocument();
 
     rerender(<CurrentSession auth={{ ...activeMemberAuthFixture, role: "HOST" }} data={{ currentSession: null }} />);
 
-    expect(screen.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(screen.getByRole("link", { name: "세션 문서 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
   });
 
   it("shows RSVP, check-in, and question sections", () => {

@@ -220,7 +220,7 @@ function MemberSessionDetailDesktop({
               <FeedbackStatusCard session={session} returnTarget={returnTarget} />
               {session.isHost ? (
                 <Link to={`/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`} className="btn btn-quiet btn-sm">
-                  세션 편집
+                  세션 문서 편집
                 </Link>
               ) : null}
             </aside>
