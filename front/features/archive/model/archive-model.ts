@@ -294,19 +294,19 @@ export function publicationLabel(published: boolean, variant: "desktop" | "mobil
     return published ? "공개" : "비공개";
   }
 
-  return published ? "공개 기록" : "비공개 기록";
+  return published ? "공개" : "비공개";
 }
 
 export function feedbackArchiveLabel(feedbackDocument: ArchiveFeedbackDocumentStatus) {
   if (!feedbackDocument.available) {
-    return "피드백 없음";
+    return "피드백 X";
   }
 
   if (!feedbackDocument.readable) {
     return "피드백 잠김";
   }
 
-  return "피드백 있음";
+  return "피드백 O";
 }
 
 export function feedbackArchiveDescription(feedbackDocument: ArchiveFeedbackDocumentStatus) {

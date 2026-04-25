@@ -86,10 +86,15 @@ describe("SessionIdentity", () => {
       />,
     );
 
-    expect(screen.getByLabelText("No.06 · 지난 회차 · 공개됨 · 문서 있음")).toBeVisible();
+    expect(screen.getByLabelText("No.06 · 지난 회차 · 공개 · 문서 있음")).toBeVisible();
     expect(screen.getByText("No.06")).toBeVisible();
     expect(screen.getByText("지난 회차")).toBeVisible();
-    expect(screen.getByText("공개됨")).toBeVisible();
+    expect(screen.getByText("공개")).toHaveClass(
+      "rm-session-identity__chip",
+      "rm-session-identity__chip--dot",
+      "rm-state",
+      "rm-state--success",
+    );
     expect(screen.getByText("문서 있음")).toBeVisible();
   });
 
@@ -105,9 +110,9 @@ describe("SessionIdentity", () => {
       />,
     );
 
-    expect(screen.getByLabelText("No.06 · 공개됨 · 문서 있음")).toBeVisible();
+    expect(screen.getByLabelText("No.06 · 공개 · 문서 있음")).toBeVisible();
     expect(screen.queryByText("지난 회차")).not.toBeInTheDocument();
-    expect(screen.getByText("공개됨")).toBeVisible();
+    expect(screen.getByText("공개")).toBeVisible();
   });
 
   it("can hide the feedback document label", () => {
@@ -123,7 +128,7 @@ describe("SessionIdentity", () => {
       />,
     );
 
-    expect(screen.getByLabelText("No.06 · 공개됨")).toBeVisible();
+    expect(screen.getByLabelText("No.06 · 공개")).toBeVisible();
     expect(screen.queryByText("지난 회차")).not.toBeInTheDocument();
     expect(screen.queryByText("문서 있음")).not.toBeInTheDocument();
   });

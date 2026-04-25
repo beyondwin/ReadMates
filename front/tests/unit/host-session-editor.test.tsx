@@ -647,8 +647,8 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 정리 중/ })).toBeVisible();
-    expect(screen.queryByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 비공개/ })).toBeVisible();
+    expect(screen.queryByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).not.toBeInTheDocument();
   });
 
   it("labels published member-visibility records as published in the session identity", () => {
@@ -665,7 +665,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).toBeVisible();
+    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
   });
 
   it("saves publication summary and record visibility through the publication API without redirecting", async () => {
@@ -762,7 +762,7 @@ describe("HostSessionEditor", () => {
       visibility: "PUBLIC",
     });
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
-    expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).toBeVisible();
+    expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
     expect(screen.getByText("공개된 기록입니다. 공개 대상은 저장 버튼으로 변경할 수 있습니다.")).toBeVisible();
     expect(screen.getByText("공개 완료")).toBeVisible();
     expect(await screen.findByRole("status")).toHaveTextContent("외부 공개가 완료되었습니다.");

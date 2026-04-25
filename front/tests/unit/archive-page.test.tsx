@@ -243,7 +243,7 @@ describe("ArchivePage", () => {
     expect(desktop.queryByText("지난 회차")).not.toBeInTheDocument();
     expect(desktop.queryByText("공개됨")).not.toBeInTheDocument();
     expect(desktop.queryByText("문서 있음")).not.toBeInTheDocument();
-    expect(desktop.getAllByText("공개 기록")).toHaveLength(seededSessions.length);
+    expect(desktop.getAllByText("공개")).toHaveLength(seededSessions.length);
     expect(desktop.getByText("피드백 있음")).toBeInTheDocument();
     expect(desktop.getAllByText("피드백 없음").length).toBe(seededSessions.length - 1);
   });
@@ -384,6 +384,11 @@ describe("ArchivePage", () => {
     expect(mobile?.querySelectorAll(".rm-archive-session-card.m-card")).toHaveLength(6);
     expect(scoped.getByText("No.06 · 2026.04.15")).toBeInTheDocument();
     const latestSessionCard = scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 열기" });
+    expect(latestSessionCard).toHaveStyle({
+      gridTemplateColumns: "52px minmax(0, 1fr) 20px",
+      gap: "10px",
+    });
+    expect(latestSessionCard.querySelector(".rm-archive-session-card__meta")).not.toBeNull();
     expect(within(latestSessionCard).getAllByText(/^No\.06/)).toHaveLength(1);
     expect(scoped.queryByText("지난 회차")).not.toBeInTheDocument();
     expect(scoped.queryByText("공개됨")).not.toBeInTheDocument();
@@ -683,9 +688,9 @@ describe("ArchivePage", () => {
     );
     expect(desktop.queryByText("준비 중")).not.toBeInTheDocument();
     expect(mobile.queryByText("준비 중")).not.toBeInTheDocument();
-    expect(desktop.queryByText("공개 기록")).not.toBeInTheDocument();
-    expect(mobile.queryByText("공개 기록")).not.toBeInTheDocument();
-    expect(desktop.getByText("비공개 기록")).toBeInTheDocument();
+    expect(desktop.queryByText("공개")).not.toBeInTheDocument();
+    expect(mobile.queryByText("공개")).not.toBeInTheDocument();
+    expect(desktop.getByText("비공개")).toBeInTheDocument();
     expect(mobile.getByText("비공개")).toBeInTheDocument();
   });
 

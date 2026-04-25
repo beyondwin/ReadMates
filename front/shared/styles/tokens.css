@@ -405,6 +405,18 @@ img { max-width: 100%; display: block; }
   color: var(--accent);
 }
 
+.rm-session-identity__chip--dot {
+  gap: 5px;
+}
+
+.rm-session-identity__chip--dot::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--state-text, var(--text-3));
+}
+
 .rm-session-identity--compact .rm-session-identity__number,
 .rm-session-identity--compact .rm-session-identity__chip {
   min-height: 22px;
@@ -623,6 +635,29 @@ button.rm-record-row:hover {
   background: var(--bg-sub);
   color: var(--text);
 }
+
+.rm-archive-session-card__meta {
+  gap: 4px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.rm-archive-session-card__meta .badge {
+  gap: 4px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+.rm-archive-session-card__meta .badge-dot::before {
+  width: 4px;
+  height: 4px;
+}
+
+.rm-archive-session-card .rm-archive-session-action {
+  width: 20px;
+}
+
 .divider {
   height: 1px;
   background: var(--line);

@@ -400,7 +400,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
             to={appSessionHref(session.id)}
             state={archiveReturnState("sessions")}
             className="rm-archive-session-card m-card"
-            style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) auto", gap: 14, alignItems: "center", width: "100%" }}
+            style={{ display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) 20px", gap: 10, alignItems: "center", width: "100%" }}
             aria-label={`No.${session.number} ${session.book} 열기`}
           >
             <BookCover title={session.book} author={session.author} imageUrl={session.bookImageUrl} width={52} />
@@ -414,7 +414,7 @@ function ArchiveMobileSessions({ sessions }: { sessions: ArchiveSessionRecord[] 
               <div className="tiny" style={{ color: "var(--text-3)" }}>
                 {session.author}
               </div>
-              <div className="m-row" style={{ gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+              <div className="m-row rm-archive-session-card__meta" style={{ marginTop: 10 }}>
                 <span className="badge">
                   {session.attendance}/{session.total} 참석
                 </span>
