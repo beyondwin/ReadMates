@@ -108,7 +108,7 @@ export function MobileMemberActivity({ items }: { items: NoteFeedItem[] }) {
           <div className="eyebrow">멤버 활동</div>
         </div>
         <Link to="/app/notes" className="btn btn-quiet btn-sm">
-          클럽 노트 →
+          전체 보기
         </Link>
       </div>
       {items.length === 0 ? (

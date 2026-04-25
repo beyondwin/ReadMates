@@ -209,7 +209,7 @@ export function MobileSessionPicker({
       <div className="row-between" style={{ marginBottom: "10px" }}>
         <span className="eyebrow">세션별</span>
         <button type="button" className="btn btn-quiet btn-sm" onClick={onOpenAll} ref={allSessionsButtonRef}>
-          세션 목록 →
+          전체 보기
         </button>
       </div>
       {noteSessions.length === 0 ? (
