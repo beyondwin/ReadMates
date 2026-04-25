@@ -707,7 +707,7 @@ Task 3 checkpoint (2026-04-25):
 - Modify `front/features/host/route/host-session-editor-data.ts`
 - Test: `front/tests/unit/host-session-editor.test.tsx`
 
-- [ ] **Step 1: Extend editor action type and test actions**
+- [x] **Step 1: Extend editor action type and test actions**
 
 In `HostSessionEditorActions`, add:
 
@@ -729,7 +729,7 @@ publishSession: (sessionId) =>
   }) as Promise<JsonResponse<HostSessionDetailResponse>>,
 ```
 
-- [ ] **Step 2: Add failing API tests through component behavior**
+- [x] **Step 2: Add failing API tests through component behavior**
 
 In `host-session-editor.test.tsx`, add:
 
@@ -778,7 +778,7 @@ it("saves publication and publishes a closed record", async () => {
 });
 ```
 
-- [ ] **Step 3: Run frontend tests and verify failures**
+- [x] **Step 3: Run frontend tests and verify failures**
 
 Run:
 
@@ -788,7 +788,7 @@ pnpm --dir front test -- host-session-editor.test.tsx
 
 Expected: tests fail because actions and buttons do not exist.
 
-- [ ] **Step 4: Add API functions**
+- [x] **Step 4: Add API functions**
 
 In `host-api.ts`, add:
 
@@ -818,12 +818,21 @@ closeSession: closeHostSession,
 publishSession: publishHostSession,
 ```
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 ```bash
 git add front/features/host/api/host-api.ts front/features/host/route/host-session-editor-data.ts front/features/host/components/host-session-editor.tsx front/tests/unit/host-session-editor.test.tsx
 git commit -m "feat: wire host lifecycle actions"
 ```
+
+Task 4 checkpoint (2026-04-25):
+- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Changed files: `host-api.ts`, `host-session-editor-data.ts`, `host-session-editor.tsx`, `host-session-editor.test.tsx`.
+- Decisions: route actions call the new server lifecycle endpoints; editor stores the full returned session snapshot so state and publication details stay in sync after close/publish.
+- Reviews: spec review passed; quality review found stale publication response merging, fixed in `89bc557`; re-review passed.
+- Verification: `pnpm --dir front test -- host-session-editor.test.tsx`, `pnpm --dir front lint`, and `pnpm --dir front build` passed after `pnpm --dir front install` populated this worktree's dependencies.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 4 agents were closed.
+- Remaining risks/next task notes: Task 5 should add the fuller lifecycle UX/copy and decide how to handle HOST_ONLY publish attempts.
 
 ## Task 5: Frontend Lifecycle UX
 
