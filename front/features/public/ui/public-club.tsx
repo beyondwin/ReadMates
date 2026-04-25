@@ -176,7 +176,6 @@ export default function PublicClub({ data }: PublicClubProps) {
             </div>
             <Link to="/records" className="public-records-link">
               전체 보기
-              <span aria-hidden>→</span>
             </Link>
           </div>
 
