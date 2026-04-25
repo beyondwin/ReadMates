@@ -11,7 +11,6 @@ import {
   feedbackDocumentCardClassName,
   feedbackRailCardClassName,
   feedbackStatusText,
-  sessionNo,
 } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
 import {
@@ -154,10 +153,6 @@ function MemberSessionDetailDesktop({
                 >
                   ← {sessionDetailBackLabel(returnTarget)}
                 </Link>
-                <span className="rm-session-detail-kicker__divider">·</span>
-                <span>
-                  아카이브 세션 · {sessionNo(session.sessionNumber)} · {date}
-                </span>
               </p>
               <div style={{ marginTop: 10 }}>
                 <SessionIdentity
@@ -261,10 +256,7 @@ function MemberSessionDetailMobile({
             decorative
           />
           <div style={{ minWidth: 0 }}>
-            <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-              {sessionNo(session.sessionNumber)} · {date}
-            </div>
-            <div style={{ marginTop: 6 }}>
+            <div>
               <SessionIdentity
                 sessionNumber={session.sessionNumber}
                 state={session.state}
@@ -281,6 +273,7 @@ function MemberSessionDetailMobile({
               {session.bookAuthor}
             </div>
             <div className="m-row" style={{ gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+              <span className="badge">{date}</span>
               <span className="badge">
                 참석 {session.attendance}/{session.total}
               </span>
@@ -508,10 +501,6 @@ function MemberSessionDetailStyles() {
 
       .rm-session-detail-backlink:hover {
         color: var(--text);
-      }
-
-      .rm-session-detail-kicker__divider {
-        color: var(--text-3);
       }
 
       .rm-session-detail-section-nav {
