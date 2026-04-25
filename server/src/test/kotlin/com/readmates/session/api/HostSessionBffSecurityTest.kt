@@ -102,6 +102,21 @@ class HostSessionBffSecurityTest(
         assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
     }
 
+    @Test
+    fun `host close bff request reaches controller without spring csrf token`() {
+        createOpenSession()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009888/close") {
+            with(user("host@example.com"))
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+            jsonPath("$.state") { value("CLOSED") }
+        }
+    }
+
     private fun createDraftSession() {
         createSession(state = "DRAFT", visibility = "HOST_ONLY")
     }
