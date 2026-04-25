@@ -2,20 +2,22 @@
 
 Cloudflare Pages production 자동 배포를 끄거나, GitHub Actions에서 명시적으로 프론트 배포를 실행할 때 참고하는 보조 절차입니다.
 
-## GitHub Actions 버튼으로 배포
+## GitHub Actions로 배포
 
 `.github/workflows/deploy-front.yml`은 `front`를 빌드한 뒤 Wrangler로 Cloudflare Pages에 직접 업로드합니다.
 
 1. GitHub repository secret에 `CLOUDFLARE_ACCOUNT_ID`와 `CLOUDFLARE_API_TOKEN`을 추가합니다.
-2. GitHub Actions에서 `Deploy Front` workflow를 열고 `Run workflow`를 실행합니다.
+2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 push합니다. 예: `git push origin v1.1.0`
+
+이 workflow는 `v*` tag push를 구독하므로 `main` push만으로는 production 배포를 실행하지 않습니다.
+
+수동으로도 실행할 수 있습니다. GitHub Actions에서 `Deploy Front` workflow를 열고 `Run workflow`를 실행합니다.
 
 CLI로도 실행할 수 있습니다.
 
 ```bash
 gh workflow run deploy-front.yml
 ```
-
-이 workflow는 `workflow_run`도 구독하므로 `main` branch의 `CI`가 성공하면 같은 commit을 배포합니다.
 
 ## 로컬에서 deploy hook으로 배포
 

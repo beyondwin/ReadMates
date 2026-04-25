@@ -115,12 +115,14 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    git tag -a v1.1.0 -m "ReadMates v1.1.0"
    ```
 
-7. `main`과 tag를 push합니다.
+7. `main`과 release tag를 push합니다.
 
    ```bash
    git push origin main
    git push origin v1.1.0
    ```
+
+   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow를 시작합니다.
 
 8. GitHub Release를 만듭니다.
 

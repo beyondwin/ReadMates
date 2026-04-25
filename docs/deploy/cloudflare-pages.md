@@ -51,16 +51,17 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 
 프로덕션 secret 값은 Git에 기록하지 않습니다. Cloudflare Pages 환경 변수/secret 저장소와 Spring 운영 환경 파일에만 실제 값을 둡니다.
 
-## Cloudflare Pages Git 연동
+## Cloudflare Pages GitHub Actions 배포
 
 프론트엔드 정상 배포 경로:
 
-1. GitHub `main`에 병합합니다.
-2. Cloudflare Pages가 `front`를 빌드합니다.
-3. Cloudflare가 `front/dist`와 `front/functions`를 함께 배포합니다.
-4. [README.md](README.md)의 smoke check를 실행합니다.
+1. GitHub `main`에 변경을 병합하고 필요한 검증을 끝냅니다.
+2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push합니다. 예: `git push origin v1.1.0`
+3. `.github/workflows/deploy-front.yml`이 tag 대상 commit에서 `front`를 빌드합니다.
+4. Wrangler가 `front/dist`와 `front/functions`를 Cloudflare Pages production으로 함께 배포합니다.
+5. [README.md](README.md)의 smoke check를 실행합니다.
 
-Wrangler 직접 업로드는 장애 대응용입니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 다시 맞춥니다.
+`main` push만으로는 production 배포가 실행되지 않습니다. 수동 workflow 실행과 로컬 deploy hook은 장애 대응용입니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
 
 이 절차는 Cloudflare Pages의 프론트엔드 배포 흐름입니다. Spring Boot 백엔드 프로덕션 배포가 GitHub Actions로 이미 구성되어 있다고 가정하지 않습니다.
 

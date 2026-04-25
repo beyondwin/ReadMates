@@ -286,7 +286,7 @@ Started ReadmatesApplicationKt
 
 권장 개선:
 
-- `main` 배포 전 변경 파일을 보고 server migration/API 변경이 있으면 서버 배포 체크리스트를 강제합니다.
+- release tag 배포 전 변경 파일을 보고 server migration/API 변경이 있으면 서버 배포 체크리스트를 강제합니다.
 - 운영 smoke check에 새 기능 endpoint를 추가합니다.
 - 호스트 인증 smoke를 별도 수동 체크리스트로 둡니다.
 - 가능하면 GitHub Actions 또는 deploy runbook에서 "서버 배포 완료 후 프론트 배포" 순서를 명시합니다.
@@ -304,4 +304,3 @@ Started ReadmatesApplicationKt
 - 운영 health check `UP`
 - 공개 API smoke 정상
 - 새 API route는 더 이상 404/405로 실패하지 않음
-
