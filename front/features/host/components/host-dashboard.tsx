@@ -585,7 +585,11 @@ function UpcomingSessionRow({
   const visibilityPending = actions.isPending(session.sessionId, "visibility");
   const openPending = actions.isPending(session.sessionId, "open");
   const controlsDisabled = actions.isBusy;
-  const visibilityLabel = visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "멤버 공개";
+  const currentVisibilityLabel = upcomingVisibilityStatusLabel(session.visibility);
+  const visibilityActionLabel = visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "공개";
+  const visibilityActionAriaLabel = visibilityPending
+    ? `처리 중 · ${session.bookTitle}`
+    : `${session.bookTitle} 공개 범위를 ${isMemberVisible ? "비공개" : "멤버 공개"}로 변경`;
   const showOpenAction = actions.canOpenSession || openPending;
   const openLabel = openPending ? "처리 중" : "현재로 시작";
 
@@ -604,6 +608,13 @@ function UpcomingSessionRow({
         <div className="tiny" style={{ marginTop: 4 }}>
           {session.bookAuthor} · {formatDateOnlyLabel(session.date)} · {session.locationLabel}
         </div>
+        <div className="tiny" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
+          <span style={{ color: "var(--text-3)" }}>공개 범위</span>
+          <span aria-hidden="true" style={{ color: "var(--text-3)" }}>
+            ·
+          </span>
+          <strong style={{ color: "var(--accent)", fontWeight: 700 }}>{currentVisibilityLabel}</strong>
+        </div>
       </div>
       <div className="row" style={{ gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {showOpenAction ? (
@@ -617,20 +628,15 @@ function UpcomingSessionRow({
             {openLabel}
           </button>
         ) : null}
-        <div className="row" style={{ gap: 6 }}>
-          <span className="tiny" style={{ color: "var(--text-3)" }}>
-            공개 범위
-          </span>
-          <button
-            className="btn btn-ghost btn-sm"
-            type="button"
-            disabled={controlsDisabled}
-            aria-label={`${visibilityLabel} · ${session.bookTitle}`}
-            onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
-          >
-            {visibilityLabel}
-          </button>
-        </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          type="button"
+          disabled={controlsDisabled}
+          aria-label={visibilityActionAriaLabel}
+          onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
+        >
+          {visibilityActionLabel}
+        </button>
         <Link className="btn btn-ghost btn-sm" to={hostSessionEditHref(session.sessionId)} aria-label={`편집 · ${session.bookTitle}`}>
           편집
         </Link>
@@ -941,6 +947,11 @@ function UpcomingSessionMobileCard({
   const visibilityPending = actions.isPending(session.sessionId, "visibility");
   const openPending = actions.isPending(session.sessionId, "open");
   const controlsDisabled = actions.isBusy;
+  const currentVisibilityLabel = upcomingVisibilityStatusLabel(session.visibility);
+  const visibilityActionLabel = visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "공개";
+  const visibilityActionAriaLabel = visibilityPending
+    ? `처리 중 · ${session.bookTitle}`
+    : `${session.bookTitle} 공개 범위를 ${isMemberVisible ? "비공개" : "멤버 공개"}로 변경`;
   const showOpenAction = actions.canOpenSession || openPending;
   const openLabel = openPending ? "처리 중" : "현재로 시작";
 
@@ -952,6 +963,13 @@ function UpcomingSessionMobileCard({
       </div>
       <div className="tiny" style={{ marginTop: 4 }}>
         {formatDateOnlyLabel(session.date)}
+      </div>
+      <div className="tiny" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 8 }}>
+        <span style={{ color: "var(--text-3)" }}>공개 범위</span>
+        <span aria-hidden="true" style={{ color: "var(--text-3)" }}>
+          ·
+        </span>
+        <strong style={{ color: "var(--accent)", fontWeight: 700 }}>{currentVisibilityLabel}</strong>
       </div>
       {showOpenAction ? (
         <button
@@ -966,25 +984,20 @@ function UpcomingSessionMobileCard({
         </button>
       ) : null}
       <div className="row" style={{ gap: 8, marginTop: showOpenAction ? 8 : 12 }}>
-        <div style={{ flex: "0 0 auto", minWidth: 0 }}>
-          <div className="tiny" style={{ color: "var(--text-3)", marginBottom: 4 }}>
-            공개 범위
-          </div>
-          <button
-            className="btn btn-ghost btn-sm"
-            type="button"
-            style={{ minWidth: 64, paddingLeft: 10, paddingRight: 10, whiteSpace: "nowrap", wordBreak: "keep-all" }}
-            disabled={controlsDisabled}
-            aria-label={`${visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "멤버 공개"} · ${session.bookTitle}`}
-            onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
-          >
-            {visibilityPending ? "처리 중" : isMemberVisible ? "비공개" : "멤버 공개"}
-          </button>
-        </div>
+        <button
+          className="btn btn-ghost btn-sm"
+          type="button"
+          style={{ flex: "0 0 auto", minWidth: 64, paddingLeft: 10, paddingRight: 10, whiteSpace: "nowrap", wordBreak: "keep-all" }}
+          disabled={controlsDisabled}
+          aria-label={visibilityActionAriaLabel}
+          onClick={() => actions.updateVisibility(session.sessionId, isMemberVisible ? "HOST_ONLY" : "MEMBER")}
+        >
+          {visibilityActionLabel}
+        </button>
         <Link
           className="btn btn-ghost btn-sm"
           to={hostSessionEditHref(session.sessionId)}
-          style={{ flex: "0 0 auto", alignSelf: "flex-end", minWidth: 64, paddingLeft: 10, paddingRight: 10 }}
+          style={{ flex: "0 0 auto", minWidth: 64, paddingLeft: 10, paddingRight: 10 }}
           aria-label={`편집 · ${session.bookTitle}`}
         >
           편집
@@ -996,6 +1009,18 @@ function UpcomingSessionMobileCard({
 
 function upcomingSessionLabel(session: HostSessionListItem) {
   return `No.${String(session.sessionNumber).padStart(2, "0")} · 예정`;
+}
+
+function upcomingVisibilityStatusLabel(visibility: SessionRecordVisibility) {
+  if (visibility === "HOST_ONLY") {
+    return "비공개";
+  }
+
+  if (visibility === "PUBLIC") {
+    return "전체 공개";
+  }
+
+  return "멤버 공개";
 }
 
 function UpcomingStartBlockedNotice({ mobile = false }: { mobile?: boolean }) {
