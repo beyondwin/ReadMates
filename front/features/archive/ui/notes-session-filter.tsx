@@ -14,6 +14,9 @@ import { Link } from "@/features/archive/ui/archive-link";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 export function SelectedSessionHeader({ session }: { session: NoteSessionItem | null }) {
+  const sessionNumber = session ? noteSessionNumberLabel(session) : null;
+  const sessionDate = session ? formatDateOnlyLabel(session.date) : null;
+
   return (
     <div>
       <p className="eyebrow" style={{ margin: 0 }}>
@@ -23,9 +26,20 @@ export function SelectedSessionHeader({ session }: { session: NoteSessionItem | 
         {session ? sessionBookTitle(session) : "읽고 돌아오는 자리"}
       </h1>
       <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-        {session
-          ? `${noteSessionNumberLabel(session)} · ${formatDateOnlyLabel(session.date)}`
-          : "다른 멤버의 하이라이트, 한줄평, 질문. 댓글도 좋아요도 없는 조용한 피드."}
+        {session && sessionNumber && sessionDate ? (
+          <span
+            aria-label={`${sessionNumber} · ${sessionDate}`}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}
+          >
+            <span className="rm-session-identity rm-session-identity--compact" aria-hidden="true">
+              <span className="rm-session-identity__number">{sessionNumber}</span>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span aria-hidden="true">{sessionDate}</span>
+          </span>
+        ) : (
+          "다른 멤버의 하이라이트, 한줄평, 질문. 댓글도 좋아요도 없는 조용한 피드."
+        )}
       </p>
     </div>
   );
