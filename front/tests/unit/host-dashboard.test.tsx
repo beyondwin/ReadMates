@@ -590,16 +590,13 @@ describe("HostDashboard", () => {
     const mobileCard = mobile.getByText("다음 책").closest(".m-card-quiet");
 
     expect(within(desktopRow as HTMLElement).getByRole("group", { name: "No.08 · D-53" })).toBeInTheDocument();
-    expect(within(desktopRow as HTMLElement).getByText("No.08")).toHaveClass(
-      "rm-session-identity__chip",
-      "rm-state",
-      "rm-state--pending",
+    expect(within(desktopRow as HTMLElement).getByRole("group", { name: "No.08 · D-53" })).toHaveClass(
+      "rm-session-identity--muted",
     );
-    expect(within(desktopRow as HTMLElement).getByText("D-53")).toHaveClass(
-      "rm-session-identity__chip",
-      "rm-state",
-      "rm-state--pending",
-    );
+    expect(within(desktopRow as HTMLElement).getByText("No.08")).toHaveClass("rm-session-identity__chip");
+    expect(within(desktopRow as HTMLElement).getByText("No.08")).not.toHaveClass("rm-session-identity__number", "rm-state--pending");
+    expect(within(desktopRow as HTMLElement).getByText("D-53")).toHaveClass("rm-session-identity__chip");
+    expect(within(desktopRow as HTMLElement).getByText("D-53")).not.toHaveClass("rm-state--pending");
     expect(within(desktopRow as HTMLElement).queryByText("예정 세션")).not.toBeInTheDocument();
     expect(within(desktopRow as HTMLElement).queryByText("예정")).not.toBeInTheDocument();
     expect(within(mobileCard as HTMLElement).getByRole("group", { name: "No.08 · D-53" })).toBeInTheDocument();

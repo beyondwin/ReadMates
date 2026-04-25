@@ -402,6 +402,13 @@ img { max-width: 100%; display: block; }
   font-size: 11px;
 }
 
+.rm-session-identity--muted .rm-session-identity__number,
+.rm-session-identity--muted .rm-session-identity__chip {
+  border-color: var(--line-soft);
+  background: color-mix(in oklch, var(--paper-100), var(--paper-50) 36%);
+  color: oklch(0.42 0.006 80);
+}
+
 .rm-book-cover {
   aspect-ratio: 3 / 4;
   border-radius: var(--r-1);

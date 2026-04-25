@@ -152,7 +152,11 @@ describe("MemberHome", () => {
     expect(desktop.getByText(/다음 저자/)).toBeInTheDocument();
     const upcomingIdentity = desktop.getByRole("group", { name: "No.08 · D-53" });
     expect(upcomingIdentity).toBeInTheDocument();
-    expect(within(upcomingIdentity).getByText("No.08")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    expect(upcomingIdentity).toHaveClass("rm-session-identity--muted");
+    expect(within(upcomingIdentity).getByText("No.08")).toHaveClass("rm-session-identity__chip");
+    expect(within(upcomingIdentity).getByText("No.08")).not.toHaveClass("rm-state", "rm-state--pending");
+    expect(within(upcomingIdentity).getByText("D-53")).toHaveClass("rm-session-identity__chip");
+    expect(within(upcomingIdentity).getByText("D-53")).not.toHaveClass("rm-state", "rm-state--pending");
     expect(within(upcomingIdentity).queryByText("예정")).not.toBeInTheDocument();
     expect(mobile.getByText("예정 세션")).toBeInTheDocument();
     expect(mobile.getByText("다음 달 책")).toBeInTheDocument();
