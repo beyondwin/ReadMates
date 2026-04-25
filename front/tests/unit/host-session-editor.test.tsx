@@ -322,17 +322,17 @@ describe("HostSessionEditor", () => {
     const user = userEvent.setup();
     expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-04-21");
     expect(screen.getByLabelText("시작 시간")).toHaveValue("20:00");
-    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("04-20 23:59까지 질문 제출");
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("04-20 23:59까지");
 
     await user.clear(screen.getByLabelText("시작 시간"));
     await user.type(screen.getByLabelText("시작 시간"), "18:45");
 
-    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("04-20 23:59까지 질문 제출");
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("04-20 23:59까지");
 
     await user.clear(screen.getByLabelText("모임 날짜"));
     await user.type(screen.getByLabelText("모임 날짜"), "2026-01-01");
 
-    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("12-31 23:59까지 질문 제출");
+    expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("12-31 23:59까지");
   });
 
   it("renders attendance and the session feedback document from the host session detail API payload", () => {
