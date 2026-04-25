@@ -534,18 +534,17 @@ describe("HostDashboard", () => {
     await waitFor(() => expect(desktop.queryByText("다음 책")).not.toBeInTheDocument());
     expect(desktop.getByText("그 다음 책")).toBeInTheDocument();
     expect(desktop.queryByRole("button", { name: /현재로 시작/ })).not.toBeInTheDocument();
-    expect(desktop.getByRole("button", { name: /현재 세션 있음/ })).toBeDisabled();
-    expect(mobile.getByRole("button", { name: /현재 세션 있음/ })).toBeDisabled();
+    expect(desktop.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
+    expect(desktop.getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
+    expect(mobile.getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
     expect(mobile.getAllByText("완료").length).toBeGreaterThanOrEqual(4);
     expect(screen.getAllByText("현재 세션 시작됨")).toHaveLength(2);
-
-    await user.click(desktop.getByRole("button", { name: /현재 세션 있음/ }));
 
     expect(actions.openSession).toHaveBeenCalledTimes(1);
   });
 
-  it("disables upcoming open action while a current session exists", async () => {
-    const user = userEvent.setup();
+  it("summarizes blocked upcoming start once while a current session exists", () => {
     const actions = {
       ...noopHostDashboardActions,
       openSession: vi.fn(async () => undefined),
@@ -555,17 +554,32 @@ describe("HostDashboard", () => {
     );
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
-    const desktopStart = desktop.getByRole("button", { name: /현재 세션 있음/ });
-    const mobileStart = mobile.getByRole("button", { name: /현재 세션 있음/ });
+    const desktopUpcoming = desktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section");
+    const mobileUpcoming = mobile.getByText("예정 세션").closest("section");
 
-    expect(desktopStart).toBeDisabled();
-    expect(desktopStart).toHaveAttribute("title", "현재 세션이 있습니다.");
-    expect(mobileStart).toBeDisabled();
-    expect(mobileStart).toHaveAttribute("title", "현재 세션이 있습니다.");
-
-    await user.click(desktopStart);
+    expect(desktop.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
+    expect(mobile.queryByRole("button", { name: /현재 세션 있음/ })).not.toBeInTheDocument();
+    expect(within(desktopUpcoming as HTMLElement).getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
+    expect(within(mobileUpcoming as HTMLElement).getByText("현재 열린 세션이 있어 예정 세션을 바로 시작할 수 없습니다.")).toBeInTheDocument();
+    expect(within(desktopUpcoming as HTMLElement).getByRole("button", { name: /멤버 공개|비공개/ })).toBeEnabled();
+    expect(within(mobileUpcoming as HTMLElement).getByRole("button", { name: /멤버 공개|비공개/ })).toBeEnabled();
 
     expect(actions.openSession).not.toHaveBeenCalled();
+  });
+
+  it("renders compact upcoming session identity on desktop and mobile", () => {
+    const { container } = render(
+      <HostDashboardForTest auth={hostAuth} current={current} data={dashboard} hostSessions={hostSessions} />,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+    const desktopUpcoming = desktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section");
+    const desktopRow = within(desktopUpcoming as HTMLElement).getByText("다음 책").closest(".row-between");
+    const mobileCard = mobile.getByText("다음 책").closest(".m-card-quiet");
+
+    expect(within(desktopRow as HTMLElement).getByText("No.08 · 예정")).toBeInTheDocument();
+    expect(within(desktopRow as HTMLElement).queryByText("예정 세션")).not.toBeInTheDocument();
+    expect(within(mobileCard as HTMLElement).getByText("No.08 · 예정")).toBeInTheDocument();
   });
 
   it("shows a compact error when an upcoming action fails", async () => {
@@ -594,12 +608,13 @@ describe("HostDashboard", () => {
     const nextBookCard = mobile.getByText("다음 책").closest(".m-card-quiet");
 
     expect(nextBookCard).not.toBeNull();
-    expect(within(nextBookCard as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toBeInTheDocument();
+    const visibilityButton = within(nextBookCard as HTMLElement).getByRole("button", { name: /멤버 공개/ });
+    const editLink = within(nextBookCard as HTMLElement).getByRole("link", { name: "편집 · 다음 책" });
+    expect(visibilityButton).toBeInTheDocument();
+    expect(visibilityButton).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
+    expect(editLink).toHaveStyle({ minWidth: "64px", paddingLeft: "10px", paddingRight: "10px" });
     expect(within(nextBookCard as HTMLElement).getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
-    expect(within(nextBookCard as HTMLElement).getByRole("link", { name: "편집 · 다음 책" })).toHaveAttribute(
-      "href",
-      "/app/host/sessions/session-8/edit",
-    );
+    expect(editLink).toHaveAttribute("href", "/app/host/sessions/session-8/edit");
   });
 
   it("does not double the top rule on the first desktop upcoming session row", () => {
