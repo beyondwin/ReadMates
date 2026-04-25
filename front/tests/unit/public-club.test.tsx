@@ -50,8 +50,8 @@ describe("PublicClub", () => {
     expect(within(overview).getByText("2024.11")).toBeInTheDocument();
     expect(within(overview).getByText("운영 리듬")).toBeInTheDocument();
     expect(within(overview).getByText("호스트가 공지하는 날 · 20:00 – 22:00")).toBeInTheDocument();
-    expect(within(overview).getByText("멤버 정원")).toBeInTheDocument();
-    expect(within(overview).getByText("9명 소규모 초대제")).toBeInTheDocument();
+    expect(within(overview).getByText("현재 멤버")).toBeInTheDocument();
+    expect(within(overview).getByText("9명 · 초대 기반")).toBeInTheDocument();
     expect(within(overview).getByText("호스트")).toBeInTheDocument();
     expect(within(overview).getByText("김호스트 · 2025.11~")).toBeInTheDocument();
     expect(within(overview).getByText("기록 방식")).toBeInTheDocument();

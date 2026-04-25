@@ -52,7 +52,7 @@ export default function PublicClub({ data }: PublicClubProps) {
   const overviewItems = [
     ["시작", STATIC_OPERATION_INTRO.startedAt],
     ["운영 리듬", STATIC_OPERATION_INTRO.cadence],
-    ["멤버 정원", `${memberCount}명 소규모 초대제`],
+    ["현재 멤버", `${memberCount}명 · 초대 기반`],
     ["호스트", `${STATIC_OPERATION_INTRO.hostName} · ${STATIC_OPERATION_INTRO.hostSince}~`],
     ["기록 방식", STATIC_OPERATION_INTRO.recording],
   ];
