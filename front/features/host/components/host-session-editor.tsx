@@ -613,8 +613,8 @@ export default function HostSessionEditor({
               style={{ "--stack": "28px" } as CSSProperties}
             >
               <Panel
-                eyebrow="책 · 세션 정보"
-                title="책과 세션 이름"
+                eyebrow="기본 정보"
+                title="책과 모임"
                 mobileSection="basic"
                 panelId="host-editor-panel-basic-info"
                 activeMobileSection={activeMobileSection}
@@ -629,6 +629,7 @@ export default function HostSessionEditor({
                       className="input"
                       value={title}
                       onChange={(event) => setTitle(event.target.value)}
+                      placeholder="예: 8회차 모임 · 물고기는 존재하지 않는다"
                     />
                   </div>
                   <div className="grid-2">
@@ -641,6 +642,7 @@ export default function HostSessionEditor({
                         className="input"
                         value={bookTitle}
                         onChange={(event) => setBookTitle(event.target.value)}
+                        placeholder="예: 물고기는 존재하지 않는다"
                       />
                     </div>
                     <div>
@@ -652,6 +654,7 @@ export default function HostSessionEditor({
                         className="input"
                         value={bookAuthor}
                         onChange={(event) => setBookAuthor(event.target.value)}
+                        placeholder="예: 룰루 밀러"
                       />
                     </div>
                   </div>

@@ -72,39 +72,22 @@ export type HostSessionDestructiveActionAvailability = {
   guidance: string;
 };
 
-export const defaultBookLink = "https://product.kyobobook.co.kr/detail/S000001947832";
 const koreaOffsetHours = 9;
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
 }
 
-function thirdWednesdayOfMonth(year: number, monthIndex: number) {
-  const firstDayOfMonth = new Date(year, monthIndex, 1);
-  const daysUntilWednesday = (3 - firstDayOfMonth.getDay() + 7) % 7;
-
-  return new Date(year, monthIndex, 1 + daysUntilWednesday + 14);
-}
-
 export function defaultSessionDateFrom(currentDate: Date) {
-  const year = currentDate.getFullYear();
-  const monthIndex = currentDate.getMonth();
-  const day = currentDate.getDate();
-  const thisMonthThirdWednesday = thirdWednesdayOfMonth(year, monthIndex);
-  const defaultDate =
-    day <= thisMonthThirdWednesday.getDate()
-      ? thisMonthThirdWednesday
-      : thirdWednesdayOfMonth(year, monthIndex + 1);
-
-  return `${defaultDate.getFullYear()}-${padDatePart(defaultDate.getMonth() + 1)}-${padDatePart(defaultDate.getDate())}`;
+  return `${currentDate.getFullYear()}-${padDatePart(currentDate.getMonth() + 1)}-${padDatePart(currentDate.getDate())}`;
 }
 
 export function defaultHostSessionFormValues(now = new Date()): HostSessionFormValues {
   return {
-    title: "7회차 모임 · ",
+    title: "",
     bookTitle: "",
     bookAuthor: "",
-    bookLink: defaultBookLink,
+    bookLink: "",
     bookImageUrl: "",
     locationLabel: "온라인",
     meetingUrl: "",
