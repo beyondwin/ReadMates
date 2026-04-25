@@ -93,6 +93,41 @@ describe("SessionIdentity", () => {
     expect(screen.getByText("문서 있음")).toBeVisible();
   });
 
+  it("can hide the past-session phase label", () => {
+    render(
+      <SessionIdentity
+        sessionNumber={6}
+        state="PUBLISHED"
+        date="2026-04-15"
+        published={true}
+        feedbackDocumentAvailable={true}
+        hidePastPhaseLabel
+      />,
+    );
+
+    expect(screen.getByLabelText("No.06 · 공개됨 · 문서 있음")).toBeVisible();
+    expect(screen.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(screen.getByText("공개됨")).toBeVisible();
+  });
+
+  it("can hide the feedback document label", () => {
+    render(
+      <SessionIdentity
+        sessionNumber={6}
+        state="PUBLISHED"
+        date="2026-04-15"
+        published={true}
+        feedbackDocumentAvailable={true}
+        hidePastPhaseLabel
+        hideFeedbackDocumentLabel
+      />,
+    );
+
+    expect(screen.getByLabelText("No.06 · 공개됨")).toBeVisible();
+    expect(screen.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(screen.queryByText("문서 있음")).not.toBeInTheDocument();
+  });
+
   it("labels a draft new session as upcoming", () => {
     render(
       <SessionIdentity

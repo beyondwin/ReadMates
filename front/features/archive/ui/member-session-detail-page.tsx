@@ -161,6 +161,8 @@ function MemberSessionDetailDesktop({
                   date={session.date}
                   published={published}
                   feedbackDocumentAvailable={session.feedbackDocument.available}
+                  hidePastPhaseLabel
+                  hideFeedbackDocumentLabel
                 />
               </div>
               <h1 className="h1 editorial" style={{ margin: "10px 0 0", maxWidth: 720 }}>
@@ -264,6 +266,8 @@ function MemberSessionDetailMobile({
                 published={published}
                 feedbackDocumentAvailable={session.feedbackDocument.available}
                 compact
+                hidePastPhaseLabel
+                hideFeedbackDocumentLabel
               />
             </div>
             <h1 className="h2 editorial" style={{ margin: "6px 0 4px" }}>
