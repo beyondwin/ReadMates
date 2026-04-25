@@ -340,7 +340,6 @@ export default function PublicHome({ data }: PublicHomeProps) {
             </div>
             <Link to="/records" className="public-records-link">
               전체 보기
-              <span aria-hidden>→</span>
             </Link>
           </div>
           {publicRecordPreviewSessions.length > 0 ? (

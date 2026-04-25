@@ -53,7 +53,7 @@ export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
         title="최근 클럽 흐름"
         action={
           <Link to="/app/notes" className="btn btn-quiet btn-sm">
-            클럽 노트 →
+            전체 보기
           </Link>
         }
       />

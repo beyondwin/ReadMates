@@ -470,7 +470,7 @@ describe("MemberHome", () => {
     expect(desktop.getByText("RSVP · 참석 명단")).toBeInTheDocument();
     expect(desktop.getByText("다음 달 선정")).toBeInTheDocument();
     expect(desktop.getByText("바로가기")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: /클럽 노트/ })).toHaveAttribute("href", "/app/notes");
+    expect(desktop.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/notes");
     expect(desktop.getByRole("link", { name: /피드백 문서/ })).toHaveAttribute(
       "href",
       "/app/archive?view=report",
