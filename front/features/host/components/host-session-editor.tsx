@@ -613,8 +613,8 @@ export default function HostSessionEditor({
               style={{ "--stack": "28px" } as CSSProperties}
             >
               <Panel
-                eyebrow="기본 정보"
-                title="책과 모임"
+                eyebrow="도서 정보"
+                title="읽을 책"
                 mobileSection="basic"
                 panelId="host-editor-panel-basic-info"
                 activeMobileSection={activeMobileSection}
@@ -695,8 +695,8 @@ export default function HostSessionEditor({
               </Panel>
 
               <Panel
-                eyebrow="일정 · 장소 · 링크"
-                title="일정과 참여 링크"
+                eyebrow="일정 정보"
+                title="모임 일정과 접속 정보"
                 mobileSection="basic"
                 panelId="host-editor-panel-basic-schedule"
                 activeMobileSection={activeMobileSection}
