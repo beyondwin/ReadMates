@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation, useSearchParams } from "react-router-dom";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
 import {
   feedFilterFromSearchParam,
@@ -516,6 +516,53 @@ describe("NotesFeedPage", () => {
       "page",
     );
     expect(within(picker as HTMLElement).queryByRole("link", { name: "No.02 월든 세션 보기" })).not.toBeInTheDocument();
+  });
+
+  it("left-aligns the selected session in the mobile recent picker", async () => {
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+
+    Element.prototype.scrollIntoView = scrollIntoView;
+
+    try {
+      const { container, rerender } = renderNotesFeedPage();
+
+      await waitFor(() =>
+        expect(scrollIntoView).toHaveBeenCalledWith({
+          block: "nearest",
+          inline: "start",
+        }),
+      );
+
+      scrollIntoView.mockClear();
+
+      rerender(
+        notesFeedPageElement({
+          renderItems: [otherSessionItem],
+          selectedSessionId: "session-1",
+          renderSelectedSession: noteSessions[8],
+        }),
+      );
+
+      const picker = container.querySelector('[aria-label="최근 세션"]');
+
+      expect(picker).not.toBeNull();
+
+      const selectedLink = within(picker as HTMLElement).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" });
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
+      expect(scrollIntoView.mock.contexts[0]).toBe(selectedLink);
+      expect(scrollIntoView).toHaveBeenCalledWith({
+        block: "nearest",
+        inline: "start",
+      });
+    } finally {
+      if (originalScrollIntoView) {
+        Element.prototype.scrollIntoView = originalScrollIntoView;
+      } else {
+        delete (Element.prototype as Partial<Element>).scrollIntoView;
+      }
+    }
   });
 
   it("traps keyboard focus in the mobile session sheet, closes on Escape, and restores the opener", async () => {
