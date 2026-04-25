@@ -117,6 +117,10 @@ describe("MemberSessionDetailPage", () => {
     const desktopBadges = badgeTexts(container.querySelector(".desktop-only") as HTMLElement);
     expect(desktopBadges).toContain("2025.11.26");
     expect(desktopBadges).toContain("참석 5/6");
+    expect(desktopBadges).toContain("피드백 O");
+    const desktopAttendanceBadge = desktop.getByText("참석 5/6");
+    const desktopFeedbackBadge = desktop.getByText("피드백 O");
+    expect(desktopAttendanceBadge.compareDocumentPosition(desktopFeedbackBadge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(desktopBadges).not.toContain("온라인");
     expect(desktopBadges).not.toContain("피드백 공개");
     expect(desktop.queryByRole("link", { name: "아카이브로" })).not.toBeInTheDocument();
@@ -149,10 +153,13 @@ describe("MemberSessionDetailPage", () => {
     expect(mobile.queryByText("No.01 · 2025.11.26")).not.toBeInTheDocument();
     const mobileDateBadge = mobile.getByText("2025.11.26");
     const mobileAttendanceBadge = mobile.getByText("참석 5/6");
+    const mobileFeedbackBadge = mobile.getByText("피드백 O");
     expect(mobileDateBadge.compareDocumentPosition(mobileAttendanceBadge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(mobileAttendanceBadge.compareDocumentPosition(mobileFeedbackBadge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const mobileBadges = badgeTexts(container.querySelector(".mobile-only") as HTMLElement);
     expect(mobileBadges).toContain("2025.11.26");
     expect(mobileBadges).toContain("참석 5/6");
+    expect(mobileBadges).toContain("피드백 O");
     expect(mobileBadges).not.toContain("피드백 공개");
     expect(mobile.getByRole("group", { name: "No.01 · 비공개" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
@@ -392,7 +399,7 @@ describe("MemberSessionDetailPage", () => {
     expect(container.querySelector('a[href="/app/feedback/00000000-0000-0000-0000-000000000301/print"]')).toBeNull();
 
     const lockedBadges = Array.from(container.querySelectorAll(".badge")).filter((badge) => badge.textContent === "피드백 잠김");
-    expect(lockedBadges).toHaveLength(0);
+    expect(lockedBadges).toHaveLength(2);
     expect(container.querySelectorAll(".rm-locked-state")).toHaveLength(1);
     expect(container.querySelector(".surface-quiet.rm-state--locked")).toHaveTextContent("피드백 잠김");
   });
@@ -414,6 +421,7 @@ describe("MemberSessionDetailPage", () => {
 
     const readonlyBadges = Array.from(container.querySelectorAll(".badge")).filter((badge) => badge.textContent === "피드백 없음");
     expect(readonlyBadges).toHaveLength(0);
+    expect(screen.getAllByText("피드백 X").length).toBeGreaterThanOrEqual(2);
     expect(container.querySelectorAll(".rm-empty-state.rm-state--readonly")).toHaveLength(1);
     expect(container.querySelector(".surface-quiet.rm-state--readonly")).toHaveTextContent("피드백 없음");
   });
