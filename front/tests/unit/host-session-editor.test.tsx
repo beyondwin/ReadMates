@@ -718,6 +718,35 @@ describe("HostSessionEditor", () => {
     expect(await screen.findByRole("status")).toHaveTextContent("외부 공개가 완료되었습니다.");
   });
 
+  it("blocks publishing a closed record when host-only visibility is selected", async () => {
+    const user = userEvent.setup();
+    const closedSession = { ...session, state: "CLOSED" as const, publication: null };
+    const savePublication = vi.fn(async () => new Response("{}", { status: 200 }));
+    const publishSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...closedSession, state: "PUBLISHED" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={closedSession}
+        actions={{ ...hostSessionEditorTestActions, savePublication, publishSession }}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("기록 요약"), "호스트만 볼 수 있는 기록입니다.");
+    expect(screen.getByRole("radio", { name: /호스트 전용/ })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "기록 공개" }));
+
+    expect(savePublication).not.toHaveBeenCalled();
+    expect(publishSession).not.toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "기록 공개 전 멤버 공개 또는 외부 공개를 선택해 주세요.",
+    );
+  });
+
   it("disables publication editing controls while the record save is pending", async () => {
     const saveResponse = deferredFetchResponse();
     const fetchMock = vi.fn().mockReturnValue(saveResponse.promise);

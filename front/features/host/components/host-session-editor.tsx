@@ -421,6 +421,14 @@ export default function HostSessionEditor({
       return;
     }
 
+    if (recordVisibility === "HOST_ONLY") {
+      setPublicationFeedback({
+        tone: "error",
+        message: "기록 공개 전 멤버 공개 또는 외부 공개를 선택해 주세요.",
+      });
+      return;
+    }
+
     const publicationRequest = buildPublicationRequest(summary, recordVisibility);
 
     if (!publicationRequest) {
