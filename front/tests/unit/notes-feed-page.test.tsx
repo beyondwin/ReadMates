@@ -279,7 +279,9 @@ describe("NotesFeedPage", () => {
     renderNotesFeedPage();
 
     expect(screen.getByRole("heading", { name: "가난한 찰리의 연감" })).toBeInTheDocument();
-    expect(screen.getAllByText("No.06 · 2026.04.15").length).toBeGreaterThan(0);
+    const selectedHeaderMeta = screen.getByLabelText("No.06 · 2026.04.15");
+    expect(selectedHeaderMeta).toBeInTheDocument();
+    expect(within(selectedHeaderMeta).getByText("No.06")).toHaveClass("rm-session-identity__number");
     expect(screen.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
     expect(screen.getByText("질문 4")).toBeInTheDocument();
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
