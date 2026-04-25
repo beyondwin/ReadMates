@@ -76,13 +76,13 @@ describe("TopNav responsive variants", () => {
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
     expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "운영",
-      "세션 편집",
+      "세션 문서",
       "멤버 초대",
       "멤버 승인",
     ]);
     expect(within(nav).getByRole("link", { name: "운영" })).toHaveAttribute("href", "/app/host");
-    expect(within(nav).getByRole("link", { name: "세션 편집" })).toHaveAttribute("href", "/app/host/sessions/new");
-    expect(within(nav).getByRole("link", { name: "세션 편집" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "세션 문서" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(within(nav).getByRole("link", { name: "세션 문서" })).toHaveAttribute("aria-current", "page");
     const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
     expect(memberReturn).toHaveAttribute("href", "/app");
     expect(memberReturn).toHaveClass("rm-workspace-switch");

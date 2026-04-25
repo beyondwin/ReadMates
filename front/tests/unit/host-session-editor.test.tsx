@@ -160,18 +160,18 @@ describe("HostSessionEditor", () => {
     });
   });
 
-  it("labels new session creation separately from current session editing", () => {
+  it("labels new session document creation separately from current session editing", () => {
     render(<HostSessionEditorForTest session={null} />);
 
-    expect(screen.getByRole("heading", { name: "새 세션 만들기" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "세션 문서 만들기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "새 세션 만들기" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "세션 문서 저장" })).toBeVisible();
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
     const bookAndSessionPanel = screen.getByRole("heading", { name: "읽을 책" }).closest("section");
     expect(bookAndSessionPanel).not.toBeNull();
     expect(within(bookAndSessionPanel as HTMLElement).getByText("도서 정보")).toBeVisible();
-    expect(screen.getByText("세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
-    expect(screen.queryByText("이번 세션 편집")).not.toBeInTheDocument();
+    expect(screen.getByText("책, 일정, 장소, 링크를 저장하면 예정 세션 문서가 생성됩니다. 기록 공개 범위와 피드백 문서는 생성 후 각 섹션에서 따로 저장합니다.")).toBeVisible();
+    expect(screen.queryByText("세션 문서 편집")).not.toBeInTheDocument();
   });
 
   it("shows helpful hints for the new-session title and book fields", () => {
@@ -185,7 +185,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByLabelText("저자")).toHaveAttribute("placeholder", "예: 룰루 밀러");
   });
 
-  it("labels existing open session as current session editing", () => {
+  it("labels existing open session as session document editing", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 4, 2));
 
@@ -196,7 +196,7 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={currentOpenSession} />);
 
-    expect(screen.getByRole("heading", { name: "이번 세션 편집" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
     expect(screen.getByText("세션 운영 문서")).toBeVisible();
     expect(screen.queryByText("세션 운영 문서 · No.7")).not.toBeInTheDocument();
     expect(screen.getByRole("group", { name: "No.07 · D-18 · 이번 세션" })).toBeVisible();
@@ -458,7 +458,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("모임 날짜"), "2026-05-20");
     await user.clear(screen.getByLabelText("시작 시간"));
     await user.type(screen.getByLabelText("시작 시간"), "19:30");
-    await user.click(screen.getByRole("button", { name: "새 세션 만들기" }));
+    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
@@ -507,7 +507,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("장소"), "성수 스터디룸");
     await user.type(screen.getByLabelText("미팅 URL"), "https://meet.google.com/readmates-custom");
     await user.type(screen.getByLabelText("Passcode · 선택"), "custom");
-    await user.click(screen.getByRole("button", { name: "새 세션 만들기" }));
+    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({

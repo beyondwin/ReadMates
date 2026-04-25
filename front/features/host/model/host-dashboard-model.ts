@@ -234,7 +234,7 @@ export function getHostDashboardNextOperationAction(
       title: "새 세션 문서 만들기",
       helper: "운영을 시작하려면 책, 일정, 장소 또는 링크를 먼저 확정해야 합니다.",
       href: null,
-      unavailableReason: "아래 세션 준비 문서에서 새 세션 만들기를 사용하세요.",
+      unavailableReason: "아래 세션 준비 문서에서 세션 문서 만들기를 사용하세요.",
     };
   }
 
@@ -264,7 +264,7 @@ export function getHostDashboardNextOperationAction(
       helper: "공개 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
       href: null,
       label: "세션 기록에서 선택",
-      unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 편집 화면을 바로 열 수 없습니다.",
+      unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다.",
     };
   }
 
@@ -274,7 +274,7 @@ export function getHostDashboardNextOperationAction(
       helper: "피드백 문서 대기 건수는 여러 세션을 합산한 값입니다. 현재 열린 세션으로 바로 이동하지 말고 세션 기록에서 정확한 회차를 선택하세요.",
       href: null,
       label: "세션 기록에서 선택",
-      unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 편집 화면을 바로 열 수 없습니다.",
+      unavailableReason: "대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다.",
     };
   }
 

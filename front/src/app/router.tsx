@@ -216,7 +216,7 @@ export const routes: RouteObject[] = [
         element: <EditHostSessionRouteElement />,
         loader: hostSessionEditorLoader,
         errorElement: <HostRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="세션 편집 정보를 불러오는 중" variant="host" />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
       },
     ],
   },

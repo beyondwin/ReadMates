@@ -44,12 +44,12 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");
 
-  await page.getByRole("link", { name: "예정 세션 만들기" }).click();
+  await page.getByRole("link", { name: "세션 문서 만들기" }).first().click();
   await page.getByLabel("세션 제목").fill("7회차 · E2E 예정 책");
   await page.getByLabel("책 제목").fill("E2E 예정 책");
   await page.getByLabel("저자").fill("E2E 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: /예정 세션 만들기|새 세션 만들기/ }).click();
+  await page.getByRole("button", { name: "세션 문서 저장" }).click();
 
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
   await page.goto("/app/host");
@@ -85,7 +85,7 @@ test("host creates session seven and member sees current session", async ({ page
   await page.getByLabel("책 제목").fill("테스트 책");
   await page.getByLabel("저자").fill("테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: "새 세션 만들기" }).click();
+  await page.getByRole("button", { name: "세션 문서 저장" }).click();
 
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
   await startUpcomingSession(page, "테스트 책");
@@ -115,7 +115,7 @@ test("host invites a new member and invite page uses Google acceptance", async (
   await page.getByLabel("책 제목").fill("초대 테스트 책");
   await page.getByLabel("저자").fill("초대 테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: "새 세션 만들기" }).click();
+  await page.getByRole("button", { name: "세션 문서 저장" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
   await startUpcomingSession(page, "초대 테스트 책");
 

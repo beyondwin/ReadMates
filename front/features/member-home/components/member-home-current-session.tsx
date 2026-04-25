@@ -154,7 +154,7 @@ export function MobileCurrentSessionCard({
         </p>
         {isHost ? (
           <Link to="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: 16, width: "100%" }}>
-            새 세션 만들기
+            세션 문서 만들기
           </Link>
         ) : null}
       </article>

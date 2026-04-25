@@ -520,7 +520,7 @@ describe("MemberHome", () => {
     );
     const desktop = getDesktopView(container);
 
-    expect(desktop.getByRole("link", { name: "새 세션 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(desktop.getByRole("link", { name: "세션 문서 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
   });
 
   it("visually marks members who RSVP as attending in the roster summary", () => {

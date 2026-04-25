@@ -18,7 +18,7 @@ async function createOpenSessionThroughUi(page: Page) {
   await page.getByLabel("책 제목").fill(lifecycleBookTitle);
   await page.getByLabel("저자").fill("테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: "새 세션 만들기" }).click();
+  await page.getByRole("button", { name: "세션 문서 저장" }).click();
 
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
   await page.goto("/app/host");

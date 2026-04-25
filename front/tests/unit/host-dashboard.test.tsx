@@ -654,14 +654,14 @@ describe("HostDashboard", () => {
     expect(mobile.getByText("세션을 만들면 참석 현황이 표시됩니다.")).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
-    const desktopNewSessionLinks = desktop.getAllByRole("link", { name: "새 세션 만들기" });
-    const mobileNewSessionLinks = mobile.getAllByRole("link", { name: "새 세션 만들기" });
-    expect(desktopNewSessionLinks).toHaveLength(1);
+    const desktopNewSessionLinks = desktop.getAllByRole("link", { name: "세션 문서 만들기" });
+    const mobileNewSessionLinks = mobile.getAllByRole("link", { name: "세션 문서 만들기" });
+    expect(desktopNewSessionLinks).toHaveLength(2);
     expect(mobileNewSessionLinks).toHaveLength(1);
-    expect(desktopNewSessionLinks[0]).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(desktopNewSessionLinks.every((link) => link.getAttribute("href") === "/app/host/sessions/new")).toBe(true);
     expect(mobileNewSessionLinks[0]).toHaveAttribute("href", "/app/host/sessions/new");
-    expect(desktop.getByText("아래 세션 준비 문서에서 새 세션 만들기를 사용하세요.")).toBeInTheDocument();
-    expect(mobile.getByText("아래 세션 준비 문서에서 새 세션 만들기를 사용하세요.")).toBeInTheDocument();
+    expect(desktop.getByText("아래 세션 준비 문서에서 세션 문서 만들기를 사용하세요.")).toBeInTheDocument();
+    expect(mobile.getByText("아래 세션 준비 문서에서 세션 문서 만들기를 사용하세요.")).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expectDisabledActionInViews(desktop, mobile, /공개 요약 편집.*공개 대기 건수는 여러 세션을 합산한 값/);
@@ -776,7 +776,7 @@ describe("HostDashboard", () => {
     ).toBeInTheDocument();
     expect(
       within(mobileAction as HTMLElement).getByRole("button", {
-        name: /세션 기록에서 선택.*대시보드는 집계 건수만 제공하므로 특정 세션 편집 화면을 바로 열 수 없습니다/,
+        name: /세션 기록에서 선택.*대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다/,
       }),
     ).toBeDisabled();
   });
@@ -821,7 +821,7 @@ describe("HostDashboard", () => {
     ).toBeInTheDocument();
     expect(
       within(mobileAction as HTMLElement).getByRole("button", {
-        name: /세션 기록에서 선택.*대시보드는 집계 건수만 제공하므로 특정 세션 편집 화면을 바로 열 수 없습니다/,
+        name: /세션 기록에서 선택.*대시보드는 집계 건수만 제공하므로 특정 세션 문서를 바로 열 수 없습니다/,
       }),
     ).toBeDisabled();
   });
