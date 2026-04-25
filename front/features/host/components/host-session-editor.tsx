@@ -973,7 +973,7 @@ export default function HostSessionEditor({
                     {publicationLifecycleHelp}
                   </div>
                 </div>
-                <div className="row" style={{ gap: "8px", flexWrap: "wrap", marginTop: "16px" }}>
+                <div className="row" style={{ gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", marginTop: "16px" }}>
                   <button
                     type="button"
                     className="btn btn-primary"
