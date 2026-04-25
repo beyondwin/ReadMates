@@ -674,11 +674,18 @@ describe("HostSessionEditor", () => {
 
   it("saves publication and publishes a closed record", async () => {
     const user = userEvent.setup();
-    const closedSession = { ...session, state: "CLOSED" as const };
+    const closedSession = { ...session, state: "CLOSED" as const, publication: null };
     const savePublication = vi.fn(async () => new Response("{}", { status: 200 }));
     const publishSession = vi.fn(
       async () =>
-        new Response(JSON.stringify({ ...closedSession, state: "PUBLISHED" }), {
+        new Response(JSON.stringify({
+          ...closedSession,
+          state: "PUBLISHED",
+          publication: {
+            publicSummary: "최종 공개 요약입니다.",
+            visibility: "PUBLIC",
+          },
+        }), {
           status: 200,
         }) as JsonResponse<HostSessionDetailResponse>,
     );
@@ -700,7 +707,7 @@ describe("HostSessionEditor", () => {
       visibility: "PUBLIC",
     });
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
-    expect((await screen.findAllByText("공개됨")).length).toBeGreaterThan(0);
+    expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개됨/ })).toBeVisible();
   });
 
   it("disables publication editing controls while the record save is pending", async () => {

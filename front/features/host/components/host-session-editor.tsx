@@ -177,6 +177,7 @@ export default function HostSessionEditor({
   const [lifecycleState, setLifecycleState] = useState<HostSessionDetailResponse["state"] | undefined>(
     () => session?.state,
   );
+  const [displaySessionSnapshot, setDisplaySessionSnapshot] = useState<HostSessionDetailResponse | null>(null);
   const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [activeMobileSection, setActiveMobileSection] = useState<MobileEditorSection>("basic");
@@ -215,7 +216,7 @@ export default function HostSessionEditor({
         state: readmatesReturnState(returnTarget),
       })
     : undefined;
-  const displaySession = session && lifecycleState ? { ...session, state: lifecycleState } : session;
+  const displaySession = displaySessionSnapshot ?? (session && lifecycleState ? { ...session, state: lifecycleState } : session);
   const destructiveActionAvailability = getDestructiveActionAvailability(displaySession);
 
   const flash = (message: string) => {
@@ -400,6 +401,7 @@ export default function HostSessionEditor({
 
       const updatedSession = await response.json();
       setLifecycleState(updatedSession.state);
+      setDisplaySessionSnapshot(updatedSession);
       flash("세션을 마감했습니다");
     } catch {
       flash("세션 마감에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
@@ -456,6 +458,7 @@ export default function HostSessionEditor({
       setRecordVisibility(publicationRequest.visibility);
       setHasPublicationRecord(true);
       setLifecycleState(updatedSession.state);
+      setDisplaySessionSnapshot(updatedSession);
       setPublicationFeedback({
         tone: "success",
         message: "기록을 공개했습니다.",
