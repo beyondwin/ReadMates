@@ -158,16 +158,31 @@
   font-weight: 600;
 }
 .m-hdr-link--icon {
+  position: relative;
   width: 44px;
   max-width: 44px;
   height: 44px;
   padding: 0;
+  border-color: transparent;
   border-radius: var(--r-3);
   color: var(--text-2);
   background: transparent;
 }
+.m-hdr-link--icon::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  pointer-events: none;
+  transition: border-color var(--motion-fast) var(--ease-standard-refined);
+}
 .m-hdr-link--icon svg {
+  position: relative;
   flex-shrink: 0;
+}
+.m-hdr-link--icon svg path {
+  stroke-width: 1.55;
 }
 .m-hdr--host .m-hdr-link {
   color: var(--accent);
@@ -177,7 +192,7 @@
 .m-hdr--host .m-hdr-link--icon {
   color: var(--text-2);
   background: transparent;
-  border-color: var(--line);
+  border-color: transparent;
 }
 .m-hdr-brand:active,
 .m-hdr-back:active,
