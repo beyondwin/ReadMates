@@ -566,7 +566,7 @@ Task 2 checkpoint (2026-04-25):
 **Files:**
 - Modify `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`
 
-- [ ] **Step 1: Add regression test for closed vs published visibility**
+- [x] **Step 1: Add regression test for closed vs published visibility**
 
 Add:
 
@@ -673,7 +673,7 @@ private fun insertClosedPublicSessionWithQuestion(number: Int): String {
 }
 ```
 
-- [ ] **Step 2: Run archive and notes tests**
+- [x] **Step 2: Run archive and notes tests**
 
 Run:
 
@@ -683,12 +683,21 @@ Run:
 
 Expected: pass after Task 2.
 
-- [ ] **Step 3: Commit Task 3**
+- [x] **Step 3: Commit Task 3**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt
 git commit -m "test: cover closed and published record surfaces"
 ```
+
+Task 3 checkpoint (2026-04-25):
+- Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/session-lifecycle-publication`, `codex/session-lifecycle-publication`.
+- Changed files: `server/src/test/kotlin/com/readmates/archive/api/ArchiveAndNotesDbTest.kt`.
+- Decisions: regression uses an isolated inserted CLOSED/PUBLIC session with a question and flips only `sessions.state` to prove archive vs notes lifecycle behavior.
+- Reviews: spec review passed; quality review passed with a minor note that `sessionId`/`questionCount` assertions could make the final notes check more explicit.
+- Verification: `./server/gradlew -p server test --tests "com.readmates.archive.api.ArchiveAndNotesDbTest"` passed.
+- Background resources: no Node/Vite/dev server/browser sessions started; completed Task 3 agents were closed.
+- Remaining risks/next task notes: frontend tasks must avoid the unrelated original-worktree host-dashboard changes and operate only in this integration worktree.
 
 ## Task 4: Frontend API Wiring
 
