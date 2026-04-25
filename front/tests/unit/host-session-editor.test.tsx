@@ -167,9 +167,9 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "새 세션 만들기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
-    const bookAndSessionPanel = screen.getByRole("heading", { name: "책과 모임" }).closest("section");
+    const bookAndSessionPanel = screen.getByRole("heading", { name: "읽을 책" }).closest("section");
     expect(bookAndSessionPanel).not.toBeNull();
-    expect(within(bookAndSessionPanel as HTMLElement).getByText("기본 정보")).toBeVisible();
+    expect(within(bookAndSessionPanel as HTMLElement).getByText("도서 정보")).toBeVisible();
     expect(screen.getByText("세션 기본 정보는 새 세션 만들기 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.")).toBeVisible();
     expect(screen.queryByText("이번 세션 편집")).not.toBeInTheDocument();
   });
