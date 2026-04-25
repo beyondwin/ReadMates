@@ -954,7 +954,9 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("아직 저장된 모임 기록이 없습니다.")).toBeInTheDocument();
 
     await user.click(desktop.getByRole("button", { name: "내 서평" }));
-    expect(desktop.getByText("아직 작성된 서평이 없습니다.")).toBeInTheDocument();
+    const reviewEmptyText = desktop.getByText("아직 작성된 서평이 없습니다.");
+    expect(reviewEmptyText).toBeInTheDocument();
+    expect(reviewEmptyText.closest(".rm-empty-state")).toHaveStyle({ marginTop: "36px" });
     expect(desktop.queryByText("맡겨진 소녀")).not.toBeInTheDocument();
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
