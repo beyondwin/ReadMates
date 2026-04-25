@@ -6,8 +6,11 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
@@ -21,6 +24,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
     delete from feedback_reports
@@ -317,6 +321,159 @@ class HostSessionControllerDbTest(
         updateSessionState("00000000-0000-0000-0000-000000009777", "PUBLISHED")
 
         mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+    }
+
+    @Test
+    fun `host closes open session`() {
+        createSessionSeven()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+            jsonPath("$.state") { value("CLOSED") }
+        }
+
+        assertEquals("CLOSED", findSessionState("00000000-0000-0000-0000-000000009777"))
+    }
+
+    @Test
+    fun `host close transition is idempotent for already closed session`() {
+        createSessionSeven()
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+            jsonPath("$.state") { value("CLOSED") }
+        }
+    }
+
+    @Test
+    fun `host publishes closed session with member or public publication`() {
+        createSessionSeven()
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
+
+        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "공개 전환 테스트 요약입니다.",
+                  "visibility": "PUBLIC"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.state") { value("PUBLISHED") }
+            jsonPath("$.publication.visibility") { value("PUBLIC") }
+        }
+
+        assertEquals("PUBLISHED", findSessionState("00000000-0000-0000-0000-000000009777"))
+        assertNotNull(findPublicationRow("00000000-0000-0000-0000-000000009777")["published_at"])
+    }
+
+    @Test
+    fun `host cannot publish open draft host only or unpublished sessions`() {
+        createSessionSeven()
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "publicSummary": "호스트 전용 요약입니다.",
+                  "visibility": "HOST_ONLY"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+    }
+
+    @Test
+    fun `host close does not overwrite session state changed before close update`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+
+        HostSessionCloseRaceProbe.publishBeforeNextCloseUpdate(sessionId)
+        try {
+            mockMvc.post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
+        } finally {
+            HostSessionCloseRaceProbe.clear()
+        }
+
+        assertEquals("PUBLISHED", findSessionState(sessionId))
+    }
+
+    @Test
+    fun `host cannot close draft or published session`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc.post("/api/host/sessions/$sessionId/close") {
+            with(user("host@example.com"))
+            with(csrf())
+        }.andExpect {
+            status { isConflict() }
+        }
+
+        updateSessionState(sessionId, "PUBLISHED")
+
+        mockMvc.post("/api/host/sessions/$sessionId/close") {
             with(user("host@example.com"))
             with(csrf())
         }.andExpect {
@@ -1222,11 +1379,66 @@ class HostSessionControllerDbTest(
             sessionId,
         )
 
+    @TestConfiguration
+    class CloseRaceJdbcTemplateConfig {
+        @Bean
+        @Primary
+        fun closeRaceJdbcTemplate(dataSource: DataSource): JdbcTemplate =
+            CloseRaceJdbcTemplate(dataSource)
+    }
+
     companion object {
         @JvmStatic
         @DynamicPropertySource
         fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
             MySqlTestContainer.registerDatasourceProperties(registry)
         }
+    }
+}
+
+private object HostSessionCloseRaceProbe {
+    private val targetSessionId = ThreadLocal<String>()
+
+    fun publishBeforeNextCloseUpdate(sessionId: String) {
+        targetSessionId.set(sessionId)
+    }
+
+    fun clear() {
+        targetSessionId.remove()
+    }
+
+    fun consumeIfMatches(sql: String, args: Array<out Any?>): String? {
+        val sessionId = targetSessionId.get() ?: return null
+        val normalizedSql = sql.trimIndent().replace(Regex("\\s+"), " ")
+        val isHostSessionCloseUpdate = normalizedSql.startsWith("update sessions set state = 'CLOSED', updated_at = utc_timestamp(6)")
+        if (!isHostSessionCloseUpdate || args.firstOrNull() != sessionId) {
+            return null
+        }
+
+        targetSessionId.remove()
+        return sessionId
+    }
+}
+
+private class CloseRaceJdbcTemplate(private val rawDataSource: DataSource) : JdbcTemplate(rawDataSource) {
+    override fun update(sql: String, vararg args: Any?): Int {
+        val sessionId = HostSessionCloseRaceProbe.consumeIfMatches(sql, args)
+        if (sessionId != null) {
+            rawDataSource.connection.use { connection ->
+                connection.autoCommit = true
+                connection.prepareStatement(
+                    """
+                    update sessions
+                    set state = 'PUBLISHED'
+                    where id = ?
+                      and club_id = '00000000-0000-0000-0000-000000000001'
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, sessionId)
+                    statement.executeUpdate()
+                }
+            }
+        }
+        return super.update(sql, *args)
     }
 }

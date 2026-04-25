@@ -4,6 +4,7 @@ import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionAttendee
+import com.readmates.session.application.HostSessionCloseNotAllowedException
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
@@ -11,6 +12,7 @@ import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublication
+import com.readmates.session.application.HostSessionPublishNotAllowedException
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
@@ -216,6 +218,102 @@ class JdbcHostSessionWriteAdapter(
             command.host.clubId.dbString(),
         )
         createActiveParticipants(jdbcTemplate, command.host.clubId, command.sessionId)
+        return findHostSession(command.host, command.sessionId)
+    }
+
+    @Transactional
+    override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
+        requireHost(command.host)
+        val jdbcTemplate = jdbcTemplate()
+        val closedRows = jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'CLOSED',
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+              and state = 'OPEN'
+            """.trimIndent(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+        if (closedRows == 0) {
+            val state = jdbcTemplate.query(
+                """
+                select state
+                from sessions
+                where id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getString("state") },
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            ).firstOrNull() ?: throw HostSessionNotFoundException()
+
+            if (state == "CLOSED") {
+                return findHostSession(command.host, command.sessionId)
+            }
+            throw HostSessionCloseNotAllowedException()
+        }
+        return findHostSession(command.host, command.sessionId)
+    }
+
+    @Transactional
+    override fun publish(command: HostSessionIdCommand): HostSessionDetailResponse {
+        requireHost(command.host)
+        val jdbcTemplate = jdbcTemplate()
+        val publishedRows = jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'PUBLISHED',
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+              and state = 'CLOSED'
+              and exists (
+                select 1
+                from public_session_publications
+                where public_session_publications.session_id = sessions.id
+                  and public_session_publications.club_id = sessions.club_id
+                  and public_session_publications.visibility in ('MEMBER', 'PUBLIC')
+                  and trim(public_session_publications.public_summary) <> ''
+              )
+            """.trimIndent(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+        if (publishedRows == 0) {
+            val state = jdbcTemplate.query(
+                """
+                select state
+                from sessions
+                where id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getString("state") },
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            ).firstOrNull() ?: throw HostSessionNotFoundException()
+
+            if (state == "PUBLISHED") {
+                return findHostSession(command.host, command.sessionId)
+            }
+            throw HostSessionPublishNotAllowedException()
+        }
+
+        jdbcTemplate.update(
+            """
+            update public_session_publications
+            set is_public = true,
+                published_at = coalesce(published_at, utc_timestamp(6)),
+                updated_at = utc_timestamp(6)
+            where session_id = ?
+              and club_id = ?
+              and visibility = 'PUBLIC'
+            """.trimIndent(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
         return findHostSession(command.host, command.sessionId)
     }
 

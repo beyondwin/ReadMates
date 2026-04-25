@@ -1,9 +1,11 @@
 import type { LoaderFunctionArgs } from "react-router-dom";
 import {
+  closeHostSession,
   createHostSession,
   deleteHostSession,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
+  publishHostSession,
   saveHostSessionAttendance,
   saveHostSessionPublication,
   updateHostSession,
@@ -25,6 +27,8 @@ export async function hostSessionEditorLoader({ params }: LoaderFunctionArgs) {
 export const hostSessionEditorActions = {
   loadDeletionPreview: fetchHostSessionDeletionPreview,
   deleteSession: deleteHostSession,
+  closeSession: closeHostSession,
+  publishSession: publishHostSession,
   saveSession: (sessionId, request) =>
     sessionId === null ? createHostSession(request) : updateHostSession(sessionId, request),
   savePublication: saveHostSessionPublication,
