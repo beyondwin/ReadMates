@@ -147,6 +147,7 @@ pnpm --dir front dev
 | 로컬 실행 | [docs/development/local-setup.md](docs/development/local-setup.md) |
 | 아키텍처 상세 | [docs/development/architecture.md](docs/development/architecture.md) |
 | 테스트 가이드 | [docs/development/test-guide.md](docs/development/test-guide.md) |
+| 릴리즈 관리와 CHANGELOG | [docs/development/release-management.md](docs/development/release-management.md), [CHANGELOG.md](CHANGELOG.md) |
 | 배포 문서 허브 | [docs/deploy/README.md](docs/deploy/README.md) |
 | Cloudflare Pages | [docs/deploy/cloudflare-pages.md](docs/deploy/cloudflare-pages.md) |
 | SPA fallback | [docs/deploy/cloudflare-pages-spa.md](docs/deploy/cloudflare-pages-spa.md) |
