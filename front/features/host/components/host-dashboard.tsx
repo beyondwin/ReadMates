@@ -412,15 +412,20 @@ export default function HostDashboard({
                     eyebrow="예정 세션"
                     title="앞으로 읽을 세션"
                     action={
-                      <Link to={newSessionHref} className="btn btn-ghost btn-sm">
+                      <Link to={newSessionHref} className="btn btn-quiet btn-sm">
                         예정 세션 만들기
                       </Link>
                     }
                   />
                   {upcomingSessions.length > 0 ? (
                     <div className="surface" style={{ padding: 4 }}>
-                      {upcomingSessions.map((item) => (
-                        <UpcomingSessionRow key={item.sessionId} session={item} actions={upcomingActions} />
+                      {upcomingSessions.map((item, index) => (
+                        <UpcomingSessionRow
+                          key={item.sessionId}
+                          session={item}
+                          actions={upcomingActions}
+                          showSeparator={index > 0}
+                        />
                       ))}
                     </div>
                   ) : (
@@ -574,9 +579,11 @@ export default function HostDashboard({
 function UpcomingSessionRow({
   session,
   actions,
+  showSeparator = true,
 }: {
   session: HostSessionListItem;
   actions: UpcomingActionHandlers;
+  showSeparator?: boolean;
 }) {
   const isMemberVisible = session.visibility !== "HOST_ONLY";
   const visibilityPending = actions.isPending(session.sessionId, "visibility");
@@ -589,7 +596,7 @@ function UpcomingSessionRow({
   return (
     <div
       className="row-between"
-      style={{ gap: 12, padding: "14px 16px", borderTop: "1px solid var(--line-soft)" }}
+      style={{ gap: 12, padding: "14px 16px", borderTop: showSeparator ? "1px solid var(--line-soft)" : undefined }}
     >
       <div style={{ minWidth: 0 }}>
         <SessionIdentity
