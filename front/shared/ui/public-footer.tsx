@@ -13,7 +13,7 @@ export function PublicFooter({ showGuestMemberActions = true }: PublicFooterProp
           <div className="editorial h3" style={{ marginBottom: 6 }}>
             읽는사이
           </div>
-          <div className="small">공개 기록은 누구나 읽고, 참여는 초대받은 멤버가 이어갑니다.</div>
+          <div className="small">공개 기록은 누구나 읽고, 함께 읽는 자리는 초대받은 멤버와 이어갑니다.</div>
         </div>
         <nav className="public-footer__nav" aria-label="공개 하단 탐색">
           <div>
