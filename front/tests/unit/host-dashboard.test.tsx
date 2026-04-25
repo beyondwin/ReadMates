@@ -577,6 +577,9 @@ describe("HostDashboard", () => {
   });
 
   it("renders compact upcoming session identity on desktop and mobile", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 3, 25, 0, 0, 0));
+
     const { container } = render(
       <HostDashboardForTest auth={hostAuth} current={current} data={dashboard} hostSessions={hostSessions} />,
     );
@@ -586,9 +589,19 @@ describe("HostDashboard", () => {
     const desktopRow = within(desktopUpcoming as HTMLElement).getByText("다음 책").closest(".row-between");
     const mobileCard = mobile.getByText("다음 책").closest(".m-card-quiet");
 
-    expect(within(desktopRow as HTMLElement).getByText("No.08 · 예정")).toBeInTheDocument();
+    expect(within(desktopRow as HTMLElement).getByRole("group", { name: "No.08 · D-53 · 예정" })).toBeInTheDocument();
+    expect(within(desktopRow as HTMLElement).getByText("No.08")).toHaveClass(
+      "rm-session-identity__chip",
+      "rm-state",
+      "rm-state--pending",
+    );
+    expect(within(desktopRow as HTMLElement).getByText("D-53")).toHaveClass(
+      "rm-session-identity__chip",
+      "rm-state",
+      "rm-state--pending",
+    );
     expect(within(desktopRow as HTMLElement).queryByText("예정 세션")).not.toBeInTheDocument();
-    expect(within(mobileCard as HTMLElement).getByText("No.08 · 예정")).toBeInTheDocument();
+    expect(within(mobileCard as HTMLElement).getByRole("group", { name: "No.08 · D-53 · 예정" })).toBeInTheDocument();
   });
 
   it("shows a compact error when an upcoming action fails", async () => {

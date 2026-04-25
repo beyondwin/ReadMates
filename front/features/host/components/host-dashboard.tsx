@@ -599,9 +599,7 @@ function UpcomingSessionRow({
       style={{ gap: 12, padding: "14px 16px", borderTop: showSeparator ? "1px solid var(--line-soft)" : undefined }}
     >
       <div style={{ minWidth: 0 }}>
-        <div className="tiny mono" style={{ color: "var(--text-3)" }}>
-          {upcomingSessionLabel(session)}
-        </div>
+        <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="예정" />
         <div className="body editorial" style={{ marginTop: 6, fontSize: 16 }}>
           {session.bookTitle}
         </div>
@@ -957,7 +955,7 @@ function UpcomingSessionMobileCard({
 
   return (
     <div className="m-card-quiet">
-      <div className="tiny mono">{upcomingSessionLabel(session)}</div>
+      <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="예정" />
       <div className="body editorial" style={{ marginTop: 6 }}>
         {session.bookTitle}
       </div>
@@ -1005,10 +1003,6 @@ function UpcomingSessionMobileCard({
       </div>
     </div>
   );
-}
-
-function upcomingSessionLabel(session: HostSessionListItem) {
-  return `No.${String(session.sessionNumber).padStart(2, "0")} · 예정`;
 }
 
 function upcomingVisibilityStatusLabel(visibility: SessionRecordVisibility) {
