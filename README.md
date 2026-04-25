@@ -4,10 +4,10 @@ ReadMates는 정기 독서모임의 세션 준비, 참여 관리, 기록 공개,
 
 - Demo: [https://readmates.pages.dev](https://readmates.pages.dev)
 - Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`
-- Scope: 1개 독서모임, 1개 현재 `OPEN` 세션, 여러 개의 예정 `DRAFT` 세션에 최적화된 운영형 서비스
+- Scope: 정기 독서모임의 현재·예정 회차 준비부터 참여 관리, 기록 공개, 피드백 문서 열람까지 아우르는 운영형 서비스
 - Highlight: Google OAuth, 서버 측 session cookie, Cloudflare BFF 보안 경계, 역할 기반 권한 제어, 피드백 문서 접근 제어, Playwright E2E, 공개 릴리즈 후보 scan
 
-이 저장소는 포트폴리오 공개 검토를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
+이 저장소는 외부 공개를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
 
 ## 왜 만들었나
 
