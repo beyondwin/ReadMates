@@ -13,7 +13,12 @@ import java.util.UUID
 
 private const val CLEANUP_NOTIFICATION_OUTBOX_SQL = """
     delete from notification_outbox
-    where club_id = '00000000-0000-0000-0000-000000000001';
+    where club_id in (
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002'
+    );
+    delete from clubs
+    where id = '00000000-0000-0000-0000-000000000002';
 """
 
 @SpringBootTest(
@@ -133,6 +138,37 @@ class JdbcNotificationOutboxAdapterTest(
     }
 
     @Test
+    fun `claimPendingForClub only claims rows for requested club`() {
+        val hostClubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val otherClubId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+        insertOtherClub()
+        insertPendingNotification(
+            id = "00000000-0000-0000-0000-000000009201",
+            clubId = hostClubId.toString(),
+            dedupeKey = "host-notification-adapter-test-host-club",
+        )
+        insertPendingNotification(
+            id = "00000000-0000-0000-0000-000000009202",
+            clubId = otherClubId.toString(),
+            dedupeKey = "host-notification-adapter-test-other-club",
+        )
+
+        val claimed = adapter.claimPendingForClub(hostClubId, 10)
+
+        assertThat(claimed.map { it.id.toString() }).containsExactly("00000000-0000-0000-0000-000000009201")
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select status
+                from notification_outbox
+                where id = '00000000-0000-0000-0000-000000009202'
+                """.trimIndent(),
+                String::class.java,
+            ),
+        ).isEqualTo("PENDING")
+    }
+
+    @Test
     fun `markSent does not overwrite row that is no longer sending`() {
         val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
@@ -210,6 +246,47 @@ class JdbcNotificationOutboxAdapterTest(
         )
         assertThat(row["status"]).isEqualTo("SENDING")
         assertThat(row["sent_at"]).isNull()
+    }
+
+    private fun insertOtherClub() {
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (
+              '00000000-0000-0000-0000-000000000002',
+              'other-club',
+              'Other Club',
+              'Separate reading club',
+              'Separate club for notification processing scope tests.'
+            )
+            """.trimIndent(),
+        )
+    }
+
+    private fun insertPendingNotification(id: String, clubId: String, dedupeKey: String) {
+        jdbcTemplate.update(
+            """
+            insert into notification_outbox (
+              id, club_id, event_type, aggregate_type, aggregate_id,
+              recipient_email, subject, body_text, deep_link_path, status, dedupe_key
+            ) values (
+              ?,
+              ?,
+              'FEEDBACK_DOCUMENT_PUBLISHED',
+              'SESSION',
+              '00000000-0000-0000-0000-000000000301',
+              'member@example.com',
+              '피드백 문서가 올라왔습니다',
+              'ReadMates에서 확인해 주세요.',
+              '/app/feedback/00000000-0000-0000-0000-000000000301',
+              'PENDING',
+              ?
+            )
+            """.trimIndent(),
+            id,
+            clubId,
+            dedupeKey,
+        )
     }
 
     companion object {

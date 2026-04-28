@@ -208,6 +208,21 @@ export type HostDashboardResponse = {
   }>;
 };
 
+export type HostNotificationSummary = {
+  pending: number;
+  failed: number;
+  dead: number;
+  sentLast24h: number;
+  latestFailures: Array<{
+    id: string;
+    eventType: "NEXT_BOOK_PUBLISHED" | "SESSION_REMINDER_DUE" | "FEEDBACK_DOCUMENT_PUBLISHED";
+    recipientEmail: string;
+    attemptCount: number;
+    lastError: string | null;
+    updatedAt: string;
+  }>;
+};
+
 export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
 
 export type HostSessionListItem = {

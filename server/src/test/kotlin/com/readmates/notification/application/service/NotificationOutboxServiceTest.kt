@@ -65,6 +65,22 @@ class NotificationOutboxServiceTest {
     }
 
     @Test
+    fun `processPendingForClub claims only rows for the requested club`() {
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val item = sampleItem()
+        val port = FakeNotificationOutboxPort(items = listOf(item))
+        val mail = RecordingMailDeliveryPort()
+        val service = NotificationOutboxService(port, mail, maxAttempts = 5)
+
+        val processed = service.processPendingForClub(clubId, limit = 10)
+
+        assertThat(processed).isEqualTo(1)
+        assertThat(port.clubClaimRequests).containsExactly(clubId to 10)
+        assertThat(port.claimRequests).isEmpty()
+        assertThat(port.sentIds).containsExactly(item.id)
+    }
+
+    @Test
     fun `processPending marks failed with configured retry delay before max attempts`() {
         val item = sampleItem(attemptCount = 2)
         val port = FakeNotificationOutboxPort(items = listOf(item))
@@ -128,6 +144,7 @@ private class FakeNotificationOutboxPort(
 ) : NotificationOutboxPort {
     val sentIds = mutableListOf<UUID>()
     val claimRequests = mutableListOf<Int>()
+    val clubClaimRequests = mutableListOf<Pair<UUID, Int>>()
     val failedIds = mutableListOf<UUID>()
     val failedErrors = mutableListOf<String>()
     val failedDelays = mutableListOf<Long>()
@@ -143,6 +160,11 @@ private class FakeNotificationOutboxPort(
     override fun claimPending(limit: Int): List<NotificationOutboxItem> {
         claimRequests += limit
         return items.take(limit)
+    }
+
+    override fun claimPendingForClub(clubId: UUID, limit: Int): List<NotificationOutboxItem> {
+        clubClaimRequests += clubId to limit
+        return items.filter { it.clubId == clubId }.take(limit)
     }
 
     override fun markSent(id: UUID, lockedAt: OffsetDateTime) {

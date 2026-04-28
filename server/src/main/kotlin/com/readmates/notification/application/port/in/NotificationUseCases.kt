@@ -13,6 +13,7 @@ interface RecordNotificationEventUseCase {
 
 interface ProcessNotificationOutboxUseCase {
     fun processPending(limit: Int): Int
+    fun processPendingForClub(clubId: UUID, limit: Int): Int
 }
 
 interface GetHostNotificationSummaryUseCase {

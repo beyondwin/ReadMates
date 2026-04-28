@@ -11,6 +11,7 @@ interface NotificationOutboxPort {
     fun enqueueNextBookPublished(clubId: UUID, sessionId: UUID): Int
     fun enqueueSessionReminderDue(targetDate: LocalDate): Int
     fun claimPending(limit: Int): List<NotificationOutboxItem>
+    fun claimPendingForClub(clubId: UUID, limit: Int): List<NotificationOutboxItem>
     fun markSent(id: UUID, lockedAt: OffsetDateTime)
     fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long)
     fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String)

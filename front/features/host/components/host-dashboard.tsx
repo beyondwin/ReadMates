@@ -4,6 +4,7 @@ import { hostDashboardReturnTarget, readmatesReturnState } from "@/src/app/route
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
+  HostNotificationSummary,
   HostSessionListItem,
   SessionRecordVisibility,
 } from "@/features/host/api/host-contracts";
@@ -46,6 +47,7 @@ const HOST_DASHBOARD_LABELS = {
   nextActionSection: "우선 처리할 일",
   nextAction: "다음 운영 액션",
   quickActions: "운영 액션 목록",
+  notifications: "알림 발송",
 } as const;
 
 const SESSION_REQUIRED_REASON = "현재 세션을 먼저 만든 뒤 사용할 수 있습니다.";
@@ -111,6 +113,13 @@ export type HostDashboardActions = {
 };
 
 const newSessionHref = "/app/host/sessions/new";
+const EMPTY_NOTIFICATION_SUMMARY: HostNotificationSummary = {
+  pending: 0,
+  failed: 0,
+  dead: 0,
+  sentLast24h: 0,
+  latestFailures: [],
+};
 
 function memberSessionState(
   session: CurrentSession,
@@ -184,12 +193,14 @@ export default function HostDashboard({
   current,
   data,
   hostSessions,
+  notifications = EMPTY_NOTIFICATION_SUMMARY,
   actions,
 }: {
   auth?: AuthMeResponse;
   current?: CurrentSessionResponse;
   data: HostDashboardResponse;
   hostSessions: HostSessionListItem[];
+  notifications?: HostNotificationSummary;
   actions: HostDashboardActions;
 }) {
   const hostName = auth?.displayName ?? "호스트";
@@ -532,6 +543,7 @@ export default function HostDashboard({
                 </section>
 
                 <PublicationFeedbackSection data={data} />
+                <HostNotificationLedger notifications={notifications} />
                 <InvitePipelineSection />
 
                 <section>
@@ -561,6 +573,7 @@ export default function HostDashboard({
         hostName={hostName}
         session={session}
         data={data}
+        notifications={notifications}
         sessionEditHref={sessionEditHref}
         sessionEditState={sessionEditState}
         sessionSpecificEditHref={sessionSpecificEditHref}
@@ -655,6 +668,7 @@ function MobileHostDashboard({
   hostName,
   session,
   data,
+  notifications,
   sessionEditHref,
   sessionEditState,
   sessionSpecificEditHref,
@@ -673,6 +687,7 @@ function MobileHostDashboard({
   hostName: string;
   session: CurrentSession | null;
   data: HostDashboardResponse;
+  notifications: HostNotificationSummary;
   sessionEditHref: string;
   sessionEditState: ReturnType<typeof readmatesReturnState>;
   sessionSpecificEditHref: string | null;
@@ -911,6 +926,10 @@ function MobileHostDashboard({
           {HOST_DASHBOARD_LABELS.publishFeedback}
         </div>
         <PublicationFeedbackSection data={data} mobile />
+      </section>
+
+      <section className="m-sec">
+        <HostNotificationLedger notifications={notifications} mobile />
       </section>
 
       <section className="m-sec">
@@ -1272,6 +1291,94 @@ function PublicationFeedbackSection({ data, mobile = false }: { data: HostDashbo
       ))}
     </section>
   );
+}
+
+function HostNotificationLedger({
+  notifications,
+  mobile = false,
+}: {
+  notifications: HostNotificationSummary;
+  mobile?: boolean;
+}) {
+  const failures = notifications.latestFailures.slice(0, 3);
+  const body = (
+    <>
+      <div className="row-between" style={{ alignItems: "baseline", gap: 12, marginBottom: mobile ? 10 : 12 }}>
+        <h2 id={mobile ? undefined : "host-notifications-title"} className={mobile ? "body" : "eyebrow"} style={{ margin: 0 }}>
+          {HOST_DASHBOARD_LABELS.notifications}
+        </h2>
+        <span className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
+          최근 24시간 {nonNegativeCount(notifications.sentLast24h)}건
+        </span>
+      </div>
+      <div className={mobile ? "m-list" : undefined}>
+        <div
+          className={mobile ? "m-list-row rm-host-dashboard-mobile__two-column-row" : "row"}
+          style={{
+            gap: mobile ? undefined : 8,
+            flexWrap: "wrap",
+            padding: mobile ? undefined : "0 0 10px",
+          }}
+        >
+          {[
+            ["대기", notifications.pending],
+            ["실패", notifications.failed],
+            ["중단", notifications.dead],
+          ].map(([label, value]) => (
+            <span key={label} className={badgeClass(Number(value), label === "대기" ? "default" : "warn")}>
+              {label} {nonNegativeCount(Number(value))}
+            </span>
+          ))}
+        </div>
+        {failures.length > 0 ? (
+          <ul style={{ margin: mobile ? "10px 0 0" : "4px 0 0", padding: 0, listStyle: "none" }}>
+            {failures.map((failure, index) => (
+              <li
+                key={failure.id}
+                className={mobile ? "m-list-row rm-host-dashboard-mobile__two-column-row" : "row-between"}
+                style={{
+                  gap: 10,
+                  padding: mobile ? undefined : "10px 0",
+                  borderTop: index === 0 || mobile ? undefined : "1px solid var(--line-soft)",
+                }}
+              >
+                <span style={{ minWidth: 0 }}>
+                  <strong className="tiny mono" style={{ display: "block", color: "var(--text)" }}>
+                    {failure.eventType}
+                  </strong>
+                  <span className="tiny" style={{ display: "block", marginTop: 2 }}>
+                    {maskEmail(failure.recipientEmail)}
+                  </span>
+                </span>
+                <span className="tiny mono" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
+                  {nonNegativeCount(failure.attemptCount)}회 시도
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </>
+  );
+
+  return (
+    <section
+      className={mobile ? "m-card-quiet" : "rm-reading-desk"}
+      aria-labelledby={mobile ? undefined : "host-notifications-title"}
+      style={{ padding: mobile ? undefined : "18px" }}
+    >
+      {body}
+    </section>
+  );
+}
+
+function maskEmail(email: string) {
+  const [localPart, domain] = email.split("@");
+  if (!localPart || !domain) {
+    return "숨김";
+  }
+
+  return `${localPart[0]}***@${domain}`;
 }
 
 function InvitePipelineSection({ mobile = false }: { mobile?: boolean }) {

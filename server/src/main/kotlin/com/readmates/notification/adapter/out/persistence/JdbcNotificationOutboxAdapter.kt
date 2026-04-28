@@ -183,24 +183,40 @@ class JdbcNotificationOutboxAdapter(
 
     @Transactional
     override fun claimPending(limit: Int): List<NotificationOutboxItem> {
+        return claimPendingRows(limit, clubId = null)
+    }
+
+    @Transactional
+    override fun claimPendingForClub(clubId: UUID, limit: Int): List<NotificationOutboxItem> {
+        return claimPendingRows(limit, clubId)
+    }
+
+    private fun claimPendingRows(limit: Int, clubId: UUID?): List<NotificationOutboxItem> {
         if (limit <= 0) {
             return emptyList()
         }
 
         val jdbcTemplate = jdbcTemplate()
-        resetStaleSendingRows(jdbcTemplate)
+        resetStaleSendingRows(jdbcTemplate, clubId)
+        val clubPredicate = if (clubId == null) "" else "and club_id = ?"
+        val selectArgs = if (clubId == null) {
+            arrayOf(limit as Any)
+        } else {
+            arrayOf(clubId.dbString() as Any, limit as Any)
+        }
         val ids = jdbcTemplate.query(
             """
             select id
             from notification_outbox
             where status in ('PENDING', 'FAILED')
               and next_attempt_at <= utc_timestamp(6)
+              $clubPredicate
             order by next_attempt_at, created_at
             limit ?
             for update skip locked
             """.trimIndent(),
             { resultSet, _ -> resultSet.uuid("id") },
-            limit,
+            *selectArgs,
         )
         if (ids.isEmpty()) {
             return emptyList()
@@ -383,7 +399,9 @@ class JdbcNotificationOutboxAdapter(
             clubId.dbString(),
         )
 
-    private fun resetStaleSendingRows(jdbcTemplate: JdbcTemplate) {
+    private fun resetStaleSendingRows(jdbcTemplate: JdbcTemplate, clubId: UUID? = null) {
+        val clubPredicate = if (clubId == null) "" else "and club_id = ?"
+        val args = if (clubId == null) emptyArray() else arrayOf(clubId.dbString() as Any)
         jdbcTemplate.update(
             """
             update notification_outbox
@@ -393,7 +411,9 @@ class JdbcNotificationOutboxAdapter(
                 updated_at = utc_timestamp(6)
             where status = 'SENDING'
               and locked_at < timestampadd(MINUTE, -15, utc_timestamp(6))
+              $clubPredicate
             """.trimIndent(),
+            *args,
         )
     }
 

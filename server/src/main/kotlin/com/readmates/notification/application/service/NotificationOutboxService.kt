@@ -46,8 +46,16 @@ class NotificationOutboxService(
         }
 
         val items = notificationOutboxPort.claimPending(limit)
-        items.forEach(::deliver)
-        return items.size
+        return deliverAll(items)
+    }
+
+    override fun processPendingForClub(clubId: UUID, limit: Int): Int {
+        if (limit <= 0 || !deliveryEnabled) {
+            return 0
+        }
+
+        val items = notificationOutboxPort.claimPendingForClub(clubId, limit)
+        return deliverAll(items)
     }
 
     override fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary {
@@ -80,6 +88,11 @@ class NotificationOutboxService(
                 )
             }
         }
+    }
+
+    private fun deliverAll(items: List<NotificationOutboxItem>): Int {
+        items.forEach(::deliver)
+        return items.size
     }
 
     private fun retryDelayMinutes(attemptCount: Int): Long =
