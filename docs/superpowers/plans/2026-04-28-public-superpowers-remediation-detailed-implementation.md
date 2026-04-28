@@ -549,7 +549,7 @@ Expected:
 
 ### Task 5.1: path denylist 조정
 
-- [ ] **Step 1: `is_forbidden_path()`에서 private plan dir case 제거**
+- [x] **Step 1: `is_forbidden_path()`에서 private plan dir case 제거**
 
 Modify `scripts/public-release-check.sh`.
 
@@ -563,7 +563,7 @@ Do not remove any file-extension denylist or provider/build/temp denylist.
 
 ### Task 5.2: token scanner false positive 경계 강화
 
-- [ ] **Step 1: OpenAI/API key style token pattern 교체**
+- [x] **Step 1: OpenAI/API key style token pattern 교체**
 
 In `run_targeted_content_checks()`, replace only the OpenAI/API key style token check with:
 
@@ -580,7 +580,7 @@ Ordinary words or file names ending with the same two letters before a hyphen ar
 
 ### Task 5.3: checker 검증
 
-- [ ] **Step 1: syntax check**
+- [x] **Step 1: syntax check**
 
 ```bash
 bash -n scripts/public-release-check.sh
@@ -592,7 +592,7 @@ Expected:
 <no output>
 ```
 
-- [ ] **Step 2: current tree scan**
+- [x] **Step 2: current tree scan**
 
 ```bash
 ./scripts/public-release-check.sh
@@ -608,7 +608,7 @@ If it fails, fix the reported content. Do not broaden allowlists until the findi
 
 ### Task 5.4: script commit
 
-- [ ] **Step 1: commit**
+- [x] **Step 1: commit**
 
 ```bash
 git add scripts/build-public-release-candidate.sh scripts/public-release-check.sh
