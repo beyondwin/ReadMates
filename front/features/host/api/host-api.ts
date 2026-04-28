@@ -10,6 +10,7 @@ import type {
   HostInvitationResponse,
   HostMemberListItem,
   HostMemberProfileResponse,
+  HostNotificationSummary,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
   HostSessionDetailResponse,
@@ -29,6 +30,14 @@ export function fetchHostCurrentSession() {
 
 export function fetchHostDashboard() {
   return readmatesFetch<HostDashboardResponse>("/api/host/dashboard");
+}
+
+export function fetchHostNotificationSummary() {
+  return readmatesFetch<HostNotificationSummary>("/api/host/notifications/summary");
+}
+
+export function processHostNotifications() {
+  return readmatesFetchResponse("/api/host/notifications/process", { method: "POST" });
 }
 
 export function fetchHostSessions() {

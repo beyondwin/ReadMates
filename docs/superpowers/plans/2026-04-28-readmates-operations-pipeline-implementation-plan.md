@@ -771,7 +771,7 @@ git commit -m "feat: enqueue session notification events"
 - Modify: `front/features/host/components/host-dashboard.tsx`
 - Test: `front/tests/unit/host-dashboard.test.tsx`
 
-- [ ] **Step 1: Add API controller test**
+- [x] **Step 1: Add API controller test**
 
 Create `HostNotificationControllerTest.kt`:
 
@@ -809,7 +809,7 @@ fun `host can read notification status summary`() {
 }
 ```
 
-- [ ] **Step 2: Add controller**
+- [x] **Step 2: Add controller**
 
 `HostNotificationController.kt`:
 
@@ -834,7 +834,7 @@ class HostNotificationController(
 }
 ```
 
-- [ ] **Step 3: Update security**
+- [x] **Step 3: Update security**
 
 Add CSRF ignore matcher:
 
@@ -844,7 +844,7 @@ methodAndPath("POST", Regex("^/api/host/notifications/process$"))
 
 No new `authorizeHttpRequests` rule is needed because `/api/host/**` already requires host role.
 
-- [ ] **Step 4: Add frontend contracts**
+- [x] **Step 4: Add frontend contracts**
 
 In `host-contracts.ts`:
 
@@ -877,7 +877,7 @@ export function processHostNotifications() {
 }
 ```
 
-- [ ] **Step 5: Load status in dashboard route**
+- [x] **Step 5: Load status in dashboard route**
 
 Modify `HostDashboardRouteData`:
 
@@ -892,7 +892,7 @@ export type HostDashboardRouteData = {
 
 Add `fetchHostNotificationSummary()` to the existing `Promise.all`.
 
-- [ ] **Step 6: Render compact host ledger section**
+- [x] **Step 6: Render compact host ledger section**
 
 Add to dashboard props:
 
@@ -928,7 +928,7 @@ Render a section near `공개 · 피드백`:
 
 Use existing CSS classes where possible. Do not expose full email addresses in UI if the current host dashboard does not already show them in that context. Mask as `m***@example.com` in the server DTO or frontend model before rendering.
 
-- [ ] **Step 7: Run checks**
+- [x] **Step 7: Run checks**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.api.HostNotificationControllerTest
@@ -938,7 +938,7 @@ pnpm --dir front lint
 
 Expected: all pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/in/web server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt server/src/test/kotlin/com/readmates/notification/api front/features/host front/tests/unit/host-dashboard.test.tsx
