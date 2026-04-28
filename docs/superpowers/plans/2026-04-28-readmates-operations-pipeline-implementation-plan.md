@@ -1163,7 +1163,7 @@ git commit -m "docs: document notification operations deployment"
 - Create: `deploy/oci/backup-mysql-to-object-storage.sh`
 - Modify: `docs/deploy/oci-mysql-heatwave.md`
 
-- [ ] **Step 1: Write backup script**
+- [x] **Step 1: Write backup script**
 
 Create `deploy/oci/backup-mysql-to-object-storage.sh`:
 
@@ -1190,10 +1190,15 @@ export_path="$(
 )"
 
 checksum_path="${export_path}.sha256"
-sha256sum "$export_path" > "$checksum_path"
+export_dir="$(dirname "$export_path")"
+backup_name="$(basename "$export_path")"
+
+(
+  cd "$export_dir"
+  sha256sum "$backup_name"
+) > "$checksum_path"
 
 object_prefix="${READMATES_BACKUP_OBJECT_PREFIX:-mysql}"
-backup_name="$(basename "$export_path")"
 checksum_name="$(basename "$checksum_path")"
 
 oci os object put \
@@ -1214,13 +1219,13 @@ echo "UPLOADED: $object_prefix/$backup_name"
 echo "UPLOADED: $object_prefix/$checksum_name"
 ```
 
-- [ ] **Step 2: Make script executable**
+- [x] **Step 2: Make script executable**
 
 ```bash
 chmod +x deploy/oci/backup-mysql-to-object-storage.sh
 ```
 
-- [ ] **Step 3: Add docs**
+- [x] **Step 3: Add docs**
 
 In `docs/deploy/oci-mysql-heatwave.md`, document:
 
@@ -1235,7 +1240,7 @@ sha256sum -c readmates-YYYYMMDDTHHMMSSZ.sql.gz.sha256
 
 - restore rehearsal command using a non-production DB.
 
-- [ ] **Step 4: Run shell syntax and docs checks**
+- [x] **Step 4: Run shell syntax and docs checks**
 
 ```bash
 bash -n deploy/oci/backup-mysql-to-object-storage.sh
@@ -1244,7 +1249,7 @@ git diff --check -- deploy/oci/backup-mysql-to-object-storage.sh docs/deploy/oci
 
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add deploy/oci/backup-mysql-to-object-storage.sh docs/deploy/oci-mysql-heatwave.md
