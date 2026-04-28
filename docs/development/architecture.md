@@ -70,23 +70,33 @@ adapter.in.web
   -> adapter.out.persistence
 ```
 
-현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
+현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface와 `notification` 운영 slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
+
+Notification slice는 MySQL transactional outbox를 source of truth로 유지하고, 이메일 발송은 재시도 가능한 side effect 작업으로 처리합니다. 패키지 경계는 아래처럼 web/scheduler inbound adapter, application service, outbound port, persistence/mail adapter로 나눕니다.
+
+```text
+notification
+  adapter.in.web / adapter.in.scheduler
+  application.service
+  application.port.out
+  adapter.out.persistence / adapter.out.mail
+```
 
 | 영역 | 현재 패키지 | 역할 |
 | --- | --- | --- |
-| Web adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, response mapping; shared health endpoint |
+| Web/scheduler adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, response mapping; shared health endpoint |
 | Security adapter/infrastructure | `auth.adapter.in.security`, `auth.infrastructure.security` | Spring Security `Authentication` 해석, OAuth/session filter, cookie/security wiring |
-| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `note.application.port.in`, `auth.application.port.in` | controller가 의존하는 use case contract |
-| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `note.application.service`, `auth.application`/`auth.application.service` | command/query orchestration과 권한 확인 |
-| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `note.application.port.out`, `auth.application.port.out` | application service가 persistence 세부사항 없이 호출하는 contract |
-| Persistence adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence` | JDBC query와 row mapping을 소유하는 outbound adapter |
+| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in` | controller나 scheduler가 의존하는 use case contract |
+| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
+| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out` | application service가 persistence/mail 세부사항 없이 호출하는 contract |
+| Persistence/mail adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `notification.adapter.out.persistence`, `notification.adapter.out.mail` | JDBC query와 row mapping, 외부 mail delivery 세부 구현을 소유하는 outbound adapter |
 | Redis adapter | `auth.adapter.out.redis`, `publication.adapter.out.redis`, `note.adapter.out.redis`, `shared.adapter.out.redis` | 선택적 Redis rate limit/cache/invalidation 구현. application service는 Redis adapter가 아니라 port에만 의존 |
 
 전환된 controller는 legacy repository, `JdbcTemplate`, persistence adapter를 직접 주입받지 않습니다. 인증된 사용자는 controller method에서 `CurrentMember`로 받으며, resolver가 `ResolveCurrentMemberUseCase`를 통해 멤버 정보를 조회합니다.
 
 새 기능이나 전환된 slice에서는 기존 repository를 controller에 다시 주입하지 않고, 필요한 경우 inbound port, application service, outbound port와 adapter를 먼저 둡니다.
 
-아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다. 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
+아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다. 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth`/`notification` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
 
 ## 인증과 세션
 

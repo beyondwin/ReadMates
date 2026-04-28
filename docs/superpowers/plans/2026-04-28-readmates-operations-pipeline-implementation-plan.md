@@ -1265,7 +1265,7 @@ git commit -m "feat: upload mysql backups to object storage"
 - Modify: `docs/development/architecture.md`
 - Modify: `docs/deploy/security-public-repo.md` only if scanner behavior changes.
 
-- [ ] **Step 1: Add concise README highlight**
+- [x] **Step 1: Add concise README highlight**
 
 Add one bullet under highlights:
 
@@ -1273,7 +1273,7 @@ Add one bullet under highlights:
 - 운영 파이프라인: MySQL transactional outbox 기반 이메일 알림, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 ```
 
-- [ ] **Step 2: Add architecture note**
+- [x] **Step 2: Add architecture note**
 
 In `docs/development/architecture.md`, document:
 
@@ -1287,7 +1287,7 @@ notification
 
 State that MySQL remains the source of truth and email delivery is retryable side effect work.
 
-- [ ] **Step 3: Run full checks**
+- [x] **Step 3: Run full checks**
 
 ```bash
 ./server/gradlew -p server clean test
@@ -1299,7 +1299,7 @@ git diff --check -- README.md docs/development/architecture.md docs/deploy/oci-b
 
 Expected: all pass.
 
-- [ ] **Step 4: Run public release checks if docs mention deployment or public safety changes**
+- [x] **Step 4: Run public release checks if docs mention deployment or public safety changes**
 
 ```bash
 ./scripts/build-public-release-candidate.sh
@@ -1308,7 +1308,7 @@ Expected: all pass.
 
 Expected: no new public-safety findings caused by the changed files.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add README.md docs/development/architecture.md
