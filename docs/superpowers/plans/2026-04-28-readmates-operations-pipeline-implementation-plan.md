@@ -121,7 +121,7 @@ The phases should be implemented in order. Phase 1 creates the product value. Ph
 - Create: `server/src/main/resources/db/mysql/migration/V16__notification_outbox.sql`
 - Test: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 Create `V16__notification_outbox.sql`:
 
@@ -163,7 +163,7 @@ create table notification_outbox (
 );
 ```
 
-- [ ] **Step 2: Run migration test**
+- [x] **Step 2: Run migration test**
 
 Run:
 
@@ -173,7 +173,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add server/src/main/resources/db/mysql/migration/V16__notification_outbox.sql
