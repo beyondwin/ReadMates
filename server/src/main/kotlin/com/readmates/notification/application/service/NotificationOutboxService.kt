@@ -22,6 +22,7 @@ private val RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 class NotificationOutboxService(
     private val notificationOutboxPort: NotificationOutboxPort,
     private val mailDeliveryPort: MailDeliveryPort,
+    private val metrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.worker.max-attempts:5}") private val maxAttempts: Int,
     @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
 ) : RecordNotificationEventUseCase,
@@ -74,18 +75,26 @@ class NotificationOutboxService(
                     text = item.bodyText,
                 ),
             )
-            notificationOutboxPort.markSent(item.id, item.lockedAt)
+            if (notificationOutboxPort.markSent(item.id, item.lockedAt)) {
+                metrics.sent(item.eventType)
+            }
         } catch (exception: Exception) {
             val error = exception.toStorageError()
             if (item.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
-                notificationOutboxPort.markDead(item.id, item.lockedAt, error)
+                if (notificationOutboxPort.markDead(item.id, item.lockedAt, error)) {
+                    metrics.dead(item.eventType)
+                }
             } else {
-                notificationOutboxPort.markFailed(
-                    id = item.id,
-                    lockedAt = item.lockedAt,
-                    error = error,
-                    nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
-                )
+                if (
+                    notificationOutboxPort.markFailed(
+                        id = item.id,
+                        lockedAt = item.lockedAt,
+                        error = error,
+                        nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
+                    )
+                ) {
+                    metrics.failed(item.eventType)
+                }
             }
         }
     }

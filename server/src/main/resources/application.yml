@@ -20,13 +20,23 @@ spring:
     locations: ${READMATES_FLYWAY_LOCATIONS:classpath:db/mysql/migration}
 
 management:
+  server:
+    address: ${READMATES_MANAGEMENT_ADDRESS:127.0.0.1}
+    port: ${READMATES_MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
   health:
     redis:
       enabled: ${READMATES_REDIS_ENABLED:false}
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 readmates:
   app-base-url: ${READMATES_APP_BASE_URL:http://localhost:3000}

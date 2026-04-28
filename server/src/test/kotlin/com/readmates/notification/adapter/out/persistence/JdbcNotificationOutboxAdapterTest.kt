@@ -187,7 +187,7 @@ class JdbcNotificationOutboxAdapterTest(
             claimed.id.toString(),
         )
 
-        adapter.markSent(claimed.id, claimed.lockedAt)
+        val marked = adapter.markSent(claimed.id, claimed.lockedAt)
 
         val row = jdbcTemplate.queryForMap(
             """
@@ -200,6 +200,7 @@ class JdbcNotificationOutboxAdapterTest(
         assertThat(row["status"]).isEqualTo("DEAD")
         assertThat(row["last_error"]).isEqualTo("already terminal")
         assertThat(row["sent_at"]).isNull()
+        assertThat(marked).isFalse()
     }
 
     @Test
@@ -234,7 +235,7 @@ class JdbcNotificationOutboxAdapterTest(
         assertThat(freshClaim.id).isEqualTo(staleClaim.id)
         assertThat(freshClaim.lockedAt).isNotEqualTo(staleClaim.lockedAt)
 
-        adapter.markSent(staleClaim.id, staleClaim.lockedAt)
+        val marked = adapter.markSent(staleClaim.id, staleClaim.lockedAt)
 
         val row = jdbcTemplate.queryForMap(
             """
@@ -246,6 +247,7 @@ class JdbcNotificationOutboxAdapterTest(
         )
         assertThat(row["status"]).isEqualTo("SENDING")
         assertThat(row["sent_at"]).isNull()
+        assertThat(marked).isFalse()
     }
 
     private fun insertOtherClub() {
