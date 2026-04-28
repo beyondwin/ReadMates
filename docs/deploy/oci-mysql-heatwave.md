@@ -7,8 +7,8 @@
 - Cloudflare Pages: `front/` SPA와 Pages Functions
 - OCI Compute: Spring Boot API
 - OCI MySQL HeatWave: Always Free `MySQL.Free`
-- 백업 스크립트: `deploy/oci/export-mysql.sh`
-- Object Storage bucket: 운영에서 실제 생성과 lifecycle rule을 확인한 뒤 사용합니다. 확인 전에는 planned 상태로 봅니다.
+- 백업 스크립트: `deploy/oci/export-mysql.sh`, `deploy/oci/backup-mysql-to-object-storage.sh`
+- Object Storage bucket: private bucket `readmates-db-exports`를 placeholder 이름으로 사용합니다. 운영에서는 실제 private bucket 생성과 lifecycle rule을 확인한 뒤 사용합니다.
 
 가능하면 MySQL은 OCI private network 안에 둡니다. 공개 entry point는 Cloudflare Pages URL과 HTTPS API endpoint입니다. Spring의 `127.0.0.1:8080` listener를 운영에서 직접 공개하지 않습니다.
 
@@ -97,29 +97,56 @@ READMATES_MYSQL_DEFAULTS_FILE=/etc/readmates/mysql-backup.cnf \
 - Object Storage bucket이 확인되면 14-30일 daily export를 보관하고 lifecycle rule로 만료시킵니다.
 - 월 1회 비운영 DB로 restore rehearsal을 실행합니다.
 
-## Object Storage 업로드 예시
+## Object Storage 업로드
 
-bucket이 생성되어 있고 Free tier 범위에 있음을 확인한 뒤 사용합니다.
+Object Storage bucket은 private으로만 생성합니다. 공개 bucket, pre-authenticated request, public URL을 백업 공유 수단으로 사용하지 않습니다. 이 문서의 bucket 이름은 placeholder `readmates-db-exports`입니다.
+
+필수 환경 변수:
+
+- `READMATES_EXPORT_BUCKET`: Object Storage private bucket 이름, 예: `readmates-db-exports`
+- `OCI_NAMESPACE`: OCI Object Storage namespace
+- `READMATES_DB_HOST`: MySQL private host
+
+기본값:
+
+- `READMATES_DB_NAME=readmates`
+- `READMATES_DB_USER=readmates`
+- `READMATES_EXPORT_DIR=/var/backups/readmates/mysql`
+- `READMATES_MYSQL_DEFAULTS_FILE=/etc/readmates/mysql-backup.cnf`
+- `READMATES_BACKUP_OBJECT_PREFIX=mysql`
+
+수동 export와 업로드:
 
 ```bash
 export OCI_NAMESPACE=<object-storage-namespace>
 export READMATES_EXPORT_BUCKET=readmates-db-exports
-export_path="$(READMATES_DB_HOST=<mysql-private-host> READMATES_DB_NAME=readmates READMATES_DB_USER=readmates READMATES_EXPORT_DIR=/var/backups/readmates/mysql READMATES_MYSQL_DEFAULTS_FILE=/etc/readmates/mysql-backup.cnf /opt/readmates/deploy/oci/export-mysql.sh)"
+export READMATES_DB_HOST=<mysql-private-host>
 
-oci os object put \
-  --namespace-name "$OCI_NAMESPACE" \
-  --bucket-name "$READMATES_EXPORT_BUCKET" \
-  --name "mysql/$(basename "$export_path")" \
-  --file "$export_path"
+/opt/readmates/deploy/oci/backup-mysql-to-object-storage.sh
+```
+
+업로드 후 같은 prefix에 dump와 checksum object가 함께 있어야 합니다.
+
+```text
+mysql/readmates-YYYYMMDDTHHMMSSZ.sql.gz
+mysql/readmates-YYYYMMDDTHHMMSSZ.sql.gz.sha256
+```
+
+다운로드한 백업 파일을 검증합니다.
+
+```bash
+sha256sum -c readmates-YYYYMMDDTHHMMSSZ.sql.gz.sha256
 ```
 
 ## 복구 rehearsal
 
-운영 DB가 아닌 별도 schema 또는 별도 DB system에 복구합니다.
+운영 DB가 아닌 별도 schema 또는 별도 DB system에 복구합니다. rehearsal 전에는 checksum을 먼저 검증합니다.
 
 ```bash
-gunzip -c readmates-20260420T000000Z.sql.gz | mysql \
-  --defaults-extra-file=/etc/readmates/mysql-backup.cnf \
+sha256sum -c readmates-YYYYMMDDTHHMMSSZ.sql.gz.sha256
+
+gunzip -c readmates-YYYYMMDDTHHMMSSZ.sql.gz | mysql \
+  --defaults-extra-file=/etc/readmates/mysql-restore-rehearsal.cnf \
   --host="$READMATES_RESTORE_DB_HOST" \
   --user="$READMATES_RESTORE_DB_USER" \
   "$READMATES_RESTORE_DB_NAME"
