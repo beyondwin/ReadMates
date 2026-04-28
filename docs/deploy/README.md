@@ -31,6 +31,7 @@
 | Spring API | OCI Compute 또는 동등한 VM | Spring Boot JAR를 reverse proxy 뒤에서 실행합니다. |
 | Reverse proxy | Caddy | 직접 API origin이 필요할 때 HTTPS를 종료하고 Spring으로 전달합니다. |
 | Database | MySQL 8 compatible service | 문서화된 운영 대상은 OCI MySQL HeatWave입니다. |
+| Optional cache | Redis-compatible service | rate limit, auth session metadata cache, public/notes read-through cache에만 사용하며 MySQL source of truth를 대체하지 않습니다. |
 | Migrations | Flyway | Spring 시작 시 migration을 적용합니다. |
 
 프로덕션 secret 실제 값은 Git 밖에 둡니다. 공개 문서는 환경 변수 이름과 placeholder만 사용합니다. 실제 값은 Cloudflare Pages secret, 서버 런타임 환경 파일, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 저장합니다.
