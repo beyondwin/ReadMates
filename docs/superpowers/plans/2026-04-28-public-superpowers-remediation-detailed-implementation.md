@@ -771,7 +771,7 @@ gitleaks detect --source .tmp/public-release-candidate --redact --verbose
 
 ### Task 8.1: history rewrite 필요성 판단
 
-- [ ] **Step 1: history scan 결과 확인**
+- [x] **Step 1: history scan 결과 확인**
 
 ```bash
 gitleaks detect --source . --redact --verbose
@@ -790,7 +790,37 @@ Active or possibly active secret in history:
   rotate first, then rewrite or purge history if needed.
 ```
 
+Status, 2026-04-28:
+
+```text
+DONE_WITH_CONCERNS.
+Confirmed `gitleaks detect --source . --redact --verbose` still exits 1 with 7
+redacted historical findings, all in commit
+db4ce355c13192296c76bfce5237502f2c1c01ed under `docs/superpowers/**`.
+
+Classification:
+- 1 finding is a historical grep-pattern example for a BFF secret assignment.
+- 3 findings are historical `.env.example` replacement values in planning docs.
+- 3 findings are historical scanner-remediation fixture/example notes.
+
+Decision:
+No active secret was identified in history from the inspected redacted context.
+The already-made content cleanup commit is enough for the current task. Do not
+rewrite history, force-push, change repository visibility, or purge paths without
+explicit future approval.
+
+Residual risk:
+The historical commit still contains redacted gitleaks findings and personal
+author/committer email metadata. Existing forks, clones, GitHub caches,
+third-party mirrors, and search indexes may retain prior content even after the
+current-tree cleanup.
+```
+
 ### Task 8.2: metadata rewrite가 필요한 경우
+
+Status, 2026-04-28: not executed. Only personal email metadata remains as a
+known residual privacy risk, and a metadata rewrite/force-push is not warranted
+without explicit approval.
 
 - [ ] **Step 1: mirror clone에서만 실행**
 
@@ -823,6 +853,10 @@ git push --force --mirror
 ### Task 8.3: path purge가 필요한 경우
 
 `docs/superpowers/**`를 공개 유지하려는 목표라면 path purge를 기본 선택으로 쓰지 않는다. active secret이 과거 commit에 남아 있고 content rewrite로 해결하기 어려운 경우에만 mirror clone에서 실행한다.
+
+Status, 2026-04-28: not executed. The inspected findings were classified as
+historical planning examples/fixtures, not active secrets, so no path purge is
+required now.
 
 ```bash
 git filter-repo --path docs/superpowers --invert-paths
