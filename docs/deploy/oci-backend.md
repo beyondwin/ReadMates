@@ -136,6 +136,16 @@ curl -sS http://127.0.0.1:8081/actuator/prometheus | grep readmates_notification
 
 VM-local scraping을 위해 management endpoint는 loopback에만 바인딩합니다. 운영 환경 파일에는 `READMATES_MANAGEMENT_ADDRESS=127.0.0.1`과 `READMATES_MANAGEMENT_PORT=8081`이 필요합니다.
 
+Operations pipeline live smoke:
+
+```bash
+READMATES_EXPORT_BUCKET=readmates-db-exports \
+READMATES_OBJECT_STORAGE_SMOKE_WRITE=true \
+/opt/readmates/deploy/oci/verify-operations-pipeline-live.sh
+```
+
+SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `READMATES_NOTIFICATION_SENDER_EMAIL`, `READMATES_SMTP_SMOKE_TO`를 운영 VM 환경에 주입해 같은 스크립트를 실행합니다. `READMATES_SMTP_SMOKE_TO`는 운영자가 관리하는 테스트 수신 주소만 사용합니다.
+
 ## 운영 메모
 
 - Spring `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기본 운영 기준입니다. secret이 비면 시작 실패가 맞습니다.
