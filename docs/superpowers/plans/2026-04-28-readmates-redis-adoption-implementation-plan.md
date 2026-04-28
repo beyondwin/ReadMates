@@ -408,7 +408,7 @@ git commit -m "feat: add optional redis foundation"
 - Create: `server/src/test/kotlin/com/readmates/support/RedisTestContainer.kt`
 - Test support used by Redis adapter tests in later tasks.
 
-- [ ] **Step 1: Create Redis test container helper**
+- [x] **Step 1: Create Redis test container helper**
 
 Create `server/src/test/kotlin/com/readmates/support/RedisTestContainer.kt`:
 
@@ -435,7 +435,7 @@ object RedisTestContainer {
 }
 ```
 
-- [ ] **Step 2: Compile test support**
+- [x] **Step 2: Compile test support**
 
 Run:
 
@@ -445,7 +445,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit Redis test support**
+- [x] **Step 3: Commit Redis test support**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/support/RedisTestContainer.kt
