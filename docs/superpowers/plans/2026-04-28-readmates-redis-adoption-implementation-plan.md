@@ -1992,7 +1992,7 @@ git commit -m "test: cover redis adapters and boundaries"
 - Modify: `docs/development/test-guide.md`
 - Modify: `docs/deploy/README.md`
 
-- [ ] **Step 1: Document local Redis usage**
+- [x] **Step 1: Document local Redis usage**
 
 In `docs/development/local-setup.md`, add a concise section:
 
@@ -2019,7 +2019,7 @@ READMATES_NOTES_CACHE_ENABLED=true \
 ```
 ```
 
-- [ ] **Step 2: Document verification commands**
+- [x] **Step 2: Document verification commands**
 
 In `docs/development/test-guide.md`, add:
 
@@ -2036,7 +2036,7 @@ pnpm --dir front test:e2e
 Targeted Redis tests use Testcontainers and do not require a manually running Redis server.
 ```
 
-- [ ] **Step 3: Document deployment flags**
+- [x] **Step 3: Document deployment flags**
 
 In `docs/deploy/README.md`, add public-safe flag names only:
 
@@ -2054,7 +2054,7 @@ Redis is optional. Enable in this order after configuring a managed Redis URL in
 Disable the affected feature flag to roll back a Redis-backed behavior without changing MySQL data.
 ```
 
-- [ ] **Step 4: Run docs checks**
+- [x] **Step 4: Run docs checks**
 
 Run:
 
@@ -2064,7 +2064,7 @@ git diff --check -- docs/development/local-setup.md docs/development/test-guide.
 
 Expected: no output.
 
-- [ ] **Step 5: Run full server tests**
+- [x] **Step 5: Run full server tests**
 
 Run:
 
@@ -2074,7 +2074,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Run E2E smoke**
+- [x] **Step 6: Run E2E smoke**
 
 Run:
 
@@ -2084,7 +2084,9 @@ pnpm --dir front test:e2e
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit docs and final verification**
+Status note: the exact default command was attempted and is blocked by stale local Flyway checksums in the default `readmates_e2e` database. The full E2E suite passed with `READMATES_E2E_DB_NAME=readmates_e2e_codex_20260425133321 pnpm --dir front test:e2e` against a granted schema whose Flyway history matches the current migrations.
+
+- [x] **Step 7: Commit docs and final verification**
 
 ```bash
 git add docs/development/local-setup.md docs/development/test-guide.md docs/deploy/README.md
@@ -2093,16 +2095,16 @@ git commit -m "docs: document redis feature rollout"
 
 ## Final Review Checklist
 
-- [ ] Redis disabled by default.
-- [ ] Server starts and tests pass without Redis running.
-- [ ] No raw session token, invitation token, BFF secret, OAuth code, private feedback body, email, or display name is stored in Redis keys or metric labels.
-- [ ] Rate limit returns `429` and does not leak internal key material.
-- [ ] Auth session cache stores only session metadata and keeps MySQL as source of truth.
-- [ ] `last_seen_at` is still updated, but throttled.
-- [ ] Logout and revoke-all evict Redis cache best-effort after MySQL revoke.
-- [ ] Public cache only contains public API read models.
-- [ ] Notes cache only contains member-visible published notes feed models.
-- [ ] Broad cache eviction runs after host/session/note/member/profile mutations.
-- [ ] Architecture boundary test blocks application code from depending on Redis adapters.
-- [ ] `./server/gradlew -p server clean test` passes.
-- [ ] `pnpm --dir front test:e2e` passes.
+- [x] Redis disabled by default.
+- [x] Server starts and tests pass without Redis running.
+- [x] No raw session token, invitation token, BFF secret, OAuth code, private feedback body, email, or display name is stored in Redis keys or metric labels.
+- [x] Rate limit returns `429` and does not leak internal key material.
+- [x] Auth session cache stores only session metadata and keeps MySQL as source of truth.
+- [x] `last_seen_at` is still updated, but throttled.
+- [x] Logout and revoke-all evict Redis cache best-effort after MySQL revoke.
+- [x] Public cache only contains public API read models.
+- [x] Notes cache only contains member-visible published notes feed models.
+- [x] Broad cache eviction runs after host/session/note/member/profile mutations.
+- [x] Architecture boundary test blocks application code from depending on Redis adapters.
+- [x] `./server/gradlew -p server clean test` passes.
+- [x] E2E smoke passes with a granted current-schema E2E database override; the default local `readmates_e2e` schema still has stale Flyway history.
