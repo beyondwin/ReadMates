@@ -7,6 +7,7 @@ import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationOutboxPort
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -20,7 +21,7 @@ class NotificationOutboxServiceTest {
         val item = sampleItem()
         val port = FakeNotificationOutboxPort(items = listOf(item))
         val mail = RecordingMailDeliveryPort()
-        val service = NotificationOutboxService(port, mail, maxAttempts = 5)
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
 
         val processed = service.processPending(limit = 10)
 
@@ -32,11 +33,33 @@ class NotificationOutboxServiceTest {
     }
 
     @Test
+    fun `processPending does not increment sent metric when sent mark misses lease`() {
+        val item = sampleItem()
+        val port = FakeNotificationOutboxPort(items = listOf(item), markSentUpdatesRow = false)
+        val mail = RecordingMailDeliveryPort()
+        val registry = SimpleMeterRegistry()
+        val service = NotificationOutboxService(port, mail, ReadmatesOperationalMetrics(registry), maxAttempts = 5)
+
+        val processed = service.processPending(limit = 10)
+
+        assertThat(processed).isEqualTo(1)
+        assertThat(mail.sentSubjects).containsExactly("피드백 문서가 올라왔습니다")
+        assertThat(port.sentIds).isEmpty()
+        assertThat(
+            registry.counter(
+                "readmates.notifications.sent",
+                "event_type",
+                "FEEDBACK_DOCUMENT_PUBLISHED",
+            ).count(),
+        ).isZero()
+    }
+
+    @Test
     fun `processPending marks dead after max attempts`() {
         val item = sampleItem(attemptCount = 4)
         val port = FakeNotificationOutboxPort(items = listOf(item))
         val mail = FailingMailDeliveryPort("smtp rejected")
-        val service = NotificationOutboxService(port, mail, maxAttempts = 5)
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
 
         val processed = service.processPending(limit = 10)
 
@@ -52,7 +75,7 @@ class NotificationOutboxServiceTest {
         val item = sampleItem()
         val port = FakeNotificationOutboxPort(items = listOf(item))
         val mail = RecordingMailDeliveryPort()
-        val service = NotificationOutboxService(port, mail, maxAttempts = 5, deliveryEnabled = false)
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5, deliveryEnabled = false)
 
         val processed = service.processPending(limit = 10)
 
@@ -70,7 +93,7 @@ class NotificationOutboxServiceTest {
         val item = sampleItem()
         val port = FakeNotificationOutboxPort(items = listOf(item))
         val mail = RecordingMailDeliveryPort()
-        val service = NotificationOutboxService(port, mail, maxAttempts = 5)
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
 
         val processed = service.processPendingForClub(clubId, limit = 10)
 
@@ -85,7 +108,7 @@ class NotificationOutboxServiceTest {
         val item = sampleItem(attemptCount = 2)
         val port = FakeNotificationOutboxPort(items = listOf(item))
         val mail = FailingMailDeliveryPort("temporary failure")
-        val service = NotificationOutboxService(port, mail, maxAttempts = 5)
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
 
         val processed = service.processPending(limit = 10)
 
@@ -100,7 +123,7 @@ class NotificationOutboxServiceTest {
         val item = sampleItem(attemptCount = 4)
         val port = FakeNotificationOutboxPort(items = listOf(item))
         val mail = FailingMailDeliveryPort("x".repeat(600))
-        val service = NotificationOutboxService(port, mail, maxAttempts = 5)
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
 
         val processed = service.processPending(limit = 10)
 
@@ -123,6 +146,9 @@ class NotificationOutboxServiceTest {
         )
 }
 
+private fun testMetrics(): ReadmatesOperationalMetrics =
+    ReadmatesOperationalMetrics(SimpleMeterRegistry())
+
 private class RecordingMailDeliveryPort : MailDeliveryPort {
     val sentSubjects = mutableListOf<String>()
 
@@ -141,6 +167,7 @@ private class FailingMailDeliveryPort(
 
 private class FakeNotificationOutboxPort(
     private val items: List<NotificationOutboxItem>,
+    private val markSentUpdatesRow: Boolean = true,
 ) : NotificationOutboxPort {
     val sentIds = mutableListOf<UUID>()
     val claimRequests = mutableListOf<Int>()
@@ -167,19 +194,26 @@ private class FakeNotificationOutboxPort(
         return items.filter { it.clubId == clubId }.take(limit)
     }
 
-    override fun markSent(id: UUID, lockedAt: OffsetDateTime) {
-        sentIds += id
+    override fun markSent(id: UUID, lockedAt: OffsetDateTime): Boolean {
+        return if (markSentUpdatesRow) {
+            sentIds += id
+            true
+        } else {
+            false
+        }
     }
 
-    override fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long) {
+    override fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean {
         failedIds += id
         failedErrors += error
         failedDelays += nextAttemptDelayMinutes
+        return true
     }
 
-    override fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String) {
+    override fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean {
         deadIds += id
         deadErrors += error
+        return true
     }
 
     override fun hostSummary(clubId: UUID): HostNotificationSummary =

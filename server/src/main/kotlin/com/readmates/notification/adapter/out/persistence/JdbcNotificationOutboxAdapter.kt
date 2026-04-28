@@ -250,7 +250,7 @@ class JdbcNotificationOutboxAdapter(
         )
     }
 
-    override fun markSent(id: UUID, lockedAt: OffsetDateTime) {
+    override fun markSent(id: UUID, lockedAt: OffsetDateTime): Boolean =
         jdbcTemplate().update(
             """
             update notification_outbox
@@ -265,10 +265,9 @@ class JdbcNotificationOutboxAdapter(
             """.trimIndent(),
             id.dbString(),
             lockedAt.toUtcLocalDateTime(),
-        )
-    }
+        ) > 0
 
-    override fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long) {
+    override fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean =
         jdbcTemplate().update(
             """
             update notification_outbox
@@ -286,10 +285,9 @@ class JdbcNotificationOutboxAdapter(
             error.truncateForStorage(),
             id.dbString(),
             lockedAt.toUtcLocalDateTime(),
-        )
-    }
+        ) > 0
 
-    override fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String) {
+    override fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean =
         jdbcTemplate().update(
             """
             update notification_outbox
@@ -306,8 +304,7 @@ class JdbcNotificationOutboxAdapter(
             error.truncateForStorage(),
             id.dbString(),
             lockedAt.toUtcLocalDateTime(),
-        )
-    }
+        ) > 0
 
     override fun hostSummary(clubId: UUID): HostNotificationSummary =
         HostNotificationSummary(

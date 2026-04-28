@@ -958,7 +958,7 @@ git commit -m "feat: show host notification status"
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetricsTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/shared/adapter/in/web/HealthControllerTest.kt`
 
-- [ ] **Step 1: Add Prometheus registry**
+- [x] **Step 1: Add Prometheus registry**
 
 Add:
 
@@ -966,7 +966,7 @@ Add:
 runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 ```
 
-- [ ] **Step 2: Configure management endpoints**
+- [x] **Step 2: Configure management endpoints**
 
 Change management exposure:
 
@@ -990,7 +990,7 @@ management:
 
 Keep `/actuator/**` off the public Caddy route. `HealthControllerTest` must continue to assert the main application port does not expose `/actuator/health` anonymously.
 
-- [ ] **Step 3: Add metrics service**
+- [x] **Step 3: Add metrics service**
 
 `ReadmatesOperationalMetrics.kt`:
 
@@ -1028,7 +1028,7 @@ class ReadmatesOperationalMetrics(private val meterRegistry: MeterRegistry) {
 }
 ```
 
-- [ ] **Step 4: Wire metrics**
+- [x] **Step 4: Wire metrics**
 
 In `NotificationOutboxService`, call:
 
@@ -1050,7 +1050,7 @@ return runCatching {
 
 Inject `ReadmatesOperationalMetrics` into both notification and feedback services. Do not create a second metrics helper class.
 
-- [ ] **Step 5: Add metric tests**
+- [x] **Step 5: Add metric tests**
 
 Assert counters increment using `SimpleMeterRegistry`:
 
@@ -1070,7 +1070,7 @@ fun `sent metric increments with event type tag`() {
 }
 ```
 
-- [ ] **Step 6: Run checks**
+- [x] **Step 6: Run checks**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.application.service.ReadmatesOperationalMetricsTest --tests com.readmates.shared.adapter.in.web.HealthControllerTest
@@ -1082,7 +1082,7 @@ Expected:
 - `/internal/health` remains public;
 - `/actuator/health` remains unauthorized.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/build.gradle.kts server/src/main/resources/application.yml server/src/main/kotlin/com/readmates/notification/application/service server/src/main/kotlin/com/readmates/feedback/application/service/FeedbackDocumentService.kt server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/shared/adapter/in/web/HealthControllerTest.kt
