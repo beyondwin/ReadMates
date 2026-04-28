@@ -7,6 +7,7 @@ import com.readmates.notification.application.port.out.NotificationOutboxPort
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import org.springframework.beans.factory.ObjectProvider
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import java.sql.ResultSet
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.math.max
 
@@ -222,7 +224,7 @@ class JdbcNotificationOutboxAdapter(
         return jdbcTemplate.query(
             """
             select id, club_id, event_type, recipient_email, subject, body_text,
-                   deep_link_path, status, attempt_count
+                   deep_link_path, status, attempt_count, locked_at
             from notification_outbox
             where id in ($placeholders)
             order by field(id, $placeholders)
@@ -232,7 +234,7 @@ class JdbcNotificationOutboxAdapter(
         )
     }
 
-    override fun markSent(id: UUID) {
+    override fun markSent(id: UUID, lockedAt: OffsetDateTime) {
         jdbcTemplate().update(
             """
             update notification_outbox
@@ -242,12 +244,15 @@ class JdbcNotificationOutboxAdapter(
                 last_error = null,
                 updated_at = utc_timestamp(6)
             where id = ?
+              and status = 'SENDING'
+              and locked_at = ?
             """.trimIndent(),
             id.dbString(),
+            lockedAt.toUtcLocalDateTime(),
         )
     }
 
-    override fun markFailed(id: UUID, error: String, nextAttemptDelayMinutes: Long) {
+    override fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long) {
         jdbcTemplate().update(
             """
             update notification_outbox
@@ -258,14 +263,17 @@ class JdbcNotificationOutboxAdapter(
                 last_error = ?,
                 updated_at = utc_timestamp(6)
             where id = ?
+              and status = 'SENDING'
+              and locked_at = ?
             """.trimIndent(),
             max(0L, nextAttemptDelayMinutes),
             error.truncateForStorage(),
             id.dbString(),
+            lockedAt.toUtcLocalDateTime(),
         )
     }
 
-    override fun markDead(id: UUID, error: String) {
+    override fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String) {
         jdbcTemplate().update(
             """
             update notification_outbox
@@ -276,9 +284,12 @@ class JdbcNotificationOutboxAdapter(
                 last_error = ?,
                 updated_at = utc_timestamp(6)
             where id = ?
+              and status = 'SENDING'
+              and locked_at = ?
             """.trimIndent(),
             error.truncateForStorage(),
             id.dbString(),
+            lockedAt.toUtcLocalDateTime(),
         )
     }
 
@@ -423,6 +434,7 @@ class JdbcNotificationOutboxAdapter(
             deepLinkPath = getString("deep_link_path"),
             status = NotificationOutboxStatus.valueOf(getString("status")),
             attemptCount = getInt("attempt_count"),
+            lockedAt = utcOffsetDateTime("locked_at"),
         )
 
     private fun ResultSet.toHostNotificationFailure(): HostNotificationFailure =

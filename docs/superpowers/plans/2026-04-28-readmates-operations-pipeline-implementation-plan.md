@@ -433,7 +433,7 @@ git commit -m "feat: add notification outbox persistence"
 - Create: `server/src/main/kotlin/com/readmates/notification/adapter/in/scheduler/NotificationOutboxScheduler.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationOutboxServiceTest.kt`
 
-- [ ] **Step 1: Add dependencies**
+- [x] **Step 1: Add dependencies**
 
 Add to `server/build.gradle.kts`:
 
@@ -441,7 +441,7 @@ Add to `server/build.gradle.kts`:
 implementation("org.springframework.boot:spring-boot-starter-mail")
 ```
 
-- [ ] **Step 2: Add config defaults**
+- [x] **Step 2: Add config defaults**
 
 Append to `application.yml`:
 
@@ -460,7 +460,7 @@ readmates:
 
 Add SMTP placeholders in Task 7 deploy docs, not to committed runtime defaults.
 
-- [ ] **Step 3: Write service tests**
+- [x] **Step 3: Write service tests**
 
 Create tests for:
 
@@ -491,7 +491,7 @@ fun `processPending marks dead after max attempts`() {
 }
 ```
 
-- [ ] **Step 4: Add use cases and service**
+- [x] **Step 4: Add use cases and service**
 
 `NotificationUseCases.kt`:
 
@@ -544,7 +544,7 @@ interface MailDeliveryPort {
 - mark dead when `attemptCount + 1 >= maxAttempts`;
 - truncate `lastError` to 500 characters before persistence.
 
-- [ ] **Step 5: Add mail adapters**
+- [x] **Step 5: Add mail adapters**
 
 `SmtpMailDeliveryAdapter`:
 
@@ -569,7 +569,7 @@ class SmtpMailDeliveryAdapter(
 
 `LoggingMailDeliveryAdapter` must be active when `readmates.notifications.enabled=false` and log recipient domain only, not full addresses.
 
-- [ ] **Step 6: Add scheduler**
+- [x] **Step 6: Add scheduler**
 
 `NotificationOutboxScheduler.kt`:
 
@@ -595,7 +595,7 @@ Enable scheduling with a small config class:
 class NotificationSchedulingConfig
 ```
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.application.service.NotificationOutboxServiceTest
@@ -603,7 +603,7 @@ class NotificationSchedulingConfig
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/build.gradle.kts server/src/main/resources/application.yml server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification
