@@ -1,6 +1,7 @@
 package com.readmates.auth.infrastructure.security
 
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
@@ -19,6 +20,7 @@ import org.springframework.web.filter.ForwardedHeaderFilter
 class SecurityConfig(
     private val bffSecretFilter: BffSecretFilter,
     private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter,
+    private val rateLimitFilter: RateLimitFilter,
     private val memberAuthoritiesFilter: MemberAuthoritiesFilter,
     private val oAuthInviteTokenCaptureFilter: OAuthInviteTokenCaptureFilter,
     private val googleOidcUserService: GoogleOidcUserService,
@@ -106,6 +108,7 @@ class SecurityConfig(
             }
             .addFilterBefore(bffSecretFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterBefore(sessionCookieAuthenticationFilter, AnonymousAuthenticationFilter::class.java)
+            .addFilterAfter(rateLimitFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterBefore(oAuthForwardedHeaderFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
             .addFilterBefore(oAuthInviteTokenCaptureFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
             .addFilterAfter(memberAuthoritiesFilter, AnonymousAuthenticationFilter::class.java)
@@ -122,6 +125,12 @@ class SecurityConfig(
 
         return http.build()
     }
+
+    @Bean
+    fun rateLimitFilterRegistration(rateLimitFilter: RateLimitFilter): FilterRegistrationBean<RateLimitFilter> =
+        FilterRegistrationBean(rateLimitFilter).apply {
+            isEnabled = false
+        }
 }
 
 private fun methodAndPath(method: String, pathPattern: Regex): RequestMatcher =
