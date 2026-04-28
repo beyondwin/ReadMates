@@ -21,6 +21,8 @@
 공개 릴리즈 후보 manifest는 명시적으로 관리합니다. 주요 포함 범위는 다음과 같습니다.
 
 - `.github/workflows/ci.yml`
+- `.github/workflows/deploy-front.yml`
+- `.github/CODEOWNERS`, 파일이 있을 때만 포함
 - `.gitignore`
 - `.gitleaks.toml`, 파일이 있을 때만 포함
 - `.env.example`
@@ -39,6 +41,8 @@
 루트 `.env.example`만 의도적으로 포함되는 environment file입니다. 필수 파일과 디렉터리 root는 symlink일 수 없고, 승인된 source root 안에서 발견되는 symlink도 복사 전에 거부합니다. staging 후보 검증 단계에서도 승인된 manifest 밖의 경로, 금지 경로, `.envrc*`, symlink가 남아 있으면 실패합니다.
 
 성공하면 후보 경로와 후속 확인 명령을 출력합니다. 루트 `.gitleaks.toml`이 있으면 후보에 함께 포함되어, 공개 전 같은 custom scanner rule을 사용할 수 있습니다.
+
+`.github/CODEOWNERS`가 후보에 포함되더라도 Code Owner review enforcement는 GitHub branch protection 설정과 protected base branch에 병합된 CODEOWNERS 파일이 함께 있어야 적용됩니다. 후보 검증은 파일 포함과 scanner 통과를 확인하고, GitHub 설정은 별도 API나 Settings 화면에서 확인합니다.
 
 ## `public-release-check.sh`
 
@@ -71,6 +75,8 @@ checker가 차단하는 주요 항목은 다음과 같습니다.
 - private 또는 generated path로 분류된 금지 경로
 
 `gitleaks`가 설치되어 있으면 repository의 `.gitleaks.toml` 설정으로 `gitleaks dir <path>`를 실행합니다. 설치된 `gitleaks`가 `dir` subcommand를 지원하지 않는 구버전이면 `gitleaks detect --source <path>`로 compatibility fallback을 실행하고, 그 사실을 출력합니다.
+
+현재 filesystem을 보는 `gitleaks dir`와 달리 `gitleaks detect --source .`는 Git history까지 검사합니다. 과거 commit의 redacted example이나 fixture finding은 active secret 여부와 별도로 분류하고, active 또는 active 가능 secret이 확인되지 않으면 history rewrite와 force-push를 기본 처리로 삼지 않습니다.
 
 `gitleaks`가 없더라도 targeted path/content check는 계속 실행합니다. 다만 fallback check는 좁은 guardrail입니다. 통과했다고 해서 전문적이거나 완전한 secret scan을 통과한 것은 아니며, 공개 전 명백한 실수를 줄이기 위한 로컬 안전장치로 봐야 합니다.
 
