@@ -1938,7 +1938,7 @@ git commit -m "feat: evict redis read caches after mutations"
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Add missing Redis adapter tests from Tasks 5 and 6 if they were not added there.
 
-- [ ] **Step 1: Update architecture test to allow redis adapters but keep application clean**
+- [x] **Step 1: Update architecture test to allow redis adapters but keep application clean**
 
 Modify the architecture test so application packages still do not depend on adapters:
 
@@ -1958,7 +1958,7 @@ noClasses()
 
 This makes Redis adapters follow the same direction as persistence adapters.
 
-- [ ] **Step 2: Run architecture test**
+- [x] **Step 2: Run architecture test**
 
 Run:
 
@@ -1968,7 +1968,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Run Redis adapter tests**
+- [x] **Step 3: Run Redis adapter tests**
 
 Run:
 
@@ -1978,10 +1978,10 @@ Run:
 
 Expected: PASS. If Gradle does not match wildcard class names in this shell, run each Redis adapter test class explicitly.
 
-- [ ] **Step 4: Commit test guard updates**
+- [x] **Step 4: Commit test guard updates**
 
 ```bash
-git add server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt server/src/test/kotlin/com/readmates/**/adapter/out/redis
+git add -A docs/superpowers/plans/2026-04-28-readmates-redis-adoption-implementation-plan.md server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt server/src/main/kotlin/com/readmates/shared/cache/NoopReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/shared/cache/RedisReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/shared/adapter/out/redis server/src/test/kotlin/com/readmates/shared/adapter/out/redis server/src/test/kotlin/com/readmates/**/adapter/out/redis
 git commit -m "test: cover redis adapters and boundaries"
 ```
 
