@@ -27,14 +27,22 @@ afterEach(() => {
 });
 
 describe("Cloudflare BFF function", () => {
-  it("forwards api requests with bff secret", async () => {
+  it("forwards api requests with bff secret and Cloudflare client ip", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
     const response = await onRequest(
-      context(new Request("https://readmates.pages.dev/api/bff/api/auth/me"), {
-        path: ["api", "auth", "me"],
-      }),
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/me", {
+          headers: {
+            "CF-Connecting-IP": "203.0.113.10",
+            "X-Forwarded-For": "198.51.100.10, 198.51.100.11",
+          },
+        }),
+        {
+          path: ["api", "auth", "me"],
+        },
+      ),
     );
 
     expect(response.status).toBe(200);
@@ -48,6 +56,29 @@ describe("Cloudflare BFF function", () => {
     );
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("secret");
+    expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("203.0.113.10");
+  });
+
+  it("falls back to first x-forwarded-for value for client ip handoff", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/me", {
+          headers: {
+            "X-Forwarded-For": "198.51.100.10, 198.51.100.11",
+          },
+        }),
+        {
+          path: ["api", "auth", "me"],
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("198.51.100.10");
   });
 
   it("supports Cloudflare slash-delimited catch-all path params", async () => {
@@ -80,6 +111,8 @@ describe("Cloudflare BFF function", () => {
           headers: {
             "Content-Type": "application/json",
             "Set-Cookie": "readmates.sid=next",
+            "X-Readmates-Bff-Secret": "upstream-placeholder-secret",
+            "X-Readmates-Client-IP": "upstream-placeholder-client",
           },
         });
       }),
@@ -113,6 +146,8 @@ describe("Cloudflare BFF function", () => {
     expect(new Uint8Array(forwardedInit?.body as ArrayBuffer)).toEqual(payload);
     expect(response.status).toBe(201);
     expect(response.headers.get("set-cookie")).toBe("readmates.sid=next");
+    expect(response.headers.get("x-readmates-bff-secret")).toBeNull();
+    expect(response.headers.get("x-readmates-client-ip")).toBeNull();
   });
 
   it("forwards multiple logout Set-Cookie headers", async () => {

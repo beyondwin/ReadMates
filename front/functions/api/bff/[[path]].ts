@@ -14,6 +14,7 @@ type HeadersWithSetCookie = Headers & {
 };
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const MAX_CLIENT_IP_LENGTH = 128;
 
 function pathSegments(path: string | string[] | undefined) {
   if (Array.isArray(path)) {
@@ -57,6 +58,8 @@ function buildApiUpstreamPath(path: string[]) {
 function copyUpstreamHeaders(headers: Headers) {
   const copiedHeaders = new Headers(headers);
   copiedHeaders.delete("set-cookie");
+  copiedHeaders.delete("x-readmates-bff-secret");
+  copiedHeaders.delete("x-readmates-client-ip");
 
   const setCookies = (headers as HeadersWithSetCookie).getSetCookie?.() ?? [];
   if (setCookies.length > 0) {
@@ -97,6 +100,16 @@ function isSameOriginMutation(request: Request) {
   }
 }
 
+function clientIpFromRequest(request: Request) {
+  const cloudflareIp = request.headers.get("CF-Connecting-IP")?.trim();
+  if (cloudflareIp) {
+    return cloudflareIp.slice(0, MAX_CLIENT_IP_LENGTH);
+  }
+
+  const forwardedFor = request.headers.get("X-Forwarded-For")?.split(",")[0]?.trim();
+  return forwardedFor ? forwardedFor.slice(0, MAX_CLIENT_IP_LENGTH) : null;
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   const upstreamPath = buildApiUpstreamPath(pathSegments(context.params.path));
   if (!upstreamPath) {
@@ -135,6 +148,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const bffSecret = context.env.READMATES_BFF_SECRET?.trim();
   if (bffSecret) {
     headers.set("X-Readmates-Bff-Secret", bffSecret);
+  }
+
+  const clientIp = clientIpFromRequest(context.request);
+  if (clientIp) {
+    headers.set("X-Readmates-Client-IP", clientIp);
   }
 
   const body = ["GET", "HEAD"].includes(context.request.method)

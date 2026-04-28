@@ -463,7 +463,7 @@ git commit -m "test: add redis test container support"
 - Test: `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapterTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilterTest.kt`
 
-- [ ] **Step 1: Write Redis adapter tests**
+- [x] **Step 1: Write Redis adapter tests**
 
 Create `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapterTest.kt`:
 
@@ -518,7 +518,7 @@ class RedisRateLimitAdapterTest(
 }
 ```
 
-- [ ] **Step 2: Write rate limit filter tests**
+- [x] **Step 2: Write rate limit filter tests**
 
 Create `server/src/test/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilterTest.kt`:
 
@@ -578,7 +578,7 @@ class RateLimitFilterTest {
 }
 ```
 
-- [ ] **Step 3: Run rate limit tests to verify they fail**
+- [x] **Step 3: Run rate limit tests to verify they fail**
 
 Run:
 
@@ -588,7 +588,7 @@ Run:
 
 Expected: FAIL because the port, adapter, and filter do not exist.
 
-- [ ] **Step 4: Create the rate limit port**
+- [x] **Step 4: Create the rate limit port**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/port/out/RateLimitPort.kt`:
 
@@ -630,7 +630,7 @@ interface RateLimitPort {
 }
 ```
 
-- [ ] **Step 5: Add Redis and no-op adapters**
+- [x] **Step 5: Add Redis and no-op adapters**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapter.kt`:
 
@@ -696,7 +696,7 @@ class NoopRateLimitAdapter : RateLimitPort {
 }
 ```
 
-- [ ] **Step 6: Add the security filter**
+- [x] **Step 6: Add the security filter**
 
 Create `server/src/main/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilter.kt`:
 
@@ -784,7 +784,7 @@ class RateLimitFilter(
 }
 ```
 
-- [ ] **Step 7: Register the filter**
+- [x] **Step 7: Register the filter**
 
 Modify `SecurityConfig` constructor and filter chain:
 
@@ -807,7 +807,7 @@ Add after `sessionCookieAuthenticationFilter`:
 .addFilterAfter(rateLimitFilter, SessionCookieAuthenticationFilter::class.java)
 ```
 
-- [ ] **Step 8: Run rate limit tests**
+- [x] **Step 8: Run rate limit tests**
 
 Run:
 
@@ -817,7 +817,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Run security smoke tests**
+- [x] **Step 9: Run security smoke tests**
 
 Run:
 
@@ -827,7 +827,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit rate limit**
+- [x] **Step 10: Commit rate limit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth/application/port/out/RateLimitPort.kt server/src/main/kotlin/com/readmates/auth/adapter/out/redis server/src/main/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilter.kt server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapterTest.kt server/src/test/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilterTest.kt
