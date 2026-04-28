@@ -6,11 +6,14 @@ import com.readmates.session.application.model.ReplaceQuestionsCommand
 import com.readmates.session.application.model.ReplaceQuestionCommandItem
 import com.readmates.session.application.model.ReplaceQuestionsResult
 import com.readmates.session.application.model.SaveCheckinCommand
+import com.readmates.session.application.model.SaveOneLineReviewCommand
 import com.readmates.session.application.model.SaveQuestionCommand
 import com.readmates.session.application.model.UpdateRsvpCommand
 import com.readmates.session.application.port.out.SessionParticipationWritePort
+import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.CurrentMember
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -29,23 +32,27 @@ class SessionMemberWriteServiceTest {
     @Test
     fun `delegates rsvp update to write port`() {
         val port = RecordingSessionParticipationWritePort()
-        val service = SessionMemberWriteService(port)
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = SessionMemberWriteService(port, invalidation)
 
         val result = service.updateRsvp(UpdateRsvpCommand(member, "GOING"))
 
         assertEquals("GOING", result.status)
         assertEquals("updateRsvp:GOING", port.calls.single())
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
     }
 
     @Test
     fun `delegates checkin save to write port`() {
         val port = RecordingSessionParticipationWritePort()
-        val service = SessionMemberWriteService(port)
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = SessionMemberWriteService(port, invalidation)
 
         val result = service.saveCheckin(SaveCheckinCommand(member, 80))
 
         assertEquals(80, result.readingProgress)
         assertEquals("saveCheckin:80", port.calls.single())
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
     }
 
     @Test
@@ -68,8 +75,47 @@ class SessionMemberWriteServiceTest {
         assertEquals("replaceQuestions:1:첫 질문|3:셋째 질문", port.calls.single())
     }
 
+    @Test
+    fun `evicts club content after one line review save`() {
+        val port = RecordingSessionParticipationWritePort()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = SessionMemberWriteService(port, invalidation)
+
+        service.saveOneLineReview(SaveOneLineReviewCommand(member, "좋았어요"))
+
+        assertEquals(listOf(member.clubId), invalidation.clubs)
+    }
+
+    @Test
+    fun `invalidation failure does not fail review save`() {
+        val port = RecordingSessionParticipationWritePort()
+        val invalidation = ThrowingReadCacheInvalidationPort()
+        val service = SessionMemberWriteService(port, invalidation)
+
+        val result = service.saveOneLineReview(SaveOneLineReviewCommand(member, "좋았어요"))
+
+        assertEquals("좋았어요", result.text)
+        assertEquals(1, invalidation.attempts)
+    }
+
+    @Test
+    fun `does not evict when write port throws`() {
+        val port = RecordingSessionParticipationWritePort().apply {
+            throwOnSaveOneLineReview = true
+        }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = SessionMemberWriteService(port, invalidation)
+
+        assertThrows(IllegalStateException::class.java) {
+            service.saveOneLineReview(SaveOneLineReviewCommand(member, "좋았어요"))
+        }
+
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
+    }
+
     private class RecordingSessionParticipationWritePort : SessionParticipationWritePort {
         val calls = mutableListOf<String>()
+        var throwOnSaveOneLineReview = false
 
         override fun updateRsvp(command: UpdateRsvpCommand) =
             com.readmates.session.application.model.RsvpResult(command.status)
@@ -90,10 +136,31 @@ class SessionMemberWriteServiceTest {
                 calls += "replaceQuestions:${command.questions.joinToString("|") { question -> "${question.priority}:${question.text}" }}"
             }
 
-        override fun saveOneLineReview(command: com.readmates.session.application.model.SaveOneLineReviewCommand) =
-            com.readmates.session.application.model.OneLineReviewResult(command.text)
+        override fun saveOneLineReview(command: com.readmates.session.application.model.SaveOneLineReviewCommand): com.readmates.session.application.model.OneLineReviewResult {
+            if (throwOnSaveOneLineReview) {
+                throw IllegalStateException("write failed")
+            }
+            return com.readmates.session.application.model.OneLineReviewResult(command.text)
+        }
 
         override fun saveLongReview(command: com.readmates.session.application.model.SaveLongReviewCommand) =
             com.readmates.session.application.model.LongReviewResult(command.body)
+    }
+
+    private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {
+        val clubs = mutableListOf<UUID>()
+
+        override fun evictClubContent(clubId: UUID) {
+            clubs += clubId
+        }
+    }
+
+    private class ThrowingReadCacheInvalidationPort : ReadCacheInvalidationPort {
+        var attempts = 0
+
+        override fun evictClubContent(clubId: UUID) {
+            attempts += 1
+            throw IllegalStateException("invalidation failed")
+        }
     }
 }

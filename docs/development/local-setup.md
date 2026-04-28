@@ -46,6 +46,29 @@ port: 3306
 
 이 Compose database는 로컬 backend 실행과 E2E 준비용입니다. Backend Gradle test는 Testcontainers가 테스트용 MySQL을 직접 띄우므로, 일반 backend test를 위해 이 컨테이너를 먼저 실행할 필요는 없습니다.
 
+## Optional Redis
+
+Redis는 선택 의존성이며 기본값은 비활성화입니다. 세션, 멤버십, 발행 기록, 노트 데이터의 최종 권위는 계속 MySQL입니다.
+
+로컬 MySQL과 Redis를 함께 띄웁니다.
+
+```bash
+docker compose up -d mysql redis
+```
+
+Redis-backed 기능은 명시적으로 켭니다.
+
+```bash
+READMATES_REDIS_ENABLED=true \
+READMATES_RATE_LIMIT_ENABLED=true \
+READMATES_AUTH_SESSION_CACHE_ENABLED=true \
+READMATES_PUBLIC_CACHE_ENABLED=true \
+READMATES_NOTES_CACHE_ENABLED=true \
+./server/gradlew -p server bootRun
+```
+
+기본 Redis URL은 `redis://localhost:6379`입니다. 다른 Redis를 쓰면 `READMATES_REDIS_URL`에 placeholder-safe 값을 넣고, 실제 secret이나 private endpoint는 Git에 남기지 않습니다.
+
 ## Backend 실행
 
 로컬 개발은 `dev` profile을 사용합니다. 이 profile은 sample seed data와 dev-login fixture를 켭니다.

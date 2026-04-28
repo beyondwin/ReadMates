@@ -7,6 +7,7 @@ function context(request: Request, registrationId: string | string[]) {
     request,
     env: {
       READMATES_API_BASE_URL: "https://api.example.com",
+      READMATES_BFF_SECRET: "test-bff-secret",
     },
     params: {
       registrationId,
@@ -27,6 +28,8 @@ describe("Cloudflare OAuth proxy functions", () => {
         headers: {
           Location: "https://accounts.google.com/o/oauth2/v2/auth",
           "Set-Cookie": "OAUTH2_STATE=state; Path=/; HttpOnly",
+          "X-Readmates-Bff-Secret": "upstream-placeholder-secret",
+          "X-Readmates-Client-IP": "upstream-placeholder-client",
         },
       })
     ));
@@ -37,6 +40,7 @@ describe("Cloudflare OAuth proxy functions", () => {
         new Request("https://readmates.pages.dev/oauth2/authorization/google?inviteToken=abc", {
           headers: {
             Cookie: "readmates_session=existing",
+            "CF-Connecting-IP": "203.0.113.10",
             "User-Agent": "vitest",
           },
         }),
@@ -57,9 +61,13 @@ describe("Cloudflare OAuth proxy functions", () => {
     expect((init.headers as Headers).get("user-agent")).toBe("vitest");
     expect((init.headers as Headers).get("x-forwarded-host")).toBe("readmates.pages.dev");
     expect((init.headers as Headers).get("x-forwarded-proto")).toBe("https");
+    expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
+    expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("203.0.113.10");
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("https://accounts.google.com/o/oauth2/v2/auth");
     expect(response.headers.get("set-cookie")).toBe("OAUTH2_STATE=state; Path=/; HttpOnly");
+    expect(response.headers.get("x-readmates-bff-secret")).toBeNull();
+    expect(response.headers.get("x-readmates-client-ip")).toBeNull();
   });
 
   it("proxies OAuth callback requests to backend OAuth with query, cookies, and forwarded host headers", async () => {
@@ -69,6 +77,8 @@ describe("Cloudflare OAuth proxy functions", () => {
         headers: {
           Location: "https://readmates.pages.dev/app",
           "Set-Cookie": "readmates_session=issued; Path=/; HttpOnly",
+          "X-Readmates-Bff-Secret": "upstream-placeholder-secret",
+          "X-Readmates-Client-IP": "upstream-placeholder-client",
         },
       })
     ));
@@ -79,6 +89,7 @@ describe("Cloudflare OAuth proxy functions", () => {
         new Request("https://readmates.pages.dev/login/oauth2/code/google?code=test&state=xyz", {
           headers: {
             Cookie: "OAUTH2_STATE=state",
+            "X-Forwarded-For": "198.51.100.10, 198.51.100.11",
           },
         }),
         "google",
@@ -97,9 +108,13 @@ describe("Cloudflare OAuth proxy functions", () => {
     expect((init.headers as Headers).get("cookie")).toBe("OAUTH2_STATE=state");
     expect((init.headers as Headers).get("x-forwarded-host")).toBe("readmates.pages.dev");
     expect((init.headers as Headers).get("x-forwarded-proto")).toBe("https");
+    expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
+    expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("198.51.100.10");
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("https://readmates.pages.dev/app");
     expect(response.headers.get("set-cookie")).toBe("readmates_session=issued; Path=/; HttpOnly");
+    expect(response.headers.get("x-readmates-bff-secret")).toBeNull();
+    expect(response.headers.get("x-readmates-client-ip")).toBeNull();
   });
 
   it.each([

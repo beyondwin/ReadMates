@@ -6,6 +6,7 @@ import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
+import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -16,6 +17,7 @@ import java.util.UUID
 @Service
 class MemberLifecycleService(
     private val memberLifecycleStore: MemberLifecycleStorePort,
+    private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : ManageMemberLifecycleUseCase, LeaveMembershipUseCase {
     override fun listMembers(host: CurrentMember): List<HostMemberListItem> {
         requireHost(host)
@@ -39,7 +41,7 @@ class MemberLifecycleService(
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
             currentSessionPolicyResult = policyResult,
-        )
+        ).also { cacheInvalidation.evictClubContentAfterCommit(host.clubId) }
     }
 
     @Transactional
@@ -57,7 +59,7 @@ class MemberLifecycleService(
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
             currentSessionPolicyResult = CurrentSessionPolicyResult.NOT_APPLICABLE,
-        )
+        ).also { cacheInvalidation.evictClubContentAfterCommit(host.clubId) }
     }
 
     @Transactional
@@ -76,7 +78,7 @@ class MemberLifecycleService(
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
             currentSessionPolicyResult = policyResult,
-        )
+        ).also { cacheInvalidation.evictClubContentAfterCommit(host.clubId) }
     }
 
     @Transactional
@@ -97,7 +99,7 @@ class MemberLifecycleService(
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
             currentSessionPolicyResult = CurrentSessionPolicyResult.APPLIED,
-        )
+        ).also { cacheInvalidation.evictClubContentAfterCommit(host.clubId) }
     }
 
     @Transactional
@@ -114,7 +116,7 @@ class MemberLifecycleService(
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
             currentSessionPolicyResult = CurrentSessionPolicyResult.APPLIED,
-        )
+        ).also { cacheInvalidation.evictClubContentAfterCommit(host.clubId) }
     }
 
     @Transactional
@@ -141,7 +143,7 @@ class MemberLifecycleService(
         return MemberLifecycleResponse(
             member = findHostMemberListItem(member, member.membershipId),
             currentSessionPolicyResult = policyResult,
-        )
+        ).also { cacheInvalidation.evictClubContentAfterCommit(member.clubId) }
     }
 
     private fun ensureMutableMembership(

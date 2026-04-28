@@ -31,6 +31,7 @@
 | Spring API | OCI Compute 또는 동등한 VM | Spring Boot JAR를 reverse proxy 뒤에서 실행합니다. |
 | Reverse proxy | Caddy | 직접 API origin이 필요할 때 HTTPS를 종료하고 Spring으로 전달합니다. |
 | Database | MySQL 8 compatible service | 문서화된 운영 대상은 OCI MySQL HeatWave입니다. |
+| Optional cache | Redis-compatible service | rate limit, auth session metadata cache, public/notes read-through cache에만 사용하며 MySQL source of truth를 대체하지 않습니다. |
 | Migrations | Flyway | Spring 시작 시 migration을 적용합니다. |
 
 프로덕션 secret 실제 값은 Git 밖에 둡니다. 공개 문서는 환경 변수 이름과 placeholder만 사용합니다. 실제 값은 Cloudflare Pages secret, 서버 런타임 환경 파일, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 저장합니다.
@@ -105,6 +106,24 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 ```
 
 직접 API origin 예시는 공개 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다. 실제 운영 secret, DB password, OAuth secret, OCI OCID, private IP, DB dump는 문서와 Git에 넣지 않습니다.
+
+## Redis Feature Flags
+
+Redis는 선택 계층입니다. 런타임 환경에 관리형 Redis URL을 placeholder-safe 값으로 설정한 뒤, 기능 flag를 단계적으로 켭니다.
+
+```text
+READMATES_REDIS_URL=<managed-redis-url>
+```
+
+권장 순서:
+
+1. `READMATES_REDIS_ENABLED=true`
+2. `READMATES_RATE_LIMIT_ENABLED=true`
+3. `READMATES_AUTH_SESSION_CACHE_ENABLED=true`
+4. `READMATES_PUBLIC_CACHE_ENABLED=true`
+5. `READMATES_NOTES_CACHE_ENABLED=true`
+
+Redis-backed 동작을 되돌릴 때는 MySQL 데이터를 바꾸지 않고 영향을 받은 기능 flag만 `false`로 내립니다. Rate limit은 필요할 때만 `READMATES_RATE_LIMIT_FAIL_CLOSED_SENSITIVE=true`로 민감 요청 장애 정책을 강화합니다.
 
 ## 배포 절차 요약
 

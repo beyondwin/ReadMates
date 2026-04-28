@@ -4,6 +4,16 @@ spring:
 
 readmates:
   bff-secret-required: false
+  redis:
+    enabled: false
+  rate-limit:
+    enabled: false
+  auth-session-cache:
+    enabled: false
+  public-cache:
+    enabled: false
+  notes-cache:
+    enabled: false
   dev:
     login-enabled: true
     google-oauth-auto-member-enabled: false
