@@ -218,7 +218,6 @@ export type HostNotificationSummary = {
     eventType: "NEXT_BOOK_PUBLISHED" | "SESSION_REMINDER_DUE" | "FEEDBACK_DOCUMENT_PUBLISHED";
     recipientEmail: string;
     attemptCount: number;
-    lastError: string | null;
     updatedAt: string;
   }>;
 };

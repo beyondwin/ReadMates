@@ -1,6 +1,7 @@
 package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
@@ -131,6 +132,17 @@ class NotificationOutboxServiceTest {
         assertThat(port.deadErrors.single()).hasSize(500)
     }
 
+    @Test
+    fun `recordSessionReminderDue enqueues reminder notifications for target date`() {
+        val port = FakeNotificationOutboxPort(items = emptyList())
+        val service = NotificationOutboxService(port, RecordingMailDeliveryPort(), testMetrics(), maxAttempts = 5)
+        val targetDate = LocalDate.of(2026, 4, 30)
+
+        service.recordSessionReminderDue(targetDate)
+
+        assertThat(port.reminderDates).containsExactly(targetDate)
+    }
+
     private fun sampleItem(attemptCount: Int = 0): NotificationOutboxItem =
         NotificationOutboxItem(
             id = UUID.fromString("00000000-0000-0000-0000-000000000701"),
@@ -177,12 +189,16 @@ private class FakeNotificationOutboxPort(
     val failedDelays = mutableListOf<Long>()
     val deadIds = mutableListOf<UUID>()
     val deadErrors = mutableListOf<String>()
+    val reminderDates = mutableListOf<LocalDate>()
 
     override fun enqueueFeedbackDocumentPublished(clubId: UUID, sessionId: UUID): Int = 0
 
     override fun enqueueNextBookPublished(clubId: UUID, sessionId: UUID): Int = 0
 
-    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int = 0
+    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int {
+        reminderDates += targetDate
+        return 1
+    }
 
     override fun claimPending(limit: Int): List<NotificationOutboxItem> {
         claimRequests += limit
@@ -223,5 +239,13 @@ private class FakeNotificationOutboxPort(
             dead = 0,
             sentLast24h = 0,
             latestFailures = emptyList(),
+        )
+
+    override fun outboxBacklog(): NotificationOutboxBacklog =
+        NotificationOutboxBacklog(
+            pending = 0,
+            failed = 0,
+            dead = 0,
+            sending = 0,
         )
 }
