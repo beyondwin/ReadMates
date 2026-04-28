@@ -1449,7 +1449,7 @@ git commit -m "feat: cache public read models in redis"
 - Modify: `server/src/main/kotlin/com/readmates/note/application/service/NotesFeedService.kt`
 - Test: `server/src/test/kotlin/com/readmates/note/application/service/NotesFeedServiceCacheTest.kt`
 
-- [ ] **Step 1: Write notes cache service tests**
+- [x] **Step 1: Write notes cache service tests**
 
 Create `NotesFeedServiceCacheTest.kt`:
 
@@ -1546,7 +1546,7 @@ class NotesFeedServiceCacheTest {
 }
 ```
 
-- [ ] **Step 2: Run notes cache tests to verify they fail**
+- [x] **Step 2: Run notes cache tests to verify they fail**
 
 Run:
 
@@ -1556,7 +1556,7 @@ Run:
 
 Expected: FAIL because `NotesReadCachePort` and constructor overload do not exist.
 
-- [ ] **Step 3: Create notes cache port**
+- [x] **Step 3: Create notes cache port**
 
 Create `NotesReadCachePort.kt`:
 
@@ -1605,7 +1605,7 @@ interface NotesReadCachePort {
 }
 ```
 
-- [ ] **Step 4: Modify NotesFeedService**
+- [x] **Step 4: Modify NotesFeedService**
 
 Change constructor and read paths:
 
@@ -1637,7 +1637,7 @@ class NotesFeedService(
 }
 ```
 
-- [ ] **Step 5: Create Redis/no-op notes cache adapters**
+- [x] **Step 5: Create Redis/no-op notes cache adapters**
 
 Use keys:
 
@@ -1656,7 +1656,7 @@ private val sessionListType = objectMapper.typeFactory.constructCollectionType(L
 
 On decode failure, delete the key and return null.
 
-- [ ] **Step 6: Run notes service cache tests**
+- [x] **Step 6: Run notes service cache tests**
 
 Run:
 
@@ -1666,17 +1666,17 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Run notes API tests**
+- [x] **Step 7: Run notes API tests**
 
 Run:
 
 ```bash
-./server/gradlew -p server test --tests com.readmates.note.api.QuestionControllerTest --tests com.readmates.note.api.ReviewControllerTest --tests com.readmates.note.api.CheckinControllerTest
+./server/gradlew -p server test --tests com.readmates.note.adapter.in.web.QuestionControllerTest --tests com.readmates.note.adapter.in.web.ReviewControllerTest --tests com.readmates.note.adapter.in.web.CheckinControllerTest
 ```
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit notes cache**
+- [x] **Step 8: Commit notes cache**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/note/application/port/out/NotesReadCachePort.kt server/src/main/kotlin/com/readmates/note/adapter/out/redis server/src/main/kotlin/com/readmates/note/application/service/NotesFeedService.kt server/src/test/kotlin/com/readmates/note/application/service/NotesFeedServiceCacheTest.kt
