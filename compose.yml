@@ -18,5 +18,17 @@ services:
       retries: 10
       start_period: 30s
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: readmates-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
 volumes:
   readmates-mysql-data:
