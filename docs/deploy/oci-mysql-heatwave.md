@@ -125,6 +125,16 @@ export READMATES_DB_HOST=<mysql-private-host>
 /opt/readmates/deploy/oci/backup-mysql-to-object-storage.sh
 ```
 
+Object Storage 권한만 먼저 확인하려면 실제 DB dump 없이 임시 object를 업로드하고 삭제하는 live smoke를 실행합니다.
+
+```bash
+READMATES_EXPORT_BUCKET=readmates-db-exports \
+READMATES_OBJECT_STORAGE_SMOKE_WRITE=true \
+/opt/readmates/deploy/oci/verify-operations-pipeline-live.sh
+```
+
+DB 연결과 실제 dump 업로드까지 확인하려면 `READMATES_DB_HOST`, `READMATES_DB_NAME`, `READMATES_DB_USER`, `READMATES_MYSQL_DEFAULTS_FILE`을 함께 설정하고, 실제 dump/upload 의도가 있을 때만 `READMATES_BACKUP_UPLOAD_SMOKE=true`를 추가합니다.
+
 업로드 후 같은 prefix에 dump와 checksum object가 함께 있어야 합니다.
 
 ```text
