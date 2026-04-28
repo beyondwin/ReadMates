@@ -844,24 +844,41 @@ git commit -m "feat: add redis-backed rate limiting"
 - Modify: `server/src/test/kotlin/com/readmates/auth/application/AuthSessionServiceTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapterTest.kt`
 
-- [ ] **Step 1: Add AuthSessionService cache tests**
+- [x] **Step 1: Add AuthSessionService cache tests**
+
+Final correctness update: Redis may accelerate reconstruction only after MySQL confirms the token hash is still valid; add regression coverage that a revoked MySQL session is rejected even when Redis still has a snapshot.
 
 Append these tests and helper to `AuthSessionServiceTest`:
 
 ```kotlin
 @Test
-fun `uses cached session without repository lookup`() {
+fun `uses cached session only after repository validity check`() {
     val repository = CountingAuthSessionStore()
     val cache = AuthSessionCachePort.InMemoryForTest()
     val service = AuthSessionService(repository, cache)
     val issued = service.issueSession("00000000-0000-0000-0000-000000000101", "agent", "127.0.0.1")
     repository.findCount = 0
 
-    val first = service.findValidSession(issued.rawToken)
-    val second = service.findValidSession(issued.rawToken)
+    val session = service.findValidSession(issued.rawToken)
 
-    assertEquals(first?.id, second?.id)
-    assertEquals(0, repository.findCount)
+    assertEquals(issued.storedTokenHash, session?.sessionTokenHash)
+    assertNull(session?.userAgent)
+    assertNull(session?.ipHash)
+    assertEquals(1, repository.findCount)
+}
+
+@Test
+fun `rejects revoked repository session even when cache still has snapshot`() {
+    val repository = CountingAuthSessionStore()
+    val cache = AuthSessionCachePort.InMemoryForTest()
+    val service = AuthSessionService(repository, cache)
+    val issued = service.issueSession("00000000-0000-0000-0000-000000000101", "agent", "127.0.0.1")
+
+    repository.revokeByTokenHash(issued.storedTokenHash)
+
+    assertNotNull(cache.find(issued.storedTokenHash))
+    assertNull(service.findValidSession(issued.rawToken))
+    assertEquals(1, repository.findCount)
 }
 
 @Test
@@ -895,7 +912,7 @@ private class CountingAuthSessionStore : AuthSessionStorePort.InMemoryForTest() 
 
 If `AuthSessionStorePort.InMemoryForTest` is not open for inheritance, replace it with a local implementation that delegates to a mutable map.
 
-- [ ] **Step 2: Run AuthSessionService tests to verify they fail**
+- [x] **Step 2: Run AuthSessionService tests to verify they fail**
 
 Run:
 
@@ -905,7 +922,7 @@ Run:
 
 Expected: FAIL because `AuthSessionCachePort` and the new constructor do not exist.
 
-- [ ] **Step 3: Create auth session cache port**
+- [x] **Step 3: Create auth session cache port**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/port/out/AuthSessionCachePort.kt`:
 
@@ -957,7 +974,7 @@ interface AuthSessionCachePort {
 }
 ```
 
-- [ ] **Step 4: Modify AuthSessionService**
+- [x] **Step 4: Modify AuthSessionService**
 
 Update constructor and methods in `AuthSessionService`:
 
@@ -996,11 +1013,17 @@ fun findValidSession(rawToken: String): StoredAuthSession? {
     val tokenHash = hashToken(rawToken)
     val now = OffsetDateTime.now(ZoneOffset.UTC)
     val cached = authSessionCache.find(tokenHash)
+        ?.takeIf { it.expiresAt.isAfter(now) }
+    val sourceOfTruth = authSessionStore.findValidByTokenHash(tokenHash)
         ?.takeIf { !it.revoked && it.expiresAt.isAfter(now) }
-    val session = cached ?: authSessionStore.findValidByTokenHash(tokenHash)?.also {
-        authSessionCache.store(tokenHash, it, cacheTtlFor(it.expiresAt, now))
-        authSessionCache.rememberUserSession(it.userId, tokenHash, cacheTtlFor(it.expiresAt, now))
-    } ?: return null
+        ?: return null
+    val session = cached
+        ?.takeIf { it.sessionId == sourceOfTruth.id && it.userId == sourceOfTruth.userId && it.expiresAt == sourceOfTruth.expiresAt }
+        ?.toStoredAuthSession(tokenHash, now)
+        ?: sourceOfTruth.also {
+            authSessionCache.store(tokenHash, AuthSessionCacheSnapshot(it.id, it.userId, it.expiresAt), cacheTtlFor(it.expiresAt, now))
+            authSessionCache.rememberUserSession(it.userId, tokenHash, cacheTtlFor(it.expiresAt, now))
+        }
 
     if (authSessionCache.shouldTouch(tokenHash, cacheProperties.touchThrottleTtl)) {
         authSessionStore.touchByTokenHash(tokenHash)
@@ -1019,8 +1042,9 @@ fun revokeSession(rawToken: String) {
 }
 
 fun revokeAllForUser(userId: String) {
-    authSessionStore.revokeAllForUser(userId)
-    authSessionCache.evictAllForUser(userId)
+    val normalizedUserId = UUID.fromString(userId).toString()
+    authSessionStore.revokeAllForUser(normalizedUserId)
+    authSessionCache.evictAllForUser(normalizedUserId)
 }
 ```
 
@@ -1036,7 +1060,7 @@ private fun cacheTtlFor(expiresAt: OffsetDateTime, now: OffsetDateTime): Duratio
 }
 ```
 
-- [ ] **Step 5: Create Redis/no-op auth cache adapters**
+- [x] **Step 5: Create Redis/no-op auth cache adapters**
 
 Create `NoopAuthSessionCacheAdapter` conditional on `readmates.auth-session-cache.enabled=false`.
 
@@ -1044,35 +1068,36 @@ Create `RedisAuthSessionCacheAdapter` conditional on `readmates.auth-session-cac
 
 ```kotlin
 private data class CachedAuthSession(
-    val schemaVersion: Int,
-    val id: String,
-    val userId: String,
-    val sessionTokenHash: String,
-    val createdAt: String,
-    val lastSeenAt: String,
-    val expiresAt: String,
-    val userAgent: String?,
-    val ipHash: String?,
+    val schemaVersion: Int = 0,
+    val sessionId: String = "",
+    val userId: String = "",
+    val expiresAt: String = "",
 )
 ```
+
+The earlier full-session value shape is superseded by the minimal spec-compliant snapshot above. Do not cache `sessionTokenHash`, `createdAt`, `lastSeenAt`, `userAgent`, `ipHash`, or revocation state in Redis; MySQL remains the source of truth for validity.
 
 The adapter must:
 
 ```kotlin
-override fun find(tokenHash: String): StoredAuthSession? {
+override fun find(tokenHash: String): AuthSessionCacheSnapshot? {
     val raw = redisTemplate.opsForValue().get(sessionKey(tokenHash)) ?: return null
     val cached = codec.decode(raw, CachedAuthSession::class.java) ?: run {
         redisTemplate.delete(sessionKey(tokenHash))
         metrics.increment("readmates.redis.fallbacks", "feature", "auth-session-decode")
         return null
     }
-    return cached.toStoredAuthSession()
+    return AuthSessionCacheSnapshot(
+        sessionId = cached.sessionId,
+        userId = cached.userId,
+        expiresAt = OffsetDateTime.parse(cached.expiresAt),
+    )
 }
 ```
 
 Use `opsForSet()` for `auth:user-sessions:{userId}` and `opsForValue().setIfAbsent(touchKey, "1", ttl)` for touch throttle.
 
-- [ ] **Step 6: Write Redis auth cache adapter test**
+- [x] **Step 6: Write Redis auth cache adapter test**
 
 Create `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapterTest.kt`:
 
@@ -1080,6 +1105,7 @@ Create `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSes
 package com.readmates.auth.adapter.out.redis
 
 import com.readmates.auth.application.model.StoredAuthSession
+import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.support.RedisTestContainer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -1108,10 +1134,11 @@ class RedisAuthSessionCacheAdapterTest(
     @Test
     fun `stores and loads session snapshot`() {
         val session = storedSession("session-token-hash-1", "00000000-0000-0000-0000-000000000101")
+        val snapshot = snapshot(session)
 
-        adapter.store(session.sessionTokenHash, session, Duration.ofMinutes(10))
+        adapter.store(session.sessionTokenHash, snapshot, Duration.ofMinutes(10))
 
-        assertEquals(session, adapter.find(session.sessionTokenHash))
+        assertEquals(snapshot, adapter.find(session.sessionTokenHash))
     }
 
     @Test
@@ -1126,7 +1153,7 @@ class RedisAuthSessionCacheAdapterTest(
     fun `evicts all cached sessions for user`() {
         val userId = "00000000-0000-0000-0000-000000000101"
         val session = storedSession("session-token-hash-3", userId)
-        adapter.store(session.sessionTokenHash, session, Duration.ofMinutes(10))
+        adapter.store(session.sessionTokenHash, snapshot(session), Duration.ofMinutes(10))
         adapter.rememberUserSession(userId, session.sessionTokenHash, Duration.ofMinutes(10))
 
         adapter.evictAllForUser(userId)
@@ -1144,6 +1171,13 @@ class RedisAuthSessionCacheAdapterTest(
             expiresAt = OffsetDateTime.of(2026, 5, 12, 0, 0, 0, 0, ZoneOffset.UTC),
             userAgent = "agent",
             ipHash = "ip-hash",
+        )
+
+    private fun snapshot(session: StoredAuthSession) =
+        AuthSessionCacheSnapshot(
+            sessionId = session.id,
+            userId = session.userId,
+            expiresAt = session.expiresAt,
         )
 
     companion object {
@@ -1175,7 +1209,7 @@ Use `RedisTestContainer.registerRedisProperties(registry)` and set:
 "readmates.auth-session-cache.enabled=true"
 ```
 
-- [ ] **Step 7: Run auth cache tests**
+- [x] **Step 7: Run auth cache tests**
 
 Run:
 
@@ -1185,7 +1219,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Run auth API smoke tests**
+- [x] **Step 8: Run auth API smoke tests**
 
 Run:
 
@@ -1195,7 +1229,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit auth session cache**
+- [x] **Step 9: Commit auth session cache**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth/application/AuthSessionService.kt server/src/main/kotlin/com/readmates/auth/application/port/out/AuthSessionCachePort.kt server/src/main/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapter.kt server/src/main/kotlin/com/readmates/auth/adapter/out/redis/NoopAuthSessionCacheAdapter.kt server/src/test/kotlin/com/readmates/auth/application/AuthSessionServiceTest.kt server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapterTest.kt
