@@ -28,6 +28,7 @@ import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.shared.db.dbString
@@ -165,7 +166,7 @@ class JdbcHostSessionWriteAdapter(
     }
 
     @Transactional
-    override fun open(command: HostSessionIdCommand): HostSessionDetailResponse {
+    override fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
         val jdbcTemplate = jdbcTemplate()
         jdbcTemplate.queryForObject(
@@ -186,7 +187,10 @@ class JdbcHostSessionWriteAdapter(
         ).firstOrNull() ?: throw HostSessionNotFoundException()
 
         if (state == "OPEN") {
-            return findHostSession(command.host, command.sessionId)
+            return HostSessionTransitionResult(
+                detail = findHostSession(command.host, command.sessionId),
+                changed = false,
+            )
         }
         if (state != "DRAFT") {
             throw HostSessionOpenNotAllowedException()
@@ -218,11 +222,14 @@ class JdbcHostSessionWriteAdapter(
             command.host.clubId.dbString(),
         )
         createActiveParticipants(jdbcTemplate, command.host.clubId, command.sessionId)
-        return findHostSession(command.host, command.sessionId)
+        return HostSessionTransitionResult(
+            detail = findHostSession(command.host, command.sessionId),
+            changed = true,
+        )
     }
 
     @Transactional
-    override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
+    override fun close(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
         val jdbcTemplate = jdbcTemplate()
         val closedRows = jdbcTemplate.update(
@@ -251,15 +258,21 @@ class JdbcHostSessionWriteAdapter(
             ).firstOrNull() ?: throw HostSessionNotFoundException()
 
             if (state == "CLOSED") {
-                return findHostSession(command.host, command.sessionId)
+                return HostSessionTransitionResult(
+                    detail = findHostSession(command.host, command.sessionId),
+                    changed = false,
+                )
             }
             throw HostSessionCloseNotAllowedException()
         }
-        return findHostSession(command.host, command.sessionId)
+        return HostSessionTransitionResult(
+            detail = findHostSession(command.host, command.sessionId),
+            changed = true,
+        )
     }
 
     @Transactional
-    override fun publish(command: HostSessionIdCommand): HostSessionDetailResponse {
+    override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
         val jdbcTemplate = jdbcTemplate()
         val publishedRows = jdbcTemplate.update(
@@ -296,7 +309,10 @@ class JdbcHostSessionWriteAdapter(
             ).firstOrNull() ?: throw HostSessionNotFoundException()
 
             if (state == "PUBLISHED") {
-                return findHostSession(command.host, command.sessionId)
+                return HostSessionTransitionResult(
+                    detail = findHostSession(command.host, command.sessionId),
+                    changed = false,
+                )
             }
             throw HostSessionPublishNotAllowedException()
         }
@@ -314,7 +330,10 @@ class JdbcHostSessionWriteAdapter(
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
-        return findHostSession(command.host, command.sessionId)
+        return HostSessionTransitionResult(
+            detail = findHostSession(command.host, command.sessionId),
+            changed = true,
+        )
     }
 
     @Transactional

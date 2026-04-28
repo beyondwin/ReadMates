@@ -12,12 +12,14 @@ import com.readmates.session.application.port.`in`.SaveQuestionUseCase
 import com.readmates.session.application.port.`in`.SaveReviewUseCase
 import com.readmates.session.application.port.`in`.UpdateRsvpUseCase
 import com.readmates.session.application.port.out.SessionParticipationWritePort
+import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class SessionMemberWriteService(
     private val writePort: SessionParticipationWritePort,
+    private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : UpdateRsvpUseCase,
     SaveCheckinUseCase,
     SaveQuestionUseCase,
@@ -33,17 +35,17 @@ class SessionMemberWriteService(
 
     @Transactional
     override fun saveQuestion(command: SaveQuestionCommand) =
-        writePort.saveQuestion(command)
+        writePort.saveQuestion(command).also { cacheInvalidation.evictClubContentAfterCommit(command.member.clubId) }
 
     @Transactional
     override fun replaceQuestions(command: ReplaceQuestionsCommand) =
-        writePort.replaceQuestions(command)
+        writePort.replaceQuestions(command).also { cacheInvalidation.evictClubContentAfterCommit(command.member.clubId) }
 
     @Transactional
     override fun saveOneLineReview(command: SaveOneLineReviewCommand) =
-        writePort.saveOneLineReview(command)
+        writePort.saveOneLineReview(command).also { cacheInvalidation.evictClubContentAfterCommit(command.member.clubId) }
 
     @Transactional
     override fun saveLongReview(command: SaveLongReviewCommand) =
-        writePort.saveLongReview(command)
+        writePort.saveLongReview(command).also { cacheInvalidation.evictClubContentAfterCommit(command.member.clubId) }
 }

@@ -9,6 +9,7 @@ import com.readmates.auth.application.port.out.MemberProfileRow
 import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.auth.application.toHostMemberListItem
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -18,6 +19,7 @@ import java.util.UUID
 @Service
 class MemberProfileService(
     private val memberProfileStore: MemberProfileStorePort,
+    private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : UpdateOwnMemberProfileUseCase, UpdateHostMemberProfileUseCase {
     @Transactional
     override fun updateOwnProfile(
@@ -38,9 +40,11 @@ class MemberProfileService(
 
         val displayName = validateDisplayName(command.displayName)
         updateOwnDisplayName(member.clubId, member.membershipId, displayName)
-        return memberProfileStore.findProfileMemberByEmail(email)
+        val profile = memberProfileStore.findProfileMemberByEmail(email)
             ?.toMemberProfile()
             ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        cacheInvalidation.evictClubContentAfterCommit(member.clubId)
+        return profile
     }
 
     @Transactional
@@ -63,9 +67,11 @@ class MemberProfileService(
 
         val displayName = validateDisplayName(command.displayName)
         updateHostDisplayName(host.clubId, membershipId, displayName)
-        return memberProfileStore.findHostMemberListItem(host.clubId, membershipId)
+        val member = memberProfileStore.findHostMemberListItem(host.clubId, membershipId)
             ?.toHostMemberListItem(host.membershipId)
             ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        cacheInvalidation.evictClubContentAfterCommit(host.clubId)
+        return member
     }
 
     private fun updateHostDisplayName(clubId: UUID, membershipId: UUID, displayName: String) {
