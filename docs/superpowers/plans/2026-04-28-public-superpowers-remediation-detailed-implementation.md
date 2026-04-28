@@ -446,7 +446,7 @@ git commit -m "docs: sanitize historical superpowers notes for public release"
 
 ### Task 4.1: preflight root 확장
 
-- [ ] **Step 1: `preflight_envrc_loaders()` roots에 추가**
+- [x] **Step 1: `preflight_envrc_loaders()` roots에 추가**
 
 Modify `scripts/build-public-release-candidate.sh`:
 
@@ -463,7 +463,7 @@ local roots=(
 )
 ```
 
-- [ ] **Step 2: `preflight_source_symlinks()` roots에 추가**
+- [x] **Step 2: `preflight_source_symlinks()` roots에 추가**
 
 Modify `scripts/build-public-release-candidate.sh`:
 
@@ -488,7 +488,7 @@ docs/superpowers 아래의 symlink와 env loader도 candidate build 전에 거�
 
 ### Task 4.2: manifest copy 확장
 
-- [ ] **Step 1: `copy_manifest()`에 sanitized docs 추가**
+- [x] **Step 1: `copy_manifest()`에 sanitized docs 추가**
 
 Modify `scripts/build-public-release-candidate.sh`:
 
@@ -502,7 +502,7 @@ copy_dir "docs/superpowers"
 
 ### Task 4.3: manifest allowlist 확장
 
-- [ ] **Step 1: `is_approved_manifest_path()`의 docs case 수정**
+- [x] **Step 1: `is_approved_manifest_path()`의 docs case 수정**
 
 Replace the docs case with:
 
@@ -512,7 +512,7 @@ docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*|docs/superpow
 
 ### Task 4.4: candidate forbidden path 조정
 
-- [ ] **Step 1: `is_forbidden_candidate_path()`에서 private plan dir case 제거**
+- [x] **Step 1: `is_forbidden_candidate_path()`에서 private plan dir case 제거**
 
 Remove only this case:
 
@@ -529,7 +529,7 @@ private folders, screenshots, .gstack, .superpowers, IDE files, temp folders
 
 ### Task 4.5: builder 검증
 
-- [ ] **Step 1: syntax check**
+- [x] **Step 1: syntax check**
 
 ```bash
 bash -n scripts/build-public-release-candidate.sh
@@ -541,7 +541,7 @@ Expected:
 <no output>
 ```
 
-- [ ] **Step 2: candidate 생성은 Phase 7에서 실행**
+- [x] **Step 2: candidate 생성은 Phase 7에서 실행**
 
 이 시점에는 checker가 아직 경로를 막을 수 있으므로 full candidate verification은 Phase 7에서 한다.
 

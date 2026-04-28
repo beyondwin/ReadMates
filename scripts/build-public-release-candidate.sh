@@ -180,6 +180,7 @@ preflight_envrc_loaders() {
     "deploy/oci"
     "docs/development"
     "docs/deploy"
+    "docs/superpowers"
     "scripts"
   )
   local matches=()
@@ -216,6 +217,7 @@ preflight_source_symlinks() {
     "deploy/oci"
     "docs/development"
     "docs/deploy"
+    "docs/superpowers"
     "scripts"
   )
   local matches=()
@@ -372,6 +374,7 @@ copy_manifest() {
 
   copy_dir "docs/deploy"
   copy_dir "docs/development"
+  copy_dir "docs/superpowers"
 
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/README.md"
@@ -388,7 +391,7 @@ is_approved_manifest_path() {
     front|front/*) return 0 ;;
     server|server/*) return 0 ;;
     deploy|deploy/oci|deploy/oci/*) return 0 ;;
-    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*) return 0 ;;
+    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*|docs/superpowers|docs/superpowers/*) return 0 ;;
     scripts|scripts/README.md|scripts/build-public-release-candidate.sh|scripts/public-release-check.sh|scripts/verify-public-release-fixtures.sh) return 0 ;;
     *) return 1 ;;
   esac
@@ -418,7 +421,6 @@ is_forbidden_candidate_path() {
     server/build|server/build/*) return 0 ;;
     server/.gradle|server/.gradle/*) return 0 ;;
     server/.kotlin|server/.kotlin/*) return 0 ;;
-    "$private_plan_dir"|"$private_plan_dir"/*) return 0 ;;
     design|design/*) return 0 ;;
     .gstack|.gstack/*) return 0 ;;
     .superpowers|.superpowers/*) return 0 ;;
