@@ -1,5 +1,8 @@
 package com.readmates.session.application.service
 
+import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
+import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -16,11 +19,14 @@ import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
+import java.util.UUID
 
 @Service
 class HostSessionCommandService(
     private val port: HostSessionWritePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
+    private val recordNotificationEventUseCase: RecordNotificationEventUseCase = NoopRecordNotificationEventUseCase,
 ) : ManageHostSessionUseCase,
     ConfirmAttendanceUseCase,
     UpsertPublicationUseCase,
@@ -39,8 +45,17 @@ class HostSessionCommandService(
         port.update(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
 
     @Transactional
-    override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) =
-        port.updateVisibility(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
+    override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
+        val detail = port.updateVisibility(command)
+        if (detail.state == "DRAFT" && detail.visibility != SessionRecordVisibility.HOST_ONLY) {
+            recordNotificationEventUseCase.recordNextBookPublished(
+                clubId = command.host.clubId,
+                sessionId = command.sessionId,
+            )
+        }
+        cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+        return detail
+    }
 
     @Transactional
     override fun open(command: HostSessionIdCommand) =
@@ -83,4 +98,12 @@ class HostSessionCommandService(
     override fun dashboard(host: CurrentMember) = port.dashboard(host)
 
     override fun upcoming(member: CurrentMember) = port.upcoming(member)
+}
+
+private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCase {
+    override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID) = Unit
+
+    override fun recordNextBookPublished(clubId: UUID, sessionId: UUID) = Unit
+
+    override fun recordSessionReminderDue(targetDate: LocalDate) = Unit
 }
