@@ -508,7 +508,7 @@ Expected:
 Open:
 
 ```text
-<local-user-path>
+<local-workspace>/ReadMates/design/standalone/mobile.html
 ```
 
 Expected:

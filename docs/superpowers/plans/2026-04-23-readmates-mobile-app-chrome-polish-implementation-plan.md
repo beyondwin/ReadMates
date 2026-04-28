@@ -12,7 +12,7 @@
 
 ## Design Context
 
-Use `<local-user-path> as the design source of truth.
+Use `<local-workspace>/ReadMates/.impeccable.md` as the design source of truth.
 
 Relevant principles:
 
