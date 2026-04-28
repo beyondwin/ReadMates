@@ -1,5 +1,7 @@
-package com.readmates.shared.cache
+package com.readmates.shared.adapter.out.redis
 
+import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component

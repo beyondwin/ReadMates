@@ -39,6 +39,8 @@ class ServerArchitectureBoundaryTest {
             .resideInAnyPackage(
                 "org.springframework.jdbc..",
                 "..adapter.out.persistence..",
+                "..adapter.out.redis..",
+                "org.springframework.data.redis..",
             )
             .check(importedClasses)
 
@@ -61,6 +63,7 @@ class ServerArchitectureBoundaryTest {
             .resideInAnyPackage(
                 "..adapter.in.web..",
                 "..adapter.out.persistence..",
+                "..adapter.out.redis..",
             )
             .check(importedClasses)
     }
@@ -75,6 +78,7 @@ class ServerArchitectureBoundaryTest {
             .resideInAnyPackage(
                 "org.springframework.jdbc..",
                 "org.springframework.dao..",
+                "org.springframework.data.redis..",
             )
             .check(importedClasses)
     }

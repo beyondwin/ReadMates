@@ -1,5 +1,6 @@
-package com.readmates.shared.cache
+package com.readmates.shared.adapter.out.redis
 
+import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 import java.util.UUID
