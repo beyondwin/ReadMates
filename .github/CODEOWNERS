@@ -1,0 +1,2 @@
+# CI/CD workflow changes are owned by @beyondwin; enforcement depends on branch protection.
+.github/workflows/** @beyondwin

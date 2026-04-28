@@ -327,7 +327,7 @@ standalone verification passed
 Run a static server:
 
 ```sh
-python3 -m http.server 4177 -d /Users/kws/source/persnal/ReadMates/design/standalone
+python3 -m http.server 4177 -d <local-workspace>/ReadMates/design/standalone
 ```
 
 Use Playwright CLI or a visible browser to check:

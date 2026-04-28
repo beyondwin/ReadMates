@@ -101,7 +101,7 @@ git status --short --untracked-files=all
 ```bash
 git status --short --untracked-files=all
 ```
-- Result: command passed (only baseline file appeared as untracked before edits): `?? docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md`.
+- Result: command passed (only baseline file appeared as untracked before edits): `?? docs/superpowers/plans/<server legacy risk cleanup implementation plan>`.
 
 - [x] **Step 2: Run current focused suites**
 
@@ -189,7 +189,7 @@ Expected: archive tests pass. Remaining archive application JDBC hits, if any, a
 - [x] **Step 5: Commit archive bridge removal**
 
 ```bash
-git add server/src/main/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add server/src/main/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "refactor: replace archive legacy query bridge"
 ```
 
@@ -247,7 +247,7 @@ Expected: no `JdbcTemplate`, `query(`, or `queryForObject` hits under `feedback.
 - [x] **Step 5: Commit feedback bridge removal**
 
 ```bash
-git add server/src/main/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/auth docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add server/src/main/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/auth docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "refactor: replace feedback document legacy bridge"
 ```
 
@@ -318,7 +318,7 @@ Expected: no `note.api` package remains, and no notes-feed JDBC remains under `a
 - [x] **Step 6: Commit notes feed migration**
 
 ```bash
-git add server/src/main/kotlin/com/readmates/note server/src/main/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/note server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add server/src/main/kotlin/com/readmates/note server/src/main/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/note server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "refactor: migrate notes feed to clean architecture"
 ```
 
@@ -353,7 +353,7 @@ If there is no dedicated shared test suite, run architecture tests plus full ser
 - [x] **Step 4: Commit shared health migration**
 
 ```bash
-git add server/src/main/kotlin/com/readmates/shared server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add server/src/main/kotlin/com/readmates/shared server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "refactor: move health endpoint to web adapter"
 ```
 
@@ -418,7 +418,7 @@ Expected: auth application JDBC hits are reduced to invitation/member-lifecycle/
 - [x] **Step 5: Commit auth session/member account extraction**
 
 ```bash
-git add server/src/main/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add server/src/main/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "refactor: extract auth session and account persistence"
 ```
 
@@ -483,7 +483,7 @@ Expected: no Spring JDBC imports or query calls remain under `auth.application`.
 - [x] **Step 6: Commit auth operational persistence extraction**
 
 ```bash
-git add server/src/main/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add server/src/main/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/architecture docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "refactor: extract auth operational persistence"
 ```
 
@@ -552,7 +552,7 @@ Expected:
 - [x] **Step 5: Commit boundary hardening**
 
 ```bash
-git add server/src/test/kotlin/com/readmates/architecture docs/development/architecture.md docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add server/src/test/kotlin/com/readmates/architecture docs/development/architecture.md docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "test: harden server architecture boundaries"
 ```
 
@@ -607,7 +607,7 @@ Update `docs/development/architecture.md` and `README.md` if they still mention 
 - [x] **Step 4: Commit final docs**
 
 ```bash
-git add docs/development/architecture.md README.md docs/superpowers/plans/2026-04-23-server-legacy-risk-cleanup-implementation-plan.md
+git add docs/development/architecture.md README.md docs/superpowers/plans/<server legacy risk cleanup implementation plan>
 git commit -m "docs: record server legacy risk cleanup"
 ```
 

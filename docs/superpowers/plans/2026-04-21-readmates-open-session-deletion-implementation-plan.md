@@ -523,7 +523,7 @@ Expected: tests fail because the new routes are absent. The likely failure is `4
 Run from:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ```
 
 ## Task 2: Backend API And Repository Preview
@@ -838,7 +838,7 @@ private fun deleteSessionOwnedRows(
 
 - [x] **Step 3: Run backend tests**
 
-Run from `/Users/kws/source/persnal/ReadMates/server`:
+Run from `<local-workspace>/ReadMates/server`:
 
 ```bash
 ./gradlew test --tests 'com.readmates.session.api.HostSessionControllerDbTest'
@@ -1076,7 +1076,7 @@ it("keeps the modal open when delete fails", async () => {
 
 - [x] **Step 6: Run frontend tests and verify they fail**
 
-Run from `/Users/kws/source/persnal/ReadMates/front`:
+Run from `<local-workspace>/ReadMates/front`:
 
 ```bash
 pnpm exec vitest run tests/unit/host-session-editor.test.tsx
@@ -1349,7 +1349,7 @@ git commit -m "feat: add open session deletion modal"
 
 - [x] **Step 1: Run backend targeted suite**
 
-Run from `/Users/kws/source/persnal/ReadMates/server`:
+Run from `<local-workspace>/ReadMates/server`:
 
 ```bash
 ./gradlew test \
@@ -1363,7 +1363,7 @@ Expected: all selected tests pass.
 
 - [x] **Step 2: Run frontend targeted suite**
 
-Run from `/Users/kws/source/persnal/ReadMates/front`:
+Run from `<local-workspace>/ReadMates/front`:
 
 ```bash
 pnpm test -- tests/unit/host-session-editor.test.tsx
@@ -1386,7 +1386,7 @@ Expected: only pre-existing unrelated user changes remain, or no output if the i
 Run the app if a local dev server is needed for manual verification:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm dev
 ```
 

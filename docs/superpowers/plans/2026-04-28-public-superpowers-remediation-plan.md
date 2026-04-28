@@ -823,12 +823,12 @@ Important: if the goal is to keep `docs/superpowers`, do not use `--invert-paths
 **Files:**
 - Optional Create: `.github/CODEOWNERS`
 
-- [ ] **Step 1: CODEOWNERS 추가**
+- [x] **Step 1: CODEOWNERS 추가**
 
 Create `.github/CODEOWNERS`:
 
 ```text
-# CI/CD workflow changes require owner review.
+# CI/CD workflow changes are owned by @beyondwin; enforcement depends on branch protection.
 .github/workflows/** @beyondwin
 ```
 
@@ -845,7 +845,7 @@ Expected:
 [main <sha>] chore: require owner review for workflow changes
 ```
 
-- [ ] **Step 2: GitHub branch protection 설정**
+- [x] **Step 2: GitHub branch protection 설정**
 
 In GitHub:
 
@@ -861,10 +861,12 @@ Enable:
 Expected:
 
 ```text
-Workflow file changes require CODEOWNERS review before merge
+Branch protection is configured now; CODEOWNERS review enforcement for workflow ownership becomes effective after this branch's .github/CODEOWNERS is merged into main.
 ```
 
-- [ ] **Step 3: GitHub secret scanning 확인**
+Status (2026-04-28): branch protection was applied and verified externally. `main` requires 1 approving review, code-owner review is enabled, strict required status checks include `Frontend` and `Backend`, and force pushes/deletions are disabled. CODEOWNERS review enforcement for workflow ownership becomes effective after this branch's `.github/CODEOWNERS` file is merged into `main`. Residual risk is future settings drift or admin changes, plus the until-merged caveat that `.github/CODEOWNERS` is not yet present on `main`.
+
+- [x] **Step 3: GitHub secret scanning 확인**
 
 In GitHub:
 
@@ -881,6 +883,8 @@ Expected:
 ```text
 GitHub security alerts active for public repository
 ```
+
+Status (2026-04-28): applied and verified externally. Secret scanning, push protection, Dependabot security updates, and Dependabot alerts are enabled; the vulnerability alerts endpoint returned HTTP 204. Residual risk is future settings drift or admin changes.
 
 ---
 
