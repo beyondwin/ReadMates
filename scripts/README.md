@@ -31,9 +31,10 @@
 - `deploy/oci/`
 - `docs/development/`
 - `docs/deploy/`
+- `docs/superpowers/`의 sanitized historical design and implementation records
 - 공개 릴리즈 보조 스크립트: `scripts/build-public-release-candidate.sh`, `scripts/README.md`, `scripts/public-release-check.sh`, `scripts/verify-public-release-fixtures.sh`
 
-디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `front/output`, `front/node_modules`, `front/dist`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. provider state, screenshot, private planning docs, `design`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
+디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `front/output`, `front/node_modules`, `front/dist`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. sanitized `docs/superpowers/` historical docs는 공개 후보에 포함하지만, sanitization을 거치지 않은 private historical planning docs는 공개 후보에 남길 수 없습니다. provider state, screenshot, `design`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
 
 루트 `.env.example`만 의도적으로 포함되는 environment file입니다. 필수 파일과 디렉터리 root는 symlink일 수 없고, 승인된 source root 안에서 발견되는 symlink도 복사 전에 거부합니다. staging 후보 검증 단계에서도 승인된 manifest 밖의 경로, 금지 경로, `.envrc*`, symlink가 남아 있으면 실패합니다.
 
@@ -55,7 +56,7 @@ clean 공개 릴리즈 후보를 검사합니다.
 
 현재 tree 모드는 `git ls-files`를 기준으로 tracked 금지 경로와 tracked symlink를 확인합니다. 후보 모드는 전달한 디렉터리를 `find`로 순회하며, 후보 안의 모든 symlink와 금지 경로를 거부합니다.
 
-현재 private tree에는 공개 후보에서 제외되는 historical planning 문서가 추적 중일 수 있습니다. no-arg 검사가 `docs/superpowers` 같은 private planning 경로를 보고 실패하면, 공개 판단은 clean 후보를 다시 만든 뒤 `.tmp/public-release-candidate`에 대해 실행한 결과를 기준으로 합니다.
+`docs/superpowers/`는 sanitized historical documentation만 공개 후보에 포함할 수 있습니다. 이 경로를 포함하려면 no-arg current-tree scan과 candidate scan 모두에서 local workstation path, private club domain, Gmail address, provider-token-shaped string, real-looking secret assignment 검사를 통과해야 합니다. no-arg current-tree scan이 `docs/superpowers/`에서 실패하면 공개 후보를 만들기 전에 해당 문서를 먼저 정리합니다.
 
 checker가 차단하는 주요 항목은 다음과 같습니다.
 
