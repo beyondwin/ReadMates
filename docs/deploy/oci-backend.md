@@ -32,6 +32,21 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=true
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
+READMATES_NOTIFICATIONS_ENABLED=true
+READMATES_NOTIFICATION_WORKER_ENABLED=true
+READMATES_NOTIFICATION_SENDER_NAME=ReadMates
+READMATES_NOTIFICATION_SENDER_EMAIL=no-reply@example.com
+SPRING_MAIL_HOST=smtp.email.<oci-region>.oci.oraclecloud.com
+SPRING_MAIL_PORT=587
+SPRING_MAIL_USERNAME=<oci-smtp-username>
+SPRING_MAIL_PASSWORD=<oci-smtp-password>
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=5000
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=3000
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
+READMATES_MANAGEMENT_ADDRESS=127.0.0.1
+READMATES_MANAGEMENT_PORT=8081
 ```
 
 Git에는 변수 이름과 placeholder만 둡니다. 프로덕션 secret 실제 값은 VM, Cloudflare, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 둡니다.
@@ -71,6 +86,8 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-conf
 - `readmates-server` 서비스 enable
 - Caddy reverse proxy 설정, `${CADDY_SITE} -> 127.0.0.1:8080`
 
+`02-configure.sh`는 baseline OAuth, DB, BFF 값으로 `/etc/readmates/readmates.env`를 다시 생성합니다. 알림 발송을 켜는 배포에서는 스크립트 실행 뒤 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_NOTIFICATION_WORKER_ENABLED`, `READMATES_NOTIFICATION_SENDER_*`, `SPRING_MAIL_*`, `READMATES_MANAGEMENT_*` 값을 같은 env 파일에 운영 값으로 추가한 뒤 `readmates-server`를 재시작합니다.
+
 ## JAR 배포
 
 ```bash
@@ -109,9 +126,20 @@ OAuth:
 curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.pages.dev/oauth2/authorization/google
 ```
 
+Metrics:
+
+```bash
+curl -sS http://127.0.0.1:8081/actuator/prometheus | grep readmates_notifications
+```
+
+`readmates_notifications` meter는 알림 처리 뒤 노출됩니다. 신규 배포 직후에는 먼저 `curl -sS http://127.0.0.1:8081/actuator/prometheus`로 endpoint reachability를 확인하고, 알림 처리 뒤 위 grep으로 counter 노출을 확인합니다.
+
+VM-local scraping을 위해 management endpoint는 loopback에만 바인딩합니다. 운영 환경 파일에는 `READMATES_MANAGEMENT_ADDRESS=127.0.0.1`과 `READMATES_MANAGEMENT_PORT=8081`이 필요합니다.
+
 ## 운영 메모
 
 - Spring `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기본 운영 기준입니다. secret이 비면 시작 실패가 맞습니다.
+- OCI Email Delivery SMTP credential과 sender 값은 `/etc/readmates/readmates.env`에만 둡니다. Git에는 `<oci-region>`, `<oci-smtp-username>`, `<oci-smtp-password>`, `no-reply@example.com` 같은 placeholder만 기록합니다.
 - DB migration은 Spring 시작 시 Flyway가 `db/mysql/migration`을 적용합니다.
 - 백엔드 프로덕션 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
 - Caddy 로그는 `/var/log/caddy/readmates.log`에 남습니다.
