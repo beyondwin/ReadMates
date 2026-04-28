@@ -118,7 +118,7 @@ Create or modify these files.
 - Create: `server/src/main/kotlin/com/readmates/shared/cache/RedisCacheMetrics.kt`
 - Create test: `server/src/test/kotlin/com/readmates/shared/cache/CacheJsonCodecTest.kt`
 
-- [ ] **Step 1: Write the JSON codec test**
+- [x] **Step 1: Write the JSON codec test**
 
 Create `server/src/test/kotlin/com/readmates/shared/cache/CacheJsonCodecTest.kt`:
 
@@ -155,7 +155,7 @@ class CacheJsonCodecTest {
 }
 ```
 
-- [ ] **Step 2: Run the codec test to verify it fails**
+- [x] **Step 2: Run the codec test to verify it fails**
 
 Run:
 
@@ -165,7 +165,7 @@ Run:
 
 Expected: FAIL because `CacheJsonCodec` does not exist.
 
-- [ ] **Step 3: Add the Redis dependency**
+- [x] **Step 3: Add the Redis dependency**
 
 Modify `server/build.gradle.kts` dependencies:
 
@@ -175,7 +175,7 @@ implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
 Keep the existing `org.testcontainers:testcontainers-mysql:2.0.2` dependency. Redis tests will use `org.testcontainers.containers.GenericContainer` from the existing Testcontainers core dependency.
 
-- [ ] **Step 4: Add Redis and feature properties**
+- [x] **Step 4: Add Redis and feature properties**
 
 Modify `server/src/main/resources/application.yml`:
 
@@ -255,7 +255,7 @@ readmates:
     google-oauth-auto-member-enabled: false
 ```
 
-- [ ] **Step 5: Add local Redis to compose**
+- [x] **Step 5: Add local Redis to compose**
 
 Before editing, run:
 
@@ -281,7 +281,7 @@ Preserve any existing user edits. Add this service beside `mysql`:
 
 Do not add a Redis volume; local Redis is cache-only.
 
-- [ ] **Step 6: Create properties and codec**
+- [x] **Step 6: Create properties and codec**
 
 Create `server/src/main/kotlin/com/readmates/shared/cache/RedisCacheProperties.kt`:
 
@@ -375,7 +375,7 @@ class RedisCacheMetrics(
 }
 ```
 
-- [ ] **Step 7: Run the codec test**
+- [x] **Step 7: Run the codec test**
 
 Run:
 
@@ -385,7 +385,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Run context-adjacent server tests with Redis disabled**
+- [x] **Step 8: Run context-adjacent server tests with Redis disabled**
 
 Run:
 
@@ -395,7 +395,7 @@ Run:
 
 Expected: PASS without a Redis container running.
 
-- [ ] **Step 9: Commit foundation**
+- [x] **Step 9: Commit foundation**
 
 ```bash
 git add server/build.gradle.kts server/src/main/resources/application.yml server/src/main/resources/application-dev.yml compose.yml server/src/main/kotlin/com/readmates/shared/cache server/src/test/kotlin/com/readmates/shared/cache/CacheJsonCodecTest.kt
@@ -408,7 +408,7 @@ git commit -m "feat: add optional redis foundation"
 - Create: `server/src/test/kotlin/com/readmates/support/RedisTestContainer.kt`
 - Test support used by Redis adapter tests in later tasks.
 
-- [ ] **Step 1: Create Redis test container helper**
+- [x] **Step 1: Create Redis test container helper**
 
 Create `server/src/test/kotlin/com/readmates/support/RedisTestContainer.kt`:
 
@@ -435,7 +435,7 @@ object RedisTestContainer {
 }
 ```
 
-- [ ] **Step 2: Compile test support**
+- [x] **Step 2: Compile test support**
 
 Run:
 
@@ -445,7 +445,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit Redis test support**
+- [x] **Step 3: Commit Redis test support**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/support/RedisTestContainer.kt
@@ -463,7 +463,7 @@ git commit -m "test: add redis test container support"
 - Test: `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapterTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilterTest.kt`
 
-- [ ] **Step 1: Write Redis adapter tests**
+- [x] **Step 1: Write Redis adapter tests**
 
 Create `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapterTest.kt`:
 
@@ -518,7 +518,7 @@ class RedisRateLimitAdapterTest(
 }
 ```
 
-- [ ] **Step 2: Write rate limit filter tests**
+- [x] **Step 2: Write rate limit filter tests**
 
 Create `server/src/test/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilterTest.kt`:
 
@@ -578,7 +578,7 @@ class RateLimitFilterTest {
 }
 ```
 
-- [ ] **Step 3: Run rate limit tests to verify they fail**
+- [x] **Step 3: Run rate limit tests to verify they fail**
 
 Run:
 
@@ -588,7 +588,7 @@ Run:
 
 Expected: FAIL because the port, adapter, and filter do not exist.
 
-- [ ] **Step 4: Create the rate limit port**
+- [x] **Step 4: Create the rate limit port**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/port/out/RateLimitPort.kt`:
 
@@ -630,7 +630,7 @@ interface RateLimitPort {
 }
 ```
 
-- [ ] **Step 5: Add Redis and no-op adapters**
+- [x] **Step 5: Add Redis and no-op adapters**
 
 Create `server/src/main/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapter.kt`:
 
@@ -696,7 +696,7 @@ class NoopRateLimitAdapter : RateLimitPort {
 }
 ```
 
-- [ ] **Step 6: Add the security filter**
+- [x] **Step 6: Add the security filter**
 
 Create `server/src/main/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilter.kt`:
 
@@ -784,7 +784,7 @@ class RateLimitFilter(
 }
 ```
 
-- [ ] **Step 7: Register the filter**
+- [x] **Step 7: Register the filter**
 
 Modify `SecurityConfig` constructor and filter chain:
 
@@ -807,7 +807,7 @@ Add after `sessionCookieAuthenticationFilter`:
 .addFilterAfter(rateLimitFilter, SessionCookieAuthenticationFilter::class.java)
 ```
 
-- [ ] **Step 8: Run rate limit tests**
+- [x] **Step 8: Run rate limit tests**
 
 Run:
 
@@ -817,7 +817,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Run security smoke tests**
+- [x] **Step 9: Run security smoke tests**
 
 Run:
 
@@ -827,7 +827,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit rate limit**
+- [x] **Step 10: Commit rate limit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth/application/port/out/RateLimitPort.kt server/src/main/kotlin/com/readmates/auth/adapter/out/redis server/src/main/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilter.kt server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisRateLimitAdapterTest.kt server/src/test/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilterTest.kt
@@ -844,24 +844,41 @@ git commit -m "feat: add redis-backed rate limiting"
 - Modify: `server/src/test/kotlin/com/readmates/auth/application/AuthSessionServiceTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapterTest.kt`
 
-- [ ] **Step 1: Add AuthSessionService cache tests**
+- [x] **Step 1: Add AuthSessionService cache tests**
+
+Final correctness update: Redis may accelerate reconstruction only after MySQL confirms the token hash is still valid; add regression coverage that a revoked MySQL session is rejected even when Redis still has a snapshot.
 
 Append these tests and helper to `AuthSessionServiceTest`:
 
 ```kotlin
 @Test
-fun `uses cached session without repository lookup`() {
+fun `uses cached session only after repository validity check`() {
     val repository = CountingAuthSessionStore()
     val cache = AuthSessionCachePort.InMemoryForTest()
     val service = AuthSessionService(repository, cache)
     val issued = service.issueSession("00000000-0000-0000-0000-000000000101", "agent", "127.0.0.1")
     repository.findCount = 0
 
-    val first = service.findValidSession(issued.rawToken)
-    val second = service.findValidSession(issued.rawToken)
+    val session = service.findValidSession(issued.rawToken)
 
-    assertEquals(first?.id, second?.id)
-    assertEquals(0, repository.findCount)
+    assertEquals(issued.storedTokenHash, session?.sessionTokenHash)
+    assertNull(session?.userAgent)
+    assertNull(session?.ipHash)
+    assertEquals(1, repository.findCount)
+}
+
+@Test
+fun `rejects revoked repository session even when cache still has snapshot`() {
+    val repository = CountingAuthSessionStore()
+    val cache = AuthSessionCachePort.InMemoryForTest()
+    val service = AuthSessionService(repository, cache)
+    val issued = service.issueSession("00000000-0000-0000-0000-000000000101", "agent", "127.0.0.1")
+
+    repository.revokeByTokenHash(issued.storedTokenHash)
+
+    assertNotNull(cache.find(issued.storedTokenHash))
+    assertNull(service.findValidSession(issued.rawToken))
+    assertEquals(1, repository.findCount)
 }
 
 @Test
@@ -895,7 +912,7 @@ private class CountingAuthSessionStore : AuthSessionStorePort.InMemoryForTest() 
 
 If `AuthSessionStorePort.InMemoryForTest` is not open for inheritance, replace it with a local implementation that delegates to a mutable map.
 
-- [ ] **Step 2: Run AuthSessionService tests to verify they fail**
+- [x] **Step 2: Run AuthSessionService tests to verify they fail**
 
 Run:
 
@@ -905,7 +922,7 @@ Run:
 
 Expected: FAIL because `AuthSessionCachePort` and the new constructor do not exist.
 
-- [ ] **Step 3: Create auth session cache port**
+- [x] **Step 3: Create auth session cache port**
 
 Create `server/src/main/kotlin/com/readmates/auth/application/port/out/AuthSessionCachePort.kt`:
 
@@ -957,7 +974,7 @@ interface AuthSessionCachePort {
 }
 ```
 
-- [ ] **Step 4: Modify AuthSessionService**
+- [x] **Step 4: Modify AuthSessionService**
 
 Update constructor and methods in `AuthSessionService`:
 
@@ -996,11 +1013,17 @@ fun findValidSession(rawToken: String): StoredAuthSession? {
     val tokenHash = hashToken(rawToken)
     val now = OffsetDateTime.now(ZoneOffset.UTC)
     val cached = authSessionCache.find(tokenHash)
+        ?.takeIf { it.expiresAt.isAfter(now) }
+    val sourceOfTruth = authSessionStore.findValidByTokenHash(tokenHash)
         ?.takeIf { !it.revoked && it.expiresAt.isAfter(now) }
-    val session = cached ?: authSessionStore.findValidByTokenHash(tokenHash)?.also {
-        authSessionCache.store(tokenHash, it, cacheTtlFor(it.expiresAt, now))
-        authSessionCache.rememberUserSession(it.userId, tokenHash, cacheTtlFor(it.expiresAt, now))
-    } ?: return null
+        ?: return null
+    val session = cached
+        ?.takeIf { it.sessionId == sourceOfTruth.id && it.userId == sourceOfTruth.userId && it.expiresAt == sourceOfTruth.expiresAt }
+        ?.toStoredAuthSession(tokenHash, now)
+        ?: sourceOfTruth.also {
+            authSessionCache.store(tokenHash, AuthSessionCacheSnapshot(it.id, it.userId, it.expiresAt), cacheTtlFor(it.expiresAt, now))
+            authSessionCache.rememberUserSession(it.userId, tokenHash, cacheTtlFor(it.expiresAt, now))
+        }
 
     if (authSessionCache.shouldTouch(tokenHash, cacheProperties.touchThrottleTtl)) {
         authSessionStore.touchByTokenHash(tokenHash)
@@ -1019,8 +1042,9 @@ fun revokeSession(rawToken: String) {
 }
 
 fun revokeAllForUser(userId: String) {
-    authSessionStore.revokeAllForUser(userId)
-    authSessionCache.evictAllForUser(userId)
+    val normalizedUserId = UUID.fromString(userId).toString()
+    authSessionStore.revokeAllForUser(normalizedUserId)
+    authSessionCache.evictAllForUser(normalizedUserId)
 }
 ```
 
@@ -1036,7 +1060,7 @@ private fun cacheTtlFor(expiresAt: OffsetDateTime, now: OffsetDateTime): Duratio
 }
 ```
 
-- [ ] **Step 5: Create Redis/no-op auth cache adapters**
+- [x] **Step 5: Create Redis/no-op auth cache adapters**
 
 Create `NoopAuthSessionCacheAdapter` conditional on `readmates.auth-session-cache.enabled=false`.
 
@@ -1044,35 +1068,36 @@ Create `RedisAuthSessionCacheAdapter` conditional on `readmates.auth-session-cac
 
 ```kotlin
 private data class CachedAuthSession(
-    val schemaVersion: Int,
-    val id: String,
-    val userId: String,
-    val sessionTokenHash: String,
-    val createdAt: String,
-    val lastSeenAt: String,
-    val expiresAt: String,
-    val userAgent: String?,
-    val ipHash: String?,
+    val schemaVersion: Int = 0,
+    val sessionId: String = "",
+    val userId: String = "",
+    val expiresAt: String = "",
 )
 ```
+
+The earlier full-session value shape is superseded by the minimal spec-compliant snapshot above. Do not cache `sessionTokenHash`, `createdAt`, `lastSeenAt`, `userAgent`, `ipHash`, or revocation state in Redis; MySQL remains the source of truth for validity.
 
 The adapter must:
 
 ```kotlin
-override fun find(tokenHash: String): StoredAuthSession? {
+override fun find(tokenHash: String): AuthSessionCacheSnapshot? {
     val raw = redisTemplate.opsForValue().get(sessionKey(tokenHash)) ?: return null
     val cached = codec.decode(raw, CachedAuthSession::class.java) ?: run {
         redisTemplate.delete(sessionKey(tokenHash))
         metrics.increment("readmates.redis.fallbacks", "feature", "auth-session-decode")
         return null
     }
-    return cached.toStoredAuthSession()
+    return AuthSessionCacheSnapshot(
+        sessionId = cached.sessionId,
+        userId = cached.userId,
+        expiresAt = OffsetDateTime.parse(cached.expiresAt),
+    )
 }
 ```
 
 Use `opsForSet()` for `auth:user-sessions:{userId}` and `opsForValue().setIfAbsent(touchKey, "1", ttl)` for touch throttle.
 
-- [ ] **Step 6: Write Redis auth cache adapter test**
+- [x] **Step 6: Write Redis auth cache adapter test**
 
 Create `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapterTest.kt`:
 
@@ -1080,6 +1105,7 @@ Create `server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSes
 package com.readmates.auth.adapter.out.redis
 
 import com.readmates.auth.application.model.StoredAuthSession
+import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.support.RedisTestContainer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -1108,10 +1134,11 @@ class RedisAuthSessionCacheAdapterTest(
     @Test
     fun `stores and loads session snapshot`() {
         val session = storedSession("session-token-hash-1", "00000000-0000-0000-0000-000000000101")
+        val snapshot = snapshot(session)
 
-        adapter.store(session.sessionTokenHash, session, Duration.ofMinutes(10))
+        adapter.store(session.sessionTokenHash, snapshot, Duration.ofMinutes(10))
 
-        assertEquals(session, adapter.find(session.sessionTokenHash))
+        assertEquals(snapshot, adapter.find(session.sessionTokenHash))
     }
 
     @Test
@@ -1126,7 +1153,7 @@ class RedisAuthSessionCacheAdapterTest(
     fun `evicts all cached sessions for user`() {
         val userId = "00000000-0000-0000-0000-000000000101"
         val session = storedSession("session-token-hash-3", userId)
-        adapter.store(session.sessionTokenHash, session, Duration.ofMinutes(10))
+        adapter.store(session.sessionTokenHash, snapshot(session), Duration.ofMinutes(10))
         adapter.rememberUserSession(userId, session.sessionTokenHash, Duration.ofMinutes(10))
 
         adapter.evictAllForUser(userId)
@@ -1144,6 +1171,13 @@ class RedisAuthSessionCacheAdapterTest(
             expiresAt = OffsetDateTime.of(2026, 5, 12, 0, 0, 0, 0, ZoneOffset.UTC),
             userAgent = "agent",
             ipHash = "ip-hash",
+        )
+
+    private fun snapshot(session: StoredAuthSession) =
+        AuthSessionCacheSnapshot(
+            sessionId = session.id,
+            userId = session.userId,
+            expiresAt = session.expiresAt,
         )
 
     companion object {
@@ -1175,7 +1209,7 @@ Use `RedisTestContainer.registerRedisProperties(registry)` and set:
 "readmates.auth-session-cache.enabled=true"
 ```
 
-- [ ] **Step 7: Run auth cache tests**
+- [x] **Step 7: Run auth cache tests**
 
 Run:
 
@@ -1185,7 +1219,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Run auth API smoke tests**
+- [x] **Step 8: Run auth API smoke tests**
 
 Run:
 
@@ -1195,7 +1229,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit auth session cache**
+- [x] **Step 9: Commit auth session cache**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth/application/AuthSessionService.kt server/src/main/kotlin/com/readmates/auth/application/port/out/AuthSessionCachePort.kt server/src/main/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapter.kt server/src/main/kotlin/com/readmates/auth/adapter/out/redis/NoopAuthSessionCacheAdapter.kt server/src/test/kotlin/com/readmates/auth/application/AuthSessionServiceTest.kt server/src/test/kotlin/com/readmates/auth/adapter/out/redis/RedisAuthSessionCacheAdapterTest.kt
@@ -1211,7 +1245,7 @@ git commit -m "feat: cache auth session lookups in redis"
 - Modify: `server/src/main/kotlin/com/readmates/publication/application/service/PublicQueryService.kt`
 - Test: `server/src/test/kotlin/com/readmates/publication/application/service/PublicQueryServiceCacheTest.kt`
 
-- [ ] **Step 1: Write service cache tests**
+- [x] **Step 1: Write service cache tests**
 
 Create `PublicQueryServiceCacheTest.kt`:
 
@@ -1285,7 +1319,7 @@ class PublicQueryServiceCacheTest {
 }
 ```
 
-- [ ] **Step 2: Run public cache test to verify it fails**
+- [x] **Step 2: Run public cache test to verify it fails**
 
 Run:
 
@@ -1295,7 +1329,7 @@ Run:
 
 Expected: FAIL because `PublicReadCachePort` and new constructor do not exist.
 
-- [ ] **Step 3: Create public cache port**
+- [x] **Step 3: Create public cache port**
 
 Create `PublicReadCachePort.kt`:
 
@@ -1335,7 +1369,7 @@ interface PublicReadCachePort {
 }
 ```
 
-- [ ] **Step 4: Modify PublicQueryService**
+- [x] **Step 4: Modify PublicQueryService**
 
 Change constructor and methods:
 
@@ -1355,7 +1389,7 @@ class PublicQueryService(
 }
 ```
 
-- [ ] **Step 5: Create Redis/no-op public cache adapters**
+- [x] **Step 5: Create Redis/no-op public cache adapters**
 
 Create Redis adapter with keys:
 
@@ -1379,7 +1413,7 @@ return decoded
 
 No-op adapter returns misses and is conditional on `readmates.public-cache.enabled=false`.
 
-- [ ] **Step 6: Run public cache service tests**
+- [x] **Step 6: Run public cache service tests**
 
 Run:
 
@@ -1389,7 +1423,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Run public API tests**
+- [x] **Step 7: Run public API tests**
 
 Run:
 
@@ -1399,7 +1433,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit public cache**
+- [x] **Step 8: Commit public cache**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/publication/application/port/out/PublicReadCachePort.kt server/src/main/kotlin/com/readmates/publication/adapter/out/redis server/src/main/kotlin/com/readmates/publication/application/service/PublicQueryService.kt server/src/test/kotlin/com/readmates/publication/application/service/PublicQueryServiceCacheTest.kt
@@ -1415,7 +1449,7 @@ git commit -m "feat: cache public read models in redis"
 - Modify: `server/src/main/kotlin/com/readmates/note/application/service/NotesFeedService.kt`
 - Test: `server/src/test/kotlin/com/readmates/note/application/service/NotesFeedServiceCacheTest.kt`
 
-- [ ] **Step 1: Write notes cache service tests**
+- [x] **Step 1: Write notes cache service tests**
 
 Create `NotesFeedServiceCacheTest.kt`:
 
@@ -1512,7 +1546,7 @@ class NotesFeedServiceCacheTest {
 }
 ```
 
-- [ ] **Step 2: Run notes cache tests to verify they fail**
+- [x] **Step 2: Run notes cache tests to verify they fail**
 
 Run:
 
@@ -1522,7 +1556,7 @@ Run:
 
 Expected: FAIL because `NotesReadCachePort` and constructor overload do not exist.
 
-- [ ] **Step 3: Create notes cache port**
+- [x] **Step 3: Create notes cache port**
 
 Create `NotesReadCachePort.kt`:
 
@@ -1571,7 +1605,7 @@ interface NotesReadCachePort {
 }
 ```
 
-- [ ] **Step 4: Modify NotesFeedService**
+- [x] **Step 4: Modify NotesFeedService**
 
 Change constructor and read paths:
 
@@ -1603,7 +1637,7 @@ class NotesFeedService(
 }
 ```
 
-- [ ] **Step 5: Create Redis/no-op notes cache adapters**
+- [x] **Step 5: Create Redis/no-op notes cache adapters**
 
 Use keys:
 
@@ -1622,7 +1656,7 @@ private val sessionListType = objectMapper.typeFactory.constructCollectionType(L
 
 On decode failure, delete the key and return null.
 
-- [ ] **Step 6: Run notes service cache tests**
+- [x] **Step 6: Run notes service cache tests**
 
 Run:
 
@@ -1632,7 +1666,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Run notes API tests**
+- [x] **Step 7: Run notes API tests**
 
 Run:
 
@@ -1642,7 +1676,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit notes cache**
+- [x] **Step 8: Commit notes cache**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/note/application/port/out/NotesReadCachePort.kt server/src/main/kotlin/com/readmates/note/adapter/out/redis server/src/main/kotlin/com/readmates/note/application/service/NotesFeedService.kt server/src/test/kotlin/com/readmates/note/application/service/NotesFeedServiceCacheTest.kt
@@ -1661,7 +1695,7 @@ git commit -m "feat: cache notes feed read models in redis"
 - Modify: `server/src/main/kotlin/com/readmates/auth/application/service/MemberProfileService.kt`
 - Extend tests listed in file structure.
 
-- [ ] **Step 1: Write service invalidation tests**
+- [x] **Step 1: Write service invalidation tests**
 
 In `HostSessionCommandServiceTest`, add a fake invalidator:
 
@@ -1710,7 +1744,7 @@ fun `evicts club content after one line review save`() {
 }
 ```
 
-- [ ] **Step 2: Run invalidation tests to verify they fail**
+- [x] **Step 2: Run invalidation tests to verify they fail**
 
 Run:
 
@@ -1720,7 +1754,7 @@ Run:
 
 Expected: FAIL because `ReadCacheInvalidationPort` and new constructors do not exist.
 
-- [ ] **Step 3: Create invalidation port and adapters**
+- [x] **Step 3: Create invalidation port and adapters**
 
 Create `ReadCacheInvalidationPort.kt`:
 
@@ -1771,7 +1805,7 @@ class RedisReadCacheInvalidationAdapter(
 
 Use broad `KEYS` only because this project has small cache cardinality. If production cache size grows, replace this adapter with tracked key sets.
 
-- [ ] **Step 4: Evict after host session mutations**
+- [x] **Step 4: Evict after host session mutations**
 
 Modify `HostSessionCommandService` constructor:
 
@@ -1842,7 +1876,7 @@ override fun upsertPublication(command: UpsertPublicationCommand) =
     port.upsertPublication(command).also { cacheInvalidation.evictClubContent(command.host.clubId) }
 ```
 
-- [ ] **Step 5: Evict after note/member/profile mutations**
+- [x] **Step 5: Evict after note/member/profile mutations**
 
 Modify `SessionMemberWriteService` constructor:
 
@@ -1881,7 +1915,7 @@ override fun saveLongReview(command: SaveLongReviewCommand) =
 
 Modify `MemberLifecycleService` and `MemberProfileService` constructors with `ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop()`. Evict after successful membership status/profile changes because public/notes author names and left-member labels can change.
 
-- [ ] **Step 6: Run invalidation tests**
+- [x] **Step 6: Run invalidation tests**
 
 Run:
 
@@ -1891,7 +1925,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit invalidation**
+- [x] **Step 7: Commit invalidation**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/shared/cache/ReadCacheInvalidationPort.kt server/src/main/kotlin/com/readmates/shared/cache/NoopReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/shared/cache/RedisReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt server/src/main/kotlin/com/readmates/session/application/service/SessionMemberWriteService.kt server/src/main/kotlin/com/readmates/auth/application/MemberLifecycleService.kt server/src/main/kotlin/com/readmates/auth/application/service/MemberProfileService.kt server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt server/src/test/kotlin/com/readmates/session/application/service/SessionMemberWriteServiceTest.kt
@@ -1904,7 +1938,7 @@ git commit -m "feat: evict redis read caches after mutations"
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Add missing Redis adapter tests from Tasks 5 and 6 if they were not added there.
 
-- [ ] **Step 1: Update architecture test to allow redis adapters but keep application clean**
+- [x] **Step 1: Update architecture test to allow redis adapters but keep application clean**
 
 Modify the architecture test so application packages still do not depend on adapters:
 
@@ -1924,7 +1958,7 @@ noClasses()
 
 This makes Redis adapters follow the same direction as persistence adapters.
 
-- [ ] **Step 2: Run architecture test**
+- [x] **Step 2: Run architecture test**
 
 Run:
 
@@ -1934,7 +1968,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Run Redis adapter tests**
+- [x] **Step 3: Run Redis adapter tests**
 
 Run:
 
@@ -1944,10 +1978,10 @@ Run:
 
 Expected: PASS. If Gradle does not match wildcard class names in this shell, run each Redis adapter test class explicitly.
 
-- [ ] **Step 4: Commit test guard updates**
+- [x] **Step 4: Commit test guard updates**
 
 ```bash
-git add server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt server/src/test/kotlin/com/readmates/**/adapter/out/redis
+git add -A docs/superpowers/plans/2026-04-28-readmates-redis-adoption-implementation-plan.md server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt server/src/main/kotlin/com/readmates/shared/cache/NoopReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/shared/cache/RedisReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/shared/adapter/out/redis server/src/test/kotlin/com/readmates/shared/adapter/out/redis server/src/test/kotlin/com/readmates/**/adapter/out/redis
 git commit -m "test: cover redis adapters and boundaries"
 ```
 
@@ -1958,7 +1992,7 @@ git commit -m "test: cover redis adapters and boundaries"
 - Modify: `docs/development/test-guide.md`
 - Modify: `docs/deploy/README.md`
 
-- [ ] **Step 1: Document local Redis usage**
+- [x] **Step 1: Document local Redis usage**
 
 In `docs/development/local-setup.md`, add a concise section:
 
@@ -1985,7 +2019,7 @@ READMATES_NOTES_CACHE_ENABLED=true \
 ```
 ```
 
-- [ ] **Step 2: Document verification commands**
+- [x] **Step 2: Document verification commands**
 
 In `docs/development/test-guide.md`, add:
 
@@ -2002,7 +2036,7 @@ pnpm --dir front test:e2e
 Targeted Redis tests use Testcontainers and do not require a manually running Redis server.
 ```
 
-- [ ] **Step 3: Document deployment flags**
+- [x] **Step 3: Document deployment flags**
 
 In `docs/deploy/README.md`, add public-safe flag names only:
 
@@ -2020,7 +2054,7 @@ Redis is optional. Enable in this order after configuring a managed Redis URL in
 Disable the affected feature flag to roll back a Redis-backed behavior without changing MySQL data.
 ```
 
-- [ ] **Step 4: Run docs checks**
+- [x] **Step 4: Run docs checks**
 
 Run:
 
@@ -2030,7 +2064,7 @@ git diff --check -- docs/development/local-setup.md docs/development/test-guide.
 
 Expected: no output.
 
-- [ ] **Step 5: Run full server tests**
+- [x] **Step 5: Run full server tests**
 
 Run:
 
@@ -2040,7 +2074,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Run E2E smoke**
+- [x] **Step 6: Run E2E smoke**
 
 Run:
 
@@ -2050,7 +2084,9 @@ pnpm --dir front test:e2e
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit docs and final verification**
+Status note: the exact default command was attempted and is blocked by stale local Flyway checksums in the default `readmates_e2e` database. The full E2E suite passed with `READMATES_E2E_DB_NAME=readmates_e2e_codex_20260425133321 pnpm --dir front test:e2e` against a granted schema whose Flyway history matches the current migrations.
+
+- [x] **Step 7: Commit docs and final verification**
 
 ```bash
 git add docs/development/local-setup.md docs/development/test-guide.md docs/deploy/README.md
@@ -2059,16 +2095,16 @@ git commit -m "docs: document redis feature rollout"
 
 ## Final Review Checklist
 
-- [ ] Redis disabled by default.
-- [ ] Server starts and tests pass without Redis running.
-- [ ] No raw session token, invitation token, BFF secret, OAuth code, private feedback body, email, or display name is stored in Redis keys or metric labels.
-- [ ] Rate limit returns `429` and does not leak internal key material.
-- [ ] Auth session cache stores only session metadata and keeps MySQL as source of truth.
-- [ ] `last_seen_at` is still updated, but throttled.
-- [ ] Logout and revoke-all evict Redis cache best-effort after MySQL revoke.
-- [ ] Public cache only contains public API read models.
-- [ ] Notes cache only contains member-visible published notes feed models.
-- [ ] Broad cache eviction runs after host/session/note/member/profile mutations.
-- [ ] Architecture boundary test blocks application code from depending on Redis adapters.
-- [ ] `./server/gradlew -p server clean test` passes.
-- [ ] `pnpm --dir front test:e2e` passes.
+- [x] Redis disabled by default.
+- [x] Server starts and tests pass without Redis running.
+- [x] No raw session token, invitation token, BFF secret, OAuth code, private feedback body, email, or display name is stored in Redis keys or metric labels.
+- [x] Rate limit returns `429` and does not leak internal key material.
+- [x] Auth session cache stores only session metadata and keeps MySQL as source of truth.
+- [x] `last_seen_at` is still updated, but throttled.
+- [x] Logout and revoke-all evict Redis cache best-effort after MySQL revoke.
+- [x] Public cache only contains public API read models.
+- [x] Notes cache only contains member-visible published notes feed models.
+- [x] Broad cache eviction runs after host/session/note/member/profile mutations.
+- [x] Architecture boundary test blocks application code from depending on Redis adapters.
+- [x] `./server/gradlew -p server clean test` passes.
+- [x] E2E smoke passes with a granted current-schema E2E database override; the default local `readmates_e2e` schema still has stale Flyway history.
