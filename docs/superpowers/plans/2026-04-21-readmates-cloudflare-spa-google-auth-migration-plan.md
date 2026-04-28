@@ -101,7 +101,7 @@ enum class MembershipStatus {
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.support.MySqlFlywayMigrationTest
 ```
 
@@ -167,7 +167,7 @@ Use existing test helpers in the file for session cookie issuance. If the file h
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.AuthMeControllerTest
 ```
 
@@ -263,7 +263,7 @@ import com.readmates.auth.domain.MembershipStatus
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.AuthMeControllerTest
 ```
 
@@ -383,7 +383,7 @@ class GoogleLoginServiceTest(
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.application.GoogleLoginServiceTest
 ```
 
@@ -484,7 +484,7 @@ class GoogleLoginService(
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.application.GoogleLoginServiceTest
 ```
 
@@ -588,7 +588,7 @@ class GoogleOAuthLoginSessionTest(
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.OAuthAuthorizationControllerTest --tests com.readmates.auth.api.GoogleOAuthLoginSessionTest
 ```
 
@@ -680,7 +680,7 @@ class GoogleOidcUserService : OidcUserService() {
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.OAuthAuthorizationControllerTest --tests com.readmates.auth.api.GoogleOAuthLoginSessionTest
 ```
 
@@ -753,7 +753,7 @@ Use the file's private helpers to insert users and memberships into the seeded `
 - [x] **Step 2: Run tests and verify failure**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.HostMemberApprovalControllerTest
 ```
 
@@ -819,7 +819,7 @@ class HostMemberApprovalController(
 - [x] **Step 5: Run tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.HostMemberApprovalControllerTest
 ```
 
@@ -884,7 +884,7 @@ fun `pending approval cannot access host api`() {
 - [x] **Step 2: Run and verify failure**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.PendingApprovalSecurityTest
 ```
 
@@ -935,7 +935,7 @@ if (currentMember.isPendingApproval) {
 - [x] **Step 6: Run tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.PendingApprovalSecurityTest
 ```
 
@@ -980,7 +980,7 @@ fun `pending approval user can read pending app summary`() {
 - [x] **Step 2: Run and verify failure**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.PendingApprovalControllerTest
 ```
 
@@ -1032,7 +1032,7 @@ class PendingApprovalController(
 - [x] **Step 5: Run tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.PendingApprovalControllerTest
 ```
 
@@ -1078,7 +1078,7 @@ it("shows only the Google login action", () => {
 - [x] **Step 2: Run frontend test and verify failure**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm test -- login-card.test.tsx
 ```
 
@@ -1118,10 +1118,10 @@ Apply to password login, password reset issue/reset, and password invitation acc
 - [x] **Step 5: Run tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm test -- login-card.test.tsx
 
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests com.readmates.auth.api.PasswordAuthControllerTest --tests com.readmates.auth.api.PasswordResetControllerTest
 ```
 
@@ -1253,7 +1253,7 @@ Use `/login/oauth2/code/${registrationId}` for the callback function.
 - [x] **Step 4: Run tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm test -- cloudflare-bff.test.ts cloudflare-oauth-proxy.test.ts
 ```
 
@@ -1384,7 +1384,7 @@ export const router = createBrowserRouter([
 - [x] **Step 5: Run build and tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm install
 pnpm build
 pnpm test spa-router.test.tsx
@@ -1526,7 +1526,7 @@ export function RequireHost({ children }: { children: React.ReactNode }) {
 - [x] **Step 4: Run tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm test -- auth-context.test.tsx
 ```
 
@@ -1562,7 +1562,7 @@ git commit -m "feat: add spa auth guards"
 Search:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 rg -n "next/link|next/navigation|next/headers|next/server|server-only" .
 ```
 
@@ -1647,7 +1647,7 @@ Active member routes use `RequireActiveMember`; host routes use `RequireHost`.
 - [x] **Step 4: Run frontend tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm test
 ```
 
@@ -1718,7 +1718,7 @@ Remove `playwright` from `dependencies` in `front/package.json`. Keep `@playwrig
 - [x] **Step 5: Run tests**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm test -- feedback-document-page.test.tsx
 pnpm build
 ```
@@ -1748,7 +1748,7 @@ git commit -m "feat: use browser print for feedback pdf"
 - [x] **Step 1: Verify no Next imports remain**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 rg -n "next/|NextRequest|NextResponse|server-only" .
 ```
 
@@ -1768,7 +1768,7 @@ Result: deleted `front/app/**`, `front/next.config.ts`, and `front/next-env.d.ts
 - [x] **Step 3: Remove packages**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm remove next server-only playwright
 pnpm install
 ```
@@ -1778,7 +1778,7 @@ Result: ran `pnpm remove next server-only eslint-config-next` because runtime `p
 - [x] **Step 4: Run frontend verification**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm lint
 pnpm test
 pnpm build
@@ -1926,10 +1926,10 @@ Adjustment: Permitted Spring Boot's `/error` dispatch in `SecurityConfig` so aut
 - [x] **Step 3: Run full verification**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test
 
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm lint
 pnpm test
 pnpm build
@@ -1945,7 +1945,7 @@ Result: PASS on 2026-04-21. `./gradlew test` passed; `pnpm lint` passed with 6 e
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm dev
 ```
 

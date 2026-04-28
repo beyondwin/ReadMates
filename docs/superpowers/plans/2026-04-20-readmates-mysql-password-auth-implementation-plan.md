@@ -1746,16 +1746,16 @@ Replace Google OAuth-centered values with:
 SPRING_PROFILES_ACTIVE=prod
 SPRING_DATASOURCE_URL=jdbc:mysql://mysql-private-host:3306/readmates?useSSL=true&serverTimezone=UTC
 SPRING_DATASOURCE_USERNAME=readmates
-SPRING_DATASOURCE_PASSWORD=replace-with-db-password
+SPRING_DATASOURCE_PASSWORD=<db-password>
 READMATES_APP_BASE_URL=https://replace-with-vercel-url
 READMATES_ALLOWED_ORIGINS=https://replace-with-vercel-url
-READMATES_BFF_SECRET=replace-with-shared-secret
+READMATES_BFF_SECRET=<shared-bff-secret>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 
 NEXT_PUBLIC_ENABLE_DEV_LOGIN=false
 NEXT_PUBLIC_APP_URL=https://replace-with-vercel-url
 READMATES_API_BASE_URL=https://api.example.com
-READMATES_BFF_SECRET=replace-with-shared-secret
+READMATES_BFF_SECRET=<shared-bff-secret>
 ```
 
 - [x] **Step 5: Update README run/test/deploy sections**
@@ -1766,7 +1766,7 @@ Keep local dev instructions for MySQL:
 SPRING_PROFILES_ACTIVE=dev \
 SPRING_DATASOURCE_URL='jdbc:mysql://localhost:3306/readmates?serverTimezone=UTC' \
 READMATES_APP_BASE_URL=http://localhost:3000 \
-READMATES_BFF_SECRET=local-dev-secret \
+READMATES_BFF_SECRET=<shared-bff-secret> \
 ./server/gradlew -p server bootRun
 ```
 
@@ -1774,7 +1774,7 @@ Frontend:
 
 ```bash
 READMATES_API_BASE_URL=http://localhost:8080 \
-READMATES_BFF_SECRET=local-dev-secret \
+READMATES_BFF_SECRET=<shared-bff-secret> \
 NEXT_PUBLIC_ENABLE_DEV_LOGIN=true \
 pnpm --dir front dev
 ```

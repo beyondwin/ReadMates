@@ -274,7 +274,7 @@ Expected: fails to compile or fails with missing endpoints/classes.
 - Modify: `server/src/main/resources/db/dev/R__readmates_dev_seed.sql`
 
 - [x] Add the SQL table exactly as listed in "Database Table".
-- [x] Insert the full approved Markdown content from every file under `/Users/kws/source/persnal/ReadMates/recode/feedback` into `R__readmates_dev_seed.sql` so runtime does not depend on ignored files.
+- [x] Insert the full approved Markdown content from every file under `<local-workspace>/ReadMates/recode/feedback` into `R__readmates_dev_seed.sql` so runtime does not depend on ignored files.
 - [x] Seed all six feedback files with deterministic id suffixes `701` through `706`, matching session numbers `1` through `6`, version `1`, content type `text/markdown`, and original source basenames as `file_name` values:
   - `251126 1차.md`
   - `251227 2차.md`

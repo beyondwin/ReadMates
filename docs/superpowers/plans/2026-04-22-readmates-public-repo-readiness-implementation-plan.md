@@ -134,7 +134,7 @@ Checklist:
 - [x] Use backend direct API placeholders such as `https://api.example.com` for Spring/API origins.
 - [x] Remove the hardcoded `MYSQL_PRIVATE_IP:=10.0.2.217` default from `deploy/oci/02-configure.sh`; require `MYSQL_PRIVATE_IP` or a full `SPRING_DATASOURCE_URL` instead.
 - [x] Keep all credential values as placeholders, not fake-looking long random values.
-- [x] Remove or generalize local absolute paths such as `/Users/kws/source/persnal/ReadMates` from public docs.
+- [x] Remove or generalize local absolute paths such as `<local-workspace>/ReadMates` from public docs.
 - [x] Ensure deploy docs say production secrets live outside Git.
 - [x] Ensure docs do not imply GitHub Actions production deployment secrets are configured.
 - [x] Ensure `docs/deploy/security-public-repo.md` matches the actual clean-public-release strategy.
@@ -164,7 +164,7 @@ D  "design/\354\235\275\353\212\224\354\202\254\354\235\264 \353\252\250\353\260
 ```
 
 - `git ls-files .env.local front/.env.local .env front/.env deploy/oci/.deploy-state` returned no files.
-- `rg -n '/Users/kws|10\.0\.2\.217|readmates\.kr|GitHub Actions.*secret|github actions.*secret' README.md .env.example docs/deploy deploy/oci/02-configure.sh deploy/oci/03-deploy.sh || true` returned no matches during remediation.
+- `rg -n 'local absolute path|private IP literal|private ReadMates domain|GitHub Actions.*secret|github actions.*secret' README.md .env.example docs/deploy deploy/oci/02-configure.sh deploy/oci/03-deploy.sh || true` returned no matches during remediation.
 - `rg -n 'readmates\.pages\.dev' README.md .env.example docs/deploy deploy/oci/02-configure.sh deploy/oci/03-deploy.sh || true` returned only approved frontend/demo URL references during remediation.
 - `bash -n deploy/oci/02-configure.sh` returned no output and exit code 0.
 - `bash -n deploy/oci/03-deploy.sh` returned no output and exit code 0.
@@ -258,7 +258,7 @@ Verification notes, 2026-04-22:
 
 ```text
 Public release candidate built:
-  /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 
 Next verification commands:
   find .tmp/public-release-candidate -name '.env*' -print
@@ -323,7 +323,7 @@ status=0
 
 ```text
 Public release candidate built:
-  /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 
 Next verification commands:
   find .tmp/public-release-candidate -type l -print
@@ -529,8 +529,8 @@ Checklist:
   - OpenAI/API key style tokens
   - real-looking DB/BFF/OAuth secret assignments
   - Gmail addresses
-  - `readmates.kr`
-  - `/Users/kws/`
+  - private ReadMates domain strings
+  - local absolute home paths
 - [x] Prefer `gitleaks dir <path>` when `gitleaks` is installed.
 - [x] Keep a legacy `gitleaks detect --source <path>` compatibility fallback for older installed binaries that do not support `dir`.
 - [x] Provide a clear fallback if `gitleaks` is not installed.
@@ -564,7 +564,7 @@ build_status=0
 ```text
 ReadMates public-release check
   mode: candidate
-  source: /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  source: <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 gitleaks is not installed; running fallback path/content checks only.
 Fallback scanning is not a professional or complete secret scan. It blocks obvious mistakes before local iteration, but install gitleaks before publishing.
 Public-release check passed.
@@ -623,9 +623,9 @@ Review finding remediation notes, 2026-04-22:
 - Verified the fallback branch with `rg` hidden from `PATH`: an unreadable file now fails with `grep exit 2` scan errors. Also passed grep/git-grep patterns through `--`/`-e` so the private-key regex beginning with `-----BEGIN` is treated as a pattern, not an option.
 - Final Task 4 finding remediation widened DB/BFF/OAuth assignment scanning to catch punctuation-containing plausible secrets such as a strong Spring datasource password, while keeping documented placeholder and test/local values allowed. It also adds `.gitleaks.toml` to the public candidate manifest and adds `scripts/verify-public-release-fixtures.sh` for repeatable secret/placeholder fixture checks.
 - Latest Task 4 remediation widened the fallback and `.gitleaks.toml` real-secret assignment value regexes to allow literal `$` inside matched values instead of excluding dollar signs globally. `${...}` environment indirections remain allowed by the narrow assignment-value allowlist.
-- The fallback content scanner now emits matched substrings with `git grep -o`, `rg -o`, or `grep -o`, then allowlists only the matched assignment value. A real value such as `SPRING_DATASOURCE_PASSWORD=SuperSecretPassword123 # <db-password>` fails because the placeholder appears in comment text outside the matched value.
+- The fallback content scanner now emits matched substrings with `git grep -o`, `rg -o`, or `grep -o`, then allowlists only the matched assignment value. A real datasource password assignment followed by a placeholder comment fails because the placeholder appears in comment text outside the matched value.
 - `scripts/verify-public-release-fixtures.sh` now resolves and verifies repository-local `.tmp` like the builder before removing `.tmp/public-release-fixtures`; it refuses a symlinked `.tmp` parent and skips cleanup through symlinked temp paths.
-- Updated fixture coverage so `SPRING_DATASOURCE_PASSWORD=Abc$123Def456Gh!` fails, `SPRING_DATASOURCE_PASSWORD=SuperSecretPassword123 # <db-password>` fails, and both `<db-password>` and `${SPRING_DATASOURCE_PASSWORD}` pass.
+- Updated fixture coverage so real datasource password assignments fail, comment-only placeholder hints fail, and both `<db-password>` and environment-variable indirection pass.
 - Latest verification returned expected statuses: `bash_n_status=0`, `tomllib_parse_status=0`, dollar secret fixture status `1`, comment-placeholder secret fixture status `1`, placeholder fixture status `0`, env indirection fixture status `0`, isolated symlinked `.tmp` fixture status `1` with outside sentinel preserved, `build_status=0`, `candidate_check_status=0`, `fixture_script_status=0`, and `diff_check_status=0`.
 
 ---
@@ -646,7 +646,7 @@ Checklist:
 - [x] Replace personal-looking sample identifiers with generic deterministic sample identifiers.
 - [x] Keep reserved emails such as `host@example.com`, `member1@example.com`, and `new.member@example.com`.
 - [x] Replace `wooseung` and similar personal-looking subject fragments when they appear in files included in the public candidate.
-- [x] Remove `seoyun@readmates.kr` by excluding `design/`; if it appears elsewhere in the candidate, replace it.
+- [x] Replace private-domain member email examples by excluding `design/`; if they appear elsewhere in the candidate, use reserved placeholders.
 - [x] Keep Korean sample display names only when they are clearly generic sample names.
 - [x] Re-run the release check script after each scrub batch.
 
@@ -654,12 +654,12 @@ Expected result: the candidate contains public-safe sample data only.
 
 Verification notes, 2026-04-22:
 
-- Built the public candidate with `./scripts/build-public-release-candidate.sh`; exit code 0. The script printed the candidate path as `/Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate` and the next verification commands.
+- Built the public candidate with `./scripts/build-public-release-candidate.sh`; exit code 0. The script printed the candidate path as `<local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate` and the next verification commands.
 - Ran `./scripts/public-release-check.sh .tmp/public-release-candidate`; exit code 0. Output included `gitleaks is not installed; running fallback path/content checks only.` and `Public-release check passed.`
 - Ran the required targeted scan:
 
 ```bash
-rg -n 'wooseung|seoyun|readmates\.kr|gmail\.com|/Users/kws' .tmp/public-release-candidate || true
+rg -n 'wooseung|seoyun|readmates[.]example[.]com|gmail[.]com|local absolute path' .tmp/public-release-candidate || true
 ```
 
 It returned five exported-file findings:
@@ -672,7 +672,7 @@ It returned five exported-file findings:
 .tmp/public-release-candidate/server/src/test/kotlin/com/readmates/auth/application/GoogleLoginServiceTest.kt:50:        assertEquals("google-existing-wooseung", subject)
 ```
 
-- Inspected the findings in public-candidate source files only. `seoyun@readmates.kr` was absent from the candidate. The only `seoyun` occurrence was the exported frontend test filename assertion.
+- Inspected the findings in public-candidate source files only. The private-domain member email was absent from the candidate. The only `seoyun` occurrence was the exported frontend test filename assertion.
 - Scrub batch 1 made the smallest replacements:
   - `front/tests/unit/host-session-editor.test.tsx`: `이서윤` -> `이멤버14`, `feedback-14-seoyun.html` -> `feedback-14-sample-member.html`.
   - `server/src/test/kotlin/com/readmates/auth/application/GoogleLoginServiceTest.kt`: `google-existing-wooseung` -> `google-existing-host`, `https://example.com/wooseung.png` -> `https://example.com/sample-host.png`.
@@ -692,7 +692,7 @@ It returned no output.
 rg -n '/Users/|source/persnal|persnal|ReadMates-public-readiness|\.tmp/public-release-candidate' .tmp/public-release-candidate || true
 ```
 
-The only output was intentional documentation/script text for `.tmp/public-release-candidate` and the checker's split local-path pattern string; no concrete `/Users/kws` local path was present in the candidate.
+The only output was intentional documentation/script text for `.tmp/public-release-candidate` and the checker's split local-path pattern string; no concrete local account path was present in the candidate.
 - Confirmed reserved `example.com` sample emails remained unchanged.
 
 ---
@@ -723,8 +723,8 @@ Verification notes, 2026-04-22:
 - Kept the user-approved portfolio demo URL `https://readmates.pages.dev`.
 - Omitted screenshots from the README and stated that no screenshots are included.
 - Reworked `docs/deploy/README.md` into a public-safe deployment runbook with placeholders for direct API origin and secrets, and without account-specific read-only Cloudflare/OCI inventory commands.
-- Confirmed the accidental patch target issue was reverted in `/Users/kws/source/persnal/ReadMates`: `git status --short -- README.md docs/deploy/README.md` returned no output there.
-- `rg -n 'docs/superpowers|/Users/kws|readmates\.kr|gmail\.com|10\.0\.2\.217' README.md docs/deploy/README.md || true` returned no output.
+- Confirmed the accidental patch target issue was reverted in `<local-workspace>/ReadMates`: `git status --short -- README.md docs/deploy/README.md` returned no output there.
+- `rg -n 'docs/superpowers|local absolute path|readmates[.]example[.]com|gmail[.]com|private IP literal' README.md docs/deploy/README.md || true` returned no output.
 - `rg -n 'X-Readmates-Bff-Secret|HttpOnly|SameSite=Lax|Secure|invite|host|member|readmates\.pages\.dev' README.md docs/deploy/README.md` returned:
 
 ```text
@@ -785,7 +785,7 @@ README.md:243:Do not commit real OCI OCIDs, API keys, SSH keys, database dumps, 
 
 ```text
 Public release candidate built:
-  /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 
 Next verification commands:
   find .tmp/public-release-candidate -type l -print
@@ -799,7 +799,7 @@ Next verification commands:
 ```text
 ReadMates public-release check
   mode: candidate
-  source: /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  source: <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 gitleaks is not installed; running fallback path/content checks only.
 Fallback scanning is not a professional or complete secret scan. It blocks obvious mistakes before local iteration, but install gitleaks before publishing.
 Public-release check passed.
@@ -870,7 +870,7 @@ Verification notes, 2026-04-22:
 
 ```text
 Public release candidate built:
-  /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 
 Next verification commands:
   find .tmp/public-release-candidate -type l -print
@@ -884,7 +884,7 @@ Next verification commands:
 ```text
 ReadMates public-release check
   mode: candidate
-  source: /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  source: <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 gitleaks is not installed; running fallback path/content checks only.
 Fallback scanning is not a professional or complete secret scan. It blocks obvious mistakes before local iteration, but install gitleaks before publishing.
 Public-release check passed.
@@ -901,7 +901,7 @@ No known vulnerabilities found
 - First `pnpm --dir front lint` attempt exited 1 because local frontend dependencies were missing:
 
 ```text
-> readmates-front@ lint /Users/kws/source/persnal/ReadMates-public-readiness/front
+> readmates-front@ lint <local-workspace>/ReadMates-public-readiness/front
 > eslint .
 
 sh: eslint: command not found
@@ -913,7 +913,7 @@ sh: eslint: command not found
 - Re-ran `pnpm --dir front lint`; it exited 0 after printing the npm script header:
 
 ```text
-> readmates-front@ lint /Users/kws/source/persnal/ReadMates-public-readiness/front
+> readmates-front@ lint <local-workspace>/ReadMates-public-readiness/front
 > eslint .
 ```
 
@@ -978,7 +978,7 @@ source_rg_status=0
 
 ```text
 Public release candidate built:
-  /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 
 Next verification commands:
   find .tmp/public-release-candidate -type l -print
@@ -999,7 +999,7 @@ rg_status=0
 ```text
 ReadMates public-release check
   mode: candidate
-  source: /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  source: <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 gitleaks is not installed; running fallback path/content checks only.
 Fallback scanning is not a professional or complete secret scan. It blocks obvious mistakes before local iteration, but install gitleaks before publishing.
 Public-release check passed.
@@ -1031,7 +1031,7 @@ status_status=0
 
 Final required verification suite, 2026-04-22:
 
-- Ran the requested final verification commands from `/Users/kws/source/persnal/ReadMates-public-readiness` only. No publish, push, commit, remote, visibility, secret-rotation, candidate Git init, or other worktree operation was performed.
+- Ran the requested final verification commands from `<local-workspace>/ReadMates-public-readiness` only. No publish, push, commit, remote, visibility, secret-rotation, candidate Git init, or other worktree operation was performed.
 - `git status --short --branch` exited 0 and printed the same readiness source changes listed above.
 - `git ls-files design` exited 0 with no stdout.
 - `git ls-files | rg '(^|/)(\.env|\.vercel|\.wrangler|\.cloudflare|.*\.pem|.*\.key|.*\.sql\.gz|.*\.dump|deploy/oci/\.deploy-state)$' || true` exited 0 with no stdout.
@@ -1040,7 +1040,7 @@ Final required verification suite, 2026-04-22:
 - `pnpm --dir front audit --prod`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, and `./server/gradlew -p server test` all exited 0.
 - `./scripts/verify-public-release-fixtures.sh` exited 0 and printed `Public-release fixture checks passed.`
 - `test ! -e .tmp/public-release-candidate/.git` exited 0 with no stdout.
-- `rg -n 'docs/superpowers|wooseung|seoyun|readmates\.kr|gmail\.com|/Users/kws' .tmp/public-release-candidate || true` exited 0 with no stdout.
+- `rg -n 'docs/superpowers|wooseung|seoyun|readmates[.]example[.]com|gmail[.]com|local absolute path' .tmp/public-release-candidate || true` exited 0 with no stdout.
 - `git diff --check` exited 0 with no stdout.
 
 Post-publish verification, 2026-04-22:
@@ -1089,7 +1089,7 @@ Publish execution status, 2026-04-22:
 - GitHub secret scanning and secret scanning push protection are enabled for the public repository.
 - Dependabot security updates are enabled for the public repository.
 - Basic `main` branch protection is enabled with force pushes and branch deletion disabled.
-- The parent private source worktrees at `/Users/kws/source/persnal/ReadMates-public-readiness` and `/Users/kws/source/persnal/ReadMates` now use `https://github.com/beyondwin/ReadMates-legacy.git` as fetch origin and keep push URL disabled as `DISABLED_BY_CODEX_NO_PUSH_APPROVAL`.
+- The parent private source worktrees at `<local-workspace>/ReadMates-public-readiness` and `<local-workspace>/ReadMates` now use `https://github.com/beyondwin/ReadMates-legacy.git` as fetch origin and keep push URL disabled as `DISABLED_BY_CODEX_NO_PUSH_APPROVAL`.
 - No production deployment secrets were connected to the public repository.
 - No production secret rotation was performed.
 
@@ -1132,8 +1132,8 @@ Approval-gate verification, 2026-04-22:
 ```text
 ReadMates public-release check
   mode: candidate
-  source: /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
-	Running gitleaks dir /Users/kws/source/persnal/ReadMates-public-readiness/.tmp/public-release-candidate
+  source: <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
+	Running gitleaks dir <local-workspace>/ReadMates-public-readiness/.tmp/public-release-candidate
 	1:11PM INF no leaks found
 	Public-release check passed.
 ```

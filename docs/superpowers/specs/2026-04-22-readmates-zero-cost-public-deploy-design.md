@@ -312,7 +312,7 @@ git ls-files | rg '(^|/)(\\.env|\\.vercel|\\.wrangler|.*\\.pem|deploy/oci/\\.dep
 git grep -n -E 'gmai[l][.]com' -- . || true
 git grep -n -E 'oci[d]1[.]' -- . || true
 git grep -n -E 'PRIVATE KEY----[-]' -- . || true
-git grep -n -E 'READMATES_BFF_SECRET=[A-Fa-f0-9]{32,}|SPRING_DATASOURCE_PASSWORD=[A-Za-z0-9_+/=]{8,}|MYSQL_ADMIN_PASS=[A-Za-z0-9_+/=]{8,}|APP_DB_PASS=[A-Za-z0-9_+/=]{8,}' -- . || true
+git grep -n -E '(READMATES_BFF_SECRET|SPRING_DATASOURCE_PASSWORD|MYSQL_ADMIN_PASS|APP_DB_PASS)[[:space:]]*=' -- . | grep -Ev '<(shared-bff-secret|db-password)>|[$][{]' || true
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build

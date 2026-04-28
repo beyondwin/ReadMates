@@ -43,9 +43,11 @@
 
 ## Phase 1: 현재 노출 상태 재확인
 
+> Status: Complete. Task 1 confirmed no Class A active credential; cleanup proceeds with Class B/C remediation.
+
 ### Task 1.1: 작업 시작 상태 기록
 
-- [ ] **Step 1: 현재 branch와 작업 tree 확인**
+- [x] **Step 1: 현재 branch와 작업 tree 확인**
 
 ```bash
 git status --short --branch
@@ -59,7 +61,7 @@ Expected:
 
 기존 변경이 있으면 이번 remediation commit에 섞지 않는다. 특히 `compose.yml`처럼 이 작업과 무관한 변경은 그대로 두고 stage하지 않는다.
 
-- [ ] **Step 2: 현재 공개 검사 실패 목록 확보**
+- [x] **Step 2: 현재 공개 검사 실패 목록 확보**
 
 ```bash
 ./scripts/public-release-check.sh
@@ -77,7 +79,7 @@ Public-release check failed:
 
 ### Task 1.2: `docs/superpowers/**` 전용 targeted scan
 
-- [ ] **Step 1: 로컬 경로 후보 검색**
+- [x] **Step 1: 로컬 경로 후보 검색**
 
 ```bash
 LOCAL_ACCOUNT='<macos-account-name>'
@@ -96,7 +98,7 @@ Expected after cleanup:
 <no output>
 ```
 
-- [ ] **Step 2: private domain 후보 검색**
+- [x] **Step 2: private domain 후보 검색**
 
 ```bash
 PRIVATE_DOMAIN='<private-domain>'
@@ -109,7 +111,7 @@ Expected after cleanup:
 <no output>
 ```
 
-- [ ] **Step 3: 개인 Gmail 주소 검색**
+- [x] **Step 3: 개인 Gmail 주소 검색**
 
 ```bash
 rg -n '[A-Za-z0-9._%+-]+@gmail[.]com' docs/superpowers
@@ -121,7 +123,7 @@ Expected after cleanup:
 <no output>
 ```
 
-- [ ] **Step 4: secret assignment 형태 검색**
+- [x] **Step 4: secret assignment 형태 검색**
 
 ```bash
 rg -n -i '(READMATES_BFF_SECRET|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET)[[:space:]]*[:=][[:space:]]*["'"'"']?[^[:space:]"'"'"'<>`]{16,}' docs/superpowers
@@ -135,7 +137,7 @@ Expected after cleanup:
 
 ### Task 1.3: active secret 여부 결정
 
-- [ ] **Step 1: scanner hit을 세 가지로 분류**
+- [x] **Step 1: scanner hit을 세 가지로 분류**
 
 ```text
 Class A: active 또는 active 가능 credential
@@ -149,7 +151,7 @@ Class C: 명백한 false positive
 - `Class B`: 실제 값은 아니지만 16자 이상 password처럼 보이는 예시, `replace-with-*` 스타일 값, private domain, 개인 이메일, 로컬 절대 경로.
 - `Class C`: 일반 파일명이나 설명 문장 일부가 token prefix처럼 보이는 경우.
 
-- [ ] **Step 2: Class A가 있으면 remediation 순서 변경**
+- [x] **Step 2: Class A가 있으면 remediation 순서 변경**
 
 Expected if Class A exists:
 
@@ -166,6 +168,8 @@ Continue to Phase 2.
 ## Phase 2: active secret 발견 시 incident response
 
 이 Phase는 Task 1.3에서 `Class A`가 있을 때만 실행한다.
+
+> Status: Skipped. Task 1 found no confirmed Class A active credential.
 
 ### Task 2.1: 공개 상태 완화
 
@@ -247,16 +251,18 @@ Remaining follow-up:
 
 ## Phase 3: `docs/superpowers/**` 본문 정리
 
+> Status: Complete. Task 2 sanitized local paths, private domains, Gmail scan targets, scanner-noisy secret examples, and token-shaped false positives.
+
 ### Task 3.1: 로컬 절대 경로 제거
 
-- [ ] **Step 1: 파일 목록 추출**
+- [x] **Step 1: 파일 목록 추출**
 
 ```bash
 LOCAL_ACCOUNT='<macos-account-name>'
 rg -l -F "/Users/${LOCAL_ACCOUNT}/" docs/superpowers
 ```
 
-- [ ] **Step 2: 치환 기준 적용**
+- [x] **Step 2: 치환 기준 적용**
 
 ```text
 <absolute-local-repository-path> -> <local-workspace>/ReadMates
@@ -265,7 +271,7 @@ rg -l -F "/Users/${LOCAL_ACCOUNT}/" docs/superpowers
 
 문서가 “경로 형식 자체”를 설명해야 할 때만 generic placeholder를 사용한다.
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 LOCAL_ACCOUNT='<macos-account-name>'
@@ -280,21 +286,21 @@ Expected:
 
 ### Task 3.2: private domain 제거
 
-- [ ] **Step 1: 파일 목록 추출**
+- [x] **Step 1: 파일 목록 추출**
 
 ```bash
 PRIVATE_DOMAIN='<private-domain>'
 rg -l -F "$PRIVATE_DOMAIN" docs/superpowers
 ```
 
-- [ ] **Step 2: 치환 기준 적용**
+- [x] **Step 2: 치환 기준 적용**
 
 ```text
 <private-domain> -> readmates.example.com
 https://<private-domain> -> https://readmates.example.com
 ```
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 PRIVATE_DOMAIN='<private-domain>'
@@ -309,13 +315,13 @@ Expected:
 
 ### Task 3.3: 개인 이메일 제거
 
-- [ ] **Step 1: Gmail 주소 검색**
+- [x] **Step 1: Gmail 주소 검색**
 
 ```bash
 rg -n '[A-Za-z0-9._%+-]+@gmail[.]com' docs/superpowers
 ```
 
-- [ ] **Step 2: 문맥별 치환**
+- [x] **Step 2: 문맥별 치환**
 
 ```text
 host email      -> host@example.com
@@ -323,7 +329,7 @@ member email    -> member@example.com
 maintainer mail -> maintainer@example.com
 ```
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 rg -n '[A-Za-z0-9._%+-]+@gmail[.]com' docs/superpowers
@@ -337,13 +343,13 @@ Expected:
 
 ### Task 3.4: secret-looking example 정리
 
-- [ ] **Step 1: scanner-noisy assignment 검색**
+- [x] **Step 1: scanner-noisy assignment 검색**
 
 ```bash
 rg -n -i '(READMATES_BFF_SECRET|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET)[[:space:]]*[:=][[:space:]]*["'"'"']?[^[:space:]"'"'"'<>`]{16,}' docs/superpowers
 ```
 
-- [ ] **Step 2: 안전한 placeholder로 치환**
+- [x] **Step 2: 안전한 placeholder로 치환**
 
 ```text
 SPRING_DATASOURCE_PASSWORD=<db-password>
@@ -355,7 +361,7 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-cl
 
 값이 test-only라면 기존 checker allowlist에 있는 테스트 값만 남긴다. 운영 secret처럼 보이는 긴 예시는 남기지 않는다.
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 rg -n -i '(READMATES_BFF_SECRET|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET)[[:space:]]*[:=][[:space:]]*["'"'"']?[^[:space:]"'"'"'<>`]{16,}' docs/superpowers
@@ -369,13 +375,13 @@ Expected:
 
 ### Task 3.5: token-shaped false positive 정리
 
-- [ ] **Step 1: provider token 형태 검색**
+- [x] **Step 1: provider token 형태 검색**
 
 ```bash
 rg -n '(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9][A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,})' docs/superpowers
 ```
 
-- [ ] **Step 2: false positive는 문장으로 풀어쓰기**
+- [x] **Step 2: false positive는 문장으로 풀어쓰기**
 
 파일명이나 문장 일부가 provider token prefix처럼 보이면 하이픈이 이어진 token-shaped substring을 제거한다.
 
@@ -387,7 +393,7 @@ server legacy risk cleanup implementation plan
 
 실제 provider token처럼 보이는 값이면 false positive로 처리하지 말고 Phase 2로 돌아간다.
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 rg -n '(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9][A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,})' docs/superpowers
@@ -401,7 +407,7 @@ Expected:
 
 ### Task 3.6: docs-only 검증과 commit
 
-- [ ] **Step 1: whitespace 검증**
+- [x] **Step 1: whitespace 검증**
 
 ```bash
 git diff --check -- docs/superpowers
@@ -413,7 +419,7 @@ Expected:
 <no output>
 ```
 
-- [ ] **Step 2: targeted safety 검증**
+- [x] **Step 2: targeted safety 검증**
 
 ```bash
 LOCAL_ACCOUNT='<macos-account-name>'
@@ -429,7 +435,7 @@ Expected for each command:
 <no output>
 ```
 
-- [ ] **Step 3: commit**
+- [x] **Step 3: commit**
 
 ```bash
 git add docs/superpowers

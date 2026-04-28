@@ -43,7 +43,7 @@ ReadMates 서버는 현재 Spring Boot 단일 애플리케이션이며 `auth`, `
 
 ### 4.1 kuke-board에서 채택할 점
 
-`/Users/kws/doc/lecture/강의자료/kuke-board`는 멀티 서비스 게시판 예제다. ReadMates에 그대로 가져올 구조는 아니지만 다음 장점은 채택한다.
+`<local-home>/doc/lecture/강의자료/kuke-board`는 멀티 서비스 게시판 예제다. ReadMates에 그대로 가져올 구조는 아니지만 다음 장점은 채택한다.
 
 - 컨트롤러가 얇고 서비스에 위임하는 흐름이 직관적이다.
 - article write 서비스와 article-read 서비스가 분리되어 있어 CQRS/read model 사고방식을 참고하기 좋다.
@@ -58,7 +58,7 @@ ReadMates 서버는 현재 Spring Boot 단일 애플리케이션이며 `auth`, `
 
 ### 4.3 commerce에서 채택할 점
 
-`/Users/kws/doc/lecture/v1.1/final-dev-practice-commerce_v1.1`는 Kotlin Spring Boot 멀티모듈 예제다. 다음 장점을 채택한다.
+`<local-home>/doc/lecture/v1.1/final-dev-practice-commerce_v1.1`는 Kotlin Spring Boot 멀티모듈 예제다. 다음 장점을 채택한다.
 
 - Presentation, Business, Logic, Data Access를 명시적으로 나누는 사고방식이 팀 규칙으로 쓰기 좋다.
 - `Service`는 유스케이스 흐름, `Reader/Finder/Manager/Validator/Handler`는 세부 책임이라는 네이밍이 직관적이다.
