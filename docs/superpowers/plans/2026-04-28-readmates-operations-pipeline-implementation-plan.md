@@ -193,7 +193,7 @@ git commit -m "feat: add notification outbox schema"
 - Create: `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationOutboxAdapterTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 
-- [ ] **Step 1: Write failing persistence tests**
+- [x] **Step 1: Write failing persistence tests**
 
 Create `JdbcNotificationOutboxAdapterTest.kt` with tests that prove:
 
@@ -244,7 +244,7 @@ fun `enqueue is idempotent for the same event and recipient`() {
 
 Use existing testcontainer setup style from `FeedbackDocumentControllerTest.kt`: `@SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])`.
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run:
 
@@ -254,7 +254,7 @@ Run:
 
 Expected: compile failure because notification classes do not exist.
 
-- [ ] **Step 3: Add domain enums**
+- [x] **Step 3: Add domain enums**
 
 `NotificationEventType.kt`:
 
@@ -282,7 +282,7 @@ enum class NotificationOutboxStatus {
 }
 ```
 
-- [ ] **Step 4: Add models and port**
+- [x] **Step 4: Add models and port**
 
 `NotificationModels.kt`:
 
@@ -346,7 +346,7 @@ interface NotificationOutboxPort {
 }
 ```
 
-- [ ] **Step 5: Implement JDBC adapter**
+- [x] **Step 5: Implement JDBC adapter**
 
 Create `JdbcNotificationOutboxAdapter.kt`. Use `insert ignore` with a deterministic `dedupe_key`:
 
@@ -399,11 +399,11 @@ where sessions.session_date = ?
   and memberships.status = 'ACTIVE'
 ```
 
-- [ ] **Step 6: Update architecture boundary**
+- [x] **Step 6: Update architecture boundary**
 
 Add `com.readmates.notification.adapter.in.web..` to web adapter packages and `com.readmates.notification.application..` to application packages in `ServerArchitectureBoundaryTest.kt`.
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationOutboxAdapterTest --tests com.readmates.architecture.ServerArchitectureBoundaryTest
@@ -411,7 +411,7 @@ Add `com.readmates.notification.adapter.in.web..` to web adapter packages and `c
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt
