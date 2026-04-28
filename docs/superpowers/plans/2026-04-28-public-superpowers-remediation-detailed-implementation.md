@@ -878,14 +878,16 @@ Existing forks, clones, GitHub caches, third-party mirrors, search indexes may s
 
 ### Task 9.1: CODEOWNERS 추가
 
-- [ ] **Step 1: `.github/CODEOWNERS` 생성**
+- [x] **Step 1: `.github/CODEOWNERS` 생성**
 
 ```text
-# CI/CD workflow changes require owner review.
+# CI/CD workflow changes are owned by @beyondwin; enforcement depends on branch protection.
 .github/workflows/** @beyondwin
 ```
 
-- [ ] **Step 2: commit**
+Status (2026-04-28): `.github/CODEOWNERS` is included in the public release candidate; CODEOWNERS review enforcement for workflow ownership becomes effective after this branch's `.github/CODEOWNERS` file is merged into `main`.
+
+- [x] **Step 2: commit**
 
 ```bash
 git add .github/CODEOWNERS
@@ -894,7 +896,7 @@ git commit -m "chore: require owner review for workflow changes"
 
 ### Task 9.2: branch protection 설정
 
-- [ ] **Step 1: GitHub settings에서 main 보호**
+- [x] **Step 1: GitHub settings에서 main 보호**
 
 ```text
 Settings -> Branches -> Branch protection rules -> main
@@ -908,12 +910,14 @@ Enable:
 Expected:
 
 ```text
-Workflow file changes require CODEOWNERS review before merge.
+Branch protection is configured now; CODEOWNERS review enforcement for workflow ownership becomes effective after this branch's .github/CODEOWNERS is merged into main.
 ```
+
+Status (2026-04-28): branch protection was applied and verified externally. `main` requires 1 approving review, code-owner review is enabled, strict required status checks include `Frontend` and `Backend`, and force pushes/deletions are disabled. CODEOWNERS review enforcement for workflow ownership becomes effective after this branch's `.github/CODEOWNERS` file is merged into `main`. Residual risk is future settings drift or admin changes, plus the until-merged caveat that `.github/CODEOWNERS` is not yet present on `main`.
 
 ### Task 9.3: GitHub security feature 확인
 
-- [ ] **Step 1: code security settings 확인**
+- [x] **Step 1: code security settings 확인**
 
 ```text
 Settings -> Code security and analysis
@@ -928,6 +932,8 @@ Expected:
 ```text
 Public repository security alerts are active.
 ```
+
+Status (2026-04-28): applied and verified externally. Secret scanning, push protection, Dependabot security updates, and Dependabot alerts are enabled; the vulnerability alerts endpoint returned HTTP 204. Residual risk is future settings drift or admin changes.
 
 ## Final Verification
 
