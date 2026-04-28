@@ -673,9 +673,11 @@ git commit -m "docs: document sanitized superpowers public release policy"
 
 ## Phase 7: clean candidate 재생성과 검증
 
+> Status: Complete with concerns. Clean candidate and filesystem release checks passed on 2026-04-28. Direct `gitleaks detect --source . --redact --verbose` found 7 redacted historical findings in commit `db4ce355c13192296c76bfce5237502f2c1c01ed` under `docs/superpowers/**`; current-tree and candidate filesystem scans found no leaks, so this is deferred to Phase 8 history handling.
+
 ### Task 7.1: candidate 생성
 
-- [ ] **Step 1: build 실행**
+- [x] **Step 1: build 실행**
 
 ```bash
 ./scripts/build-public-release-candidate.sh
@@ -688,7 +690,7 @@ Public release candidate built:
   <repo>/.tmp/public-release-candidate
 ```
 
-- [ ] **Step 2: `docs/superpowers` 포함 확인**
+- [x] **Step 2: `docs/superpowers` 포함 확인**
 
 ```bash
 test -d .tmp/public-release-candidate/docs/superpowers && echo "included"
@@ -702,7 +704,7 @@ included
 
 ### Task 7.2: public release checker 실행
 
-- [ ] **Step 1: candidate scan**
+- [x] **Step 1: candidate scan**
 
 ```bash
 ./scripts/public-release-check.sh .tmp/public-release-candidate
@@ -714,7 +716,7 @@ Expected:
 Public-release check passed.
 ```
 
-- [ ] **Step 2: current tree scan**
+- [x] **Step 2: current tree scan**
 
 ```bash
 ./scripts/public-release-check.sh
@@ -728,7 +730,7 @@ Public-release check passed.
 
 ### Task 7.3: gitleaks 직접 실행
 
-- [ ] **Step 1: current tree**
+- [x] **Step 1: current tree**
 
 ```bash
 gitleaks detect --source . --redact --verbose
@@ -740,7 +742,14 @@ Expected:
 no leaks found
 ```
 
-- [ ] **Step 2: candidate**
+Actual on 2026-04-28:
+
+```text
+Exit 1: 7 redacted historical findings in commit db4ce355c13192296c76bfce5237502f2c1c01ed.
+Current-tree filesystem scanner passed, so handle under Phase 8 history review.
+```
+
+- [x] **Step 2: candidate**
 
 ```bash
 gitleaks dir .tmp/public-release-candidate --redact --verbose
