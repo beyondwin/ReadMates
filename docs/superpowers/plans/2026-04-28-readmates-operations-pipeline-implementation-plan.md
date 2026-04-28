@@ -319,7 +319,6 @@ data class HostNotificationFailure(
     val eventType: NotificationEventType,
     val recipientEmail: String,
     val attemptCount: Int,
-    val lastError: String?,
     val updatedAt: OffsetDateTime,
 )
 ```
@@ -859,7 +858,6 @@ export type HostNotificationSummary = {
     eventType: "NEXT_BOOK_PUBLISHED" | "SESSION_REMINDER_DUE" | "FEEDBACK_DOCUMENT_PUBLISHED";
     recipientEmail: string;
     attemptCount: number;
-    lastError: string | null;
     updatedAt: string;
   }>;
 };
@@ -1027,6 +1025,8 @@ class ReadmatesOperationalMetrics(private val meterRegistry: MeterRegistry) {
     }
 }
 ```
+
+Final implementation also registers `readmates.notifications.outbox.backlog` gauges with a low-cardinality `status` tag for `pending`, `failed`, `dead`, and `sending`.
 
 - [x] **Step 4: Wire metrics**
 
@@ -1354,7 +1354,7 @@ READMATES_NOTIFICATION_WORKER_ENABLED=true
 
 ```bash
 sudo journalctl -u readmates-server -n 120 --no-pager
-curl -sS http://127.0.0.1:8080/actuator/prometheus | grep readmates_notifications
+curl -sS http://127.0.0.1:8081/actuator/prometheus | grep readmates_notifications
 ```
 
 8. Enable Object Storage backup script from a manual command before adding a timer.

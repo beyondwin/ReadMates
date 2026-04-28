@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.scheduling.annotation.EnableScheduling
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -18,6 +19,7 @@ class NotificationOutboxScheduler(
     private val recordNotificationEventUseCase: RecordNotificationEventUseCase,
     @param:Value("\${readmates.notifications.worker.batch-size}") private val batchSize: Int,
     @param:Value("\${readmates.notifications.reminder-zone:Asia/Seoul}") private val reminderZone: String,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @Scheduled(fixedDelayString = "\${readmates.notifications.worker.fixed-delay-ms}")
     fun process() {
@@ -29,7 +31,7 @@ class NotificationOutboxScheduler(
         zone = "\${readmates.notifications.reminder-zone:Asia/Seoul}",
     )
     fun enqueueTomorrowReminders() {
-        val targetDate = LocalDate.now(ZoneId.of(reminderZone)).plusDays(1)
+        val targetDate = LocalDate.now(clock.withZone(ZoneId.of(reminderZone))).plusDays(1)
         recordNotificationEventUseCase.recordSessionReminderDue(targetDate)
     }
 }

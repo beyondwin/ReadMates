@@ -3,6 +3,7 @@ package com.readmates.notification.api
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.support.MySqlTestContainer
+import org.assertj.core.api.Assertions.assertThat
 import jakarta.mail.Session
 import jakarta.mail.internet.MimeMessage
 import org.junit.jupiter.api.Test
@@ -84,7 +85,7 @@ class HostNotificationControllerTest(
             """.trimIndent(),
         )
 
-        mockMvc.get("/api/host/notifications/summary") {
+        val response = mockMvc.get("/api/host/notifications/summary") {
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
@@ -95,7 +96,10 @@ class HostNotificationControllerTest(
             jsonPath("$.latestFailures[0].eventType") { value("FEEDBACK_DOCUMENT_PUBLISHED") }
             jsonPath("$.latestFailures[0].attemptCount") { value(2) }
             jsonPath("$.latestFailures[0].recipientEmail") { value("member@example.com") }
-        }
+        }.andReturn().response.contentAsString
+
+        assertThat(response).doesNotContain("lastError")
+        assertThat(response).doesNotContain("SMTP temporary failure")
     }
 
     @Test

@@ -26,11 +26,17 @@ data class HostNotificationSummary(
     val latestFailures: List<HostNotificationFailure>,
 )
 
+data class NotificationOutboxBacklog(
+    val pending: Int,
+    val failed: Int,
+    val dead: Int,
+    val sending: Int,
+)
+
 data class HostNotificationFailure(
     val id: UUID,
     val eventType: NotificationEventType,
     val recipientEmail: String,
     val attemptCount: Int,
-    val lastError: String?,
     val updatedAt: OffsetDateTime,
 )

@@ -1,6 +1,7 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.HostNotificationFailure
+import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.port.out.NotificationOutboxPort
@@ -325,6 +326,27 @@ class JdbcNotificationOutboxAdapter(
             latestFailures = latestFailures(clubId),
         )
 
+    override fun outboxBacklog(): NotificationOutboxBacklog {
+        val counts = jdbcTemplate().query(
+            """
+            select status, count(*) as status_count
+            from notification_outbox
+            where status in ('PENDING', 'FAILED', 'DEAD', 'SENDING')
+            group by status
+            """.trimIndent(),
+            { resultSet, _ ->
+                NotificationOutboxStatus.valueOf(resultSet.getString("status")) to resultSet.getInt("status_count")
+            },
+        ).toMap()
+
+        return NotificationOutboxBacklog(
+            pending = counts[NotificationOutboxStatus.PENDING] ?: 0,
+            failed = counts[NotificationOutboxStatus.FAILED] ?: 0,
+            dead = counts[NotificationOutboxStatus.DEAD] ?: 0,
+            sending = counts[NotificationOutboxStatus.SENDING] ?: 0,
+        )
+    }
+
     private fun insertOutbox(
         clubId: UUID,
         eventType: NotificationEventType,
@@ -385,7 +407,7 @@ class JdbcNotificationOutboxAdapter(
     private fun latestFailures(clubId: UUID): List<HostNotificationFailure> =
         jdbcTemplate().query(
             """
-            select id, event_type, recipient_email, attempt_count, last_error, updated_at
+            select id, event_type, recipient_email, attempt_count, updated_at
             from notification_outbox
             where club_id = ?
               and status in ('FAILED', 'DEAD')
@@ -460,7 +482,6 @@ class JdbcNotificationOutboxAdapter(
             eventType = NotificationEventType.valueOf(getString("event_type")),
             recipientEmail = getString("recipient_email"),
             attemptCount = getInt("attempt_count"),
-            lastError = getString("last_error"),
             updatedAt = utcOffsetDateTime("updated_at"),
         )
 

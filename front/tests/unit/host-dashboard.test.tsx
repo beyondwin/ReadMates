@@ -11,6 +11,7 @@ import {
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
+  HostNotificationSummary,
   HostSessionListItem,
 } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -47,11 +48,10 @@ const notificationSummary = {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
       recipientEmail: "member@example.com",
       attemptCount: 3,
-      lastError: "SMTP temporary failure",
       updatedAt: "2026-04-28T10:30:00Z",
     },
   ],
-};
+} satisfies HostNotificationSummary;
 
 const emptyNotificationSummary = {
   pending: 0,

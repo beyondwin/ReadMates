@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -9,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
+import java.time.LocalDate
 import java.util.UUID
 
 private const val CLEANUP_NOTIFICATION_OUTBOX_SQL = """
@@ -17,6 +19,8 @@ private const val CLEANUP_NOTIFICATION_OUTBOX_SQL = """
       '00000000-0000-0000-0000-000000000001',
       '00000000-0000-0000-0000-000000000002'
     );
+    delete from sessions
+    where id = '00000000-0000-0000-0000-000000009401';
     delete from clubs
     where id = '00000000-0000-0000-0000-000000000002';
 """
@@ -169,6 +173,76 @@ class JdbcNotificationOutboxAdapterTest(
     }
 
     @Test
+    fun `outboxBacklog counts pending failed dead and sending rows`() {
+        listOf(
+            "00000000-0000-0000-0000-000000009301" to NotificationOutboxStatus.PENDING,
+            "00000000-0000-0000-0000-000000009302" to NotificationOutboxStatus.FAILED,
+            "00000000-0000-0000-0000-000000009303" to NotificationOutboxStatus.DEAD,
+            "00000000-0000-0000-0000-000000009304" to NotificationOutboxStatus.SENDING,
+        ).forEach { (id, status) ->
+            insertNotification(
+                id = id,
+                clubId = "00000000-0000-0000-0000-000000000001",
+                status = status,
+                dedupeKey = "host-notification-adapter-test-backlog-${status.name.lowercase()}",
+            )
+        }
+
+        val backlog = adapter.outboxBacklog()
+
+        assertThat(backlog.pending).isEqualTo(1)
+        assertThat(backlog.failed).isEqualTo(1)
+        assertThat(backlog.dead).isEqualTo(1)
+        assertThat(backlog.sending).isEqualTo(1)
+    }
+
+    @Test
+    fun `enqueueSessionReminderDue creates reminder rows for active members on target date`() {
+        val sessionId = "00000000-0000-0000-0000-000000009401"
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              session_date, start_time, end_time, location_label,
+              question_deadline_at, state, visibility
+            ) values (
+              ?,
+              '00000000-0000-0000-0000-000000000001',
+              9401,
+              '리마인더 테스트 회차',
+              '리마인더 테스트 책',
+              '테스트 저자',
+              '2026-04-30',
+              '19:30:00',
+              '21:30:00',
+              '온라인',
+              '2026-04-29 14:59:00.000000',
+              'OPEN',
+              'MEMBER'
+            )
+            """.trimIndent(),
+            sessionId,
+        )
+
+        val inserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 4, 30))
+
+        assertThat(inserted).isGreaterThan(0)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from notification_outbox
+                where event_type = 'SESSION_REMINDER_DUE'
+                  and aggregate_id = ?
+                  and status = 'PENDING'
+                """.trimIndent(),
+                Int::class.java,
+                sessionId,
+            ),
+        ).isGreaterThan(0)
+    }
+
+    @Test
     fun `markSent does not overwrite row that is no longer sending`() {
         val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
@@ -266,6 +340,15 @@ class JdbcNotificationOutboxAdapterTest(
     }
 
     private fun insertPendingNotification(id: String, clubId: String, dedupeKey: String) {
+        insertNotification(id = id, clubId = clubId, status = NotificationOutboxStatus.PENDING, dedupeKey = dedupeKey)
+    }
+
+    private fun insertNotification(
+        id: String,
+        clubId: String,
+        status: NotificationOutboxStatus,
+        dedupeKey: String,
+    ) {
         jdbcTemplate.update(
             """
             insert into notification_outbox (
@@ -281,12 +364,13 @@ class JdbcNotificationOutboxAdapterTest(
               '피드백 문서가 올라왔습니다',
               'ReadMates에서 확인해 주세요.',
               '/app/feedback/00000000-0000-0000-0000-000000000301',
-              'PENDING',
+              ?,
               ?
             )
             """.trimIndent(),
             id,
             clubId,
+            status.name,
             dedupeKey,
         )
     }

@@ -1,6 +1,7 @@
 package com.readmates.notification.application.port.out
 
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -16,4 +17,5 @@ interface NotificationOutboxPort {
     fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean
     fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean
     fun hostSummary(clubId: UUID): HostNotificationSummary
+    fun outboxBacklog(): NotificationOutboxBacklog
 }
