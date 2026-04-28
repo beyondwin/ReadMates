@@ -1245,7 +1245,7 @@ git commit -m "feat: cache auth session lookups in redis"
 - Modify: `server/src/main/kotlin/com/readmates/publication/application/service/PublicQueryService.kt`
 - Test: `server/src/test/kotlin/com/readmates/publication/application/service/PublicQueryServiceCacheTest.kt`
 
-- [ ] **Step 1: Write service cache tests**
+- [x] **Step 1: Write service cache tests**
 
 Create `PublicQueryServiceCacheTest.kt`:
 
@@ -1319,7 +1319,7 @@ class PublicQueryServiceCacheTest {
 }
 ```
 
-- [ ] **Step 2: Run public cache test to verify it fails**
+- [x] **Step 2: Run public cache test to verify it fails**
 
 Run:
 
@@ -1329,7 +1329,7 @@ Run:
 
 Expected: FAIL because `PublicReadCachePort` and new constructor do not exist.
 
-- [ ] **Step 3: Create public cache port**
+- [x] **Step 3: Create public cache port**
 
 Create `PublicReadCachePort.kt`:
 
@@ -1369,7 +1369,7 @@ interface PublicReadCachePort {
 }
 ```
 
-- [ ] **Step 4: Modify PublicQueryService**
+- [x] **Step 4: Modify PublicQueryService**
 
 Change constructor and methods:
 
@@ -1389,7 +1389,7 @@ class PublicQueryService(
 }
 ```
 
-- [ ] **Step 5: Create Redis/no-op public cache adapters**
+- [x] **Step 5: Create Redis/no-op public cache adapters**
 
 Create Redis adapter with keys:
 
@@ -1413,7 +1413,7 @@ return decoded
 
 No-op adapter returns misses and is conditional on `readmates.public-cache.enabled=false`.
 
-- [ ] **Step 6: Run public cache service tests**
+- [x] **Step 6: Run public cache service tests**
 
 Run:
 
@@ -1423,7 +1423,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Run public API tests**
+- [x] **Step 7: Run public API tests**
 
 Run:
 
@@ -1433,7 +1433,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit public cache**
+- [x] **Step 8: Commit public cache**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/publication/application/port/out/PublicReadCachePort.kt server/src/main/kotlin/com/readmates/publication/adapter/out/redis server/src/main/kotlin/com/readmates/publication/application/service/PublicQueryService.kt server/src/test/kotlin/com/readmates/publication/application/service/PublicQueryServiceCacheTest.kt
