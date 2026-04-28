@@ -1097,7 +1097,7 @@ git commit -m "feat: add operations metrics"
 - Modify: `docs/deploy/oci-backend.md`
 - Modify: `docs/development/test-guide.md`
 
-- [ ] **Step 1: Add production env placeholders**
+- [x] **Step 1: Add production env placeholders**
 
 Add this block to `docs/deploy/oci-backend.md`:
 
@@ -1119,7 +1119,7 @@ SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
 
 Use `<oci-region>` and placeholders only. Do not use the real region, sender domain, SMTP username, or SMTP password.
 
-- [ ] **Step 2: Add local metrics verification**
+- [x] **Step 2: Add local metrics verification**
 
 Document VM-local check:
 
@@ -1129,7 +1129,7 @@ curl -sS http://127.0.0.1:8081/actuator/prometheus | grep readmates_notification
 
 Document that `READMATES_MANAGEMENT_ADDRESS=127.0.0.1` and `READMATES_MANAGEMENT_PORT=8081` are required for VM-local scraping. Do not suggest exposing `/actuator/prometheus` through Caddy.
 
-- [ ] **Step 3: Add test guide section**
+- [x] **Step 3: Add test guide section**
 
 Add targeted commands:
 
@@ -1140,7 +1140,7 @@ pnpm --dir front test -- host-dashboard
 pnpm --dir front lint
 ```
 
-- [ ] **Step 4: Run docs check**
+- [x] **Step 4: Run docs check**
 
 ```bash
 git diff --check -- docs/deploy/oci-backend.md docs/development/test-guide.md
@@ -1148,7 +1148,7 @@ git diff --check -- docs/deploy/oci-backend.md docs/development/test-guide.md
 
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/deploy/oci-backend.md docs/development/test-guide.md
