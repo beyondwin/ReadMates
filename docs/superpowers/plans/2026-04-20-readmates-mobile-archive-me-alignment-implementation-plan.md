@@ -141,7 +141,7 @@ Add this test after the existing empty-state test:
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/archive-page.test.tsx
 ```
 
@@ -542,7 +542,7 @@ function MobileEmptyState({ message }: { message: string }) {
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/archive-page.test.tsx
 ```
 
@@ -551,7 +551,7 @@ Expected: PASS.
 - [x] **Step 7: Commit**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates
+cd <local-workspace>/ReadMates
 git add front/features/archive/components/archive-page.tsx front/tests/unit/archive-page.test.tsx
 git commit -m "fix: align archive mobile view with standalone design"
 ```
@@ -626,7 +626,7 @@ No unit test currently imports `front/app/(app)/app/me/page.tsx` directly. Do no
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/my-page.test.tsx
 ```
 
@@ -853,7 +853,7 @@ function MyMobile({
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/my-page.test.tsx
 ```
 
@@ -862,7 +862,7 @@ Expected: PASS.
 - [x] **Step 6: Commit**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates
+cd <local-workspace>/ReadMates
 git add 'front/app/(app)/app/me/page.tsx' front/features/archive/components/my-page.tsx front/tests/unit/my-page.test.tsx
 git commit -m "fix: align my page mobile view with standalone design"
 ```
@@ -881,7 +881,7 @@ git commit -m "fix: align my page mobile view with standalone design"
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/archive-page.test.tsx tests/unit/my-page.test.tsx
 ```
 
@@ -892,7 +892,7 @@ Expected: PASS for both files.
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm test
 ```
 
@@ -903,7 +903,7 @@ Expected: all Vitest tests pass.
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm lint
 ```
 
@@ -914,7 +914,7 @@ Expected: ESLint completes without errors.
 If tests or lint required edits, commit the scoped fixes:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates
+cd <local-workspace>/ReadMates
 git add front
 git commit -m "fix: stabilize mobile archive my tests"
 ```
@@ -966,7 +966,7 @@ Required captures:
 Save them under:
 
 ```text
-/Users/kws/source/persnal/ReadMates/output/playwright/mobile-archive-me-audit
+<local-workspace>/ReadMates/output/playwright/mobile-archive-me-audit
 ```
 
 Expected visual result:
@@ -1022,7 +1022,7 @@ Run Task 5 again after any CSS fix.
 - [x] **Step 5: Commit browser-only fixes if any**
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates
+cd <local-workspace>/ReadMates
 git add front/app/globals.css
 git commit -m "fix: polish mobile archive my layout"
 ```
@@ -1043,7 +1043,7 @@ If no browser-only fixes are needed, do not create an empty commit.
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates
+cd <local-workspace>/ReadMates
 git diff --stat HEAD
 git status --short
 ```
@@ -1055,7 +1055,7 @@ Expected: only intended `front` source/test files are modified if commits were n
 Capture the final status of:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/archive-page.test.tsx tests/unit/my-page.test.tsx
 pnpm test
 pnpm lint

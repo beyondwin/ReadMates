@@ -173,7 +173,6 @@ is_forbidden_path() {
     server/build|server/build/*) return 0 ;;
     server/.gradle|server/.gradle/*) return 0 ;;
     server/.kotlin|server/.kotlin/*) return 0 ;;
-    "$private_plan_dir"|"$private_plan_dir"/*) return 0 ;;
     design|design/*) return 0 ;;
     .gstack|.gstack/*) return 0 ;;
     .superpowers|.superpowers/*) return 0 ;;
@@ -344,7 +343,7 @@ run_targeted_content_checks() {
   run_content_check "private key block" '-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----'
   run_content_check "OCI OCID" 'ocid1[.][a-z0-9][a-z0-9._-]{16,}'
   run_content_check "GitHub token" '(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})'
-  run_content_check "OpenAI/API key style token" '(sk-[A-Za-z0-9][A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|(OPENAI_API_KEY|API_KEY|GOOGLE_API_KEY)[[:space:]]*[:=][[:space:]]*['"'"'"]?[A-Za-z0-9_-]{24,})'
+  run_content_check "OpenAI/API key style token" '(^|[^A-Za-z0-9_-])(sk-[A-Za-z0-9][A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|(OPENAI_API_KEY|API_KEY|GOOGLE_API_KEY)[[:space:]]*[:=][[:space:]]*['"'"'"]?[A-Za-z0-9_-]{24,})'
   run_content_check "real-looking DB/BFF/OAuth secret assignment" '(^|[^A-Za-z0-9_$/{.-])(READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|client[_-]?secret|oauth[_-]?client[_-]?secret)[[:space:]]*[:=][[:space:]]*['"'"'"]?[^[:space:]'"'"'"<>`]{16,}'
   run_content_check "Gmail address" '[A-Za-z0-9._%+-]+@gmail[.]com'
   run_content_check "private club domain" 'readmates[.]kr'

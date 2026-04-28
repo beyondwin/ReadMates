@@ -24,8 +24,8 @@ Those files contain real local values and must remain untracked. They must not b
 The main public-readiness risks are not an obvious checked-in credential. They are:
 
 - `design/` is ignored but already tracked in Git, including generated standalone design artifacts.
-- Existing docs and plans contain local absolute paths such as `/Users/kws/source/persnal/ReadMates`.
-- Some design/docs/test material contains personal-looking sample identifiers such as `wooseung` and `seoyun@readmates.kr`.
+- Existing docs and plans contain local absolute paths such as `<local-workspace>/ReadMates`.
+- Some design/docs/test material contains personal-looking sample identifiers and private-domain member email examples.
 - The repository contains many historical planning docs under `docs/superpowers`. These are useful privately, but a portfolio repo should only publish the docs that help reviewers understand the product and engineering choices.
 - The repo has no committed `.gitleaks.toml`, `.secretlintrc`, or equivalent secret scanning config.
 
@@ -87,7 +87,7 @@ Tracked public files must not contain:
 
 - Real DB passwords, BFF secrets, OAuth client secrets, SSH keys, OCI API keys, provider tokens, or private keys.
 - Real member emails, real Gmail addresses, real names of private club members, or real profile image URLs.
-- Local absolute paths such as `/Users/kws/...`.
+- Local absolute paths such as `<local-home>/...`.
 - Machine-specific instructions that only work on the current laptop.
 - Private deployment state such as OCI OCIDs, VM public IPs, private IPs that identify the current tenancy, or Cloudflare account-specific data.
 

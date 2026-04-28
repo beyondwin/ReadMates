@@ -508,7 +508,7 @@ Expected:
 Open:
 
 ```text
-/Users/kws/source/persnal/ReadMates/design/standalone/mobile.html
+<local-workspace>/ReadMates/design/standalone/mobile.html
 ```
 
 Expected:

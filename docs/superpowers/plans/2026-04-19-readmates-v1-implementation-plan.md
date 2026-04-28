@@ -708,7 +708,7 @@ class InvitationController {
     @GetMapping("/{token}")
     fun preview(@PathVariable token: String) = InvitationPreviewResponse(
         token = token,
-        emailHint = "se****@readmates.kr",
+        emailHint = "se****@readmates.example.com",
         status = "PENDING",
     )
 }

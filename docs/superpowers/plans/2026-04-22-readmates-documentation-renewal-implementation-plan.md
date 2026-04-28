@@ -254,7 +254,7 @@ Checklist:
 - [x] Run markdown/path sanity checks:
 
 ```bash
-rg -n "TBD|TODO|FIXME|자동 생성|AI API를 호출|OpenAI|ChatGPT|/Users/kws|10\\.0\\.2\\.|readmates\\.kr|oci1\\.|ghp_|sk-[A-Za-z0-9]" README.md docs/development docs/deploy scripts/README.md || true
+rg -n "TBD|TODO|FIXME|자동 생성|AI API를 호출|OpenAI|ChatGPT|local absolute path|private IP pattern|private ReadMates domain|oci1\\.|ghp_|sk-[A-Za-z0-9]" README.md docs/development docs/deploy scripts/README.md || true
 rg -n "\\]\\(([^)#]+\\.md)" README.md docs/development docs/deploy scripts/README.md
 git diff --check -- README.md docs/development docs/deploy scripts/README.md
 ```

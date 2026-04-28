@@ -155,7 +155,7 @@ Assert:
 Run the narrow test:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests '*ArchiveControllerDbTest'
 ```
 
@@ -288,14 +288,14 @@ Title should match the feedback detail title style:
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests '*ArchiveControllerDbTest'
 ```
 
 Then run relevant existing tests:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests '*FeedbackDocumentControllerTest' --tests '*CurrentSessionControllerDbTest'
 ```
 
@@ -370,7 +370,7 @@ Assert:
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/member-session-detail-page.test.tsx
 ```
 
@@ -497,7 +497,7 @@ In `front/shared/ui/mobile-header.tsx`:
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/member-session-detail-page.test.tsx
 ```
 
@@ -571,7 +571,7 @@ Add expectations:
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/archive-page.test.tsx
 ```
 
@@ -603,7 +603,7 @@ If not already covered in `member-session-detail-page.test.tsx`, assert the new 
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run tests/unit/public-session-page.test.tsx tests/unit/member-session-detail-page.test.tsx
 ```
 
@@ -623,7 +623,7 @@ Expected:
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm exec vitest run \
   tests/unit/archive-page.test.tsx \
   tests/unit/member-session-detail-page.test.tsx \
@@ -636,7 +636,7 @@ pnpm exec vitest run \
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/server
+cd <local-workspace>/ReadMates/server
 ./gradlew test --tests '*ArchiveControllerDbTest' --tests '*FeedbackDocumentControllerTest'
 ```
 
@@ -645,7 +645,7 @@ cd /Users/kws/source/persnal/ReadMates/server
 Run:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm lint
 pnpm build
 ```
@@ -655,7 +655,7 @@ pnpm build
 Start the local app if it is not already running:
 
 ```bash
-cd /Users/kws/source/persnal/ReadMates/front
+cd <local-workspace>/ReadMates/front
 pnpm dev
 ```
 
