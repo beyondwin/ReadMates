@@ -15,6 +15,7 @@ data class NotificationOutboxItem(
     val deepLinkPath: String,
     val status: NotificationOutboxStatus,
     val attemptCount: Int,
+    val lockedAt: OffsetDateTime,
 )
 
 data class HostNotificationSummary(

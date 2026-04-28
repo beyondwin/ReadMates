@@ -31,6 +31,17 @@ management:
 readmates:
   app-base-url: ${READMATES_APP_BASE_URL:http://localhost:3000}
   bff-secret-required: ${READMATES_BFF_SECRET_REQUIRED:true}
+  notifications:
+    enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
+    sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:ReadMates}
+    sender-email: ${READMATES_NOTIFICATION_SENDER_EMAIL:no-reply@example.com}
+    reminder-cron: ${READMATES_NOTIFICATION_REMINDER_CRON:0 0 9 * * *}
+    reminder-zone: ${READMATES_NOTIFICATION_REMINDER_ZONE:Asia/Seoul}
+    worker:
+      enabled: ${READMATES_NOTIFICATION_WORKER_ENABLED:false}
+      fixed-delay-ms: ${READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS:30000}
+      batch-size: ${READMATES_NOTIFICATION_WORKER_BATCH_SIZE:20}
+      max-attempts: ${READMATES_NOTIFICATION_MAX_ATTEMPTS:5}
   redis:
     enabled: ${READMATES_REDIS_ENABLED:false}
   rate-limit:

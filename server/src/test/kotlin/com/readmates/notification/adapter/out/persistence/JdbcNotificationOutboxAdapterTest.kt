@@ -132,6 +132,86 @@ class JdbcNotificationOutboxAdapterTest(
         ).isTrue()
     }
 
+    @Test
+    fun `markSent does not overwrite row that is no longer sending`() {
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+
+        adapter.enqueueFeedbackDocumentPublished(clubId, sessionId)
+        val claimed = adapter.claimPending(1).single()
+        jdbcTemplate.update(
+            """
+            update notification_outbox
+            set status = 'DEAD',
+                last_error = 'already terminal',
+                locked_at = null,
+                sent_at = null
+            where id = ?
+            """.trimIndent(),
+            claimed.id.toString(),
+        )
+
+        adapter.markSent(claimed.id, claimed.lockedAt)
+
+        val row = jdbcTemplate.queryForMap(
+            """
+            select status, last_error, sent_at
+            from notification_outbox
+            where id = ?
+            """.trimIndent(),
+            claimed.id.toString(),
+        )
+        assertThat(row["status"]).isEqualTo("DEAD")
+        assertThat(row["last_error"]).isEqualTo("already terminal")
+        assertThat(row["sent_at"]).isNull()
+    }
+
+    @Test
+    fun `markSent does not overwrite row reclaimed with a newer lease`() {
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+
+        adapter.enqueueFeedbackDocumentPublished(clubId, sessionId)
+        val staleClaim = adapter.claimPending(1).single()
+        jdbcTemplate.update(
+            """
+            update notification_outbox
+            set status = 'DEAD',
+                locked_at = null
+            where club_id = ?
+              and id <> ?
+            """.trimIndent(),
+            clubId.toString(),
+            staleClaim.id.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            update notification_outbox
+            set status = 'PENDING',
+                locked_at = null,
+                next_attempt_at = utc_timestamp(6)
+            where id = ?
+            """.trimIndent(),
+            staleClaim.id.toString(),
+        )
+        val freshClaim = adapter.claimPending(1).single()
+        assertThat(freshClaim.id).isEqualTo(staleClaim.id)
+        assertThat(freshClaim.lockedAt).isNotEqualTo(staleClaim.lockedAt)
+
+        adapter.markSent(staleClaim.id, staleClaim.lockedAt)
+
+        val row = jdbcTemplate.queryForMap(
+            """
+            select status, locked_at, sent_at
+            from notification_outbox
+            where id = ?
+            """.trimIndent(),
+            staleClaim.id.toString(),
+        )
+        assertThat(row["status"]).isEqualTo("SENDING")
+        assertThat(row["sent_at"]).isNull()
+    }
+
     companion object {
         @JvmStatic
         @DynamicPropertySource
