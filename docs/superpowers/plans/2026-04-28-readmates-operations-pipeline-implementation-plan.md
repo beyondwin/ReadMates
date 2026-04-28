@@ -620,7 +620,7 @@ git commit -m "feat: process notification outbox email delivery"
 - Test: `server/src/test/kotlin/com/readmates/feedback/api/FeedbackDocumentControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`
 
-- [ ] **Step 1: Add failing feedback upload test**
+- [x] **Step 1: Add failing feedback upload test**
 
 Extend `FeedbackDocumentControllerTest`:
 
@@ -655,7 +655,7 @@ fun `host feedback upload enqueues attendee notification`() {
 }
 ```
 
-- [ ] **Step 2: Inject notification event use case into feedback service**
+- [x] **Step 2: Inject notification event use case into feedback service**
 
 Modify constructor:
 
@@ -677,7 +677,7 @@ recordNotificationEventUseCase.recordFeedbackDocumentPublished(
 
 This runs in the same transaction as document insert. If the request rolls back, the outbox insert rolls back too.
 
-- [ ] **Step 3: Add failing next-book visibility test**
+- [x] **Step 3: Add failing next-book visibility test**
 
 Extend `HostSessionControllerDbTest` with:
 
@@ -706,7 +706,7 @@ fun `member visible draft session enqueues next book notification`() {
 }
 ```
 
-- [ ] **Step 4: Inject notification event use case into host session service**
+- [x] **Step 4: Inject notification event use case into host session service**
 
 Modify constructor:
 
@@ -729,7 +729,7 @@ override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): Host
 }
 ```
 
-- [ ] **Step 5: Add reminder scheduler entry point**
+- [x] **Step 5: Add reminder scheduler entry point**
 
 Add a daily scheduled method in `NotificationOutboxScheduler`:
 
@@ -742,7 +742,7 @@ fun enqueueTomorrowReminders() {
 
 Inject `RecordNotificationEventUseCase` into the scheduler. Keep the cron disabled in tests by setting `readmates.notifications.worker.enabled=false`.
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.feedback.api.FeedbackDocumentControllerTest --tests com.readmates.session.api.HostSessionControllerDbTest
@@ -750,7 +750,7 @@ Inject `RecordNotificationEventUseCase` into the scheduler. Keep the cron disabl
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/feedback/application/service/FeedbackDocumentService.kt server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/feedback/api/FeedbackDocumentControllerTest.kt server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt

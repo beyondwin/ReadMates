@@ -35,7 +35,7 @@ readmates:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
     sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:ReadMates}
     sender-email: ${READMATES_NOTIFICATION_SENDER_EMAIL:no-reply@example.com}
-    reminder-cron: ${READMATES_NOTIFICATION_REMINDER_CRON:0 0 9 * * *}
+    reminder-cron: ${READMATES_NOTIFICATION_REMINDER_CRON:0 0 0 * * *}
     reminder-zone: ${READMATES_NOTIFICATION_REMINDER_ZONE:Asia/Seoul}
     worker:
       enabled: ${READMATES_NOTIFICATION_WORKER_ENABLED:false}

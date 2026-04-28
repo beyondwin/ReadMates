@@ -18,6 +18,7 @@ import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentU
 import com.readmates.feedback.application.port.`in`.ListMyReadableFeedbackDocumentsUseCase
 import com.readmates.feedback.application.port.`in`.UploadHostFeedbackDocumentUseCase
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
+import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
@@ -29,6 +30,7 @@ import java.util.UUID
 @Service
 class FeedbackDocumentService(
     private val feedbackDocumentStorePort: FeedbackDocumentStorePort,
+    private val recordNotificationEventUseCase: RecordNotificationEventUseCase,
 ) : ListMyReadableFeedbackDocumentsUseCase,
     GetReadableFeedbackDocumentUseCase,
     GetHostFeedbackDocumentStatusUseCase,
@@ -98,6 +100,10 @@ class FeedbackDocumentService(
             command = command,
             version = version,
             documentId = UUID.randomUUID(),
+        )
+        recordNotificationEventUseCase.recordFeedbackDocumentPublished(
+            clubId = currentMember.clubId,
+            sessionId = command.sessionId,
         )
 
         val storedDocument = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)

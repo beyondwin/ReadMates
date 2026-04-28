@@ -17,7 +17,7 @@ class NotificationOutboxScheduler(
     private val processNotificationOutboxUseCase: ProcessNotificationOutboxUseCase,
     private val recordNotificationEventUseCase: RecordNotificationEventUseCase,
     @param:Value("\${readmates.notifications.worker.batch-size}") private val batchSize: Int,
-    @param:Value("\${readmates.notifications.reminder-zone}") private val reminderZone: String,
+    @param:Value("\${readmates.notifications.reminder-zone:Asia/Seoul}") private val reminderZone: String,
 ) {
     @Scheduled(fixedDelayString = "\${readmates.notifications.worker.fixed-delay-ms}")
     fun process() {
@@ -25,8 +25,8 @@ class NotificationOutboxScheduler(
     }
 
     @Scheduled(
-        cron = "\${readmates.notifications.reminder-cron}",
-        zone = "\${readmates.notifications.reminder-zone}",
+        cron = "\${readmates.notifications.reminder-cron:0 0 0 * * *}",
+        zone = "\${readmates.notifications.reminder-zone:Asia/Seoul}",
     )
     fun enqueueTomorrowReminders() {
         val targetDate = LocalDate.now(ZoneId.of(reminderZone)).plusDays(1)
