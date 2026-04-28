@@ -21,10 +21,15 @@ import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionWritePort
+import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.CurrentMember
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.UUID
 
 class HostSessionCommandServiceTest {
@@ -143,6 +148,112 @@ class HostSessionCommandServiceTest {
         assertEquals("dashboard:${host.email}", port.calls.single())
     }
 
+    @Test
+    fun `evicts club content after publication update`() {
+        val port = RecordingHostSessionWritePort()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionCommandService(port, invalidation)
+        val command = UpsertPublicationCommand(
+            host = host,
+            sessionId = sessionId,
+            publicSummary = "요약",
+            visibility = SessionRecordVisibility.PUBLIC,
+        )
+
+        service.upsertPublication(command)
+
+        assertEquals(listOf(host.clubId), invalidation.clubs)
+    }
+
+    @Test
+    fun `evicts host mutation after commit when transaction synchronization is active`() {
+        val port = RecordingHostSessionWritePort()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionCommandService(port, invalidation)
+        val command = UpsertPublicationCommand(
+            host = host,
+            sessionId = sessionId,
+            publicSummary = "요약",
+            visibility = SessionRecordVisibility.PUBLIC,
+        )
+
+        TransactionSynchronizationManager.initSynchronization()
+        try {
+            service.upsertPublication(command)
+
+            assertEquals(emptyList<UUID>(), invalidation.clubs)
+
+            TransactionSynchronizationManager.getSynchronizations().forEach { synchronization ->
+                synchronization.afterCommit()
+            }
+
+            assertEquals(listOf(host.clubId), invalidation.clubs)
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
+    }
+
+    @Test
+    fun `invalidation failure does not fail host mutation`() {
+        val port = RecordingHostSessionWritePort()
+        val invalidation = ThrowingReadCacheInvalidationPort()
+        val service = HostSessionCommandService(port, invalidation)
+        val command = UpsertPublicationCommand(
+            host = host,
+            sessionId = sessionId,
+            publicSummary = "요약",
+            visibility = SessionRecordVisibility.PUBLIC,
+        )
+
+        var result: HostPublicationResponse? = null
+        assertDoesNotThrow {
+            service.upsertPublication(command)
+                .also { result = it }
+        }
+
+        assertEquals(SessionRecordVisibility.PUBLIC, result?.visibility)
+        assertEquals(1, invalidation.attempts)
+    }
+
+    @Test
+    fun `does not evict when host write port throws`() {
+        val port = RecordingHostSessionWritePort().apply {
+            throwOnUpsertPublication = true
+        }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionCommandService(port, invalidation)
+        val command = UpsertPublicationCommand(
+            host = host,
+            sessionId = sessionId,
+            publicSummary = "요약",
+            visibility = SessionRecordVisibility.PUBLIC,
+        )
+
+        assertThrows(IllegalStateException::class.java) {
+            service.upsertPublication(command)
+        }
+
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
+    }
+
+    @Test
+    fun `does not evict when current session transitions are no-ops`() {
+        val port = RecordingHostSessionWritePort().apply {
+            openChanged = false
+            closeChanged = false
+            publishChanged = false
+        }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionCommandService(port, invalidation)
+        val command = HostSessionIdCommand(host, sessionId)
+
+        service.open(command)
+        service.close(command)
+        service.publish(command)
+
+        assertEquals(emptyList<UUID>(), invalidation.clubs)
+    }
+
     private fun hostSessionCommand() = HostSessionCommand(
         host = host,
         title = "7회차",
@@ -167,6 +278,10 @@ class HostSessionCommandServiceTest {
         var closeCommand: HostSessionIdCommand? = null
         var publishCommand: HostSessionIdCommand? = null
         var upcomingMember: CurrentMember? = null
+        var openChanged = true
+        var closeChanged = true
+        var publishChanged = true
+        var throwOnUpsertPublication = false
 
         override fun list(host: CurrentMember): List<HostSessionListItem> {
             listHost = host
@@ -204,19 +319,28 @@ class HostSessionCommandServiceTest {
             return hostSessionDetail(command.sessionId).copy(visibility = command.visibility)
         }
 
-        override fun open(command: HostSessionIdCommand): HostSessionDetailResponse {
+        override fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
             openCommand = command
-            return hostSessionDetail(command.sessionId).copy(state = "OPEN")
+            return HostSessionTransitionResult(
+                detail = hostSessionDetail(command.sessionId).copy(state = "OPEN"),
+                changed = openChanged,
+            )
         }
 
-        override fun close(command: HostSessionIdCommand): HostSessionDetailResponse {
+        override fun close(command: HostSessionIdCommand): HostSessionTransitionResult {
             closeCommand = command
-            return hostSessionDetail(command.sessionId).copy(state = "CLOSED")
+            return HostSessionTransitionResult(
+                detail = hostSessionDetail(command.sessionId).copy(state = "CLOSED"),
+                changed = closeChanged,
+            )
         }
 
-        override fun publish(command: HostSessionIdCommand): HostSessionDetailResponse {
+        override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult {
             publishCommand = command
-            return hostSessionDetail(command.sessionId).copy(state = "PUBLISHED")
+            return HostSessionTransitionResult(
+                detail = hostSessionDetail(command.sessionId).copy(state = "PUBLISHED"),
+                changed = publishChanged,
+            )
         }
 
         override fun deletionPreview(command: HostSessionIdCommand) =
@@ -243,12 +367,16 @@ class HostSessionCommandServiceTest {
                 count = command.entries.size,
             ).also { calls += "confirmAttendance:${command.sessionId}:${command.entries.size}" }
 
-        override fun upsertPublication(command: UpsertPublicationCommand) =
-            HostPublicationResponse(
+        override fun upsertPublication(command: UpsertPublicationCommand): HostPublicationResponse {
+            if (throwOnUpsertPublication) {
+                throw IllegalStateException("write failed")
+            }
+            return HostPublicationResponse(
                 sessionId = command.sessionId.toString(),
                 publicSummary = command.publicSummary,
                 visibility = command.visibility,
             ).also { calls += "upsertPublication:${command.sessionId}:${command.visibility}" }
+        }
 
         override fun dashboard(host: CurrentMember) =
             HostDashboardResult(
@@ -301,5 +429,22 @@ class HostSessionCommandServiceTest {
             feedbackReports = 0,
             feedbackDocuments = 0,
         )
+    }
+
+    private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {
+        val clubs = mutableListOf<UUID>()
+
+        override fun evictClubContent(clubId: UUID) {
+            clubs += clubId
+        }
+    }
+
+    private class ThrowingReadCacheInvalidationPort : ReadCacheInvalidationPort {
+        var attempts = 0
+
+        override fun evictClubContent(clubId: UUID) {
+            attempts += 1
+            throw IllegalStateException("invalidation failed")
+        }
     }
 }

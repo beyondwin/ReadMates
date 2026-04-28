@@ -1695,7 +1695,7 @@ git commit -m "feat: cache notes feed read models in redis"
 - Modify: `server/src/main/kotlin/com/readmates/auth/application/service/MemberProfileService.kt`
 - Extend tests listed in file structure.
 
-- [ ] **Step 1: Write service invalidation tests**
+- [x] **Step 1: Write service invalidation tests**
 
 In `HostSessionCommandServiceTest`, add a fake invalidator:
 
@@ -1744,7 +1744,7 @@ fun `evicts club content after one line review save`() {
 }
 ```
 
-- [ ] **Step 2: Run invalidation tests to verify they fail**
+- [x] **Step 2: Run invalidation tests to verify they fail**
 
 Run:
 
@@ -1754,7 +1754,7 @@ Run:
 
 Expected: FAIL because `ReadCacheInvalidationPort` and new constructors do not exist.
 
-- [ ] **Step 3: Create invalidation port and adapters**
+- [x] **Step 3: Create invalidation port and adapters**
 
 Create `ReadCacheInvalidationPort.kt`:
 
@@ -1805,7 +1805,7 @@ class RedisReadCacheInvalidationAdapter(
 
 Use broad `KEYS` only because this project has small cache cardinality. If production cache size grows, replace this adapter with tracked key sets.
 
-- [ ] **Step 4: Evict after host session mutations**
+- [x] **Step 4: Evict after host session mutations**
 
 Modify `HostSessionCommandService` constructor:
 
@@ -1876,7 +1876,7 @@ override fun upsertPublication(command: UpsertPublicationCommand) =
     port.upsertPublication(command).also { cacheInvalidation.evictClubContent(command.host.clubId) }
 ```
 
-- [ ] **Step 5: Evict after note/member/profile mutations**
+- [x] **Step 5: Evict after note/member/profile mutations**
 
 Modify `SessionMemberWriteService` constructor:
 
@@ -1915,7 +1915,7 @@ override fun saveLongReview(command: SaveLongReviewCommand) =
 
 Modify `MemberLifecycleService` and `MemberProfileService` constructors with `ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop()`. Evict after successful membership status/profile changes because public/notes author names and left-member labels can change.
 
-- [ ] **Step 6: Run invalidation tests**
+- [x] **Step 6: Run invalidation tests**
 
 Run:
 
@@ -1925,7 +1925,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit invalidation**
+- [x] **Step 7: Commit invalidation**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/shared/cache/ReadCacheInvalidationPort.kt server/src/main/kotlin/com/readmates/shared/cache/NoopReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/shared/cache/RedisReadCacheInvalidationAdapter.kt server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt server/src/main/kotlin/com/readmates/session/application/service/SessionMemberWriteService.kt server/src/main/kotlin/com/readmates/auth/application/MemberLifecycleService.kt server/src/main/kotlin/com/readmates/auth/application/service/MemberProfileService.kt server/src/test/kotlin/com/readmates/session/application/service/HostSessionCommandServiceTest.kt server/src/test/kotlin/com/readmates/session/application/service/SessionMemberWriteServiceTest.kt
