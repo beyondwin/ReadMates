@@ -144,6 +144,16 @@ const regularMemberAuth: AuthMeResponse = {
   role: "MEMBER",
 };
 
+const viewerAuth: AuthMeResponse = {
+  ...activeAuth,
+  email: "viewer@example.com",
+  displayName: "Viewer",
+  accountName: "Viewer Member",
+  role: "MEMBER",
+  membershipStatus: "VIEWER",
+  approvalState: "VIEWER",
+};
+
 const notificationPreferences: NotificationPreferencesResponse = {
   emailEnabled: true,
   events: {
@@ -377,6 +387,71 @@ describe("MyPage", () => {
     expect(mobile.queryByText("이름")).not.toBeInTheDocument();
   });
 
+  it("loads viewer my page without requesting notification preferences", async () => {
+    installRouterRequestShim();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(viewerAuth));
+      }
+
+      if (url === "/api/bff/api/app/me") {
+        return Promise.resolve(
+          jsonResponse({
+            ...regularMemberData,
+            email: viewerAuth.email,
+            displayName: viewerAuth.displayName,
+            accountName: viewerAuth.accountName,
+            membershipStatus: "VIEWER",
+            sessionCount: 0,
+            recentAttendances: [],
+          }),
+        );
+      }
+
+      if (url === "/api/bff/api/feedback-documents/me") {
+        return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
+      }
+
+      if (url === "/api/bff/api/archive/me/questions" || url === "/api/bff/api/archive/me/reviews") {
+        return Promise.resolve(jsonResponse([]));
+      }
+
+      if (url === "/api/bff/api/me/notifications/preferences") {
+        return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/app/me",
+          element: <MyRoutePage />,
+          loader: myPageLoader,
+          hydrateFallbackElement: <div>내 공간을 불러오는 중</div>,
+        },
+      ],
+      { initialEntries: ["/app/me"] },
+    );
+
+    render(
+      <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn().mockResolvedValue(undefined) }}>
+        <AuthContext.Provider value={{ status: "ready", auth: viewerAuth }}>
+          <RouterProvider router={router} />
+        </AuthContext.Provider>
+      </AuthActionsContext.Provider>,
+    );
+
+    expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "페이지를 불러오지 못했습니다." })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => input.toString() === "/api/bff/api/me/notifications/preferences")).toBe(false);
+    expect(screen.queryAllByRole("button", { name: "알림 설정 저장" })).toHaveLength(0);
+  });
+
   it("saves a trimmed display name through the profile editor", async () => {
     const onUpdateProfile = vi.fn(async (displayName: string) => memberProfileResponse(displayName));
     const { container } = renderEditableMyPage({ onUpdateProfile });
@@ -549,7 +624,8 @@ describe("MyPage", () => {
     expect(scoped.getByRole("link", { name: "질문 7" })).toHaveAttribute("href", "/app/archive?view=questions");
     expect(scoped.getByRole("link", { name: "서평 3" })).toHaveAttribute("href", "/app/archive?view=reviews");
     expect(scoped.queryByText("읽기 전용 설정")).not.toBeInTheDocument();
-    expect(scoped.queryByText("알림")).not.toBeInTheDocument();
+    expect(scoped.getByText("알림")).toBeInTheDocument();
+    expect(scoped.getByRole("switch", { name: "이메일 알림" })).toBeInTheDocument();
     expect(scoped.queryByText("캘린더 연동")).not.toBeInTheDocument();
     expect(scoped.queryByText("테마 · 표시")).not.toBeInTheDocument();
     expect(scoped.queryByText("연결 안 됨")).not.toBeInTheDocument();
@@ -694,6 +770,24 @@ describe("MyPage", () => {
 
     await user.click(scoped.getByRole("switch", { name: "이메일 알림" }));
     await user.click(scoped.getByRole("button", { name: "알림 설정 저장" }));
+
+    expect(onSaveNotificationPreferences).toHaveBeenCalledWith({
+      emailEnabled: false,
+      events: notificationPreferences.events,
+    });
+  });
+
+  it("renders mobile notification preferences and saves changes", async () => {
+    const user = userEvent.setup();
+    const onSaveNotificationPreferences = vi.fn().mockResolvedValue({
+      ...notificationPreferences,
+      emailEnabled: false,
+    });
+    const { container } = renderMyPage({ onSaveNotificationPreferences });
+    const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
+
+    await user.click(mobile.getByRole("switch", { name: "이메일 알림" }));
+    await user.click(mobile.getByRole("button", { name: "알림 설정 저장" }));
 
     expect(onSaveNotificationPreferences).toHaveBeenCalledWith({
       emailEnabled: false,

@@ -20,6 +20,7 @@ export type MyPageRouteData = {
   questionCount: number;
   reviewCount: number;
   notificationPreferences: NotificationPreferencesResponse;
+  canManageNotificationPreferences: boolean;
 };
 
 function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
@@ -37,8 +38,13 @@ function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
   };
 }
 
+function canManageNotificationPreferences(auth: AuthMeResponse) {
+  return auth.membershipStatus !== "VIEWER";
+}
+
 export async function myPageLoader(): Promise<MyPageRouteData> {
   const access = await loadArchiveMemberAuth();
+  const notificationPreferencesAvailable = access.allowed && canManageNotificationPreferences(access.auth);
 
   if (!access.allowed) {
     return {
@@ -47,6 +53,7 @@ export async function myPageLoader(): Promise<MyPageRouteData> {
       questionCount: 0,
       reviewCount: 0,
       notificationPreferences: defaultNotificationPreferences,
+      canManageNotificationPreferences: false,
     };
   }
 
@@ -55,8 +62,15 @@ export async function myPageLoader(): Promise<MyPageRouteData> {
     fetchMyFeedbackDocuments(),
     fetchMyArchiveQuestions(),
     fetchMyArchiveReviews(),
-    fetchNotificationPreferences(),
+    notificationPreferencesAvailable ? fetchNotificationPreferences() : Promise.resolve(defaultNotificationPreferences),
   ]);
 
-  return { data, reports, questionCount: questions.length, reviewCount: reviews.length, notificationPreferences };
+  return {
+    data,
+    reports,
+    questionCount: questions.length,
+    reviewCount: reviews.length,
+    notificationPreferences,
+    canManageNotificationPreferences: notificationPreferencesAvailable,
+  };
 }
