@@ -1953,7 +1953,7 @@ git commit -m "feat: expose notification event delivery ledger"
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Update tests under `server/src/test/kotlin/com/readmates/notification`.
 
-- [ ] **Step 1: Add architecture assertion**
+- [x] **Step 1: Add architecture assertion**
 
 In `ServerArchitectureBoundaryTest.kt`, add a test assertion that application services do not depend on `NotificationOutboxPort`:
 
@@ -1966,7 +1966,7 @@ noClasses()
 
 If the boundary test uses a helper style, add the same rule using the existing helper conventions.
 
-- [ ] **Step 2: Run architecture test to verify it fails**
+- [x] **Step 2: Run architecture test to verify it fails**
 
 Run:
 
@@ -1976,7 +1976,7 @@ Run:
 
 Expected: FAIL while old service and port still exist.
 
-- [ ] **Step 3: Remove old worker path**
+- [x] **Step 3: Remove old worker path**
 
 Delete the old direct worker files after replacement code compiles:
 
@@ -1989,7 +1989,7 @@ git rm server/src/main/kotlin/com/readmates/notification/adapter/out/persistence
 
 Update all imports and tests to use new services and ports.
 
-- [ ] **Step 4: Run notification server tests**
+- [x] **Step 4: Run notification server tests**
 
 Run:
 
@@ -1999,7 +1999,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Run architecture test**
+- [x] **Step 5: Run architecture test**
 
 Run:
 
@@ -2009,7 +2009,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt
