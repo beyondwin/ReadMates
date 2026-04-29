@@ -4,6 +4,7 @@ import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
@@ -25,6 +26,10 @@ interface ProcessNotificationOutboxUseCase {
 
 interface PublishNotificationEventsUseCase {
     fun publishPending(limit: Int): Int
+}
+
+interface DispatchNotificationEventUseCase {
+    fun dispatch(message: NotificationEventMessage)
 }
 
 interface GetHostNotificationSummaryUseCase {
