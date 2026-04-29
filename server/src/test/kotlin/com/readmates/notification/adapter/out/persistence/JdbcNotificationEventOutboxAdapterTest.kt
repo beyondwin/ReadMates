@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -13,6 +14,9 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
@@ -195,6 +199,163 @@ class JdbcNotificationEventOutboxAdapterTest(
         ).isTrue()
     }
 
+    @Test
+    fun `claim publishable moves due failed rows to publishing but leaves future failed rows alone`() {
+        insertClub()
+        val dueFailedId = enqueueTestEvent(
+            dedupeKey = "event-outbox-adapter-test-due-failed",
+            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Due Failed"),
+        )
+        val futureFailedId = enqueueTestEvent(
+            dedupeKey = "event-outbox-adapter-test-future-failed",
+            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Future Failed"),
+        )
+        markFailedForRetry(dueFailedId, nextAttemptExpression = "timestampadd(MINUTE, -1, utc_timestamp(6))")
+        markFailedForRetry(futureFailedId, nextAttemptExpression = "timestampadd(MINUTE, 5, utc_timestamp(6))")
+
+        val claimed = adapter.claimPublishable(10)
+
+        assertThat(claimed.map { it.id.toString() }).containsExactly(dueFailedId)
+        assertThat(claimed.single().status).isEqualTo(NotificationEventOutboxStatus.PUBLISHING)
+        assertThat(claimed.single().attemptCount).isEqualTo(2)
+        assertThat(eventRow(dueFailedId)["status"]).isEqualTo("PUBLISHING")
+        assertThat(eventRow(futureFailedId)["status"]).isEqualTo("FAILED")
+    }
+
+    @Test
+    fun `markPublished only publishes the active publishing lease`() {
+        insertClub()
+        val claimed = claimSingleEvent("event-outbox-adapter-test-mark-published")
+        val staleLease = claimed.lockedAt.minusSeconds(1)
+
+        val staleMarked = adapter.markPublished(claimed.id, staleLease)
+        val activeMarked = adapter.markPublished(claimed.id, claimed.lockedAt)
+
+        val row = eventRow(claimed.id.toString())
+        assertThat(staleMarked).isFalse()
+        assertThat(activeMarked).isTrue()
+        assertThat(row["status"]).isEqualTo("PUBLISHED")
+        assertThat(row["published_at"]).isNotNull()
+        assertThat(row["locked_at"]).isNull()
+        assertThat(row["last_error"]).isNull()
+    }
+
+    @Test
+    fun `markPublishFailed only fails active publishing lease and stores sanitized truncated error`() {
+        insertClub()
+        val claimed = claimSingleEvent("event-outbox-adapter-test-mark-failed")
+        val unsafeError = unsafeLongError()
+
+        val staleMarked = adapter.markPublishFailed(claimed.id, claimed.lockedAt.minusSeconds(1), "stale", 0)
+        val activeMarked = adapter.markPublishFailed(claimed.id, claimed.lockedAt, unsafeError, -10)
+
+        val row = eventRow(claimed.id.toString())
+        val storedError = row["last_error"].toString()
+        assertThat(staleMarked).isFalse()
+        assertThat(activeMarked).isTrue()
+        assertThat(row["status"]).isEqualTo("FAILED")
+        assertThat(row["attempt_count"]).isEqualTo(1)
+        assertThat(row["locked_at"]).isNull()
+        assertThat(storedError).hasSize(500)
+        assertThat(storedError).contains("[redacted-secret]", "[redacted-email]")
+        assertThat(storedError).doesNotContain("Authorization", "reader@example.com", "Bearer example")
+    }
+
+    @Test
+    fun `markPublishDead only kills active publishing lease and stores sanitized truncated error`() {
+        insertClub()
+        val claimed = claimSingleEvent("event-outbox-adapter-test-mark-dead")
+        val unsafeError = unsafeLongError()
+
+        val staleMarked = adapter.markPublishDead(claimed.id, claimed.lockedAt.minusSeconds(1), "stale")
+        val activeMarked = adapter.markPublishDead(claimed.id, claimed.lockedAt, unsafeError)
+
+        val row = eventRow(claimed.id.toString())
+        val storedError = row["last_error"].toString()
+        assertThat(staleMarked).isFalse()
+        assertThat(activeMarked).isTrue()
+        assertThat(row["status"]).isEqualTo("DEAD")
+        assertThat(row["attempt_count"]).isEqualTo(1)
+        assertThat(row["locked_at"]).isNull()
+        assertThat(storedError).hasSize(500)
+        assertThat(storedError).contains("[redacted-secret]", "[redacted-email]")
+        assertThat(storedError).doesNotContain("Authorization", "reader@example.com", "Bearer example")
+    }
+
+    @Test
+    fun `mark publish transitions do not overwrite rows that are no longer publishing`() {
+        insertClub()
+        val publishedClaim = claimSingleEvent("event-outbox-adapter-test-cas-published-status")
+        val failedClaim = claimSingleEvent("event-outbox-adapter-test-cas-failed-status")
+        val deadClaim = claimSingleEvent("event-outbox-adapter-test-cas-dead-status")
+        forceEventState(publishedClaim.id.toString(), "DEAD")
+        forceEventState(failedClaim.id.toString(), "PUBLISHED")
+        forceEventState(deadClaim.id.toString(), "FAILED")
+
+        val publishedMarked = adapter.markPublished(publishedClaim.id, publishedClaim.lockedAt)
+        val failedMarked = adapter.markPublishFailed(failedClaim.id, failedClaim.lockedAt, "late failure", 0)
+        val deadMarked = adapter.markPublishDead(deadClaim.id, deadClaim.lockedAt, "late death")
+
+        assertThat(publishedMarked).isFalse()
+        assertThat(failedMarked).isFalse()
+        assertThat(deadMarked).isFalse()
+        assertThat(eventRow(publishedClaim.id.toString())["status"]).isEqualTo("DEAD")
+        assertThat(eventRow(failedClaim.id.toString())["status"]).isEqualTo("PUBLISHED")
+        assertThat(eventRow(deadClaim.id.toString())["status"]).isEqualTo("FAILED")
+    }
+
+    @Test
+    fun `loadMessage maps created at and payload`() {
+        insertClub()
+        val payload = NotificationEventPayload(
+            sessionId = sessionId,
+            sessionNumber = 12,
+            bookTitle = "Message Mapping",
+            documentVersion = 3,
+            authorMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000301"),
+            targetDate = LocalDate.of(2026, 5, 9),
+        )
+        val eventId = enqueueTestEvent(
+            dedupeKey = "event-outbox-adapter-test-load-message",
+            eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+            payload = payload,
+        )
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set created_at = ?
+            where id = ?
+            """.trimIndent(),
+            LocalDateTime.of(2026, 4, 29, 12, 34, 56, 123456000),
+            eventId,
+        )
+
+        val message = adapter.loadMessage(UUID.fromString(eventId))
+
+        assertThat(message).isNotNull
+        assertThat(message!!.eventId.toString()).isEqualTo(eventId)
+        assertThat(message.clubId).isEqualTo(clubId)
+        assertThat(message.eventType).isEqualTo(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED)
+        assertThat(message.aggregateType).isEqualTo("SESSION")
+        assertThat(message.aggregateId).isEqualTo(sessionId)
+        assertThat(message.occurredAt).isEqualTo(OffsetDateTime.of(2026, 4, 29, 12, 34, 56, 123456000, ZoneOffset.UTC))
+        assertThat(message.payload).isEqualTo(payload)
+    }
+
+    @Test
+    fun `loadMessage returns null for missing event`() {
+        val message = adapter.loadMessage(UUID.fromString("00000000-0000-0000-0000-000000009999"))
+
+        assertThat(message).isNull()
+    }
+
+    @Test
+    fun `enqueueSessionReminderDue returns zero for event outbox adapter`() {
+        val inserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 5, 1))
+
+        assertThat(inserted).isZero()
+    }
+
     private fun eventRows(): Int =
         jdbcTemplate.queryForObject(
             """
@@ -206,6 +367,74 @@ class JdbcNotificationEventOutboxAdapterTest(
             clubId.toString(),
         ) ?: 0
 
+    private fun claimSingleEvent(
+        dedupeKey: String,
+    ): NotificationEventOutboxItem {
+        val eventId = enqueueTestEvent(dedupeKey)
+
+        return adapter.claimPublishable(10).single { it.id.toString() == eventId }
+    }
+
+    private fun enqueueTestEvent(
+        dedupeKey: String,
+        eventType: NotificationEventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+        payload: NotificationEventPayload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Outbox Test"),
+    ): String {
+        val inserted = adapter.enqueueEvent(
+            clubId = clubId,
+            eventType = eventType,
+            aggregateType = "SESSION",
+            aggregateId = sessionId,
+            payload = payload,
+            dedupeKey = dedupeKey,
+        )
+        assertThat(inserted).isTrue()
+        return eventIdForDedupeKey(dedupeKey)
+    }
+
+    private fun markFailedForRetry(
+        eventId: String,
+        nextAttemptExpression: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set status = 'FAILED',
+                attempt_count = 2,
+                locked_at = null,
+                next_attempt_at = $nextAttemptExpression
+            where id = ?
+            """.trimIndent(),
+            eventId,
+        )
+    }
+
+    private fun forceEventState(
+        eventId: String,
+        status: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set status = ?,
+                locked_at = null
+            where id = ?
+            """.trimIndent(),
+            status,
+            eventId,
+        )
+    }
+
+    private fun eventRow(eventId: String): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select status, attempt_count, locked_at, published_at, last_error
+            from notification_event_outbox
+            where id = ?
+            """.trimIndent(),
+            eventId,
+        )
+
     private fun eventIdForDedupeKey(dedupeKey: String): String =
         jdbcTemplate.queryForObject(
             """
@@ -216,6 +445,9 @@ class JdbcNotificationEventOutboxAdapterTest(
             String::class.java,
             dedupeKey,
         ) ?: error("Missing notification event outbox row for dedupe key $dedupeKey")
+
+    private fun unsafeLongError(): String =
+        "Authorization: Bearer example reader@example.com " + "x".repeat(600)
 
     private fun insertClub() {
         jdbcTemplate.update(
