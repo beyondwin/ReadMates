@@ -10,6 +10,7 @@ import {
   type ReadmatesMobileWorkspace,
 } from "@/src/app/route-continuity";
 import { readmatesFetch } from "@/shared/api/client";
+import { PublicUrlPolicyHead } from "@/features/public/ui/public-url-policy-head";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
@@ -44,6 +45,7 @@ export function PublicRouteLayout() {
 
   return (
     <div className="public-shell m-app">
+      <PublicUrlPolicyHead path={location.pathname} />
       <div className="desktop-only">
         <TopNav authenticated={authenticated} publicBasePath={basePath} />
       </div>
