@@ -127,6 +127,21 @@ class AuthSessionServiceTest {
     }
 
     @Test
+    fun `session cookies can be scoped to a configured shared domain`() {
+        val service = AuthSessionService(
+            authSessionStore = repository,
+            secureCookie = true,
+            sessionCookieDomain = ".readmates.example",
+        )
+
+        val cookie = service.sessionCookie("opaque-token")
+        val clearedCookie = service.clearedSessionCookie()
+
+        assertTrue(cookie.contains("Domain=.readmates.example"))
+        assertTrue(clearedCookie.contains("Domain=.readmates.example"))
+    }
+
+    @Test
     fun `revoke all for user normalizes uuid before repository and cache eviction`() {
         val repository = CountingAuthSessionStore()
         val cache = AuthSessionCachePort.InMemoryForTest()

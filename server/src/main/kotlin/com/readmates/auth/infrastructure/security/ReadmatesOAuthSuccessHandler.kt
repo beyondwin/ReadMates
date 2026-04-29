@@ -24,6 +24,7 @@ class ReadmatesOAuthSuccessHandler(
     private val googleLoginService: GoogleLoginService,
     private val invitationService: InvitationService,
     private val authSessionService: AuthSessionService,
+    private val oauthReturnState: OAuthReturnState,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : AuthenticationSuccessHandler, AuthenticationFailureHandler {
@@ -37,7 +38,8 @@ class ReadmatesOAuthSuccessHandler(
         val oidcUser = authentication.principal as OidcUser
         try {
             val inviteToken = capturedInviteToken(request)
-            val authenticatedUserId = if (inviteToken != null) {
+            val signedReturnState = capturedReturnState(request)
+            val login = if (inviteToken != null) {
                 val acceptedMember = invitationService.acceptGoogleInvitation(
                     rawToken = inviteToken,
                     googleSubjectId = oidcUser.subject,
@@ -45,24 +47,31 @@ class ReadmatesOAuthSuccessHandler(
                     displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
                     profileImageUrl = oidcUser.getClaimAsString("picture"),
                 )
-                acceptedMember.userId
+                OAuthLoginRedirect(
+                    userId = acceptedMember.userId,
+                    returnTarget = oauthReturnState.inviteReturnTarget(acceptedMember.clubSlug, inviteToken),
+                )
             } else {
-                googleLoginService.loginVerifiedGoogleUserForSession(
+                val loginResult = googleLoginService.loginVerifiedGoogleUserForSession(
                     googleSubjectId = oidcUser.subject,
                     email = oidcUser.email,
                     displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
                     profileImageUrl = oidcUser.getClaimAsString("picture"),
-                ).userId
+                )
+                OAuthLoginRedirect(
+                    userId = loginResult.userId,
+                    returnTarget = oauthReturnState.validatedReturnTarget(signedReturnState),
+                )
             }
             val issuedSession = authSessionService.issueSession(
-                userId = authenticatedUserId.toString(),
+                userId = login.userId.toString(),
                 userAgent = request.getHeader("User-Agent"),
                 ipAddress = request.remoteAddr,
             )
 
             response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.sessionCookie(issuedSession.rawToken))
             clearServletAuthenticationState(request)
-            response.sendRedirect("$appOrigin/app")
+            response.sendRedirect(oauthReturnState.redirectUrl(login.returnTarget))
         } catch (exception: RuntimeException) {
             if (exception !is GoogleLoginException && exception !is InvitationDomainException) {
                 throw exception
@@ -100,11 +109,23 @@ class ReadmatesOAuthSuccessHandler(
         return inviteToken
     }
 
+    private fun capturedReturnState(request: HttpServletRequest): String? {
+        val session = request.getSession(false) ?: return null
+        val signedState = session.getAttribute(OAuthReturnState.SESSION_ATTRIBUTE)?.toString()
+        session.removeAttribute(OAuthReturnState.SESSION_ATTRIBUTE)
+        return signedState
+    }
+
     private fun clearServletAuthenticationState(request: HttpServletRequest) {
         SecurityContextHolder.clearContext()
         request.getSession(false)?.invalidate()
     }
 }
+
+private data class OAuthLoginRedirect(
+    val userId: java.util.UUID,
+    val returnTarget: String,
+)
 
 internal fun readmatesAppOrigin(appBaseUrl: String): String {
     val rawValue = appBaseUrl.trim().ifEmpty { "http://localhost:3000" }

@@ -40,6 +40,11 @@ management:
 
 readmates:
   app-base-url: ${READMATES_APP_BASE_URL:http://localhost:3000}
+  auth:
+    auth-base-url: ${READMATES_AUTH_BASE_URL:${READMATES_APP_BASE_URL:http://localhost:3000}}
+    return-state-secret: ${READMATES_AUTH_RETURN_STATE_SECRET:dev-return-state-secret}
+    return-state-ttl: ${READMATES_AUTH_RETURN_STATE_TTL:10m}
+    session-cookie-domain: ${READMATES_AUTH_SESSION_COOKIE_DOMAIN:}
   bff-secret-required: ${READMATES_BFF_SECRET_REQUIRED:true}
   notifications:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}

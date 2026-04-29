@@ -32,6 +32,8 @@ class AuthSessionService(
     private val cacheProperties: AuthSessionCacheProperties = AuthSessionCacheProperties(),
     @param:Value("\${readmates.auth.session-cookie-secure:true}")
     private val secureCookie: Boolean = false,
+    @param:Value("\${readmates.auth.session-cookie-domain:}")
+    private val sessionCookieDomain: String = "",
 ) : LogoutAuthSessionUseCase {
     private val secureRandom = SecureRandom()
 
@@ -173,14 +175,20 @@ class AuthSessionService(
         return minOf(cacheProperties.sessionTtl, remaining)
     }
 
-    private fun cookieBuilder(value: String, maxAge: Duration): ResponseCookie.ResponseCookieBuilder =
-        ResponseCookie
+    private fun cookieBuilder(value: String, maxAge: Duration): ResponseCookie.ResponseCookieBuilder {
+        val builder = ResponseCookie
             .from(COOKIE_NAME, value)
             .httpOnly(true)
             .secure(secureCookie)
             .sameSite("Lax")
             .path("/")
             .maxAge(maxAge)
+        val normalizedDomain = sessionCookieDomain.trim().takeIf { it.isNotEmpty() }
+        if (normalizedDomain != null) {
+            builder.domain(normalizedDomain)
+        }
+        return builder
+    }
 
     companion object {
         const val COOKIE_NAME = "readmates_session"
