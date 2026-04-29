@@ -129,6 +129,28 @@ API 성격별 처리:
 - Host API: 해당 클럽 `ACTIVE + HOST` membership이 필요하다.
 - Admin API: platform admin 권한이 필요하고 club membership은 필요하지 않다.
 
+역할은 누적되지만, 권한 계산은 surface와 club context별로 분리한다.
+
+- 한 user는 Platform Admin이면서 동시에 하나 이상의 클럽 membership을 가질 수 있다.
+- 한 user는 A클럽에서 `HOST`, B클럽에서 `MEMBER`, C클럽에서 `VIEWER`일 수 있다.
+- `/admin/**`과 `/api/admin/**`는 `platform_admins`만 본다. 특정 클럽의 `HOST` role은 admin 권한으로 승격되지 않는다.
+- `/clubs/a/app/host/**`와 A클럽 host API는 A클럽 membership만 본다. 같은 user가 Platform Admin이어도 A클럽 `HOST` membership 또는 support access 없이 host 기능을 우회하지 않는다.
+- `/clubs/b/app/**`는 B클럽 membership만 본다. A클럽 host 권한은 B클럽 member surface에 영향을 주지 않는다.
+- 클럽 스위처와 `GET /api/auth/me`는 각 club membership의 role/status를 독립적으로 보여준다.
+
+예시:
+
+```text
+user-1
+  platform_admins.role = OPERATOR
+  memberships:
+    club-a: HOST / ACTIVE
+    club-b: MEMBER / ACTIVE
+    club-c: VIEWER
+```
+
+이 user는 `/admin`에 OPERATOR로 접근할 수 있고, `club-a`에서는 host 도구를 쓸 수 있으며, `club-b`에서는 일반 멤버 앱만 사용할 수 있다. `club-c`에서는 viewer 정책에 맞는 읽기 화면만 접근한다.
+
 로그인 세션은 ReadMates 계정 단위로 공유한다. `<club-a>.<primary-domain>`에서 로그인한 사용자가 `<club-b>.<primary-domain>`에 가면 같은 session cookie로 인증된다. 권한은 각 클럽의 membership으로 다시 판단한다.
 
 소유 도메인 subdomain 사이 공유 cookie는 다음 posture를 사용한다.
@@ -162,6 +184,8 @@ memberships
   role: HOST | MEMBER
   status: VIEWER | ACTIVE | SUSPENDED | LEFT | INACTIVE | INVITED
 ```
+
+`platform_admins`는 전역 운영 role이고, `memberships.role`은 클럽별 role이다. 두 role은 서로를 대체하지 않는다. Platform Admin이 어떤 클럽에서 host 작업을 하려면 그 클럽의 `HOST` membership을 갖거나, 별도의 만료되는 support access grant를 받아야 한다. 반대로 클럽 `HOST`는 Platform Admin row가 없으면 전역 admin surface에 접근할 수 없다.
 
 Platform Admin surface:
 
@@ -378,7 +402,7 @@ GET /api/auth/me
 
 - authenticated user profile
 - current club membership, 있으면
-- joined clubs list
+- joined clubs list, 각 항목의 club slug, membership id, role, status 포함
 - platform admin 여부와 role, 있으면
 - recommended app entry URL
 
@@ -403,6 +427,8 @@ POST /api/admin/support-access-grants
 ```
 
 Admin API는 `CurrentMember`가 아니라 `CurrentPlatformAdmin` 같은 별도 principal을 사용한다. 클럽 membership role이 `HOST`여도 `/api/admin/**` 접근 권한이 생기지 않는다.
+
+Club-scoped API는 항상 `CurrentMember`를 request club context로 resolve한다. 같은 session user가 여러 membership을 가져도 endpoint path 또는 host가 가리키는 club 하나만 현재 membership이 된다.
 
 ## Frontend 변화
 
@@ -494,6 +520,8 @@ Public repo에는 실제 custom domain, 운영 secret, 멤버 데이터, deploym
 - `club_domains` resolve 단위 테스트.
 - `user + clubId` membership resolve 테스트.
 - 같은 user가 두 club에 가입한 경우 current member가 request club에 따라 달라지는 테스트.
+- 같은 user가 A클럽 HOST, B클럽 MEMBER일 때 A클럽 host API만 허용되고 B클럽 host API는 거부되는 테스트.
+- Platform Admin이면서 클럽 member인 user가 admin API와 member API에서 서로 다른 principal로 평가되는 테스트.
 - cross-club session, membership, notification 접근 거부 테스트.
 - Platform Admin이 club creation transaction을 수행하고 audit event를 남기는 테스트.
 - OWNER/OPERATOR/SUPPORT 권한 매트릭스 테스트.
@@ -507,6 +535,7 @@ Public repo에는 실제 custom domain, 운영 secret, 멤버 데이터, deploym
 - 클럽 스위처 이동.
 - subdomain host context mock을 사용한 public/app loader 테스트.
 - `/admin/**` route guard와 role별 화면 action 표시/숨김 테스트.
+- 클럽 스위처가 club별 role/status를 표시하고, host badge/action을 해당 클럽에서만 보여주는 테스트.
 
 E2E:
 
