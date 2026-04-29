@@ -31,6 +31,7 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getByRole("link", { name: "이번 세션" })).toHaveAttribute("href", "/app/session/current");
     expect(within(nav).getByRole("link", { name: "클럽 노트" })).toHaveAttribute("href", "/app/notes");
     expect(within(nav).getByRole("link", { name: "아카이브" })).toHaveAttribute("href", "/app/archive");
+    expect(within(nav).getByRole("link", { name: "알림" })).toHaveAttribute("href", "/app/notifications");
     expect(within(nav).getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
     expect(within(nav).getByRole("link", { name: "이번 세션" })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
@@ -46,6 +47,7 @@ describe("TopNav responsive variants", () => {
       "이번 세션",
       "클럽 노트",
       "아카이브",
+      "알림",
       "내 공간",
     ]);
     const hostEntry = screen.getByRole("link", { name: "호스트 화면" });

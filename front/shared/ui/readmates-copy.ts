@@ -11,6 +11,7 @@ export const READMATES_NAV_LABELS = {
     currentSession: "이번 세션",
     clubNotes: "클럽 노트",
     archive: "아카이브",
+    notifications: "알림",
     mySpace: "내 공간",
   },
   host: {
