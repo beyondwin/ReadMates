@@ -36,6 +36,8 @@ class KafkaNotificationEventPublisherAdapter(
 
         try {
             kafkaTemplate.send(kafkaMessage).get(kafkaProperties.sendTimeout.toMillis(), TimeUnit.MILLISECONDS)
+        } catch (ex: NotificationKafkaPublishException) {
+            throw ex
         } catch (ex: InterruptedException) {
             Thread.currentThread().interrupt()
             throw NotificationKafkaPublishException("Interrupted publishing notification event ${message.eventId}", ex)
@@ -46,6 +48,8 @@ class KafkaNotificationEventPublisherAdapter(
             )
         } catch (ex: ExecutionException) {
             throw NotificationKafkaPublishException("Failed publishing notification event ${message.eventId}", ex.cause ?: ex)
+        } catch (ex: RuntimeException) {
+            throw NotificationKafkaPublishException("Failed publishing notification event ${message.eventId}", ex)
         }
     }
 }

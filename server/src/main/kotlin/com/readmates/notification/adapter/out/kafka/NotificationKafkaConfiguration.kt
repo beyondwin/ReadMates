@@ -1,9 +1,8 @@
-@file:Suppress("DEPRECATION")
-
 package com.readmates.notification.adapter.out.kafka
 
 import com.readmates.notification.application.model.NotificationEventMessage
 import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.common.serialization.Serializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -14,7 +13,9 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.core.ProducerFactory
-import org.springframework.kafka.support.serializer.JsonSerializer
+import org.springframework.kafka.support.JacksonMapperUtils
+import org.springframework.kafka.support.serializer.JacksonJsonSerializer
+import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 
 @Configuration(proxyBeanMethods = false)
@@ -25,7 +26,11 @@ class NotificationKafkaConfiguration {
     fun notificationEventProducerFactory(
         properties: NotificationKafkaProperties,
     ): ProducerFactory<String, NotificationEventMessage> =
-        DefaultKafkaProducerFactory(notificationProducerConfigs(properties))
+        DefaultKafkaProducerFactory(
+            notificationProducerConfigs(properties),
+            { StringSerializer() },
+            { notificationEventValueSerializer() },
+        )
 
     @Bean
     fun notificationEventKafkaTemplate(
@@ -42,11 +47,14 @@ class NotificationKafkaConfiguration {
 
         return mapOf(
             ProducerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers,
-            ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java,
-            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG to JsonSerializer::class.java,
-            JsonSerializer.ADD_TYPE_INFO_HEADERS to false,
         )
     }
+
+    private fun notificationEventValueSerializer(): Serializer<NotificationEventMessage> =
+        JacksonJsonSerializer<NotificationEventMessage>(notificationEventJsonMapper()).noTypeInfo()
+
+    private fun notificationEventJsonMapper(): JsonMapper =
+        JacksonMapperUtils.enhancedJsonMapper()
 }
 
 @ConfigurationProperties(prefix = "readmates.notifications.kafka")
