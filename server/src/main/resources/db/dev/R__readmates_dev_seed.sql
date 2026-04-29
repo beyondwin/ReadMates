@@ -1,21 +1,32 @@
 -- Development seed data for local ReadMates fixtures.
 
-with seed(id, slug, name, tagline, about) as (
-  values (
-    '00000000-0000-0000-0000-000000000001'::uuid,
-    'reading-sai',
-    '읽는사이',
-    '함께 읽고 각자의 언어로 남기는 독서모임',
-    '초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.'
-  )
+with seed(id, slug, name, tagline, about, status) as (
+  values
+    (
+      '00000000-0000-0000-0000-000000000001'::uuid,
+      'reading-sai',
+      '읽는사이',
+      '함께 읽고 각자의 언어로 남기는 독서모임',
+      '초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.',
+      'ACTIVE'
+    ),
+    (
+      '00000000-0000-0000-0000-000000000002'::uuid,
+      'sample-book-club',
+      '샘플 북클럽',
+      '다른 클럽 권한을 확인하기 위한 공개 샘플입니다.',
+      'ReadMates 멀티 클럽 개발 검증용 샘플 클럽입니다.',
+      'ACTIVE'
+    )
 )
-insert into clubs (id, slug, name, tagline, about)
-select id, slug, name, tagline, about
+insert into clubs (id, slug, name, tagline, about, status)
+select id, slug, name, tagline, about, status
 from seed
 on conflict (slug) do update set
   name = excluded.name,
   tagline = excluded.tagline,
-  about = excluded.about;
+  about = excluded.about,
+  status = excluded.status;
 
 with seed(id_suffix, google_subject_id, email, name) as (
   values

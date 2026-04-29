@@ -451,6 +451,82 @@ class MySqlFlywayMigrationTest(
         }
     }
 
+    @Test
+    fun `mysql creates multi club platform metadata tables`() {
+        val tableCount = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.tables
+            where table_schema = database()
+              and table_name in (
+                'club_domains',
+                'platform_admins',
+                'club_audit_events',
+                'platform_audit_events',
+                'support_access_grants'
+              )
+            """.trimIndent(),
+            Int::class.java,
+        )
+
+        assertEquals(5, tableCount)
+        assertEquals("NO", columnValue("clubs", "status", "is_nullable"))
+        assertTrue(checkConstraintClause("clubs_status_check").contains("ACTIVE"))
+        assertTrue(checkConstraintClause("clubs_status_check").contains("ARCHIVED"))
+
+        assertEquals("NO", columnValue("club_domains", "club_id", "is_nullable"))
+        assertEquals("NO", columnValue("club_domains", "hostname", "is_nullable"))
+        assertEquals("NO", columnValue("club_domains", "status", "is_nullable"))
+        assertEquals("club_id,status,is_primary", indexColumns("club_domains", "club_domains_club_status_idx"))
+        assertEquals(1, uniqueIndexCount("club_domains", "hostname"))
+        assertEquals("club_id", foreignKeyColumns("club_domains", "club_domains_club_fk"))
+        assertEquals("clubs:id", foreignKeyReference("club_domains", "club_domains_club_fk"))
+        assertTrue(checkConstraintClause("club_domains_kind_check").contains("CUSTOM_DOMAIN"))
+        assertTrue(checkConstraintClause("club_domains_status_check").contains("ACTION_REQUIRED"))
+
+        assertEquals("NO", columnValue("platform_admins", "user_id", "is_nullable"))
+        assertEquals("NO", columnValue("platform_admins", "role", "is_nullable"))
+        assertEquals("NO", columnValue("platform_admins", "status", "is_nullable"))
+        assertEquals("user_id", foreignKeyColumns("platform_admins", "platform_admins_user_fk"))
+        assertEquals("users:id", foreignKeyReference("platform_admins", "platform_admins_user_fk"))
+        assertTrue(checkConstraintClause("platform_admins_role_check").contains("OWNER"))
+        assertTrue(checkConstraintClause("platform_admins_status_check").contains("DISABLED"))
+
+        assertEquals("club_id,created_at", indexColumns("club_audit_events", "club_audit_events_club_created_idx"))
+        assertEquals("actor_user_id,created_at", indexColumns("club_audit_events", "club_audit_events_actor_created_idx"))
+        assertEquals("actor_user_id", foreignKeyColumns("club_audit_events", "club_audit_events_actor_fk"))
+        assertEquals("club_id", foreignKeyColumns("club_audit_events", "club_audit_events_club_fk"))
+        assertEquals("NO", columnValue("club_audit_events", "metadata_json", "is_nullable"))
+
+        assertEquals(
+            "actor_user_id,created_at",
+            indexColumns("platform_audit_events", "platform_audit_events_actor_created_idx"),
+        )
+        assertEquals(
+            "target_user_id,created_at",
+            indexColumns("platform_audit_events", "platform_audit_events_target_created_idx"),
+        )
+        assertEquals("actor_user_id", foreignKeyColumns("platform_audit_events", "platform_audit_events_actor_fk"))
+        assertEquals("target_user_id", foreignKeyColumns("platform_audit_events", "platform_audit_events_target_fk"))
+        assertEquals("NO", columnValue("platform_audit_events", "metadata_json", "is_nullable"))
+
+        assertEquals(
+            "club_id,expires_at",
+            indexColumns("support_access_grants", "support_access_grants_club_expires_idx"),
+        )
+        assertEquals(
+            "grantee_user_id,expires_at",
+            indexColumns("support_access_grants", "support_access_grants_grantee_expires_idx"),
+        )
+        assertEquals("club_id", foreignKeyColumns("support_access_grants", "support_access_grants_club_fk"))
+        assertEquals(
+            "granted_by_user_id",
+            foreignKeyColumns("support_access_grants", "support_access_grants_granted_by_fk"),
+        )
+        assertEquals("grantee_user_id", foreignKeyColumns("support_access_grants", "support_access_grants_grantee_fk"))
+        assertTrue(checkConstraintClause("support_access_grants_scope_check").contains("HOST_SUPPORT_READ"))
+    }
+
     private fun insertClub(
         clubId: String,
         slug: String,
