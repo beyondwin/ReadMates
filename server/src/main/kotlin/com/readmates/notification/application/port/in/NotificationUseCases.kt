@@ -14,6 +14,7 @@ import java.util.UUID
 interface RecordNotificationEventUseCase {
     fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID)
     fun recordNextBookPublished(clubId: UUID, sessionId: UUID)
+    fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID)
     fun recordSessionReminderDue(targetDate: LocalDate)
 }
 

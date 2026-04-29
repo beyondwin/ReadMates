@@ -41,6 +41,8 @@ private class RecordingNotificationEvents : RecordNotificationEventUseCase {
 
     override fun recordNextBookPublished(clubId: UUID, sessionId: UUID) = Unit
 
+    override fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID) = Unit
+
     override fun recordSessionReminderDue(targetDate: LocalDate) {
         reminderDates += targetDate
     }

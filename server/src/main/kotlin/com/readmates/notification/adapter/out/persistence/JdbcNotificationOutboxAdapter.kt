@@ -174,6 +174,66 @@ class JdbcNotificationOutboxAdapter(
     }
 
     @Transactional
+    override fun enqueueReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID): Int {
+        val recipients = jdbcTemplate().query(
+            """
+            select
+              memberships.id as recipient_membership_id,
+              users.email,
+              coalesce(memberships.short_name, users.name) as display_name,
+              sessions.number as session_number,
+              sessions.book_title
+            from sessions
+            join memberships on memberships.club_id = sessions.club_id
+            join users on users.id = memberships.user_id
+            left join notification_preferences on notification_preferences.membership_id = memberships.id
+              and notification_preferences.club_id = memberships.club_id
+            where sessions.club_id = ?
+              and sessions.id = ?
+              and sessions.state = 'PUBLISHED'
+              and sessions.visibility in ('MEMBER', 'PUBLIC')
+              and memberships.status = 'ACTIVE'
+              and memberships.id <> ?
+              and coalesce(notification_preferences.email_enabled, true)
+              and coalesce(notification_preferences.review_published_enabled, false)
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toSessionNotificationRecipient() },
+            clubId.dbString(),
+            sessionId.dbString(),
+            authorMembershipId.dbString(),
+        )
+
+        return recipients.sumOf { recipient ->
+            insertOutbox(
+                clubId = clubId,
+                eventType = NotificationEventType.REVIEW_PUBLISHED,
+                aggregateId = sessionId,
+                recipientMembershipId = recipient.membershipId,
+                recipientEmail = recipient.email,
+                recipientDisplayName = recipient.displayName,
+                subject = "새 서평이 공개되었습니다",
+                bodyText = """
+                    ${recipient.displayName ?: "멤버"}님,
+
+                    ${recipient.sessionNumber}회차 ${recipient.bookTitle}에 새 서평이 공개되었습니다.
+                    ReadMates에서 확인해 주세요.
+                """.trimIndent(),
+                deepLinkPath = "/notes?sessionId=$sessionId",
+                metadata = mapOf(
+                    "sessionNumber" to recipient.sessionNumber,
+                    "bookTitle" to recipient.bookTitle,
+                ),
+                dedupeKey = reviewDedupeKey(
+                    eventType = NotificationEventType.REVIEW_PUBLISHED,
+                    aggregateId = sessionId,
+                    authorMembershipId = authorMembershipId,
+                    recipientMembershipId = recipient.membershipId,
+                ),
+            )
+        }
+    }
+
+    @Transactional
     override fun enqueueSessionReminderDue(targetDate: LocalDate): Int {
         val recipients = jdbcTemplate().query(
             """
@@ -697,6 +757,7 @@ class JdbcNotificationOutboxAdapter(
         bodyText: String,
         deepLinkPath: String,
         metadata: Map<String, Any?>,
+        dedupeKey: String = dedupeKey(eventType, aggregateId, recipientMembershipId),
     ): Int =
         jdbcTemplate().update(
             """
@@ -730,7 +791,7 @@ class JdbcNotificationOutboxAdapter(
             bodyText,
             deepLinkPath,
             metadataJson(metadata),
-            dedupeKey(eventType, aggregateId, recipientMembershipId),
+            dedupeKey,
         )
 
     private fun countByStatus(clubId: UUID, status: NotificationOutboxStatus): Int =
@@ -783,6 +844,13 @@ class JdbcNotificationOutboxAdapter(
         aggregateId: UUID,
         recipientMembershipId: UUID,
     ): String = "${eventType.name}:$aggregateId:$recipientMembershipId"
+
+    private fun reviewDedupeKey(
+        eventType: NotificationEventType,
+        aggregateId: UUID,
+        authorMembershipId: UUID,
+        recipientMembershipId: UUID,
+    ): String = "${eventType.name}:$aggregateId:$authorMembershipId:$recipientMembershipId"
 
     private fun ResultSet.toSessionNotificationRecipient(): SessionNotificationRecipient =
         SessionNotificationRecipient(

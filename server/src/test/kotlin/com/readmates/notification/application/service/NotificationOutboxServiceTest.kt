@@ -433,6 +433,8 @@ private class FakeNotificationOutboxPort(
 
     override fun enqueueNextBookPublished(clubId: UUID, sessionId: UUID): Int = 0
 
+    override fun enqueueReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID): Int = 0
+
     override fun enqueueSessionReminderDue(targetDate: LocalDate): Int {
         reminderDates += targetDate
         return 1

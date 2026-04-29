@@ -1323,7 +1323,7 @@ git commit -m "feat: add host notification test mail"
 - Test: `server/src/test/kotlin/com/readmates/archive/api/MemberArchiveReviewControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationOutboxAdapterTest.kt`
 
-- [ ] **Step 1: Write notification adapter tests for REVIEW_PUBLISHED**
+- [x] **Step 1: Write notification adapter tests for REVIEW_PUBLISHED**
 
 Append to `JdbcNotificationOutboxAdapterTest.kt`:
 
@@ -1365,7 +1365,7 @@ private fun membershipIdForEmail(email: String): UUID =
     )
 ```
 
-- [ ] **Step 2: Run adapter tests and verify failure**
+- [x] **Step 2: Run adapter tests and verify failure**
 
 Run:
 
@@ -1375,7 +1375,7 @@ Run:
 
 Expected: FAIL because `enqueueReviewPublished` is not defined.
 
-- [ ] **Step 3: Add review event port and service method**
+- [x] **Step 3: Add review event port and service method**
 
 Add to `RecordNotificationEventUseCase`:
 
@@ -1399,7 +1399,7 @@ override fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembersh
 
 Update `NoopRecordNotificationEventUseCase` in `HostSessionCommandService.kt` with an empty `recordReviewPublished` method.
 
-- [ ] **Step 4: Implement REVIEW_PUBLISHED enqueue SQL**
+- [x] **Step 4: Implement REVIEW_PUBLISHED enqueue SQL**
 
 Add a recipient query in `JdbcNotificationOutboxAdapter.kt`:
 
@@ -1450,7 +1450,7 @@ private fun reviewDedupeKey(
 ): String = "${eventType.name}:$aggregateId:$authorMembershipId:$recipientMembershipId"
 ```
 
-- [ ] **Step 5: Write archive review controller tests**
+- [x] **Step 5: Write archive review controller tests**
 
 Create `server/src/test/kotlin/com/readmates/archive/api/MemberArchiveReviewControllerTest.kt`:
 
@@ -1536,7 +1536,7 @@ class MemberArchiveReviewControllerTest(
 }
 ```
 
-- [ ] **Step 6: Run archive review tests and verify failure**
+- [x] **Step 6: Run archive review tests and verify failure**
 
 Run:
 
@@ -1546,7 +1546,7 @@ Run:
 
 Expected: FAIL because the endpoint does not exist.
 
-- [ ] **Step 7: Implement archive review use case and controller**
+- [x] **Step 7: Implement archive review use case and controller**
 
 Create `MemberArchiveReviewUseCases.kt`:
 
@@ -1608,7 +1608,7 @@ class MemberArchiveReviewController(
 }
 ```
 
-- [ ] **Step 8: Implement archive review service and persistence**
+- [x] **Step 8: Implement archive review service and persistence**
 
 Create `MemberArchiveReviewWritePort.kt`:
 
@@ -1677,7 +1677,7 @@ on duplicate key update
 
 Return `newlyPublic = previousVisibility != "PUBLIC"`.
 
-- [ ] **Step 9: Run review notification tests**
+- [x] **Step 9: Run review notification tests**
 
 Run:
 
@@ -1688,7 +1688,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/main/kotlin/com/readmates/archive \

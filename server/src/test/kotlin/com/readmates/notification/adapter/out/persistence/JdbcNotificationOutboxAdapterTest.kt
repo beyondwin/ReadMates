@@ -106,6 +106,20 @@ class JdbcNotificationOutboxAdapterTest(
     }
 
     @Test
+    fun `enqueueReviewPublished notifies opted-in active members except author`() {
+        enableReviewPublished("member2@example.com")
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000306")
+        val authorMembershipId = membershipIdForEmail("member1@example.com")
+
+        val inserted = adapter.enqueueReviewPublished(clubId, sessionId, authorMembershipId)
+
+        assertThat(inserted).isGreaterThan(0)
+        assertThat(notificationRowsFor("REVIEW_PUBLISHED", "member1@example.com")).isZero()
+        assertThat(notificationRowsFor("REVIEW_PUBLISHED", "member2@example.com")).isGreaterThan(0)
+    }
+
+    @Test
     fun `enqueue is idempotent for the same event and recipient`() {
         val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
@@ -457,6 +471,25 @@ class JdbcNotificationOutboxAdapterTest(
         disableMemberPreference(email, "email_enabled")
     }
 
+    private fun enableReviewPublished(email: String) {
+        upsertPreference(email, "review_published_enabled", true)
+    }
+
+    private fun membershipIdForEmail(email: String): UUID =
+        UUID.fromString(
+            jdbcTemplate.queryForObject(
+                """
+                select memberships.id
+                from memberships
+                join users on users.id = memberships.user_id
+                where users.email = ?
+                  and memberships.club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+                String::class.java,
+                email,
+            ),
+        )
+
     private fun makeNextBookSessionEligible(sessionId: UUID) {
         jdbcTemplate.update(
             """
@@ -478,10 +511,10 @@ class JdbcNotificationOutboxAdapterTest(
             "review_published_enabled",
         )
         require(column in allowedColumns) { "Unsupported notification preference column: $column" }
-        upsertPreference(email, column)
+        upsertPreference(email, column, false)
     }
 
-    private fun upsertPreference(email: String, column: String) {
+    private fun upsertPreference(email: String, column: String, enabled: Boolean) {
         val membership = jdbcTemplate.queryForMap(
             """
             select memberships.id as membership_id, memberships.club_id as club_id
@@ -504,10 +537,11 @@ class JdbcNotificationOutboxAdapterTest(
         jdbcTemplate.update(
             """
             update notification_preferences
-            set $column = false
+            set $column = ?
             where membership_id = ?
               and club_id = ?
             """.trimIndent(),
+            enabled,
             membership["membership_id"].toString(),
             membership["club_id"].toString(),
         )
