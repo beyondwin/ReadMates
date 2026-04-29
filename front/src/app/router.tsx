@@ -29,11 +29,13 @@ import {
   hostDashboardLoader,
   hostInvitationsLoader,
   hostMembersLoader,
+  hostNotificationsLoader,
   hostSessionEditorLoader,
 } from "@/features/host";
 import {
   EditHostSessionRouteElement,
   HostDashboardRouteElement,
+  HostNotificationsRouteElement,
   NewHostSessionRouteElement,
 } from "@/src/app/host-route-elements";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
@@ -205,6 +207,13 @@ export const routes: RouteObject[] = [
         loader: hostInvitationsLoader,
         errorElement: <HostRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
+      },
+      {
+        path: "notifications",
+        element: <HostNotificationsRouteElement />,
+        loader: hostNotificationsLoader,
+        errorElement: <HostRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="알림 발송 장부를 불러오는 중" variant="host" />,
       },
       {
         path: "sessions/new",

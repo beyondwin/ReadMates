@@ -2104,7 +2104,7 @@ git commit -m "feat: add member notification settings UI"
 - Modify: `front/src/app/router.tsx`
 - Test: `front/tests/unit/host-notifications.test.tsx`
 
-- [ ] **Step 1: Write frontend tests**
+- [x] **Step 1: Write frontend tests**
 
 Create `front/tests/unit/host-notifications.test.tsx`:
 
@@ -2155,7 +2155,7 @@ describe("HostNotificationsPage", () => {
 });
 ```
 
-- [ ] **Step 2: Run test and verify failure**
+- [x] **Step 2: Run test and verify failure**
 
 Run:
 
@@ -2165,7 +2165,7 @@ pnpm --dir front test -- --run front/tests/unit/host-notifications.test.tsx
 
 Expected: FAIL because `HostNotificationsPage` does not exist.
 
-- [ ] **Step 3: Add loader/actions**
+- [x] **Step 3: Add loader/actions**
 
 Create `front/features/host/route/host-notifications-data.ts`:
 
@@ -2209,7 +2209,7 @@ export const hostNotificationsActions = {
 };
 ```
 
-- [ ] **Step 4: Add route shell**
+- [x] **Step 4: Add route shell**
 
 Create `front/features/host/route/host-notifications-route.tsx`:
 
@@ -2241,7 +2241,7 @@ export function HostNotificationsRoute() {
 }
 ```
 
-- [ ] **Step 5: Add UI component**
+- [x] **Step 5: Add UI component**
 
 Create `front/features/host/ui/host-notifications-page.tsx`:
 
@@ -2354,7 +2354,7 @@ export function HostNotificationsPage({
 }
 ```
 
-- [ ] **Step 6: Register route**
+- [x] **Step 6: Register route**
 
 Export route modules in `front/features/host/index.ts`:
 
@@ -2405,7 +2405,7 @@ Add child under `/app/host`:
 },
 ```
 
-- [ ] **Step 7: Run host notification UI tests**
+- [x] **Step 7: Run host notification UI tests**
 
 Run:
 
@@ -2415,7 +2415,7 @@ pnpm --dir front test -- --run front/tests/unit/host-notifications.test.tsx
 
 Expected: `PASS`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add front/features/host front/src/app/router.tsx front/src/app/host-route-elements.tsx front/tests/unit/host-notifications.test.tsx
