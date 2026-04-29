@@ -16,6 +16,7 @@ import java.util.UUID
 interface NotificationOutboxPort {
     fun enqueueFeedbackDocumentPublished(clubId: UUID, sessionId: UUID): Int
     fun enqueueNextBookPublished(clubId: UUID, sessionId: UUID): Int
+    fun enqueueReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID): Int
     fun enqueueSessionReminderDue(targetDate: LocalDate): Int
     fun claimPending(limit: Int): List<NotificationOutboxItem>
     fun claimPendingForClub(clubId: UUID, limit: Int): List<NotificationOutboxItem>

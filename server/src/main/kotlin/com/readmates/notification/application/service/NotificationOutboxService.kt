@@ -60,6 +60,10 @@ class NotificationOutboxService(
         notificationOutboxPort.enqueueNextBookPublished(clubId, sessionId)
     }
 
+    override fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID) {
+        notificationOutboxPort.enqueueReviewPublished(clubId, sessionId, authorMembershipId)
+    }
+
     override fun recordSessionReminderDue(targetDate: LocalDate) {
         notificationOutboxPort.enqueueSessionReminderDue(targetDate)
     }

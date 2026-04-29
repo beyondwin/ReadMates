@@ -105,5 +105,7 @@ private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCa
 
     override fun recordNextBookPublished(clubId: UUID, sessionId: UUID) = Unit
 
+    override fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID) = Unit
+
     override fun recordSessionReminderDue(targetDate: LocalDate) = Unit
 }

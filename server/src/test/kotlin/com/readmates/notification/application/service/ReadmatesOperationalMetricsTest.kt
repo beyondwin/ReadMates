@@ -138,6 +138,8 @@ private class FixedBacklogNotificationOutboxPort(
 
     override fun enqueueNextBookPublished(clubId: UUID, sessionId: UUID): Int = 0
 
+    override fun enqueueReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID): Int = 0
+
     override fun enqueueSessionReminderDue(targetDate: LocalDate): Int = 0
 
     override fun claimPending(limit: Int): List<NotificationOutboxItem> = emptyList()
