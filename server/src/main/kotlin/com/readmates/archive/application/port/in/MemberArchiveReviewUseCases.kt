@@ -11,6 +11,8 @@ data class SaveMemberArchiveLongReviewCommand(
 
 data class SaveMemberArchiveLongReviewResult(
     val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
     val body: String,
     val newlyPublic: Boolean,
 )

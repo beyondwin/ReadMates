@@ -116,6 +116,8 @@ class FeedbackDocumentService(
             recordNotificationEventUseCase.recordFeedbackDocumentPublished(
                 clubId = currentMember.clubId,
                 sessionId = command.sessionId,
+                sessionNumber = session.sessionNumber,
+                bookTitle = session.bookTitle,
                 documentVersion = version,
             )
 

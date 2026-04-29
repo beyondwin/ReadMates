@@ -19,7 +19,13 @@ class NotificationEventServiceTest {
         val clubId = UUID.randomUUID()
         val sessionId = UUID.randomUUID()
 
-        service.recordFeedbackDocumentPublished(clubId, sessionId, documentVersion = 3)
+        service.recordFeedbackDocumentPublished(
+            clubId = clubId,
+            sessionId = sessionId,
+            sessionNumber = 6,
+            bookTitle = "가난한 찰리의 연감",
+            documentVersion = 3,
+        )
 
         val event = outbox.recorded.single()
         assertThat(event.clubId).isEqualTo(clubId)
@@ -29,6 +35,8 @@ class NotificationEventServiceTest {
         assertThat(event.payload).isEqualTo(
             NotificationEventPayload(
                 sessionId = sessionId,
+                sessionNumber = 6,
+                bookTitle = "가난한 찰리의 연감",
                 documentVersion = 3,
             ),
         )
@@ -72,7 +80,13 @@ class NotificationEventServiceTest {
         val sessionId = UUID.randomUUID()
         val authorMembershipId = UUID.randomUUID()
 
-        service.recordReviewPublished(clubId, sessionId, authorMembershipId)
+        service.recordReviewPublished(
+            clubId = clubId,
+            sessionId = sessionId,
+            sessionNumber = 6,
+            bookTitle = "가난한 찰리의 연감",
+            authorMembershipId = authorMembershipId,
+        )
 
         val event = outbox.recorded.single()
         assertThat(event.eventType).isEqualTo(NotificationEventType.REVIEW_PUBLISHED)
@@ -81,6 +95,8 @@ class NotificationEventServiceTest {
         assertThat(event.payload).isEqualTo(
             NotificationEventPayload(
                 sessionId = sessionId,
+                sessionNumber = 6,
+                bookTitle = "가난한 찰리의 연감",
                 authorMembershipId = authorMembershipId,
             ),
         )

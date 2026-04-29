@@ -37,11 +37,23 @@ private class RecordingNotificationProcessor : ProcessNotificationOutboxUseCase 
 private class RecordingNotificationEvents : RecordNotificationEventUseCase {
     val reminderDates = mutableListOf<LocalDate>()
 
-    override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID, documentVersion: Int) = Unit
+    override fun recordFeedbackDocumentPublished(
+        clubId: UUID,
+        sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
+        documentVersion: Int,
+    ) = Unit
 
     override fun recordNextBookPublished(clubId: UUID, sessionId: UUID, sessionNumber: Int, bookTitle: String) = Unit
 
-    override fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID) = Unit
+    override fun recordReviewPublished(
+        clubId: UUID,
+        sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
+        authorMembershipId: UUID,
+    ) = Unit
 
     override fun recordSessionReminderDue(targetDate: LocalDate) {
         reminderDates += targetDate

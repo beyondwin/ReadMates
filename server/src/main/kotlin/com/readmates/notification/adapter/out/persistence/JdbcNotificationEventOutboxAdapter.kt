@@ -74,7 +74,48 @@ class JdbcNotificationEventOutboxAdapter(
             false
         }
 
-    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int = 0
+    @Transactional
+    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int =
+        jdbcTemplate().update(
+            """
+            insert ignore into notification_event_outbox (
+              id,
+              club_id,
+              event_type,
+              aggregate_type,
+              aggregate_id,
+              payload_json,
+              kafka_topic,
+              kafka_key,
+              status,
+              dedupe_key
+            )
+            select
+              uuid(),
+              sessions.club_id,
+              'SESSION_REMINDER_DUE',
+              'session',
+              sessions.id,
+              json_object(
+                'sessionId', sessions.id,
+                'sessionNumber', sessions.number,
+                'bookTitle', sessions.book_title,
+                'targetDate', ?
+              ),
+              ?,
+              sessions.club_id,
+              'PENDING',
+              concat('session-reminder:', ?, ':', sessions.id)
+            from sessions
+            where sessions.session_date = ?
+              and sessions.state in ('DRAFT', 'OPEN')
+              and sessions.visibility in ('MEMBER', 'PUBLIC')
+            """.trimIndent(),
+            targetDate.toString(),
+            eventsTopic,
+            targetDate.toString(),
+            targetDate,
+        )
 
     @Transactional
     override fun claimPublishable(limit: Int): List<NotificationEventOutboxItem> {
