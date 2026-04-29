@@ -1224,7 +1224,7 @@ git commit -m "feat: publish notification events to kafka"
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationDispatchServiceTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt`
 
-- [ ] **Step 1: Write dispatch service unit test**
+- [x] **Step 1: Write dispatch service unit test**
 
 Create `NotificationDispatchServiceTest.kt`:
 
@@ -1304,7 +1304,7 @@ class NotificationDispatchServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1314,7 +1314,7 @@ Run:
 
 Expected: FAIL because `NotificationDispatchService` does not exist.
 
-- [ ] **Step 3: Implement dispatch service**
+- [x] **Step 3: Implement dispatch service**
 
 Create `NotificationDispatchService.kt`:
 
@@ -1368,7 +1368,7 @@ class NotificationDispatchService(
 }
 ```
 
-- [ ] **Step 4: Add Kafka listener**
+- [x] **Step 4: Add Kafka listener**
 
 In `NotificationUseCases.kt`, add:
 
@@ -1407,7 +1407,7 @@ class NotificationEventKafkaListener(
 }
 ```
 
-- [ ] **Step 5: Implement persistence adapters**
+- [x] **Step 5: Implement persistence adapters**
 
 Implement `JdbcNotificationDeliveryAdapter` to:
 
@@ -1420,7 +1420,7 @@ Implement `JdbcNotificationDeliveryAdapter` to:
 
 Implement `JdbcMemberNotificationAdapter` with list, unread count, mark read, and mark all read methods matching `MemberNotificationPort`.
 
-- [ ] **Step 6: Run service tests**
+- [x] **Step 6: Run service tests**
 
 Run:
 
@@ -1430,7 +1430,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationDispatchService.kt server/src/main/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListener.kt server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationDeliveryAdapter.kt server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcMemberNotificationAdapter.kt server/src/main/kotlin/com/readmates/notification/application/model/NotificationModels.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/application/service/NotificationDispatchServiceTest.kt
