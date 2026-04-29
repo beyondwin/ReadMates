@@ -35,6 +35,7 @@ private const val MAX_METADATA_ENTRIES = 25
 private const val MAX_METADATA_LIST_ITEMS = 20
 private const val MAX_METADATA_STRING_LENGTH = 200
 private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
+private val SENSITIVE_METADATA_VALUE_PATTERN = Regex("""(?i)(token|secret|password|passcode|api[-_ ]?key|bearer\s+)""")
 
 private data class SessionNotificationRecipient(
     val membershipId: UUID,
@@ -780,7 +781,10 @@ class JdbcNotificationOutboxAdapter(
             null -> null
             is String -> value
                 .take(MAX_METADATA_STRING_LENGTH)
-                .takeUnless { EMAIL_LIKE_PATTERN.containsMatchIn(it) }
+                .takeUnless {
+                    EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
+                        SENSITIVE_METADATA_VALUE_PATTERN.containsMatchIn(it)
+                }
                 ?: UnsafeMetadataValue
             is Number, is Boolean -> value
             is Map<*, *> -> {
@@ -809,7 +813,15 @@ class JdbcNotificationOutboxAdapter(
         return normalized.contains("email") ||
             normalized.contains("recipient") ||
             normalized.contains("body") ||
-            normalized.endsWith("text")
+            normalized.endsWith("text") ||
+            normalized.contains("token") ||
+            normalized.contains("secret") ||
+            normalized.contains("password") ||
+            normalized.contains("passcode") ||
+            normalized.contains("apikey") ||
+            normalized.contains("api_key") ||
+            normalized.contains("api-key") ||
+            normalized.endsWith("key")
     }
 
     private fun String.truncateForStorage(): String =

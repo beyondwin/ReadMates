@@ -96,9 +96,10 @@ class HostNotificationControllerTest(
             jsonPath("$.sentLast24h") { value(0) }
             jsonPath("$.latestFailures[0].eventType") { value("FEEDBACK_DOCUMENT_PUBLISHED") }
             jsonPath("$.latestFailures[0].attemptCount") { value(2) }
-            jsonPath("$.latestFailures[0].recipientEmail") { value("member@example.com") }
+            jsonPath("$.latestFailures[0].recipientEmail") { value("m***@example.com") }
         }.andReturn().response.contentAsString
 
+        assertThat(response).doesNotContain("member@example.com")
         assertThat(response).doesNotContain("lastError")
         assertThat(response).doesNotContain("SMTP temporary failure")
     }
@@ -162,6 +163,12 @@ class HostNotificationControllerTest(
         assertThat(response).doesNotContain("bodyText")
         assertThat(response).doesNotContain("member@example.com")
         assertThat(response).doesNotContain("ReadMates에서 확인해 주세요.")
+        assertThat(response).doesNotContain("inviteToken")
+        assertThat(response).doesNotContain("sample-secret-value")
+        assertThat(response).doesNotContain("apiKey")
+        assertThat(response).doesNotContain("sample-api-key")
+        assertThat(response).doesNotContain("password")
+        assertThat(response).doesNotContain("sample-password")
     }
 
     @Test
@@ -323,7 +330,10 @@ class HostNotificationControllerTest(
                 'sessionNumber', 3,
                 'bookTitle', '메타데이터 테스트 책',
                 'recipientEmail', 'member@example.com',
-                'bodyText', 'ReadMates에서 확인해 주세요.'
+                'bodyText', 'ReadMates에서 확인해 주세요.',
+                'inviteToken', 'sample-secret-value',
+                'apiKey', 'sample-api-key',
+                'password', 'sample-password'
               ),
               ?,
               ?,

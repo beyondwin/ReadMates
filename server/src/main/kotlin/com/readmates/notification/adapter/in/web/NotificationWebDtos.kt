@@ -1,15 +1,37 @@
 package com.readmates.notification.adapter.`in`.web
 
 import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationFailure
 import com.readmates.notification.application.model.HostNotificationItem
 import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import java.util.UUID
 
 private const val MAX_HOST_LAST_ERROR_LENGTH = 200
+private const val MAX_HOST_METADATA_ENTRIES = 25
+private const val MAX_HOST_METADATA_LIST_ITEMS = 20
+private const val MAX_HOST_METADATA_STRING_LENGTH = 200
 private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
+private val SENSITIVE_VALUE_PATTERN = Regex("""(?i)(token|secret|password|passcode|api[-_ ]?key|bearer\s+)""")
+
+data class HostNotificationSummaryResponse(
+    val pending: Int,
+    val failed: Int,
+    val dead: Int,
+    val sentLast24h: Int,
+    val latestFailures: List<HostNotificationFailureResponse>,
+)
+
+data class HostNotificationFailureResponse(
+    val id: UUID,
+    val eventType: NotificationEventType,
+    val recipientEmail: String,
+    val attemptCount: Int,
+    val updatedAt: String,
+)
 
 data class HostNotificationItemListResponse(
     val items: List<HostNotificationItemResponse>,
@@ -63,6 +85,24 @@ fun NotificationPreferences.toResponse(): NotificationPreferencesResponse =
         events = NotificationEventType.entries.associateWith(::eventPreference),
     )
 
+fun HostNotificationSummary.toResponse(): HostNotificationSummaryResponse =
+    HostNotificationSummaryResponse(
+        pending = pending,
+        failed = failed,
+        dead = dead,
+        sentLast24h = sentLast24h,
+        latestFailures = latestFailures.map { it.toResponse() },
+    )
+
+private fun HostNotificationFailure.toResponse(): HostNotificationFailureResponse =
+    HostNotificationFailureResponse(
+        id = id,
+        eventType = eventType,
+        recipientEmail = maskEmail(recipientEmail),
+        attemptCount = attemptCount,
+        updatedAt = updatedAt.toString(),
+    )
+
 fun HostNotificationItemList.toResponse(): HostNotificationItemListResponse =
     HostNotificationItemListResponse(
         items = items.map { it.toResponse() },
@@ -87,7 +127,7 @@ fun HostNotificationDetail.toResponse(): HostNotificationDetailResponse =
         recipientEmail = maskEmail(recipientEmail),
         subject = subject,
         deepLinkPath = deepLinkPath,
-        metadata = metadata,
+        metadata = metadata.toHostSafeMetadata(),
         attemptCount = attemptCount,
         lastError = lastError.toHostSafeLastError(),
         createdAt = createdAt.toString(),
@@ -116,3 +156,67 @@ private fun String?.toHostSafeLastError(): String? =
         ?.takeIf { it.isNotEmpty() }
         ?.replace(EMAIL_LIKE_PATTERN, "[redacted-email]")
         ?.take(MAX_HOST_LAST_ERROR_LENGTH)
+
+private fun Map<String, Any?>.toHostSafeMetadata(depth: Int = 0): Map<String, Any?> {
+    val safe = linkedMapOf<String, Any?>()
+    entries
+        .asSequence()
+        .filterNot { it.key.isSensitiveMetadataKey() }
+        .take(MAX_HOST_METADATA_ENTRIES)
+        .forEach { (key, value) ->
+            val sanitized = value.toHostSafeMetadataValue(depth)
+            if (sanitized !== UnsafeHostMetadataValue) {
+                safe[key] = sanitized
+            }
+        }
+    return safe
+}
+
+private fun Any?.toHostSafeMetadataValue(depth: Int): Any? =
+    when (this) {
+        null -> null
+        is String -> trim()
+            .take(MAX_HOST_METADATA_STRING_LENGTH)
+            .takeUnless {
+                EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
+                    SENSITIVE_VALUE_PATTERN.containsMatchIn(it)
+            } ?: UnsafeHostMetadataValue
+        is Number, is Boolean -> this
+        is Map<*, *> -> {
+            if (depth >= 2) {
+                emptyMap<String, Any?>()
+            } else {
+                entries
+                    .mapNotNull { (key, value) -> (key as? String)?.let { it to value } }
+                    .toMap()
+                    .toHostSafeMetadata(depth + 1)
+            }
+        }
+        is Iterable<*> -> asSequence()
+            .take(MAX_HOST_METADATA_LIST_ITEMS)
+            .map { it.toHostSafeMetadataValue(depth + 1) }
+            .filterNot { it === UnsafeHostMetadataValue }
+            .toList()
+        else -> toString()
+            .take(MAX_HOST_METADATA_STRING_LENGTH)
+            .takeUnless { SENSITIVE_VALUE_PATTERN.containsMatchIn(it) }
+            ?: UnsafeHostMetadataValue
+    }
+
+private fun String.isSensitiveMetadataKey(): Boolean {
+    val normalized = lowercase()
+    return normalized.contains("email") ||
+        normalized.contains("recipient") ||
+        normalized.contains("body") ||
+        normalized.endsWith("text") ||
+        normalized.contains("token") ||
+        normalized.contains("secret") ||
+        normalized.contains("password") ||
+        normalized.contains("passcode") ||
+        normalized.contains("apikey") ||
+        normalized.contains("api_key") ||
+        normalized.contains("api-key") ||
+        normalized.endsWith("key")
+}
+
+private object UnsafeHostMetadataValue
