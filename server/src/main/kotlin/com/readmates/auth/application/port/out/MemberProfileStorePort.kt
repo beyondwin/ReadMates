@@ -8,6 +8,7 @@ data class MemberProfileRow(
     val membershipId: UUID,
     val userId: UUID,
     val clubId: UUID,
+    val clubSlug: String,
     val email: String,
     val displayName: String,
     val accountName: String,

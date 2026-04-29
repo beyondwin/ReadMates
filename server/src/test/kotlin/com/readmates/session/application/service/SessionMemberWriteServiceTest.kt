@@ -22,6 +22,7 @@ class SessionMemberWriteServiceTest {
         userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
         membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
         clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+        clubSlug = "reading-sai",
         email = "member@example.com",
         displayName = "멤버",
         accountName = "김멤버",

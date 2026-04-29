@@ -37,24 +37,25 @@ class ReadmatesOAuthSuccessHandler(
         val oidcUser = authentication.principal as OidcUser
         try {
             val inviteToken = capturedInviteToken(request)
-            val member = if (inviteToken != null) {
-                invitationService.acceptGoogleInvitation(
+            val authenticatedUserId = if (inviteToken != null) {
+                val acceptedMember = invitationService.acceptGoogleInvitation(
                     rawToken = inviteToken,
                     googleSubjectId = oidcUser.subject,
                     email = oidcUser.email,
                     displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
                     profileImageUrl = oidcUser.getClaimAsString("picture"),
                 )
+                acceptedMember.userId
             } else {
-                googleLoginService.loginVerifiedGoogleUser(
+                googleLoginService.loginVerifiedGoogleUserForSession(
                     googleSubjectId = oidcUser.subject,
                     email = oidcUser.email,
                     displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
                     profileImageUrl = oidcUser.getClaimAsString("picture"),
-                )
+                ).userId
             }
             val issuedSession = authSessionService.issueSession(
-                userId = member.userId.toString(),
+                userId = authenticatedUserId.toString(),
                 userAgent = request.getHeader("User-Agent"),
                 ipAddress = request.remoteAddr,
             )

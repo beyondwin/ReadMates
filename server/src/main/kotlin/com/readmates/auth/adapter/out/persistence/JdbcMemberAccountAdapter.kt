@@ -4,9 +4,13 @@ import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.club.application.model.JoinedClubSummary
+import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.CurrentUser
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
@@ -52,6 +56,7 @@ class JdbcMemberAccountAdapter(
               users.id as user_id,
               memberships.id as membership_id,
               clubs.id as club_id,
+              clubs.slug as club_slug,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -70,6 +75,125 @@ class JdbcMemberAccountAdapter(
         ).firstOrNull()
     }
 
+    override fun findMemberByUserIdAndClubId(userId: UUID, clubId: UUID): CurrentMember? {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
+        return jdbcTemplate.query(
+            """
+            select
+              users.id as user_id,
+              memberships.id as membership_id,
+              clubs.id as club_id,
+              clubs.slug as club_slug,
+              users.email,
+              users.name as account_name,
+              coalesce(memberships.short_name, users.name) as display_name,
+              memberships.role,
+              memberships.status as membership_status
+            from users
+            join memberships on memberships.user_id = users.id
+            join clubs on clubs.id = memberships.club_id
+            where users.id = ?
+              and clubs.id = ?
+              and memberships.status in ('ACTIVE', 'SUSPENDED', 'VIEWER')
+            limit 1
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toCurrentMember() },
+            userId.dbString(),
+            clubId.dbString(),
+        ).firstOrNull()
+    }
+
+    override fun findMemberByEmailAndClubId(email: String, clubId: UUID): CurrentMember? {
+        val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
+        return jdbcTemplate.query(
+            """
+            select
+              users.id as user_id,
+              memberships.id as membership_id,
+              clubs.id as club_id,
+              clubs.slug as club_slug,
+              users.email,
+              users.name as account_name,
+              coalesce(memberships.short_name, users.name) as display_name,
+              memberships.role,
+              memberships.status as membership_status
+            from users
+            join memberships on memberships.user_id = users.id
+            join clubs on clubs.id = memberships.club_id
+            where lower(users.email) = ?
+              and clubs.id = ?
+              and memberships.status in ('ACTIVE', 'SUSPENDED', 'VIEWER')
+            limit 1
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toCurrentMember() },
+            normalizedEmail,
+            clubId.dbString(),
+        ).firstOrNull()
+    }
+
+    override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
+        return jdbcTemplate.query(
+            """
+            select
+              clubs.id as club_id,
+              clubs.slug as club_slug,
+              clubs.name as club_name,
+              memberships.id as membership_id,
+              memberships.role,
+              memberships.status,
+              primary_domains.hostname as primary_host
+            from memberships
+            join clubs on clubs.id = memberships.club_id
+            left join (
+              select club_id, min(hostname) as hostname
+              from club_domains
+              where status = 'ACTIVE'
+                and is_primary = true
+              group by club_id
+            ) primary_domains on primary_domains.club_id = clubs.id
+            where memberships.user_id = ?
+              and memberships.status in ('ACTIVE', 'SUSPENDED', 'VIEWER')
+            order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
+            """.trimIndent(),
+            { resultSet, _ ->
+                JoinedClubSummary(
+                    clubId = resultSet.uuid("club_id"),
+                    clubSlug = resultSet.getString("club_slug"),
+                    clubName = resultSet.getString("club_name"),
+                    membershipId = resultSet.uuid("membership_id"),
+                    role = MembershipRole.valueOf(resultSet.getString("role")),
+                    status = MembershipStatus.valueOf(resultSet.getString("status")),
+                    primaryHost = resultSet.getString("primary_host"),
+                )
+            },
+            userId.dbString(),
+        )
+    }
+
+    override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
+        return jdbcTemplate.query(
+            """
+            select platform_admins.user_id, users.email, platform_admins.role
+            from platform_admins
+            join users on users.id = platform_admins.user_id
+            where platform_admins.user_id = ?
+              and platform_admins.status = 'ACTIVE'
+            limit 1
+            """.trimIndent(),
+            { resultSet, _ ->
+                CurrentPlatformAdmin(
+                    userId = resultSet.uuid("user_id"),
+                    email = resultSet.getString("email").lowercase(Locale.ROOT),
+                    role = PlatformAdminRole.valueOf(resultSet.getString("role")),
+                )
+            },
+            userId.dbString(),
+        ).firstOrNull()
+    }
+
     override fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember? {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return null
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
@@ -79,6 +203,7 @@ class JdbcMemberAccountAdapter(
               users.id as user_id,
               memberships.id as membership_id,
               clubs.id as club_id,
+              clubs.slug as club_slug,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -109,6 +234,25 @@ class JdbcMemberAccountAdapter(
             """.trimIndent(),
             { resultSet, _ -> resultSet.uuid("id") },
             normalizedEmail,
+        ).firstOrNull()
+    }
+
+    override fun findUserById(userId: UUID): CurrentUser? {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
+        return jdbcTemplate.query(
+            """
+            select id, email
+            from users
+            where id = ?
+            limit 1
+            """.trimIndent(),
+            { resultSet, _ ->
+                CurrentUser(
+                    userId = resultSet.uuid("id"),
+                    email = resultSet.getString("email").lowercase(Locale.ROOT),
+                )
+            },
+            userId.dbString(),
         ).firstOrNull()
     }
 
@@ -268,6 +412,7 @@ class JdbcMemberAccountAdapter(
               users.id as user_id,
               memberships.id as membership_id,
               clubs.id as club_id,
+              clubs.slug as club_slug,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -399,6 +544,7 @@ class JdbcMemberAccountAdapter(
               users.id as user_id,
               memberships.id as membership_id,
               clubs.id as club_id,
+              clubs.slug as club_slug,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -455,6 +601,7 @@ class JdbcMemberAccountAdapter(
             userId = uuid("user_id"),
             membershipId = uuid("membership_id"),
             clubId = uuid("club_id"),
+            clubSlug = getString("club_slug"),
             email = getString("email").lowercase(Locale.ROOT),
             displayName = displayName,
             accountName = getString("account_name"),

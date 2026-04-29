@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import java.util.Locale
 import java.util.UUID
 
+data class GoogleLoginResult(
+    val userId: UUID,
+    val currentMember: CurrentMember?,
+)
+
 @ResponseStatus(HttpStatus.UNAUTHORIZED)
 class GoogleLoginException(
     message: String,
@@ -28,7 +33,23 @@ class GoogleLoginService(
         email: String,
         displayName: String?,
         profileImageUrl: String?,
-    ): CurrentMember = connectOrCreate(
+    ): CurrentMember {
+        val result = loginVerifiedGoogleUserForSession(
+            googleSubjectId = googleSubjectId,
+            email = email,
+            displayName = displayName,
+            profileImageUrl = profileImageUrl,
+        )
+        return result.currentMember ?: throwBlockedOrMissingMembership(result.userId)
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    fun loginVerifiedGoogleUserForSession(
+        googleSubjectId: String,
+        email: String,
+        displayName: String?,
+        profileImageUrl: String?,
+    ): GoogleLoginResult = connectOrCreate(
         googleSubjectId = googleSubjectId.trim().takeIf { it.isNotEmpty() }
             ?: throw GoogleLoginException("Google subject is required"),
         normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
@@ -42,17 +63,18 @@ class GoogleLoginService(
         normalizedEmail: String,
         displayName: String?,
         profileImageUrl: String?,
-    ): CurrentMember {
+    ): GoogleLoginResult {
         val memberBySubject = memberAccountStore.findMemberByGoogleSubject(googleSubjectId)
         if (memberBySubject != null) {
             if (memberBySubject.email != normalizedEmail) {
                 throw GoogleLoginException("Google account is already connected")
             }
-            return memberBySubject
+            return memberBySubject.toLoginResult()
         }
 
         return connectExistingEmailUser(googleSubjectId, normalizedEmail, profileImageUrl)
             ?: createViewerGoogleMember(googleSubjectId, normalizedEmail, displayName, profileImageUrl)
+                .toLoginResult()
     }
 
     private fun createViewerGoogleMember(
@@ -87,7 +109,7 @@ class GoogleLoginService(
             return memberBySubject
         }
 
-        return connectExistingEmailUser(googleSubjectId, normalizedEmail, profileImageUrl)
+        return connectExistingEmailUser(googleSubjectId, normalizedEmail, profileImageUrl)?.currentMember
             ?: throw exception
     }
 
@@ -95,7 +117,7 @@ class GoogleLoginService(
         googleSubjectId: String,
         normalizedEmail: String,
         profileImageUrl: String?,
-    ): CurrentMember? {
+    ): GoogleLoginResult? {
         val ownerEmail = memberAccountStore.googleSubjectOwnerEmail(googleSubjectId)
         if (ownerEmail != null && ownerEmail != normalizedEmail) {
             throw GoogleLoginException("Google account is already connected")
@@ -110,8 +132,14 @@ class GoogleLoginService(
         if (!connected) {
             throw GoogleLoginException("Existing user is connected to a different Google account")
         }
-        return memberAccountStore.findMemberByUserIdIncludingViewer(userId)
-            ?: throwBlockedOrMissingMembership(userId)
+        val member = memberAccountStore.findMemberByUserIdIncludingViewer(userId)
+        if (member != null) {
+            return member.toLoginResult()
+        }
+        if (memberAccountStore.findPlatformAdmin(userId) != null) {
+            return GoogleLoginResult(userId = userId, currentMember = null)
+        }
+        throwBlockedOrMissingMembership(userId)
     }
 
     private fun throwBlockedOrMissingMembership(userId: UUID): Nothing {
@@ -123,4 +151,7 @@ class GoogleLoginService(
         }
         throw GoogleLoginException("Connected user has no membership")
     }
+
+    private fun CurrentMember.toLoginResult(): GoogleLoginResult =
+        GoogleLoginResult(userId = userId, currentMember = this)
 }
