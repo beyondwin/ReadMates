@@ -81,6 +81,12 @@ const hostLinks: NavLink[] = [
     current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
   },
   {
+    key: "host-notifications",
+    href: "/app/host/notifications",
+    label: READMATES_NAV_LABELS.host.notifications,
+    current: (pathname) => pathname === "/app/host/notifications",
+  },
+  {
     key: "host-invitations",
     href: "/app/host/invitations",
     label: READMATES_NAV_LABELS.host.invitations,
