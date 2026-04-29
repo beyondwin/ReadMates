@@ -12,10 +12,10 @@ import java.util.UUID
 
 private const val MAX_HOST_LAST_ERROR_LENGTH = 200
 private const val MAX_HOST_METADATA_ENTRIES = 25
-private const val MAX_HOST_METADATA_LIST_ITEMS = 20
 private const val MAX_HOST_METADATA_STRING_LENGTH = 200
 private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
 private val SENSITIVE_VALUE_PATTERN = Regex("""(?i)(token|secret|password|passcode|api[-_ ]?key|bearer\s+)""")
+private val HOST_METADATA_KEY_ALLOWLIST = setOf("sessionNumber", "bookTitle")
 
 data class HostNotificationSummaryResponse(
     val pending: Int,
@@ -161,10 +161,10 @@ private fun Map<String, Any?>.toHostSafeMetadata(depth: Int = 0): Map<String, An
     val safe = linkedMapOf<String, Any?>()
     entries
         .asSequence()
-        .filterNot { it.key.isSensitiveMetadataKey() }
+        .filter { it.key in HOST_METADATA_KEY_ALLOWLIST }
         .take(MAX_HOST_METADATA_ENTRIES)
         .forEach { (key, value) ->
-            val sanitized = value.toHostSafeMetadataValue(depth)
+            val sanitized = value.toHostSafeMetadataValue(key, depth)
             if (sanitized !== UnsafeHostMetadataValue) {
                 safe[key] = sanitized
             }
@@ -172,51 +172,28 @@ private fun Map<String, Any?>.toHostSafeMetadata(depth: Int = 0): Map<String, An
     return safe
 }
 
-private fun Any?.toHostSafeMetadataValue(depth: Int): Any? =
-    when (this) {
-        null -> null
-        is String -> trim()
-            .take(MAX_HOST_METADATA_STRING_LENGTH)
-            .takeUnless {
-                EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
-                    SENSITIVE_VALUE_PATTERN.containsMatchIn(it)
-            } ?: UnsafeHostMetadataValue
-        is Number, is Boolean -> this
-        is Map<*, *> -> {
-            if (depth >= 2) {
-                emptyMap<String, Any?>()
-            } else {
-                entries
-                    .mapNotNull { (key, value) -> (key as? String)?.let { it to value } }
-                    .toMap()
-                    .toHostSafeMetadata(depth + 1)
-            }
-        }
-        is Iterable<*> -> asSequence()
-            .take(MAX_HOST_METADATA_LIST_ITEMS)
-            .map { it.toHostSafeMetadataValue(depth + 1) }
-            .filterNot { it === UnsafeHostMetadataValue }
-            .toList()
-        else -> toString()
-            .take(MAX_HOST_METADATA_STRING_LENGTH)
-            .takeUnless { SENSITIVE_VALUE_PATTERN.containsMatchIn(it) }
-            ?: UnsafeHostMetadataValue
+private fun Any?.toHostSafeMetadataValue(key: String, depth: Int): Any? {
+    if (depth > 0) {
+        return UnsafeHostMetadataValue
     }
 
-private fun String.isSensitiveMetadataKey(): Boolean {
-    val normalized = lowercase()
-    return normalized.contains("email") ||
-        normalized.contains("recipient") ||
-        normalized.contains("body") ||
-        normalized.endsWith("text") ||
-        normalized.contains("token") ||
-        normalized.contains("secret") ||
-        normalized.contains("password") ||
-        normalized.contains("passcode") ||
-        normalized.contains("apikey") ||
-        normalized.contains("api_key") ||
-        normalized.contains("api-key") ||
-        normalized.endsWith("key")
+    return when (key) {
+        "sessionNumber" -> when (this) {
+            is Number -> this.toInt()
+            else -> UnsafeHostMetadataValue
+        }
+        "bookTitle" -> when (this) {
+            is String -> trim()
+                .take(MAX_HOST_METADATA_STRING_LENGTH)
+                .takeIf { it.isNotEmpty() }
+                ?.takeUnless {
+                    EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
+                        SENSITIVE_VALUE_PATTERN.containsMatchIn(it)
+                } ?: UnsafeHostMetadataValue
+            else -> UnsafeHostMetadataValue
+        }
+        else -> UnsafeHostMetadataValue
+    }
 }
 
 private object UnsafeHostMetadataValue

@@ -32,10 +32,10 @@ private const val AGGREGATE_TYPE_SESSION = "SESSION"
 private const val MAX_LAST_ERROR_LENGTH = 500
 private const val MAX_METADATA_JSON_LENGTH = 4_000
 private const val MAX_METADATA_ENTRIES = 25
-private const val MAX_METADATA_LIST_ITEMS = 20
 private const val MAX_METADATA_STRING_LENGTH = 200
 private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
 private val SENSITIVE_METADATA_VALUE_PATTERN = Regex("""(?i)(token|secret|password|passcode|api[-_ ]?key|bearer\s+)""")
+private val HOST_METADATA_KEY_ALLOWLIST = setOf("sessionNumber", "bookTitle")
 
 private data class SessionNotificationRecipient(
     val membershipId: UUID,
@@ -765,10 +765,10 @@ class JdbcNotificationOutboxAdapter(
         val safe = linkedMapOf<String, Any?>()
         metadata.entries
             .asSequence()
-            .filterNot { it.key.isSensitiveMetadataKey() }
+            .filter { it.key in HOST_METADATA_KEY_ALLOWLIST }
             .take(MAX_METADATA_ENTRIES)
             .forEach { (key, value) ->
-                val sanitized = sanitizeMetadataValue(value, depth)
+                val sanitized = sanitizeMetadataValue(key, value, depth)
                 if (sanitized !== UnsafeMetadataValue) {
                     safe[key] = sanitized
                 }
@@ -776,52 +776,29 @@ class JdbcNotificationOutboxAdapter(
         return safe
     }
 
-    private fun sanitizeMetadataValue(value: Any?, depth: Int): Any? =
-        when (value) {
-            null -> null
-            is String -> value
-                .take(MAX_METADATA_STRING_LENGTH)
-                .takeUnless {
-                    EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
-                        SENSITIVE_METADATA_VALUE_PATTERN.containsMatchIn(it)
-                }
-                ?: UnsafeMetadataValue
-            is Number, is Boolean -> value
-            is Map<*, *> -> {
-                if (depth >= 2) {
-                    emptyMap<String, Any?>()
-                } else {
-                    sanitizeMetadata(
-                        value.entries
-                            .mapNotNull { (key, nestedValue) -> (key as? String)?.let { it to nestedValue } }
-                            .toMap(),
-                        depth = depth + 1,
-                    )
-                }
-            }
-            is Iterable<*> -> value
-                .asSequence()
-                .take(MAX_METADATA_LIST_ITEMS)
-                .map { sanitizeMetadataValue(it, depth + 1) }
-                .filterNot { it === UnsafeMetadataValue }
-                .toList()
-            else -> value.toString().take(MAX_METADATA_STRING_LENGTH)
+    private fun sanitizeMetadataValue(key: String, value: Any?, depth: Int): Any? {
+        if (depth > 0) {
+            return UnsafeMetadataValue
         }
 
-    private fun String.isSensitiveMetadataKey(): Boolean {
-        val normalized = lowercase()
-        return normalized.contains("email") ||
-            normalized.contains("recipient") ||
-            normalized.contains("body") ||
-            normalized.endsWith("text") ||
-            normalized.contains("token") ||
-            normalized.contains("secret") ||
-            normalized.contains("password") ||
-            normalized.contains("passcode") ||
-            normalized.contains("apikey") ||
-            normalized.contains("api_key") ||
-            normalized.contains("api-key") ||
-            normalized.endsWith("key")
+        return when (key) {
+            "sessionNumber" -> when (value) {
+                is Number -> value.toInt()
+                else -> UnsafeMetadataValue
+            }
+            "bookTitle" -> when (value) {
+                is String -> value
+                    .trim()
+                    .take(MAX_METADATA_STRING_LENGTH)
+                    .takeIf { it.isNotEmpty() }
+                    ?.takeUnless {
+                        EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
+                            SENSITIVE_METADATA_VALUE_PATTERN.containsMatchIn(it)
+                    } ?: UnsafeMetadataValue
+                else -> UnsafeMetadataValue
+            }
+            else -> UnsafeMetadataValue
+        }
     }
 
     private fun String.truncateForStorage(): String =

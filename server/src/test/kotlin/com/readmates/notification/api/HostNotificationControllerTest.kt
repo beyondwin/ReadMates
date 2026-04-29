@@ -169,6 +169,13 @@ class HostNotificationControllerTest(
         assertThat(response).doesNotContain("sample-api-key")
         assertThat(response).doesNotContain("password")
         assertThat(response).doesNotContain("sample-password")
+        assertThat(response).doesNotContain("accessKeyId")
+        assertThat(response).doesNotContain("AKIAIOSFODNN7EXAMPLE")
+        assertThat(response).doesNotContain("privateKeyPem")
+        assertThat(response).doesNotContain("BEGIN PRIVATE KEY")
+        assertThat(response).doesNotContain("signingKeyId")
+        assertThat(response).doesNotContain("authorization")
+        assertThat(response).doesNotContain("credential")
     }
 
     @Test
@@ -333,7 +340,12 @@ class HostNotificationControllerTest(
                 'bodyText', 'ReadMates에서 확인해 주세요.',
                 'inviteToken', 'sample-secret-value',
                 'apiKey', 'sample-api-key',
-                'password', 'sample-password'
+                'password', 'sample-password',
+                'accessKeyId', 'AKIAIOSFODNN7EXAMPLE',
+                'privateKeyPem', '-----BEGIN PRIVATE KEY-----',
+                'signingKeyId', 'signing-key-id',
+                'authorization', 'Bearer sample-token',
+                'credential', 'sample-credential'
               ),
               ?,
               ?,
