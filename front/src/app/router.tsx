@@ -15,6 +15,8 @@ import { clubSelectionLoader } from "@/features/club-selection/route/club-select
 import { ClubSelectionRoute } from "@/features/club-selection/route/club-selection-route";
 import { publicClubLoader, publicSessionLoader } from "@/features/public/route/public-route-data";
 import { PublicRouteError } from "@/features/public/route/public-route-state";
+import { platformAdminLoader } from "@/features/platform-admin/route/platform-admin-data";
+import { PlatformAdminRoute } from "@/features/platform-admin/route/platform-admin-route";
 import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 import { memberHomeLoader } from "@/features/member-home/route/member-home-data";
@@ -45,7 +47,7 @@ import {
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
-import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
+import { RequireAuth, RequireHost, RequireMemberApp, RequirePlatformAdmin } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import AboutPage from "@/src/pages/about";
 import AppHomePage from "@/src/pages/app-home";
@@ -257,6 +259,17 @@ export const routes: RouteObject[] = [
       { path: "/invite/:token", element: <InvitePage /> },
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
     ],
+  },
+  {
+    path: "/admin",
+    element: (
+      <RequirePlatformAdmin>
+        <PlatformAdminRoute />
+      </RequirePlatformAdmin>
+    ),
+    loader: platformAdminLoader,
+    errorElement: <ArchiveRouteError />,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="플랫폼 관리를 불러오는 중" variant="member" />,
   },
   {
     path: "/app/pending",

@@ -4,6 +4,7 @@ import { LogoutButton } from "@/features/auth/route/logout-button";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import { canUseHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
 import { scopedAppPath } from "@/shared/auth/member-app-loader";
+import { canUsePlatformAdmin } from "@/shared/auth/platform-admin-access";
 import { useAuth, useAuthActions } from "./auth-state";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
@@ -11,6 +12,16 @@ export function RequireAuth({ children }: { children: ReactNode }) {
 
   if (state.status === "loading") return <ReadmatesRouteLoading label="로그인 상태를 확인하는 중" variant="auth" />;
   if (!state.auth.authenticated) return <Navigate to="/login" replace />;
+
+  return <>{children}</>;
+}
+
+export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
+  const state = useAuth();
+
+  if (state.status === "loading") return <ReadmatesRouteLoading label="플랫폼 권한을 확인하는 중" variant="auth" />;
+  if (!state.auth.authenticated) return <Navigate to="/login" replace />;
+  if (!canUsePlatformAdmin(state.auth)) return <BlockedPlatformAdmin />;
 
   return <>{children}</>;
 }
@@ -71,6 +82,32 @@ function BlockedMemberApp() {
                 클럽 소개
               </Link>
               <LogoutButton className="btn btn-ghost" onLoggedOut={markLoggedOut} />
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function BlockedPlatformAdmin() {
+  return (
+    <main className="auth-pending-content">
+      <section className="auth-pending-section">
+        <div className="container">
+          <div className="surface auth-card auth-card--pending">
+            <p className="eyebrow">권한 필요</p>
+            <h1 className="h1 editorial auth-card__title">플랫폼 관리 권한이 없습니다.</h1>
+            <p className="body auth-card__lede">
+              이 화면은 플랫폼 운영 권한이 있는 계정으로만 열 수 있습니다.
+            </p>
+            <div className="auth-card__actions auth-card__actions--primary">
+              <Link to="/app" className="btn btn-primary">
+                내 클럽으로
+              </Link>
+              <Link to="/" className="btn btn-ghost">
+                공개 홈
+              </Link>
             </div>
           </div>
         </div>
