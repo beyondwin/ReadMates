@@ -384,7 +384,7 @@ class JdbcNotificationEventOutboxAdapterTest(
         assertThat(firstInserted).isEqualTo(1)
         assertThat(duplicateInserted).isZero()
         assertThat(row["event_type"]).isEqualTo("SESSION_REMINDER_DUE")
-        assertThat(row["aggregate_type"]).isEqualTo("session")
+        assertThat(row["aggregate_type"]).isEqualTo("SESSION")
         assertThat(row["aggregate_id"]).isEqualTo(reminderSessionId)
         assertThat(row["status"]).isEqualTo("PENDING")
         assertThat(row["kafka_topic"]).isEqualTo(TEST_NOTIFICATION_EVENTS_TOPIC)

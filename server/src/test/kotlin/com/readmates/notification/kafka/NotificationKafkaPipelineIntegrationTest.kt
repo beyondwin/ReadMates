@@ -125,7 +125,7 @@ class NotificationKafkaPipelineIntegrationTest(
                 eventId = UUID.fromString("11111111-1111-4111-8111-111111111111"),
                 clubId = UUID.fromString("22222222-2222-4222-8222-222222222222"),
                 eventType = NotificationEventType.SESSION_REMINDER_DUE,
-                aggregateType = "session",
+                aggregateType = "SESSION",
                 aggregateId = UUID.fromString("33333333-3333-4333-8333-333333333333"),
                 occurredAt = OffsetDateTime.of(2026, 4, 29, 12, 0, 0, 0, ZoneOffset.UTC),
                 payload = NotificationEventPayload(
