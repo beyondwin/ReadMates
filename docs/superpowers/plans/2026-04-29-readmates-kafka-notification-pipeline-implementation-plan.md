@@ -2492,7 +2492,7 @@ git commit -m "test: cover kafka notification pipeline"
 - Modify: `docs/development/test-guide.md`
 - Modify: `docs/deploy/oci-backend.md`
 
-- [ ] **Step 1: Update README highlight**
+- [x] **Step 1: Update README highlight**
 
 Change the notification line in `README.md` to:
 
@@ -2500,7 +2500,7 @@ Change the notification line in `README.md` to:
 - 운영 파이프라인: MySQL transactional event outbox, Kafka relay/consumer 기반 이메일·인앱 알림, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 ```
 
-- [ ] **Step 2: Update architecture notification section**
+- [x] **Step 2: Update architecture notification section**
 
 In `docs/development/architecture.md`, replace the notification slice summary with:
 
@@ -2508,7 +2508,7 @@ In `docs/development/architecture.md`, replace the notification slice summary wi
 Notification slice는 도메인 이벤트 outbox를 MySQL source of truth로 저장하고, Kafka relay가 `readmates.notification.events.v1` topic으로 발행한다. Kafka consumer는 같은 Spring Boot 모듈 안에서 이벤트를 받아 수신자 계산, preference 적용, 인앱 알림 생성, 이메일 발송을 처리한다. 이벤트 발행 상태는 `notification_event_outbox`, 채널별 배송 상태는 `notification_deliveries`, 멤버 알림함은 `member_notifications`에 남긴다.
 ```
 
-- [ ] **Step 3: Update local setup**
+- [x] **Step 3: Update local setup**
 
 Add Kafka local command to `docs/development/local-setup.md`:
 
@@ -2524,7 +2524,7 @@ READMATES_KAFKA_ENABLED=true \
 READMATES_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 ```
 
-- [ ] **Step 4: Update test guide**
+- [x] **Step 4: Update test guide**
 
 Add:
 
@@ -2536,7 +2536,7 @@ Kafka notification tests use Testcontainers Kafka. They require Docker or Colima
 ```
 ```
 
-- [ ] **Step 5: Run docs checks**
+- [x] **Step 5: Run docs checks**
 
 Run:
 
@@ -2546,7 +2546,7 @@ git diff --check -- README.md docs/development/architecture.md docs/development/
 
 Expected: no output.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add README.md docs/development/architecture.md docs/development/local-setup.md docs/development/test-guide.md docs/deploy/oci-backend.md
