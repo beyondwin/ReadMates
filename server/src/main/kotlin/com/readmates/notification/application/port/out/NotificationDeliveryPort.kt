@@ -1,6 +1,7 @@
 package com.readmates.notification.application.port.out
 
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
+import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.domain.NotificationChannel
@@ -25,4 +26,10 @@ interface NotificationDeliveryPort {
     fun markDeliveryFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean
     fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean
     fun countByStatus(clubId: UUID, channel: NotificationChannel?, status: NotificationDeliveryStatus): Int
+    fun listHostDeliveries(
+        clubId: UUID,
+        status: NotificationDeliveryStatus?,
+        channel: NotificationChannel?,
+        limit: Int,
+    ): List<HostNotificationDelivery>
 }

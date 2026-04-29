@@ -1,6 +1,8 @@
 package com.readmates.notification.application.port.`in`
 
 import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationDeliveryList
+import com.readmates.notification.application.model.HostNotificationEventList
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
@@ -9,6 +11,9 @@ import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
+import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.shared.security.CurrentMember
 import java.time.LocalDate
 import java.util.UUID
@@ -51,6 +56,17 @@ interface GetHostNotificationSummaryUseCase {
 
 interface ManageHostNotificationsUseCase {
     fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList
+    fun listEvents(
+        host: CurrentMember,
+        status: NotificationEventOutboxStatus?,
+        limit: Int,
+    ): HostNotificationEventList
+    fun listDeliveries(
+        host: CurrentMember,
+        status: NotificationDeliveryStatus?,
+        channel: NotificationChannel?,
+        limit: Int,
+    ): HostNotificationDeliveryList
     fun detail(host: CurrentMember, id: UUID): HostNotificationDetail
     fun retry(host: CurrentMember, id: UUID): HostNotificationDetail
     fun restore(host: CurrentMember, id: UUID): HostNotificationDetail

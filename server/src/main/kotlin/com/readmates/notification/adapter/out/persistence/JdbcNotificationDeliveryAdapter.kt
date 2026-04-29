@@ -1,6 +1,7 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
+import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
@@ -274,6 +275,43 @@ class JdbcNotificationDeliveryAdapter(
             Int::class.java,
             *args.toTypedArray(),
         ) ?: 0
+    }
+
+    override fun listHostDeliveries(
+        clubId: UUID,
+        status: NotificationDeliveryStatus?,
+        channel: NotificationChannel?,
+        limit: Int,
+    ): List<HostNotificationDelivery> {
+        val statusPredicate = if (status == null) "" else "and notification_deliveries.status = ?"
+        val channelPredicate = if (channel == null) "" else "and notification_deliveries.channel = ?"
+        val args = mutableListOf<Any>(clubId.dbString())
+        status?.let { args += it.name }
+        channel?.let { args += it.name }
+        args += limit
+        return jdbcTemplate().query(
+            """
+            select
+              notification_deliveries.id,
+              notification_deliveries.event_id,
+              notification_deliveries.channel,
+              notification_deliveries.status,
+              case when notification_deliveries.channel = 'EMAIL' then users.email else null end as recipient_email,
+              notification_deliveries.attempt_count,
+              notification_deliveries.updated_at
+            from notification_deliveries
+            join memberships on memberships.id = notification_deliveries.recipient_membership_id
+              and memberships.club_id = notification_deliveries.club_id
+            join users on users.id = memberships.user_id
+            where notification_deliveries.club_id = ?
+              $statusPredicate
+              $channelPredicate
+            order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc
+            limit ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationDelivery() },
+            *args.toTypedArray(),
+        )
     }
 
     private fun recipientsFor(jdbcTemplate: JdbcTemplate, message: NotificationEventMessage): List<DeliveryRecipient> =
@@ -668,6 +706,17 @@ class JdbcNotificationDeliveryAdapter(
             bodyText = copy.emailBodyText,
         )
     }
+
+    private fun ResultSet.toHostNotificationDelivery(): HostNotificationDelivery =
+        HostNotificationDelivery(
+            id = uuid("id"),
+            eventId = uuid("event_id"),
+            channel = NotificationChannel.valueOf(getString("channel")),
+            status = NotificationDeliveryStatus.valueOf(getString("status")),
+            recipientEmail = getString("recipient_email"),
+            attemptCount = getInt("attempt_count"),
+            updatedAt = utcOffsetDateTime("updated_at"),
+        )
 
     private fun copyFor(message: NotificationEventMessage, displayName: String?): DeliveryCopy =
         copyFor(

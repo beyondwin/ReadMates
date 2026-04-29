@@ -1,5 +1,6 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
@@ -128,6 +129,12 @@ private class FakeEventOutbox(
     }
 
     override fun loadMessage(eventId: UUID): NotificationEventMessage? = messages[eventId]
+
+    override fun listHostEvents(
+        clubId: UUID,
+        status: NotificationEventOutboxStatus?,
+        limit: Int,
+    ): List<HostNotificationEvent> = error("unused")
 }
 
 private class RecordingPublisher(
