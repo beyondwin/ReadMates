@@ -1859,7 +1859,7 @@ git commit -m "feat: add notification frontend contracts"
 - Modify: `front/features/archive/ui/my-page.tsx`
 - Test: `front/tests/unit/my-page.test.tsx`
 
-- [ ] **Step 1: Update tests from read-only rows to editable preferences**
+- [x] **Step 1: Update tests from read-only rows to editable preferences**
 
 In `front/tests/unit/my-page.test.tsx`, replace the test named `renders notifications as read-only pending status rows` with:
 
@@ -1904,7 +1904,7 @@ it("renders editable notification preferences and saves changes", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test and verify failure**
+- [x] **Step 2: Run test and verify failure**
 
 Run:
 
@@ -1914,7 +1914,7 @@ pnpm --dir front test -- --run front/tests/unit/my-page.test.tsx
 
 Expected: FAIL because `notificationPreferences` props do not exist.
 
-- [ ] **Step 3: Add model labels and props**
+- [x] **Step 3: Add model labels and props**
 
 Append to `front/features/archive/model/archive-model.ts`:
 
@@ -1948,7 +1948,7 @@ export const defaultNotificationPreferences: NotificationPreferencesResponse = {
 
 If this creates duplicate import placement, move the type import to the existing import block at the top of the file.
 
-- [ ] **Step 4: Load and save preferences in the route**
+- [x] **Step 4: Load and save preferences in the route**
 
 Modify `my-page-data.ts` to include preferences:
 
@@ -1972,7 +1972,7 @@ notificationPreferences={loaderData.notificationPreferences}
 onSaveNotificationPreferences={saveNotificationPreferences}
 ```
 
-- [ ] **Step 5: Replace `NotificationsSection`**
+- [x] **Step 5: Replace `NotificationsSection`**
 
 In `front/features/archive/ui/my-page.tsx`, update props:
 
@@ -2074,7 +2074,7 @@ function NotificationSwitchRow({
 }
 ```
 
-- [ ] **Step 6: Run my-page tests**
+- [x] **Step 6: Run my-page tests**
 
 Run:
 
@@ -2084,7 +2084,7 @@ pnpm --dir front test -- --run front/tests/unit/my-page.test.tsx
 
 Expected: `PASS`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add front/features/archive front/tests/unit/my-page.test.tsx
