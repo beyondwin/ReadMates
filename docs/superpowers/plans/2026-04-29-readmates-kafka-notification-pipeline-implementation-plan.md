@@ -2558,7 +2558,7 @@ git commit -m "docs: document kafka notification pipeline"
 **Files:**
 - No source files unless verification exposes defects.
 
-- [ ] **Step 1: Run server tests**
+- [x] **Step 1: Run server tests**
 
 Run:
 
@@ -2568,7 +2568,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 2: Run frontend checks**
+- [x] **Step 2: Run frontend checks**
 
 Run:
 
@@ -2580,7 +2580,7 @@ pnpm --dir front build
 
 Expected: all PASS.
 
-- [ ] **Step 3: Run E2E**
+- [x] **Step 3: Run E2E**
 
 Run:
 
@@ -2590,7 +2590,7 @@ pnpm --dir front test:e2e
 
 Expected: PASS. If Kafka is disabled in E2E, notification events may remain pending; member/host pages should still render stable disabled or empty states.
 
-- [ ] **Step 4: Run public release checks**
+- [x] **Step 4: Run public release checks**
 
 Run:
 
@@ -2601,7 +2601,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit any verification fixes**
+- [x] **Step 5: Commit any verification fixes**
 
 If fixes were required, inspect and stage only the concrete files changed by those fixes:
 
