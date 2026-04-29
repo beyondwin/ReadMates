@@ -375,15 +375,25 @@ describe("MobileTabBar app tabs", () => {
       "이번 세션",
       "클럽 노트",
       "아카이브",
+      "알림",
       "내 공간",
     ]);
     expect(within(tabs).getByRole("link", { name: "홈" })).toHaveAttribute("href", "/app");
     expect(within(tabs).getByRole("link", { name: "이번 세션" })).toHaveAttribute("href", "/app/session/current");
     expect(within(tabs).getByRole("link", { name: "클럽 노트" })).toHaveAttribute("href", "/app/notes");
     expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("href", "/app/archive");
+    expect(within(tabs).getByRole("link", { name: "알림" })).toHaveAttribute("href", "/app/notifications");
     expect(within(tabs).getByRole("link", { name: "내 공간" })).toHaveAttribute("href", "/app/me");
     expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).queryByRole("link", { name: "운영" })).not.toBeInTheDocument();
+  });
+
+  it("marks the member notification tab active on notification routes", () => {
+    renderAt("/app/notifications", <MobileTabBar variant="member" />);
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(tabs).getByRole("link", { name: "알림" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "아카이브" })).not.toHaveAttribute("aria-current");
   });
 
   it("keeps the archive tab active on member session detail routes", () => {

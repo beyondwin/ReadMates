@@ -1,3 +1,5 @@
+import type { MouseEvent } from "react";
+
 type NotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
@@ -17,9 +19,15 @@ interface MemberNotificationItem {
 interface MemberNotificationsPageProps {
   unreadCount: number;
   items: MemberNotificationItem[];
-  onMarkRead: (id: string) => void | Promise<void>;
-  onMarkAllRead: () => void | Promise<void>;
+  pendingReadIds?: ReadonlySet<string>;
+  markAllReadPending?: boolean;
+  actionError?: string | null;
+  onMarkRead: (id: string) => void;
+  onMarkAllRead: () => void;
+  onOpenNotification?: (id: string, href: string) => void;
 }
+
+const EMPTY_PENDING_READ_IDS = new Set<string>();
 
 const eventLabels: Record<NotificationEventType, string> = {
   NEXT_BOOK_PUBLISHED: "다음 책",
@@ -67,13 +75,22 @@ function formatNotificationDate(value: string) {
   }).format(date);
 }
 
+function isPrimaryLinkActivation(event: MouseEvent<HTMLAnchorElement>) {
+  return event.button === 0 && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.currentTarget.target !== "_blank";
+}
+
 export function MemberNotificationsPage({
   unreadCount,
   items,
+  pendingReadIds = EMPTY_PENDING_READ_IDS,
+  markAllReadPending = false,
+  actionError = null,
   onMarkRead,
   onMarkAllRead,
+  onOpenNotification,
 }: MemberNotificationsPageProps) {
   const unreadLabel = unreadCount > 0 ? `읽지 않은 알림 ${unreadCount}개` : "새 알림이 없습니다";
+  const readAllDisabled = unreadCount === 0 || markAllReadPending;
 
   return (
     <main className="rm-member-notifications-page">
@@ -99,10 +116,16 @@ export function MemberNotificationsPage({
               {unreadLabel}
             </p>
           </div>
-          <button type="button" className="btn btn-quiet btn-sm" onClick={onMarkAllRead} disabled={unreadCount === 0}>
-            모두 읽음
+          <button type="button" className="btn btn-quiet btn-sm" onClick={onMarkAllRead} disabled={readAllDisabled}>
+            {markAllReadPending ? "모두 읽음 처리 중" : "모두 읽음"}
           </button>
         </header>
+
+        {actionError ? (
+          <p role="alert" className="small" style={{ color: "var(--danger)", margin: "0 0 14px" }}>
+            {actionError}
+          </p>
+        ) : null}
 
         <section className="surface" aria-label="알림 목록" style={{ padding: 6 }}>
           {items.length === 0 ? (
@@ -118,6 +141,8 @@ export function MemberNotificationsPage({
             <div style={{ display: "grid", gap: 6 }}>
               {items.map((item) => {
                 const unread = item.readAt === null;
+                const href = notificationHref(item.deepLinkPath);
+                const readPending = pendingReadIds.has(item.id) || markAllReadPending;
 
                 return (
                   <article
@@ -145,9 +170,21 @@ export function MemberNotificationsPage({
                         ) : null}
                       </div>
                       <a
-                        href={notificationHref(item.deepLinkPath)}
+                        href={href}
                         className="h3 editorial"
                         style={{ display: "inline-block", margin: 0, textDecoration: "none" }}
+                        onClick={
+                          unread && onOpenNotification
+                            ? (event) => {
+                                if (!isPrimaryLinkActivation(event)) {
+                                  return;
+                                }
+
+                                event.preventDefault();
+                                onOpenNotification(item.id, href);
+                              }
+                            : undefined
+                        }
                       >
                         {item.title}
                       </a>
@@ -156,8 +193,13 @@ export function MemberNotificationsPage({
                       </p>
                     </div>
                     {unread ? (
-                      <button type="button" className="btn btn-quiet btn-sm" onClick={() => onMarkRead(item.id)}>
-                        읽음
+                      <button
+                        type="button"
+                        className="btn btn-quiet btn-sm"
+                        onClick={() => onMarkRead(item.id)}
+                        disabled={readPending}
+                      >
+                        {readPending ? "읽음 처리 중" : "읽음"}
                       </button>
                     ) : null}
                   </article>
