@@ -209,6 +209,9 @@ export type HostDashboardResponse = {
 };
 
 export type HostNotificationStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD";
+export type NotificationEventOutboxStatus = "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
+export type NotificationDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD" | "SKIPPED";
+export type NotificationChannel = "EMAIL" | "IN_APP";
 export type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
@@ -241,6 +244,33 @@ export type HostNotificationItem = {
 
 export type HostNotificationItemListResponse = {
   items: HostNotificationItem[];
+};
+
+export type HostNotificationEventItem = {
+  id: string;
+  eventType: HostNotificationEventType;
+  status: NotificationEventOutboxStatus;
+  attemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type HostNotificationEventListResponse = {
+  items: HostNotificationEventItem[];
+};
+
+export type HostNotificationDeliveryItem = {
+  id: string;
+  eventId: string;
+  channel: NotificationChannel;
+  status: NotificationDeliveryStatus;
+  recipientEmail: string | null;
+  attemptCount: number;
+  updatedAt: string;
+};
+
+export type HostNotificationDeliveryListResponse = {
+  items: HostNotificationDeliveryItem[];
 };
 
 export type HostNotificationMetadata = {

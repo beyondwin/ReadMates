@@ -1,5 +1,6 @@
 import {
-  fetchHostNotificationItems,
+  fetchHostNotificationDeliveries,
+  fetchHostNotificationEvents,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
   processHostNotifications,
@@ -8,7 +9,8 @@ import {
   sendHostNotificationTestMail,
 } from "@/features/host/api/host-api";
 import type {
-  HostNotificationItem,
+  HostNotificationDeliveryItem,
+  HostNotificationEventItem,
   HostNotificationSummary,
   NotificationTestMailAuditItem,
 } from "@/features/host/api/host-contracts";
@@ -16,20 +18,22 @@ import { requireHostLoaderAuth } from "./host-loader-auth";
 
 export type HostNotificationsRouteData = {
   summary: HostNotificationSummary;
-  items: HostNotificationItem[];
+  events: HostNotificationEventItem[];
+  deliveries: HostNotificationDeliveryItem[];
   audit: NotificationTestMailAuditItem[];
 };
 
 export async function hostNotificationsLoader(): Promise<HostNotificationsRouteData> {
   await requireHostLoaderAuth();
 
-  const [summary, items, audit] = await Promise.all([
+  const [summary, events, deliveries, audit] = await Promise.all([
     fetchHostNotificationSummary(),
-    fetchHostNotificationItems(),
+    fetchHostNotificationEvents(),
+    fetchHostNotificationDeliveries(),
     fetchHostNotificationTestMailAudit(),
   ]);
 
-  return { summary, items: items.items, audit };
+  return { summary, events: events.items, deliveries: deliveries.items, audit };
 }
 
 export const hostNotificationsActions = {

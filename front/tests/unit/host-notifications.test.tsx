@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
 import type {
-  HostNotificationItem,
+  HostNotificationDeliveryItem,
+  HostNotificationEventItem,
   HostNotificationSummary,
   NotificationTestMailAuditItem,
 } from "@/features/host/api/host-contracts";
@@ -26,27 +27,38 @@ const audit: NotificationTestMailAuditItem[] = [
   },
 ];
 
-const deadItem: HostNotificationItem = {
-  id: "notification-1",
+const pendingEvent: HostNotificationEventItem = {
+  id: "event-1",
   eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+  status: "PENDING",
+  attemptCount: 1,
+  createdAt: "2026-04-29T00:00:00Z",
+  updatedAt: "2026-04-29T00:00:00Z",
+};
+
+const deadDelivery: HostNotificationDeliveryItem = {
+  id: "notification-1",
+  eventId: "event-1",
+  channel: "EMAIL",
   status: "DEAD",
   recipientEmail: "m***@example.com",
   attemptCount: 5,
-  nextAttemptAt: "2026-04-29T00:00:00Z",
   updatedAt: "2026-04-29T00:00:00Z",
 };
 
 type ActionMock = ReturnType<typeof vi.fn>;
 
 function renderPage({
-  items = [deadItem],
+  events = [pendingEvent],
+  deliveries = [deadDelivery],
   auditItems = [],
   onProcess = vi.fn().mockResolvedValue(undefined),
   onRetry = vi.fn().mockResolvedValue(undefined),
   onRestore = vi.fn().mockResolvedValue(undefined),
   onSendTestMail = vi.fn().mockResolvedValue(undefined),
 }: {
-  items?: HostNotificationItem[];
+  events?: HostNotificationEventItem[];
+  deliveries?: HostNotificationDeliveryItem[];
   auditItems?: NotificationTestMailAuditItem[];
   onProcess?: ActionMock;
   onRetry?: ActionMock;
@@ -56,7 +68,8 @@ function renderPage({
   render(
     <HostNotificationsPage
       summary={summary}
-      items={items}
+      events={events}
+      deliveries={deliveries}
       audit={auditItems}
       onProcess={onProcess}
       onRetry={onRetry}
@@ -74,6 +87,19 @@ afterEach(() => {
 });
 
 describe("HostNotificationsPage", () => {
+  it("renders event and delivery operation ledgers", async () => {
+    const user = userEvent.setup();
+
+    renderPage();
+
+    expect(screen.getByRole("tab", { name: "이벤트" })).toBeInTheDocument();
+    expect(screen.getByText("Kafka 발행 대기")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "배송" }));
+
+    expect(screen.getByText("EMAIL")).toBeInTheDocument();
+  });
+
   it("renders notification ledger and restores a dead item after confirmation", async () => {
     const user = userEvent.setup();
     const onRestore = vi.fn().mockResolvedValue(undefined);
@@ -81,6 +107,7 @@ describe("HostNotificationsPage", () => {
     renderPage({ onRestore });
 
     expect(screen.getByText("알림 발송 장부")).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "배송" }));
     expect(screen.getByText("m***@example.com")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "복구" }));
@@ -92,10 +119,11 @@ describe("HostNotificationsPage", () => {
   it("retries pending and failed notifications only", async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn().mockResolvedValue(undefined);
-    const pendingItem: HostNotificationItem = { ...deadItem, id: "notification-2", status: "PENDING" };
-    const sentItem: HostNotificationItem = { ...deadItem, id: "notification-3", status: "SENT" };
+    const pendingItem: HostNotificationDeliveryItem = { ...deadDelivery, id: "notification-2", status: "PENDING" };
+    const sentItem: HostNotificationDeliveryItem = { ...deadDelivery, id: "notification-3", status: "SENT" };
 
-    renderPage({ items: [pendingItem, sentItem], onRetry });
+    renderPage({ deliveries: [pendingItem, sentItem], onRetry });
+    await user.click(screen.getByRole("tab", { name: "배송" }));
 
     await user.click(screen.getByRole("button", { name: "재시도" }));
 
@@ -119,12 +147,13 @@ describe("HostNotificationsPage", () => {
   it("keeps notification operations disabled while route data is refreshing", async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn().mockResolvedValue(undefined);
-    const pendingItem: HostNotificationItem = { ...deadItem, id: "notification-2", status: "FAILED" };
+    const pendingItem: HostNotificationDeliveryItem = { ...deadDelivery, id: "notification-2", status: "FAILED" };
 
     render(
       <HostNotificationsPage
         summary={summary}
-        items={[pendingItem]}
+        events={[pendingEvent]}
+        deliveries={[pendingItem]}
         audit={[]}
         isRefreshing
         onProcess={vi.fn()}
@@ -135,6 +164,7 @@ describe("HostNotificationsPage", () => {
     );
 
     expect(screen.getByRole("button", { name: "새로고침 중" })).toBeDisabled();
+    await user.click(screen.getByRole("tab", { name: "배송" }));
     const retryButton = screen.getByRole("button", { name: "재시도" });
     expect(retryButton).toBeDisabled();
 
@@ -149,6 +179,7 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onRestore });
 
+    await user.click(screen.getByRole("tab", { name: "배송" }));
     await user.click(screen.getByRole("button", { name: "복구" }));
     await user.click(screen.getByRole("button", { name: "복구 확인" }));
 
