@@ -41,6 +41,43 @@ class MySqlFlywayMigrationTest(
         assertEquals("NO", columnValue("memberships", "short_name", "is_nullable"))
         assertEquals("NO", columnValue("invitations", "invited_name", "is_nullable"))
         assertEquals("longtext", columnValue("session_feedback_documents", "source_text", "data_type"))
+        assertEquals("YES", columnValue("session_feedback_documents", "document_title", "is_nullable"))
+        assertEquals(
+            "club_id,state,visibility,number,session_date",
+            indexColumns("sessions", "sessions_club_state_visibility_number_idx"),
+        )
+        assertEquals(
+            "club_id,session_id,participation_status,membership_id",
+            indexColumns("session_participants", "session_participants_club_session_status_member_idx"),
+        )
+        assertEquals(
+            "club_id,session_id,created_at,priority",
+            indexColumns("questions", "questions_club_session_created_idx"),
+        )
+        assertEquals(
+            "club_id,visibility,created_at,session_id",
+            indexColumns("one_line_reviews", "one_line_reviews_club_visibility_created_idx"),
+        )
+        assertEquals(
+            "club_id,visibility,created_at,session_id",
+            indexColumns("long_reviews", "long_reviews_club_visibility_created_idx"),
+        )
+        assertEquals(
+            "club_id,session_id,created_at,sort_order",
+            indexColumns("highlights", "highlights_club_session_created_idx"),
+        )
+        assertEquals(
+            "club_id,session_id,version,created_at",
+            indexColumns("session_feedback_documents", "session_feedback_documents_club_session_version_idx"),
+        )
+        assertEquals(
+            "club_id,status,updated_at,created_at",
+            indexColumns("notification_outbox", "notification_outbox_club_status_updated_idx"),
+        )
+        assertEquals(
+            "club_id,status,next_attempt_at,created_at",
+            indexColumns("notification_outbox", "notification_outbox_club_status_next_idx"),
+        )
         assertEquals(1, uniqueIndexCount("auth_sessions", "session_token_hash"))
         assertEquals(1, uniqueIndexCount("memberships", "short_name"))
         assertEquals("invited_by_membership_id,club_id", foreignKeyColumns("invitations", "invitations_inviter_fk"))
@@ -264,6 +301,20 @@ class MySqlFlywayMigrationTest(
         tableName,
         columnName,
     ) ?: 0
+
+    private fun indexColumns(tableName: String, indexName: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select group_concat(column_name order by seq_in_index separator ',')
+            from information_schema.statistics
+            where table_schema = database()
+              and table_name = ?
+              and index_name = ?
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            indexName,
+        ) ?: error("Index $tableName.$indexName does not exist")
 
     private fun foreignKeyColumns(
         tableName: String,
