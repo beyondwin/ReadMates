@@ -4,7 +4,7 @@ import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
-import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
+import com.readmates.notification.application.port.`in`.ProcessNotificationDeliveriesUseCase
 import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
@@ -26,7 +26,7 @@ import java.util.UUID
 @RequestMapping("/api/host/notifications")
 class HostNotificationController(
     private val getHostNotificationSummaryUseCase: GetHostNotificationSummaryUseCase,
-    private val processNotificationOutboxUseCase: ProcessNotificationOutboxUseCase,
+    private val processNotificationDeliveriesUseCase: ProcessNotificationDeliveriesUseCase,
     private val manageHostNotificationsUseCase: ManageHostNotificationsUseCase,
     private val sendNotificationTestMailUseCase: SendNotificationTestMailUseCase,
 ) {
@@ -94,7 +94,7 @@ class HostNotificationController(
             throw AccessDeniedException("Host role required")
         }
 
-        return mapOf("processed" to processNotificationOutboxUseCase.processPendingForClub(host.clubId, PROCESS_BATCH_SIZE))
+        return mapOf("processed" to processNotificationDeliveriesUseCase.processPendingForClub(host.clubId, PROCESS_BATCH_SIZE))
     }
 
     @PostMapping("/items/{id}/retry")

@@ -95,19 +95,6 @@ fun notificationDeliveryDedupeKey(
     channel: NotificationChannel,
 ): String = "$eventId:$recipientMembershipId:${channel.name}"
 
-data class NotificationOutboxItem(
-    val id: UUID,
-    val clubId: UUID,
-    val eventType: NotificationEventType,
-    val recipientEmail: String,
-    val subject: String,
-    val bodyText: String,
-    val deepLinkPath: String,
-    val status: NotificationOutboxStatus,
-    val attemptCount: Int,
-    val lockedAt: OffsetDateTime,
-)
-
 data class HostNotificationSummary(
     val pending: Int,
     val failed: Int,
@@ -194,7 +181,7 @@ data class HostNotificationDetail(
     val updatedAt: OffsetDateTime,
 )
 
-data class NotificationOutboxBacklog(
+data class NotificationDeliveryBacklog(
     val pending: Int,
     val failed: Int,
     val dead: Int,

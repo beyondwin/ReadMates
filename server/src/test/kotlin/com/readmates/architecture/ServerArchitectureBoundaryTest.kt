@@ -86,6 +86,17 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `notification application does not depend on legacy notification outbox port`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.notification.application..")
+            .should()
+            .dependOnClassesThat()
+            .haveSimpleName("NotificationOutboxPort")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `member profile application service does not depend on web status types`() {
         noClasses()
             .that()

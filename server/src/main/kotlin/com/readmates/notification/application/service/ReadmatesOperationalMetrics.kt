@@ -1,7 +1,7 @@
 package com.readmates.notification.application.service
 
-import com.readmates.notification.application.model.NotificationOutboxBacklog
-import com.readmates.notification.application.port.out.NotificationOutboxPort
+import com.readmates.notification.application.model.NotificationDeliveryBacklog
+import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationEventType
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
@@ -13,7 +13,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 class ReadmatesOperationalMetrics(
     private val meterRegistry: MeterRegistry,
-    private val notificationOutboxPort: NotificationOutboxPort? = null,
+    private val notificationDeliveryPort: NotificationDeliveryPort? = null,
 ) {
     init {
         registerOutboxBacklogGauges()
@@ -66,12 +66,12 @@ class ReadmatesOperationalMetrics(
     }
 
     private fun registerOutboxBacklogGauges() {
-        val port = notificationOutboxPort ?: return
+        val port = notificationDeliveryPort ?: return
         OutboxBacklogStatus.entries.forEach { status ->
             Gauge.builder("readmates.notifications.outbox.backlog") {
-                port.outboxBacklog().count(status).toDouble()
+                port.deliveryBacklog().count(status).toDouble()
             }
-                .description("Current notification outbox rows by delivery status")
+                .description("Current email notification delivery rows by status")
                 .tag("status", status.tag)
                 .register(meterRegistry)
         }
@@ -85,7 +85,7 @@ private enum class OutboxBacklogStatus(val tag: String) {
     SENDING("sending"),
 }
 
-private fun NotificationOutboxBacklog.count(status: OutboxBacklogStatus): Int =
+private fun NotificationDeliveryBacklog.count(status: OutboxBacklogStatus): Int =
     when (status) {
         OutboxBacklogStatus.PENDING -> pending
         OutboxBacklogStatus.FAILED -> failed

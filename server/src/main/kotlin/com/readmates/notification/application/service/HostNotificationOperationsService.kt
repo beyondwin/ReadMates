@@ -20,16 +20,16 @@ import java.util.UUID
 
 @Service
 class HostNotificationOperationsService(
-    private val notificationOutboxService: NotificationOutboxService,
     private val notificationEventOutboxPort: NotificationEventOutboxPort,
     private val notificationDeliveryPort: NotificationDeliveryPort,
+    private val notificationDeliveryProcessingService: NotificationDeliveryProcessingService,
 ) : GetHostNotificationSummaryUseCase,
     ManageHostNotificationsUseCase {
     override fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary =
-        notificationOutboxService.getHostNotificationSummary(host)
+        notificationDeliveryPort.hostSummary(requireHost(host).clubId)
 
     override fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList =
-        notificationOutboxService.listItems(host, query)
+        notificationDeliveryPort.listHostEmailItems(requireHost(host).clubId, query.copy(limit = query.limit.coerceIn(1, 100)))
 
     override fun listEvents(
         host: CurrentMember,
@@ -64,13 +64,26 @@ class HostNotificationOperationsService(
     }
 
     override fun detail(host: CurrentMember, id: UUID): HostNotificationDetail =
-        notificationOutboxService.detail(host, id)
+        notificationDeliveryPort.hostEmailDetail(requireHost(host).clubId, id)
+            ?: throw notificationAccessDenied()
 
-    override fun retry(host: CurrentMember, id: UUID): HostNotificationDetail =
-        notificationOutboxService.retry(host, id)
+    override fun retry(host: CurrentMember, id: UUID): HostNotificationDetail {
+        val currentHost = requireHost(host)
+        val item = notificationDeliveryPort.claimHostEmailDelivery(currentHost.clubId, id)
+            ?: throw notificationAccessDenied()
+        notificationDeliveryProcessingService.processClaimed(item)
+        return notificationDeliveryPort.hostEmailDetail(currentHost.clubId, id)
+            ?: throw notificationAccessDenied()
+    }
 
-    override fun restore(host: CurrentMember, id: UUID): HostNotificationDetail =
-        notificationOutboxService.restore(host, id)
+    override fun restore(host: CurrentMember, id: UUID): HostNotificationDetail {
+        val currentHost = requireHost(host)
+        if (!notificationDeliveryPort.restoreDeadEmailDeliveryForClub(currentHost.clubId, id)) {
+            throw notificationAccessDenied()
+        }
+        return notificationDeliveryPort.hostEmailDetail(currentHost.clubId, id)
+            ?: throw notificationAccessDenied()
+    }
 
     private fun requireHost(host: CurrentMember): CurrentMember {
         if (!host.isHost) {
@@ -78,6 +91,9 @@ class HostNotificationOperationsService(
         }
         return host
     }
+
+    private fun notificationAccessDenied(): AccessDeniedException =
+        AccessDeniedException("Notification not found")
 }
 
 private const val MAX_HOST_LEDGER_LIMIT = 100

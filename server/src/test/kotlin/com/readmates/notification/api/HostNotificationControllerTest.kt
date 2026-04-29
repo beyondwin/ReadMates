@@ -32,6 +32,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import java.io.InputStream
 import java.util.Properties
+import java.util.UUID
 
 private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
     delete from notification_test_mail_audit
@@ -40,8 +41,10 @@ private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
     where dedupe_key like 'host-notification-controller-test-%';
     delete from notification_event_outbox
     where dedupe_key like 'host-notification-controller-test-%';
-    delete from notification_outbox
-    where dedupe_key like 'host-notification-controller-test-%';
+    delete from memberships
+    where club_id = '00000000-0000-0000-0000-000000000002';
+    delete from users
+    where id = '00000000-0000-0000-0000-000000009102';
     delete from clubs
     where id = '00000000-0000-0000-0000-000000000002';
 """
@@ -76,28 +79,13 @@ class HostNotificationControllerTest(
 ) {
     @Test
     fun `host can read notification status summary`() {
-        jdbcTemplate.update(
-            """
-            insert into notification_outbox (
-              id, club_id, event_type, aggregate_type, aggregate_id,
-              recipient_email, subject, body_text, deep_link_path, status,
-              attempt_count, last_error, dedupe_key
-            ) values (
-              '00000000-0000-0000-0000-000000009001',
-              '00000000-0000-0000-0000-000000000001',
-              'FEEDBACK_DOCUMENT_PUBLISHED',
-              'SESSION',
-              '00000000-0000-0000-0000-000000000301',
-              'member@example.com',
-              '피드백 문서가 올라왔습니다',
-              'ReadMates에서 확인해 주세요.',
-              '/app/feedback/00000000-0000-0000-0000-000000000301',
-              'FAILED',
-              2,
-              'SMTP temporary failure',
-              'host-notification-controller-test-failed'
-            )
-            """.trimIndent(),
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009001",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.FAILED,
+            dedupeKey = "host-notification-controller-test-failed",
+            lastError = "SMTP temporary failure",
+            attemptCount = 2,
         )
 
         val response = mockMvc.get("/api/host/notifications/summary") {
@@ -411,18 +399,7 @@ class HostNotificationControllerTest(
 
     @Test
     fun `manual host process only processes notifications for host club`() {
-        jdbcTemplate.update(
-            """
-            insert into clubs (id, slug, name, tagline, about)
-            values (
-              '00000000-0000-0000-0000-000000000002',
-              'other-club',
-              'Other Club',
-              'Separate reading club',
-              'Separate club for notification processing scope tests.'
-            )
-            """.trimIndent(),
-        )
+        insertOtherClub()
         insertPendingNotification(
             id = "00000000-0000-0000-0000-000000009101",
             clubId = "00000000-0000-0000-0000-000000000001",
@@ -444,7 +421,7 @@ class HostNotificationControllerTest(
         val otherClubStatus = jdbcTemplate.queryForObject(
             """
             select status
-            from notification_outbox
+            from notification_deliveries
             where id = '00000000-0000-0000-0000-000000009102'
             """.trimIndent(),
             String::class.java,
@@ -452,7 +429,7 @@ class HostNotificationControllerTest(
         val hostClubStatus = jdbcTemplate.queryForObject(
             """
             select status
-            from notification_outbox
+            from notification_deliveries
             where id = '00000000-0000-0000-0000-000000009101'
             """.trimIndent(),
             String::class.java,
@@ -488,6 +465,33 @@ class HostNotificationControllerTest(
             )
             """.trimIndent(),
         )
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+            values (
+              '00000000-0000-0000-0000-000000009102',
+              'google-other-club-member',
+              'other-member@example.com',
+              'Other Member',
+              'Other',
+              'GOOGLE'
+            )
+            """.trimIndent(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (
+              '00000000-0000-0000-0000-000000000292',
+              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000009102',
+              'MEMBER',
+              'ACTIVE',
+              utc_timestamp(6),
+              'Other'
+            )
+            """.trimIndent(),
+        )
     }
 
     private fun insertNotification(
@@ -496,45 +500,51 @@ class HostNotificationControllerTest(
         status: NotificationOutboxStatus,
         dedupeKey: String,
         lastError: String? = null,
+        attemptCount: Int = 0,
     ) {
+        val eventId = UUID.randomUUID().toString()
+        insertNotificationEvent(
+            id = eventId,
+            clubId = clubId,
+            eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+            status = NotificationEventOutboxStatus.PUBLISHED,
+            dedupeKey = "$dedupeKey-event",
+        )
         jdbcTemplate.update(
             """
-            insert into notification_outbox (
-              id, club_id, event_type, aggregate_type, aggregate_id,
-              recipient_email, subject, body_text, deep_link_path, metadata, status, last_error, dedupe_key
-            ) values (
+            insert into notification_deliveries (
+              id,
+              event_id,
+              club_id,
+              recipient_membership_id,
+              channel,
+              status,
+              attempt_count,
+              last_error,
+              sent_at,
+              dedupe_key
+            )
+            values (
               ?,
               ?,
-              'FEEDBACK_DOCUMENT_PUBLISHED',
-              'SESSION',
-              '00000000-0000-0000-0000-000000000301',
-              'member@example.com',
-              '피드백 문서가 올라왔습니다',
-              'ReadMates에서 확인해 주세요.',
-              '/app/feedback/00000000-0000-0000-0000-000000000301',
-              json_object(
-                'sessionNumber', 3,
-                'bookTitle', '메타데이터 테스트 책',
-                'recipientEmail', 'member@example.com',
-                'bodyText', 'ReadMates에서 확인해 주세요.',
-                'inviteToken', 'secret marker',
-                'apiKey', 'api key marker',
-                'password', 'password marker',
-                'accessKeyId', 'access key marker',
-                'privateKeyPem', 'private key marker',
-                'signingKeyId', 'signing-key-id',
-                'authorization', 'authorization marker',
-                'credential', 'credential marker'
-              ),
               ?,
               ?,
+              'EMAIL',
+              ?,
+              ?,
+              ?,
+              if(? = 'SENT', utc_timestamp(6), null),
               ?
             )
             """.trimIndent(),
             id,
+            eventId,
             clubId,
+            recipientMembershipIdForClub(clubId),
             status.name,
+            attemptCount,
             lastError,
+            status.name,
             dedupeKey,
         )
     }
@@ -559,7 +569,24 @@ class HostNotificationControllerTest(
               kafka_key,
               dedupe_key
             )
-            values (?, ?, ?, 'SESSION', '00000000-0000-0000-0000-000000000301', json_object('sessionId', '00000000-0000-0000-0000-000000000301'), ?, ?, ?)
+            values (
+              ?,
+              ?,
+              ?,
+              'SESSION',
+              '00000000-0000-0000-0000-000000000301',
+              json_object(
+                'sessionId', '00000000-0000-0000-0000-000000000301',
+                'sessionNumber', 3,
+                'bookTitle', '메타데이터 테스트 책',
+                'documentVersion', null,
+                'authorMembershipId', null,
+                'targetDate', null
+              ),
+              ?,
+              ?,
+              ?
+            )
             """.trimIndent(),
             id,
             clubId,
@@ -601,6 +628,12 @@ class HostNotificationControllerTest(
             dedupeKey,
         )
     }
+
+    private fun recipientMembershipIdForClub(clubId: String): String =
+        when (clubId) {
+            "00000000-0000-0000-0000-000000000002" -> "00000000-0000-0000-0000-000000000292"
+            else -> "00000000-0000-0000-0000-000000000202"
+        }
 
     private fun assertNoSensitiveErrorValues(value: String) {
         assertThat(value).doesNotContain("external@example.com")
