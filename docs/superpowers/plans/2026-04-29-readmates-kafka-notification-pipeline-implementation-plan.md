@@ -2027,7 +2027,7 @@ git commit -m "refactor: remove jdbc notification delivery worker"
 - Modify app chrome badge component found with `rg "mobile-header|mobile-tab|TopNav|notification" front/src front/shared front/features`.
 - Test: `front/tests/unit/member-notifications.test.tsx`
 
-- [ ] **Step 1: Write failing unit test**
+- [x] **Step 1: Write failing unit test**
 
 Create `front/tests/unit/member-notifications.test.tsx`:
 
@@ -2064,7 +2064,7 @@ describe("MemberNotificationsPage", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -2074,7 +2074,7 @@ pnpm --dir front test -- member-notifications.test.tsx
 
 Expected: FAIL because the notifications feature does not exist.
 
-- [ ] **Step 3: Add contracts and API**
+- [x] **Step 3: Add contracts and API**
 
 Create `notifications-contracts.ts`:
 
@@ -2116,7 +2116,7 @@ export async function markAllMemberNotificationsRead(): Promise<{ updatedCount: 
 }
 ```
 
-- [ ] **Step 4: Add UI**
+- [x] **Step 4: Add UI**
 
 Create `member-notifications-page.tsx`:
 
@@ -2172,7 +2172,7 @@ export function MemberNotificationsPage({
 }
 ```
 
-- [ ] **Step 5: Add route**
+- [x] **Step 5: Add route**
 
 Create `member-notifications-route.tsx`:
 
@@ -2221,7 +2221,7 @@ Add route in `front/src/app/router.tsx`:
 
 Import the route symbols at the top of `router.tsx`.
 
-- [ ] **Step 6: Run frontend unit test**
+- [x] **Step 6: Run frontend unit test**
 
 Run:
 
@@ -2231,7 +2231,7 @@ pnpm --dir front test -- member-notifications.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add front/features/notifications front/src/app/router.tsx front/tests/unit/member-notifications.test.tsx
