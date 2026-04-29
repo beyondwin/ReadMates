@@ -103,7 +103,7 @@ The implementation should not preserve the old JDBC direct delivery worker. It m
 - Modify: `server/src/main/resources/application.yml`
 - Create: `server/src/test/kotlin/com/readmates/support/KafkaTestContainer.kt`
 
-- [ ] **Step 1: Write a failing Kafka container smoke test**
+- [x] **Step 1: Write a failing Kafka container smoke test**
 
 Create `server/src/test/kotlin/com/readmates/support/KafkaTestContainer.kt`:
 
@@ -138,7 +138,7 @@ class NotificationKafkaDependencyTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -148,7 +148,7 @@ Run:
 
 Expected: FAIL because `org.testcontainers.kafka.KafkaContainer` is not on the test classpath.
 
-- [ ] **Step 3: Add dependencies and config**
+- [x] **Step 3: Add dependencies and config**
 
 Modify `server/build.gradle.kts` dependencies:
 
@@ -192,7 +192,7 @@ Modify `server/src/main/resources/application.yml` under `readmates.notification
       max-delivery-attempts: ${READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS:5}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -202,7 +202,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/build.gradle.kts compose.yml server/src/main/resources/application.yml server/src/test/kotlin/com/readmates/support/KafkaTestContainer.kt server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaDependencyTest.kt
