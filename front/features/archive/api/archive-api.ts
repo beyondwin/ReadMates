@@ -4,6 +4,8 @@ import type {
   CurrentSessionPolicy,
   FeedbackDocumentListItem,
   MemberProfileResponse,
+  NotificationPreferencesRequest,
+  NotificationPreferencesResponse,
   UpdateMemberProfileRequest,
   MemberArchiveSessionDetailResponse,
   MyArchiveQuestionItem,
@@ -86,5 +88,16 @@ export async function leaveMembership(currentSessionPolicy: CurrentSessionPolicy
   return readmatesFetchResponse(
     "/api/me/membership/leave",
     jsonRequest({ method: "POST" }, { currentSessionPolicy }),
+  );
+}
+
+export function fetchNotificationPreferences() {
+  return readmatesFetch<NotificationPreferencesResponse>("/api/me/notifications/preferences");
+}
+
+export function saveNotificationPreferences(request: NotificationPreferencesRequest) {
+  return readmatesFetch<NotificationPreferencesResponse>(
+    "/api/me/notifications/preferences",
+    jsonRequest({ method: "PUT" }, request),
   );
 }

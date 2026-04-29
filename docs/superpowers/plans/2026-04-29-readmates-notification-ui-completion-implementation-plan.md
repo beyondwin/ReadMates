@@ -1709,7 +1709,7 @@ git commit -m "feat: notify opted-in members about public reviews"
 - Test: `front/tests/unit/host-dashboard.test.tsx`
 - Test: `front/tests/unit/my-page.test.tsx`
 
-- [ ] **Step 1: Add contract types**
+- [x] **Step 1: Add contract types**
 
 Append to `front/features/archive/api/archive-contracts.ts`:
 
@@ -1772,7 +1772,7 @@ export type NotificationTestMailAuditItem = {
 };
 ```
 
-- [ ] **Step 2: Add API functions**
+- [x] **Step 2: Add API functions**
 
 Append to `front/features/archive/api/archive-api.ts`:
 
@@ -1831,7 +1831,7 @@ export function fetchHostNotificationTestMailAudit() {
 
 Add imports for the new types.
 
-- [ ] **Step 3: Run frontend type and related unit tests**
+- [x] **Step 3: Run frontend type and related unit tests**
 
 Run:
 
@@ -1841,7 +1841,7 @@ pnpm --dir front test -- --run front/tests/unit/host-dashboard.test.tsx front/te
 
 Expected: the API contract files typecheck; the existing my-page read-only notification test fails until Task 8 replaces that UI.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add front/features/host/api front/features/archive/api
