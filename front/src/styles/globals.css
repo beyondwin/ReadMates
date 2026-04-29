@@ -109,6 +109,48 @@
   font-weight: 600;
 }
 
+.platform-admin-page {
+  min-height: 100vh;
+  background: var(--bg);
+  padding: 72px 0 96px;
+}
+
+.platform-admin-page__inner {
+  display: grid;
+  gap: 28px;
+}
+
+.platform-admin-page__header {
+  display: grid;
+  gap: 8px;
+}
+
+.platform-admin-page__header .h1 {
+  margin: 0;
+}
+
+.platform-admin-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.platform-admin-metric {
+  padding: 22px;
+}
+
+.platform-admin-metric__label {
+  margin: 0 0 10px;
+  font-weight: 700;
+}
+
+.platform-admin-metric__value {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 700;
+}
+
 .rm-route-stage {
   min-height: inherit;
 }
@@ -1098,6 +1140,14 @@
   .club-switcher__select {
     flex: 1;
     min-width: 0;
+  }
+
+  .platform-admin-page {
+    padding: 32px 0 72px;
+  }
+
+  .platform-admin-summary {
+    grid-template-columns: 1fr;
   }
 
   .rm-route-reveal {
