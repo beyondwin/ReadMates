@@ -60,6 +60,7 @@ function copyUpstreamHeaders(headers: Headers) {
   copiedHeaders.delete("set-cookie");
   copiedHeaders.delete("x-readmates-bff-secret");
   copiedHeaders.delete("x-readmates-client-ip");
+  copiedHeaders.delete("x-readmates-club-host");
 
   const setCookies = (headers as HeadersWithSetCookie).getSetCookie?.() ?? [];
   if (setCookies.length > 0) {
@@ -110,6 +111,11 @@ function clientIpFromRequest(request: Request) {
   return forwardedFor ? forwardedFor.slice(0, MAX_CLIENT_IP_LENGTH) : null;
 }
 
+function normalizedHostFromRequest(request: Request) {
+  const host = new URL(request.url).host.trim().toLowerCase();
+  return host.endsWith(".") ? host.slice(0, -1) : host;
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   const upstreamPath = buildApiUpstreamPath(pathSegments(context.params.path));
   if (!upstreamPath) {
@@ -144,6 +150,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     headers.set("Origin", origin);
     headers.set("Referer", origin);
   }
+
+  headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(context.request));
 
   const bffSecret = context.env.READMATES_BFF_SECRET?.trim();
   if (bffSecret) {
