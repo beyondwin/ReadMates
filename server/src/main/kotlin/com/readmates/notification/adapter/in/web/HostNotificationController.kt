@@ -24,8 +24,8 @@ class HostNotificationController(
     private val manageHostNotificationsUseCase: ManageHostNotificationsUseCase,
 ) {
     @GetMapping("/summary")
-    fun summary(host: CurrentMember) =
-        getHostNotificationSummaryUseCase.getHostNotificationSummary(host)
+    fun summary(host: CurrentMember): HostNotificationSummaryResponse =
+        getHostNotificationSummaryUseCase.getHostNotificationSummary(host).toResponse()
 
     @GetMapping("/items")
     fun listItems(
