@@ -4,6 +4,7 @@ import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.MemberNotificationList
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationPreferences
@@ -63,4 +64,11 @@ interface SendNotificationTestMailUseCase {
 interface ManageNotificationPreferencesUseCase {
     fun getPreferences(member: CurrentMember): NotificationPreferences
     fun savePreferences(member: CurrentMember, preferences: NotificationPreferences): NotificationPreferences
+}
+
+interface ManageMemberNotificationsUseCase {
+    fun list(member: CurrentMember, limit: Int): MemberNotificationList
+    fun unreadCount(member: CurrentMember): Int
+    fun markRead(member: CurrentMember, id: UUID)
+    fun markAllRead(member: CurrentMember): Int
 }

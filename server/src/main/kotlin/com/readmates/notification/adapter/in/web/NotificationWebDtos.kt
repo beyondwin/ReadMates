@@ -5,6 +5,8 @@ import com.readmates.notification.application.model.HostNotificationFailure
 import com.readmates.notification.application.model.HostNotificationItem
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.MemberNotificationItem
+import com.readmates.notification.application.model.MemberNotificationList
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationTestMailStatus
@@ -94,10 +96,42 @@ data class NotificationPreferencesResponse(
     val events: Map<NotificationEventType, Boolean>,
 )
 
+data class MemberNotificationListResponse(
+    val items: List<MemberNotificationResponse>,
+    val unreadCount: Int,
+)
+
+data class MemberNotificationResponse(
+    val id: UUID,
+    val eventType: NotificationEventType,
+    val title: String,
+    val body: String,
+    val deepLinkPath: String,
+    val readAt: String?,
+    val createdAt: String,
+)
+
 fun NotificationPreferences.toResponse(): NotificationPreferencesResponse =
     NotificationPreferencesResponse(
         emailEnabled = emailEnabled,
         events = NotificationEventType.entries.associateWith(::eventPreference),
+    )
+
+fun MemberNotificationList.toResponse(): MemberNotificationListResponse =
+    MemberNotificationListResponse(
+        items = items.map { it.toResponse() },
+        unreadCount = unreadCount,
+    )
+
+fun MemberNotificationItem.toResponse(): MemberNotificationResponse =
+    MemberNotificationResponse(
+        id = id,
+        eventType = eventType,
+        title = title,
+        body = body,
+        deepLinkPath = deepLinkPath,
+        readAt = readAt?.toString(),
+        createdAt = createdAt.toString(),
     )
 
 fun HostNotificationSummary.toResponse(): HostNotificationSummaryResponse =
