@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit
     ],
 )
 @AutoConfigureMockMvc
+@Sql(statements = [HostInvitationControllerTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [HostInvitationControllerTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class HostInvitationControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
@@ -49,7 +50,7 @@ class HostInvitationControllerTest(
                 jsonPath("$.status") { value("PENDING") }
                 jsonPath("$.effectiveStatus") { value("PENDING") }
                 jsonPath("$.applyToCurrentSession") { value(true) }
-                jsonPath("$.acceptUrl", startsWith("http://localhost:3000/invite/"))
+                jsonPath("$.acceptUrl", startsWith("http://localhost:3000/clubs/reading-sai/invite/"))
                 jsonPath("$.canRevoke") { value(true) }
                 jsonPath("$.canReissue") { value(true) }
             }
@@ -66,6 +67,33 @@ class HostInvitationControllerTest(
         assertEquals("MEMBER", row["role"])
         assertEquals("PENDING", row["status"])
         assertEquals(64, numberValue(row["token_hash_length"]).toInt())
+    }
+
+    @Test
+    fun `host invitation accept url uses primary active club domain when present`() {
+        jdbcTemplate.update(
+            """
+            insert into club_domains (id, club_id, hostname, kind, status, is_primary)
+            values (
+              '00000000-0000-0000-0000-000000007301',
+              '00000000-0000-0000-0000-000000000001',
+              'reading.example.test',
+              'CUSTOM_DOMAIN',
+              'ACTIVE',
+              true
+            )
+            """.trimIndent(),
+        )
+
+        mockMvc.post("/api/host/invitations") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"primary.domain.invite@example.com","name":"도메인 초대"}"""
+        }
+            .andExpect {
+                status { isCreated() }
+                jsonPath("$.acceptUrl", startsWith("https://reading.example.test/invite/"))
+            }
     }
 
     @Test
@@ -322,8 +350,11 @@ class HostInvitationControllerTest(
               'repeat@example.com',
               'list.member@example.com',
               'accepted.list.member@example.com',
-              'race@example.com'
+              'race@example.com',
+              'primary.domain.invite@example.com'
             );
+            delete from club_domains
+            where hostname = 'reading.example.test';
             delete memberships
             from memberships
             join users on memberships.user_id = users.id

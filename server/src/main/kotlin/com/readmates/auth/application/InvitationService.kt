@@ -42,6 +42,8 @@ data class HostInvitationResponse(
 
 data class InvitationPreviewResponse(
     val clubName: String,
+    val clubSlug: String,
+    val canonicalPath: String,
     val email: String,
     val name: String,
     val emailHint: String,
@@ -97,7 +99,8 @@ class InvitationService(
             ),
         )
 
-        return findHostInvitation(host.clubId, invitationId).copy(acceptUrl = acceptUrl(token))
+        val created = findHostInvitationRow(host.clubId, invitationId)
+        return toHostInvitationResponse(created).copy(acceptUrl = acceptUrl(created.clubSlug, token, created.primaryHost))
     }
 
     override fun listHostInvitations(host: CurrentMember): List<HostInvitationResponse> {
@@ -105,11 +108,16 @@ class InvitationService(
         return invitationStore.listHostInvitations(host.clubId).map(::toHostInvitationResponse)
     }
 
-    override fun previewInvitation(rawToken: String): InvitationPreviewResponse {
+    override fun previewInvitation(rawToken: String, clubSlug: String?): InvitationPreviewResponse {
         val invitation = findInvitationByToken(rawToken)
+        if (clubSlug != null && invitation.clubSlug != clubSlug) {
+            throw InvitationDomainException("INVITATION_CLUB_MISMATCH", HttpStatus.NOT_FOUND, "Invitation not found")
+        }
         val effectiveStatus = effectiveStatus(invitation.status, invitation.expiresAt)
         return InvitationPreviewResponse(
             clubName = invitation.clubName,
+            clubSlug = invitation.clubSlug,
+            canonicalPath = invitePath(invitation.clubSlug, rawToken),
             email = invitation.email,
             name = invitation.name,
             emailHint = maskEmail(invitation.email),
@@ -126,8 +134,12 @@ class InvitationService(
         email: String,
         displayName: String?,
         profileImageUrl: String?,
+        expectedClubSlug: String? = null,
     ): CurrentMember {
         val invitation = queryInvitationByToken(rawToken, forUpdate = true)
+        if (expectedClubSlug != null && invitation.clubSlug != expectedClubSlug) {
+            throw InvitationDomainException("INVITATION_CLUB_MISMATCH", HttpStatus.NOT_FOUND, "Invitation not found")
+        }
         val effectiveStatus = effectiveStatus(invitation.status, invitation.expiresAt)
         if (effectiveStatus != InvitationStatus.PENDING) {
             throw InvitationDomainException(
@@ -183,7 +195,13 @@ class InvitationService(
         clubId: UUID,
         invitationId: UUID,
     ): HostInvitationResponse =
-        invitationStore.findHostInvitation(clubId, invitationId)?.let(::toHostInvitationResponse)
+        toHostInvitationResponse(findHostInvitationRow(clubId, invitationId))
+
+    private fun findHostInvitationRow(
+        clubId: UUID,
+        invitationId: UUID,
+    ): HostInvitationListRow =
+        invitationStore.findHostInvitation(clubId, invitationId)
             ?: throw InvitationDomainException("INVITATION_NOT_FOUND", HttpStatus.NOT_FOUND, "Invitation not found")
 
     private fun findInvitationByToken(rawToken: String): InvitationTokenRow =
@@ -302,9 +320,15 @@ class InvitationService(
         }
     }
 
-    private fun acceptUrl(token: String): String {
-        return "${appBaseUrl.trimEnd('/')}/invite/$token"
-    }
+    private fun acceptUrl(clubSlug: String, token: String, primaryHost: String?): String =
+        if (primaryHost != null) {
+            "https://$primaryHost/invite/$token"
+        } else {
+            "${appBaseUrl.trimEnd('/')}${invitePath(clubSlug, token)}"
+        }
+
+    private fun invitePath(clubSlug: String, token: String): String =
+        "/clubs/$clubSlug/invite/$token"
 
     private fun sha256Short(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))

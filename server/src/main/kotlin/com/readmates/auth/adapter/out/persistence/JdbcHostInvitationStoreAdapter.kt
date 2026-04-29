@@ -120,6 +120,7 @@ class JdbcHostInvitationStoreAdapter(
             """
             select
               invitations.id,
+              clubs.slug as club_slug,
               invitations.invited_email,
               invitations.invited_name,
               invitations.role,
@@ -128,15 +129,24 @@ class JdbcHostInvitationStoreAdapter(
               invitations.accepted_at,
               invitations.created_at,
               invitations.apply_to_current_session,
+              primary_domains.hostname as primary_host,
               exists (
                 select 1
                 from users
                 join memberships on memberships.user_id = users.id
                 where memberships.club_id = invitations.club_id
                   and lower(users.email) = lower(invitations.invited_email)
-                  and memberships.status = 'ACTIVE'
+                and memberships.status = 'ACTIVE'
               ) as has_active_membership
             from invitations
+            join clubs on clubs.id = invitations.club_id
+            left join (
+              select club_id, min(hostname) as hostname
+              from club_domains
+              where status = 'ACTIVE'
+                and is_primary = true
+              group by club_id
+            ) primary_domains on primary_domains.club_id = invitations.club_id
             where invitations.club_id = ?
             order by invitations.created_at desc
             """.trimIndent(),
@@ -149,6 +159,7 @@ class JdbcHostInvitationStoreAdapter(
             """
             select
               invitations.id,
+              clubs.slug as club_slug,
               invitations.invited_email,
               invitations.invited_name,
               invitations.role,
@@ -157,15 +168,24 @@ class JdbcHostInvitationStoreAdapter(
               invitations.accepted_at,
               invitations.created_at,
               invitations.apply_to_current_session,
+              primary_domains.hostname as primary_host,
               exists (
                 select 1
                 from users
                 join memberships on memberships.user_id = users.id
                 where memberships.club_id = invitations.club_id
                   and lower(users.email) = lower(invitations.invited_email)
-                  and memberships.status = 'ACTIVE'
+                and memberships.status = 'ACTIVE'
               ) as has_active_membership
             from invitations
+            join clubs on clubs.id = invitations.club_id
+            left join (
+              select club_id, min(hostname) as hostname
+              from club_domains
+              where status = 'ACTIVE'
+                and is_primary = true
+              group by club_id
+            ) primary_domains on primary_domains.club_id = invitations.club_id
             where invitations.club_id = ?
               and invitations.id = ?
             """.trimIndent(),
@@ -197,6 +217,7 @@ class JdbcHostInvitationStoreAdapter(
             select
               invitations.id,
               invitations.club_id,
+              clubs.slug as club_slug,
               clubs.name as club_name,
               invitations.invited_email,
               invitations.invited_name,
@@ -213,6 +234,7 @@ class JdbcHostInvitationStoreAdapter(
                 InvitationTokenRow(
                     id = resultSet.uuid("id"),
                     clubId = resultSet.uuid("club_id"),
+                    clubSlug = resultSet.getString("club_slug"),
                     clubName = resultSet.getString("club_name"),
                     email = resultSet.getString("invited_email"),
                     name = resultSet.getString("invited_name"),
@@ -357,6 +379,7 @@ class JdbcHostInvitationStoreAdapter(
     private fun ResultSet.toHostInvitationListRow(): HostInvitationListRow =
         HostInvitationListRow(
             invitationId = uuid("id"),
+            clubSlug = getString("club_slug"),
             email = getString("invited_email"),
             name = getString("invited_name"),
             role = MembershipRole.valueOf(getString("role")),
@@ -366,6 +389,7 @@ class JdbcHostInvitationStoreAdapter(
             createdAt = utcOffsetDateTime("created_at"),
             applyToCurrentSession = getBoolean("apply_to_current_session"),
             hasActiveMembership = getBoolean("has_active_membership"),
+            primaryHost = getString("primary_host"),
         )
 
     private fun releaseInvitationLock(connection: Connection, lockKey: String) {

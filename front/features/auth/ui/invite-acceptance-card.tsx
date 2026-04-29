@@ -2,6 +2,7 @@
 
 import { Link } from "@/features/auth/ui/auth-link";
 import type { InvitationPreviewView, InvitationStatus } from "@/features/auth/model/auth-model";
+import { googleInviteHref } from "@/features/auth/model/invite-oauth";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 const statusCopy: Record<InvitationStatus, { title: string; body: string; badgeClass: string; badge: string }> = {
@@ -39,14 +40,24 @@ function membershipStatusLabel(status: InvitationStatus) {
 }
 
 export type InvitePreviewState = {
+  clubSlug: string | null;
   token: string;
   preview: InvitationPreviewView | null;
   error: string | null;
   isLoading: boolean;
 };
 
-export default function InviteAcceptanceCard({ token, previewState }: { token: string; previewState: InvitePreviewState }) {
-  const isCurrentPreview = previewState.token === token;
+export default function InviteAcceptanceCard({
+  clubSlug,
+  token,
+  previewState,
+}: {
+  clubSlug?: string;
+  token: string;
+  previewState: InvitePreviewState;
+}) {
+  const currentClubSlug = clubSlug ?? null;
+  const isCurrentPreview = previewState.token === token && previewState.clubSlug === currentClubSlug;
   const preview = isCurrentPreview ? previewState.preview : null;
   const error = isCurrentPreview ? previewState.error : null;
   const isLoading = !isCurrentPreview || previewState.isLoading;
@@ -55,7 +66,7 @@ export default function InviteAcceptanceCard({ token, previewState }: { token: s
   const heading = title ?? "초대장을 확인하는 중입니다.";
   const canAccept = preview?.canAccept === true;
   const isAccepted = preview?.status === "ACCEPTED";
-  const googleInviteHref = `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}`;
+  const acceptHref = googleInviteHref(token, preview);
 
   return (
     <section className="auth-shell">
@@ -112,7 +123,7 @@ export default function InviteAcceptanceCard({ token, previewState }: { token: s
                 Google 인증이 끝나면 정식 멤버로 연결되고 현재 세션, RSVP, 질문과 서평 작성 권한이 열립니다.
               </p>
               <div className="auth-card__actions auth-card__actions--primary">
-                <a className="btn btn-primary btn-lg" href={googleInviteHref}>
+                <a className="btn btn-primary btn-lg" href={acceptHref}>
                   Google로 초대 수락
                 </a>
               </div>

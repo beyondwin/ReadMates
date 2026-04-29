@@ -8,6 +8,7 @@ import java.util.UUID
 
 data class HostInvitationListRow(
     val invitationId: UUID,
+    val clubSlug: String,
     val email: String,
     val name: String,
     val role: MembershipRole,
@@ -17,11 +18,13 @@ data class HostInvitationListRow(
     val createdAt: OffsetDateTime,
     val applyToCurrentSession: Boolean,
     val hasActiveMembership: Boolean,
+    val primaryHost: String?,
 )
 
 data class InvitationTokenRow(
     val id: UUID,
     val clubId: UUID,
+    val clubSlug: String,
     val clubName: String,
     val email: String,
     val name: String,

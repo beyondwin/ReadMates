@@ -18,7 +18,9 @@ export type AuthMeResponse = {
 export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
 
 export type InvitationPreviewResponse = {
+  clubSlug: string;
   clubName: string;
+  canonicalPath: string;
   email: string;
   name: string;
   emailHint: string;

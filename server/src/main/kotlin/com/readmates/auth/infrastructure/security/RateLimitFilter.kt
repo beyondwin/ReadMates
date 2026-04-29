@@ -64,8 +64,28 @@ class RateLimitFilter(
                 )
             }
 
+            method == "GET" && CLUB_INVITATION_PREVIEW.matches(path) -> {
+                val token = CLUB_INVITATION_PREVIEW.matchEntire(path)!!.groupValues[2]
+                RateLimitCheck(
+                    "rl:ip:$ipHash:invite-preview:${stableHash(token).take(12)}",
+                    30,
+                    Duration.ofMinutes(10),
+                    sensitive = false,
+                )
+            }
+
             method == "POST" && INVITATION_ACCEPT.matches(path) -> {
                 val token = INVITATION_ACCEPT.matchEntire(path)!!.groupValues[1]
+                RateLimitCheck(
+                    "rl:ip:$ipHash:invite-accept:${stableHash(token).take(12)}",
+                    10,
+                    Duration.ofMinutes(10),
+                    sensitive = true,
+                )
+            }
+
+            method == "POST" && CLUB_INVITATION_ACCEPT.matches(path) -> {
+                val token = CLUB_INVITATION_ACCEPT.matchEntire(path)!!.groupValues[2]
                 RateLimitCheck(
                     "rl:ip:$ipHash:invite-accept:${stableHash(token).take(12)}",
                     10,
@@ -138,6 +158,8 @@ class RateLimitFilter(
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
         val INVITATION_PREVIEW = Regex("^/api/invitations/([^/]+)$")
         val INVITATION_ACCEPT = Regex("^/api/invitations/([^/]+)/accept$")
+        val CLUB_INVITATION_PREVIEW = Regex("^/api/clubs/([^/]+)/invitations/([^/]+)$")
+        val CLUB_INVITATION_ACCEPT = Regex("^/api/clubs/([^/]+)/invitations/([^/]+)/accept$")
         val FEEDBACK_UPLOAD = Regex("^/api/host/sessions/([^/]+)/feedback-document$")
     }
 }

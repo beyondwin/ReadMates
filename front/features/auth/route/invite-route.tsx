@@ -3,8 +3,9 @@ import { useParams } from "react-router-dom";
 import { fetchInvitationPreview, parseInvitationPreview } from "@/features/auth/api/auth-api";
 import InviteAcceptanceCard, { type InvitePreviewState } from "@/features/auth/ui/invite-acceptance-card";
 
-function initialInvitePreviewState(token: string): InvitePreviewState {
+function initialInvitePreviewState(clubSlug: string | undefined, token: string): InvitePreviewState {
   return {
+    clubSlug: clubSlug ?? null,
     token,
     preview: null,
     error: null,
@@ -12,8 +13,8 @@ function initialInvitePreviewState(token: string): InvitePreviewState {
   };
 }
 
-export function InviteAcceptanceRouteContent({ token }: { token: string }) {
-  const [previewState, setPreviewState] = useState<InvitePreviewState>(() => initialInvitePreviewState(token));
+export function InviteAcceptanceRouteContent({ clubSlug, token }: { clubSlug?: string; token: string }) {
+  const [previewState, setPreviewState] = useState<InvitePreviewState>(() => initialInvitePreviewState(clubSlug, token));
   const mountedRef = useRef(false);
 
   useEffect(() => {
@@ -26,13 +27,14 @@ export function InviteAcceptanceRouteContent({ token }: { token: string }) {
   useEffect(() => {
     let active = true;
 
-    fetchInvitationPreview(token)
+    fetchInvitationPreview(token, clubSlug)
       .then(async (previewResponse) => {
         if (!active || !mountedRef.current) {
           return;
         }
         if (!previewResponse.ok) {
           setPreviewState({
+            clubSlug: clubSlug ?? null,
             token,
             preview: null,
             error: "초대 링크를 찾을 수 없습니다. 주소를 다시 확인하거나 호스트에게 새 링크를 요청해 주세요.",
@@ -45,6 +47,7 @@ export function InviteAcceptanceRouteContent({ token }: { token: string }) {
           return;
         }
         setPreviewState({
+          clubSlug: clubSlug ?? null,
           token,
           preview: parsedPreview,
           error: null,
@@ -54,6 +57,7 @@ export function InviteAcceptanceRouteContent({ token }: { token: string }) {
       .catch(() => {
         if (active && mountedRef.current) {
           setPreviewState({
+            clubSlug: clubSlug ?? null,
             token,
             preview: null,
             error: "초대 정보를 불러오지 못했습니다. 네트워크 연결을 확인한 뒤 새로고침해 주세요.",
@@ -65,13 +69,15 @@ export function InviteAcceptanceRouteContent({ token }: { token: string }) {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [clubSlug, token]);
 
-  return <InviteAcceptanceCard token={token} previewState={previewState} />;
+  return <InviteAcceptanceCard clubSlug={clubSlug} token={token} previewState={previewState} />;
 }
 
 export function InviteRoute() {
-  const token = useParams().token ?? "";
+  const params = useParams();
+  const clubSlug = params.clubSlug;
+  const token = params.token ?? "";
 
-  return <InviteAcceptanceRouteContent token={token} />;
+  return <InviteAcceptanceRouteContent clubSlug={clubSlug} token={token} />;
 }

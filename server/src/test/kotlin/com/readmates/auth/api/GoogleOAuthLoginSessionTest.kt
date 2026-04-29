@@ -284,7 +284,7 @@ class GoogleOAuthLoginSessionTest(
         servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
         servletSession.setAttribute(
             OAuthReturnState.SESSION_ATTRIBUTE,
-            oauthReturnState.signReturnTarget("/clubs/sample-book-club/invite/$token"),
+            oauthReturnState.signReturnTarget("/clubs/reading-sai/invite/$token"),
         )
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.addHeader(HttpHeaders.USER_AGENT, "MockMvc")
@@ -348,6 +348,136 @@ class GoogleOAuthLoginSessionTest(
             "oauth.invited@example.com",
         )
         assertEquals(1, participantCount)
+    }
+
+    @Test
+    fun `google invite login rejects mismatched return club without accepting invitation`() {
+        val token = createInvitation(
+            token = "oauthInviteWrongClubToken00000000000000000000000",
+            email = "oauth.invite.wrong.club@example.com",
+            name = "OAuth Wrong Club",
+        )
+        val servletSession = securitySession()
+        servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("/clubs/sample-book-club/invite/$token"),
+        )
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication = TestingAuthenticationToken(
+            googleOidcUser(
+                googleSubjectId = "google-oauth-invite-wrong-club",
+                email = "oauth.invite.wrong.club@example.com",
+                name = "OAuth Wrong Club",
+            ),
+            "credentials",
+        )
+        SecurityContextHolder.getContext().authentication = authentication
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/login?error=google", response.redirectedUrl)
+        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
+        assertNotNull(setCookie)
+        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}=;"))
+        assertTrue(servletSession.isInvalid)
+        assertNull(SecurityContextHolder.getContext().authentication)
+
+        val invitation = jdbcTemplate.queryForMap(
+            "select status, accepted_user_id from invitations where invited_email = ?",
+            "oauth.invite.wrong.club@example.com",
+        )
+        assertEquals("PENDING", invitation["status"])
+        assertNull(invitation["accepted_user_id"])
+        val userCount = jdbcTemplate.queryForObject(
+            "select count(*) from users where email = ?",
+            Int::class.java,
+            "oauth.invite.wrong.club@example.com",
+        )
+        assertEquals(0, userCount)
+    }
+
+    @Test
+    fun `google invite login preserves trusted custom domain invite return target`() {
+        jdbcTemplate.update(
+            """
+            insert into club_domains (id, club_id, hostname, kind, status, is_primary)
+            values (
+              '00000000-0000-0000-0000-000000007302',
+              '00000000-0000-0000-0000-000000000001',
+              'reading.readmates.example',
+              'CUSTOM_DOMAIN',
+              'ACTIVE',
+              true
+            )
+            """.trimIndent(),
+        )
+        val token = createInvitation(
+            token = "oauthInviteDomainToken0000000000000000000000000",
+            email = "oauth.invite.domain@example.com",
+            name = "OAuth Domain",
+        )
+        val servletSession = securitySession()
+        servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("https://reading.readmates.example/invite/$token"),
+        )
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.addHeader(HttpHeaders.USER_AGENT, "MockMvc")
+        request.remoteAddr = "127.0.0.1"
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication = TestingAuthenticationToken(
+            googleOidcUser(
+                googleSubjectId = "google-oauth-invite-domain",
+                email = "oauth.invite.domain@example.com",
+                name = "OAuth Domain",
+            ),
+            "credentials",
+        )
+        SecurityContextHolder.getContext().authentication = authentication
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://reading.readmates.example/invite/$token", response.redirectedUrl)
+        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
+        assertNotNull(setCookie)
+        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}="))
+        assertTrue(servletSession.isInvalid)
+        assertNull(SecurityContextHolder.getContext().authentication)
+    }
+
+    @Test
+    fun `trusted custom domain scoped invite return target must match host club`() {
+        jdbcTemplate.update(
+            """
+            insert into club_domains (id, club_id, hostname, kind, status, is_primary)
+            values (
+              '00000000-0000-0000-0000-000000007303',
+              '00000000-0000-0000-0000-000000000001',
+              'reading.readmates.example',
+              'CUSTOM_DOMAIN',
+              'ACTIVE',
+              true
+            )
+            """.trimIndent(),
+        )
+        val token = "oauthInviteCrossHostToken000000000000000000000"
+        val signedState = oauthReturnState.signReturnTarget(
+            "https://reading.readmates.example/clubs/sample-book-club/invite/$token",
+        )
+
+        assertEquals("sample-book-club", oauthReturnState.inviteClubSlugFromReturnState(signedState, token))
+        assertNull(
+            oauthReturnState.inviteReturnTargetFromState(
+                signedState = signedState,
+                clubSlug = "sample-book-club",
+                inviteToken = token,
+            ),
+        )
     }
 
     @Test
@@ -423,7 +553,13 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.invalid.return@example.com',
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
-                'oauth.left@example.com'
+                'oauth.left@example.com',
+                'oauth.platform.admin@example.com',
+                'oauth.invited@example.com',
+                'oauth.invite.wrong.club@example.com',
+                'oauth.invite.domain@example.com',
+                'oauth.invite.owner@example.com',
+                'oauth.invite.other@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
@@ -433,6 +569,8 @@ class GoogleOAuthLoginSessionTest(
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
                    'google-oauth-invited',
+                   'google-oauth-invite-wrong-club',
+                   'google-oauth-invite-domain',
                    'google-oauth-invite-mismatch'
                  )
             );
@@ -463,6 +601,8 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.left@example.com',
                 'oauth.platform.admin@example.com',
                 'oauth.invited@example.com',
+                'oauth.invite.wrong.club@example.com',
+                'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
               )
@@ -474,13 +614,20 @@ class GoogleOAuthLoginSessionTest(
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
                    'google-oauth-invited',
+                   'google-oauth-invite-wrong-club',
+                   'google-oauth-invite-domain',
                    'google-oauth-invite-mismatch'
                  )
             );
 
+            delete from club_domains
+            where hostname = 'reading.readmates.example';
+
             delete from invitations
             where invited_email in (
               'oauth.invited@example.com',
+              'oauth.invite.wrong.club@example.com',
+              'oauth.invite.domain@example.com',
               'oauth.invite.owner@example.com'
             );
 
@@ -500,6 +647,8 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.left@example.com',
                 'oauth.platform.admin@example.com',
                 'oauth.invited@example.com',
+                'oauth.invite.wrong.club@example.com',
+                'oauth.invite.domain@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
               )
@@ -511,6 +660,8 @@ class GoogleOAuthLoginSessionTest(
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
                    'google-oauth-invited',
+                   'google-oauth-invite-wrong-club',
+                   'google-oauth-invite-domain',
                    'google-oauth-invite-mismatch'
                  )
             );
@@ -525,6 +676,8 @@ class GoogleOAuthLoginSessionTest(
               'oauth.left@example.com',
               'oauth.platform.admin@example.com',
               'oauth.invited@example.com',
+              'oauth.invite.wrong.club@example.com',
+              'oauth.invite.domain@example.com',
               'oauth.invite.owner@example.com',
               'oauth.invite.other@example.com'
             )
@@ -536,6 +689,8 @@ class GoogleOAuthLoginSessionTest(
                  'google-oauth-conflict-subject',
                  'google-oauth-left-member',
                  'google-oauth-invited',
+                 'google-oauth-invite-wrong-club',
+                 'google-oauth-invite-domain',
                  'google-oauth-invite-mismatch'
                );
         """

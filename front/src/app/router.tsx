@@ -101,6 +101,7 @@ export const routes: RouteObject[] = [
         hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
       },
       { path: "/login", element: <LoginPage /> },
+      { path: "/clubs/:clubSlug/invite/:token", element: <InvitePage /> },
       { path: "/invite/:token", element: <InvitePage /> },
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
     ],

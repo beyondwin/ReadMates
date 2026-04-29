@@ -57,6 +57,16 @@ class OAuthReturnState(
     fun inviteReturnTarget(clubSlug: String, inviteToken: String): String =
         "/clubs/$clubSlug/invite/$inviteToken"
 
+    fun inviteClubSlugFromReturnState(signedState: String?, inviteToken: String): String? {
+        val returnTarget = verifiedReturnTarget(signedState) ?: return null
+        return inviteClubSlug(returnTarget, inviteToken)
+    }
+
+    fun inviteReturnTargetFromState(signedState: String?, clubSlug: String, inviteToken: String): String? {
+        val returnTarget = verifiedReturnTarget(signedState) ?: return null
+        return returnTarget.takeIf { inviteReturnTargetMatchesClub(it, clubSlug, inviteToken) }
+    }
+
     fun redirectUrl(returnTarget: String): String =
         if (returnTarget.startsWith("/")) {
             "$appOrigin$returnTarget"
@@ -127,18 +137,71 @@ class OAuthReturnState(
     }
 
     private fun isActiveClubDomain(host: String): Boolean {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return false
-        val count = jdbcTemplate.queryForObject(
+        return activeClubSlugForDomain(host) != null
+    }
+
+    private fun inviteClubSlug(returnTarget: String, inviteToken: String): String? {
+        val uri = try {
+            URI.create(returnTarget)
+        } catch (_: IllegalArgumentException) {
+            return null
+        }
+        val path = uri.path ?: return null
+        val scopedMatch = CLUB_INVITE_PATH.matchEntire(path)
+        if (scopedMatch != null) {
+            return scopedMatch.groupValues[1].takeIf { scopedMatch.groupValues[2] == inviteToken }
+        }
+        val legacyMatch = LEGACY_INVITE_PATH.matchEntire(path) ?: return null
+        if (legacyMatch.groupValues[1] != inviteToken || returnTarget.startsWith("/")) {
+            return null
+        }
+        val host = uri.host?.trimEnd('.')?.lowercase(Locale.ROOT) ?: return null
+        return activeClubSlugForDomain(host)
+    }
+
+    private fun inviteReturnTargetMatchesClub(returnTarget: String, clubSlug: String, inviteToken: String): Boolean {
+        val uri = try {
+            URI.create(returnTarget)
+        } catch (_: IllegalArgumentException) {
+            return false
+        }
+        val path = uri.path ?: return false
+        val scopedMatch = CLUB_INVITE_PATH.matchEntire(path)
+        if (scopedMatch != null) {
+            val pathSlug = scopedMatch.groupValues[1]
+            if (pathSlug != clubSlug || scopedMatch.groupValues[2] != inviteToken) {
+                return false
+            }
+            if (returnTarget.startsWith("/")) {
+                return true
+            }
+            val host = uri.host?.trimEnd('.')?.lowercase(Locale.ROOT) ?: return false
+            val hostClubSlug = activeClubSlugForDomain(host)
+            return hostClubSlug == null || hostClubSlug == clubSlug
+        }
+
+        val legacyMatch = LEGACY_INVITE_PATH.matchEntire(path) ?: return false
+        if (legacyMatch.groupValues[1] != inviteToken || returnTarget.startsWith("/")) {
+            return false
+        }
+        val host = uri.host?.trimEnd('.')?.lowercase(Locale.ROOT) ?: return false
+        return activeClubSlugForDomain(host) == clubSlug
+    }
+
+    private fun activeClubSlugForDomain(host: String): String? {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
+        return jdbcTemplate.query(
             """
-            select count(*)
+            select clubs.slug
             from club_domains
+            join clubs on clubs.id = club_domains.club_id
             where lower(hostname) = ?
-              and status = 'ACTIVE'
+              and club_domains.status = 'ACTIVE'
+            limit 1
             """.trimIndent(),
-            Int::class.java,
+            { resultSet, _ -> resultSet.getString("slug") },
             host,
-        ) ?: 0
-        return count > 0
+        ).firstOrNull()
     }
 
     private fun signature(returnTo: String, expiresAtEpochSeconds: Long): String {
@@ -160,5 +223,7 @@ class OAuthReturnState(
         private const val HMAC_ALGORITHM = "HmacSHA256"
         private const val PAGES_PREVIEW_HOST = "readmates.pages.dev"
         private const val MAX_RETURN_TO_LENGTH = 2048
+        private val CLUB_INVITE_PATH = Regex("^/clubs/([^/]+)/invite/([^/]+)$")
+        private val LEGACY_INVITE_PATH = Regex("^/invite/([^/]+)$")
     }
 }
