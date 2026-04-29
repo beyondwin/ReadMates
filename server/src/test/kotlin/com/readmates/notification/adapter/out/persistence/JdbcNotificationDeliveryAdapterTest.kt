@@ -107,6 +107,40 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     @Test
+    fun `persistPlannedDeliveries plans from persisted outbox event when Kafka message fields are stale`() {
+        insertEventOutboxRow()
+
+        val deliveries = deliveryAdapter.persistPlannedDeliveries(
+            message(
+                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                aggregateId = UUID.fromString("00000000-0000-0000-0000-000000009798"),
+                payload = NotificationEventPayload(
+                    sessionId = UUID.fromString("00000000-0000-0000-0000-000000009797"),
+                    sessionNumber = 99,
+                    bookTitle = "Kafka payload book",
+                ),
+            ),
+        )
+
+        assertThat(deliveries).hasSize(6)
+        assertThat(deliveries.filter { it.channel == NotificationChannel.EMAIL })
+            .extracting<String?> { it.subject }
+            .containsOnly("피드백 문서가 올라왔습니다")
+        assertThat(deliveries.filter { it.channel == NotificationChannel.EMAIL })
+            .extracting<String?> { it.bodyText }
+            .allSatisfy {
+                assertThat(it).contains("1회차 팩트풀니스")
+                assertThat(it).doesNotContain("99회차")
+                assertThat(it).doesNotContain("Kafka payload book")
+            }
+
+        val member1 = membershipIdForEmail("member1@example.com")
+        val member1Notifications = memberNotificationAdapter.listForMembership(clubId, member1, limit = 10)
+        assertThat(member1Notifications.single().title).isEqualTo("피드백 문서가 올라왔습니다")
+        assertThat(member1Notifications.single().body).contains("1회차 팩트풀니스")
+    }
+
+    @Test
     fun `persistPlannedDeliveries replays existing event delivery snapshot without adding newly joined recipient`() {
         insertEventOutboxRow()
         val member1 = membershipIdForEmail("member1@example.com")
@@ -289,20 +323,22 @@ class JdbcNotificationDeliveryAdapterTest(
         eventId: UUID = this.eventId,
         eventType: NotificationEventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
         authorMembershipId: UUID? = null,
+        aggregateId: UUID = sessionId,
+        payload: NotificationEventPayload = NotificationEventPayload(
+            sessionId = sessionId,
+            sessionNumber = 1,
+            bookTitle = "팩트풀니스",
+            authorMembershipId = authorMembershipId,
+        ),
     ): NotificationEventMessage =
         NotificationEventMessage(
             eventId = eventId,
             clubId = clubId,
             eventType = eventType,
             aggregateType = "SESSION",
-            aggregateId = sessionId,
+            aggregateId = aggregateId,
             occurredAt = OffsetDateTime.of(2026, 4, 29, 3, 0, 0, 0, ZoneOffset.UTC),
-            payload = NotificationEventPayload(
-                sessionId = sessionId,
-                sessionNumber = 1,
-                bookTitle = "팩트풀니스",
-                authorMembershipId = authorMembershipId,
-            ),
+            payload = payload,
         )
 
     private fun disableMemberPreference(email: String, column: String) {
