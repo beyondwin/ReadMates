@@ -13,6 +13,9 @@ data class CurrentPlatformAdmin(
 
     val canCreateClub: Boolean
         get() = role in setOf(PlatformAdminRole.OWNER, PlatformAdminRole.OPERATOR)
+
+    val canManageClubDomains: Boolean
+        get() = role in setOf(PlatformAdminRole.OWNER, PlatformAdminRole.OPERATOR)
 }
 
 data class CurrentUser(

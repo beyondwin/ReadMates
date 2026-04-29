@@ -151,6 +151,72 @@
   font-weight: 700;
 }
 
+.platform-admin-domains {
+  display: grid;
+  gap: 14px;
+}
+
+.platform-admin-domains__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.platform-admin-domains__header .h3 {
+  margin: 0;
+}
+
+.platform-admin-domain-list {
+  display: grid;
+  gap: 10px;
+}
+
+.platform-admin-domain-empty {
+  margin: 0;
+}
+
+.platform-admin-domain-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 16px;
+  padding: 18px;
+}
+
+.platform-admin-domain-row__main,
+.platform-admin-domain-row__status {
+  min-width: 0;
+}
+
+.platform-admin-domain-row__hostname {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.platform-admin-domain-row__status {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 6px;
+}
+
+.platform-admin-domain-status {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 4px 8px;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.platform-admin-domain-row__action {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+}
+
 .rm-route-stage {
   min-height: inherit;
 }
@@ -1148,6 +1214,14 @@
 
   .platform-admin-summary {
     grid-template-columns: 1fr;
+  }
+
+  .platform-admin-domain-row {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-admin-domain-row__status {
+    justify-items: start;
   }
 
   .rm-route-reveal {
