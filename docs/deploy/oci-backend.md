@@ -103,6 +103,41 @@ SSH_KEY='~/.ssh/other_key' VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.
 
 배포 스크립트는 `server/build/libs/readmates-server-0.0.1-SNAPSHOT.jar`를 VM의 `/tmp/readmates-server.jar`로 복사한 뒤 `/opt/readmates/readmates-server.jar`로 이동하고 `readmates-server`를 재시작합니다.
 
+## Email Notification Operations
+
+ReadMates 알림은 먼저 MySQL `notification_outbox`에 저장되고, worker가 outbox를 claim한 뒤 SMTP로 발송합니다. MySQL이 source of truth이고 SMTP 발송은 재시도 가능한 side effect입니다.
+
+실제 SMTP 발송은 아래 조건이 모두 맞을 때만 동작합니다.
+
+- `READMATES_NOTIFICATIONS_ENABLED=true`
+- `READMATES_NOTIFICATION_WORKER_ENABLED=true`
+- `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`
+- `READMATES_NOTIFICATION_SENDER_EMAIL`
+
+`READMATES_NOTIFICATIONS_ENABLED=false`이면 실제 SMTP 발송 대신 logging adapter가 동작합니다. 운영 rollout에서는 먼저 `READMATES_NOTIFICATIONS_ENABLED=false`, `READMATES_NOTIFICATION_WORKER_ENABLED=false`로 outbox row 생성과 host dashboard count를 확인한 뒤, OCI Email Delivery credential을 넣고 두 값을 `true`로 바꿉니다.
+
+알림 생성 시점:
+
+- 호스트가 피드백 문서를 업로드하면 참석 완료(`ATTENDED`)한 활성 멤버 대상으로 `FEEDBACK_DOCUMENT_PUBLISHED` 알림을 생성합니다.
+- 호스트가 예정 세션 공개 범위를 `MEMBER` 또는 `PUBLIC`으로 바꾸면 활성 멤버 대상으로 `NEXT_BOOK_PUBLISHED` 알림을 생성합니다.
+- worker scheduler가 기본 `Asia/Seoul` 기준 매일 자정에 다음 날 세션 대상 `SESSION_REMINDER_DUE` 알림을 생성합니다.
+
+발송 처리 기준:
+
+- worker는 기본 `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS=30000`으로 30초마다 outbox를 처리합니다.
+- 한 번에 기본 `READMATES_NOTIFICATION_WORKER_BATCH_SIZE=20`건을 claim합니다.
+- 발송 성공 시 row는 `SENT`가 됩니다.
+- 발송 실패 시 row는 `FAILED`가 되고, 기본 최대 `READMATES_NOTIFICATION_MAX_ATTEMPTS=5`회까지 재시도합니다.
+- 최대 시도 횟수를 넘으면 row는 `DEAD`가 됩니다.
+
+재시도 간격은 순서대로 5분, 15분, 60분, 240분입니다. SMTP credential 오류나 provider reject가 지속되면 host dashboard의 pending/failed/dead count와 `readmates_notifications_*` metrics를 함께 확인합니다.
+
+수동 처리:
+
+- Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인합니다.
+- Host dashboard의 수동 처리 action은 현재 host club의 pending/failed 알림만 처리합니다.
+- worker가 꺼져 있거나 즉시 확인이 필요할 때만 수동 처리를 사용합니다.
+
 ## 검증
 
 VM 내부:

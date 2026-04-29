@@ -72,7 +72,7 @@ adapter.in.web
 
 현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface와 `notification` 운영 slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
 
-Notification slice는 MySQL transactional outbox를 source of truth로 유지하고, 이메일 발송은 재시도 가능한 side effect 작업으로 처리합니다. 패키지 경계는 아래처럼 web/scheduler inbound adapter, application service, outbound port, persistence/mail adapter로 나눕니다.
+Notification slice는 MySQL transactional outbox를 source of truth로 유지하고, 이메일 발송은 재시도 가능한 side effect 작업으로 처리합니다. 발송 조건, 생성 시점, worker 주기, 재시도 정책은 [OCI backend runbook](../deploy/oci-backend.md#email-notification-operations)을 기준으로 운영합니다. 패키지 경계는 아래처럼 web/scheduler inbound adapter, application service, outbound port, persistence/mail adapter로 나눕니다.
 
 ```text
 notification
