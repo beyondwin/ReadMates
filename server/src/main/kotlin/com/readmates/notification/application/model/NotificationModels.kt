@@ -60,6 +60,7 @@ data class NotificationDeliveryItem(
 data class ClaimedNotificationDeliveryItem(
     val id: UUID,
     val eventId: UUID,
+    val eventType: NotificationEventType,
     val clubId: UUID,
     val recipientMembershipId: UUID,
     val channel: NotificationChannel,

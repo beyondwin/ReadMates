@@ -953,6 +953,7 @@ class JdbcNotificationDeliveryAdapter(
         return ClaimedNotificationDeliveryItem(
             id = uuid("id"),
             eventId = uuid("event_id"),
+            eventType = eventType,
             clubId = uuid("club_id"),
             recipientMembershipId = uuid("recipient_membership_id"),
             channel = NotificationChannel.valueOf(getString("channel")),

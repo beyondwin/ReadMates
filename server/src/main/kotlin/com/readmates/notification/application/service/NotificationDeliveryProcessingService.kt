@@ -18,6 +18,7 @@ private val PROCESSING_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 class NotificationDeliveryProcessingService(
     private val notificationDeliveryPort: NotificationDeliveryPort,
     private val mailDeliveryPort: MailDeliveryPort,
+    private val metrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.kafka.max-delivery-attempts:5}") private val maxAttempts: Int,
     @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
 ) : ProcessNotificationDeliveriesUseCase {
@@ -55,28 +56,32 @@ class NotificationDeliveryProcessingService(
             return
         }
 
-        require(notificationDeliveryPort.markDeliverySent(item.id, item.lockedAt)) {
+        val marked = notificationDeliveryPort.markDeliverySent(item.id, item.lockedAt)
+        require(marked) {
             staleDeliveryLeaseMessage(item.id, NotificationDeliveryStatus.SENT)
         }
+        metrics.sent(item.eventType)
     }
 
     private fun markFailure(item: ClaimedNotificationDeliveryItem, exception: Exception) {
         val error = exception.toStorageError()
         if (item.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
-            require(notificationDeliveryPort.markDeliveryDead(item.id, item.lockedAt, error)) {
+            val marked = notificationDeliveryPort.markDeliveryDead(item.id, item.lockedAt, error)
+            require(marked) {
                 staleDeliveryLeaseMessage(item.id, NotificationDeliveryStatus.DEAD)
             }
+            metrics.dead(item.eventType)
         } else {
-            require(
-                notificationDeliveryPort.markDeliveryFailed(
-                    id = item.id,
-                    lockedAt = item.lockedAt,
-                    error = error,
-                    nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
-                ),
-            ) {
+            val marked = notificationDeliveryPort.markDeliveryFailed(
+                id = item.id,
+                lockedAt = item.lockedAt,
+                error = error,
+                nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
+            )
+            require(marked) {
                 staleDeliveryLeaseMessage(item.id, NotificationDeliveryStatus.FAILED)
             }
+            metrics.failed(item.eventType)
         }
     }
 
