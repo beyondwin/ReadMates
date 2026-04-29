@@ -3,8 +3,10 @@ package com.readmates.notification.application.service
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
+import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.port.out.NotificationOutboxPort
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.security.CurrentMember
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -156,4 +158,12 @@ private class FixedBacklogNotificationOutboxPort(
         backlogReads += 1
         return backlog
     }
+
+    override fun getPreferences(member: CurrentMember): NotificationPreferences =
+        NotificationPreferences.defaults()
+
+    override fun savePreferences(
+        member: CurrentMember,
+        preferences: NotificationPreferences,
+    ): NotificationPreferences = preferences
 }

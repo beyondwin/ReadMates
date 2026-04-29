@@ -33,6 +33,30 @@ data class NotificationOutboxBacklog(
     val sending: Int,
 )
 
+data class NotificationPreferences(
+    val emailEnabled: Boolean,
+    val events: Map<NotificationEventType, Boolean>,
+) {
+    fun enabled(eventType: NotificationEventType): Boolean =
+        events[eventType] ?: defaultEventEnabled(eventType)
+
+    companion object {
+        fun defaults(): NotificationPreferences =
+            NotificationPreferences(
+                emailEnabled = true,
+                events = NotificationEventType.entries.associateWith(::defaultEventEnabled),
+            )
+
+        fun defaultEventEnabled(eventType: NotificationEventType): Boolean =
+            when (eventType) {
+                NotificationEventType.NEXT_BOOK_PUBLISHED -> true
+                NotificationEventType.SESSION_REMINDER_DUE -> true
+                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> true
+                NotificationEventType.REVIEW_PUBLISHED -> false
+            }
+    }
+}
+
 data class HostNotificationFailure(
     val id: UUID,
     val eventType: NotificationEventType,
