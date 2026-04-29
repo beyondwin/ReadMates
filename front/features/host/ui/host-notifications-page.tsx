@@ -129,7 +129,9 @@ export function HostNotificationsPage({
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const processableNotificationCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
-  const hasVisibleProcessableNotifications = items.some((item) => item.status === "PENDING" || item.status === "FAILED");
+  const hasVisibleProcessableNotifications = deliveries.some(
+    (delivery) => delivery.channel === "EMAIL" && (delivery.status === "PENDING" || delivery.status === "FAILED"),
+  );
   const hasProcessableNotifications = processableNotificationCount > 0 || hasVisibleProcessableNotifications;
   const isBusy = pendingAction !== null || isRefreshing;
 

@@ -151,7 +151,8 @@ describe("HostNotificationsPage", () => {
     render(
       <HostNotificationsPage
         summary={{ ...summary, pending: 0, failed: 0 }}
-        items={[]}
+        events={[]}
+        deliveries={[]}
         audit={[]}
         onProcess={onProcess}
         onRetry={vi.fn()}
@@ -171,12 +172,13 @@ describe("HostNotificationsPage", () => {
   it("keeps processing available when a pending item is visible even if the summary is stale", async () => {
     const user = userEvent.setup();
     const onProcess = vi.fn().mockResolvedValue(undefined);
-    const pendingItem: HostNotificationItem = { ...deadItem, id: "notification-2", status: "PENDING" };
+    const pendingItem: HostNotificationDeliveryItem = { ...deadDelivery, id: "notification-2", status: "PENDING" };
 
     render(
       <HostNotificationsPage
         summary={{ ...summary, pending: 0, failed: 0 }}
-        items={[pendingItem]}
+        events={[]}
+        deliveries={[pendingItem]}
         audit={[]}
         onProcess={onProcess}
         onRetry={vi.fn()}
