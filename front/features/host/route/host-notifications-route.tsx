@@ -8,7 +8,7 @@ export function HostNotificationsRoute() {
 
   const refreshAfter = async (action: () => Promise<unknown>) => {
     await action();
-    revalidator.revalidate();
+    await revalidator.revalidate();
   };
 
   return (
@@ -16,6 +16,7 @@ export function HostNotificationsRoute() {
       summary={data.summary}
       items={data.items}
       audit={data.audit}
+      isRefreshing={revalidator.state !== "idle"}
       onProcess={() => refreshAfter(hostNotificationsActions.process)}
       onRetry={(id) => refreshAfter(() => hostNotificationsActions.retry(id))}
       onRestore={(id) => refreshAfter(() => hostNotificationsActions.restore(id))}

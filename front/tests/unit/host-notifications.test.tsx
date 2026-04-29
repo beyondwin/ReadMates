@@ -116,6 +116,48 @@ describe("HostNotificationsPage", () => {
     expect(onProcess).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps notification operations disabled while route data is refreshing", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn().mockResolvedValue(undefined);
+    const pendingItem: HostNotificationItem = { ...deadItem, id: "notification-2", status: "FAILED" };
+
+    render(
+      <HostNotificationsPage
+        summary={summary}
+        items={[pendingItem]}
+        audit={[]}
+        isRefreshing
+        onProcess={vi.fn()}
+        onRetry={onRetry}
+        onRestore={vi.fn()}
+        onSendTestMail={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "새로고침 중" })).toBeDisabled();
+    const retryButton = screen.getByRole("button", { name: "재시도" });
+    expect(retryButton).toBeDisabled();
+
+    await user.click(retryButton);
+
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("shows restore failures inside the active confirmation dialog", async () => {
+    const user = userEvent.setup();
+    const onRestore = vi.fn().mockRejectedValue(new Error("restore failed"));
+
+    renderPage({ onRestore });
+
+    await user.click(screen.getByRole("button", { name: "복구" }));
+    await user.click(screen.getByRole("button", { name: "복구 확인" }));
+
+    const dialog = screen.getByRole("dialog", { name: "중단된 알림을 복구할까요?" });
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "복구하지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.",
+    );
+  });
+
   it("sends a test mail request and renders masked audit rows", async () => {
     const user = userEvent.setup();
     const onSendTestMail = vi.fn().mockResolvedValue(undefined);

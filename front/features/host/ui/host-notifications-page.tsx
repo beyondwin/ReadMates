@@ -54,6 +54,7 @@ type HostNotificationsPageProps = {
   onRetry: (id: string) => Promise<unknown>;
   onRestore: (id: string) => Promise<unknown>;
   onSendTestMail: (request: SendNotificationTestMailRequest) => Promise<unknown>;
+  isRefreshing?: boolean;
 };
 
 type HostNotificationMessage = {
@@ -90,11 +91,14 @@ export function HostNotificationsPage({
   onRetry,
   onRestore,
   onSendTestMail,
+  isRefreshing = false,
 }: HostNotificationsPageProps) {
   const [restoreTarget, setRestoreTarget] = useState<HostNotificationItem | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState("");
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const isBusy = pendingAction !== null || isRefreshing;
 
   const isPending = (kind: PendingAction["kind"], id?: string) => {
     if (!pendingAction || pendingAction.kind !== kind) {
@@ -105,7 +109,7 @@ export function HostNotificationsPage({
   };
 
   const runAction = async (action: PendingAction, callback: () => Promise<unknown>, successMessage: string) => {
-    if (pendingAction !== null) {
+    if (isBusy) {
       return;
     }
 
@@ -130,10 +134,25 @@ export function HostNotificationsPage({
   };
 
   const handleRestore = (item: HostNotificationItem) => {
-    void runAction({ kind: "restore", id: item.id }, async () => {
-      await onRestore(item.id);
-      setRestoreTarget(null);
-    }, "중단된 알림을 발송 대기 상태로 복구했습니다.");
+    if (isBusy) {
+      return;
+    }
+
+    setPendingAction({ kind: "restore", id: item.id });
+    setMessage(null);
+    setRestoreError(null);
+
+    void (async () => {
+      try {
+        await onRestore(item.id);
+        setRestoreTarget(null);
+        setMessage({ kind: "status", text: "중단된 알림을 발송 대기 상태로 복구했습니다." });
+      } catch {
+        setRestoreError("복구하지 못했습니다. 목록을 새로고침한 뒤 다시 시도해 주세요.");
+      } finally {
+        setPendingAction(null);
+      }
+    })();
   };
 
   const submitTestMail = (event: FormEvent<HTMLFormElement>) => {
@@ -168,10 +187,10 @@ export function HostNotificationsPage({
             <button
               className="btn btn-primary btn-sm"
               type="button"
-              disabled={pendingAction !== null}
+              disabled={isBusy}
               onClick={handleProcess}
             >
-              {isPending("process") ? "처리 중" : "대기/실패 처리"}
+              {isPending("process") ? "처리 중" : isRefreshing ? "새로고침 중" : "대기/실패 처리"}
             </button>
           </div>
         </div>
@@ -234,9 +253,12 @@ export function HostNotificationsPage({
                     isFirst={index === 0}
                     retryPending={isPending("retry", item.id)}
                     restorePending={isPending("restore", item.id)}
-                    disabled={pendingAction !== null}
+                    disabled={isBusy}
                     onRetry={() => handleRetry(item)}
-                    onRestore={() => setRestoreTarget(item)}
+                    onRestore={() => {
+                      setRestoreError(null);
+                      setRestoreTarget(item);
+                    }}
                   />
                 ))}
               </div>
@@ -267,7 +289,7 @@ export function HostNotificationsPage({
                   required
                 />
               </div>
-              <button className="btn btn-primary btn-sm" type="submit" disabled={pendingAction !== null}>
+              <button className="btn btn-primary btn-sm" type="submit" disabled={isBusy}>
                 {isPending("test-mail") ? "발송 중" : "테스트 발송"}
               </button>
             </form>
@@ -316,6 +338,7 @@ export function HostNotificationsPage({
         <RestoreNotificationDialog
           item={restoreTarget}
           submitting={isPending("restore", restoreTarget.id)}
+          error={restoreError}
           onClose={() => setRestoreTarget(null)}
           onConfirm={() => handleRestore(restoreTarget)}
         />
@@ -413,11 +436,13 @@ function NotificationRow({
 function RestoreNotificationDialog({
   item,
   submitting,
+  error,
   onClose,
   onConfirm,
 }: {
   item: HostNotificationItem;
   submitting: boolean;
+  error: string | null;
   onClose: () => void;
   onConfirm: () => void;
 }) {
@@ -509,6 +534,11 @@ function RestoreNotificationDialog({
             {Math.max(0, item.attemptCount)}회 시도 · {formatDateOnlyLabel(item.updatedAt)}
           </div>
         </div>
+        {error ? (
+          <p role="alert" className="small" style={{ color: "var(--danger)", margin: "14px 0 0" }}>
+            {error}
+          </p>
+        ) : null}
         <div className="actions" style={{ marginTop: "22px", justifyContent: "flex-end" }}>
           <button ref={cancelButtonRef} className="btn btn-ghost btn-sm" type="button" disabled={submitting} onClick={onClose}>
             취소

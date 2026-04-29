@@ -626,6 +626,7 @@ describe("frontend architecture boundaries", () => {
       "features/host/route/host-session-editor-route.tsx",
       "features/host/route/host-members-route.tsx",
       "features/host/route/host-invitations-route.tsx",
+      "features/host/route/host-notifications-route.tsx",
     ];
 
     for (const relativePath of hostRouteComponents) {
