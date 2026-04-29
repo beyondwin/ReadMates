@@ -2430,7 +2430,7 @@ git commit -m "feat: add host notification operations page"
 - Modify: `front/features/host/components/host-dashboard.tsx`
 - Test: `front/tests/unit/host-dashboard.test.tsx`
 
-- [ ] **Step 1: Add failing dashboard link test**
+- [x] **Step 1: Add failing dashboard link test**
 
 Append to `front/tests/unit/host-dashboard.test.tsx`:
 
@@ -2450,7 +2450,7 @@ it("links to the host notification operations page", () => {
 });
 ```
 
-- [ ] **Step 2: Run test and verify failure**
+- [x] **Step 2: Run test and verify failure**
 
 Run:
 
@@ -2460,7 +2460,7 @@ pnpm --dir front test -- --run front/tests/unit/host-dashboard.test.tsx
 
 Expected: FAIL because the link does not exist.
 
-- [ ] **Step 3: Add the link**
+- [x] **Step 3: Add the link**
 
 In `HostNotificationLedger`, add below the badge row:
 
@@ -2472,7 +2472,7 @@ In `HostNotificationLedger`, add below the badge row:
 
 If `Link` is not imported in the file, import the same route-aware link primitive already used in this component or nearby host components.
 
-- [ ] **Step 4: Run test**
+- [x] **Step 4: Run test**
 
 Run:
 
@@ -2482,7 +2482,7 @@ pnpm --dir front test -- --run front/tests/unit/host-dashboard.test.tsx
 
 Expected: `PASS`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add front/features/host/components/host-dashboard.tsx front/tests/unit/host-dashboard.test.tsx
