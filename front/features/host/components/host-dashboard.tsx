@@ -1330,6 +1330,14 @@ function HostNotificationLedger({
             </span>
           ))}
         </div>
+        <Link
+          to="/app/host/notifications"
+          className="btn btn-quiet btn-sm"
+          style={{ marginTop: 12 }}
+          aria-label={mobile ? "알림 발송 장부 열기" : undefined}
+        >
+          알림 발송 장부
+        </Link>
         {failures.length > 0 ? (
           <ul style={{ margin: mobile ? "10px 0 0" : "4px 0 0", padding: 0, listStyle: "none" }}>
             {failures.map((failure, index) => (

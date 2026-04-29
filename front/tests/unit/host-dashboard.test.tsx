@@ -495,6 +495,14 @@ describe("HostDashboard", () => {
     expect(screen.queryByText("member@example.com")).not.toBeInTheDocument();
   });
 
+  it("links to the host notification operations page", () => {
+    render(
+      <HostDashboardForTest current={current} data={dashboard} notifications={notificationSummary} />,
+    );
+
+    expect(screen.getByRole("link", { name: "알림 발송 장부" })).toHaveAttribute("href", "/app/host/notifications");
+  });
+
   it("renders upcoming session management on desktop and mobile", () => {
     const { container } = render(
       <HostDashboardForTest auth={hostAuth} current={noCurrent} data={dashboard} hostSessions={hostSessions} />,
