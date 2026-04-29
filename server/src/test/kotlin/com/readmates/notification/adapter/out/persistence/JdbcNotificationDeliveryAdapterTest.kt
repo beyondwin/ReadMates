@@ -94,6 +94,27 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(staleMarked).isFalse()
         assertThat(activeMarked).isTrue()
         assertThat(statusFor(emailDeliveryId)).isEqualTo("SENT")
+        assertThat(deliveryAdapter.findDeliveryStatus(emailDeliveryId)).isEqualTo(NotificationDeliveryStatus.SENT)
+    }
+
+    @Test
+    fun `findDeliveryStatus exposes failed email row that is not due for retry`() {
+        insertEventOutboxRow()
+        deliveryAdapter.persistPlannedDeliveries(message())
+        val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
+        val claimed = deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
+
+        val failed = deliveryAdapter.markDeliveryFailed(
+            id = emailDeliveryId,
+            lockedAt = claimed.lockedAt,
+            error = "smtp rejected",
+            nextAttemptDelayMinutes = 60,
+        )
+        val notDueClaim = deliveryAdapter.claimEmailDelivery(emailDeliveryId)
+
+        assertThat(failed).isTrue()
+        assertThat(notDueClaim).isNull()
+        assertThat(deliveryAdapter.findDeliveryStatus(emailDeliveryId)).isEqualTo(NotificationDeliveryStatus.FAILED)
     }
 
     @Test

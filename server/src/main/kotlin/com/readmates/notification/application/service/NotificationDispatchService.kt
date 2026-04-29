@@ -9,6 +9,7 @@ import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.OffsetDateTime
@@ -32,7 +33,7 @@ class NotificationDispatchService(
     }
 
     private fun dispatchEmail(delivery: NotificationDeliveryItem) {
-        val claimed = deliveryPort.claimEmailDelivery(delivery.id) ?: return
+        val claimed = deliveryPort.claimEmailDelivery(delivery.id) ?: return handleUnclaimedEmailDelivery(delivery.id)
         try {
             mailDeliveryPort.send(
                 MailDeliveryCommand(
@@ -45,6 +46,22 @@ class NotificationDispatchService(
         } catch (exception: Exception) {
             markFailure(claimed, exception)
             throw exception
+        }
+    }
+
+    private fun handleUnclaimedEmailDelivery(deliveryId: UUID) {
+        val status = deliveryPort.findDeliveryStatus(deliveryId)
+        when (status) {
+            NotificationDeliveryStatus.SENT,
+            NotificationDeliveryStatus.SKIPPED,
+            NotificationDeliveryStatus.DEAD,
+            -> return
+
+            NotificationDeliveryStatus.PENDING,
+            NotificationDeliveryStatus.FAILED,
+            NotificationDeliveryStatus.SENDING,
+            null,
+            -> throw IllegalStateException("Email delivery $deliveryId is not claimable with status ${status ?: "UNKNOWN"}")
         }
     }
 

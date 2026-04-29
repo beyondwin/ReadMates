@@ -20,6 +20,7 @@ interface NotificationDeliveryPort {
 
     fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem?
     fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem>
+    fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus?
     fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean
     fun markDeliveryFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean
     fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean
