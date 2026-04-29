@@ -37,6 +37,9 @@ private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
     delete from clubs
     where id = '00000000-0000-0000-0000-000000000002';
 """
+private const val FAILING_TEST_MAIL_RECIPIENT = "failure@example.com"
+private const val SENSITIVE_TEST_MAIL_ERROR =
+    "smtp rejected external@example.com password=raw-password Bearer raw-bearer-token api_key=raw-api-key authorization=Basic raw-basic-token -----BEGIN PRIVATE KEY----- raw-private-key"
 
 @SpringBootTest(
     properties = [
@@ -181,6 +184,86 @@ class HostNotificationControllerTest(
                 }
             }
         }
+    }
+
+    @Test
+    fun `host test mail failure audit stores and returns sanitized error`() {
+        val response = mockMvc.post("/api/host/notifications/test-mail") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"recipientEmail":"$FAILING_TEST_MAIL_RECIPIENT"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.recipientEmail") { value("f***@example.com") }
+            jsonPath("$.status") { value("FAILED") }
+        }.andReturn().response.contentAsString
+
+        assertThat(response).contains("[redacted-email]")
+        assertThat(response).contains("[redacted-secret]")
+        assertNoSensitiveErrorValues(response)
+
+        val rows = jdbcTemplate.queryForList(
+            """
+            select status, last_error
+            from notification_test_mail_audit
+            where club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+        )
+
+        assertThat(rows).hasSize(1)
+        assertThat(rows.single()["status"]).isEqualTo("FAILED")
+        val storedError = rows.single()["last_error"].toString()
+        assertThat(storedError).contains("[redacted-email]")
+        assertThat(storedError).contains("[redacted-secret]")
+        assertNoSensitiveErrorValues(storedError)
+
+        val auditResponse = mockMvc.get("/api/host/notifications/test-mail/audit") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].status") { value("FAILED") }
+        }.andReturn().response.contentAsString
+
+        assertThat(auditResponse).contains("[redacted-email]")
+        assertThat(auditResponse).contains("[redacted-secret]")
+        assertNoSensitiveErrorValues(auditResponse)
+    }
+
+    @Test
+    fun `host test mail audit response redacts stored sensitive error`() {
+        jdbcTemplate.update(
+            """
+            insert into notification_test_mail_audit (
+              id,
+              club_id,
+              host_membership_id,
+              recipient_masked_email,
+              recipient_email_hash,
+              status,
+              last_error
+            ) values (
+              '00000000-0000-0000-0000-000000009901',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000201',
+              'f***@example.com',
+              '0000000000000000000000000000000000000000000000000000000000000000',
+              'FAILED',
+              ?
+            )
+            """.trimIndent(),
+            SENSITIVE_TEST_MAIL_ERROR,
+        )
+
+        val response = mockMvc.get("/api/host/notifications/test-mail/audit") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[0].status") { value("FAILED") }
+        }.andReturn().response.contentAsString
+
+        assertThat(response).contains("[redacted-email]")
+        assertThat(response).contains("[redacted-secret]")
+        assertNoSensitiveErrorValues(response)
     }
 
     @Test
@@ -406,13 +489,27 @@ class HostNotificationControllerTest(
         )
     }
 
+    private fun assertNoSensitiveErrorValues(value: String) {
+        assertThat(value).doesNotContain("external@example.com")
+        assertThat(value).doesNotContain("raw-password")
+        assertThat(value).doesNotContain("raw-bearer-token")
+        assertThat(value).doesNotContain("raw-api-key")
+        assertThat(value).doesNotContain("raw-basic-token")
+        assertThat(value).doesNotContain("raw-private-key")
+        assertThat(value).doesNotContain("BEGIN PRIVATE KEY")
+    }
+
     @TestConfiguration
     class TestMailDeliveryConfig {
         @Bean
         @Primary
         fun testMailDeliveryPort(): MailDeliveryPort =
             object : MailDeliveryPort {
-                override fun send(command: MailDeliveryCommand) = Unit
+                override fun send(command: MailDeliveryCommand) {
+                    if (command.to == FAILING_TEST_MAIL_RECIPIENT) {
+                        error(SENSITIVE_TEST_MAIL_ERROR)
+                    }
+                }
             }
 
         @Bean

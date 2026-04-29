@@ -264,19 +264,31 @@ class NotificationOutboxServiceTest {
     }
 
     @Test
-    fun `sendTestMail records failed audit without raw email in stored error`() {
+    fun `sendTestMail records failed audit without raw sensitive values in stored error`() {
         val port = FakeNotificationOutboxPort(items = emptyList())
-        val mail = FailingMailDeliveryPort("smtp rejected external@example.com")
+        val mail = FailingMailDeliveryPort(
+            """
+            smtp rejected external@example.com password=raw-password Bearer raw-bearer-token api_key=raw-api-key
+            -----BEGIN PRIVATE KEY----- raw-private-key
+            """.trimIndent(),
+        )
         val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
 
         val result = service.sendTestMail(host(), SendNotificationTestMailCommand("External@Example.com"))
 
         assertThat(result.status).isEqualTo(NotificationTestMailStatus.FAILED)
         assertThat(result.recipientEmail).isEqualTo("e***@example.com")
-        assertThat(port.testMailAudits.single().status).isEqualTo(NotificationTestMailStatus.FAILED)
-        assertThat(port.testMailAudits.single().lastError).contains("[redacted-email]")
-        assertThat(port.testMailAudits.single().lastError).doesNotContain("external@example.com")
-        assertThat(port.testMailAudits.single().recipientEmail).doesNotContain("External@Example.com")
+        val audit = port.testMailAudits.single()
+        assertThat(audit.status).isEqualTo(NotificationTestMailStatus.FAILED)
+        assertThat(audit.lastError).contains("[redacted-email]")
+        assertThat(audit.lastError).contains("[redacted-secret]")
+        assertThat(audit.lastError).doesNotContain("external@example.com")
+        assertThat(audit.lastError).doesNotContain("raw-password")
+        assertThat(audit.lastError).doesNotContain("raw-bearer-token")
+        assertThat(audit.lastError).doesNotContain("raw-api-key")
+        assertThat(audit.lastError).doesNotContain("raw-private-key")
+        assertThat(audit.lastError).doesNotContain("BEGIN PRIVATE KEY")
+        assertThat(audit.recipientEmail).doesNotContain("External@Example.com")
         assertThat(port.testMailHashes.single()).matches("^[0-9a-f]{64}$")
     }
 

@@ -8,6 +8,7 @@ import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationTestMailStatus
+import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import java.util.UUID
@@ -174,11 +175,7 @@ private fun maskEmail(email: String): String {
 }
 
 private fun String?.toHostSafeLastError(): String? =
-    this
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-        ?.replace(EMAIL_LIKE_PATTERN, "[redacted-email]")
-        ?.take(MAX_HOST_LAST_ERROR_LENGTH)
+    sanitizeNotificationError(this, MAX_HOST_LAST_ERROR_LENGTH)
 
 private fun Map<String, Any?>.toHostSafeMetadata(depth: Int = 0): Map<String, Any?> {
     val safe = linkedMapOf<String, Any?>()

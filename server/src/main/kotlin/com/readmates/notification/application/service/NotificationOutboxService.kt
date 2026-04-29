@@ -9,6 +9,7 @@ import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
+import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
@@ -36,7 +37,6 @@ private const val TEST_MAIL_SUBJECT = "ReadMates 알림 테스트"
 private const val TEST_MAIL_BODY = "ReadMates 알림 발송 설정을 확인하기 위한 테스트 메일입니다."
 private val RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 private val EMAIL_PATTERN = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
-private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
 
 @Service
 class NotificationOutboxService(
@@ -235,9 +235,8 @@ class NotificationOutboxService(
         (message ?: javaClass.simpleName).take(MAX_LAST_ERROR_LENGTH)
 
     private fun Exception.toTestMailStorageError(): String =
-        toStorageError()
-            .replace(EMAIL_LIKE_PATTERN, "[redacted-email]")
-            .take(MAX_LAST_ERROR_LENGTH)
+        sanitizeNotificationError(message ?: javaClass.simpleName, MAX_LAST_ERROR_LENGTH)
+            ?: javaClass.simpleName.take(MAX_LAST_ERROR_LENGTH)
 
     private fun String.maskEmail(): String {
         val atIndex = indexOf('@')
