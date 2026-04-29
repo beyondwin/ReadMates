@@ -194,6 +194,128 @@ class MySqlFlywayMigrationTest(
         }
     }
 
+    @Test
+    fun `mysql creates notification preference and test mail audit tables`() {
+        val tableCount = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.tables
+            where table_schema = database()
+              and table_name in ('notification_preferences', 'notification_test_mail_audit')
+            """.trimIndent(),
+            Int::class.java,
+        )
+
+        assertEquals(2, tableCount)
+
+        assertEquals("NO", columnValue("notification_preferences", "membership_id", "is_nullable"))
+        assertEquals("NO", columnValue("notification_preferences", "club_id", "is_nullable"))
+        assertEquals("NO", columnValue("notification_preferences", "email_enabled", "is_nullable"))
+        assertEquals("NO", columnValue("notification_preferences", "review_published_enabled", "is_nullable"))
+        assertEquals(
+            "membership_id,club_id",
+            foreignKeyColumns("notification_preferences", "notification_preferences_membership_fk"),
+        )
+        assertEquals(
+            "memberships:id,club_id",
+            foreignKeyReference("notification_preferences", "notification_preferences_membership_fk"),
+        )
+
+        assertEquals("NO", columnValue("notification_test_mail_audit", "id", "is_nullable"))
+        assertEquals("NO", columnValue("notification_test_mail_audit", "club_id", "is_nullable"))
+        assertEquals("NO", columnValue("notification_test_mail_audit", "host_membership_id", "is_nullable"))
+        assertEquals("NO", columnValue("notification_test_mail_audit", "recipient_masked_email", "is_nullable"))
+        assertEquals("NO", columnValue("notification_test_mail_audit", "recipient_email_hash", "is_nullable"))
+        assertEquals("NO", columnValue("notification_test_mail_audit", "status", "is_nullable"))
+        assertEquals("YES", columnValue("notification_test_mail_audit", "last_error", "is_nullable"))
+        assertEquals(
+            "club_id,created_at",
+            indexColumns("notification_test_mail_audit", "notification_test_mail_audit_club_created_idx"),
+        )
+        assertEquals(
+            "host_membership_id,club_id,created_at",
+            indexColumns("notification_test_mail_audit", "notification_test_mail_audit_host_created_idx"),
+        )
+        assertEquals(
+            "recipient_email_hash,created_at",
+            indexColumns("notification_test_mail_audit", "notification_test_mail_audit_recipient_hash_idx"),
+        )
+        assertEquals(
+            "club_id",
+            foreignKeyColumns("notification_test_mail_audit", "notification_test_mail_audit_club_fk"),
+        )
+        assertEquals(
+            "clubs:id",
+            foreignKeyReference("notification_test_mail_audit", "notification_test_mail_audit_club_fk"),
+        )
+        assertEquals(
+            "host_membership_id,club_id",
+            foreignKeyColumns("notification_test_mail_audit", "notification_test_mail_audit_host_membership_fk"),
+        )
+        assertEquals(
+            "memberships:id,club_id",
+            foreignKeyReference("notification_test_mail_audit", "notification_test_mail_audit_host_membership_fk"),
+        )
+        assertTrue(checkConstraintClause("notification_test_mail_audit_status_check").contains("SENT"))
+        assertTrue(checkConstraintClause("notification_test_mail_audit_status_check").contains("FAILED"))
+        assertTrue(checkConstraintClause("notification_test_mail_audit_mask_check").contains("trim"))
+        assertTrue(checkConstraintClause("notification_test_mail_audit_hash_check").contains("^[0-9a-f]{64}$"))
+
+        val suffix = UUID.randomUUID().toString().take(8)
+        val clubId = UUID.randomUUID().toString()
+        val userId = UUID.randomUUID().toString()
+        val membershipId = UUID.randomUUID().toString()
+        val shortName = "Notify$suffix"
+
+        try {
+            jdbcTemplate.update(
+                """
+                insert into clubs (id, slug, name, tagline, about)
+                values (?, ?, '테스트 클럽', '테스트 클럽', '테스트 클럽입니다.')
+                """.trimIndent(),
+                clubId,
+                "notify-$suffix",
+            )
+            insertProfileUser(userId, "notify-$suffix@example.com", "Notify User", shortName)
+            insertMembership(membershipId, clubId, userId, shortName)
+
+            jdbcTemplate.update(
+                """
+                insert into notification_preferences (membership_id, club_id)
+                values (?, ?)
+                """.trimIndent(),
+                membershipId,
+                clubId,
+            )
+
+            val preferences = jdbcTemplate.queryForMap(
+                """
+                select email_enabled,
+                       next_book_published_enabled,
+                       session_reminder_due_enabled,
+                       feedback_document_published_enabled,
+                       review_published_enabled
+                from notification_preferences
+                where membership_id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                membershipId,
+                clubId,
+            )
+
+            assertEquals(true, preferences["email_enabled"])
+            assertEquals(true, preferences["next_book_published_enabled"])
+            assertEquals(true, preferences["session_reminder_due_enabled"])
+            assertEquals(true, preferences["feedback_document_published_enabled"])
+            assertEquals(false, preferences["review_published_enabled"])
+        } finally {
+            deleteWhereIn("notification_preferences", "membership_id", setOf(membershipId))
+            deleteWhereIn("memberships", "id", setOf(membershipId))
+            deleteWhereIn("users", "id", setOf(userId))
+            deleteWhereIn("clubs", "id", setOf(clubId))
+        }
+    }
+
     private fun insertProfileUser(
         userId: String,
         email: String,
@@ -297,6 +419,33 @@ class MySqlFlywayMigrationTest(
         tableName,
         constraintName,
     ) ?: error("Foreign key $tableName.$constraintName does not exist")
+
+    private fun indexColumns(
+        tableName: String,
+        indexName: String,
+    ): String = jdbcTemplate.queryForObject(
+        """
+        select group_concat(column_name order by seq_in_index separator ',')
+        from information_schema.statistics
+        where table_schema = database()
+          and table_name = ?
+          and index_name = ?
+        """.trimIndent(),
+        String::class.java,
+        tableName,
+        indexName,
+    ) ?: error("Index $tableName.$indexName does not exist")
+
+    private fun checkConstraintClause(constraintName: String): String = jdbcTemplate.queryForObject(
+        """
+        select check_clause
+        from information_schema.check_constraints
+        where constraint_schema = database()
+          and constraint_name = ?
+        """.trimIndent(),
+        String::class.java,
+        constraintName,
+    ) ?: error("Check constraint $constraintName does not exist")
 
     private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
         if (values.isEmpty()) {
