@@ -62,7 +62,7 @@ class NotificationDispatchServiceTest {
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(NotificationDeliveryRetryableException::class.java)
             .hasMessageContaining("smtp rejected")
-            .hasCauseInstanceOf(IllegalStateException::class.java)
+            .hasNoCause()
 
         assertThat(deliveryPort.failed.map { it.id }).containsExactly(emailDelivery().id)
         assertThat(deliveryPort.failed.map { it.delayMinutes }).containsExactly(15L)
@@ -88,13 +88,30 @@ class NotificationDispatchServiceTest {
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(NotificationDeliveryRetryableException::class.java)
             .hasMessageContaining("1 email delivery")
-            .hasCauseInstanceOf(IllegalStateException::class.java)
+            .hasNoCause()
 
         assertThat(deliveryPort.claimedIds).containsExactly(failedDelivery.id, laterDelivery.id)
         assertThat(deliveryPort.failed.map { it.id }).containsExactly(failedDelivery.id)
         assertThat(deliveryPort.sent).containsExactly(laterDelivery.id to claimedEmailDelivery(laterDelivery).lockedAt)
         assertThat(mailPort.sent.map { it.to }).containsExactly("first@example.com", "second@example.com")
         assertThat(deliveryPort.dead).isEmpty()
+    }
+
+    @Test
+    fun `dispatch retryable exception from mail failure does not retain raw provider exception`() {
+        val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 1)))
+        val mailPort = FailingMailPort("provider token=raw-secret failed for member@example.com")
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
+            .hasNoCause()
+            .hasMessageContaining("[redacted-secret]")
+            .hasMessageContaining("[redacted-email]")
+            .hasMessageNotContaining("raw-secret")
+            .hasMessageNotContaining("member@example.com")
+
+        assertThat(deliveryPort.failed.single().error).contains("[redacted-secret]", "[redacted-email]")
     }
 
     @Test

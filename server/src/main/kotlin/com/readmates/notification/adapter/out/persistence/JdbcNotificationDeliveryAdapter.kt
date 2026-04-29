@@ -63,6 +63,7 @@ class JdbcNotificationDeliveryAdapter(
     @Transactional
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> {
         val jdbcTemplate = jdbcTemplate()
+        verifyEventOutboxExists(jdbcTemplate, message)
         val existingDeliveries = deliveryItemsForEvent(jdbcTemplate, message)
         if (existingDeliveries.isNotEmpty()) {
             return existingDeliveries
@@ -286,6 +287,27 @@ class JdbcNotificationDeliveryAdapter(
             NotificationEventType.REVIEW_PUBLISHED ->
                 reviewRecipients(jdbcTemplate, message)
         }
+
+    private fun verifyEventOutboxExists(jdbcTemplate: JdbcTemplate, message: NotificationEventMessage) {
+        val exists = jdbcTemplate.queryForObject(
+            """
+            select exists(
+              select 1
+              from notification_event_outbox
+              where id = ?
+                and club_id = ?
+            )
+            """.trimIndent(),
+            Boolean::class.java,
+            message.eventId.dbString(),
+            message.clubId.dbString(),
+        ) ?: false
+        if (!exists) {
+            throw MissingNotificationEventOutboxException(
+                "Notification event outbox row not found for eventId=${message.eventId} clubId=${message.clubId}",
+            )
+        }
+    }
 
     private fun sessionViewerRecipients(
         jdbcTemplate: JdbcTemplate,
@@ -741,3 +763,7 @@ class JdbcNotificationDeliveryAdapter(
         val displayName: String?,
     )
 }
+
+class MissingNotificationEventOutboxException(
+    message: String,
+) : RuntimeException(message)
