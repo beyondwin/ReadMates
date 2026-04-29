@@ -2,6 +2,17 @@ import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+const clubSlugPattern = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
+
+function normalizedClubSlugFromProxyPath(proxyPath: string | undefined) {
+  if (!proxyPath) {
+    return "";
+  }
+  const value = new URL(proxyPath, "http://readmates.local").searchParams.get("clubSlug") ?? "";
+  const normalized = value.trim().toLowerCase();
+  return clubSlugPattern.test(normalized) && !normalized.includes("--") ? normalized : "";
+}
+
 export default defineConfig({
   plugins: [react()],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
@@ -30,6 +41,16 @@ export default defineConfig({
           ...(process.env.READMATES_BFF_SECRET
             ? { "X-Readmates-Bff-Secret": process.env.READMATES_BFF_SECRET }
             : {}),
+        },
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.removeHeader("X-Readmates-Club-Slug");
+            proxyReq.removeHeader("X-Readmates-Club-Host");
+            const clubSlug = normalizedClubSlugFromProxyPath(proxyReq.path);
+            if (clubSlug) {
+              proxyReq.setHeader("X-Readmates-Club-Slug", clubSlug);
+            }
+          });
         },
         rewrite: (proxyPath) => proxyPath.replace(/^\/api\/bff/, ""),
       },
