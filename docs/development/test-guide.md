@@ -91,12 +91,15 @@ Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관
 
 ## Notification Operations
 
-알림 outbox, OCI Email Delivery adapter 설정, 운영 metrics, host dashboard 알림 표시를 바꿨다면 아래 targeted command를 먼저 실행합니다.
+알림 outbox, OCI Email Delivery adapter 설정, 운영 metrics, host dashboard/notification operations UI, 멤버 알림 설정을 바꿨다면 아래 targeted command를 먼저 실행합니다.
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.notification.*'
+./server/gradlew -p server test --tests com.readmates.archive.api.MemberArchiveReviewControllerTest
 ./server/gradlew -p server clean test
 pnpm --dir front exec vitest run tests/unit/host-dashboard.test.tsx
+pnpm --dir front exec vitest run tests/unit/host-notifications.test.tsx
+pnpm --dir front exec vitest run tests/unit/my-page.test.tsx
 pnpm --dir front lint
 ```
 

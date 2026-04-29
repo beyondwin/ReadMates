@@ -4,6 +4,30 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 버전 규칙과 릴리즈 절차는 [docs/development/release-management.md](docs/development/release-management.md)를 기준으로 합니다.
 
+## Unreleased
+
+### Added
+
+- 멤버 My Page에서 이메일 알림 전체 설정과 이벤트별 수신 설정을 저장할 수 있게 했습니다.
+- 호스트 알림 운영 페이지(`/app/host/notifications`)를 추가해 outbox 목록, 상세, 개별 retry, `DEAD` 복구, 고정 템플릿 테스트 메일, 테스트 메일 audit을 확인할 수 있게 했습니다.
+- 발행된 회차에 공개 장문 서평이 처음 저장되면 opt-in 멤버에게 `REVIEW_PUBLISHED` 알림을 생성합니다.
+- 알림 선호도와 테스트 메일 audit을 위한 Flyway migration을 추가했습니다. 테스트 메일 audit은 masked recipient email과 hash만 저장합니다.
+
+### Changed
+
+- 기존 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED` 알림 생성은 멤버의 전역/이벤트별 알림 선호도를 반영합니다.
+- 호스트 알림 API 응답은 recipient email을 masked 값으로 반환하고, detail metadata는 allowlist된 제품 metadata만 노출합니다.
+
+### Verification
+
+- `./server/gradlew -p server test --tests 'com.readmates.notification.*'`
+- `./server/gradlew -p server test --tests com.readmates.archive.api.MemberArchiveReviewControllerTest`
+- `./server/gradlew -p server clean test`
+- `pnpm --dir front lint`
+- `pnpm --dir front test`
+- `pnpm --dir front build`
+- `pnpm --dir front test:e2e`
+
 ## v1.2.0 - 2026-04-25
 
 ### Highlights
