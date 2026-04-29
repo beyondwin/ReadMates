@@ -67,6 +67,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/notifications/process$")),
                     methodAndPath("POST", Regex("^/api/me/membership/leave$")),
                     methodAndPath("PATCH", Regex("^/api/me/profile$")),
+                    methodAndPath("PUT", Regex("^/api/me/notifications/preferences$")),
                     methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$")),
                     methodAndPath("POST", Regex("^/api/invitations/[^/]+/accept$")),
                     methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$")),
