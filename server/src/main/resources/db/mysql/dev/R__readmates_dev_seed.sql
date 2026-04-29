@@ -1,19 +1,27 @@
 -- Development seed data for local ReadMates fixtures.
 
-set @club_id = '00000000-0000-0000-0000-000000000001';
-
-insert into clubs (id, slug, name, tagline, about)
+insert into clubs (id, slug, name, tagline, about, status)
 values (
-  @club_id,
+  '00000000-0000-0000-0000-000000000001',
   'reading-sai',
   '읽는사이',
   '함께 읽고 각자의 언어로 남기는 독서모임',
-  '초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.'
+  '초대받은 멤버들이 매달 한 권의 책을 읽고, 질문과 감상과 대화를 조용히 쌓아갑니다.',
+  'ACTIVE'
+),
+(
+  '00000000-0000-0000-0000-000000000002',
+  'sample-book-club',
+  '샘플 북클럽',
+  '다른 클럽 권한을 확인하기 위한 공개 샘플입니다.',
+  'ReadMates 멀티 클럽 개발 검증용 샘플 클럽입니다.',
+  'ACTIVE'
 )
 on duplicate key update
   name = values(name),
   tagline = values(tagline),
-  about = values(about);
+  about = values(about),
+  status = values(status);
 
 insert into users (id, google_subject_id, email, name, short_name, profile_image_url)
 with seed as (
