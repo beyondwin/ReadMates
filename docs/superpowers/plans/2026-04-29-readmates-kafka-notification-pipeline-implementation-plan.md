@@ -376,7 +376,7 @@ git commit -m "feat: add kafka notification ledger schema"
 - Create: `server/src/main/kotlin/com/readmates/notification/application/port/out/NotificationDeliveryPort.kt`
 - Create: `server/src/main/kotlin/com/readmates/notification/application/port/out/MemberNotificationPort.kt`
 
-- [ ] **Step 1: Write model test**
+- [x] **Step 1: Write model test**
 
 Create `server/src/test/kotlin/com/readmates/notification/application/model/NotificationEventModelsTest.kt`:
 
@@ -438,7 +438,7 @@ class NotificationEventModelsTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -448,7 +448,7 @@ Run:
 
 Expected: FAIL because the new model types do not exist.
 
-- [ ] **Step 3: Add domain enums**
+- [x] **Step 3: Add domain enums**
 
 Create `NotificationEventOutboxStatus.kt`:
 
@@ -490,7 +490,7 @@ enum class NotificationChannel {
 }
 ```
 
-- [ ] **Step 4: Add application models and helper**
+- [x] **Step 4: Add application models and helper**
 
 Add these models to `NotificationModels.kt`, keeping existing preference and test mail models until later tasks migrate callers:
 
@@ -577,7 +577,7 @@ import com.readmates.notification.domain.NotificationEventOutboxStatus
 import java.time.LocalDate
 ```
 
-- [ ] **Step 5: Add ports**
+- [x] **Step 5: Add ports**
 
 Create `NotificationEventOutboxPort.kt`:
 
@@ -660,7 +660,7 @@ interface MemberNotificationPort {
 }
 ```
 
-- [ ] **Step 6: Run model tests**
+- [x] **Step 6: Run model tests**
 
 Run:
 
@@ -670,7 +670,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/domain server/src/main/kotlin/com/readmates/notification/application/model/NotificationModels.kt server/src/main/kotlin/com/readmates/notification/application/port/out server/src/test/kotlin/com/readmates/notification/application/model/NotificationEventModelsTest.kt
