@@ -6,7 +6,10 @@ import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.domain.NotificationEventType
+import org.apache.kafka.clients.consumer.ConsumerConfig
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -16,11 +19,15 @@ import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.annotation.Bean
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
+import org.springframework.kafka.core.KafkaOperations
 import org.springframework.kafka.core.KafkaTemplate
+import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.kafka.support.SendResult
-import org.springframework.context.annotation.Bean
 import org.springframework.messaging.Message
 import java.nio.charset.StandardCharsets
 import java.time.Duration
@@ -64,6 +71,92 @@ class KafkaNotificationEventPublisherAdapterTest {
                 assertThat(factory.configurationProperties[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG])
                     .isEqualTo(listOf("kafka-a:9092", "kafka-b:9092"))
             }
+    }
+
+    @Test
+    fun `consumer factory uses notification bootstrap servers and consumer group`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092,kafka-b:9092",
+                "readmates.notifications.kafka.consumer-group=notification-workers",
+                "readmates.notifications.kafka.dlq-topic=readmates.notification.events.dlq.v1",
+            ).run { context ->
+                assertThat(context).hasBean("notificationEventConsumerFactory")
+                assertThat(context).hasBean("notificationKafkaListenerContainerFactory")
+                assertThat(context).hasBean("notificationEventDeadLetterPublishingRecoverer")
+                assertThat(context).hasBean("notificationKafkaErrorHandler")
+
+                val consumerFactory = context.getBean(
+                    "notificationEventConsumerFactory",
+                    DefaultKafkaConsumerFactory::class.java,
+                )
+
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG])
+                    .isEqualTo(listOf("kafka-a:9092", "kafka-b:9092"))
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.GROUP_ID_CONFIG])
+                    .isEqualTo("notification-workers")
+            }
+    }
+
+    @Test
+    fun `listener container factory uses notification error handler`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                val factory = context.getBean(
+                    "notificationKafkaListenerContainerFactory",
+                    ConcurrentKafkaListenerContainerFactory::class.java,
+                ) as ConcurrentKafkaListenerContainerFactory<String, NotificationEventMessage>
+                val errorHandler = context.getBean(
+                    "notificationKafkaErrorHandler",
+                    CommonErrorHandler::class.java,
+                )
+
+                val container = factory.createContainer("readmates.notification.events.v1")
+
+                assertThat(container.commonErrorHandler).isSameAs(errorHandler)
+            }
+    }
+
+    @Test
+    fun `dead letter recoverer publishes to configured notification dlq topic`() {
+        val kafkaOperations =
+            Mockito.mock(KafkaOperations::class.java) as KafkaOperations<String, NotificationEventMessage>
+        Mockito.`when`(kafkaOperations.isTransactional).thenReturn(false)
+        Mockito.`when`(kafkaOperations.send(Mockito.any<ProducerRecord<String, NotificationEventMessage>>()))
+            .thenReturn(
+                CompletableFuture.completedFuture(
+                    Mockito.mock(SendResult::class.java) as SendResult<String, NotificationEventMessage>,
+                ),
+            )
+        val recoverer = NotificationKafkaConfiguration().notificationEventDeadLetterPublishingRecoverer(
+            kafkaOperations,
+            NotificationKafkaProperties(
+                bootstrapServers = listOf("kafka-a:9092"),
+                dlqTopic = "custom.notification.dlq.v1",
+            ),
+        )
+        val record = ConsumerRecord(
+            "readmates.notification.events.v1",
+            2,
+            42L,
+            "club-key",
+            notificationEventMessage(),
+        )
+
+        recoverer.accept(record, null, IllegalArgumentException("unsupported schema"))
+
+        val captor = ArgumentCaptor.forClass(ProducerRecord::class.java)
+            as ArgumentCaptor<ProducerRecord<String, NotificationEventMessage>>
+        Mockito.verify(kafkaOperations).send(captor.capture())
+        val partition: Int? = captor.value.partition()
+        assertThat(captor.value.topic()).isEqualTo("custom.notification.dlq.v1")
+        assertThat(partition).isNull()
+        assertThat(captor.value.key()).isEqualTo("club-key")
+        assertThat(captor.value.value()).isEqualTo(record.value())
     }
 
     @Test
