@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
+import { readmatesApiPath, readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 import { isReadmatesApiError } from "@/shared/api/errors";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  window.history.pushState({}, "", "/");
 });
 
 describe("readmatesFetchResponse", () => {
@@ -50,6 +51,51 @@ describe("readmatesFetchResponse", () => {
     const headers = fetchMock.mock.calls[0]?.[1]?.headers;
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).has("Content-Type")).toBe(false);
+  });
+
+  it("adds the current scoped app club slug to BFF API requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.pushState({}, "", "/clubs/reading-sai/app/host/sessions/new");
+
+    await readmatesFetchResponse("/api/host/dashboard?draft=true");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/dashboard?draft=true&clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("does not overwrite an explicit club slug on BFF API requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.pushState({}, "", "/clubs/reading-sai/app");
+
+    await readmatesFetchResponse("/api/auth/me?clubSlug=sample-book-club");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me?clubSlug=sample-book-club",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("does not use browser location fallback when an explicit empty API context is provided", () => {
+    window.history.pushState({}, "", "/clubs/reading-sai/app");
+
+    expect(readmatesApiPath("/api/host/dashboard", { clubSlug: undefined })).toBe("/api/host/dashboard");
+  });
+
+  it("keeps explicit empty API context through readmatesFetchResponse", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.pushState({}, "", "/clubs/reading-sai/app");
+
+    await readmatesFetchResponse("/api/host/dashboard", undefined, { clubSlug: undefined });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/dashboard",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it("returns undefined for 204 responses", async () => {

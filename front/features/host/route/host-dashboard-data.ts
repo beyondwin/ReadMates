@@ -15,7 +15,9 @@ import type {
   HostNotificationSummary,
   HostSessionListItem,
 } from "@/features/host/api/host-contracts";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 const EMPTY_HOST_NOTIFICATION_SUMMARY: HostNotificationSummary = {
   pending: 0,
@@ -32,14 +34,15 @@ export type HostDashboardRouteData = {
   notifications: HostNotificationSummary;
 };
 
-export async function hostDashboardLoader(): Promise<HostDashboardRouteData> {
-  await requireHostLoaderAuth();
+export async function hostDashboardLoader(args?: LoaderFunctionArgs): Promise<HostDashboardRouteData> {
+  await requireHostLoaderAuth(args);
+  const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
   const [current, data, hostSessions, notifications] = await Promise.all([
-    fetchHostCurrentSession(),
-    fetchHostDashboard(),
-    fetchHostSessions(),
-    fetchHostNotificationSummary().catch(notificationSummaryFallback),
+    fetchHostCurrentSession(context),
+    fetchHostDashboard(context),
+    fetchHostSessions(context),
+    fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
   ]);
 
   return { current, data, hostSessions, notifications };

@@ -1,5 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, type LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HostDashboard, { type HostDashboardActions } from "@/features/host/components/host-dashboard";
 import {
@@ -21,6 +22,7 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  window.history.pushState({}, "", "/");
 });
 
 const dashboard: HostDashboardResponse = {
@@ -323,6 +325,10 @@ const hostLoaderCases: Array<[string, () => Promise<unknown>]> = [
   ["session editor", hostSessionEditorLoaderForTest],
 ];
 
+const clubScopedHostDashboardLoader = hostDashboardLoader as unknown as (
+  args: LoaderFunctionArgs,
+) => ReturnType<typeof hostDashboardLoader>;
+
 describe("HostDashboard", () => {
   it.each(hostLoaderCases)("redirects anonymous users before calling %s host endpoints", async (_name, runLoader) => {
     const fetchMock = vi.fn().mockResolvedValue(authResponse(anonymousAuth));
@@ -400,6 +406,91 @@ describe("HostDashboard", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/host/notifications/summary",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("does not use stale scoped browser location for unscoped host auth and data loaders", async () => {
+    window.history.pushState({}, "", "/clubs/reading-sai/app/host");
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(authResponse(hostAuth));
+      }
+
+      if (url === "/api/bff/api/sessions/current") {
+        return Promise.resolve(jsonResponse(current));
+      }
+
+      if (url === "/api/bff/api/host/dashboard") {
+        return Promise.resolve(jsonResponse(dashboard));
+      }
+
+      if (url === "/api/bff/api/host/sessions") {
+        return Promise.resolve(jsonResponse([]));
+      }
+
+      if (url === "/api/bff/api/host/notifications/summary") {
+        return Promise.resolve(jsonResponse(notificationSummary));
+      }
+
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(hostDashboardLoader({ params: {}, request: new Request("https://readmates.test/app/host") } as LoaderFunctionArgs))
+      .resolves.toEqual({ current, data: dashboard, hostSessions: [], notifications: notificationSummary });
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url)).every((url) => !url.includes("clubSlug="))).toBe(true);
+  });
+
+  it("passes club slug context when loading a club-scoped host dashboard", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(authResponse(hostAuth));
+      }
+
+      if (url === "/api/bff/api/sessions/current?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(current));
+      }
+
+      if (url === "/api/bff/api/host/dashboard?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(dashboard));
+      }
+
+      if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse([]));
+      }
+
+      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(notificationSummary));
+      }
+
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      clubScopedHostDashboardLoader({
+        params: { clubSlug: "reading-sai" },
+        request: new Request("https://readmates.test/clubs/reading-sai/app/host"),
+      } as LoaderFunctionArgs),
+    ).resolves.toEqual({
+      current,
+      data: dashboard,
+      hostSessions: [],
+      notifications: notificationSummary,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/dashboard?clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
@@ -804,6 +895,26 @@ describe("HostDashboard", () => {
     expect(within(desktopSessionBasics as HTMLElement).getByText("안내")).toBeInTheDocument();
     expect(desktop.getByText("세션을 만들면 RSVP와 미팅 URL을 확인할 수 있습니다.")).toBeInTheDocument();
     expect(mobile.getByText("세션을 만들면 RSVP와 미팅 URL을 확인할 수 있습니다.")).toBeInTheDocument();
+  });
+
+  it("keeps host dashboard CTAs inside the scoped app route", () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
+        <HostDashboardForTest current={{ currentSession: null }} data={emptyDashboard} />
+      </MemoryRouter>,
+    );
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+
+    expect(
+      desktop
+        .getAllByRole("link", { name: "세션 문서 만들기" })
+        .every((link) => link.getAttribute("href") === "/clubs/reading-sai/app/host/sessions/new"),
+    ).toBe(true);
+    expect(mobile.getByRole("link", { name: "세션 문서 만들기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/new",
+    );
   });
 
   it("shows a member-status empty state when the current session has no attendees", () => {

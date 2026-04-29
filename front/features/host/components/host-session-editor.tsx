@@ -38,6 +38,7 @@ import {
   readmatesReturnState,
   type ReadmatesReturnTarget,
 } from "@/src/app/route-continuity";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { Link } from "@/src/app/router-link";
 import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
@@ -95,6 +96,10 @@ function focusMobileEditorSection(section: MobileEditorSection) {
   globalThis.setTimeout(() => {
     document.getElementById(mobileEditorSectionConfig(section).tabId)?.focus();
   }, 0);
+}
+
+function scopedHostRedirectHref(href: string) {
+  return scopedAppLinkTarget(globalThis.location.pathname, href);
 }
 
 function handleMobileEditorSectionKeyDown(
@@ -291,7 +296,7 @@ export default function HostSessionEditor({
         return;
       }
 
-      globalThis.location.href = "/app/host/sessions/new";
+      globalThis.location.href = scopedHostRedirectHref("/app/host/sessions/new");
     } catch {
       setDeleteError(deletionErrorMessage());
     } finally {
@@ -325,7 +330,7 @@ export default function HostSessionEditor({
         setSaveState("saved");
         if (isNewSession) {
           const created = (await response.json()) as { sessionId: string };
-          globalThis.location.href = `/app/host/sessions/${encodeURIComponent(created.sessionId)}/edit`;
+          globalThis.location.href = scopedHostRedirectHref(`/app/host/sessions/${encodeURIComponent(created.sessionId)}/edit`);
           return;
         }
 

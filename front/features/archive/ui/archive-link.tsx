@@ -6,6 +6,7 @@ import {
   type LinkProps as RouterLinkProps,
 } from "react-router-dom";
 import { rememberReadmatesArchiveScroll } from "@/features/archive/ui/archive-route-continuity";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 type ArchiveLinkProps = Omit<RouterLinkProps, "to"> & {
   to: string;
@@ -18,16 +19,17 @@ function isModifiedEvent(event: MouseEvent<HTMLAnchorElement>) {
 
 function RouterAwareArchiveLink({ to, children, onClick, ...props }: ArchiveLinkProps) {
   const location = useLocation();
+  const resolvedTo = scopedAppLinkTarget(location.pathname, to);
 
   return (
     <RouterLink
       {...props}
-      to={to}
+      to={resolvedTo}
       onClick={(event) => {
         onClick?.(event);
 
         if (!event.defaultPrevented && !isModifiedEvent(event)) {
-          rememberReadmatesArchiveScroll(location.pathname, location.search, to);
+          rememberReadmatesArchiveScroll(location.pathname, location.search, resolvedTo);
         }
       }}
     >

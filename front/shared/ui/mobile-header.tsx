@@ -24,10 +24,27 @@ type MobileHeaderProps = {
   showHostEntry?: boolean;
   authenticated?: boolean;
   publicBasePath?: string;
+  appBasePath?: string;
 };
 
 function prefixedPath(publicBasePath: string, path: string) {
   return publicBasePath ? `${publicBasePath}${path === "/" ? "" : path}` : path;
+}
+
+function prefixedAppPath(appBasePath: string, path: string) {
+  return appBasePath ? `${appBasePath}${path === "/app" ? "" : path.replace(/^\/app/, "")}` : path;
+}
+
+function appPathname(pathname: string) {
+  return pathname.replace(/^\/clubs\/[^/]+(?=\/app(?:\/|$))/, "");
+}
+
+function scopeAppBackTarget(target: HeaderBackTarget | null, appBasePath: string): HeaderBackTarget | null {
+  if (!target || !target.href.startsWith("/app")) {
+    return target;
+  }
+
+  return { ...target, href: prefixedAppPath(appBasePath, target.href) };
 }
 
 function publicTitle(pathname: string, publicBasePath = "") {
@@ -267,10 +284,10 @@ function GuestMobileHeader({ authenticated, publicBasePath = "" }: { authenticat
   );
 }
 
-function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHostEntry: boolean): HeaderAction | null {
+function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHostEntry: boolean, appBasePath: string): HeaderAction | null {
   if (variant === "host") {
     return {
-      href: "/app",
+      href: prefixedAppPath(appBasePath, "/app"),
       label: "멤버",
       ariaLabel: READMATES_WORKSPACE_LABELS.memberWorkspaceReturn,
       icon: "workspace-switch",
@@ -279,7 +296,7 @@ function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHost
 
   if (showHostEntry) {
     return {
-      href: "/app/host",
+      href: prefixedAppPath(appBasePath, "/app/host"),
       label: "운영",
       ariaLabel: READMATES_WORKSPACE_LABELS.hostWorkspace,
       icon: "workspace-switch",
@@ -292,28 +309,32 @@ function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHost
 function AppMobileHeader({
   variant,
   showHostEntry = false,
+  appBasePath = "",
 }: {
   variant: Exclude<MobileHeaderVariant, "guest">;
   showHostEntry?: boolean;
+  appBasePath?: string;
 }) {
   const location = useLocation();
   const pathname = location.pathname;
+  const appPath = appPathname(pathname);
 
   return (
     <HeaderShell
       workspace={variant}
       kicker={variant === "host" ? "호스트" : null}
-      title={appTitle(variant, pathname)}
-      backTarget={appBackTarget(variant, pathname, location.state)}
-      rightAction={appRightAction(variant, showHostEntry)}
+      title={appTitle(variant, appPath)}
+      backTarget={scopeAppBackTarget(appBackTarget(variant, appPath, location.state), appBasePath)}
+      rightAction={appRightAction(variant, showHostEntry, appBasePath)}
+      brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
     />
   );
 }
 
-export function MobileHeader({ variant, showHostEntry, authenticated, publicBasePath }: MobileHeaderProps) {
+export function MobileHeader({ variant, showHostEntry, authenticated, publicBasePath, appBasePath }: MobileHeaderProps) {
   if (variant === "guest") {
     return <GuestMobileHeader authenticated={authenticated} publicBasePath={publicBasePath} />;
   }
 
-  return <AppMobileHeader variant={variant} showHostEntry={showHostEntry} />;
+  return <AppMobileHeader variant={variant} showHostEntry={showHostEntry} appBasePath={appBasePath} />;
 }

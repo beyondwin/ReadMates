@@ -23,6 +23,7 @@ type TopNavProps = {
   showHostEntry?: boolean;
   authenticated?: boolean;
   publicBasePath?: string;
+  appBasePath?: string;
 };
 
 const memberLinks: NavLink[] = [
@@ -104,6 +105,21 @@ const memberReturnLink: NavLink = {
 
 function prefixedPath(publicBasePath: string, path: string) {
   return publicBasePath ? `${publicBasePath}${path === "/" ? "" : path}` : path;
+}
+
+function prefixedAppPath(appBasePath: string, path: string) {
+  return appBasePath ? `${appBasePath}${path === "/app" ? "" : path.replace(/^\/app/, "")}` : path;
+}
+
+function appPathname(pathname: string) {
+  return pathname.replace(/^\/clubs\/[^/]+(?=\/app(?:\/|$))/, "");
+}
+
+function scopedAppLink(link: NavLink, appBasePath: string): NavLink {
+  return {
+    ...link,
+    href: prefixedAppPath(appBasePath, link.href),
+  };
 }
 
 function guestLinks(publicBasePath: string): NavLink[] {
@@ -241,31 +257,35 @@ function AppTopNav({
   variant,
   memberName,
   showHostEntry,
+  appBasePath = "",
 }: {
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
   showHostEntry?: boolean;
+  appBasePath?: string;
 }) {
   const pathname = useLocation().pathname;
-  const links = variant === "host" ? hostLinks : memberLinks;
+  const appPath = appPathname(pathname);
+  const links = (variant === "host" ? hostLinks : memberLinks).map((link) => scopedAppLink(link, appBasePath));
   const workspaceAction = variant === "host" ? memberReturnLink : showHostEntry ? hostEntryLink : null;
+  const scopedWorkspaceAction = workspaceAction ? scopedAppLink(workspaceAction, appBasePath) : null;
 
   return (
     <TopNavFrame
-      brandHref={variant === "host" ? "/app/host" : "/app"}
+      brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
       navLabel="앱 내비게이션"
       links={links}
-      pathname={pathname}
+      pathname={appPath}
       memberName={memberName}
-      workspaceAction={workspaceAction}
+      workspaceAction={scopedWorkspaceAction}
     />
   );
 }
 
-export function TopNav({ variant = "guest", memberName, showHostEntry, authenticated, publicBasePath }: TopNavProps) {
+export function TopNav({ variant = "guest", memberName, showHostEntry, authenticated, publicBasePath, appBasePath }: TopNavProps) {
   if (variant === "guest") {
     return <GuestTopNav authenticated={authenticated} publicBasePath={publicBasePath} />;
   }
 
-  return <AppTopNav variant={variant} memberName={memberName} showHostEntry={showHostEntry} />;
+  return <AppTopNav variant={variant} memberName={memberName} showHostEntry={showHostEntry} appBasePath={appBasePath} />;
 }

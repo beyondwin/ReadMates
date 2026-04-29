@@ -1,4 +1,10 @@
-import { Link as RouterLink, useInRouterContext, type LinkProps as RouterLinkProps } from "react-router-dom";
+import {
+  Link as RouterLink,
+  useInRouterContext,
+  useLocation,
+  type LinkProps as RouterLinkProps,
+} from "react-router-dom";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 type FeedbackLinkProps = RouterLinkProps & {
   to: string;
@@ -15,8 +21,14 @@ export function Link({ to, children, state, ...props }: FeedbackLinkProps) {
     );
   }
 
+  return <RouterAwareFeedbackLink {...props} to={to} state={state}>{children}</RouterAwareFeedbackLink>;
+}
+
+function RouterAwareFeedbackLink({ to, children, state, ...props }: FeedbackLinkProps) {
+  const location = useLocation();
+
   return (
-    <RouterLink {...props} to={to} state={state}>
+    <RouterLink {...props} to={scopedAppLinkTarget(location.pathname, to)} state={state}>
       {children}
     </RouterLink>
   );

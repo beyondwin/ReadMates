@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AuthMeResponse, MembershipStatus } from "@/shared/auth/auth-contracts";
+import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import {
   canEditOwnProfile,
   canReadMemberContent,
@@ -7,6 +8,11 @@ import {
   canUseMemberApp,
   canWriteMemberActivity,
 } from "@/shared/auth/member-app-access";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  window.history.pushState({}, "", "/");
+});
 
 const readableStatuses: MembershipStatus[] = ["VIEWER", "ACTIVE", "SUSPENDED"];
 const blockedStatuses: MembershipStatus[] = ["LEFT", "INACTIVE", "INVITED"];
@@ -44,6 +50,13 @@ const anonymousAuth: AuthMeResponse = {
   membershipStatus: null,
   approvalState: "ANONYMOUS",
 };
+
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 describe("member app access helpers", () => {
   it.each(readableStatuses)("allows authenticated %s members to read member content", (membershipStatus) => {
@@ -85,5 +98,38 @@ describe("member app access helpers", () => {
     expect(canEditOwnProfile(authForStatus("VIEWER", { role: "HOST" }))).toBe(false);
     expect(canEditOwnProfile(authForStatus("SUSPENDED", { role: "HOST" }))).toBe(false);
     expect(canEditOwnProfile(anonymousAuth)).toBe(false);
+  });
+
+  it("passes club slug context to the member app auth endpoint", async () => {
+    const auth = authForStatus("ACTIVE");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(auth));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(loadMemberAppAuth({ clubSlug: "reading-sai" })).resolves.toEqual({
+      auth,
+      allowed: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("does not use stale scoped browser location for unscoped member app auth", async () => {
+    const auth = authForStatus("ACTIVE");
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(auth));
+    vi.stubGlobal("fetch", fetchMock);
+    window.history.pushState({}, "", "/clubs/reading-sai/app");
+
+    await expect(loadMemberAppAuth({ params: {} })).resolves.toEqual({
+      auth,
+      allowed: true,
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 });

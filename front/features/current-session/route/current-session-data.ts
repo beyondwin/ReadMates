@@ -1,4 +1,4 @@
-import { redirect, type ActionFunctionArgs } from "react-router-dom";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router-dom";
 import {
   getCurrentSession,
   saveCurrentSessionCheckin,
@@ -8,9 +8,8 @@ import {
   updateCurrentSessionRsvp,
 } from "@/features/current-session/api/current-session-api";
 import type { RsvpStatus } from "@/features/current-session/api/current-session-contracts";
-import { readmatesFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import { canUseMemberApp } from "@/shared/auth/member-app-access";
+import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 
 type CurrentSessionActionIntent = "rsvp" | "checkin" | "questions" | "longReview" | "oneLineReview";
 
@@ -28,24 +27,20 @@ export type CurrentSessionRouteData = {
   current: Awaited<ReturnType<typeof getCurrentSession>>;
 };
 
-export async function loadCurrentSessionRouteData(): Promise<CurrentSessionRouteData> {
-  const auth = await readmatesFetch<AuthMeResponse>("/api/auth/me");
+export async function loadCurrentSessionRouteData(args?: Pick<LoaderFunctionArgs, "params">): Promise<CurrentSessionRouteData> {
+  const { auth, allowed } = await loadMemberAppAuth(args);
 
-  if (!auth.authenticated) {
-    throw redirect("/login");
-  }
-
-  if (!canUseMemberApp(auth)) {
+  if (!allowed) {
     return { auth, current: { currentSession: null } };
   }
 
-  const current = await getCurrentSession();
+  const current = await getCurrentSession({ clubSlug: clubSlugFromLoaderArgs(args) });
 
   return { auth, current };
 }
 
-export async function currentSessionLoader(): Promise<CurrentSessionRouteData> {
-  return loadCurrentSessionRouteData();
+export async function currentSessionLoader(args?: LoaderFunctionArgs): Promise<CurrentSessionRouteData> {
+  return loadCurrentSessionRouteData(args);
 }
 
 function badRequest(message: string) {

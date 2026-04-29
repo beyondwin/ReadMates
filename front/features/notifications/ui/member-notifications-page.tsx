@@ -1,4 +1,6 @@
 import type { MouseEvent } from "react";
+import { useInRouterContext, useLocation } from "react-router-dom";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 type NotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
@@ -80,6 +82,24 @@ function isPrimaryLinkActivation(event: MouseEvent<HTMLAnchorElement>) {
 }
 
 export function MemberNotificationsPage({
+  ...props
+}: MemberNotificationsPageProps) {
+  const inRouter = useInRouterContext();
+
+  if (inRouter) {
+    return <RouterAwareMemberNotificationsPage {...props} />;
+  }
+
+  return <MemberNotificationsPageContent {...props} routePathname={globalThis.location?.pathname ?? ""} />;
+}
+
+function RouterAwareMemberNotificationsPage(props: MemberNotificationsPageProps) {
+  const location = useLocation();
+
+  return <MemberNotificationsPageContent {...props} routePathname={location.pathname} />;
+}
+
+function MemberNotificationsPageContent({
   unreadCount,
   items,
   pendingReadIds = EMPTY_PENDING_READ_IDS,
@@ -88,7 +108,8 @@ export function MemberNotificationsPage({
   onMarkRead,
   onMarkAllRead,
   onOpenNotification,
-}: MemberNotificationsPageProps) {
+  routePathname,
+}: MemberNotificationsPageProps & { routePathname: string }) {
   const unreadLabel = unreadCount > 0 ? `읽지 않은 알림 ${unreadCount}개` : "새 알림이 없습니다";
   const readAllDisabled = unreadCount === 0 || markAllReadPending;
 
@@ -141,7 +162,7 @@ export function MemberNotificationsPage({
             <div style={{ display: "grid", gap: 6 }}>
               {items.map((item) => {
                 const unread = item.readAt === null;
-                const href = notificationHref(item.deepLinkPath);
+                const href = scopedAppLinkTarget(routePathname, notificationHref(item.deepLinkPath));
                 const readPending = pendingReadIds.has(item.id) || markAllReadPending;
 
                 return (

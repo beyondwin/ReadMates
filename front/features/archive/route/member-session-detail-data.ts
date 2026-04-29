@@ -5,6 +5,7 @@ import type {
   NoteFeedItem,
 } from "@/features/archive/api/archive-contracts";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
+import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 export type MemberSessionDetailRouteData = Awaited<ReturnType<typeof fetchMemberArchiveSession>>;
 
@@ -43,7 +44,8 @@ export function enrichSessionDetailHighlightAuthors(
 export async function memberSessionDetailLoader({
   params,
 }: LoaderFunctionArgs): Promise<MemberSessionDetailRouteData> {
-  const access = await loadArchiveMemberAuth();
+  const access = await loadArchiveMemberAuth({ params });
+  const context = { clubSlug: clubSlugFromLoaderArgs({ params }) };
 
   if (!access.allowed) {
     return null;
@@ -53,14 +55,14 @@ export async function memberSessionDetailLoader({
     return null;
   }
 
-  const session = await fetchMemberArchiveSession(params.sessionId);
+  const session = await fetchMemberArchiveSession(params.sessionId, context);
 
   if (!session || session.publicHighlights.every((highlight) => highlight.authorName)) {
     return session;
   }
 
   try {
-    return enrichSessionDetailHighlightAuthors(session, await fetchNotesFeed(session.sessionId));
+    return enrichSessionDetailHighlightAuthors(session, await fetchNotesFeed(session.sessionId, context));
   } catch {
     return session;
   }

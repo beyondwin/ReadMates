@@ -82,6 +82,48 @@ describe("Cloudflare BFF function", () => {
     );
   });
 
+  it("forwards a route-selected club slug as trusted server context", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/me?clubSlug=reading-sai", {
+          headers: {
+            "X-Readmates-Club-Slug": "attacker-club",
+          },
+        }),
+        {
+          path: ["api", "auth", "me"],
+        },
+      ),
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/auth/me?clubSlug=reading-sai",
+      expect.any(Object),
+    );
+    expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
+  });
+
+  it("rejects invalid route-selected club slugs before calling upstream", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/me?clubSlug=bad--slug"),
+        {
+          path: ["api", "auth", "me"],
+        },
+      ),
+    );
+
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("falls back to first x-forwarded-for value for client ip handoff", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

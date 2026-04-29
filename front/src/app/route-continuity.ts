@@ -52,7 +52,10 @@ function toSafeReadmatesHref(value: string, scope: "app" | "public") {
       return null;
     }
 
-    const isAppHref = url.pathname === "/app" || url.pathname.startsWith("/app/");
+    const isAppHref =
+      url.pathname === "/app" ||
+      url.pathname.startsWith("/app/") ||
+      /^\/clubs\/[^/]+\/app(?:\/|$)/.test(url.pathname);
     const isPublicHref = url.pathname === "/" || url.pathname === "/records" || url.pathname.startsWith("/sessions/");
 
     if ((scope === "app" && !isAppHref) || (scope === "public" && !isPublicHref)) {
