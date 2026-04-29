@@ -30,7 +30,7 @@ class NotificationEventServiceTest {
         val event = outbox.recorded.single()
         assertThat(event.clubId).isEqualTo(clubId)
         assertThat(event.eventType).isEqualTo(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED)
-        assertThat(event.aggregateType).isEqualTo("session")
+        assertThat(event.aggregateType).isEqualTo("SESSION")
         assertThat(event.aggregateId).isEqualTo(sessionId)
         assertThat(event.payload).isEqualTo(
             NotificationEventPayload(
@@ -60,7 +60,7 @@ class NotificationEventServiceTest {
         val event = outbox.recorded.single()
         assertThat(event.clubId).isEqualTo(clubId)
         assertThat(event.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
-        assertThat(event.aggregateType).isEqualTo("session")
+        assertThat(event.aggregateType).isEqualTo("SESSION")
         assertThat(event.aggregateId).isEqualTo(sessionId)
         assertThat(event.payload).isEqualTo(
             NotificationEventPayload(
@@ -90,7 +90,7 @@ class NotificationEventServiceTest {
 
         val event = outbox.recorded.single()
         assertThat(event.eventType).isEqualTo(NotificationEventType.REVIEW_PUBLISHED)
-        assertThat(event.aggregateType).isEqualTo("session")
+        assertThat(event.aggregateType).isEqualTo("SESSION")
         assertThat(event.aggregateId).isEqualTo(sessionId)
         assertThat(event.payload).isEqualTo(
             NotificationEventPayload(

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.util.UUID
 
-private const val SESSION_AGGREGATE_TYPE = "session"
+private const val SESSION_AGGREGATE_TYPE = "SESSION"
 
 @Service
 class NotificationEventService(

@@ -168,7 +168,7 @@ private fun publishingItem(
         id = id,
         clubId = clubId,
         eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-        aggregateType = "session",
+        aggregateType = "SESSION",
         aggregateId = aggregateId,
         payload = NotificationEventPayload(sessionId = aggregateId),
         status = NotificationEventOutboxStatus.PUBLISHING,

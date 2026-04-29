@@ -94,7 +94,7 @@ class JdbcNotificationEventOutboxAdapter(
               uuid(),
               sessions.club_id,
               'SESSION_REMINDER_DUE',
-              'session',
+              'SESSION',
               sessions.id,
               json_object(
                 'sessionId', sessions.id,
