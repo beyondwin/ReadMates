@@ -128,7 +128,7 @@ Kafka relay/consumer와 실제 SMTP 발송은 아래 조건이 모두 맞을 때
 
 - 호스트가 피드백 문서를 업로드하면 참석 완료(`ATTENDED`)한 활성 멤버 대상으로 `FEEDBACK_DOCUMENT_PUBLISHED` 알림을 생성합니다.
 - 호스트가 예정 세션 공개 범위를 `MEMBER` 또는 `PUBLIC`으로 바꾸면 활성 멤버 대상으로 `NEXT_BOOK_PUBLISHED` 알림을 생성합니다.
-- worker scheduler가 기본 `Asia/Seoul` 기준 매일 자정에 다음 날 세션 대상 `SESSION_REMINDER_DUE` 알림을 생성합니다.
+- `SESSION_REMINDER_DUE` 이벤트 타입, `recordSessionReminderDue(targetDate)` API, 기본 켜짐 선호도는 지원하지만 현재 운영 코드에는 이 이벤트를 매일 생성하는 production scheduler/caller가 없습니다.
 - 멤버가 발행된 공개 회차에 공개 서평을 저장하면 `REVIEW_PUBLISHED` 알림을 생성합니다. 이 알림은 멤버가 직접 켜야 하는 opt-in 알림입니다.
 
 멤버 알림 설정 기본값:
