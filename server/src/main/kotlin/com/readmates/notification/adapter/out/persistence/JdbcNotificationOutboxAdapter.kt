@@ -64,12 +64,16 @@ class JdbcNotificationOutboxAdapter(
             join users on users.id = memberships.user_id
             join sessions on sessions.id = session_participants.session_id
               and sessions.club_id = session_participants.club_id
+            left join notification_preferences on notification_preferences.membership_id = memberships.id
+              and notification_preferences.club_id = memberships.club_id
             where session_participants.club_id = ?
               and session_participants.session_id = ?
               and session_participants.participation_status = 'ACTIVE'
               and session_participants.attendance_status = 'ATTENDED'
               and memberships.status = 'ACTIVE'
               and sessions.state in ('CLOSED', 'PUBLISHED')
+              and coalesce(notification_preferences.email_enabled, true)
+              and coalesce(notification_preferences.feedback_document_published_enabled, true)
             """.trimIndent(),
             { resultSet, _ -> resultSet.toSessionNotificationRecipient() },
             clubId.dbString(),
@@ -109,11 +113,15 @@ class JdbcNotificationOutboxAdapter(
             from memberships
             join users on users.id = memberships.user_id
             join sessions on sessions.club_id = memberships.club_id
+            left join notification_preferences on notification_preferences.membership_id = memberships.id
+              and notification_preferences.club_id = memberships.club_id
             where memberships.club_id = ?
               and sessions.id = ?
               and memberships.status = 'ACTIVE'
               and sessions.state = 'DRAFT'
               and sessions.visibility in ('MEMBER', 'PUBLIC')
+              and coalesce(notification_preferences.email_enabled, true)
+              and coalesce(notification_preferences.next_book_published_enabled, true)
             """.trimIndent(),
             { resultSet, _ -> resultSet.toSessionNotificationRecipient() },
             clubId.dbString(),
@@ -155,10 +163,14 @@ class JdbcNotificationOutboxAdapter(
             from sessions
             join memberships on memberships.club_id = sessions.club_id
             join users on users.id = memberships.user_id
+            left join notification_preferences on notification_preferences.membership_id = memberships.id
+              and notification_preferences.club_id = memberships.club_id
             where sessions.session_date = ?
               and sessions.state in ('DRAFT', 'OPEN')
               and sessions.visibility in ('MEMBER', 'PUBLIC')
               and memberships.status = 'ACTIVE'
+              and coalesce(notification_preferences.email_enabled, true)
+              and coalesce(notification_preferences.session_reminder_due_enabled, true)
             """.trimIndent(),
             { resultSet, _ -> resultSet.toReminderNotificationRecipient() },
             targetDate,
