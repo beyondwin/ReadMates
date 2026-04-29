@@ -1833,7 +1833,7 @@ git commit -m "feat: add member notification inbox api"
 - Create or modify: `server/src/main/kotlin/com/readmates/notification/application/service/HostNotificationOperationsService.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt`
 
-- [ ] **Step 1: Update host controller tests**
+- [x] **Step 1: Update host controller tests**
 
 In `HostNotificationControllerTest.kt`, replace old outbox item assertions with event/delivery assertions:
 
@@ -1853,7 +1853,7 @@ mockMvc.get("/api/host/notifications/deliveries")
     }
 ```
 
-- [ ] **Step 2: Run host notification tests to verify failure**
+- [x] **Step 2: Run host notification tests to verify failure**
 
 Run:
 
@@ -1863,7 +1863,7 @@ Run:
 
 Expected: FAIL because event and delivery endpoints do not exist.
 
-- [ ] **Step 3: Add host DTOs**
+- [x] **Step 3: Add host DTOs**
 
 Add response DTOs:
 
@@ -1890,7 +1890,7 @@ data class HostNotificationDeliveryResponse(
 )
 ```
 
-- [ ] **Step 4: Add endpoints**
+- [x] **Step 4: Add endpoints**
 
 In `HostNotificationController.kt`, add:
 
@@ -1915,7 +1915,7 @@ fun deliveries(
 
 Keep existing test mail endpoints.
 
-- [ ] **Step 5: Implement host operations service methods**
+- [x] **Step 5: Implement host operations service methods**
 
 Extend `ManageHostNotificationsUseCase` with:
 
@@ -1926,7 +1926,7 @@ fun listDeliveries(host: CurrentMember, status: NotificationDeliveryStatus?, cha
 
 Implement methods in `HostNotificationOperationsService`, requiring `host.isHost` and always scoping by `host.clubId`.
 
-- [ ] **Step 6: Run host tests**
+- [x] **Step 6: Run host tests**
 
 Run:
 
@@ -1936,7 +1936,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/in/web/HostNotificationController.kt server/src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt server/src/main/kotlin/com/readmates/notification/application/service/HostNotificationOperationsService.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt
