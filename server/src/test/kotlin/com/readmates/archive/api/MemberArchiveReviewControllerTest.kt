@@ -16,6 +16,8 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.put
 
 private const val CLEANUP_ARCHIVE_REVIEW_NOTIFICATION_SQL = """
+    delete from notification_event_outbox
+    where event_type = 'REVIEW_PUBLISHED';
     delete from notification_outbox
     where event_type = 'REVIEW_PUBLISHED';
     delete from notification_preferences
@@ -50,7 +52,7 @@ class MemberArchiveReviewControllerTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
     @Test
-    fun `member saves public long review for published session and notifies opted-in peers`() {
+    fun `member saves public long review for published session and records notification event`() {
         enableReviewPublished("member2@example.com")
 
         mockMvc.put("/api/archive/sessions/00000000-0000-0000-0000-000000000306/my-long-review") {
@@ -63,16 +65,33 @@ class MemberArchiveReviewControllerTest(
             jsonPath("$.body") { value("발행된 회차에 새로 공개하는 서평입니다.") }
         }
 
-        val notifications = jdbcTemplate.queryForObject(
+        val authorMembershipId = jdbcTemplate.queryForObject(
             """
-            select count(*)
-            from notification_outbox
-            where event_type = 'REVIEW_PUBLISHED'
-              and recipient_email = 'member2@example.com'
+            select memberships.id
+            from memberships
+            join users on users.id = memberships.user_id
+            where users.email = 'member1@example.com'
+              and memberships.club_id = '00000000-0000-0000-0000-000000000001'
             """.trimIndent(),
-            Int::class.java,
+            String::class.java,
         )
-        assertThat(notifications).isEqualTo(1)
+
+        val event = jdbcTemplate.queryForMap(
+            """
+            select
+              dedupe_key,
+              json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+              json_unquote(json_extract(payload_json, '$.authorMembershipId')) as author_membership_id
+            from notification_event_outbox
+            where event_type = 'REVIEW_PUBLISHED'
+              and aggregate_id = '00000000-0000-0000-0000-000000000306'
+            """.trimIndent(),
+        )
+        assertThat(event["dedupe_key"]).isEqualTo(
+            "review-published:00000000-0000-0000-0000-000000000306:$authorMembershipId",
+        )
+        assertThat(event["session_id"]).isEqualTo("00000000-0000-0000-0000-000000000306")
+        assertThat(event["author_membership_id"]).isEqualTo(authorMembershipId)
     }
 
     private fun enableReviewPublished(email: String) {

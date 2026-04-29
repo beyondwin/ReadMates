@@ -13,8 +13,8 @@ import java.time.LocalDate
 import java.util.UUID
 
 interface RecordNotificationEventUseCase {
-    fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID)
-    fun recordNextBookPublished(clubId: UUID, sessionId: UUID)
+    fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID, documentVersion: Int)
+    fun recordNextBookPublished(clubId: UUID, sessionId: UUID, sessionNumber: Int, bookTitle: String)
     fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID)
     fun recordSessionReminderDue(targetDate: LocalDate)
 }
