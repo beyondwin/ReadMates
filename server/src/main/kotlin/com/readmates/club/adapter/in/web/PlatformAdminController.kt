@@ -6,6 +6,7 @@ import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminDashboardSummary
 import com.readmates.club.application.model.desiredState
 import com.readmates.club.application.model.manualAction
+import com.readmates.club.application.port.`in`.CheckClubDomainProvisioningUseCase
 import com.readmates.club.application.port.`in`.CreateClubDomainUseCase
 import com.readmates.club.application.port.`in`.PlatformAdminSummaryUseCase
 import com.readmates.club.domain.ClubDomainKind
@@ -24,6 +25,7 @@ import java.util.UUID
 class PlatformAdminController(
     private val platformAdminSummaryUseCase: PlatformAdminSummaryUseCase,
     private val createClubDomainUseCase: CreateClubDomainUseCase,
+    private val checkClubDomainProvisioningUseCase: CheckClubDomainProvisioningUseCase,
 ) {
     @GetMapping("/summary")
     fun summary(admin: CurrentPlatformAdmin): PlatformAdminSummaryResponse =
@@ -44,6 +46,18 @@ class PlatformAdminController(
                     kind = request.kind,
                     isPrimary = request.isPrimary ?: false,
                 ),
+            ),
+        )
+
+    @PostMapping("/domains/{domainId}/check")
+    fun checkClubDomainProvisioning(
+        admin: CurrentPlatformAdmin,
+        @PathVariable domainId: UUID,
+    ): PlatformAdminDomainResponse =
+        PlatformAdminDomainResponse.from(
+            checkClubDomainProvisioningUseCase.checkClubDomainProvisioning(
+                admin = admin,
+                domainId = domainId,
             ),
         )
 }

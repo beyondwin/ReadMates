@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
 import { PlatformAdminDashboard } from "@/features/platform-admin/ui/platform-admin-dashboard";
@@ -224,6 +225,96 @@ describe("platform admin frontend shell", () => {
     expect(screen.getByText("failed.example.test")).toBeInTheDocument();
     expect(screen.getByText("FAILED")).toBeInTheDocument();
     expect(screen.getByText("DNS_NOT_CONNECTED")).toBeInTheDocument();
+  });
+
+  it("runs domain status check from the platform admin route", async () => {
+    const ownerAuth: AuthMeResponse = {
+      ...baseAuth,
+      platformAdmin: {
+        userId: "user-1",
+        email: "owner@example.com",
+        role: "OWNER",
+      },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(new Response(JSON.stringify(ownerAuth), { status: 200 }));
+      }
+
+      if (url === "/api/bff/api/admin/summary") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              platformRole: "OWNER",
+              activeClubCount: 2,
+              domainActionRequiredCount: 1,
+              domains: [
+                {
+                  id: "domain-1",
+                  clubId: "club-1",
+                  hostname: "reading-sai.example.test",
+                  kind: "SUBDOMAIN",
+                  status: "ACTION_REQUIRED",
+                  desiredState: "ENABLED",
+                  manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
+                  errorCode: null,
+                  isPrimary: false,
+                  verifiedAt: null,
+                  lastCheckedAt: null,
+                },
+              ],
+              domainsRequiringAction: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/domains/domain-1/check") {
+        expect(init?.method).toBe("POST");
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: "domain-1",
+              clubId: "club-1",
+              hostname: "reading-sai.example.test",
+              kind: "SUBDOMAIN",
+              status: "ACTIVE",
+              desiredState: "ENABLED",
+              manualAction: "NONE",
+              errorCode: null,
+              isPrimary: false,
+              verifiedAt: "2026-04-30T01:00:00Z",
+              lastCheckedAt: "2026-04-30T01:00:00Z",
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
+    const user = userEvent.setup();
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /상태 확인/ }));
+
+    expect(await screen.findByText("ACTIVE")).toBeInTheDocument();
+    expect(screen.getByText("추가 조치 없음")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/admin/domains/domain-1/check",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("mounts the platform admin route at /admin", async () => {

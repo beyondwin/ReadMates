@@ -32,6 +32,11 @@ data class PlatformAdminClubDomain(
     val errorCode: String?,
 )
 
+data class ClubDomainActualCheckResult(
+    val status: ClubDomainStatus,
+    val errorCode: String?,
+)
+
 enum class PlatformAdminDomainDesiredState {
     ENABLED,
     DISABLED,

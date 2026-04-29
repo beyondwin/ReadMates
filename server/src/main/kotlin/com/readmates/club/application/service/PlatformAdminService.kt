@@ -3,15 +3,22 @@ package com.readmates.club.application.service
 import com.readmates.club.application.model.CreateClubDomainCommand
 import com.readmates.club.application.model.PlatformAdminDashboardSummary
 import com.readmates.club.application.model.PlatformAdminClubDomain
+import com.readmates.club.application.port.`in`.CheckClubDomainProvisioningUseCase
 import com.readmates.club.application.port.`in`.CreateClubDomainUseCase
 import com.readmates.club.application.port.`in`.PlatformAdminSummaryUseCase
+import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.application.port.out.CreateClubDomainPort
+import com.readmates.club.application.port.out.LoadClubDomainProvisioningPort
 import com.readmates.club.application.port.out.LoadPlatformAdminSummaryPort
+import com.readmates.club.application.port.out.UpdateClubDomainProvisioningPort
+import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.AccessDeniedException
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.Locale
 import java.util.UUID
 
@@ -19,8 +26,12 @@ import java.util.UUID
 class PlatformAdminService(
     private val summaryPort: LoadPlatformAdminSummaryPort,
     private val createClubDomainPort: CreateClubDomainPort,
+    private val loadClubDomainProvisioningPort: LoadClubDomainProvisioningPort,
+    private val updateClubDomainProvisioningPort: UpdateClubDomainProvisioningPort,
+    private val checkClubDomainActualStatePort: CheckClubDomainActualStatePort,
 ) : PlatformAdminSummaryUseCase,
-    CreateClubDomainUseCase {
+    CreateClubDomainUseCase,
+    CheckClubDomainProvisioningUseCase {
     override fun summary(admin: CurrentPlatformAdmin): PlatformAdminDashboardSummary =
         PlatformAdminDashboardSummary(
             platformRole = admin.role,
@@ -50,6 +61,37 @@ class PlatformAdminService(
             hostname = hostname,
             kind = command.kind,
             isPrimary = command.isPrimary,
+        )
+    }
+
+    override fun checkClubDomainProvisioning(
+        admin: CurrentPlatformAdmin,
+        domainId: UUID,
+    ): PlatformAdminClubDomain {
+        if (!admin.canManageClubDomains) {
+            throw AccessDeniedException("Platform admin role cannot manage club domains")
+        }
+
+        val domain = loadClubDomainProvisioningPort.loadClubDomain(domainId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club domain not found")
+        if (domain.status == ClubDomainStatus.DISABLED) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Disabled club domain cannot be checked")
+        }
+
+        val now = OffsetDateTime.now(ZoneOffset.UTC)
+        val result = checkClubDomainActualStatePort.check(domain.hostname)
+        val status = if (result.status == ClubDomainStatus.ACTIVE) {
+            ClubDomainStatus.ACTIVE
+        } else {
+            ClubDomainStatus.FAILED
+        }
+
+        return updateClubDomainProvisioningPort.updateClubDomainProvisioning(
+            domainId = domainId,
+            status = status,
+            verifiedAt = now.takeIf { status == ClubDomainStatus.ACTIVE },
+            lastCheckedAt = now,
+            errorCode = result.errorCode.takeIf { status == ClubDomainStatus.FAILED },
         )
     }
 

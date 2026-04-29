@@ -17,3 +17,10 @@ interface CreateClubDomainUseCase {
         command: CreateClubDomainCommand,
     ): PlatformAdminClubDomain
 }
+
+interface CheckClubDomainProvisioningUseCase {
+    fun checkClubDomainProvisioning(
+        admin: CurrentPlatformAdmin,
+        domainId: UUID,
+    ): PlatformAdminClubDomain
+}

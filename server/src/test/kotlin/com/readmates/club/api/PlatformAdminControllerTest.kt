@@ -1,6 +1,9 @@
 package com.readmates.club.api
 
 import com.readmates.auth.application.AuthSessionService
+import com.readmates.club.application.model.ClubDomainActualCheckResult
+import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
+import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
@@ -8,6 +11,10 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.http.MediaType
 import org.springframework.security.core.context.SecurityContextHolder
@@ -24,10 +31,12 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
+@Import(PlatformAdminDomainCheckTestConfiguration::class)
 class PlatformAdminControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val domainActualStateChecker: FakeClubDomainActualStateChecker,
 ) {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
@@ -48,6 +57,7 @@ class PlatformAdminControllerTest(
             createdUserIds.clear()
             createdClubDomainIds.clear()
             SecurityContextHolder.clearContext()
+            domainActualStateChecker.reset()
         }
     }
 
@@ -260,6 +270,80 @@ class PlatformAdminControllerTest(
         }
     }
 
+    @Test
+    fun `operator can check custom domain provisioning and activate verified domain`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val hostname = "verified-${UUID.randomUUID()}.example.test"
+        val result = mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(operator))
+        }.andExpect {
+            status { isOk() }
+        }.andReturn()
+        val domainId = checkNotNull(result.response.jsonPathValue<String>("$.id"))
+        createdClubDomainIds += domainId
+        domainActualStateChecker.nextResult = ClubDomainActualCheckResult(
+            status = ClubDomainStatus.ACTIVE,
+            errorCode = null,
+        )
+
+        mockMvc.post("/api/admin/domains/$domainId/check") {
+            cookie(sessionCookieForUser(operator))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(domainId) }
+            jsonPath("$.hostname") { value(hostname) }
+            jsonPath("$.status") { value("ACTIVE") }
+            jsonPath("$.manualAction") { value("NONE") }
+            jsonPath("$.errorCode") { doesNotExist() }
+            jsonPath("$.verifiedAt") { exists() }
+            jsonPath("$.lastCheckedAt") { exists() }
+        }
+    }
+
+    @Test
+    fun `operator can check custom domain provisioning and store failure code`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val hostname = "failed-check-${UUID.randomUUID()}.example.test"
+        val result = mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(operator))
+        }.andExpect {
+            status { isOk() }
+        }.andReturn()
+        val domainId = checkNotNull(result.response.jsonPathValue<String>("$.id"))
+        createdClubDomainIds += domainId
+        domainActualStateChecker.nextResult = ClubDomainActualCheckResult(
+            status = ClubDomainStatus.FAILED,
+            errorCode = "DOMAIN_CHECK_MARKER_MISMATCH",
+        )
+
+        mockMvc.post("/api/admin/domains/$domainId/check") {
+            cookie(sessionCookieForUser(operator))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value(domainId) }
+            jsonPath("$.status") { value("FAILED") }
+            jsonPath("$.manualAction") { value("NONE") }
+            jsonPath("$.errorCode") { value("DOMAIN_CHECK_MARKER_MISMATCH") }
+            jsonPath("$.verifiedAt") { doesNotExist() }
+            jsonPath("$.lastCheckedAt") { exists() }
+        }
+    }
+
+    @Test
+    fun `support platform admin cannot check custom domain provisioning`() {
+        val support = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+
+        mockMvc.post("/api/admin/domains/${UUID.randomUUID()}/check") {
+            cookie(sessionCookieForUser(support))
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
     private fun createPlatformAdminUser(role: String, status: String): String {
         val userId = UUID.randomUUID().toString()
         val email = "platform.${UUID.randomUUID()}@example.com"
@@ -319,3 +403,26 @@ class PlatformAdminControllerTest(
 
 private inline fun <reified T> org.springframework.mock.web.MockHttpServletResponse.jsonPathValue(expression: String): T? =
     com.jayway.jsonpath.JsonPath.read(contentAsString, expression)
+
+@TestConfiguration
+class PlatformAdminDomainCheckTestConfiguration {
+    @Bean
+    @Primary
+    fun fakeClubDomainActualStateChecker(): FakeClubDomainActualStateChecker = FakeClubDomainActualStateChecker()
+}
+
+class FakeClubDomainActualStateChecker : CheckClubDomainActualStatePort {
+    var nextResult: ClubDomainActualCheckResult = ClubDomainActualCheckResult(
+        status = ClubDomainStatus.FAILED,
+        errorCode = "DOMAIN_CHECK_UNCONFIGURED",
+    )
+
+    override fun check(hostname: String): ClubDomainActualCheckResult = nextResult
+
+    fun reset() {
+        nextResult = ClubDomainActualCheckResult(
+            status = ClubDomainStatus.FAILED,
+            errorCode = "DOMAIN_CHECK_UNCONFIGURED",
+        )
+    }
+}

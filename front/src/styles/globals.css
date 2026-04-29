@@ -217,6 +217,16 @@
   color: var(--muted);
 }
 
+.platform-admin-domain-row__check {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.platform-admin-domain-row__error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .rm-route-stage {
   min-height: inherit;
 }

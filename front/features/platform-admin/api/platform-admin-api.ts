@@ -19,3 +19,11 @@ export function createPlatformAdminDomain(clubId: string, request: CreatePlatfor
     { clubSlug: undefined },
   );
 }
+
+export function checkPlatformAdminDomainProvisioning(domainId: string) {
+  return readmatesFetch<PlatformAdminDomainResponse>(
+    `/api/admin/domains/${encodeURIComponent(domainId)}/check`,
+    { method: "POST" },
+    { clubSlug: undefined },
+  );
+}

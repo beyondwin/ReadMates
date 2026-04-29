@@ -113,6 +113,8 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 
 직접 API origin 예시는 공개 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다. 실제 운영 secret, DB password, OAuth secret, OCI OCID, private IP, DB dump는 문서와 Git에 넣지 않습니다.
 
+배포 후 공개 연동 최소 smoke는 `./scripts/smoke-production-integrations.sh`로 실행합니다. 이 script는 Cloudflare Pages marker와 Google OAuth `redirect_uri`를 확인하지만, 실제 운영 결과나 domain 목록은 Git에 기록하지 않습니다.
+
 ## Redis Feature Flags
 
 Redis는 선택 계층입니다. 런타임 환경에 관리형 Redis URL을 placeholder-safe 값으로 설정한 뒤, 기능 flag를 단계적으로 켭니다.
