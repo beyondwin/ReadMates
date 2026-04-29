@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mail.SimpleMailMessage
 import org.springframework.mail.javamail.JavaMailSender
@@ -29,6 +30,8 @@ import java.io.InputStream
 import java.util.Properties
 
 private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
+    delete from notification_test_mail_audit
+    where club_id = '00000000-0000-0000-0000-000000000001';
     delete from notification_outbox
     where dedupe_key like 'host-notification-controller-test-%';
     delete from clubs
@@ -135,6 +138,49 @@ class HostNotificationControllerTest(
 
         assertThat(response).doesNotContain("subject")
         assertThat(response).doesNotContain("member@example.com")
+    }
+
+    @Test
+    fun `host sends test mail and audit stores masked recipient only`() {
+        mockMvc.post("/api/host/notifications/test-mail") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"recipientEmail":"external@example.com"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.recipientEmail") { value("e***@example.com") }
+            jsonPath("$.status") { value("SENT") }
+        }
+
+        val rows = jdbcTemplate.queryForList(
+            """
+            select recipient_masked_email, recipient_email_hash
+            from notification_test_mail_audit
+            where club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+        )
+
+        assertThat(rows).hasSize(1)
+        assertThat(rows.single()["recipient_masked_email"]).isEqualTo("e***@example.com")
+        assertThat(rows.single()["recipient_email_hash"].toString()).matches("^[0-9a-f]{64}$")
+        assertThat(rows.toString()).doesNotContain("external@example.com")
+    }
+
+    @Test
+    fun `host test mail rejects second send within cooldown`() {
+        repeat(2) { index ->
+            mockMvc.post("/api/host/notifications/test-mail") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"recipientEmail":"host@example.com"}"""
+            }.andExpect {
+                if (index == 0) {
+                    status { isOk() }
+                } else {
+                    status { isTooManyRequests() }
+                }
+            }
+        }
     }
 
     @Test

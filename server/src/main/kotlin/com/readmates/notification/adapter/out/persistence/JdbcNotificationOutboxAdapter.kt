@@ -9,6 +9,8 @@ import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.model.NotificationPreferences
+import com.readmates.notification.application.model.NotificationTestMailAuditItem
+import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.notification.application.port.out.NotificationOutboxPort
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
@@ -33,6 +35,7 @@ private const val MAX_LAST_ERROR_LENGTH = 500
 private const val MAX_METADATA_JSON_LENGTH = 4_000
 private const val MAX_METADATA_ENTRIES = 25
 private const val MAX_METADATA_STRING_LENGTH = 200
+private const val TEST_MAIL_AUDIT_LIMIT = 50
 private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
 private val SENSITIVE_METADATA_VALUE_PATTERN = Regex("""(?i)(token|secret|password|passcode|api[-_ ]?key|bearer\s+)""")
 private val HOST_METADATA_KEY_ALLOWLIST = setOf("sessionNumber", "bookTitle")
@@ -567,6 +570,76 @@ class JdbcNotificationOutboxAdapter(
         return getPreferences(member)
     }
 
+    override fun latestTestMailCreatedAt(clubId: UUID, hostMembershipId: UUID): OffsetDateTime? =
+        jdbcTemplate().query(
+            """
+            select created_at
+            from notification_test_mail_audit
+            where club_id = ?
+              and host_membership_id = ?
+            order by created_at desc
+            limit 1
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.utcOffsetDateTime("created_at") },
+            clubId.dbString(),
+            hostMembershipId.dbString(),
+        ).firstOrNull()
+
+    override fun recordTestMailAudit(
+        clubId: UUID,
+        hostMembershipId: UUID,
+        recipientMaskedEmail: String,
+        recipientEmailHash: String,
+        status: NotificationTestMailStatus,
+        lastError: String?,
+    ): NotificationTestMailAuditItem {
+        val id = UUID.randomUUID()
+        jdbcTemplate().update(
+            """
+            insert into notification_test_mail_audit (
+              id,
+              club_id,
+              host_membership_id,
+              recipient_masked_email,
+              recipient_email_hash,
+              status,
+              last_error
+            ) values (?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            id.dbString(),
+            clubId.dbString(),
+            hostMembershipId.dbString(),
+            recipientMaskedEmail,
+            recipientEmailHash,
+            status.name,
+            lastError?.truncateForStorage(),
+        )
+
+        return jdbcTemplate().query(
+            """
+            select id, recipient_masked_email, status, last_error, created_at
+            from notification_test_mail_audit
+            where id = ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
+            id.dbString(),
+        ).single()
+    }
+
+    override fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem> =
+        jdbcTemplate().query(
+            """
+            select id, recipient_masked_email, status, last_error, created_at
+            from notification_test_mail_audit
+            where club_id = ?
+            order by created_at desc
+            limit ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
+            clubId.dbString(),
+            TEST_MAIL_AUDIT_LIMIT,
+        )
+
     private fun insertOutbox(
         clubId: UUID,
         eventType: NotificationEventType,
@@ -743,6 +816,15 @@ class JdbcNotificationOutboxAdapter(
             lastError = getString("last_error"),
             createdAt = utcOffsetDateTime("created_at"),
             updatedAt = utcOffsetDateTime("updated_at"),
+        )
+
+    private fun ResultSet.toNotificationTestMailAuditItem(): NotificationTestMailAuditItem =
+        NotificationTestMailAuditItem(
+            id = uuid("id"),
+            recipientEmail = getString("recipient_masked_email"),
+            status = NotificationTestMailStatus.valueOf(getString("status")),
+            lastError = getString("last_error"),
+            createdAt = utcOffsetDateTime("created_at"),
         )
 
     private fun metadataJson(metadata: Map<String, Any?>): String =

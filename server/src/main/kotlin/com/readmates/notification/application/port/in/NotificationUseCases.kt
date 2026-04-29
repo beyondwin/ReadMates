@@ -4,7 +4,9 @@ import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationPreferences
+import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.shared.security.CurrentMember
 import java.time.LocalDate
 import java.util.UUID
@@ -29,6 +31,11 @@ interface ManageHostNotificationsUseCase {
     fun detail(host: CurrentMember, id: UUID): HostNotificationDetail
     fun retry(host: CurrentMember, id: UUID): HostNotificationDetail
     fun restore(host: CurrentMember, id: UUID): HostNotificationDetail
+}
+
+interface SendNotificationTestMailUseCase {
+    fun sendTestMail(host: CurrentMember, command: SendNotificationTestMailCommand): NotificationTestMailAuditItem
+    fun listTestMailAudit(host: CurrentMember): List<NotificationTestMailAuditItem>
 }
 
 interface ManageNotificationPreferencesUseCase {

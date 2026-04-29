@@ -6,6 +6,8 @@ import com.readmates.notification.application.model.HostNotificationItem
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationPreferences
+import com.readmates.notification.application.model.NotificationTestMailAuditItem
+import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import java.util.UUID
@@ -59,6 +61,18 @@ data class HostNotificationDetailResponse(
     val lastError: String?,
     val createdAt: String,
     val updatedAt: String,
+)
+
+data class SendNotificationTestMailRequest(
+    val recipientEmail: String,
+)
+
+data class NotificationTestMailAuditResponse(
+    val id: UUID,
+    val recipientEmail: String,
+    val status: NotificationTestMailStatus,
+    val lastError: String?,
+    val createdAt: String,
 )
 
 data class NotificationPreferencesRequest(
@@ -132,6 +146,15 @@ fun HostNotificationDetail.toResponse(): HostNotificationDetailResponse =
         lastError = lastError.toHostSafeLastError(),
         createdAt = createdAt.toString(),
         updatedAt = updatedAt.toString(),
+    )
+
+fun NotificationTestMailAuditItem.toResponse(): NotificationTestMailAuditResponse =
+    NotificationTestMailAuditResponse(
+        id = id,
+        recipientEmail = recipientEmail,
+        status = status,
+        lastError = lastError.toHostSafeLastError(),
+        createdAt = createdAt.toString(),
     )
 
 private fun maskEmail(email: String): String {
