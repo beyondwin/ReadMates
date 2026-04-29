@@ -1,14 +1,16 @@
 # 아키텍처
 
-ReadMates는 소규모 정기 독서모임의 공개 소개, 멤버 세션 준비, 호스트 운영, 공개 기록, 참석자 전용 피드백 문서를 하나의 서비스 흐름으로 묶습니다.
+ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 호스트 운영, 공개 기록, 참석자 전용 피드백 문서를 하나의 플랫폼 세션과 클럽별 권한 흐름으로 묶습니다.
 
 ## 제품 표면
 
 | 표면 | 주요 route | 사용자 | 역할 |
 | --- | --- | --- | --- |
-| 공개 사이트 | `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/invite/:token`, `/reset-password/:token` | 게스트, 로그인 사용자 | 모임 소개, 공개 기록, 공개 세션 상세, Google OAuth 시작, 초대 수락 진입, 종료된 비밀번호 경로 안내 |
-| 멤버 앱 | `/app`, `/app/pending`, `/app/session/current`, `/app/notes`, `/app/archive`, `/app/sessions/:sessionId`, `/app/feedback/:sessionId`, `/app/feedback/:sessionId/print`, `/app/me`, `/app/notifications` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 본인 표시 이름과 알림 설정 변경, 멤버 알림함 확인 |
-| 호스트 앱 | `/app/host`, `/app/host/notifications`, `/app/host/members`, `/app/host/invitations`, `/app/host/sessions/new`, `/app/host/sessions/:sessionId/edit` | 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 초대 관리, 멤버 상태와 표시 이름 관리, 피드백 문서 업로드, 알림 발송 운영 |
+| 공개 사이트 | `/clubs/:slug`, `/clubs/:slug/about`, `/clubs/:slug/records`, `/clubs/:slug/sessions/:sessionId`, `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/clubs/:slug/invite/:token`, `/invite/:token`, `/reset-password/:token` | 게스트, 로그인 사용자 | 클럽 소개, 공개 기록, 공개 세션 상세, Google OAuth 시작, 클럽 context가 있는 초대 수락 진입, 종료된 비밀번호 경로 안내. Unscoped public route는 호환성을 위해 baseline club을 사용 |
+| 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
+| 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/notifications`, 등록된 club host의 `/app/**` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 본인 표시 이름과 알림 설정 변경, 클럽별 멤버 알림함 확인 |
+| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 초대 관리, 멤버 상태와 표시 이름 관리, 피드백 문서 업로드, 알림 발송 운영 |
+| 플랫폼 관리 | `/admin` | platform admin | 클럽 생성, 클럽 목록 확인, 등록형 domain alias 요청과 상태 확인. 클럽 호스트/멤버 권한과 별도 권한으로 처리 |
 
 ## 프런트엔드 route-first 경계
 
@@ -54,9 +56,21 @@ Spring Boot API
 MySQL
 ```
 
-Production에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 직접 Spring API origin을 신뢰하지 않고, 같은 origin의 `/api/bff/**`로 요청합니다. Pages Functions는 upstream Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙이고 cookie를 전달합니다.
+Production에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 직접 Spring API origin을 신뢰하지 않고, 같은 origin의 `/api/bff/**`로 요청합니다. Pages Functions는 upstream Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙이고 cookie를 전달합니다. 또한 path fallback의 `clubSlug` query와 요청 host에서 클럽 context를 계산해 Spring으로 신뢰 가능한 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host` header를 전달합니다.
 
-로컬 Vite dev server는 `front/vite.config.ts`의 proxy로 같은 구조를 흉내 냅니다. Cloudflare Pages Functions 코드는 production/preview 배포에서 실행되고, 로컬 개발에서는 Vite proxy가 `/api/bff/**`, `/oauth2/authorization/**`, `/login/oauth2/code/**`를 backend로 넘깁니다.
+로컬 Vite dev server는 `front/vite.config.ts`의 proxy로 같은 구조를 흉내 냅니다. Cloudflare Pages Functions 코드는 production/preview 배포에서 실행되고, 로컬 개발에서는 Vite proxy가 `/api/bff/**`, `/oauth2/authorization/**`, `/login/oauth2/code/**`를 backend로 넘깁니다. 로컬 proxy도 browser-supplied club context header를 제거하고 `clubSlug` query에서 검증한 slug만 trusted header로 다시 붙입니다.
+
+## 멀티 클럽 context와 도메인 모델
+
+`clubs.slug`는 클럽의 내부 canonical key입니다. 무료 플랜에서도 항상 보장되는 공개 URL은 `https://readmates.pages.dev/clubs/:slug`이고, 같은 path 전략은 primary domain을 붙였을 때도 유지됩니다. `club_domains.hostname`은 외부 진입 alias입니다. 등록된 alias는 Cloudflare Pages custom domain에 연결된 뒤 `ACTIVE` 상태일 때 host 기반으로 같은 클럽을 resolve합니다. Primary domain path fallback은 slug로 resolve하며 별도 `club_domains` row를 만들지 않습니다.
+
+클럽 context resolve 순서는 trusted `X-Readmates-Club-Slug`가 먼저이고, 없으면 trusted `X-Readmates-Club-Host`입니다. Spring은 BFF secret을 통과한 요청에서만 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 신뢰합니다. browser가 직접 보낸 같은 이름의 header는 Pages Functions 또는 Vite proxy에서 제거되며, Spring API origin을 직접 호출하는 요청은 운영에서 BFF secret 검증을 통과할 수 없습니다.
+
+로그인 세션은 플랫폼 전체에서 공유합니다. OAuth start는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모읍니다. 성공 후 `returnTo`가 signed return state로 검증되면 클럽 path 또는 등록 host로 되돌리고, 없으면 `/app` smart entry로 이동합니다. Absolute return URL은 primary app host, `readmates.pages.dev`, 또는 `ACTIVE` club domain이면서 session cookie domain 정책으로 세션을 공유할 수 있는 host만 허용합니다. 초대 링크는 token만으로 전역 membership을 만들지 않고, 초대가 속한 club context로 돌아오도록 return URL을 보존합니다.
+
+사용자 역할은 club membership마다 독립적입니다. 현재 club membership role은 `HOST`와 `MEMBER`이고, platform admin 권한은 `platform_admins`의 `OWNER`, `OPERATOR`, `SUPPORT`로 별도 판정합니다. Platform `OPERATOR`는 club host가 아니며, 특정 클럽의 호스트 도구를 쓰려면 그 클럽 membership에서도 `HOST` 권한이 있어야 합니다.
+
+Public cache, 멤버 알림 deep link, host 알림 운영 ledger는 club id 또는 club slug를 포함해 scope를 나눕니다. 공개 cache key는 club id 기준으로 분리하고, 알림 link는 `/clubs/:slug/app/**` canonical path를 사용해 로그인 후에도 원래 클럽 화면으로 복귀합니다.
 
 ## 서버 내부 구조
 
@@ -103,13 +117,13 @@ notification
 
 운영 로그인은 Google OAuth입니다.
 
-1. 브라우저가 `/oauth2/authorization/google`로 이동합니다.
-2. Pages Functions가 Spring `/oauth2/authorization/google`로 proxy합니다.
+1. 브라우저가 `/oauth2/authorization/google`로 이동합니다. 초대 수락처럼 원래 클럽으로 돌아와야 하는 흐름은 `returnTo`를 함께 보냅니다.
+2. Pages Functions가 Spring `/oauth2/authorization/google`로 proxy하고, 현재 host 또는 slug에서 계산한 club context header를 붙입니다.
 3. Spring Security가 Google OAuth flow를 시작합니다.
-4. callback은 Pages origin의 `/login/oauth2/code/google`로 돌아옵니다.
+4. callback은 `READMATES_AUTH_BASE_URL`이 가리키는 primary auth origin의 `/login/oauth2/code/google`로 돌아옵니다. Primary auth origin을 따로 두지 않은 preview나 무료 플랜 기본 배포에서는 `https://readmates.pages.dev/login/oauth2/code/google`을 사용합니다.
 5. Pages Functions가 callback을 Spring으로 proxy합니다.
-6. Spring이 Google 사용자 정보를 확인하고 membership 상태를 반영합니다.
-7. 성공하면 Spring이 `readmates_session` cookie를 발급하고 app origin으로 redirect합니다.
+6. Spring이 Google 사용자 정보를 확인하고 platform session을 복원하거나 생성합니다.
+7. `returnTo`가 검증된 signed return state로 저장되어 있으면 허용된 primary origin, `readmates.pages.dev` fallback, 또는 등록된 active club host로 redirect합니다. 없으면 `/app` smart entry로 redirect합니다.
 
 `readmates_session` cookie는 `HttpOnly`, `SameSite=Lax`, production `Secure` posture를 사용합니다. 서버는 raw token을 저장하지 않고 hash를 `auth_sessions`에 저장합니다. API 요청마다 session cookie에서 현재 사용자를 복원하고, membership/role 상태를 기준으로 route와 API 접근을 제한합니다.
 
@@ -120,6 +134,8 @@ Password login과 password reset endpoint는 현재 운영 경로가 아니며 `
 Spring은 `/api/**` 요청에서 `X-Readmates-Bff-Secret`을 검사할 수 있습니다. `READMATES_BFF_SECRET`이 설정되어 있으면 요청 header 값이 일치해야 합니다.
 
 Mutating method인 `POST`, `PUT`, `PATCH`, `DELETE`는 `Origin` 또는 `Referer`가 `READMATES_ALLOWED_ORIGINS` 또는 `READMATES_APP_BASE_URL`에서 파생된 허용 origin에 포함되어야 합니다.
+
+클럽 context header도 BFF 신뢰 경계 안에 있습니다. Spring은 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 browser input으로 취급하지 않고, BFF secret을 통과한 요청에서만 context resolve 입력으로 사용합니다. 허용 origin은 primary auth/app origin, `https://readmates.pages.dev`, 등록된 active club host를 명시적으로 포함해야 하며 wildcard suffix로 넓게 열지 않습니다.
 
 `READMATES_BFF_SECRET`은 Cloudflare Pages Functions와 Spring runtime 설정에만 둡니다. `VITE_` 또는 `NEXT_PUBLIC_` 접두사로 만들어 브라우저 bundle에 노출하지 않습니다.
 
@@ -141,7 +157,7 @@ Redis key와 metric label에는 raw session token, 초대 token 원문, BFF secr
 
 ## 멤버십과 역할 모델
 
-ReadMates의 사용자 상태는 membership status와 role을 함께 봅니다.
+ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅니다. Membership row는 club별로 독립적이고, platform admin 권한은 `platform_admins`에서 별도로 확인합니다.
 
 | 상태/역할 | 의미 |
 | --- | --- |
@@ -152,7 +168,9 @@ ReadMates의 사용자 상태는 membership status와 role을 함께 봅니다.
 | `LEFT`, `INACTIVE` | 떠났거나 비활성화된 계정 상태입니다. 멤버 앱과 쓰기 기능에서 제외됩니다. |
 | `INVITED` | 초대 발급 또는 수락 전후의 중간 상태로 사용됩니다. |
 
-현재 세션 참여 여부는 `session_participants`와 `SessionParticipationStatus`로 관리합니다. 호스트는 정식 멤버를 현재 세션에 추가하거나 제거할 수 있고, 참석 확정 후 피드백 문서 열람 경계에 영향을 줍니다.
+같은 사용자라도 클럽마다 다른 role과 status를 가질 수 있습니다. 예를 들어 한 사용자는 `reading-sai`에서는 `HOST`, `sample-book-club`에서는 `MEMBER`일 수 있고, platform admin이라도 특정 클럽에서 호스트 API를 쓰려면 해당 클럽 membership 권한을 별도로 통과해야 합니다.
+
+현재 세션 참여 여부는 `session_participants`와 `SessionParticipationStatus`로 관리합니다. 호스트는 같은 클럽의 정식 멤버를 현재 세션에 추가하거나 제거할 수 있고, 참석 확정 후 피드백 문서 열람 경계에 영향을 줍니다.
 
 ## 세션 lifecycle과 공개 범위
 
@@ -204,16 +222,16 @@ ReadMates에서 멤버를 부르는 앱 표시 이름은 `displayName`입니다.
 
 Public route/API에는 명시적으로 공개된 데이터만 나갑니다.
 
-- 공개 사이트는 `/api/public/club`, `/api/public/sessions/{sessionId}` 같은 public API를 사용합니다.
+- 공개 사이트는 `/api/public/clubs/{slug}`, `/api/public/clubs/{slug}/sessions/{sessionId}` 같은 club-scoped public API를 사용합니다. Explicit slug endpoint에서는 slug가 public data boundary의 기준입니다.
 - 공개 기록에는 `sessions.state=PUBLISHED`이고 `public_session_publications.visibility=PUBLIC`인 세션 요약, 공개 가능한 하이라이트, 한줄평, 책/회차 정보만 포함합니다.
 - 예정 세션 목록은 멤버 앱의 `/api/sessions/upcoming`에서만 제공하며, `HOST_ONLY` draft는 멤버, 둘러보기 멤버, archive, notes, public route/API에 노출하지 않습니다.
 - 멤버 archive는 `CLOSED` 또는 `PUBLISHED`이면서 `sessions.visibility`가 `MEMBER` 또는 `PUBLIC`인 기록을 보여줍니다. `CLOSED` 기록은 멤버 archive에서 읽을 수 있지만 notes feed와 public route/API에는 아직 나오지 않습니다.
 - 멤버 notes feed는 `PUBLISHED`이면서 `sessions.visibility`가 `MEMBER` 또는 `PUBLIC`인 기록만 보여줍니다.
 - 현재 세션의 RSVP, 읽은 분량, private notes, meeting data, 피드백 문서 본문은 public API로 노출하지 않습니다.
 - 멤버 앱의 `/api/archive/**`, `/api/notes/**`, `/api/sessions/current/**`는 인증과 membership 상태를 확인합니다.
-- 호스트 API인 `/api/host/**`는 active host role이 필요합니다.
+- 호스트 API인 `/api/host/**`는 현재 club context의 active `HOST` role이 필요합니다.
 
-이 경계는 포트폴리오 공개에도 중요합니다. 문서와 예시는 실제 멤버 데이터나 private club domain을 사용하지 않고, API origin은 `https://api.example.com` 같은 placeholder를 사용합니다.
+이 경계는 포트폴리오 공개에도 중요합니다. 문서와 예시는 실제 멤버 데이터나 실제 운영 club domain을 사용하지 않고, API origin은 `https://api.example.com` 같은 placeholder를 사용합니다.
 
 ## 피드백 문서 흐름
 
