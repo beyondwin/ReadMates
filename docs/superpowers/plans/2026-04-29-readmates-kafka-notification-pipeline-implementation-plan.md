@@ -103,7 +103,7 @@ The implementation should not preserve the old JDBC direct delivery worker. It m
 - Modify: `server/src/main/resources/application.yml`
 - Create: `server/src/test/kotlin/com/readmates/support/KafkaTestContainer.kt`
 
-- [ ] **Step 1: Write a failing Kafka container smoke test**
+- [x] **Step 1: Write a failing Kafka container smoke test**
 
 Create `server/src/test/kotlin/com/readmates/support/KafkaTestContainer.kt`:
 
@@ -138,7 +138,7 @@ class NotificationKafkaDependencyTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -148,7 +148,7 @@ Run:
 
 Expected: FAIL because `org.testcontainers.kafka.KafkaContainer` is not on the test classpath.
 
-- [ ] **Step 3: Add dependencies and config**
+- [x] **Step 3: Add dependencies and config**
 
 Modify `server/build.gradle.kts` dependencies:
 
@@ -192,7 +192,7 @@ Modify `server/src/main/resources/application.yml` under `readmates.notification
       max-delivery-attempts: ${READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS:5}
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run:
 
@@ -202,7 +202,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/build.gradle.kts compose.yml server/src/main/resources/application.yml server/src/test/kotlin/com/readmates/support/KafkaTestContainer.kt server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaDependencyTest.kt
@@ -216,7 +216,7 @@ git commit -m "chore: add kafka notification infrastructure"
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/support/ReadmatesMySqlSeedTest.kt` if seed assumptions need notification table names.
 
-- [ ] **Step 1: Write failing migration assertions**
+- [x] **Step 1: Write failing migration assertions**
 
 In `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`, add assertions after the existing Flyway migration succeeds:
 
@@ -246,7 +246,7 @@ private fun assertKafkaNotificationTablesExist(jdbcTemplate: JdbcTemplate) {
 
 Call `assertKafkaNotificationTablesExist(jdbcTemplate)` in the migration test method after `flyway.migrate()`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -256,7 +256,7 @@ Run:
 
 Expected: FAIL because the new tables do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
 Create `server/src/main/resources/db/mysql/migration/V18__kafka_notification_pipeline.sql`:
 
@@ -346,7 +346,7 @@ create table member_notifications (
 );
 ```
 
-- [ ] **Step 4: Run migration tests**
+- [x] **Step 4: Run migration tests**
 
 Run:
 
@@ -356,7 +356,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/resources/db/mysql/migration/V18__kafka_notification_pipeline.sql server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt server/src/test/kotlin/com/readmates/support/ReadmatesMySqlSeedTest.kt
@@ -376,7 +376,7 @@ git commit -m "feat: add kafka notification ledger schema"
 - Create: `server/src/main/kotlin/com/readmates/notification/application/port/out/NotificationDeliveryPort.kt`
 - Create: `server/src/main/kotlin/com/readmates/notification/application/port/out/MemberNotificationPort.kt`
 
-- [ ] **Step 1: Write model test**
+- [x] **Step 1: Write model test**
 
 Create `server/src/test/kotlin/com/readmates/notification/application/model/NotificationEventModelsTest.kt`:
 
@@ -438,7 +438,7 @@ class NotificationEventModelsTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -448,7 +448,7 @@ Run:
 
 Expected: FAIL because the new model types do not exist.
 
-- [ ] **Step 3: Add domain enums**
+- [x] **Step 3: Add domain enums**
 
 Create `NotificationEventOutboxStatus.kt`:
 
@@ -490,7 +490,7 @@ enum class NotificationChannel {
 }
 ```
 
-- [ ] **Step 4: Add application models and helper**
+- [x] **Step 4: Add application models and helper**
 
 Add these models to `NotificationModels.kt`, keeping existing preference and test mail models until later tasks migrate callers:
 
@@ -577,7 +577,7 @@ import com.readmates.notification.domain.NotificationEventOutboxStatus
 import java.time.LocalDate
 ```
 
-- [ ] **Step 5: Add ports**
+- [x] **Step 5: Add ports**
 
 Create `NotificationEventOutboxPort.kt`:
 
@@ -660,7 +660,7 @@ interface MemberNotificationPort {
 }
 ```
 
-- [ ] **Step 6: Run model tests**
+- [x] **Step 6: Run model tests**
 
 Run:
 
@@ -670,7 +670,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/domain server/src/main/kotlin/com/readmates/notification/application/model/NotificationModels.kt server/src/main/kotlin/com/readmates/notification/application/port/out server/src/test/kotlin/com/readmates/notification/application/model/NotificationEventModelsTest.kt
@@ -683,7 +683,7 @@ git commit -m "feat: add notification event delivery models"
 - Create: `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapterTest.kt`
 
-- [ ] **Step 1: Write failing persistence test**
+- [x] **Step 1: Write failing persistence test**
 
 Create `JdbcNotificationEventOutboxAdapterTest.kt` with tests for idempotent enqueue and claim:
 
@@ -767,7 +767,7 @@ class JdbcNotificationEventOutboxAdapterTest(
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -777,7 +777,7 @@ Run:
 
 Expected: FAIL because `JdbcNotificationEventOutboxAdapter` does not exist.
 
-- [ ] **Step 3: Implement adapter**
+- [x] **Step 3: Implement adapter**
 
 Create `JdbcNotificationEventOutboxAdapter.kt`:
 
@@ -963,7 +963,7 @@ class JdbcNotificationEventOutboxAdapter(
 }
 ```
 
-- [ ] **Step 4: Run adapter test**
+- [x] **Step 4: Run adapter test**
 
 Run:
 
@@ -973,7 +973,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapterTest.kt
@@ -989,7 +989,7 @@ git commit -m "feat: persist notification event outbox"
 - Modify: `server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationRelayServiceTest.kt`
 
-- [ ] **Step 1: Write relay service test**
+- [x] **Step 1: Write relay service test**
 
 Create `NotificationRelayServiceTest.kt` with fake ports:
 
@@ -1068,7 +1068,7 @@ class NotificationRelayServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1078,7 +1078,7 @@ Run:
 
 Expected: FAIL because `NotificationRelayService` does not exist.
 
-- [ ] **Step 3: Add use case and service**
+- [x] **Step 3: Add use case and service**
 
 In `NotificationUseCases.kt`, add:
 
@@ -1136,7 +1136,7 @@ class NotificationRelayService(
 }
 ```
 
-- [ ] **Step 4: Add Kafka publisher adapter**
+- [x] **Step 4: Add Kafka publisher adapter**
 
 Create `KafkaNotificationEventPublisherAdapter.kt`:
 
@@ -1169,7 +1169,7 @@ class KafkaNotificationEventPublisherAdapter(
 }
 ```
 
-- [ ] **Step 5: Replace scheduler**
+- [x] **Step 5: Replace scheduler**
 
 Create `NotificationEventRelayScheduler.kt`:
 
@@ -1197,7 +1197,7 @@ class NotificationEventRelayScheduler(
 
 Leave `NotificationOutboxScheduler` in place until Task 10 removes old references, but disable its worker property in configuration so Kafka is the new path.
 
-- [ ] **Step 6: Run relay tests**
+- [x] **Step 6: Run relay tests**
 
 Run:
 
@@ -1207,7 +1207,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationRelayService.kt server/src/main/kotlin/com/readmates/notification/adapter/out/kafka/KafkaNotificationEventPublisherAdapter.kt server/src/main/kotlin/com/readmates/notification/adapter/in/scheduler/NotificationEventRelayScheduler.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/application/service/NotificationRelayServiceTest.kt
@@ -1224,7 +1224,7 @@ git commit -m "feat: publish notification events to kafka"
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationDispatchServiceTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt`
 
-- [ ] **Step 1: Write dispatch service unit test**
+- [x] **Step 1: Write dispatch service unit test**
 
 Create `NotificationDispatchServiceTest.kt`:
 
@@ -1304,7 +1304,7 @@ class NotificationDispatchServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1314,7 +1314,7 @@ Run:
 
 Expected: FAIL because `NotificationDispatchService` does not exist.
 
-- [ ] **Step 3: Implement dispatch service**
+- [x] **Step 3: Implement dispatch service**
 
 Create `NotificationDispatchService.kt`:
 
@@ -1368,7 +1368,7 @@ class NotificationDispatchService(
 }
 ```
 
-- [ ] **Step 4: Add Kafka listener**
+- [x] **Step 4: Add Kafka listener**
 
 In `NotificationUseCases.kt`, add:
 
@@ -1407,7 +1407,7 @@ class NotificationEventKafkaListener(
 }
 ```
 
-- [ ] **Step 5: Implement persistence adapters**
+- [x] **Step 5: Implement persistence adapters**
 
 Implement `JdbcNotificationDeliveryAdapter` to:
 
@@ -1420,7 +1420,7 @@ Implement `JdbcNotificationDeliveryAdapter` to:
 
 Implement `JdbcMemberNotificationAdapter` with list, unread count, mark read, and mark all read methods matching `MemberNotificationPort`.
 
-- [ ] **Step 6: Run service tests**
+- [x] **Step 6: Run service tests**
 
 Run:
 
@@ -1430,7 +1430,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationDispatchService.kt server/src/main/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListener.kt server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationDeliveryAdapter.kt server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcMemberNotificationAdapter.kt server/src/main/kotlin/com/readmates/notification/application/model/NotificationModels.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/application/service/NotificationDispatchServiceTest.kt
@@ -1447,7 +1447,7 @@ git commit -m "feat: dispatch kafka notification deliveries"
   - review publication caller found with `rg "recordReviewPublished" server/src/main/kotlin`
 - Test: update existing service tests that assert notification enqueue behavior.
 
-- [ ] **Step 1: Write event service tests**
+- [x] **Step 1: Write event service tests**
 
 Create `server/src/test/kotlin/com/readmates/notification/application/service/NotificationEventServiceTest.kt`:
 
@@ -1493,7 +1493,7 @@ class NotificationEventServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1503,7 +1503,7 @@ Run:
 
 Expected: FAIL because `NotificationEventService` does not exist or the method signature is still old.
 
-- [ ] **Step 3: Implement event service**
+- [x] **Step 3: Implement event service**
 
 Create `NotificationEventService.kt`:
 
@@ -1572,7 +1572,7 @@ interface RecordNotificationEventUseCase {
 }
 ```
 
-- [ ] **Step 4: Update callers**
+- [x] **Step 4: Update callers**
 
 For each caller, pass the new metadata:
 
@@ -1595,7 +1595,7 @@ recordNotificationEventUseCase.recordFeedbackDocumentPublished(
 )
 ```
 
-- [ ] **Step 5: Run targeted server tests**
+- [x] **Step 5: Run targeted server tests**
 
 Run:
 
@@ -1605,7 +1605,7 @@ Run:
 
 Expected: PASS or fail only on tests that still assert old outbox row shapes. Update those assertions to check event outbox rows.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationEventService.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt server/src/main/kotlin/com/readmates/feedback/application/service/FeedbackDocumentService.kt server/src/test/kotlin/com/readmates/notification/application/service/NotificationEventServiceTest.kt server/src/test/kotlin
@@ -1620,7 +1620,7 @@ git commit -m "feat: record notification domain events"
 - Create: `server/src/main/kotlin/com/readmates/notification/application/service/MemberNotificationService.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt`
 
-- [ ] **Step 1: Write controller test**
+- [x] **Step 1: Write controller test**
 
 Create `MemberNotificationControllerTest.kt`:
 
@@ -1682,7 +1682,7 @@ class MemberNotificationControllerTest(
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1692,7 +1692,7 @@ Run:
 
 Expected: FAIL because `ManageMemberNotificationsUseCase` and endpoints do not exist.
 
-- [ ] **Step 3: Add use case and service**
+- [x] **Step 3: Add use case and service**
 
 In `NotificationUseCases.kt`, add:
 
@@ -1743,7 +1743,7 @@ class MemberNotificationService(
 }
 ```
 
-- [ ] **Step 4: Add DTOs and endpoints**
+- [x] **Step 4: Add DTOs and endpoints**
 
 Add DTOs to `NotificationWebDtos.kt`:
 
@@ -1808,7 +1808,7 @@ Make sure controller class request mapping is:
 @RequestMapping("/api/me/notifications")
 ```
 
-- [ ] **Step 5: Run controller test**
+- [x] **Step 5: Run controller test**
 
 Run:
 
@@ -1818,7 +1818,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/in/web/MemberNotificationController.kt server/src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt server/src/main/kotlin/com/readmates/notification/application/service/MemberNotificationService.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt
@@ -1833,7 +1833,7 @@ git commit -m "feat: add member notification inbox api"
 - Create or modify: `server/src/main/kotlin/com/readmates/notification/application/service/HostNotificationOperationsService.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt`
 
-- [ ] **Step 1: Update host controller tests**
+- [x] **Step 1: Update host controller tests**
 
 In `HostNotificationControllerTest.kt`, replace old outbox item assertions with event/delivery assertions:
 
@@ -1853,7 +1853,7 @@ mockMvc.get("/api/host/notifications/deliveries")
     }
 ```
 
-- [ ] **Step 2: Run host notification tests to verify failure**
+- [x] **Step 2: Run host notification tests to verify failure**
 
 Run:
 
@@ -1863,7 +1863,7 @@ Run:
 
 Expected: FAIL because event and delivery endpoints do not exist.
 
-- [ ] **Step 3: Add host DTOs**
+- [x] **Step 3: Add host DTOs**
 
 Add response DTOs:
 
@@ -1890,7 +1890,7 @@ data class HostNotificationDeliveryResponse(
 )
 ```
 
-- [ ] **Step 4: Add endpoints**
+- [x] **Step 4: Add endpoints**
 
 In `HostNotificationController.kt`, add:
 
@@ -1915,7 +1915,7 @@ fun deliveries(
 
 Keep existing test mail endpoints.
 
-- [ ] **Step 5: Implement host operations service methods**
+- [x] **Step 5: Implement host operations service methods**
 
 Extend `ManageHostNotificationsUseCase` with:
 
@@ -1926,7 +1926,7 @@ fun listDeliveries(host: CurrentMember, status: NotificationDeliveryStatus?, cha
 
 Implement methods in `HostNotificationOperationsService`, requiring `host.isHost` and always scoping by `host.clubId`.
 
-- [ ] **Step 6: Run host tests**
+- [x] **Step 6: Run host tests**
 
 Run:
 
@@ -1936,7 +1936,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/in/web/HostNotificationController.kt server/src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt server/src/main/kotlin/com/readmates/notification/application/service/HostNotificationOperationsService.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt
@@ -1953,7 +1953,7 @@ git commit -m "feat: expose notification event delivery ledger"
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Update tests under `server/src/test/kotlin/com/readmates/notification`.
 
-- [ ] **Step 1: Add architecture assertion**
+- [x] **Step 1: Add architecture assertion**
 
 In `ServerArchitectureBoundaryTest.kt`, add a test assertion that application services do not depend on `NotificationOutboxPort`:
 
@@ -1966,7 +1966,7 @@ noClasses()
 
 If the boundary test uses a helper style, add the same rule using the existing helper conventions.
 
-- [ ] **Step 2: Run architecture test to verify it fails**
+- [x] **Step 2: Run architecture test to verify it fails**
 
 Run:
 
@@ -1976,7 +1976,7 @@ Run:
 
 Expected: FAIL while old service and port still exist.
 
-- [ ] **Step 3: Remove old worker path**
+- [x] **Step 3: Remove old worker path**
 
 Delete the old direct worker files after replacement code compiles:
 
@@ -1989,7 +1989,7 @@ git rm server/src/main/kotlin/com/readmates/notification/adapter/out/persistence
 
 Update all imports and tests to use new services and ports.
 
-- [ ] **Step 4: Run notification server tests**
+- [x] **Step 4: Run notification server tests**
 
 Run:
 
@@ -1999,7 +1999,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Run architecture test**
+- [x] **Step 5: Run architecture test**
 
 Run:
 
@@ -2009,7 +2009,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt
@@ -2027,7 +2027,7 @@ git commit -m "refactor: remove jdbc notification delivery worker"
 - Modify app chrome badge component found with `rg "mobile-header|mobile-tab|TopNav|notification" front/src front/shared front/features`.
 - Test: `front/tests/unit/member-notifications.test.tsx`
 
-- [ ] **Step 1: Write failing unit test**
+- [x] **Step 1: Write failing unit test**
 
 Create `front/tests/unit/member-notifications.test.tsx`:
 
@@ -2064,7 +2064,7 @@ describe("MemberNotificationsPage", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -2074,7 +2074,7 @@ pnpm --dir front test -- member-notifications.test.tsx
 
 Expected: FAIL because the notifications feature does not exist.
 
-- [ ] **Step 3: Add contracts and API**
+- [x] **Step 3: Add contracts and API**
 
 Create `notifications-contracts.ts`:
 
@@ -2116,7 +2116,7 @@ export async function markAllMemberNotificationsRead(): Promise<{ updatedCount: 
 }
 ```
 
-- [ ] **Step 4: Add UI**
+- [x] **Step 4: Add UI**
 
 Create `member-notifications-page.tsx`:
 
@@ -2172,7 +2172,7 @@ export function MemberNotificationsPage({
 }
 ```
 
-- [ ] **Step 5: Add route**
+- [x] **Step 5: Add route**
 
 Create `member-notifications-route.tsx`:
 
@@ -2221,7 +2221,7 @@ Add route in `front/src/app/router.tsx`:
 
 Import the route symbols at the top of `router.tsx`.
 
-- [ ] **Step 6: Run frontend unit test**
+- [x] **Step 6: Run frontend unit test**
 
 Run:
 
@@ -2231,7 +2231,7 @@ pnpm --dir front test -- member-notifications.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add front/features/notifications front/src/app/router.tsx front/tests/unit/member-notifications.test.tsx
@@ -2250,7 +2250,7 @@ git commit -m "feat: add member notification inbox"
 - Modify: `front/tests/unit/api-contract-fixtures.ts`
 - Modify: `front/tests/unit/api-contract-fixtures.test.ts`
 
-- [ ] **Step 1: Update failing host UI test**
+- [x] **Step 1: Update failing host UI test**
 
 In `host-notifications.test.tsx`, assert event and delivery tabs:
 
@@ -2261,7 +2261,7 @@ expect(screen.getByText("Kafka 발행 대기")).toBeInTheDocument();
 expect(screen.getByText("EMAIL")).toBeInTheDocument();
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -2271,7 +2271,7 @@ pnpm --dir front test -- host-notifications.test.tsx
 
 Expected: FAIL because the current page still uses the old outbox item contract.
 
-- [ ] **Step 3: Add contracts**
+- [x] **Step 3: Add contracts**
 
 In `host-contracts.ts`, add:
 
@@ -2308,7 +2308,7 @@ export interface HostNotificationDeliveryListResponse {
 }
 ```
 
-- [ ] **Step 4: Add API calls**
+- [x] **Step 4: Add API calls**
 
 In `host-api.ts`, add:
 
@@ -2322,7 +2322,7 @@ export async function fetchHostNotificationDeliveries(): Promise<HostNotificatio
 }
 ```
 
-- [ ] **Step 5: Update route data**
+- [x] **Step 5: Update route data**
 
 In `host-notifications-data.ts`, load events and deliveries in parallel:
 
@@ -2337,7 +2337,7 @@ const [summary, events, deliveries, testMailAudit] = await Promise.all([
 return { summary, events, deliveries, testMailAudit };
 ```
 
-- [ ] **Step 6: Update UI**
+- [x] **Step 6: Update UI**
 
 Render event and delivery sections in `host-notifications-page.tsx`:
 
@@ -2366,7 +2366,7 @@ Render event and delivery sections in `host-notifications-page.tsx`:
 
 Keep existing test mail UI.
 
-- [ ] **Step 7: Run host UI tests**
+- [x] **Step 7: Run host UI tests**
 
 Run:
 
@@ -2389,7 +2389,7 @@ git commit -m "feat: show kafka notification ledger"
 - Create: `server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt`
 - Modify: `server/src/test/resources/application.yml` if test properties are needed.
 
-- [ ] **Step 1: Write integration test**
+- [x] **Step 1: Write integration test**
 
 Create `NotificationKafkaPipelineIntegrationTest.kt`:
 
@@ -2458,7 +2458,7 @@ object TestKafkaSink {
 }
 ```
 
-- [ ] **Step 2: Add Awaitility dependency if absent**
+- [x] **Step 2: Add Awaitility dependency if absent**
 
 If the test does not compile because Awaitility is missing, add to `server/build.gradle.kts`:
 
@@ -2466,7 +2466,7 @@ If the test does not compile because Awaitility is missing, add to `server/build
 testImplementation("org.awaitility:awaitility-kotlin:4.2.2")
 ```
 
-- [ ] **Step 3: Run integration test**
+- [x] **Step 3: Run integration test**
 
 Run:
 
@@ -2476,7 +2476,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt server/build.gradle.kts server/src/test/resources/application.yml
@@ -2492,7 +2492,7 @@ git commit -m "test: cover kafka notification pipeline"
 - Modify: `docs/development/test-guide.md`
 - Modify: `docs/deploy/oci-backend.md`
 
-- [ ] **Step 1: Update README highlight**
+- [x] **Step 1: Update README highlight**
 
 Change the notification line in `README.md` to:
 
@@ -2500,7 +2500,7 @@ Change the notification line in `README.md` to:
 - 운영 파이프라인: MySQL transactional event outbox, Kafka relay/consumer 기반 이메일·인앱 알림, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 ```
 
-- [ ] **Step 2: Update architecture notification section**
+- [x] **Step 2: Update architecture notification section**
 
 In `docs/development/architecture.md`, replace the notification slice summary with:
 
@@ -2508,7 +2508,7 @@ In `docs/development/architecture.md`, replace the notification slice summary wi
 Notification slice는 도메인 이벤트 outbox를 MySQL source of truth로 저장하고, Kafka relay가 `readmates.notification.events.v1` topic으로 발행한다. Kafka consumer는 같은 Spring Boot 모듈 안에서 이벤트를 받아 수신자 계산, preference 적용, 인앱 알림 생성, 이메일 발송을 처리한다. 이벤트 발행 상태는 `notification_event_outbox`, 채널별 배송 상태는 `notification_deliveries`, 멤버 알림함은 `member_notifications`에 남긴다.
 ```
 
-- [ ] **Step 3: Update local setup**
+- [x] **Step 3: Update local setup**
 
 Add Kafka local command to `docs/development/local-setup.md`:
 
@@ -2524,7 +2524,7 @@ READMATES_KAFKA_ENABLED=true \
 READMATES_KAFKA_BOOTSTRAP_SERVERS=localhost:9092
 ```
 
-- [ ] **Step 4: Update test guide**
+- [x] **Step 4: Update test guide**
 
 Add:
 
@@ -2536,7 +2536,7 @@ Kafka notification tests use Testcontainers Kafka. They require Docker or Colima
 ```
 ```
 
-- [ ] **Step 5: Run docs checks**
+- [x] **Step 5: Run docs checks**
 
 Run:
 
@@ -2546,7 +2546,7 @@ git diff --check -- README.md docs/development/architecture.md docs/development/
 
 Expected: no output.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add README.md docs/development/architecture.md docs/development/local-setup.md docs/development/test-guide.md docs/deploy/oci-backend.md
@@ -2558,7 +2558,7 @@ git commit -m "docs: document kafka notification pipeline"
 **Files:**
 - No source files unless verification exposes defects.
 
-- [ ] **Step 1: Run server tests**
+- [x] **Step 1: Run server tests**
 
 Run:
 
@@ -2568,7 +2568,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 2: Run frontend checks**
+- [x] **Step 2: Run frontend checks**
 
 Run:
 
@@ -2580,7 +2580,7 @@ pnpm --dir front build
 
 Expected: all PASS.
 
-- [ ] **Step 3: Run E2E**
+- [x] **Step 3: Run E2E**
 
 Run:
 
@@ -2590,7 +2590,7 @@ pnpm --dir front test:e2e
 
 Expected: PASS. If Kafka is disabled in E2E, notification events may remain pending; member/host pages should still render stable disabled or empty states.
 
-- [ ] **Step 4: Run public release checks**
+- [x] **Step 4: Run public release checks**
 
 Run:
 
@@ -2601,7 +2601,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit any verification fixes**
+- [x] **Step 5: Commit any verification fixes**
 
 If fixes were required, inspect and stage only the concrete files changed by those fixes:
 

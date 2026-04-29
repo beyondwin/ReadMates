@@ -16,6 +16,8 @@ import { PublicRouteError } from "@/features/public/route/public-route-state";
 import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 import { memberHomeLoader } from "@/features/member-home/route/member-home-data";
+import { memberNotificationsLoader } from "@/features/notifications/route/member-notifications-data";
+import { MemberNotificationsRoute } from "@/features/notifications/route/member-notifications-route";
 import { memberSessionDetailLoader } from "@/features/archive/route/member-session-detail-data";
 import { myPageLoader } from "@/features/archive/route/my-page-data";
 import {
@@ -155,6 +157,13 @@ export const routes: RouteObject[] = [
         loader: myPageLoader,
         errorElement: <ArchiveRouteError />,
         hydrateFallbackElement: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,
+      },
+      {
+        path: "notifications",
+        element: <MemberNotificationsRoute />,
+        loader: memberNotificationsLoader,
+        errorElement: <ArchiveRouteError />,
+        hydrateFallbackElement: <ArchiveRouteLoading label="알림을 불러오는 중" />,
       },
       {
         path: "sessions/:sessionId",

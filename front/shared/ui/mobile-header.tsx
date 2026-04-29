@@ -93,6 +93,10 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
     return READMATES_NAV_LABELS.member.archive;
   }
 
+  if (pathname.startsWith("/app/notifications")) {
+    return READMATES_NAV_LABELS.member.notifications;
+  }
+
   if (pathname.startsWith("/app/me")) {
     return READMATES_NAV_LABELS.member.mySpace;
   }

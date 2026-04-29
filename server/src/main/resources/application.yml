@@ -52,6 +52,15 @@ readmates:
       fixed-delay-ms: ${READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS:30000}
       batch-size: ${READMATES_NOTIFICATION_WORKER_BATCH_SIZE:20}
       max-attempts: ${READMATES_NOTIFICATION_MAX_ATTEMPTS:5}
+    kafka:
+      enabled: ${READMATES_KAFKA_ENABLED:false}
+      bootstrap-servers: ${READMATES_KAFKA_BOOTSTRAP_SERVERS:}
+      events-topic: ${READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC:readmates.notification.events.v1}
+      dlq-topic: ${READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC:readmates.notification.events.dlq.v1}
+      consumer-group: ${READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP:readmates-notification-dispatcher}
+      relay-batch-size: ${READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE:50}
+      max-publish-attempts: ${READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS:5}
+      max-delivery-attempts: ${READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS:5}
   redis:
     enabled: ${READMATES_REDIS_ENABLED:false}
   rate-limit:

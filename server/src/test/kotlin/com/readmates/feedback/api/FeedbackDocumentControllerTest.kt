@@ -20,6 +20,10 @@ import org.springframework.test.web.servlet.multipart
 import java.nio.charset.StandardCharsets
 
 private const val CLEANUP_SESSION_SIX_TEST_UPLOAD_SQL = """
+    delete from notification_event_outbox
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
+      and aggregate_id = '00000000-0000-0000-0000-000000000306';
     delete from notification_outbox
     where club_id = '00000000-0000-0000-0000-000000000001'
       and event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
@@ -377,17 +381,36 @@ class FeedbackDocumentControllerTest(
             status { isCreated() }
         }
 
-        val count = jdbcTemplate.queryForObject(
+        val event = jdbcTemplate.queryForMap(
             """
-            select count(*)
-            from notification_outbox
+            select
+              dedupe_key,
+              json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
+              cast(json_unquote(json_extract(payload_json, '$.documentVersion')) as signed) as document_version
+            from notification_event_outbox
             where event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
               and aggregate_id = '00000000-0000-0000-0000-000000000306'
             """.trimIndent(),
-            Int::class.java,
-        ) ?: 0
+        )
 
-        assertThat(count).isGreaterThan(0)
+        val documentVersion = jdbcTemplate.queryForObject(
+            """
+            select max(version)
+            from session_feedback_documents
+            where session_id = '00000000-0000-0000-0000-000000000306'
+            """.trimIndent(),
+            Int::class.java,
+        )
+
+        assertThat(event["dedupe_key"]).isEqualTo(
+            "feedback-document:00000000-0000-0000-0000-000000000306:$documentVersion",
+        )
+        assertThat(event["session_id"]).isEqualTo("00000000-0000-0000-0000-000000000306")
+        assertThat((event["session_number"] as Number).toInt()).isEqualTo(6)
+        assertThat(event["book_title"]).isEqualTo("가난한 찰리의 연감")
+        assertThat((event["document_version"] as Number).toInt()).isEqualTo(documentVersion)
     }
 
     @Test
