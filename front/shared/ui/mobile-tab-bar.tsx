@@ -11,7 +11,17 @@ type MobileTabBarProps = {
   currentSessionId?: string | null | undefined;
 };
 
-export type TabIconName = "home" | "session" | "notes" | "archive" | "me" | "host" | "edit" | "invite" | "approve";
+export type TabIconName =
+  | "home"
+  | "session"
+  | "notes"
+  | "archive"
+  | "notifications"
+  | "me"
+  | "host"
+  | "edit"
+  | "invite"
+  | "approve";
 
 type TabLink = {
   key: string;
@@ -46,6 +56,13 @@ const memberTabs: TabLink[] = [
     icon: "archive",
     current: (pathname) =>
       pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
+  },
+  {
+    key: "notifications",
+    href: "/app/notifications",
+    label: READMATES_NAV_LABELS.member.notifications,
+    icon: "notifications",
+    current: (pathname) => pathname.startsWith("/app/notifications"),
   },
   {
     key: "me",
@@ -138,6 +155,13 @@ export function TabIcon({ name }: { name: TabIconName }) {
         <svg {...common}>
           <rect x="3" y="3" width="18" height="4" rx="1" />
           <path d="M5 7v13a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M10 11h4" />
+        </svg>
+      );
+    case "notifications":
+      return (
+        <svg {...common}>
+          <path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5 2 6H4c.5-1 2-2 2-6z" />
+          <path d="M9.5 19a2.7 2.7 0 0 0 5 0" />
         </svg>
       );
     case "me":
