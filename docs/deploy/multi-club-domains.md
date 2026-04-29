@@ -13,6 +13,8 @@ https://readmates.pages.dev/clubs/<club-slug>/app
 
 `readmates.pages.dev`는 fallback과 preview origin입니다. Public URL policy는 Pages host를 `noindex`로 표시하므로 검색 노출용 canonical origin으로 쓰지 않습니다.
 
+Pages fallback route에서도 owned primary domain canonical link를 렌더링하려면 Cloudflare Pages production build 환경에 `VITE_PUBLIC_PRIMARY_DOMAIN={primary-domain}`을 설정합니다. 이 값은 public canonical host를 만들기 위한 build-time setting이며 secret이 아닙니다.
+
 Primary domain을 운영하면 같은 path fallback을 primary origin에도 둘 수 있습니다.
 
 ```text

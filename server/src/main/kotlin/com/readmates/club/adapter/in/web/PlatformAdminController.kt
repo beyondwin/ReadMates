@@ -58,16 +58,20 @@ data class PlatformAdminSummaryResponse(
     val platformRole: String,
     val activeClubCount: Long,
     val domainActionRequiredCount: Long,
+    val domains: List<PlatformAdminDomainResponse>,
     val domainsRequiringAction: List<PlatformAdminDomainResponse>,
 ) {
     companion object {
-        fun from(summary: PlatformAdminDashboardSummary): PlatformAdminSummaryResponse =
-            PlatformAdminSummaryResponse(
+        fun from(summary: PlatformAdminDashboardSummary): PlatformAdminSummaryResponse {
+            val domains = summary.domains.map(PlatformAdminDomainResponse::from)
+            return PlatformAdminSummaryResponse(
                 platformRole = summary.platformRole.name,
                 activeClubCount = summary.activeClubCount,
                 domainActionRequiredCount = summary.domainActionRequiredCount,
+                domains = domains,
                 domainsRequiringAction = summary.domainsRequiringAction.map(PlatformAdminDomainResponse::from),
             )
+        }
     }
 }
 

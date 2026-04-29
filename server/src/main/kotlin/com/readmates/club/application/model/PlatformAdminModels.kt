@@ -10,6 +10,7 @@ data class PlatformAdminDashboardSummary(
     val platformRole: PlatformAdminRole,
     val activeClubCount: Long,
     val domainActionRequiredCount: Long,
+    val domains: List<PlatformAdminClubDomain>,
     val domainsRequiringAction: List<PlatformAdminClubDomain>,
 )
 

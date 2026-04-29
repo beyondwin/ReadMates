@@ -46,10 +46,13 @@ Cloudflare Pages 운영 환경에는 아래 값을 설정합니다.
 
 | 이름 | 설명 |
 | --- | --- |
+| `VITE_PUBLIC_PRIMARY_DOMAIN` | Public canonical URL을 만들 primary domain입니다. Primary domain이 없으면 비워두고, `readmates.pages.dev`는 `noindex` fallback으로만 사용합니다. |
 | `READMATES_API_BASE_URL` | OCI Spring API의 공개 HTTPS origin, 예: `https://api.example.com` |
 | `READMATES_BFF_SECRET` | Spring `READMATES_BFF_SECRET`과 같은 공유 secret |
 
 `READMATES_BFF_SECRET`은 브라우저 번들에 들어가면 안 됩니다. `VITE_` 접두사를 붙이지 말고 Pages Functions 환경 변수 또는 secret으로만 설정합니다.
+
+`VITE_PUBLIC_PRIMARY_DOMAIN`은 Vite build-time public setting입니다. Secret이 아니며, `https://<club-slug>.<primary-domain>/...` canonical link를 Pages fallback route에서도 렌더링하려면 production build 환경에 설정해야 합니다. 실제 운영 primary domain은 공개 문서에 기록하지 않습니다.
 
 Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API 접근이 필요하면 별도 preview Spring 환경과 별도 secret을 사용합니다.
 

@@ -198,6 +198,55 @@ class PlatformAdminControllerTest(
     }
 
     @Test
+    fun `summary lists failed and provisioning domain statuses for admin UI`() {
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val actionRequiredId = UUID.randomUUID().toString()
+        val failedId = UUID.randomUUID().toString()
+        val provisioningId = UUID.randomUUID().toString()
+        val actionRequiredHostname = "action-${UUID.randomUUID()}.example.test"
+        val failedHostname = "failed-${UUID.randomUUID()}.example.test"
+        val provisioningHostname = "provisioning-${UUID.randomUUID()}.example.test"
+        jdbcTemplate.update(
+            """
+            insert into club_domains (id, club_id, hostname, kind, status, is_primary, provisioning_error_code, updated_at)
+            values
+              (?, ?, ?, 'SUBDOMAIN', 'ACTION_REQUIRED', false, null, timestampadd(second, 3, utc_timestamp(6))),
+              (?, ?, ?, 'SUBDOMAIN', 'FAILED', false, 'DNS_NOT_CONNECTED', timestampadd(second, 2, utc_timestamp(6))),
+              (?, ?, ?, 'SUBDOMAIN', 'PROVISIONING', false, null, timestampadd(second, 1, utc_timestamp(6)))
+            """.trimIndent(),
+            actionRequiredId,
+            READING_SAI_CLUB_ID,
+            actionRequiredHostname,
+            failedId,
+            READING_SAI_CLUB_ID,
+            failedHostname,
+            provisioningId,
+            READING_SAI_CLUB_ID,
+            provisioningHostname,
+        )
+        createdClubDomainIds += actionRequiredId
+        createdClubDomainIds += failedId
+        createdClubDomainIds += provisioningId
+
+        mockMvc.get("/api/admin/summary") {
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.domainActionRequiredCount") { value(1) }
+            jsonPath("$.domainsRequiringAction[0].hostname") { value(actionRequiredHostname) }
+            jsonPath("$.domainsRequiringAction[0].status") { value("ACTION_REQUIRED") }
+            jsonPath("$.domainsRequiringAction[0].manualAction") { value("CLOUDFLARE_PAGES_CUSTOM_DOMAIN") }
+            jsonPath("$.domains[0].hostname") { value(actionRequiredHostname) }
+            jsonPath("$.domains[0].status") { value("ACTION_REQUIRED") }
+            jsonPath("$.domains[1].hostname") { value(failedHostname) }
+            jsonPath("$.domains[1].status") { value("FAILED") }
+            jsonPath("$.domains[1].errorCode") { value("DNS_NOT_CONNECTED") }
+            jsonPath("$.domains[2].hostname") { value(provisioningHostname) }
+            jsonPath("$.domains[2].status") { value("PROVISIONING") }
+        }
+    }
+
+    @Test
     fun `support platform admin cannot create club domain`() {
         val support = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
         val hostname = "support-${UUID.randomUUID()}.example.test"

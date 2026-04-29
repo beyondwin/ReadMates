@@ -24,11 +24,12 @@ type PlatformAdminSummaryView = {
   platformRole: string;
   activeClubCount: number;
   domainActionRequiredCount: number;
+  domains?: PlatformAdminDomainView[];
   domainsRequiringAction?: PlatformAdminDomainView[];
 };
 
 export function PlatformAdminDashboard({ summary }: { summary: PlatformAdminSummaryView }) {
-  const domainsRequiringAction = summary.domainsRequiringAction ?? [];
+  const domains = summary.domains ?? summary.domainsRequiringAction ?? [];
 
   return (
     <main className="platform-admin-page">
@@ -56,14 +57,14 @@ export function PlatformAdminDashboard({ summary }: { summary: PlatformAdminSumm
             </div>
           </div>
 
-          {domainsRequiringAction.length > 0 ? (
+          {domains.length > 0 ? (
             <div className="platform-admin-domain-list">
-              {domainsRequiringAction.map((domain) => (
+              {domains.map((domain) => (
                 <DomainProvisioningRow key={domain.id} domain={domain} />
               ))}
             </div>
           ) : (
-            <p className="muted platform-admin-domain-empty">수동 조치가 필요한 도메인이 없습니다.</p>
+            <p className="muted platform-admin-domain-empty">등록된 도메인이 없습니다.</p>
           )}
         </section>
       </section>

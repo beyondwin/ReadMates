@@ -35,6 +35,18 @@ class JdbcPlatformAdminAdapter(
             Long::class.java,
         ) ?: 0
 
+    override fun listDomains(limit: Int): List<PlatformAdminClubDomain> =
+        jdbcTemplateProvider.ifAvailable?.query(
+            """
+            select id, club_id, hostname, kind, status, is_primary, verified_at, last_checked_at, provisioning_error_code
+            from club_domains
+            order by updated_at desc, created_at desc
+            limit ?
+            """.trimIndent(),
+            ::mapDomain,
+            limit.coerceIn(1, 100),
+        ) ?: emptyList()
+
     override fun listDomainsRequiringAction(limit: Int): List<PlatformAdminClubDomain> =
         jdbcTemplateProvider.ifAvailable?.query(
             """

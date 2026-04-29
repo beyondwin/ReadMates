@@ -26,6 +26,7 @@ class PlatformAdminService(
             platformRole = admin.role,
             activeClubCount = summaryPort.countActiveClubs(),
             domainActionRequiredCount = summaryPort.countDomainsRequiringAction(),
+            domains = summaryPort.listDomains(limit = 20),
             domainsRequiringAction = summaryPort.listDomainsRequiringAction(limit = 20),
         )
 
