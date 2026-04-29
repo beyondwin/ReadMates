@@ -10,7 +10,10 @@ import type {
   HostInvitationResponse,
   HostMemberListItem,
   HostMemberProfileResponse,
+  HostNotificationDetailResponse,
+  HostNotificationItemListResponse,
   HostNotificationSummary,
+  HostNotificationStatus,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
   HostSessionDetailResponse,
@@ -20,6 +23,8 @@ import type {
   HostSessionVisibilityRequest,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
+  NotificationTestMailAuditItem,
+  SendNotificationTestMailRequest,
   UpdateHostMemberProfileRequest,
   ViewerMember,
 } from "./host-contracts";
@@ -38,6 +43,41 @@ export function fetchHostNotificationSummary() {
 
 export function processHostNotifications() {
   return readmatesFetchResponse("/api/host/notifications/process", { method: "POST" });
+}
+
+export function fetchHostNotificationItems(status?: HostNotificationStatus) {
+  const search = status ? `?status=${encodeURIComponent(status)}` : "";
+  return readmatesFetch<HostNotificationItemListResponse>(`/api/host/notifications/items${search}`);
+}
+
+export function fetchHostNotificationDetail(id: string) {
+  return readmatesFetch<HostNotificationDetailResponse>(`/api/host/notifications/items/${encodeURIComponent(id)}`);
+}
+
+export function retryHostNotification(id: string) {
+  return readmatesFetch<HostNotificationDetailResponse>(
+    `/api/host/notifications/items/${encodeURIComponent(id)}/retry`,
+    { method: "POST" },
+  );
+}
+
+export function restoreHostNotification(id: string) {
+  return readmatesFetch<HostNotificationDetailResponse>(
+    `/api/host/notifications/items/${encodeURIComponent(id)}/restore`,
+    { method: "POST" },
+  );
+}
+
+export function sendHostNotificationTestMail(request: SendNotificationTestMailRequest) {
+  return readmatesFetch<NotificationTestMailAuditItem>("/api/host/notifications/test-mail", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+}
+
+export function fetchHostNotificationTestMailAudit() {
+  return readmatesFetch<NotificationTestMailAuditItem[]>("/api/host/notifications/test-mail/audit");
 }
 
 export function fetchHostSessions() {

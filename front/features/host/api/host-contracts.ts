@@ -208,6 +208,13 @@ export type HostDashboardResponse = {
   }>;
 };
 
+export type HostNotificationStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD";
+export type HostNotificationEventType =
+  | "NEXT_BOOK_PUBLISHED"
+  | "SESSION_REMINDER_DUE"
+  | "FEEDBACK_DOCUMENT_PUBLISHED"
+  | "REVIEW_PUBLISHED";
+
 export type HostNotificationSummary = {
   pending: number;
   failed: number;
@@ -215,11 +222,50 @@ export type HostNotificationSummary = {
   sentLast24h: number;
   latestFailures: Array<{
     id: string;
-    eventType: "NEXT_BOOK_PUBLISHED" | "SESSION_REMINDER_DUE" | "FEEDBACK_DOCUMENT_PUBLISHED";
+    eventType: HostNotificationEventType;
     recipientEmail: string;
     attemptCount: number;
     updatedAt: string;
   }>;
+};
+
+export type HostNotificationItem = {
+  id: string;
+  eventType: HostNotificationEventType;
+  status: HostNotificationStatus;
+  recipientEmail: string;
+  attemptCount: number;
+  nextAttemptAt: string;
+  updatedAt: string;
+};
+
+export type HostNotificationItemListResponse = {
+  items: HostNotificationItem[];
+};
+
+export type HostNotificationMetadata = {
+  sessionNumber?: number;
+  bookTitle?: string;
+};
+
+export type HostNotificationDetailResponse = HostNotificationItem & {
+  subject: string;
+  deepLinkPath: string;
+  metadata: HostNotificationMetadata;
+  lastError: string | null;
+  createdAt: string;
+};
+
+export type SendNotificationTestMailRequest = {
+  recipientEmail: string;
+};
+
+export type NotificationTestMailAuditItem = {
+  id: string;
+  recipientEmail: string;
+  status: "SENT" | "FAILED";
+  lastError: string | null;
+  createdAt: string;
 };
 
 export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
