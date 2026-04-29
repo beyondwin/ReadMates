@@ -312,7 +312,7 @@ class JdbcNotificationDeliveryAdapter(
               and sessions.id = ?
               and $statePredicate
               and sessions.visibility in ('MEMBER', 'PUBLIC')
-              and memberships.status in ('ACTIVE', 'VIEWER')
+              and memberships.status = 'ACTIVE'
             """.trimIndent(),
             { resultSet, _ -> resultSet.toDeliveryRecipient() },
             message.clubId.dbString(),
@@ -347,7 +347,7 @@ class JdbcNotificationDeliveryAdapter(
             where sessions.club_id = ?
               and sessions.id = ?
               and sessions.state in ('CLOSED', 'PUBLISHED')
-              and memberships.status in ('ACTIVE', 'VIEWER')
+              and memberships.status = 'ACTIVE'
               and (
                 session_participants.membership_id is not null
                 or memberships.role = 'HOST'
@@ -381,7 +381,7 @@ class JdbcNotificationDeliveryAdapter(
               and sessions.id = ?
               and sessions.state = 'PUBLISHED'
               and sessions.visibility in ('MEMBER', 'PUBLIC')
-              and memberships.status in ('ACTIVE', 'VIEWER')
+              and memberships.status = 'ACTIVE'
               and memberships.id <> ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toDeliveryRecipient() },

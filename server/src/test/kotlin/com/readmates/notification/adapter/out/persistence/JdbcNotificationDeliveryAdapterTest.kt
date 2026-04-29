@@ -122,6 +122,43 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     @Test
+    fun `persistPlannedDeliveries excludes viewer memberships from planned recipients`() {
+        val viewer = insertMember("joined.after.event.viewer", status = "VIEWER")
+        try {
+            insertAttendedParticipant(viewer.membershipId)
+
+            val feedbackEventId = UUID.fromString("00000000-0000-0000-0000-000000009711")
+            insertEventOutboxRow(feedbackEventId, NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED)
+            deliveryAdapter.persistPlannedDeliveries(message(feedbackEventId, NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED))
+
+            val reviewEventId = UUID.fromString("00000000-0000-0000-0000-000000009712")
+            insertEventOutboxRow(reviewEventId, NotificationEventType.REVIEW_PUBLISHED)
+            deliveryAdapter.persistPlannedDeliveries(
+                message(
+                    eventId = reviewEventId,
+                    eventType = NotificationEventType.REVIEW_PUBLISHED,
+                    authorMembershipId = membershipIdForEmail("member1@example.com"),
+                ),
+            )
+
+            val nextBookEventId = UUID.fromString("00000000-0000-0000-0000-000000009713")
+            try {
+                updateSessionState("DRAFT")
+                insertEventOutboxRow(nextBookEventId, NotificationEventType.NEXT_BOOK_PUBLISHED)
+                deliveryAdapter.persistPlannedDeliveries(message(nextBookEventId, NotificationEventType.NEXT_BOOK_PUBLISHED))
+            } finally {
+                updateSessionState("PUBLISHED")
+            }
+
+            assertThat(deliveryRowsFor(feedbackEventId, viewer.membershipId)).isZero()
+            assertThat(deliveryRowsFor(reviewEventId, viewer.membershipId)).isZero()
+            assertThat(deliveryRowsFor(nextBookEventId, viewer.membershipId)).isZero()
+        } finally {
+            deleteInsertedMember(viewer)
+        }
+    }
+
+    @Test
     fun `claimEmailDelivery leases only due email rows and mark sent requires active lease`() {
         insertEventOutboxRow()
         deliveryAdapter.persistPlannedDeliveries(message())
@@ -194,7 +231,10 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(markedAll).isZero()
     }
 
-    private fun insertEventOutboxRow() {
+    private fun insertEventOutboxRow(
+        eventId: UUID = this.eventId,
+        eventType: NotificationEventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+    ) {
         jdbcTemplate.update(
             """
             insert into notification_event_outbox (
@@ -212,7 +252,7 @@ class JdbcNotificationDeliveryAdapterTest(
             """.trimIndent(),
             eventId.toString(),
             clubId.toString(),
-            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED.name,
+            eventType.name,
             sessionId.toString(),
             """
             {
@@ -229,11 +269,15 @@ class JdbcNotificationDeliveryAdapterTest(
         )
     }
 
-    private fun message(): NotificationEventMessage =
+    private fun message(
+        eventId: UUID = this.eventId,
+        eventType: NotificationEventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+        authorMembershipId: UUID? = null,
+    ): NotificationEventMessage =
         NotificationEventMessage(
             eventId = eventId,
             clubId = clubId,
-            eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+            eventType = eventType,
             aggregateType = "SESSION",
             aggregateId = sessionId,
             occurredAt = OffsetDateTime.of(2026, 4, 29, 3, 0, 0, 0, ZoneOffset.UTC),
@@ -241,6 +285,7 @@ class JdbcNotificationDeliveryAdapterTest(
                 sessionId = sessionId,
                 sessionNumber = 1,
                 bookTitle = "팩트풀니스",
+                authorMembershipId = authorMembershipId,
             ),
         )
 
@@ -268,6 +313,10 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     private fun insertActiveMember(emailPrefix: String): InsertedMember {
+        return insertMember(emailPrefix, status = "ACTIVE")
+    }
+
+    private fun insertMember(emailPrefix: String, status: String): InsertedMember {
         val idSuffix = UUID.randomUUID().toString()
         val userId = UUID.randomUUID()
         val membershipId = UUID.randomUUID()
@@ -285,11 +334,12 @@ class JdbcNotificationDeliveryAdapterTest(
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), ?)
+            values (?, ?, ?, 'MEMBER', ?, utc_timestamp(6), ?)
             """.trimIndent(),
             membershipId.toString(),
             clubId.toString(),
             userId.toString(),
+            status,
             "joined-${idSuffix.take(8)}",
         )
         return InsertedMember(userId = userId, membershipId = membershipId)
@@ -324,7 +374,31 @@ class JdbcNotificationDeliveryAdapterTest(
         )
     }
 
+    private fun updateSessionState(state: String) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = ?
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            state,
+            sessionId.toString(),
+            clubId.toString(),
+        )
+    }
+
     private fun deleteInsertedMember(member: InsertedMember) {
+        jdbcTemplate.update(
+            "delete from member_notifications where club_id = ? and recipient_membership_id = ?",
+            clubId.toString(),
+            member.membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            "delete from notification_deliveries where club_id = ? and recipient_membership_id = ?",
+            clubId.toString(),
+            member.membershipId.toString(),
+        )
         jdbcTemplate.update(
             "delete from session_participants where club_id = ? and membership_id = ?",
             clubId.toString(),
@@ -388,6 +462,19 @@ class JdbcNotificationDeliveryAdapterTest(
             membershipId.toString(),
             channel.name,
             status.name,
+        ) ?: 0
+
+    private fun deliveryRowsFor(eventId: UUID, membershipId: UUID): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_deliveries
+            where event_id = ?
+              and recipient_membership_id = ?
+            """.trimIndent(),
+            Int::class.java,
+            eventId.toString(),
+            membershipId.toString(),
         ) ?: 0
 
     private fun pendingEmailDeliveryIdFor(email: String): UUID =
