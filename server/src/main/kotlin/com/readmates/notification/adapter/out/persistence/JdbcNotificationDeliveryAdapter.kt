@@ -172,6 +172,17 @@ class JdbcNotificationDeliveryAdapter(
         return claimedDeliveryItems(jdbcTemplate, ids)
     }
 
+    override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
+        jdbcTemplate().query(
+            """
+            select status
+            from notification_deliveries
+            where id = ?
+            """.trimIndent(),
+            { resultSet, _ -> NotificationDeliveryStatus.valueOf(resultSet.getString("status")) },
+            id.dbString(),
+        ).firstOrNull()
+
     override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean =
         jdbcTemplate().update(
             """

@@ -84,9 +84,47 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
-    fun `dispatch skips email delivery when row cannot be claimed`() {
+    fun `dispatch throws when failed email delivery is not claimable yet`() {
         val deliveryPort = FakeDeliveryPort(
-            deliveries = listOf(emailDelivery()),
+            deliveries = listOf(emailDelivery(status = NotificationDeliveryStatus.FAILED)),
+            claimable = false,
+        )
+        val mailPort = RecordingMailPort()
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("not claimable")
+
+        assertThat(deliveryPort.claimedIds).containsExactly(emailDelivery().id)
+        assertThat(mailPort.sent).isEmpty()
+        assertThat(deliveryPort.sent).isEmpty()
+        assertThat(deliveryPort.failed).isEmpty()
+        assertThat(deliveryPort.dead).isEmpty()
+    }
+
+    @Test
+    fun `dispatch skips already sent email delivery when row cannot be claimed`() {
+        val deliveryPort = FakeDeliveryPort(
+            deliveries = listOf(emailDelivery(status = NotificationDeliveryStatus.SENT)),
+            claimable = false,
+        )
+        val mailPort = RecordingMailPort()
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        service.dispatch(message())
+
+        assertThat(deliveryPort.claimedIds).containsExactly(emailDelivery().id)
+        assertThat(mailPort.sent).isEmpty()
+        assertThat(deliveryPort.sent).isEmpty()
+        assertThat(deliveryPort.failed).isEmpty()
+        assertThat(deliveryPort.dead).isEmpty()
+    }
+
+    @Test
+    fun `dispatch skips already skipped email delivery when row cannot be claimed`() {
+        val deliveryPort = FakeDeliveryPort(
+            deliveries = listOf(emailDelivery(status = NotificationDeliveryStatus.SKIPPED)),
             claimable = false,
         )
         val mailPort = RecordingMailPort()
@@ -116,14 +154,17 @@ class NotificationDispatchServiceTest {
             ),
         )
 
-    private fun emailDelivery(attemptCount: Int = 0): NotificationDeliveryItem =
+    private fun emailDelivery(
+        attemptCount: Int = 0,
+        status: NotificationDeliveryStatus = NotificationDeliveryStatus.PENDING,
+    ): NotificationDeliveryItem =
         NotificationDeliveryItem(
             id = UUID.fromString("00000000-0000-0000-0000-000000000401"),
             eventId = message().eventId,
             clubId = message().clubId,
             recipientMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000501"),
             channel = NotificationChannel.EMAIL,
-            status = NotificationDeliveryStatus.PENDING,
+            status = status,
             attemptCount = attemptCount,
             lockedAt = null,
             recipientEmail = "member@example.com",
@@ -212,6 +253,9 @@ class NotificationDispatchServiceTest {
                 .filter { it.channel == NotificationChannel.EMAIL }
                 .take(limit.coerceAtLeast(0))
                 .mapNotNull { claimEmailDelivery(it.id) }
+
+        override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
+            deliveries.firstOrNull { it.id == id }?.status
 
         override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean {
             sent += id to lockedAt
