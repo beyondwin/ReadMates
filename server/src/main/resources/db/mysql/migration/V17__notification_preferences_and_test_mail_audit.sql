@@ -32,5 +32,5 @@ create table notification_test_mail_audit (
     foreign key (host_membership_id, club_id) references memberships(id, club_id),
   constraint notification_test_mail_audit_status_check check (status in ('SENT', 'FAILED')),
   constraint notification_test_mail_audit_mask_check check (length(trim(recipient_masked_email)) > 0),
-  constraint notification_test_mail_audit_hash_check check (recipient_email_hash regexp '^[0-9a-f]{64}$')
+  constraint notification_test_mail_audit_hash_check check (regexp_like(recipient_email_hash, '^[0-9a-f]{64}$', 'c'))
 );

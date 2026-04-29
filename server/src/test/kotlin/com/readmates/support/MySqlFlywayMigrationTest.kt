@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.UncategorizedSQLException
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
@@ -259,7 +260,9 @@ class MySqlFlywayMigrationTest(
         assertTrue(checkConstraintClause("notification_test_mail_audit_status_check").contains("SENT"))
         assertTrue(checkConstraintClause("notification_test_mail_audit_status_check").contains("FAILED"))
         assertTrue(checkConstraintClause("notification_test_mail_audit_mask_check").contains("trim"))
-        assertTrue(checkConstraintClause("notification_test_mail_audit_hash_check").contains("^[0-9a-f]{64}$"))
+        val hashCheckClause = checkConstraintClause("notification_test_mail_audit_hash_check")
+        assertTrue(hashCheckClause.contains("regexp_like"))
+        assertTrue(hashCheckClause.contains("^[0-9a-f]{64}$"))
 
         val suffix = UUID.randomUUID().toString().take(8)
         val clubId = UUID.randomUUID().toString()
@@ -308,7 +311,25 @@ class MySqlFlywayMigrationTest(
             assertEquals(true, preferences["session_reminder_due_enabled"])
             assertEquals(true, preferences["feedback_document_published_enabled"])
             assertEquals(false, preferences["review_published_enabled"])
+
+            insertTestMailAudit(
+                id = UUID.randomUUID().toString(),
+                clubId = clubId,
+                hostMembershipId = membershipId,
+                recipientEmailHash = "a".repeat(64),
+            )
+
+            val uppercaseHashError = assertThrows(UncategorizedSQLException::class.java) {
+                insertTestMailAudit(
+                    id = UUID.randomUUID().toString(),
+                    clubId = clubId,
+                    hostMembershipId = membershipId,
+                    recipientEmailHash = "A".repeat(64),
+                )
+            }
+            assertTrue(uppercaseHashError.message.orEmpty().contains("notification_test_mail_audit_hash_check"))
         } finally {
+            deleteWhereIn("notification_test_mail_audit", "host_membership_id", setOf(membershipId))
             deleteWhereIn("notification_preferences", "membership_id", setOf(membershipId))
             deleteWhereIn("memberships", "id", setOf(membershipId))
             deleteWhereIn("users", "id", setOf(userId))
@@ -350,6 +371,31 @@ class MySqlFlywayMigrationTest(
             clubId,
             userId,
             shortName,
+        )
+    }
+
+    private fun insertTestMailAudit(
+        id: String,
+        clubId: String,
+        hostMembershipId: String,
+        recipientEmailHash: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_test_mail_audit (
+              id,
+              club_id,
+              host_membership_id,
+              recipient_masked_email,
+              recipient_email_hash,
+              status
+            )
+            values (?, ?, ?, 'n***@example.com', ?, 'SENT')
+            """.trimIndent(),
+            id,
+            clubId,
+            hostMembershipId,
+            recipientEmailHash,
         )
     }
 
