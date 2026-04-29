@@ -9,8 +9,6 @@ import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.model.sanitizeNotificationError
-import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
-import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
 import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
@@ -45,8 +43,6 @@ class NotificationOutboxService(
     @param:Value("\${readmates.notifications.worker.max-attempts:5}") private val maxAttempts: Int,
     @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
 ) : ProcessNotificationOutboxUseCase,
-    GetHostNotificationSummaryUseCase,
-    ManageHostNotificationsUseCase,
     ManageNotificationPreferencesUseCase,
     SendNotificationTestMailUseCase {
 
@@ -84,24 +80,24 @@ class NotificationOutboxService(
         return deliverAll(items)
     }
 
-    override fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary {
+    fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary {
         val currentHost = requireHost(host)
         return notificationOutboxPort.hostSummary(currentHost.clubId)
     }
 
-    override fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList {
+    fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList {
         val currentHost = requireHost(host)
         val clampedQuery = query.copy(limit = query.limit.coerceIn(1, 100))
         return notificationOutboxPort.listHostItems(currentHost.clubId, clampedQuery)
     }
 
-    override fun detail(host: CurrentMember, id: UUID): HostNotificationDetail {
+    fun detail(host: CurrentMember, id: UUID): HostNotificationDetail {
         val currentHost = requireHost(host)
         return notificationOutboxPort.hostItemDetail(currentHost.clubId, id)
             ?: throw notificationAccessDenied()
     }
 
-    override fun retry(host: CurrentMember, id: UUID): HostNotificationDetail {
+    fun retry(host: CurrentMember, id: UUID): HostNotificationDetail {
         val currentHost = requireHost(host)
         if (!deliveryEnabled) {
             return notificationOutboxPort.retryableHostItemDetail(currentHost.clubId, id)
@@ -115,7 +111,7 @@ class NotificationOutboxService(
             ?: throw notificationAccessDenied()
     }
 
-    override fun restore(host: CurrentMember, id: UUID): HostNotificationDetail {
+    fun restore(host: CurrentMember, id: UUID): HostNotificationDetail {
         val currentHost = requireHost(host)
         if (!notificationOutboxPort.restoreDeadForClub(currentHost.clubId, id)) {
             throw notificationAccessDenied()

@@ -1,9 +1,11 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventOutboxPort
+import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -159,4 +161,10 @@ private class RecordingEventOutbox : NotificationEventOutboxPort {
     override fun markPublishDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = error("unused")
 
     override fun loadMessage(eventId: UUID): NotificationEventMessage? = error("unused")
+
+    override fun listHostEvents(
+        clubId: UUID,
+        status: NotificationEventOutboxStatus?,
+        limit: Int,
+    ): List<HostNotificationEvent> = error("unused")
 }

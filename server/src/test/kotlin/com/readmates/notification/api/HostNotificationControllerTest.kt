@@ -2,6 +2,10 @@ package com.readmates.notification.api
 
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
+import com.readmates.notification.domain.NotificationEventOutboxStatus
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
@@ -32,6 +36,10 @@ import java.util.Properties
 private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
     delete from notification_test_mail_audit
     where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_deliveries
+    where dedupe_key like 'host-notification-controller-test-%';
+    delete from notification_event_outbox
+    where dedupe_key like 'host-notification-controller-test-%';
     delete from notification_outbox
     where dedupe_key like 'host-notification-controller-test-%';
     delete from clubs
@@ -121,26 +129,53 @@ class HostNotificationControllerTest(
     }
 
     @Test
-    fun `host can list notification outbox items with masked recipients`() {
-        insertNotification(
-            id = "00000000-0000-0000-0000-000000009401",
+    fun `host can list notification event and delivery ledgers with masked recipients`() {
+        insertOtherClub()
+        insertNotificationEvent(
+            id = "00000000-0000-0000-0000-000000009501",
             clubId = "00000000-0000-0000-0000-000000000001",
-            status = NotificationOutboxStatus.PENDING,
-            dedupeKey = "host-notification-controller-test-list",
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+            status = NotificationEventOutboxStatus.PUBLISHED,
+            dedupeKey = "host-notification-controller-test-event-list",
+        )
+        insertNotificationEvent(
+            id = "00000000-0000-0000-0000-000000009502",
+            clubId = "00000000-0000-0000-0000-000000000002",
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+            status = NotificationEventOutboxStatus.PUBLISHED,
+            dedupeKey = "host-notification-controller-test-event-list-other-club",
+        )
+        insertNotificationDelivery(
+            id = "00000000-0000-0000-0000-000000009601",
+            eventId = "00000000-0000-0000-0000-000000009501",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            recipientMembershipId = "00000000-0000-0000-0000-000000000202",
+            channel = NotificationChannel.EMAIL,
+            status = NotificationDeliveryStatus.SENT,
+            dedupeKey = "host-notification-controller-test-delivery-list",
         )
 
-        val response = mockMvc.get("/api/host/notifications/items?status=PENDING") {
+        mockMvc.get("/api/host/notifications/events") {
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009401") }
+            jsonPath("$.items.length()") { value(1) }
+            jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009501") }
+            jsonPath("$.items[0].eventType") { value("NEXT_BOOK_PUBLISHED") }
+            jsonPath("$.items[0].status") { value("PUBLISHED") }
+        }
+
+        val response = mockMvc.get("/api/host/notifications/deliveries") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009601") }
+            jsonPath("$.items[0].channel") { value("EMAIL") }
+            jsonPath("$.items[0].status") { value("SENT") }
             jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
-            jsonPath("$.items[0].eventType") { value("FEEDBACK_DOCUMENT_PUBLISHED") }
-            jsonPath("$.items[0].status") { value("PENDING") }
         }.andReturn().response.contentAsString
 
-        assertThat(response).doesNotContain("subject")
-        assertThat(response).doesNotContain("member@example.com")
+        assertThat(response).doesNotContain("member1@example.com")
     }
 
     @Test
@@ -440,6 +475,21 @@ class HostNotificationControllerTest(
         insertNotification(id = id, clubId = clubId, status = NotificationOutboxStatus.PENDING, dedupeKey = dedupeKey)
     }
 
+    private fun insertOtherClub() {
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (
+              '00000000-0000-0000-0000-000000000002',
+              'other-club',
+              'Other Club',
+              'Separate reading club',
+              'Separate club for notification scope tests.'
+            )
+            """.trimIndent(),
+        )
+    }
+
     private fun insertNotification(
         id: String,
         clubId: String,
@@ -485,6 +535,69 @@ class HostNotificationControllerTest(
             clubId,
             status.name,
             lastError,
+            dedupeKey,
+        )
+    }
+
+    private fun insertNotificationEvent(
+        id: String,
+        clubId: String,
+        eventType: NotificationEventType,
+        status: NotificationEventOutboxStatus,
+        dedupeKey: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_event_outbox (
+              id,
+              club_id,
+              event_type,
+              aggregate_type,
+              aggregate_id,
+              payload_json,
+              status,
+              kafka_key,
+              dedupe_key
+            )
+            values (?, ?, ?, 'SESSION', '00000000-0000-0000-0000-000000000301', json_object('sessionId', '00000000-0000-0000-0000-000000000301'), ?, ?, ?)
+            """.trimIndent(),
+            id,
+            clubId,
+            eventType.name,
+            status.name,
+            clubId,
+            dedupeKey,
+        )
+    }
+
+    private fun insertNotificationDelivery(
+        id: String,
+        eventId: String,
+        clubId: String,
+        recipientMembershipId: String,
+        channel: NotificationChannel,
+        status: NotificationDeliveryStatus,
+        dedupeKey: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_deliveries (
+              id,
+              event_id,
+              club_id,
+              recipient_membership_id,
+              channel,
+              status,
+              dedupe_key
+            )
+            values (?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            id,
+            eventId,
+            clubId,
+            recipientMembershipId,
+            channel.name,
+            status.name,
             dedupeKey,
         )
     }

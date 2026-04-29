@@ -6,6 +6,9 @@ import com.readmates.notification.application.port.`in`.GetHostNotificationSumma
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
 import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
+import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.security.AccessDeniedException
@@ -46,6 +49,23 @@ class HostNotificationController(
                 limit = limit,
             ),
         ).toResponse()
+
+    @GetMapping("/events")
+    fun events(
+        host: CurrentMember,
+        @RequestParam(required = false) status: NotificationEventOutboxStatus?,
+        @RequestParam(defaultValue = "50") limit: Int,
+    ): HostNotificationEventListResponse =
+        manageHostNotificationsUseCase.listEvents(host, status, limit).toResponse()
+
+    @GetMapping("/deliveries")
+    fun deliveries(
+        host: CurrentMember,
+        @RequestParam(required = false) status: NotificationDeliveryStatus?,
+        @RequestParam(required = false) channel: NotificationChannel?,
+        @RequestParam(defaultValue = "50") limit: Int,
+    ): HostNotificationDeliveryListResponse =
+        manageHostNotificationsUseCase.listDeliveries(host, status, channel, limit).toResponse()
 
     @PostMapping("/test-mail")
     fun sendTestMail(

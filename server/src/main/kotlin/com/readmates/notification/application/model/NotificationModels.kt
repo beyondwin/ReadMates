@@ -136,6 +136,33 @@ data class HostNotificationItemList(
     val items: List<HostNotificationItem>,
 )
 
+data class HostNotificationEvent(
+    val id: UUID,
+    val eventType: NotificationEventType,
+    val status: NotificationEventOutboxStatus,
+    val attemptCount: Int,
+    val createdAt: OffsetDateTime,
+    val updatedAt: OffsetDateTime,
+)
+
+data class HostNotificationEventList(
+    val items: List<HostNotificationEvent>,
+)
+
+data class HostNotificationDelivery(
+    val id: UUID,
+    val eventId: UUID,
+    val channel: NotificationChannel,
+    val status: NotificationDeliveryStatus,
+    val recipientEmail: String?,
+    val attemptCount: Int,
+    val updatedAt: OffsetDateTime,
+)
+
+data class HostNotificationDeliveryList(
+    val items: List<HostNotificationDelivery>,
+)
+
 enum class NotificationTestMailStatus {
     SENT,
     FAILED,

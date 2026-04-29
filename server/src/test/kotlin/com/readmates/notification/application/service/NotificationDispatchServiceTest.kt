@@ -1,6 +1,7 @@
 package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
+import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
@@ -418,6 +419,13 @@ class NotificationDispatchServiceTest {
             channel: NotificationChannel?,
             status: NotificationDeliveryStatus,
         ): Int = 0
+
+        override fun listHostDeliveries(
+            clubId: UUID,
+            status: NotificationDeliveryStatus?,
+            channel: NotificationChannel?,
+            limit: Int,
+        ): List<HostNotificationDelivery> = error("unused")
     }
 
     private class RecordingMailPort : MailDeliveryPort {

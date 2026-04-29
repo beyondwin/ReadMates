@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
@@ -242,6 +243,29 @@ class JdbcNotificationEventOutboxAdapter(
             eventId.dbString(),
         ).firstOrNull()
 
+    override fun listHostEvents(
+        clubId: UUID,
+        status: NotificationEventOutboxStatus?,
+        limit: Int,
+    ): List<HostNotificationEvent> {
+        val statusPredicate = if (status == null) "" else "and status = ?"
+        val args = mutableListOf<Any>(clubId.dbString())
+        status?.let { args += it.name }
+        args += limit
+        return jdbcTemplate().query(
+            """
+            select id, event_type, status, attempt_count, created_at, updated_at
+            from notification_event_outbox
+            where club_id = ?
+              $statusPredicate
+            order by updated_at desc, created_at desc, id desc
+            limit ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationEvent() },
+            *args.toTypedArray(),
+        )
+    }
+
     private fun ResultSet.toNotificationEventOutboxItem(): NotificationEventOutboxItem =
         NotificationEventOutboxItem(
             id = uuid("id"),
@@ -266,6 +290,16 @@ class JdbcNotificationEventOutboxAdapter(
             aggregateId = uuid("aggregate_id"),
             occurredAt = utcOffsetDateTime("created_at"),
             payload = parsePayload(getString("payload_json")),
+        )
+
+    private fun ResultSet.toHostNotificationEvent(): HostNotificationEvent =
+        HostNotificationEvent(
+            id = uuid("id"),
+            eventType = NotificationEventType.valueOf(getString("event_type")),
+            status = NotificationEventOutboxStatus.valueOf(getString("status")),
+            attemptCount = getInt("attempt_count"),
+            createdAt = utcOffsetDateTime("created_at"),
+            updatedAt = utcOffsetDateTime("updated_at"),
         )
 
     private fun parsePayload(rawPayload: String): NotificationEventPayload =
