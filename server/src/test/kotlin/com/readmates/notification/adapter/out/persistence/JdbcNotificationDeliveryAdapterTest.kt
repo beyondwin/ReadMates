@@ -235,9 +235,9 @@ class JdbcNotificationDeliveryAdapterTest(
         deliveryAdapter.persistPlannedDeliveries(message())
         val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
 
-        updateSessionCopy(number = 99, bookTitle = "변경된 책")
-
-        val claimed = deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
+        val claimed = withTemporarySessionCopy(number = 99, bookTitle = "변경된 책") {
+            deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
+        }
 
         assertThat(claimed.subject).isEqualTo("피드백 문서가 올라왔습니다")
         assertThat(claimed.bodyText).contains("1회차 팩트풀니스")
@@ -424,6 +424,28 @@ class JdbcNotificationDeliveryAdapterTest(
             sessionId.toString(),
             clubId.toString(),
         )
+    }
+
+    private fun <T> withTemporarySessionCopy(number: Int, bookTitle: String, block: () -> T): T {
+        val original = jdbcTemplate.queryForMap(
+            """
+            select number, book_title
+            from sessions
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            sessionId.toString(),
+            clubId.toString(),
+        )
+        return try {
+            updateSessionCopy(number, bookTitle)
+            block()
+        } finally {
+            updateSessionCopy(
+                number = (original["number"] as Number).toInt(),
+                bookTitle = original["book_title"].toString(),
+            )
+        }
     }
 
     private fun updateSessionState(state: String) {
