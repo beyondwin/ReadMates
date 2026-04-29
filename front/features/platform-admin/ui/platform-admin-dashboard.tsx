@@ -28,7 +28,19 @@ type PlatformAdminSummaryView = {
   domainsRequiringAction?: PlatformAdminDomainView[];
 };
 
-export function PlatformAdminDashboard({ summary }: { summary: PlatformAdminSummaryView }) {
+type PlatformAdminDashboardProps = {
+  summary: PlatformAdminSummaryView;
+  checkingDomainIds?: ReadonlySet<string>;
+  domainCheckErrors?: Record<string, string>;
+  onCheckDomain?: (domainId: string) => void;
+};
+
+export function PlatformAdminDashboard({
+  summary,
+  checkingDomainIds = new Set<string>(),
+  domainCheckErrors = {},
+  onCheckDomain,
+}: PlatformAdminDashboardProps) {
   const domains = summary.domains ?? summary.domainsRequiringAction ?? [];
 
   return (
@@ -60,7 +72,13 @@ export function PlatformAdminDashboard({ summary }: { summary: PlatformAdminSumm
           {domains.length > 0 ? (
             <div className="platform-admin-domain-list">
               {domains.map((domain) => (
-                <DomainProvisioningRow key={domain.id} domain={domain} />
+                <DomainProvisioningRow
+                  key={domain.id}
+                  domain={domain}
+                  isChecking={checkingDomainIds.has(domain.id)}
+                  checkError={domainCheckErrors[domain.id]}
+                  onCheckDomain={onCheckDomain}
+                />
               ))}
             </div>
           ) : (
@@ -81,7 +99,19 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DomainProvisioningRow({ domain }: { domain: PlatformAdminDomainView }) {
+function DomainProvisioningRow({
+  domain,
+  isChecking,
+  checkError,
+  onCheckDomain,
+}: {
+  domain: PlatformAdminDomainView;
+  isChecking: boolean;
+  checkError?: string;
+  onCheckDomain?: (domainId: string) => void;
+}) {
+  const canCheck = domain.status !== "ACTIVE" && domain.status !== "DISABLED" && Boolean(onCheckDomain);
+
   return (
     <article className="surface platform-admin-domain-row">
       <div className="platform-admin-domain-row__main">
@@ -99,6 +129,17 @@ function DomainProvisioningRow({ domain }: { domain: PlatformAdminDomainView }) 
       ) : (
         <p className="platform-admin-domain-row__action">{domainActionText(domain.status)}</p>
       )}
+      {canCheck ? (
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm platform-admin-domain-row__check"
+          onClick={() => onCheckDomain?.(domain.id)}
+          disabled={isChecking}
+        >
+          {isChecking ? "확인 중" : "상태 확인"}
+        </button>
+      ) : null}
+      {checkError ? <p className="tiny danger platform-admin-domain-row__error">{checkError}</p> : null}
     </article>
   );
 }

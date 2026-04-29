@@ -2,7 +2,9 @@ package com.readmates.club.adapter.out.persistence
 
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.port.out.CreateClubDomainPort
+import com.readmates.club.application.port.out.LoadClubDomainProvisioningPort
 import com.readmates.club.application.port.out.LoadPlatformAdminSummaryPort
+import com.readmates.club.application.port.out.UpdateClubDomainProvisioningPort
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.db.dbString
@@ -16,13 +18,17 @@ import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
+import java.sql.Timestamp
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
 class JdbcPlatformAdminAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : LoadPlatformAdminSummaryPort,
-    CreateClubDomainPort {
+    CreateClubDomainPort,
+    LoadClubDomainProvisioningPort,
+    UpdateClubDomainProvisioningPort {
     override fun countActiveClubs(): Long =
         jdbcTemplateProvider.ifAvailable?.queryForObject(
             "select count(*) from clubs where status = 'ACTIVE'",
@@ -111,6 +117,52 @@ class JdbcPlatformAdminAdapter(
         )
     }
 
+    override fun loadClubDomain(domainId: UUID): PlatformAdminClubDomain? =
+        jdbcTemplateProvider.ifAvailable?.query(
+            """
+            select id, club_id, hostname, kind, status, is_primary, verified_at, last_checked_at, provisioning_error_code
+            from club_domains
+            where id = ?
+            limit 1
+            """.trimIndent(),
+            ::mapDomain,
+            domainId.dbString(),
+        )?.firstOrNull()
+
+    @Transactional
+    override fun updateClubDomainProvisioning(
+        domainId: UUID,
+        status: ClubDomainStatus,
+        verifiedAt: OffsetDateTime?,
+        lastCheckedAt: OffsetDateTime,
+        errorCode: String?,
+    ): PlatformAdminClubDomain {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable
+            ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Platform admin storage is unavailable")
+
+        val updatedRows = jdbcTemplate.update(
+            """
+            update club_domains
+            set status = ?,
+                verified_at = ?,
+                last_checked_at = ?,
+                provisioning_error_code = ?
+            where id = ?
+            """.trimIndent(),
+            status.name,
+            verifiedAt?.toTimestamp(),
+            lastCheckedAt.toTimestamp(),
+            errorCode,
+            domainId.dbString(),
+        )
+        if (updatedRows == 0) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club domain not found")
+        }
+
+        return loadClubDomain(domainId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club domain not found")
+    }
+
     private fun mapDomain(resultSet: ResultSet, @Suppress("UNUSED_PARAMETER") rowNumber: Int): PlatformAdminClubDomain =
         PlatformAdminClubDomain(
             id = resultSet.uuid("id"),
@@ -124,3 +176,5 @@ class JdbcPlatformAdminAdapter(
             errorCode = resultSet.getString("provisioning_error_code"),
         )
 }
+
+private fun OffsetDateTime.toTimestamp(): Timestamp = Timestamp.from(toInstant())

@@ -35,6 +35,7 @@
 - `docs/deploy/`
 - `docs/superpowers/`의 sanitized historical design and implementation records
 - 공개 릴리즈 보조 스크립트: `scripts/build-public-release-candidate.sh`, `scripts/README.md`, `scripts/public-release-check.sh`, `scripts/verify-public-release-fixtures.sh`
+- 배포 후 공개 연동 smoke script: `scripts/smoke-production-integrations.sh`
 
 디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `front/output`, `front/node_modules`, `front/dist`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. sanitized `docs/superpowers/` historical docs는 공개 후보에 포함하지만, sanitization을 거치지 않은 private historical planning docs는 공개 후보에 남길 수 없습니다. provider state, screenshot, `design`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
 
@@ -96,3 +97,30 @@ scanner pattern을 바꾼 뒤 fixture 검증을 실행합니다.
 - `.tmp` parent가 symlink이면 실행을 거부합니다. 이 기준은 공개 릴리즈 후보 builder의 cleanup guard와 맞춥니다.
 
 fixture 검증도 GitHub 게시, 저장소 공개 설정 변경, secret rotation, commit 생성을 수행하지 않습니다.
+
+## `smoke-production-integrations.sh`
+
+배포 후 Cloudflare Pages marker와 Google OAuth start redirect를 확인합니다. Secret을 요구하지 않으며, 실제 운영 결과는 공개 문서나 Git에 붙이지 않습니다.
+
+```bash
+READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+./scripts/smoke-production-integrations.sh
+```
+
+등록된 club host까지 확인할 때는 `READMATES_SMOKE_CLUB_HOST`를 추가합니다.
+
+```bash
+READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_AUTH_BASE_URL=https://<primary-domain> \
+READMATES_SMOKE_CLUB_HOST=https://<registered-club-host> \
+./scripts/smoke-production-integrations.sh
+```
+
+검사 항목:
+
+- `/.well-known/readmates-domain-check.json`이 ReadMates Cloudflare Pages marker를 반환합니다.
+- `/oauth2/authorization/google?returnTo=/app`이 Google OAuth endpoint로 redirect됩니다.
+- Google에 전달되는 `redirect_uri`가 `READMATES_SMOKE_AUTH_BASE_URL/login/oauth2/code/google`와 일치합니다.
+
+`READMATES_SMOKE_STRICT_GOOGLE=true`를 추가하면 Google 응답 본문에서 `redirect_uri_mismatch`를 탐지하려고 시도합니다. Google 로그인 화면은 지역, 계정 상태, bot 방어에 따라 응답이 바뀔 수 있으므로 기본 검사는 ReadMates가 생성하는 provider redirect URL을 기준으로 합니다.

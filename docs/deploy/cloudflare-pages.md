@@ -128,7 +128,9 @@ curl -sS "https://readmates.pages.dev/api/bff/api/public/clubs/${CLUB_SLUG}"
 
 등록형 subdomain 또는 custom domain은 DB의 `club_domains.status` workflow state와 실제 Cloudflare Pages custom domain 연결 상태를 분리해서 관리합니다. Platform admin UI에서 domain을 만들면 초기 상태는 `ACTION_REQUIRED`이며, 운영자가 Cloudflare dashboard 또는 Wrangler에서 Pages custom domain을 연결해야 합니다. Cloudflare 연결과 인증서 상태가 확인되기 전까지 public fallback URL인 `/clubs/<club-slug>`를 사용자에게 안내합니다.
 
-`ACTION_REQUIRED`, `PROVISIONING`, `ACTIVE`, `FAILED`, `DISABLED` 상태의 의미와 수동 처리 절차는 [multi-club-domains.md](multi-club-domains.md#cloudflare-pages-custom-domain-runbook)를 기준으로 운영합니다.
+Pages 배포에는 `/.well-known/readmates-domain-check.json` marker가 포함됩니다. 운영자가 custom domain을 Pages project에 연결한 뒤 Platform admin UI에서 상태 확인을 실행하면 Spring이 해당 hostname의 marker를 HTTPS로 확인하고 `ACTIVE` 또는 `FAILED`로 갱신합니다.
+
+`ACTION_REQUIRED`, `PROVISIONING`, `ACTIVE`, `FAILED`, `DISABLED` 상태의 의미와 처리 절차는 [multi-club-domains.md](multi-club-domains.md#cloudflare-pages-custom-domain-runbook)를 기준으로 운영합니다.
 
 ## 비용 상태 확인
 
