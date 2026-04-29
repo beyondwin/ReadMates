@@ -1,6 +1,7 @@
 package com.readmates.publication.application.model
 
 const val LEGACY_PUBLIC_CLUB_SLUG = "reading-sai"
+const val LEGACY_PUBLIC_CLUB_ID = "00000000-0000-0000-0000-000000000001"
 
 data class PublicClubResult(
     val clubName: String,

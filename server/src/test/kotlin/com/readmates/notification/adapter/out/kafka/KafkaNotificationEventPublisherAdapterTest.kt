@@ -293,6 +293,7 @@ class KafkaNotificationEventPublisherAdapterTest {
                     """"schemaVersion":1""",
                     """"eventId":"00000000-0000-0000-0000-000000000001"""",
                     """"clubId":"00000000-0000-0000-0000-000000000002"""",
+                    """"clubSlug":"reading-sai"""",
                     """"eventType":"NEXT_BOOK_PUBLISHED"""",
                     """"aggregateType":"SESSION"""",
                     """"aggregateId":"00000000-0000-0000-0000-000000000003"""",
@@ -304,6 +305,41 @@ class KafkaNotificationEventPublisherAdapterTest {
                     """"occurredAt":1777420800""",
                     """"targetDate":[2026,4,30]""",
                 )
+            }
+    }
+
+    @Test
+    fun `consumer value deserializer accepts legacy JSON without club slug`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                val factory = context.getBean(
+                    "notificationEventConsumerFactory",
+                    DefaultKafkaConsumerFactory::class.java,
+                ) as DefaultKafkaConsumerFactory<String, NotificationEventMessage>
+
+                val result = factory.valueDeserializer!!.deserialize(
+                    "readmates.notification.events.v1",
+                    """
+                    {
+                      "schemaVersion":1,
+                      "eventId":"00000000-0000-0000-0000-000000000001",
+                      "clubId":"00000000-0000-0000-0000-000000000002",
+                      "eventType":"NEXT_BOOK_PUBLISHED",
+                      "aggregateType":"SESSION",
+                      "aggregateId":"00000000-0000-0000-0000-000000000003",
+                      "occurredAt":"2026-04-29T00:00:00Z",
+                      "payload":{"sessionId":"00000000-0000-0000-0000-000000000003"}
+                    }
+                    """.trimIndent().toByteArray(StandardCharsets.UTF_8),
+                )
+
+                assertThat(result).isNotNull
+                assertThat(result!!.clubSlug).isNull()
+                assertThat(result.clubId).isEqualTo(UUID.fromString("00000000-0000-0000-0000-000000000002"))
             }
     }
 
@@ -443,6 +479,7 @@ private fun notificationEventMessage(
     NotificationEventMessage(
         eventId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
         clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
+        clubSlug = "reading-sai",
         eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
         aggregateType = "SESSION",
         aggregateId = UUID.fromString("00000000-0000-0000-0000-000000000003"),

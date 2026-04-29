@@ -88,6 +88,8 @@ class JdbcNotificationDeliveryAdapterTest(
         val member1Notifications = memberNotificationAdapter.listForMembership(clubId, member1, limit = 10)
         assertThat(member1Notifications).hasSize(1)
         assertThat(member1Notifications.single().title).isEqualTo("피드백 문서가 올라왔습니다")
+        assertThat(member1Notifications.single().deepLinkPath)
+            .isEqualTo("/clubs/reading-sai/app/archive?view=report")
         assertThat(memberNotificationAdapter.unreadCount(clubId, member1)).isEqualTo(1)
     }
 

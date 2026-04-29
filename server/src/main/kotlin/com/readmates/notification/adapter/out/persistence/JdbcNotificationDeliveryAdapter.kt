@@ -12,6 +12,7 @@ import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
+import com.readmates.notification.application.model.clubScopedAppPath
 import com.readmates.notification.application.model.notificationDeliveryDedupeKey
 import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
@@ -489,11 +490,13 @@ class JdbcNotificationDeliveryAdapter(
               notification_event_outbox.event_type,
               notification_event_outbox.aggregate_id,
               notification_event_outbox.payload_json,
+              clubs.slug as club_slug,
               users.email as recipient_email,
               coalesce(memberships.short_name, users.name) as display_name
             from notification_deliveries
             join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
               and notification_event_outbox.club_id = notification_deliveries.club_id
+            join clubs on clubs.id = notification_event_outbox.club_id
             join memberships on memberships.id = notification_deliveries.recipient_membership_id
               and memberships.club_id = notification_deliveries.club_id
             join users on users.id = memberships.user_id
@@ -558,9 +561,17 @@ class JdbcNotificationDeliveryAdapter(
     private fun loadPersistedEventMessage(jdbcTemplate: JdbcTemplate, eventId: UUID): NotificationEventMessage =
         jdbcTemplate.query(
             """
-            select id, club_id, event_type, aggregate_type, aggregate_id, payload_json, created_at
+            select notification_event_outbox.id,
+                   notification_event_outbox.club_id,
+                   clubs.slug as club_slug,
+                   notification_event_outbox.event_type,
+                   notification_event_outbox.aggregate_type,
+                   notification_event_outbox.aggregate_id,
+                   notification_event_outbox.payload_json,
+                   notification_event_outbox.created_at
             from notification_event_outbox
-            where id = ?
+            join clubs on clubs.id = notification_event_outbox.club_id
+            where notification_event_outbox.id = ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNotificationEventMessage() },
             eventId.dbString(),
@@ -845,11 +856,13 @@ class JdbcNotificationDeliveryAdapter(
               notification_event_outbox.event_type,
               notification_event_outbox.aggregate_id,
               notification_event_outbox.payload_json,
+              clubs.slug as club_slug,
               users.email as recipient_email,
               coalesce(memberships.short_name, users.name) as display_name
             from notification_deliveries
             join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
               and notification_event_outbox.club_id = notification_deliveries.club_id
+            join clubs on clubs.id = notification_event_outbox.club_id
             join memberships on memberships.id = notification_deliveries.recipient_membership_id
               and memberships.club_id = notification_deliveries.club_id
             join users on users.id = memberships.user_id
@@ -939,6 +952,7 @@ class JdbcNotificationDeliveryAdapter(
             aggregateType = getString("aggregate_type"),
             aggregateId = uuid("aggregate_id"),
             occurredAt = utcOffsetDateTime("created_at"),
+            clubSlug = getString("club_slug"),
             payload = parsePayload(getString("payload_json")),
         )
 
@@ -948,6 +962,7 @@ class JdbcNotificationDeliveryAdapter(
             eventType = eventType,
             aggregateId = uuid("aggregate_id"),
             payload = parsePayload(getString("payload_json")),
+            clubSlug = getString("club_slug"),
             displayName = getString("display_name"),
         )
         return ClaimedNotificationDeliveryItem(
@@ -1004,6 +1019,7 @@ class JdbcNotificationDeliveryAdapter(
             eventType = eventType,
             aggregateId = uuid("aggregate_id"),
             payload = payload,
+            clubSlug = getString("club_slug"),
             displayName = getString("display_name"),
         )
         return HostNotificationDetail(
@@ -1029,6 +1045,7 @@ class JdbcNotificationDeliveryAdapter(
             eventType = message.eventType,
             aggregateId = message.aggregateId,
             payload = message.payload,
+            clubSlug = requireNotNull(message.clubSlug) { "Notification event ${message.eventId} missing clubSlug" },
             displayName = displayName,
         )
 
@@ -1036,6 +1053,7 @@ class JdbcNotificationDeliveryAdapter(
         eventType: NotificationEventType,
         aggregateId: UUID,
         payload: NotificationEventPayload,
+        clubSlug: String,
         displayName: String?,
     ): DeliveryCopy =
         copyFor(
@@ -1043,6 +1061,7 @@ class JdbcNotificationDeliveryAdapter(
             sessionId = payload.sessionId ?: aggregateId,
             sessionNumber = payload.sessionNumber ?: 0,
             bookTitle = payload.bookTitle ?: "선정 도서",
+            clubSlug = clubSlug,
             displayName = displayName,
         )
 
@@ -1051,6 +1070,7 @@ class JdbcNotificationDeliveryAdapter(
         sessionId: UUID,
         sessionNumber: Int,
         bookTitle: String,
+        clubSlug: String,
         displayName: String?,
     ): DeliveryCopy {
         val memberName = displayName ?: "멤버"
@@ -1058,7 +1078,7 @@ class JdbcNotificationDeliveryAdapter(
             NotificationEventType.NEXT_BOOK_PUBLISHED -> DeliveryCopy(
                 title = "다음 책이 공개되었습니다",
                 body = "${sessionNumber}회차 책은 $bookTitle 입니다.",
-                deepLinkPath = "/sessions/$sessionId",
+                deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
                 emailSubject = "다음 책이 공개되었습니다",
                 emailBodyText = """
                     ${memberName}님,
@@ -1070,7 +1090,7 @@ class JdbcNotificationDeliveryAdapter(
             NotificationEventType.SESSION_REMINDER_DUE -> DeliveryCopy(
                 title = "내일 독서모임이 있습니다",
                 body = "내일 ${sessionNumber}회차 $bookTitle 모임이 있습니다.",
-                deepLinkPath = "/sessions/$sessionId",
+                deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
                 emailSubject = "내일 독서모임이 있습니다",
                 emailBodyText = """
                     ${memberName}님,
@@ -1082,7 +1102,7 @@ class JdbcNotificationDeliveryAdapter(
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> DeliveryCopy(
                 title = "피드백 문서가 올라왔습니다",
                 body = "${sessionNumber}회차 $bookTitle 피드백 문서가 올라왔습니다.",
-                deepLinkPath = "/feedback-documents",
+                deepLinkPath = clubScopedAppPath(clubSlug, "/archive?view=report"),
                 emailSubject = "피드백 문서가 올라왔습니다",
                 emailBodyText = """
                     ${memberName}님,
@@ -1094,7 +1114,7 @@ class JdbcNotificationDeliveryAdapter(
             NotificationEventType.REVIEW_PUBLISHED -> DeliveryCopy(
                 title = "새 서평이 공개되었습니다",
                 body = "${sessionNumber}회차 $bookTitle 에 새 서평이 공개되었습니다.",
-                deepLinkPath = "/notes?sessionId=$sessionId",
+                deepLinkPath = clubScopedAppPath(clubSlug, "/notes?sessionId=$sessionId"),
                 emailSubject = "새 서평이 공개되었습니다",
                 emailBodyText = """
                     ${memberName}님,

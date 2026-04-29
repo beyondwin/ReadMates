@@ -1,5 +1,7 @@
 package com.readmates.publication.application.service
 
+import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicSessionDetailResult
@@ -11,6 +13,8 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class PublicQueryServiceCacheTest {
+    private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000099")
+
     @Test
     fun `returns cached public club without loading port`() {
         val cache = PublicReadCachePort.InMemoryForTest(club = publicClub())
@@ -33,6 +37,38 @@ class PublicQueryServiceCacheTest {
         service.getSession(sessionId)
         service.getSession(sessionId)
 
+        assertEquals(1, loader.sessionLoads)
+    }
+
+    @Test
+    fun `uses resolved club id for public cache keys`() {
+        val cache = PublicReadCachePort.InMemoryForTest()
+        val loader = RecordingPublicLoader()
+        val resolver = StaticClubContextResolver(clubId)
+        val service = PublicQueryService(loader, cache, resolver)
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+
+        service.getClub("sample-book-club")
+        service.getClub("sample-book-club")
+        service.getSession("sample-book-club", sessionId)
+        service.getSession("sample-book-club", sessionId)
+
+        assertEquals(1, loader.clubLoads)
+        assertEquals(1, loader.sessionLoads)
+        assertEquals(1, resolver.slugLoads)
+    }
+
+    @Test
+    fun `does not fall back to slug cache after resolved club cache miss when public data is missing`() {
+        val cache = PublicReadCachePort.InMemoryForTest()
+        val loader = RecordingPublicLoader(club = null, session = null)
+        val service = PublicQueryService(loader, cache, StaticClubContextResolver(clubId))
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000404")
+
+        assertNull(service.getClub("sample-book-club"))
+        assertNull(service.getSession("sample-book-club", sessionId))
+
+        assertEquals(1, loader.clubLoads)
         assertEquals(1, loader.sessionLoads)
     }
 
@@ -63,10 +99,37 @@ class PublicQueryServiceCacheTest {
             return club
         }
 
+        override fun loadClub(clubSlug: String): PublicClubResult? {
+            clubLoads += 1
+            return club
+        }
+
         override fun loadSession(sessionId: UUID): PublicSessionDetailResult? {
             sessionLoads += 1
             return session ?: return null
         }
+
+        override fun loadSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult? {
+            sessionLoads += 1
+            return session ?: return null
+        }
+    }
+
+    private class StaticClubContextResolver(private val clubId: UUID) : ResolveClubContextUseCase {
+        var slugLoads = 0
+
+        override fun resolveBySlug(slug: String): ResolvedClubContext? {
+            slugLoads += 1
+            return ResolvedClubContext(
+                clubId = clubId,
+                slug = slug,
+                name = "ReadMates",
+                status = "ACTIVE",
+                hostname = null,
+            )
+        }
+
+        override fun resolveByHost(host: String?): ResolvedClubContext? = null
     }
 
     companion object {
