@@ -1,5 +1,8 @@
 package com.readmates.notification.application.port.out
 
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
@@ -19,6 +22,10 @@ interface NotificationOutboxPort {
     fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean
     fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean
     fun hostSummary(clubId: UUID): HostNotificationSummary
+    fun listHostItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList
+    fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail?
+    fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem?
+    fun restoreDeadForClub(clubId: UUID, id: UUID): Boolean
     fun outboxBacklog(): NotificationOutboxBacklog
     fun getPreferences(member: CurrentMember): NotificationPreferences
     fun savePreferences(member: CurrentMember, preferences: NotificationPreferences): NotificationPreferences

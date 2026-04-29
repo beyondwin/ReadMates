@@ -1,5 +1,10 @@
 package com.readmates.notification.application.service
 
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.auth.domain.MembershipStatus
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
@@ -12,6 +17,7 @@ import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.security.CurrentMember
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -145,6 +151,91 @@ class NotificationOutboxServiceTest {
         assertThat(port.reminderDates).containsExactly(targetDate)
     }
 
+    @Test
+    fun `listItems clamps host query limit to one hundred`() {
+        val port = FakeNotificationOutboxPort(items = emptyList())
+        val service = NotificationOutboxService(port, RecordingMailDeliveryPort(), testMetrics(), maxAttempts = 5)
+
+        service.listItems(
+            host(),
+            HostNotificationItemQuery(
+                status = NotificationOutboxStatus.PENDING,
+                eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                limit = 250,
+            ),
+        )
+
+        assertThat(port.listRequests).containsExactly(
+            HostNotificationItemQuery(
+                status = NotificationOutboxStatus.PENDING,
+                eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                limit = 100,
+            ),
+        )
+    }
+
+    @Test
+    fun `retry claims one eligible host club notification and returns detail`() {
+        val item = sampleItem()
+        val detail = sampleDetail(id = item.id, status = NotificationOutboxStatus.SENT)
+        val port = FakeNotificationOutboxPort(
+            items = emptyList(),
+            claimOneItems = mapOf(item.id to item),
+            itemDetails = mapOf(item.id to detail),
+        )
+        val mail = RecordingMailDeliveryPort()
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
+
+        val result = service.retry(host(), item.id)
+
+        assertThat(port.claimOneRequests).containsExactly(item.clubId to item.id)
+        assertThat(mail.sentSubjects).containsExactly("피드백 문서가 올라왔습니다")
+        assertThat(port.sentIds).containsExactly(item.id)
+        assertThat(result).isEqualTo(detail)
+    }
+
+    @Test
+    fun `retry denies when no eligible row can be claimed`() {
+        val itemId = UUID.fromString("00000000-0000-0000-0000-000000000701")
+        val port = FakeNotificationOutboxPort(items = emptyList())
+        val service = NotificationOutboxService(port, RecordingMailDeliveryPort(), testMetrics(), maxAttempts = 5)
+
+        assertThatThrownBy { service.retry(host(), itemId) }
+            .hasMessageContaining("Notification not found")
+
+        assertThat(port.claimOneRequests).containsExactly(host().clubId to itemId)
+    }
+
+    @Test
+    fun `restore only restores dead host club notifications and returns pending detail`() {
+        val itemId = UUID.fromString("00000000-0000-0000-0000-000000000701")
+        val detail = sampleDetail(id = itemId, status = NotificationOutboxStatus.PENDING)
+        val port = FakeNotificationOutboxPort(
+            items = emptyList(),
+            restoreResults = mapOf(itemId to true),
+            itemDetails = mapOf(itemId to detail),
+        )
+        val service = NotificationOutboxService(port, RecordingMailDeliveryPort(), testMetrics(), maxAttempts = 5)
+
+        val result = service.restore(host(), itemId)
+
+        assertThat(port.restoreRequests).containsExactly(host().clubId to itemId)
+        assertThat(result).isEqualTo(detail)
+    }
+
+    @Test
+    fun `host notification operations reject non host members`() {
+        val port = FakeNotificationOutboxPort(items = emptyList())
+        val service = NotificationOutboxService(port, RecordingMailDeliveryPort(), testMetrics(), maxAttempts = 5)
+
+        assertThatThrownBy {
+            service.listItems(
+                host(role = MembershipRole.MEMBER),
+                HostNotificationItemQuery(status = null, eventType = null, limit = 50),
+            )
+        }.hasMessageContaining("Host role required")
+    }
+
     private fun sampleItem(attemptCount: Int = 0): NotificationOutboxItem =
         NotificationOutboxItem(
             id = UUID.fromString("00000000-0000-0000-0000-000000000701"),
@@ -157,6 +248,35 @@ class NotificationOutboxServiceTest {
             status = NotificationOutboxStatus.SENDING,
             attemptCount = attemptCount,
             lockedAt = OffsetDateTime.of(2026, 4, 29, 0, 0, 0, 123456000, ZoneOffset.UTC),
+        )
+
+    private fun sampleDetail(
+        id: UUID,
+        status: NotificationOutboxStatus,
+    ): HostNotificationDetail =
+        HostNotificationDetail(
+            id = id,
+            eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+            status = status,
+            recipientEmail = "member@example.com",
+            subject = "피드백 문서가 올라왔습니다",
+            deepLinkPath = "/feedback-documents",
+            attemptCount = 1,
+            lastError = null,
+            createdAt = OffsetDateTime.of(2026, 4, 29, 0, 0, 0, 123456000, ZoneOffset.UTC),
+            updatedAt = OffsetDateTime.of(2026, 4, 29, 0, 1, 0, 123456000, ZoneOffset.UTC),
+        )
+
+    private fun host(role: MembershipRole = MembershipRole.HOST): CurrentMember =
+        CurrentMember(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            email = "host@example.com",
+            displayName = "호스트",
+            accountName = "김호스트",
+            role = role,
+            membershipStatus = MembershipStatus.ACTIVE,
         )
 }
 
@@ -182,10 +302,16 @@ private class FailingMailDeliveryPort(
 private class FakeNotificationOutboxPort(
     private val items: List<NotificationOutboxItem>,
     private val markSentUpdatesRow: Boolean = true,
+    private val claimOneItems: Map<UUID, NotificationOutboxItem> = emptyMap(),
+    private val itemDetails: Map<UUID, HostNotificationDetail> = emptyMap(),
+    private val restoreResults: Map<UUID, Boolean> = emptyMap(),
 ) : NotificationOutboxPort {
     val sentIds = mutableListOf<UUID>()
     val claimRequests = mutableListOf<Int>()
     val clubClaimRequests = mutableListOf<Pair<UUID, Int>>()
+    val claimOneRequests = mutableListOf<Pair<UUID, UUID>>()
+    val listRequests = mutableListOf<HostNotificationItemQuery>()
+    val restoreRequests = mutableListOf<Pair<UUID, UUID>>()
     val failedIds = mutableListOf<UUID>()
     val failedErrors = mutableListOf<String>()
     val failedDelays = mutableListOf<Long>()
@@ -242,6 +368,24 @@ private class FakeNotificationOutboxPort(
             sentLast24h = 0,
             latestFailures = emptyList(),
         )
+
+    override fun listHostItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList {
+        listRequests += query
+        return HostNotificationItemList(emptyList())
+    }
+
+    override fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
+        itemDetails[id]
+
+    override fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem? {
+        claimOneRequests += clubId to id
+        return claimOneItems[id]?.takeIf { it.clubId == clubId }
+    }
+
+    override fun restoreDeadForClub(clubId: UUID, id: UUID): Boolean {
+        restoreRequests += clubId to id
+        return restoreResults[id] == true
+    }
 
     override fun outboxBacklog(): NotificationOutboxBacklog =
         NotificationOutboxBacklog(

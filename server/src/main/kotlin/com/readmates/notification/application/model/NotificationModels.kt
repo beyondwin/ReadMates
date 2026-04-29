@@ -26,6 +26,39 @@ data class HostNotificationSummary(
     val latestFailures: List<HostNotificationFailure>,
 )
 
+data class HostNotificationItemQuery(
+    val status: NotificationOutboxStatus?,
+    val eventType: NotificationEventType?,
+    val limit: Int,
+)
+
+data class HostNotificationItem(
+    val id: UUID,
+    val eventType: NotificationEventType,
+    val status: NotificationOutboxStatus,
+    val recipientEmail: String,
+    val attemptCount: Int,
+    val nextAttemptAt: OffsetDateTime,
+    val updatedAt: OffsetDateTime,
+)
+
+data class HostNotificationItemList(
+    val items: List<HostNotificationItem>,
+)
+
+data class HostNotificationDetail(
+    val id: UUID,
+    val eventType: NotificationEventType,
+    val status: NotificationOutboxStatus,
+    val recipientEmail: String,
+    val subject: String,
+    val deepLinkPath: String,
+    val attemptCount: Int,
+    val lastError: String?,
+    val createdAt: OffsetDateTime,
+    val updatedAt: OffsetDateTime,
+)
+
 data class NotificationOutboxBacklog(
     val pending: Int,
     val failed: Int,

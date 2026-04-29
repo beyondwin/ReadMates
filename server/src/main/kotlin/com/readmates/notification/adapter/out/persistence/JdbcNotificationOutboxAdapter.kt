@@ -1,6 +1,10 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.HostNotificationFailure
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationItem
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
@@ -340,6 +344,116 @@ class JdbcNotificationOutboxAdapter(
             latestFailures = latestFailures(clubId),
         )
 
+    override fun listHostItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList {
+        val predicates = mutableListOf("club_id = ?")
+        val args = mutableListOf<Any>(clubId.dbString())
+        query.status?.let {
+            predicates += "status = ?"
+            args += it.name
+        }
+        query.eventType?.let {
+            predicates += "event_type = ?"
+            args += it.name
+        }
+        args += query.limit.coerceIn(1, 100)
+
+        val items = jdbcTemplate().query(
+            """
+            select id, event_type, status, recipient_email, attempt_count, next_attempt_at, updated_at
+            from notification_outbox
+            where ${predicates.joinToString(" and ")}
+            order by updated_at desc, created_at desc
+            limit ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationItem() },
+            *args.toTypedArray(),
+        )
+
+        return HostNotificationItemList(items)
+    }
+
+    override fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
+        jdbcTemplate().query(
+            """
+            select id, event_type, status, recipient_email, subject, deep_link_path,
+                   attempt_count, last_error, created_at, updated_at
+            from notification_outbox
+            where club_id = ?
+              and id = ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationDetail() },
+            clubId.dbString(),
+            id.dbString(),
+        ).firstOrNull()
+
+    @Transactional
+    override fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem? {
+        val jdbcTemplate = jdbcTemplate()
+        resetStaleSendingRows(jdbcTemplate, clubId)
+
+        val claimedId = jdbcTemplate.query(
+            """
+            select id
+            from notification_outbox
+            where club_id = ?
+              and id = ?
+              and status in ('PENDING', 'FAILED')
+              and next_attempt_at <= utc_timestamp(6)
+            limit 1
+            for update skip locked
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.uuid("id") },
+            clubId.dbString(),
+            id.dbString(),
+        ).firstOrNull() ?: return null
+
+        val updated = jdbcTemplate.update(
+            """
+            update notification_outbox
+            set status = 'SENDING',
+                locked_at = utc_timestamp(6),
+                updated_at = utc_timestamp(6)
+            where club_id = ?
+              and id = ?
+              and status in ('PENDING', 'FAILED')
+            """.trimIndent(),
+            clubId.dbString(),
+            claimedId.dbString(),
+        )
+        if (updated == 0) {
+            return null
+        }
+
+        return jdbcTemplate.query(
+            """
+            select id, club_id, event_type, recipient_email, subject, body_text,
+                   deep_link_path, status, attempt_count, locked_at
+            from notification_outbox
+            where club_id = ?
+              and id = ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toNotificationOutboxItem() },
+            clubId.dbString(),
+            claimedId.dbString(),
+        ).firstOrNull()
+    }
+
+    override fun restoreDeadForClub(clubId: UUID, id: UUID): Boolean =
+        jdbcTemplate().update(
+            """
+            update notification_outbox
+            set status = 'PENDING',
+                next_attempt_at = utc_timestamp(6),
+                locked_at = null,
+                updated_at = utc_timestamp(6)
+            where club_id = ?
+              and id = ?
+              and status = 'DEAD'
+            """.trimIndent(),
+            clubId.dbString(),
+            id.dbString(),
+        ) > 0
+
     override fun outboxBacklog(): NotificationOutboxBacklog {
         val counts = jdbcTemplate().query(
             """
@@ -561,6 +675,31 @@ class JdbcNotificationOutboxAdapter(
             eventType = NotificationEventType.valueOf(getString("event_type")),
             recipientEmail = getString("recipient_email"),
             attemptCount = getInt("attempt_count"),
+            updatedAt = utcOffsetDateTime("updated_at"),
+        )
+
+    private fun ResultSet.toHostNotificationItem(): HostNotificationItem =
+        HostNotificationItem(
+            id = uuid("id"),
+            eventType = NotificationEventType.valueOf(getString("event_type")),
+            status = NotificationOutboxStatus.valueOf(getString("status")),
+            recipientEmail = getString("recipient_email"),
+            attemptCount = getInt("attempt_count"),
+            nextAttemptAt = utcOffsetDateTime("next_attempt_at"),
+            updatedAt = utcOffsetDateTime("updated_at"),
+        )
+
+    private fun ResultSet.toHostNotificationDetail(): HostNotificationDetail =
+        HostNotificationDetail(
+            id = uuid("id"),
+            eventType = NotificationEventType.valueOf(getString("event_type")),
+            status = NotificationOutboxStatus.valueOf(getString("status")),
+            recipientEmail = getString("recipient_email"),
+            subject = getString("subject"),
+            deepLinkPath = getString("deep_link_path"),
+            attemptCount = getInt("attempt_count"),
+            lastError = getString("last_error"),
+            createdAt = utcOffsetDateTime("created_at"),
             updatedAt = utcOffsetDateTime("updated_at"),
         )
 

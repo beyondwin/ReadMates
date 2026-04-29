@@ -1,5 +1,8 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
@@ -153,6 +156,15 @@ private class FixedBacklogNotificationOutboxPort(
             sentLast24h = 0,
             latestFailures = emptyList(),
         )
+
+    override fun listHostItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
+        HostNotificationItemList(emptyList())
+
+    override fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
+
+    override fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem? = null
+
+    override fun restoreDeadForClub(clubId: UUID, id: UUID): Boolean = false
 
     override fun outboxBacklog(): NotificationOutboxBacklog {
         backlogReads += 1
