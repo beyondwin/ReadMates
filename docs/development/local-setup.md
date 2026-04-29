@@ -77,7 +77,13 @@ Kafka 알림 relay/consumer를 로컬에서 확인할 때는 Compose의 `kafka` 
 docker compose up -d mysql kafka
 ```
 
-로컬 기본 bootstrap server는 `localhost:9092`입니다. 알림 pipeline을 켜서 실행할 때는 backend env에 현재 코드의 Kafka property 이름을 사용합니다.
+로컬 기본 bootstrap server는 `localhost:9092`입니다. Kafka/Testcontainers integration test만 실행하려면 backend를 `bootRun`으로 띄우거나 `READMATES_NOTIFICATIONS_ENABLED=true`를 설정하지 않습니다. Testcontainers가 테스트용 Kafka를 직접 띄우고 test configuration이 mail sender를 대체하므로 SMTP 환경 변수도 필요하지 않습니다.
+
+```bash
+./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
+```
+
+로컬 backend에서 Kafka relay/consumer와 실제 이메일 delivery까지 함께 켜서 실행할 때는 backend env에 현재 코드의 Kafka property와 Spring mail property를 모두 넣습니다. `READMATES_NOTIFICATIONS_ENABLED=true`는 `SmtpMailDeliveryAdapter`를 선택하므로 `JavaMailSender`가 생성될 수 있게 `SPRING_MAIL_HOST` 같은 mail 설정이 필요합니다.
 
 ```bash
 READMATES_NOTIFICATIONS_ENABLED=true \
@@ -89,10 +95,16 @@ READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher \
 READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50 \
 READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5 \
 READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5 \
+SPRING_MAIL_HOST='<smtp-host>' \
+SPRING_MAIL_PORT='<smtp-port>' \
+SPRING_MAIL_USERNAME='<smtp-username>' \
+SPRING_MAIL_PASSWORD='<smtp-password>' \
+READMATES_NOTIFICATION_SENDER_EMAIL='no-reply@example.com' \
+READMATES_NOTIFICATION_SENDER_NAME='ReadMates' \
 ./server/gradlew -p server bootRun
 ```
 
-실제 이메일 발송까지 확인하려면 `SPRING_MAIL_HOST`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, `READMATES_NOTIFICATION_SENDER_EMAIL`을 로컬 테스트용 SMTP 값으로 추가합니다. 예시에는 실제 credential이나 private endpoint를 남기지 않습니다.
+SMTP provider가 auth 또는 TLS를 요구하면 `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true`, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true` 같은 Spring mail property도 로컬 환경에만 추가합니다. 예시에는 실제 credential이나 private endpoint를 남기지 않습니다.
 
 ## Backend 실행
 
