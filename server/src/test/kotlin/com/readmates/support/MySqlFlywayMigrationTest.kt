@@ -1,5 +1,6 @@
 package com.readmates.support
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -37,6 +38,7 @@ class MySqlFlywayMigrationTest(
         )
 
         assertEquals(3, tableCount)
+        assertKafkaNotificationTablesExist(jdbcTemplate)
         assertEquals("YES", columnValue("users", "password_hash", "is_nullable"))
         assertEquals("NO", columnValue("users", "short_name", "is_nullable"))
         assertEquals("NO", columnValue("memberships", "short_name", "is_nullable"))
@@ -433,6 +435,28 @@ class MySqlFlywayMigrationTest(
             clubId,
             hostMembershipId,
             recipientEmailHash,
+        )
+    }
+
+    private fun assertKafkaNotificationTablesExist(jdbcTemplate: JdbcTemplate) {
+        val tables = jdbcTemplate.queryForList(
+            """
+            select table_name
+            from information_schema.tables
+            where table_schema = database()
+              and table_name in (
+                'notification_event_outbox',
+                'notification_deliveries',
+                'member_notifications'
+              )
+            """.trimIndent(),
+            String::class.java,
+        ).toSet()
+
+        assertThat(tables).containsExactlyInAnyOrder(
+            "notification_event_outbox",
+            "notification_deliveries",
+            "member_notifications",
         )
     }
 
