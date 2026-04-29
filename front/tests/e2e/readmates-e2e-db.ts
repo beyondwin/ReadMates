@@ -3,6 +3,8 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 
 const clubId = "00000000-0000-0000-0000-000000000001";
+const secondClubId = "00000000-0000-0000-0000-000000000002";
+const secondClubHostMembershipId = "00000000-0000-0000-0000-000000009902";
 const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 
 const devGoogleSubjects: Record<string, string> = {
@@ -137,6 +139,67 @@ set google_subject_id = ${seedGoogleSubjectCase(emails)},
     auth_provider = 'GOOGLE',
     updated_at = utc_timestamp(6)
 where lower(email) in (${emailList});
+`);
+}
+
+export function ensureSecondClubFixture() {
+  runMysql(`
+update memberships
+join users on users.id = memberships.user_id
+set memberships.role = 'HOST',
+    memberships.status = 'ACTIVE',
+    memberships.joined_at = coalesce(memberships.joined_at, utc_timestamp(6)),
+    memberships.updated_at = utc_timestamp(6)
+where memberships.club_id = ${sqlString(clubId)}
+  and lower(users.email) = 'host@example.com';
+
+insert into clubs (id, slug, name, tagline, about, status)
+select
+  ${sqlString(secondClubId)},
+  'sample-book-club',
+  '샘플 북클럽',
+  '테스트 클럽',
+  '테스트 클럽입니다.',
+  'ACTIVE'
+where not exists (
+  select 1 from clubs where slug = 'sample-book-club'
+);
+
+insert into memberships (
+  id,
+  club_id,
+  user_id,
+  role,
+  status,
+  joined_at,
+  short_name
+)
+select
+  ${sqlString(secondClubHostMembershipId)},
+  ${sqlString(secondClubId)},
+  users.id,
+  'MEMBER',
+  'ACTIVE',
+  utc_timestamp(6),
+  users.short_name
+from users
+where lower(users.email) = 'host@example.com'
+on duplicate key update
+  role = 'MEMBER',
+  status = 'ACTIVE',
+  joined_at = coalesce(joined_at, utc_timestamp(6)),
+  short_name = values(short_name),
+  updated_at = utc_timestamp(6);
+`);
+}
+
+export function cleanupSecondClubFixture() {
+  runMysql(`
+delete memberships
+from memberships
+join users on users.id = memberships.user_id
+where memberships.club_id = ${sqlString(secondClubId)}
+  and lower(users.email) = 'host@example.com';
 `);
 }
 
