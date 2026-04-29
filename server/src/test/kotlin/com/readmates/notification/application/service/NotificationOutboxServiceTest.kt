@@ -207,6 +207,30 @@ class NotificationOutboxServiceTest {
     }
 
     @Test
+    fun `retry with delivery disabled still rejects sent and dead notifications`() {
+        listOf(NotificationOutboxStatus.SENT, NotificationOutboxStatus.DEAD).forEach { status ->
+            val itemId = UUID.fromString("00000000-0000-0000-0000-000000000701")
+            val port = FakeNotificationOutboxPort(
+                items = emptyList(),
+                itemDetails = mapOf(itemId to sampleDetail(id = itemId, status = status)),
+            )
+            val service = NotificationOutboxService(
+                port,
+                RecordingMailDeliveryPort(),
+                testMetrics(),
+                maxAttempts = 5,
+                deliveryEnabled = false,
+            )
+
+            assertThatThrownBy { service.retry(host(), itemId) }
+                .hasMessageContaining("Notification not found")
+
+            assertThat(port.retryableDetailRequests).containsExactly(host().clubId to itemId)
+            assertThat(port.claimOneRequests).isEmpty()
+        }
+    }
+
+    @Test
     fun `restore only restores dead host club notifications and returns pending detail`() {
         val itemId = UUID.fromString("00000000-0000-0000-0000-000000000701")
         val detail = sampleDetail(id = itemId, status = NotificationOutboxStatus.PENDING)
@@ -311,6 +335,7 @@ private class FakeNotificationOutboxPort(
     val claimRequests = mutableListOf<Int>()
     val clubClaimRequests = mutableListOf<Pair<UUID, Int>>()
     val claimOneRequests = mutableListOf<Pair<UUID, UUID>>()
+    val retryableDetailRequests = mutableListOf<Pair<UUID, UUID>>()
     val listRequests = mutableListOf<HostNotificationItemQuery>()
     val restoreRequests = mutableListOf<Pair<UUID, UUID>>()
     val failedIds = mutableListOf<UUID>()
@@ -377,6 +402,13 @@ private class FakeNotificationOutboxPort(
 
     override fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
         itemDetails[id]
+
+    override fun retryableHostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? {
+        retryableDetailRequests += clubId to id
+        return itemDetails[id]?.takeIf {
+            it.status == NotificationOutboxStatus.PENDING || it.status == NotificationOutboxStatus.FAILED
+        }
+    }
 
     override fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem? {
         claimOneRequests += clubId to id

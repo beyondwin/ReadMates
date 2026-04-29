@@ -143,6 +143,7 @@ class HostNotificationControllerTest(
             clubId = "00000000-0000-0000-0000-000000000001",
             status = NotificationOutboxStatus.PENDING,
             dedupeKey = "host-notification-controller-test-detail",
+            lastError = "SMTP temporary failure for member@example.com",
         )
 
         val response = mockMvc.get("/api/host/notifications/items/00000000-0000-0000-0000-000000009402") {
@@ -155,6 +156,7 @@ class HostNotificationControllerTest(
             jsonPath("$.status") { value("PENDING") }
             jsonPath("$.metadata.sessionNumber") { value(3) }
             jsonPath("$.metadata.bookTitle") { value("메타데이터 테스트 책") }
+            jsonPath("$.lastError") { value("SMTP temporary failure for [redacted-email]") }
         }.andReturn().response.contentAsString
 
         assertThat(response).doesNotContain("bodyText")
@@ -177,6 +179,55 @@ class HostNotificationControllerTest(
             status { isOk() }
             jsonPath("$.id") { value("00000000-0000-0000-0000-000000009403") }
             jsonPath("$.status") { value("PENDING") }
+        }
+    }
+
+    @Test
+    fun `host retries pending notification`() {
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009404",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.PENDING,
+            dedupeKey = "host-notification-controller-test-retry",
+        )
+
+        val response = mockMvc.post("/api/host/notifications/items/00000000-0000-0000-0000-000000009404/retry") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value("00000000-0000-0000-0000-000000009404") }
+            jsonPath("$.status") { value("SENT") }
+            jsonPath("$.recipientEmail") { value("m***@example.com") }
+        }.andReturn().response.contentAsString
+
+        assertThat(response).doesNotContain("member@example.com")
+        assertThat(response).doesNotContain("ReadMates에서 확인해 주세요.")
+    }
+
+    @Test
+    fun `host cannot retry sent or dead notifications`() {
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009405",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.SENT,
+            dedupeKey = "host-notification-controller-test-retry-sent",
+        )
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009406",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.DEAD,
+            dedupeKey = "host-notification-controller-test-retry-dead",
+        )
+
+        listOf(
+            "00000000-0000-0000-0000-000000009405",
+            "00000000-0000-0000-0000-000000009406",
+        ).forEach { id ->
+            mockMvc.post("/api/host/notifications/items/$id/retry") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
         }
     }
 
@@ -251,12 +302,13 @@ class HostNotificationControllerTest(
         clubId: String,
         status: NotificationOutboxStatus,
         dedupeKey: String,
+        lastError: String? = null,
     ) {
         jdbcTemplate.update(
             """
             insert into notification_outbox (
               id, club_id, event_type, aggregate_type, aggregate_id,
-              recipient_email, subject, body_text, deep_link_path, metadata, status, dedupe_key
+              recipient_email, subject, body_text, deep_link_path, metadata, status, last_error, dedupe_key
             ) values (
               ?,
               ?,
@@ -274,12 +326,14 @@ class HostNotificationControllerTest(
                 'bodyText', 'ReadMates에서 확인해 주세요.'
               ),
               ?,
+              ?,
               ?
             )
             """.trimIndent(),
             id,
             clubId,
             status.name,
+            lastError,
             dedupeKey,
         )
     }

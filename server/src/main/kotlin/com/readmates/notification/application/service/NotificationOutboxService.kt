@@ -87,7 +87,8 @@ class NotificationOutboxService(
     override fun retry(host: CurrentMember, id: UUID): HostNotificationDetail {
         val currentHost = requireHost(host)
         if (!deliveryEnabled) {
-            return detail(currentHost, id)
+            return notificationOutboxPort.retryableHostItemDetail(currentHost.clubId, id)
+                ?: throw notificationAccessDenied()
         }
 
         val item = notificationOutboxPort.claimOneForClub(currentHost.clubId, id)
