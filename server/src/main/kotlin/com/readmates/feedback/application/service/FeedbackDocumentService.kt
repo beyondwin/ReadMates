@@ -18,6 +18,8 @@ import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentU
 import com.readmates.feedback.application.port.`in`.ListMyReadableFeedbackDocumentsUseCase
 import com.readmates.feedback.application.port.`in`.UploadHostFeedbackDocumentUseCase
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
+import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
+import com.readmates.notification.application.service.ReadmatesOperationalMetrics
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
@@ -29,6 +31,8 @@ import java.util.UUID
 @Service
 class FeedbackDocumentService(
     private val feedbackDocumentStorePort: FeedbackDocumentStorePort,
+    private val recordNotificationEventUseCase: RecordNotificationEventUseCase,
+    private val operationalMetrics: ReadmatesOperationalMetrics,
 ) : ListMyReadableFeedbackDocumentsUseCase,
     GetReadableFeedbackDocumentUseCase,
     GetHostFeedbackDocumentStatusUseCase,
@@ -89,20 +93,30 @@ class FeedbackDocumentService(
         command: FeedbackDocumentUploadCommand,
     ): FeedbackDocumentResult {
         requireHostFeedbackDocumentUploadAccess(currentMember)
-        val parsedDocument = parser.parse(command.sourceText)
-        val session = feedbackDocumentStorePort.findSessionForUpload(currentMember.clubId, command.sessionId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val version = feedbackDocumentStorePort.nextDocumentVersion(currentMember.clubId, command.sessionId)
-        feedbackDocumentStorePort.insertDocument(
-            currentMember = currentMember,
-            command = command,
-            version = version,
-            documentId = UUID.randomUUID(),
-        )
+        return runCatching {
+            val parsedDocument = parser.parse(command.sourceText)
+            val session = feedbackDocumentStorePort.findSessionForUpload(currentMember.clubId, command.sessionId)
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+            val version = feedbackDocumentStorePort.nextDocumentVersion(currentMember.clubId, command.sessionId)
+            feedbackDocumentStorePort.insertDocument(
+                currentMember = currentMember,
+                command = command,
+                version = version,
+                documentId = UUID.randomUUID(),
+            )
+            recordNotificationEventUseCase.recordFeedbackDocumentPublished(
+                clubId = currentMember.clubId,
+                sessionId = command.sessionId,
+            )
 
-        val storedDocument = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)
-            ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR)
-        return storedDocument.toResponse(session, parsedDocument)
+            val storedDocument = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)
+                ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR)
+            storedDocument.toResponse(session, parsedDocument)
+        }.onSuccess {
+            operationalMetrics.feedbackUploadSucceeded()
+        }.onFailure {
+            operationalMetrics.feedbackUploadFailed()
+        }.getOrThrow()
     }
 
     private fun requireHostFeedbackDocumentUploadAccess(currentMember: CurrentMember) {

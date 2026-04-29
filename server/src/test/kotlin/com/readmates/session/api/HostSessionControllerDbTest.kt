@@ -1,6 +1,7 @@
 package com.readmates.session.api
 
 import com.readmates.support.MySqlTestContainer
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -27,6 +28,15 @@ import org.springframework.test.web.servlet.put
 import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
+    delete from notification_outbox
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and aggregate_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001'
+          and number >= 7
+      );
+    delete from notification_outbox
+    where aggregate_id = '00000000-0000-0000-0000-000000019777';
     delete from feedback_reports
     where session_id in (
       select id from sessions
@@ -201,6 +211,33 @@ class HostSessionControllerDbTest(
             jsonPath("$[0].sessionId") { value(sessionId) }
             jsonPath("$[0].visibility") { value("MEMBER") }
         }
+    }
+
+    @Test
+    fun `member visible draft session enqueues next book notification`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
+            with(user("host@example.com"))
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"visibility":"MEMBER"}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        val count = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_outbox
+            where event_type = 'NEXT_BOOK_PUBLISHED'
+              and aggregate_id = ?
+            """.trimIndent(),
+            Int::class.java,
+            sessionId,
+        ) ?: 0
+
+        assertThat(count).isGreaterThan(0)
     }
 
     @Test
