@@ -2250,7 +2250,7 @@ git commit -m "feat: add member notification inbox"
 - Modify: `front/tests/unit/api-contract-fixtures.ts`
 - Modify: `front/tests/unit/api-contract-fixtures.test.ts`
 
-- [ ] **Step 1: Update failing host UI test**
+- [x] **Step 1: Update failing host UI test**
 
 In `host-notifications.test.tsx`, assert event and delivery tabs:
 
@@ -2261,7 +2261,7 @@ expect(screen.getByText("Kafka 발행 대기")).toBeInTheDocument();
 expect(screen.getByText("EMAIL")).toBeInTheDocument();
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -2271,7 +2271,7 @@ pnpm --dir front test -- host-notifications.test.tsx
 
 Expected: FAIL because the current page still uses the old outbox item contract.
 
-- [ ] **Step 3: Add contracts**
+- [x] **Step 3: Add contracts**
 
 In `host-contracts.ts`, add:
 
@@ -2308,7 +2308,7 @@ export interface HostNotificationDeliveryListResponse {
 }
 ```
 
-- [ ] **Step 4: Add API calls**
+- [x] **Step 4: Add API calls**
 
 In `host-api.ts`, add:
 
@@ -2322,7 +2322,7 @@ export async function fetchHostNotificationDeliveries(): Promise<HostNotificatio
 }
 ```
 
-- [ ] **Step 5: Update route data**
+- [x] **Step 5: Update route data**
 
 In `host-notifications-data.ts`, load events and deliveries in parallel:
 
@@ -2337,7 +2337,7 @@ const [summary, events, deliveries, testMailAudit] = await Promise.all([
 return { summary, events, deliveries, testMailAudit };
 ```
 
-- [ ] **Step 6: Update UI**
+- [x] **Step 6: Update UI**
 
 Render event and delivery sections in `host-notifications-page.tsx`:
 
@@ -2366,7 +2366,7 @@ Render event and delivery sections in `host-notifications-page.tsx`:
 
 Keep existing test mail UI.
 
-- [ ] **Step 7: Run host UI tests**
+- [x] **Step 7: Run host UI tests**
 
 Run:
 
