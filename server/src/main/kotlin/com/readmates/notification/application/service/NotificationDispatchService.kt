@@ -22,6 +22,7 @@ private val DISPATCH_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 class NotificationDispatchService(
     private val deliveryPort: NotificationDeliveryPort,
     private val mailDeliveryPort: MailDeliveryPort,
+    private val metrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.kafka.max-delivery-attempts:5}") private val maxAttempts: Int,
 ) : DispatchNotificationEventUseCase {
     override fun dispatch(message: NotificationEventMessage) {
@@ -53,6 +54,7 @@ class NotificationDispatchService(
         if (!deliveryPort.markDeliverySent(claimed.id, claimed.lockedAt)) {
             throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.SENT)
         }
+        metrics.sent(claimed.eventType)
         return null
     }
 
@@ -85,6 +87,7 @@ class NotificationDispatchService(
             if (!deliveryPort.markDeliveryDead(claimed.id, claimed.lockedAt, error)) {
                 throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.DEAD)
             }
+            metrics.dead(claimed.eventType)
             return null
         } else {
             val marked = deliveryPort.markDeliveryFailed(
@@ -96,6 +99,7 @@ class NotificationDispatchService(
             if (!marked) {
                 throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.FAILED)
             }
+            metrics.failed(claimed.eventType)
             return NotificationDeliveryRetryableException(
                 "Email delivery ${claimed.id} failed and is scheduled for retry: $error",
             )

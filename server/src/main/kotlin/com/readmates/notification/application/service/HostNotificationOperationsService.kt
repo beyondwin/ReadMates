@@ -13,8 +13,10 @@ import com.readmates.notification.application.port.out.NotificationEventOutboxPo
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
+import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -23,6 +25,7 @@ class HostNotificationOperationsService(
     private val notificationEventOutboxPort: NotificationEventOutboxPort,
     private val notificationDeliveryPort: NotificationDeliveryPort,
     private val notificationDeliveryProcessingService: NotificationDeliveryProcessingService,
+    @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
 ) : GetHostNotificationSummaryUseCase,
     ManageHostNotificationsUseCase {
     override fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary =
@@ -69,6 +72,12 @@ class HostNotificationOperationsService(
 
     override fun retry(host: CurrentMember, id: UUID): HostNotificationDetail {
         val currentHost = requireHost(host)
+        if (!deliveryEnabled) {
+            return notificationDeliveryPort.hostEmailDetail(currentHost.clubId, id)
+                ?.takeIf { it.status == NotificationOutboxStatus.PENDING || it.status == NotificationOutboxStatus.FAILED }
+                ?: throw notificationAccessDenied()
+        }
+
         val item = notificationDeliveryPort.claimHostEmailDelivery(currentHost.clubId, id)
             ?: throw notificationAccessDenied()
         notificationDeliveryProcessingService.processClaimed(item)

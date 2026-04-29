@@ -51,6 +51,7 @@ class NotificationEventModelsTest {
         val item = ClaimedNotificationDeliveryItem(
             id = UUID.randomUUID(),
             eventId = UUID.randomUUID(),
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
             clubId = UUID.randomUUID(),
             recipientMembershipId = UUID.randomUUID(),
             channel = NotificationChannel.EMAIL,
