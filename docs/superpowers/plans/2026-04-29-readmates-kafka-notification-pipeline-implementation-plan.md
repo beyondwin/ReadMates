@@ -1447,7 +1447,7 @@ git commit -m "feat: dispatch kafka notification deliveries"
   - review publication caller found with `rg "recordReviewPublished" server/src/main/kotlin`
 - Test: update existing service tests that assert notification enqueue behavior.
 
-- [ ] **Step 1: Write event service tests**
+- [x] **Step 1: Write event service tests**
 
 Create `server/src/test/kotlin/com/readmates/notification/application/service/NotificationEventServiceTest.kt`:
 
@@ -1493,7 +1493,7 @@ class NotificationEventServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1503,7 +1503,7 @@ Run:
 
 Expected: FAIL because `NotificationEventService` does not exist or the method signature is still old.
 
-- [ ] **Step 3: Implement event service**
+- [x] **Step 3: Implement event service**
 
 Create `NotificationEventService.kt`:
 
@@ -1572,7 +1572,7 @@ interface RecordNotificationEventUseCase {
 }
 ```
 
-- [ ] **Step 4: Update callers**
+- [x] **Step 4: Update callers**
 
 For each caller, pass the new metadata:
 
@@ -1595,7 +1595,7 @@ recordNotificationEventUseCase.recordFeedbackDocumentPublished(
 )
 ```
 
-- [ ] **Step 5: Run targeted server tests**
+- [x] **Step 5: Run targeted server tests**
 
 Run:
 
@@ -1605,7 +1605,7 @@ Run:
 
 Expected: PASS or fail only on tests that still assert old outbox row shapes. Update those assertions to check event outbox rows.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationEventService.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt server/src/main/kotlin/com/readmates/feedback/application/service/FeedbackDocumentService.kt server/src/test/kotlin/com/readmates/notification/application/service/NotificationEventServiceTest.kt server/src/test/kotlin
