@@ -4,14 +4,12 @@ import { BookCover } from "@/shared/ui/book-cover";
 import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { getPublicClubDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE } from "@/features/public/model/public-copy";
+import { publicAboutHref, publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
 
 type PublicHomeProps = {
   data: PublicClubView;
+  publicBasePath?: string;
 };
-
-function sessionHref(session: PublicSessionListItemView) {
-  return `/sessions/${encodeURIComponent(session.sessionId)}`;
-}
 
 function sessionDisplay(session: PublicSessionListItemView) {
   return getPublicSessionListItemDisplay(session);
@@ -57,7 +55,7 @@ function EmptySecondaryPublicRecords() {
   );
 }
 
-function LatestRecordFeature({ session }: { session: PublicSessionListItemView | null }) {
+function LatestRecordFeature({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView | null }) {
   if (!session) {
     return <EmptyPublicRecords />;
   }
@@ -65,7 +63,7 @@ function LatestRecordFeature({ session }: { session: PublicSessionListItemView |
   const display = sessionDisplay(session);
 
   return (
-    <Link to={sessionHref(session)} className="rm-document-panel public-latest-record" aria-label={`최근 공개 기록 ${display.title} 보기`}>
+    <Link to={publicSessionHref(session, publicBasePath)} className="rm-document-panel public-latest-record" aria-label={`최근 공개 기록 ${display.title} 보기`}>
       <div className="public-latest-record__cover">
         <BookCover title={display.title} author={display.author} imageUrl={session.bookImageUrl} width={132} />
       </div>
@@ -86,11 +84,11 @@ function LatestRecordFeature({ session }: { session: PublicSessionListItemView |
   );
 }
 
-function ArchiveRecordRow({ session }: { session: PublicSessionListItemView }) {
+function ArchiveRecordRow({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView }) {
   const display = sessionDisplay(session);
 
   return (
-    <Link to={sessionHref(session)} className="rm-record-row public-archive-row">
+    <Link to={publicSessionHref(session, publicBasePath)} className="rm-record-row public-archive-row">
       <BookCover
         title={display.title}
         author={display.author}
@@ -113,11 +111,11 @@ function ArchiveRecordRow({ session }: { session: PublicSessionListItemView }) {
   );
 }
 
-function SummaryExcerpt({ session }: { session: PublicSessionListItemView }) {
+function SummaryExcerpt({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView }) {
   const display = sessionDisplay(session);
 
   return (
-    <Link to={sessionHref(session)} className="rm-record-row public-note-row">
+    <Link to={publicSessionHref(session, publicBasePath)} className="rm-record-row public-note-row">
       <BookCover
         title={display.title}
         author={display.author}
@@ -156,7 +154,7 @@ function ReadingRhythm() {
   );
 }
 
-function PublicRecordGuide({ hasPublishedRecords }: { hasPublishedRecords: boolean }) {
+function PublicRecordGuide({ hasPublishedRecords, publicBasePath }: { hasPublishedRecords: boolean; publicBasePath: string }) {
   const guide = [
     ["첫 화면", "가장 최근에 공개한 기록을 먼저 펼쳐, 함께 읽은 흔적을 보여줍니다."],
     ["기록 목록", "지나간 공개 기록은 차례대로 모아 다시 읽을 수 있게 둡니다."],
@@ -175,7 +173,7 @@ function PublicRecordGuide({ hasPublishedRecords }: { hasPublishedRecords: boole
         ))}
       </div>
       <div className="public-membership-panel__actions">
-        <Link to="/records" className="btn btn-primary">
+        <Link to={publicRecordsHref(publicBasePath)} className="btn btn-primary">
           {hasPublishedRecords ? "공개 기록 보기" : "공개 기록 준비 중"}
         </Link>
       </div>
@@ -183,7 +181,7 @@ function PublicRecordGuide({ hasPublishedRecords }: { hasPublishedRecords: boole
   );
 }
 
-export default function PublicHome({ data }: PublicHomeProps) {
+export default function PublicHome({ data, publicBasePath = "" }: PublicHomeProps) {
   const latestSession = data.recentSessions[0] ?? null;
   const publicRecordPreviewSessions = data.recentSessions.slice(0, 3);
   const { clubName, tagline, about, stats } = getPublicClubDisplay(data);
@@ -204,10 +202,10 @@ export default function PublicHome({ data }: PublicHomeProps) {
               {about}
             </p>
             <div className="public-actions">
-              <Link to="/records" className="btn btn-primary btn-lg">
+              <Link to={publicRecordsHref(publicBasePath)} className="btn btn-primary btn-lg">
                 최근 공개 기록 보기
               </Link>
-              <Link to="/about" className="btn btn-ghost btn-lg">
+              <Link to={publicAboutHref(publicBasePath)} className="btn btn-ghost btn-lg">
                 클럽 소개 보기
               </Link>
             </div>
@@ -217,7 +215,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
             <span className="body editorial">최근 기록과 클럽의 읽는 방식</span>
           </div>
           <div className="public-home-hero__latest">
-            <LatestRecordFeature session={latestSession} />
+            <LatestRecordFeature publicBasePath={publicBasePath} session={latestSession} />
           </div>
         </div>
       </section>
@@ -251,7 +249,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
           </div>
         </div>
         <div className="container" style={{ marginTop: 24 }}>
-          <PublicRecordGuide hasPublishedRecords={data.recentSessions.length > 0} />
+          <PublicRecordGuide hasPublishedRecords={data.recentSessions.length > 0} publicBasePath={publicBasePath} />
         </div>
       </section>
 
@@ -285,7 +283,7 @@ export default function PublicHome({ data }: PublicHomeProps) {
           {publicRecordPreviewSessions.length > 0 ? (
             <div className="public-note-list">
               {publicRecordPreviewSessions.map((session) => (
-                <SummaryExcerpt key={session.sessionId} session={session} />
+                <SummaryExcerpt key={session.sessionId} publicBasePath={publicBasePath} session={session} />
               ))}
             </div>
           ) : latestSession ? (
@@ -338,14 +336,14 @@ export default function PublicHome({ data }: PublicHomeProps) {
                 공개 기록
               </h2>
             </div>
-            <Link to="/records" className="public-records-link">
+            <Link to={publicRecordsHref(publicBasePath)} className="public-records-link">
               전체 보기
             </Link>
           </div>
           {publicRecordPreviewSessions.length > 0 ? (
             <div className="public-record-list">
               {publicRecordPreviewSessions.map((session) => (
-                <ArchiveRecordRow key={session.sessionId} session={session} />
+                <ArchiveRecordRow key={session.sessionId} publicBasePath={publicBasePath} session={session} />
               ))}
             </div>
           ) : latestSession ? (

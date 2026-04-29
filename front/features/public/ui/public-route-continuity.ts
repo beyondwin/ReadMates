@@ -36,7 +36,13 @@ function toSafePublicHref(value: string) {
       return null;
     }
 
-    const isPublicHref = url.pathname === "/" || url.pathname === "/records" || url.pathname.startsWith("/sessions/");
+    const isPublicHref =
+      url.pathname === "/" ||
+      url.pathname === "/records" ||
+      url.pathname.startsWith("/sessions/") ||
+      /^\/clubs\/[^/]+$/.test(url.pathname) ||
+      /^\/clubs\/[^/]+\/records$/.test(url.pathname) ||
+      /^\/clubs\/[^/]+\/sessions\/[^/]+$/.test(url.pathname);
     return isPublicHref ? `${url.pathname}${url.search}${url.hash}` : null;
   } catch {
     return null;

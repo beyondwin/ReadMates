@@ -23,6 +23,15 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getByRole("link", { name: "공개 기록" })).toHaveAttribute("href", "/records");
   });
 
+  it("keeps guest desktop navigation scoped to the public club slug", () => {
+    renderAt("/clubs/reading-sai", <TopNav publicBasePath="/clubs/reading-sai" />);
+
+    const nav = screen.getByRole("navigation", { name: "공개 내비게이션" });
+    expect(within(nav).getByRole("link", { name: "소개" })).toHaveAttribute("href", "/clubs/reading-sai");
+    expect(within(nav).getByRole("link", { name: "클럽" })).toHaveAttribute("href", "/clubs/reading-sai/about");
+    expect(within(nav).getByRole("link", { name: "공개 기록" })).toHaveAttribute("href", "/clubs/reading-sai/records");
+  });
+
   it("renders member desktop navigation with the current app section marked", () => {
     renderAt("/app/session/current", <TopNav variant="member" memberName="이멤버5" />);
 
@@ -150,10 +159,49 @@ describe("MobileHeader route titles and actions", () => {
     expect(await screen.findByRole("link", { name: "멤버 화면" })).toHaveAttribute("href", "/app");
   });
 
+  it("keeps public club session mobile chrome scoped to the club slug", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ authenticated: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    const { container } = renderAt(
+      "/clubs/reading-sai/sessions/session-6",
+      <MobileHeader variant="guest" publicBasePath="/clubs/reading-sai" />,
+    );
+
+    expect(container.querySelector(".m-hdr-title")).toHaveTextContent("공개 기록");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/clubs/reading-sai/records");
+    expect(await screen.findByRole("link", { name: "로그인" })).toHaveAttribute("href", "/login");
+  });
+
   it("renders the public records index mobile title", () => {
     renderAt("/records", <MobileHeader variant="guest" />);
 
     expect(screen.getByText("공개 기록")).toBeInTheDocument();
+  });
+
+  it("keeps public club invite mobile back link scoped to the club slug", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ authenticated: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    renderAt("/clubs/reading-sai/invite/sample-token", <MobileHeader variant="guest" publicBasePath="/clubs/reading-sai" />);
+
+    expect(screen.getByText("로그인")).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/clubs/reading-sai");
+    expect(screen.queryByRole("link", { name: "멤버 화면" })).not.toBeInTheDocument();
   });
 
   it("keeps the public login mobile back link instead of replacing it with auth entry", async () => {

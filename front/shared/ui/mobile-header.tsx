@@ -23,22 +23,27 @@ type MobileHeaderProps = {
   variant: MobileHeaderVariant;
   showHostEntry?: boolean;
   authenticated?: boolean;
+  publicBasePath?: string;
 };
 
-function publicTitle(pathname: string) {
-  if (pathname === "/login" || pathname.startsWith("/invite/")) {
+function prefixedPath(publicBasePath: string, path: string) {
+  return publicBasePath ? `${publicBasePath}${path === "/" ? "" : path}` : path;
+}
+
+function publicTitle(pathname: string, publicBasePath = "") {
+  if (pathname === "/login" || pathname.startsWith("/invite/") || pathname.startsWith(prefixedPath(publicBasePath, "/invite/"))) {
     return READMATES_NAV_LABELS.public.login;
   }
 
-  if (pathname === "/about") {
+  if (pathname === prefixedPath(publicBasePath, "/about")) {
     return "클럽 소개";
   }
 
-  if (pathname === "/records") {
+  if (pathname === prefixedPath(publicBasePath, "/records")) {
     return READMATES_NAV_LABELS.public.publicRecords;
   }
 
-  if (pathname.startsWith("/sessions/")) {
+  if (pathname.startsWith(prefixedPath(publicBasePath, "/sessions/"))) {
     return READMATES_NAV_LABELS.public.publicRecords;
   }
 
@@ -183,14 +188,16 @@ function HeaderShell({
   kicker,
   backTarget,
   rightAction,
+  brandHref,
 }: {
   workspace: MobileHeaderVariant;
   title: string;
   kicker?: string | null;
   backTarget?: HeaderBackTarget | null;
   rightAction?: HeaderAction | null;
+  brandHref?: string;
 }) {
-  const brandHref = workspace === "host" ? "/app/host" : workspace === "member" ? "/app" : "/";
+  const resolvedBrandHref = brandHref ?? (workspace === "host" ? "/app/host" : workspace === "member" ? "/app" : "/");
   const actionTitle = rightAction?.ariaLabel ?? rightAction?.label;
 
   return (
@@ -208,7 +215,7 @@ function HeaderShell({
             {backTarget.icon ? null : <span className="m-hdr-back__label">{backTarget.label}</span>}
           </Link>
         ) : (
-          <Link to={brandHref} className="m-hdr-brand" aria-label="읽는사이 홈">
+          <Link to={resolvedBrandHref} className="m-hdr-brand" aria-label="읽는사이 홈">
             <ReadmatesBrandMark />
           </Link>
         )}
@@ -233,16 +240,18 @@ function HeaderShell({
   );
 }
 
-function GuestMobileHeader({ authenticated }: { authenticated?: boolean }) {
+function GuestMobileHeader({ authenticated, publicBasePath = "" }: { authenticated?: boolean; publicBasePath?: string }) {
   const location = useLocation();
   const pathname = location.pathname;
   const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login }, authenticated);
-  const isEntryRoute = pathname === "/login" || pathname.startsWith("/invite/");
-  const publicSessionReturnTarget = pathname.startsWith("/sessions/")
-    ? readPublicReadmatesReturnTarget(location.state, publicRecordsReturnTarget)
+  const homeHref = prefixedPath(publicBasePath, "/");
+  const recordsHref = prefixedPath(publicBasePath, "/records");
+  const isEntryRoute = pathname === "/login" || pathname.startsWith("/invite/") || pathname.startsWith(prefixedPath(publicBasePath, "/invite/"));
+  const publicSessionReturnTarget = pathname.startsWith(prefixedPath(publicBasePath, "/sessions/"))
+    ? readPublicReadmatesReturnTarget(location.state, { ...publicRecordsReturnTarget, href: recordsHref })
     : null;
   const backTarget: HeaderBackTarget | null = isEntryRoute
-    ? { href: "/", label: "홈" }
+    ? { href: homeHref, label: "홈" }
     : publicSessionReturnTarget
       ? { ...publicSessionReturnTarget, label: "뒤로" }
       : null;
@@ -250,9 +259,10 @@ function GuestMobileHeader({ authenticated }: { authenticated?: boolean }) {
   return (
     <HeaderShell
       workspace="guest"
-      title={publicTitle(pathname)}
+      title={publicTitle(pathname, publicBasePath)}
       backTarget={backTarget}
       rightAction={isEntryRoute ? null : authAction}
+      brandHref={homeHref}
     />
   );
 }
@@ -300,9 +310,9 @@ function AppMobileHeader({
   );
 }
 
-export function MobileHeader({ variant, showHostEntry, authenticated }: MobileHeaderProps) {
+export function MobileHeader({ variant, showHostEntry, authenticated, publicBasePath }: MobileHeaderProps) {
   if (variant === "guest") {
-    return <GuestMobileHeader authenticated={authenticated} />;
+    return <GuestMobileHeader authenticated={authenticated} publicBasePath={publicBasePath} />;
   }
 
   return <AppMobileHeader variant={variant} showHostEntry={showHostEntry} />;

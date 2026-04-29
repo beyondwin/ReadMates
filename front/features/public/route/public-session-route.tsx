@@ -8,12 +8,16 @@ import { PublicMissingSessionPage } from "@/features/public/ui/public-missing-se
 import PublicSession from "@/features/public/ui/public-session";
 
 export function PublicSessionRoute() {
-  const session = useLoaderData() as PublicSessionRouteData;
+  const data = useLoaderData() as PublicSessionRouteData;
   const location = useLocation();
-  const returnTarget = readPublicReadmatesReturnTarget(location.state, publicRecordsReturnTarget);
+  const fallbackReturnTarget = {
+    ...publicRecordsReturnTarget,
+    href: `${data.publicBasePath}${publicRecordsReturnTarget.href}`,
+  };
+  const returnTarget = readPublicReadmatesReturnTarget(location.state, fallbackReturnTarget);
 
-  return session ? (
-    <PublicSession session={session} returnTarget={returnTarget} />
+  return data.session ? (
+    <PublicSession session={data.session} returnTarget={returnTarget} />
   ) : (
     <PublicMissingSessionPage returnTarget={returnTarget} />
   );

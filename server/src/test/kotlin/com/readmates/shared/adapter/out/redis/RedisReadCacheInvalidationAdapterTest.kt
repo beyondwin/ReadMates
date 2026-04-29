@@ -137,8 +137,10 @@ class RedisReadCacheInvalidationAdapterTest(
         private val OTHER_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000804")
 
         private const val PUBLIC_CLUB_KEY = "public:club:v1"
+        private const val SCOPED_PUBLIC_CLUB_KEY = "public:club:sample-book-club:v1"
 
         private fun publicSessionKey(sessionId: UUID) = "public:session:$sessionId:v1"
+        private fun scopedPublicSessionKey(sessionId: UUID) = "public:session:sample-book-club:$sessionId:v1"
         private fun notesFeedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
         private fun notesSessionsKey(clubId: UUID) = "notes:club:$clubId:sessions:v1"
         private fun notesSessionFeedKey(
@@ -148,8 +150,10 @@ class RedisReadCacheInvalidationAdapterTest(
 
         private val targetKeys = setOf(
             PUBLIC_CLUB_KEY,
+            SCOPED_PUBLIC_CLUB_KEY,
             publicSessionKey(SESSION_ID),
             publicSessionKey(OTHER_SESSION_ID),
+            scopedPublicSessionKey(SESSION_ID),
             notesFeedKey(TARGET_CLUB_ID),
             notesSessionsKey(TARGET_CLUB_ID),
             notesSessionFeedKey(TARGET_CLUB_ID, SESSION_ID),

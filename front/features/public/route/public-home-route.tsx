@@ -5,5 +5,5 @@ import PublicHome from "@/features/public/ui/public-home";
 export function PublicHomeRoute() {
   const data = useLoaderData() as PublicClubRouteData;
 
-  return <PublicHome data={data} />;
+  return <PublicHome data={data} publicBasePath={data.publicBasePath} />;
 }

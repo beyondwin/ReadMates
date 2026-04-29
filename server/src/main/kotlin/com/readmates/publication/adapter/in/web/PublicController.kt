@@ -1,5 +1,6 @@
 package com.readmates.publication.adapter.`in`.web
 
+import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicHighlightResult
@@ -24,15 +25,26 @@ class PublicController(
 ) {
     @GetMapping("/club")
     fun club(): PublicClubResponse =
-        getPublicClubUseCase.getClub()?.toResponse()
+        club(LEGACY_PUBLIC_CLUB_SLUG)
+
+    @GetMapping("/clubs/{clubSlug}")
+    fun club(@PathVariable clubSlug: String): PublicClubResponse =
+        getPublicClubUseCase.getClub(clubSlug)?.toResponse()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
     @GetMapping("/sessions/{sessionId}")
-    fun session(@PathVariable sessionId: String): PublicSessionDetailResponse {
+    fun session(@PathVariable sessionId: String): PublicSessionDetailResponse =
+        session(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
+
+    @GetMapping("/clubs/{clubSlug}/sessions/{sessionId}")
+    fun session(
+        @PathVariable clubSlug: String,
+        @PathVariable sessionId: String,
+    ): PublicSessionDetailResponse {
         val id = runCatching { UUID.fromString(sessionId) }.getOrNull()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
-        return getPublicSessionUseCase.getSession(id)?.toResponse()
+        return getPublicSessionUseCase.getSession(clubSlug, id)?.toResponse()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
     }
 

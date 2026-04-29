@@ -2,19 +2,40 @@ import type { LoaderFunctionArgs } from "react-router-dom";
 import { fetchPublicClub, fetchPublicSession } from "@/features/public/api/public-api";
 import type { PublicClubResponse, PublicSessionDetailResponse } from "@/features/public/api/public-contracts";
 
-export type PublicClubRouteData = PublicClubResponse;
-export type PublicSessionRouteData = PublicSessionDetailResponse | null;
+const BASELINE_PUBLIC_CLUB_SLUG = "reading-sai";
 
-export function publicClubLoader(): Promise<PublicClubRouteData> {
-  return fetchPublicClub();
+export type PublicClubRouteData = PublicClubResponse & {
+  clubSlug: string;
+  publicBasePath: string;
+};
+export type PublicSessionRouteData = {
+  clubSlug: string;
+  publicBasePath: string;
+  session: PublicSessionDetailResponse | null;
+};
+
+function publicRouteContext(params: LoaderFunctionArgs["params"]) {
+  const clubSlug = params.clubSlug ?? BASELINE_PUBLIC_CLUB_SLUG;
+  const publicBasePath = params.clubSlug ? `/clubs/${encodeURIComponent(clubSlug)}` : "";
+
+  return { clubSlug, publicBasePath };
 }
 
-export function publicSessionLoader({ params }: LoaderFunctionArgs): Promise<PublicSessionRouteData> {
+export async function publicClubLoader({ params }: LoaderFunctionArgs): Promise<PublicClubRouteData> {
+  const context = publicRouteContext(params);
+  const club = await fetchPublicClub(context.clubSlug);
+
+  return { ...club, ...context };
+}
+
+export async function publicSessionLoader({ params }: LoaderFunctionArgs): Promise<PublicSessionRouteData> {
   const sessionId = params.sessionId;
+  const context = publicRouteContext(params);
 
   if (!sessionId) {
-    return Promise.resolve(null);
+    return { ...context, session: null };
   }
 
-  return fetchPublicSession(sessionId);
+  const session = await fetchPublicSession(context.clubSlug, sessionId);
+  return { ...context, session };
 }

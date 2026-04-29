@@ -104,6 +104,16 @@ describe("PublicClub", () => {
     );
   });
 
+  it("keeps public record links inside the scoped club route when provided", () => {
+    render(<PublicClub data={publicClubFixture} publicBasePath="/clubs/reading-sai" />);
+
+    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/clubs/reading-sai/records");
+    expect(screen.getByRole("link", { name: /가난한 찰리의 연감/ })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306",
+    );
+  });
+
   it("shows only the latest three public records with book thumbnails in the about list", () => {
     const sessions = [6, 5, 4, 3].map((sessionNumber) => ({
       ...publicClubFixture.recentSessions[0],

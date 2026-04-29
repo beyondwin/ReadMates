@@ -1,5 +1,7 @@
 package com.readmates.publication.application.model
 
+const val LEGACY_PUBLIC_CLUB_SLUG = "reading-sai"
+
 data class PublicClubResult(
     val clubName: String,
     val tagline: String,

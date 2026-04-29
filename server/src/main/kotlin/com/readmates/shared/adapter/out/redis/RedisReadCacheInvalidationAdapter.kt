@@ -21,6 +21,7 @@ class RedisReadCacheInvalidationAdapter(
     private fun evictPublicContent() {
         runCatching {
             val publicKeys = mutableSetOf(PUBLIC_CLUB_KEY)
+            redisTemplate.keys(PUBLIC_CLUB_KEYS)?.let(publicKeys::addAll)
             redisTemplate.keys(PUBLIC_SESSION_KEYS)?.let(publicKeys::addAll)
             delete(publicKeys)
             metrics.increment("readmates.public_cache.evicted", "scope", "club")
@@ -62,6 +63,7 @@ class RedisReadCacheInvalidationAdapter(
 
     private companion object {
         const val PUBLIC_CLUB_KEY = "public:club:v1"
+        const val PUBLIC_CLUB_KEYS = "public:club:*:v1"
         const val PUBLIC_SESSION_KEYS = "public:session:*:v1"
     }
 }
