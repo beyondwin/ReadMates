@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import {
   EditHostSessionRoute,
   HostDashboardRoute,
+  HostNotificationsRoute,
   NewHostSessionRoute,
 } from "@/features/host";
 import { useAuth } from "@/src/app/auth-state";
@@ -11,6 +12,10 @@ export function HostDashboardRouteElement() {
   const authState = useAuth();
 
   return <HostDashboardRoute auth={authState.status === "ready" ? authState.auth : undefined} />;
+}
+
+export function HostNotificationsRouteElement() {
+  return <HostNotificationsRoute />;
 }
 
 export function NewHostSessionRouteElement() {

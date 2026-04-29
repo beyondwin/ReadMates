@@ -48,3 +48,11 @@ export {
   hostInvitationsActions,
   hostInvitationsLoader,
 } from "@/features/host/route/host-invitations-data";
+export {
+  HostNotificationsRoute,
+} from "@/features/host/route/host-notifications-route";
+export {
+  hostNotificationsActions,
+  hostNotificationsLoader,
+  type HostNotificationsRouteData,
+} from "@/features/host/route/host-notifications-data";
