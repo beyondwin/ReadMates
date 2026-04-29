@@ -59,7 +59,7 @@ class SessionCookieAuthenticationFilter(
                                 emptyList(),
                             )
                         }
-                } else if (request.isAuthMeGet()) {
+                } else if (request.isAuthMeGet() || request.isAdminApi()) {
                     authenticatedMemberResolver.resolveProfileByUserId(session.userId)
                         ?.let { profileMember ->
                             UsernamePasswordAuthenticationToken(
@@ -102,6 +102,9 @@ class SessionCookieAuthenticationFilter(
 
     private fun HttpServletRequest.isAuthMeGet(): Boolean =
         method == "GET" && requestURI == "/api/auth/me"
+
+    private fun HttpServletRequest.isAdminApi(): Boolean =
+        requestURI == "/api/admin" || requestURI.startsWith("/api/admin/")
 
     private fun HttpServletRequest.resolveRequestedClubContext(): RequestedClubContext {
         val slug = getHeader(ClubContextHeader.CLUB_SLUG)

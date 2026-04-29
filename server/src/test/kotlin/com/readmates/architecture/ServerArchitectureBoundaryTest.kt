@@ -19,6 +19,7 @@ class ServerArchitectureBoundaryTest {
         "com.readmates.auth.adapter.in.web..",
         "com.readmates.notification.adapter.in.web..",
         "com.readmates.shared.adapter.in.web..",
+        "com.readmates.club.adapter.in.web..",
     )
 
     private val migratedApplicationPackages = arrayOf(
@@ -29,6 +30,7 @@ class ServerArchitectureBoundaryTest {
         "com.readmates.feedback.application..",
         "com.readmates.auth.application..",
         "com.readmates.notification.application..",
+        "com.readmates.club.application..",
     )
 
     @Test

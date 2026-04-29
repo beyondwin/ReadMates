@@ -7,7 +7,13 @@ data class CurrentPlatformAdmin(
     val userId: UUID,
     val email: String,
     val role: PlatformAdminRole,
-)
+) {
+    val canManagePlatformAdmins: Boolean
+        get() = role == PlatformAdminRole.OWNER
+
+    val canCreateClub: Boolean
+        get() = role in setOf(PlatformAdminRole.OWNER, PlatformAdminRole.OPERATOR)
+}
 
 data class CurrentUser(
     val userId: UUID,
