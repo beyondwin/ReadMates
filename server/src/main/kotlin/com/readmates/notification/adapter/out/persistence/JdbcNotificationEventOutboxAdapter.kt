@@ -12,6 +12,7 @@ import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -23,13 +24,13 @@ import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.math.max
 
-private const val NOTIFICATION_EVENTS_TOPIC = "readmates.notification.events.v1"
 private const val MAX_EVENT_LAST_ERROR_LENGTH = 500
 
 @Repository
 class JdbcNotificationEventOutboxAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
     private val objectMapper: ObjectMapper,
+    @param:Value("\${readmates.notifications.kafka.events-topic}") private val eventsTopic: String,
 ) : NotificationEventOutboxPort {
     private val payloadType = objectMapper.typeFactory.constructType(NotificationEventPayload::class.java)
 
@@ -64,7 +65,7 @@ class JdbcNotificationEventOutboxAdapter(
                 aggregateType,
                 aggregateId.dbString(),
                 objectMapper.writeValueAsString(payload),
-                NOTIFICATION_EVENTS_TOPIC,
+                eventsTopic,
                 clubId.dbString(),
                 dedupeKey,
             ) > 0

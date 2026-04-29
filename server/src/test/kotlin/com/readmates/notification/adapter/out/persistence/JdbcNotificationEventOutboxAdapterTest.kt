@@ -21,10 +21,12 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
     delete from clubs
     where id = '00000000-0000-0000-0000-000000000101';
 """
+private const val TEST_NOTIFICATION_EVENTS_TOPIC = "readmates.notification.events.test-override"
 
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.notifications.kafka.events-topic=$TEST_NOTIFICATION_EVENTS_TOPIC",
     ],
 )
 @Sql(
@@ -84,7 +86,7 @@ class JdbcNotificationEventOutboxAdapterTest(
         assertThat(row["event_type"]).isEqualTo("SESSION_REMINDER_DUE")
         assertThat(row["aggregate_type"]).isEqualTo("SESSION")
         assertThat(row["aggregate_id"]).isEqualTo(sessionId.toString())
-        assertThat(row["kafka_topic"]).isEqualTo("readmates.notification.events.v1")
+        assertThat(row["kafka_topic"]).isEqualTo(TEST_NOTIFICATION_EVENTS_TOPIC)
         assertThat(row["kafka_key"]).isEqualTo(clubId.toString())
         assertThat(row["status"]).isEqualTo("PENDING")
         assertThat(row["book_title"]).isEqualTo("Outbox Patterns")
