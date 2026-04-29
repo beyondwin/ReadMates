@@ -170,11 +170,105 @@ Platform Admin surface:
 /admin/clubs
 /admin/clubs/new
 /admin/clubs/:clubId
+/admin/clubs/:clubId/hosts
+/admin/clubs/:clubId/domains
 /admin/domains
+/admin/users
 /admin/audit
+/admin/support-access
 ```
 
 Platform Admin은 클럽을 생성하고, 최초 호스트를 지정하고, 기본 subdomain alias를 예약하고, 클럽 상태와 도메인 상태를 관리한다. 기본적으로 멤버의 private notes, RSVP 상세, 피드백 문서 본문 같은 클럽 내부 콘텐츠를 열람하지 않는다. 지원 목적으로 내부 콘텐츠 접근이 필요하면 별도 support access 승인과 audit event가 있어야 한다.
+
+### Admin 권한 매트릭스
+
+Platform Admin role은 역할별로 허용 작업을 분리한다. 모든 admin API는 `platform_admins.status='ACTIVE'`를 요구하고, 모든 mutation은 audit event를 남긴다.
+
+| 작업 | OWNER | OPERATOR | SUPPORT |
+| --- | --- | --- | --- |
+| Admin dashboard 읽기 | 허용 | 허용 | 허용 |
+| 클럽 목록/상태/도메인 metadata 읽기 | 허용 | 허용 | 허용 |
+| 클럽 생성 | 허용 | 허용 | 거부 |
+| 클럽 기본 정보 수정 | 허용 | 허용 | 거부 |
+| 클럽 활성/정지 전환 | 허용 | 허용, 2단계 확인 필요 | 거부 |
+| 최초/추가 호스트 지정 | 허용 | 허용 | 거부 |
+| 마지막 활성 호스트 제거 | 거부, 먼저 대체 호스트 필요 | 거부 | 거부 |
+| 등록형 subdomain alias 추가/비활성화 | 허용 | 허용 | 거부 |
+| custom domain 검증 상태 변경 | 허용 | 허용 | 거부 |
+| Platform Admin 초대/권한 변경 | 허용 | 거부 | 거부 |
+| 마지막 OWNER 비활성화 | 거부 | 거부 | 거부 |
+| 사용자 계정 검색 | 허용 | 허용 | 제한 허용 |
+| 민감하지 않은 support metadata 조회 | 허용 | 허용 | 허용 |
+| support access grant 생성 | 허용 | 거부 | 거부 |
+| audit log 조회 | 허용 | 허용 | 제한 허용 |
+
+SUPPORT는 장애 대응용 role이다. SUPPORT는 클럽 내부 콘텐츠를 직접 열람하지 않고, 클럽 id, slug, 상태, 도메인 상태, 호스트 이메일의 masked 값, 최근 배포/연결 상태처럼 운영에 필요한 metadata만 본다.
+
+### Admin 계정 부트스트랩
+
+첫 Platform Admin은 public UI에서 자가 등록하지 않는다. 운영자가 서버 환경 변수 또는 one-time CLI/seed 명령으로 OWNER를 부여한다. 이후 OWNER만 `/admin/users`에서 다른 운영자를 초대하거나 role을 바꿀 수 있다.
+
+부트스트랩 원칙:
+
+- 운영 seed에는 실제 개인 이메일을 넣지 않는다.
+- public repo에는 OWNER 이메일, admin invite token, one-time secret을 기록하지 않는다.
+- OWNER가 0명이 되는 상태는 DB constraint 또는 application guard로 막는다.
+- admin 초대와 role 변경은 모두 `club_audit_events` 또는 별도 `platform_audit_events`에 남긴다.
+
+### Admin UI 구성
+
+`/admin`은 운영자가 현재 플랫폼 상태를 빠르게 판단하는 dashboard다.
+
+- 클럽 수, 활성/정지/설정 필요 클럽 수.
+- 도메인 alias 상태: active, pending, disabled.
+- 최근 클럽 생성/정지/도메인 변경 audit event.
+- 조치가 필요한 항목: 호스트 없는 클럽, pending domain, setup required club.
+
+`/admin/clubs`는 클럽 운영 목록이다.
+
+- 검색: 클럽 이름, slug, hostname.
+- 필터: status, domain status, host 유무.
+- 표시: 클럽 이름, slug, primary hostname, status, 활성 멤버 수, 호스트 수, 최근 활동일.
+- 행 action: 상세 보기, 정지/복구, 도메인 관리.
+
+`/admin/clubs/new`는 클럽 생성 wizard다.
+
+- 기본 정보: name, slug, tagline, about.
+- 도메인: `<slug>.<primary-domain>` alias 생성 여부와 상태.
+- 최초 호스트: 기존 user email 선택 또는 초대 email 입력.
+- 확인 화면: 생성될 club, domain, host membership/invitation, audit event 요약.
+
+`/admin/clubs/:clubId`는 클럽 상세 운영 화면이다.
+
+- 클럽 profile과 status.
+- primary domain과 fallback path.
+- 호스트 목록과 최초 호스트/추가 호스트 지정 action.
+- 멤버 수, 세션 수, 공개 기록 수 같은 aggregate만 표시.
+- private notes, RSVP 상세, 피드백 문서 본문은 표시하지 않는다.
+
+`/admin/domains`와 `/admin/clubs/:clubId/domains`는 domain alias 관리 화면이다.
+
+- hostname, kind, status, isPrimary, verifiedAt.
+- 등록형 subdomain alias 활성/비활성.
+- custom domain은 `PENDING` 상태 생성까지만 1차 범위로 둔다.
+- DNS나 인증서의 실제 secret 값은 표시하지 않는다.
+
+`/admin/users`는 운영자와 사용자 계정 관리 화면이다.
+
+- OWNER 전용: Platform Admin 초대, role 변경, 비활성화.
+- OPERATOR/SUPPORT: 사용자 검색과 계정 상태 metadata 조회만 허용한다.
+- 사용자 detail은 가입 클럽 목록과 role/status summary를 보여주되, 클럽 내부 작성물 본문은 보여주지 않는다.
+
+`/admin/audit`은 운영 감사 로그다.
+
+- 클럽 생성, 상태 변경, domain 변경, admin role 변경, support access grant, 호스트 지정 이벤트를 보여준다.
+- metadata는 allowlist된 key만 표시하고, 이메일은 가능한 masked 값으로 표시한다.
+
+`/admin/support-access`는 예외적 지원 접근 관리 화면이다.
+
+- OWNER만 grant를 만들 수 있다.
+- grant는 대상 club, 목적, 만료 시각, 허용 범위를 가진다.
+- 만료된 grant는 사용할 수 없고, 사용 시마다 audit event를 남긴다.
 
 ## 클럽 생성 흐름
 
@@ -220,9 +314,37 @@ club_audit_events
 - event_type
 - metadata
 - created_at
+
+platform_audit_events
+- id
+- actor_user_id
+- actor_platform_role
+- target_user_id
+- event_type
+- metadata
+- created_at
+
+support_access_grants
+- id
+- club_id
+- granted_by_user_id
+- grantee_user_id
+- scope
+- reason
+- expires_at
+- revoked_at
+- created_at
 ```
 
 `clubs.slug`는 계속 필수다. slug는 내부 canonical route, fallback path, 로컬 개발, 도메인 미연결 상태의 클럽 접근에 쓰인다. `club_domains.hostname`은 외부 진입 alias다.
+
+`clubs`에는 운영 상태가 필요하다.
+
+```text
+clubs.status: SETUP_REQUIRED | ACTIVE | SUSPENDED | ARCHIVED
+```
+
+`SUSPENDED` 클럽은 public/member/host surface에서 새 mutation을 막고, public 노출 정책은 admin 설정에 따른다. `ARCHIVED`는 읽기 전용 보존 상태다. 초기 구현에서는 hard delete를 제공하지 않는다.
 
 ## API 변화
 
@@ -257,8 +379,30 @@ GET /api/auth/me
 - authenticated user profile
 - current club membership, 있으면
 - joined clubs list
-- platform admin 여부
+- platform admin 여부와 role, 있으면
 - recommended app entry URL
+
+Admin API는 member/host API와 분리한다.
+
+```text
+GET /api/admin/summary
+GET /api/admin/clubs
+POST /api/admin/clubs
+GET /api/admin/clubs/:clubId
+PATCH /api/admin/clubs/:clubId
+POST /api/admin/clubs/:clubId/suspend
+POST /api/admin/clubs/:clubId/restore
+GET /api/admin/clubs/:clubId/domains
+POST /api/admin/clubs/:clubId/domains
+PATCH /api/admin/domains/:domainId
+GET /api/admin/users
+POST /api/admin/platform-admins
+PATCH /api/admin/platform-admins/:userId
+GET /api/admin/audit
+POST /api/admin/support-access-grants
+```
+
+Admin API는 `CurrentMember`가 아니라 `CurrentPlatformAdmin` 같은 별도 principal을 사용한다. 클럽 membership role이 `HOST`여도 `/api/admin/**` 접근 권한이 생기지 않는다.
 
 ## Frontend 변화
 
@@ -273,8 +417,11 @@ React Router는 `/clubs/:clubSlug/**`를 중심으로 재구성한다. `PublicRo
 - 접근 불가 화면: 현재 클럽 membership이 없거나 권한이 부족한 경우.
 - Admin 클럽 생성 화면: Platform Admin 전용.
 - Admin 도메인 상태 화면: 등록형 subdomain alias와 custom domain 준비 상태 표시.
+- Admin dashboard, 클럽 목록/상세, 호스트 지정, 사용자 검색, audit log, support access 화면.
 
 사용자가 클럽 하나만 가진 경우에는 선택 화면을 보지 않고 바로 해당 클럽 앱으로 이동한다.
+
+Admin route guard는 member app guard와 분리한다. `/admin/**`은 `AuthMeResponse.platformAdmin.role` 또는 별도 admin auth loader를 기준으로 접근을 판단하고, 클럽 membership이 없어도 Platform Admin이면 접근 가능하다. 반대로 클럽 HOST는 Platform Admin row가 없으면 `/admin/**`에 접근할 수 없다.
 
 ## BFF와 Cloudflare 변경
 
@@ -349,6 +496,9 @@ Public repo에는 실제 custom domain, 운영 secret, 멤버 데이터, deploym
 - 같은 user가 두 club에 가입한 경우 current member가 request club에 따라 달라지는 테스트.
 - cross-club session, membership, notification 접근 거부 테스트.
 - Platform Admin이 club creation transaction을 수행하고 audit event를 남기는 테스트.
+- OWNER/OPERATOR/SUPPORT 권한 매트릭스 테스트.
+- 마지막 OWNER와 마지막 활성 HOST 제거 방지 테스트.
+- Admin API가 클럽 내부 private content를 반환하지 않는 response contract 테스트.
 
 프런트엔드:
 
@@ -356,6 +506,7 @@ Public repo에는 실제 custom domain, 운영 secret, 멤버 데이터, deploym
 - `/clubs/:slug/app/**` route guard.
 - 클럽 스위처 이동.
 - subdomain host context mock을 사용한 public/app loader 테스트.
+- `/admin/**` route guard와 role별 화면 action 표시/숨김 테스트.
 
 E2E:
 
