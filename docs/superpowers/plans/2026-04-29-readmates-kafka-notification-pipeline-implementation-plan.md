@@ -683,7 +683,7 @@ git commit -m "feat: add notification event delivery models"
 - Create: `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapterTest.kt`
 
-- [ ] **Step 1: Write failing persistence test**
+- [x] **Step 1: Write failing persistence test**
 
 Create `JdbcNotificationEventOutboxAdapterTest.kt` with tests for idempotent enqueue and claim:
 
@@ -767,7 +767,7 @@ class JdbcNotificationEventOutboxAdapterTest(
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -777,7 +777,7 @@ Run:
 
 Expected: FAIL because `JdbcNotificationEventOutboxAdapter` does not exist.
 
-- [ ] **Step 3: Implement adapter**
+- [x] **Step 3: Implement adapter**
 
 Create `JdbcNotificationEventOutboxAdapter.kt`:
 
@@ -963,7 +963,7 @@ class JdbcNotificationEventOutboxAdapter(
 }
 ```
 
-- [ ] **Step 4: Run adapter test**
+- [x] **Step 4: Run adapter test**
 
 Run:
 
@@ -973,7 +973,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapterTest.kt
