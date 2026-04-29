@@ -13,7 +13,6 @@ import com.readmates.notification.application.port.`in`.GetHostNotificationSumma
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
-import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
@@ -45,26 +44,25 @@ class NotificationOutboxService(
     private val metrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.worker.max-attempts:5}") private val maxAttempts: Int,
     @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
-) : RecordNotificationEventUseCase,
-    ProcessNotificationOutboxUseCase,
+) : ProcessNotificationOutboxUseCase,
     GetHostNotificationSummaryUseCase,
     ManageHostNotificationsUseCase,
     ManageNotificationPreferencesUseCase,
     SendNotificationTestMailUseCase {
 
-    override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID) {
+    fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID) {
         notificationOutboxPort.enqueueFeedbackDocumentPublished(clubId, sessionId)
     }
 
-    override fun recordNextBookPublished(clubId: UUID, sessionId: UUID) {
+    fun recordNextBookPublished(clubId: UUID, sessionId: UUID) {
         notificationOutboxPort.enqueueNextBookPublished(clubId, sessionId)
     }
 
-    override fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID) {
+    fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID) {
         notificationOutboxPort.enqueueReviewPublished(clubId, sessionId, authorMembershipId)
     }
 
-    override fun recordSessionReminderDue(targetDate: LocalDate) {
+    fun recordSessionReminderDue(targetDate: LocalDate) {
         notificationOutboxPort.enqueueSessionReminderDue(targetDate)
     }
 

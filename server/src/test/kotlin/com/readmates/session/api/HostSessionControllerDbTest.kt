@@ -28,6 +28,15 @@ import org.springframework.test.web.servlet.put
 import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
+    delete from notification_event_outbox
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and aggregate_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001'
+          and number >= 7
+      );
+    delete from notification_event_outbox
+    where aggregate_id = '00000000-0000-0000-0000-000000019777';
     delete from notification_outbox
     where club_id = '00000000-0000-0000-0000-000000000001'
       and aggregate_id in (
@@ -226,18 +235,24 @@ class HostSessionControllerDbTest(
             status { isOk() }
         }
 
-        val count = jdbcTemplate.queryForObject(
+        val event = jdbcTemplate.queryForMap(
             """
-            select count(*)
-            from notification_outbox
+            select
+              dedupe_key,
+              json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title
+            from notification_event_outbox
             where event_type = 'NEXT_BOOK_PUBLISHED'
               and aggregate_id = ?
             """.trimIndent(),
-            Int::class.java,
             sessionId,
-        ) ?: 0
+        )
 
-        assertThat(count).isGreaterThan(0)
+        assertThat(event["dedupe_key"]).isEqualTo("next-book:$sessionId")
+        assertThat(event["session_id"]).isEqualTo(sessionId)
+        assertThat((event["session_number"] as Number).toInt()).isEqualTo(7)
+        assertThat(event["book_title"]).isEqualTo("테스트 책")
     }
 
     @Test

@@ -51,6 +51,8 @@ class HostSessionCommandService(
             recordNotificationEventUseCase.recordNextBookPublished(
                 clubId = command.host.clubId,
                 sessionId = command.sessionId,
+                sessionNumber = detail.sessionNumber,
+                bookTitle = detail.bookTitle,
             )
         }
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
@@ -101,9 +103,9 @@ class HostSessionCommandService(
 }
 
 private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCase {
-    override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID) = Unit
+    override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID, documentVersion: Int) = Unit
 
-    override fun recordNextBookPublished(clubId: UUID, sessionId: UUID) = Unit
+    override fun recordNextBookPublished(clubId: UUID, sessionId: UUID, sessionNumber: Int, bookTitle: String) = Unit
 
     override fun recordReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID) = Unit
 
