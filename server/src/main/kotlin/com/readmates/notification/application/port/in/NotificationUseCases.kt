@@ -1,5 +1,8 @@
 package com.readmates.notification.application.port.`in`
 
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.shared.security.CurrentMember
@@ -19,6 +22,13 @@ interface ProcessNotificationOutboxUseCase {
 
 interface GetHostNotificationSummaryUseCase {
     fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary
+}
+
+interface ManageHostNotificationsUseCase {
+    fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList
+    fun detail(host: CurrentMember, id: UUID): HostNotificationDetail
+    fun retry(host: CurrentMember, id: UUID): HostNotificationDetail
+    fun restore(host: CurrentMember, id: UUID): HostNotificationDetail
 }
 
 interface ManageNotificationPreferencesUseCase {

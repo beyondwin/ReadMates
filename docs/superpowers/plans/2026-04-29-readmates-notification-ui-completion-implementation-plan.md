@@ -685,7 +685,7 @@ git commit -m "feat: respect notification preferences in delivery"
 - Test: `server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationOutboxServiceTest.kt`
 
-- [ ] **Step 1: Add host API tests**
+- [x] **Step 1: Add host API tests**
 
 Append to `HostNotificationControllerTest.kt`:
 
@@ -751,7 +751,7 @@ fun `host restores dead notification`() {
 
 Move `insertNotification` helper from `JdbcNotificationOutboxAdapterTest.kt` style into `HostNotificationControllerTest.kt` so it can insert different statuses.
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -761,7 +761,7 @@ Run:
 
 Expected: FAIL because item, detail, and restore endpoints do not exist.
 
-- [ ] **Step 3: Add models**
+- [x] **Step 3: Add models**
 
 Append to `NotificationModels.kt`:
 
@@ -800,7 +800,7 @@ data class HostNotificationDetail(
 )
 ```
 
-- [ ] **Step 4: Add ports and service operations**
+- [x] **Step 4: Add ports and service operations**
 
 Add to `NotificationUseCases.kt`:
 
@@ -861,7 +861,7 @@ private fun requireHost(host: CurrentMember) {
 
 Replace the existing inline host check in `getHostNotificationSummary` with `requireHost(host)`.
 
-- [ ] **Step 5: Implement masked DTO mapping and controller endpoints**
+- [x] **Step 5: Implement masked DTO mapping and controller endpoints**
 
 Extend `NotificationWebDtos.kt`:
 
@@ -955,7 +955,7 @@ fun restore(host: CurrentMember, @PathVariable id: UUID): HostNotificationDetail
     manageHostNotificationsUseCase.restore(host, id).toResponse()
 ```
 
-- [ ] **Step 6: Implement JDBC operations**
+- [x] **Step 6: Implement JDBC operations**
 
 Add SQL methods in `JdbcNotificationOutboxAdapter.kt`:
 
@@ -1027,7 +1027,7 @@ where club_id = ?
 
 for restore.
 
-- [ ] **Step 7: Run host notification tests**
+- [x] **Step 7: Run host notification tests**
 
 Run:
 
@@ -1038,7 +1038,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification

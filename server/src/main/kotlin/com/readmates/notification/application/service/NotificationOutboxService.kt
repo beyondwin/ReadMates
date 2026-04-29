@@ -1,9 +1,13 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
+import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
@@ -30,6 +34,7 @@ class NotificationOutboxService(
 ) : RecordNotificationEventUseCase,
     ProcessNotificationOutboxUseCase,
     GetHostNotificationSummaryUseCase,
+    ManageHostNotificationsUseCase,
     ManageNotificationPreferencesUseCase {
 
     override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID) {
@@ -63,10 +68,42 @@ class NotificationOutboxService(
     }
 
     override fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary {
-        if (!host.isHost) {
-            throw AccessDeniedException("Host role required")
+        val currentHost = requireHost(host)
+        return notificationOutboxPort.hostSummary(currentHost.clubId)
+    }
+
+    override fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList {
+        val currentHost = requireHost(host)
+        val clampedQuery = query.copy(limit = query.limit.coerceIn(1, 100))
+        return notificationOutboxPort.listHostItems(currentHost.clubId, clampedQuery)
+    }
+
+    override fun detail(host: CurrentMember, id: UUID): HostNotificationDetail {
+        val currentHost = requireHost(host)
+        return notificationOutboxPort.hostItemDetail(currentHost.clubId, id)
+            ?: throw notificationAccessDenied()
+    }
+
+    override fun retry(host: CurrentMember, id: UUID): HostNotificationDetail {
+        val currentHost = requireHost(host)
+        if (!deliveryEnabled) {
+            return detail(currentHost, id)
         }
-        return notificationOutboxPort.hostSummary(host.clubId)
+
+        val item = notificationOutboxPort.claimOneForClub(currentHost.clubId, id)
+            ?: throw notificationAccessDenied()
+        deliver(item)
+        return notificationOutboxPort.hostItemDetail(currentHost.clubId, id)
+            ?: throw notificationAccessDenied()
+    }
+
+    override fun restore(host: CurrentMember, id: UUID): HostNotificationDetail {
+        val currentHost = requireHost(host)
+        if (!notificationOutboxPort.restoreDeadForClub(currentHost.clubId, id)) {
+            throw notificationAccessDenied()
+        }
+        return notificationOutboxPort.hostItemDetail(currentHost.clubId, id)
+            ?: throw notificationAccessDenied()
     }
 
     override fun getPreferences(member: CurrentMember): NotificationPreferences =
@@ -115,6 +152,16 @@ class NotificationOutboxService(
         items.forEach(::deliver)
         return items.size
     }
+
+    private fun requireHost(host: CurrentMember): CurrentMember {
+        if (!host.isHost) {
+            throw AccessDeniedException("Host role required")
+        }
+        return host
+    }
+
+    private fun notificationAccessDenied(): AccessDeniedException =
+        AccessDeniedException("Notification not found")
 
     private fun retryDelayMinutes(attemptCount: Int): Long =
         RETRY_DELAYS_MINUTES[attemptCount.coerceIn(0, RETRY_DELAYS_MINUTES.lastIndex)]

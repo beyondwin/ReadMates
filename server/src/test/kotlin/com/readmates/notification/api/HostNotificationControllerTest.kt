@@ -2,6 +2,7 @@ package com.readmates.notification.api
 
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
+import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import jakarta.mail.Session
@@ -113,6 +114,71 @@ class HostNotificationControllerTest(
     }
 
     @Test
+    fun `host can list notification outbox items with masked recipients`() {
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009401",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.PENDING,
+            dedupeKey = "host-notification-controller-test-list",
+        )
+
+        val response = mockMvc.get("/api/host/notifications/items?status=PENDING") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009401") }
+            jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
+            jsonPath("$.items[0].eventType") { value("FEEDBACK_DOCUMENT_PUBLISHED") }
+            jsonPath("$.items[0].status") { value("PENDING") }
+        }.andReturn().response.contentAsString
+
+        assertThat(response).doesNotContain("subject")
+        assertThat(response).doesNotContain("member@example.com")
+    }
+
+    @Test
+    fun `host can read notification detail without body text or raw email`() {
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009402",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.PENDING,
+            dedupeKey = "host-notification-controller-test-detail",
+        )
+
+        val response = mockMvc.get("/api/host/notifications/items/00000000-0000-0000-0000-000000009402") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value("00000000-0000-0000-0000-000000009402") }
+            jsonPath("$.recipientEmail") { value("m***@example.com") }
+            jsonPath("$.subject") { value("피드백 문서가 올라왔습니다") }
+            jsonPath("$.status") { value("PENDING") }
+        }.andReturn().response.contentAsString
+
+        assertThat(response).doesNotContain("bodyText")
+        assertThat(response).doesNotContain("member@example.com")
+        assertThat(response).doesNotContain("ReadMates에서 확인해 주세요.")
+    }
+
+    @Test
+    fun `host restores dead notification`() {
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009403",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.DEAD,
+            dedupeKey = "host-notification-controller-test-restore",
+        )
+
+        mockMvc.post("/api/host/notifications/items/00000000-0000-0000-0000-000000009403/restore") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.id") { value("00000000-0000-0000-0000-000000009403") }
+            jsonPath("$.status") { value("PENDING") }
+        }
+    }
+
+    @Test
     fun `manual host process only processes notifications for host club`() {
         jdbcTemplate.update(
             """
@@ -175,6 +241,15 @@ class HostNotificationControllerTest(
     }
 
     private fun insertPendingNotification(id: String, clubId: String, dedupeKey: String) {
+        insertNotification(id = id, clubId = clubId, status = NotificationOutboxStatus.PENDING, dedupeKey = dedupeKey)
+    }
+
+    private fun insertNotification(
+        id: String,
+        clubId: String,
+        status: NotificationOutboxStatus,
+        dedupeKey: String,
+    ) {
         jdbcTemplate.update(
             """
             insert into notification_outbox (
@@ -190,12 +265,13 @@ class HostNotificationControllerTest(
               '피드백 문서가 올라왔습니다',
               'ReadMates에서 확인해 주세요.',
               '/app/feedback/00000000-0000-0000-0000-000000000301',
-              'PENDING',
+              ?,
               ?
             )
             """.trimIndent(),
             id,
             clubId,
+            status.name,
             dedupeKey,
         )
     }
