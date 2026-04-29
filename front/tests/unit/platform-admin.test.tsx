@@ -113,6 +113,7 @@ describe("platform admin frontend shell", () => {
               platformRole: "OWNER",
               activeClubCount: 2,
               domainActionRequiredCount: 0,
+              domainsRequiringAction: [],
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),
@@ -128,6 +129,7 @@ describe("platform admin frontend shell", () => {
         platformRole: "OWNER",
         activeClubCount: 2,
         domainActionRequiredCount: 0,
+        domainsRequiringAction: [],
       },
     });
   });
@@ -163,6 +165,7 @@ describe("platform admin frontend shell", () => {
           platformRole: "OWNER",
           activeClubCount: 2,
           domainActionRequiredCount: 0,
+          domainsRequiringAction: [],
         }}
       />,
     );
@@ -172,6 +175,38 @@ describe("platform admin frontend shell", () => {
     expect(screen.getByText("2")).toBeInTheDocument();
     expect(screen.getByText("0")).toBeInTheDocument();
     expect(screen.queryByText(/호스트|멤버 승인/)).not.toBeInTheDocument();
+  });
+
+  it("renders domain provisioning status and manual action text", () => {
+    render(
+      <PlatformAdminDashboard
+        summary={{
+          platformRole: "OPERATOR",
+          activeClubCount: 2,
+          domainActionRequiredCount: 1,
+          domainsRequiringAction: [
+            {
+              id: "domain-1",
+              clubId: "club-1",
+              hostname: "reading-sai.example.test",
+              kind: "SUBDOMAIN",
+              status: "ACTION_REQUIRED",
+              desiredState: "ENABLED",
+              manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
+              errorCode: null,
+              isPrimary: false,
+              verifiedAt: null,
+              lastCheckedAt: null,
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Cloudflare Pages custom domain" })).toBeInTheDocument();
+    expect(screen.getByText("reading-sai.example.test")).toBeInTheDocument();
+    expect(screen.getByText("ACTION_REQUIRED")).toBeInTheDocument();
+    expect(screen.getByText("Cloudflare Pages custom domain 연결 후 상태 확인을 실행하세요.")).toBeInTheDocument();
   });
 
   it("mounts the platform admin route at /admin", async () => {
@@ -197,6 +232,7 @@ describe("platform admin frontend shell", () => {
               platformRole: "OWNER",
               activeClubCount: 2,
               domainActionRequiredCount: 0,
+              domainsRequiringAction: [],
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),

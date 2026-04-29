@@ -9,11 +9,13 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.http.MediaType
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.post
 import java.util.UUID
 
 @SpringBootTest(
@@ -30,10 +32,12 @@ class PlatformAdminControllerTest(
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
+    private val createdClubDomainIds = linkedSetOf<String>()
 
     @AfterEach
     fun cleanupCreatedRows() {
         try {
+            deleteWhereIn("club_domains", "id", createdClubDomainIds)
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
             deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
@@ -42,6 +46,7 @@ class PlatformAdminControllerTest(
             createdSessionTokenHashes.clear()
             createdPlatformAdminUserIds.clear()
             createdUserIds.clear()
+            createdClubDomainIds.clear()
             SecurityContextHolder.clearContext()
         }
     }
@@ -75,6 +80,132 @@ class PlatformAdminControllerTest(
 
         mockMvc.get("/api/admin/summary") {
             cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
+    fun `operator can create action required subdomain row`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val hostname = "task14-${UUID.randomUUID()}.example.test"
+
+        val result = mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(operator))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.clubId") { value(READING_SAI_CLUB_ID) }
+            jsonPath("$.hostname") { value(hostname) }
+            jsonPath("$.kind") { value("SUBDOMAIN") }
+            jsonPath("$.status") { value("ACTION_REQUIRED") }
+            jsonPath("$.isPrimary") { value(false) }
+        }.andReturn()
+        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
+    }
+
+    @Test
+    fun `created domain hostnames are normalized to lowercase`() {
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val token = UUID.randomUUID().toString().replace("-", "")
+        val expectedHostname = "task14-$token.example.test"
+
+        val result = mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"Task14-$token.Example.Test.","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.hostname") { value(expectedHostname) }
+            jsonPath("$.status") { value("ACTION_REQUIRED") }
+        }.andReturn()
+        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
+    }
+
+    @Test
+    fun `cannot create platform fallback hostname as club domain`() {
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+
+        mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"readmates.pages.dev","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isBadRequest() }
+        }
+    }
+
+    @Test
+    fun `pending club domain cannot be created as primary`() {
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val hostname = "primary-${UUID.randomUUID()}.example.test"
+
+        mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN","isPrimary":true}"""
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isBadRequest() }
+        }
+    }
+
+    @Test
+    fun `cannot create duplicate club domain hostname`() {
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val hostname = "duplicate-${UUID.randomUUID()}.example.test"
+
+        val result = mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isOk() }
+        }.andReturn()
+        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
+
+        mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isConflict() }
+        }
+    }
+
+    @Test
+    fun `summary lists action required domains for admin UI`() {
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val hostname = "summary-${UUID.randomUUID()}.example.test"
+        val result = mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isOk() }
+        }.andReturn()
+        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
+
+        mockMvc.get("/api/admin/summary") {
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.domainActionRequiredCount") { value(1) }
+            jsonPath("$.domainsRequiringAction[0].hostname") { value(hostname) }
+            jsonPath("$.domainsRequiringAction[0].status") { value("ACTION_REQUIRED") }
+            jsonPath("$.domainsRequiringAction[0].manualAction") { value("CLOUDFLARE_PAGES_CUSTOM_DOMAIN") }
+        }
+    }
+
+    @Test
+    fun `support platform admin cannot create club domain`() {
+        val support = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+        val hostname = "support-${UUID.randomUUID()}.example.test"
+
+        mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+            cookie(sessionCookieForUser(support))
         }.andExpect {
             status { isForbidden() }
         }
@@ -127,6 +258,8 @@ class PlatformAdminControllerTest(
     }
 
     companion object {
+        private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
+
         @JvmStatic
         @DynamicPropertySource
         fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
@@ -134,3 +267,6 @@ class PlatformAdminControllerTest(
         }
     }
 }
+
+private inline fun <reified T> org.springframework.mock.web.MockHttpServletResponse.jsonPathValue(expression: String): T? =
+    com.jayway.jsonpath.JsonPath.read(contentAsString, expression)

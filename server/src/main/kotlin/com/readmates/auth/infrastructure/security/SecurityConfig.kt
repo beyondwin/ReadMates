@@ -81,6 +81,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/invitations/[^/]+/accept$")),
                     methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$")),
                     methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$")),
+                    methodAndPath("POST", Regex("^/api/admin/clubs/[^/]+/domains$")),
                 )
             }
             .authorizeHttpRequests {
