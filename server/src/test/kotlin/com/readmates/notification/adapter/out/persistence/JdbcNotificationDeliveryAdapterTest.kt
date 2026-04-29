@@ -143,6 +143,22 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     @Test
+    fun `claimEmailDelivery renders email copy from immutable event payload`() {
+        insertEventOutboxRow()
+        deliveryAdapter.persistPlannedDeliveries(message())
+        val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
+
+        updateSessionCopy(number = 99, bookTitle = "변경된 책")
+
+        val claimed = deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
+
+        assertThat(claimed.subject).isEqualTo("피드백 문서가 올라왔습니다")
+        assertThat(claimed.bodyText).contains("1회차 팩트풀니스")
+        assertThat(claimed.bodyText).doesNotContain("99회차")
+        assertThat(claimed.bodyText).doesNotContain("변경된 책")
+    }
+
+    @Test
     fun `findDeliveryStatus exposes failed email row that is not due for retry`() {
         insertEventOutboxRow()
         deliveryAdapter.persistPlannedDeliveries(message())
@@ -289,6 +305,22 @@ class JdbcNotificationDeliveryAdapterTest(
             clubId.toString(),
             sessionId.toString(),
             membershipId.toString(),
+        )
+    }
+
+    private fun updateSessionCopy(number: Int, bookTitle: String) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set number = ?,
+                book_title = ?
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            number,
+            bookTitle,
+            sessionId.toString(),
+            clubId.toString(),
         )
     }
 

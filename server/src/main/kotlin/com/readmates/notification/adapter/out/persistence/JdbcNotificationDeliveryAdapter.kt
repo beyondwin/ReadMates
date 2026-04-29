@@ -3,6 +3,7 @@ package com.readmates.notification.adapter.out.persistence
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
+import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.notificationDeliveryDedupeKey
 import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
@@ -19,6 +20,7 @@ import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.time.OffsetDateTime
@@ -54,7 +56,10 @@ private data class DeliveryInsertRow(
 @Repository
 class JdbcNotificationDeliveryAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val objectMapper: ObjectMapper,
 ) : NotificationDeliveryPort {
+    private val payloadType = objectMapper.typeFactory.constructType(NotificationEventPayload::class.java)
+
     @Transactional
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> {
         val jdbcTemplate = jdbcTemplate()
@@ -557,18 +562,15 @@ class JdbcNotificationDeliveryAdapter(
               notification_deliveries.locked_at,
               notification_event_outbox.event_type,
               notification_event_outbox.aggregate_id,
+              notification_event_outbox.payload_json,
               users.email as recipient_email,
-              coalesce(memberships.short_name, users.name) as display_name,
-              sessions.number as session_number,
-              sessions.book_title
+              coalesce(memberships.short_name, users.name) as display_name
             from notification_deliveries
             join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
               and notification_event_outbox.club_id = notification_deliveries.club_id
             join memberships on memberships.id = notification_deliveries.recipient_membership_id
               and memberships.club_id = notification_deliveries.club_id
             join users on users.id = memberships.user_id
-            join sessions on sessions.id = notification_event_outbox.aggregate_id
-              and sessions.club_id = notification_event_outbox.club_id
             where notification_deliveries.id in ($placeholders)
             order by field(notification_deliveries.id, $placeholders)
             """.trimIndent(),
@@ -622,9 +624,8 @@ class JdbcNotificationDeliveryAdapter(
         val eventType = NotificationEventType.valueOf(getString("event_type"))
         val copy = copyFor(
             eventType = eventType,
-            sessionId = uuid("aggregate_id"),
-            sessionNumber = getInt("session_number"),
-            bookTitle = getString("book_title"),
+            aggregateId = uuid("aggregate_id"),
+            payload = parsePayload(getString("payload_json")),
             displayName = getString("display_name"),
         )
         return ClaimedNotificationDeliveryItem(
@@ -645,9 +646,22 @@ class JdbcNotificationDeliveryAdapter(
     private fun copyFor(message: NotificationEventMessage, displayName: String?): DeliveryCopy =
         copyFor(
             eventType = message.eventType,
-            sessionId = sessionId(message),
-            sessionNumber = message.payload.sessionNumber ?: 0,
-            bookTitle = message.payload.bookTitle ?: "선정 도서",
+            aggregateId = message.aggregateId,
+            payload = message.payload,
+            displayName = displayName,
+        )
+
+    private fun copyFor(
+        eventType: NotificationEventType,
+        aggregateId: UUID,
+        payload: NotificationEventPayload,
+        displayName: String?,
+    ): DeliveryCopy =
+        copyFor(
+            eventType = eventType,
+            sessionId = payload.sessionId ?: aggregateId,
+            sessionNumber = payload.sessionNumber ?: 0,
+            bookTitle = payload.bookTitle ?: "선정 도서",
             displayName = displayName,
         )
 
@@ -713,6 +727,9 @@ class JdbcNotificationDeliveryAdapter(
 
     private fun sessionId(message: NotificationEventMessage): UUID =
         message.payload.sessionId ?: message.aggregateId
+
+    private fun parsePayload(rawPayload: String): NotificationEventPayload =
+        objectMapper.readValue(rawPayload, payloadType)
 
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateProvider.ifAvailable
