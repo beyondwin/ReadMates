@@ -13,5 +13,6 @@ class CurrentMemberWebConfig(
 ) : WebMvcConfigurer {
     override fun addArgumentResolvers(resolvers: MutableList<HandlerMethodArgumentResolver>) {
         resolvers.add(CurrentMemberArgumentResolver(resolveCurrentMemberUseCase, resolveClubContextUseCase))
+        resolvers.add(CurrentPlatformAdminArgumentResolver(resolveCurrentMemberUseCase))
     }
 }

@@ -23,6 +23,7 @@ class SecurityConfig(
     private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter,
     private val rateLimitFilter: RateLimitFilter,
     private val memberAuthoritiesFilter: MemberAuthoritiesFilter,
+    private val platformAdminAuthoritiesFilter: PlatformAdminAuthoritiesFilter,
     private val oAuthInviteTokenCaptureFilter: OAuthInviteTokenCaptureFilter,
     private val googleOidcUserService: GoogleOidcUserService,
     private val readmatesOAuthSuccessHandler: ReadmatesOAuthSuccessHandler,
@@ -108,6 +109,7 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer").hasRole("VIEWER")
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$"))).permitAll()
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$"))).permitAll()
+                    .requestMatchers("/api/admin/**").hasRole("PLATFORM_ADMIN")
                     .requestMatchers("/api/host/**").hasRole("HOST")
                     .requestMatchers(HttpMethod.GET, "/api/feedback-documents/me").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(RegexRequestMatcher("^/api/sessions/[^/]+/feedback-document$", "GET"))
@@ -121,6 +123,7 @@ class SecurityConfig(
             }
             .addFilterBefore(bffSecretFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterBefore(sessionCookieAuthenticationFilter, AnonymousAuthenticationFilter::class.java)
+            .addFilterAfter(platformAdminAuthoritiesFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterAfter(rateLimitFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterBefore(oAuthForwardedHeaderFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
             .addFilterBefore(oAuthInviteTokenCaptureFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
