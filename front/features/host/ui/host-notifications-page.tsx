@@ -98,6 +98,9 @@ export function HostNotificationsPage({
   const [testEmail, setTestEmail] = useState("");
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const processableNotificationCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
+  const hasVisibleProcessableNotifications = items.some((item) => item.status === "PENDING" || item.status === "FAILED");
+  const hasProcessableNotifications = processableNotificationCount > 0 || hasVisibleProcessableNotifications;
   const isBusy = pendingAction !== null || isRefreshing;
 
   const isPending = (kind: PendingAction["kind"], id?: string) => {
@@ -126,6 +129,10 @@ export function HostNotificationsPage({
   };
 
   const handleProcess = () => {
+    if (!hasProcessableNotifications) {
+      return;
+    }
+
     void runAction({ kind: "process" }, onProcess, "대기/실패 알림 처리를 요청했습니다.");
   };
 
@@ -187,10 +194,16 @@ export function HostNotificationsPage({
             <button
               className="btn btn-primary btn-sm"
               type="button"
-              disabled={isBusy}
+              disabled={isBusy || !hasProcessableNotifications}
               onClick={handleProcess}
             >
-              {isPending("process") ? "처리 중" : isRefreshing ? "새로고침 중" : "대기/실패 처리"}
+              {isPending("process")
+                ? "처리 중"
+                : isRefreshing
+                  ? "새로고침 중"
+                  : hasProcessableNotifications
+                    ? "대기/실패 처리"
+                    : "처리할 알림 없음"}
             </button>
           </div>
         </div>

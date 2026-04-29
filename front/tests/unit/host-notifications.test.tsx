@@ -116,6 +116,52 @@ describe("HostNotificationsPage", () => {
     expect(onProcess).toHaveBeenCalledTimes(1);
   });
 
+  it("does not process notifications when there are no pending or failed items", async () => {
+    const user = userEvent.setup();
+    const onProcess = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <HostNotificationsPage
+        summary={{ ...summary, pending: 0, failed: 0 }}
+        items={[]}
+        audit={[]}
+        onProcess={onProcess}
+        onRetry={vi.fn()}
+        onRestore={vi.fn()}
+        onSendTestMail={vi.fn()}
+      />,
+    );
+
+    const processButton = screen.getByRole("button", { name: "처리할 알림 없음" });
+    expect(processButton).toBeDisabled();
+
+    await user.click(processButton);
+
+    expect(onProcess).not.toHaveBeenCalled();
+  });
+
+  it("keeps processing available when a pending item is visible even if the summary is stale", async () => {
+    const user = userEvent.setup();
+    const onProcess = vi.fn().mockResolvedValue(undefined);
+    const pendingItem: HostNotificationItem = { ...deadItem, id: "notification-2", status: "PENDING" };
+
+    render(
+      <HostNotificationsPage
+        summary={{ ...summary, pending: 0, failed: 0 }}
+        items={[pendingItem]}
+        audit={[]}
+        onProcess={onProcess}
+        onRetry={vi.fn()}
+        onRestore={vi.fn()}
+        onSendTestMail={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "대기/실패 처리" }));
+
+    expect(onProcess).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps notification operations disabled while route data is refreshing", async () => {
     const user = userEvent.setup();
     const onRetry = vi.fn().mockResolvedValue(undefined);
