@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
 @Component
+@ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
 class NotificationEventRelayScheduler(
     private val publishNotificationEventsUseCase: PublishNotificationEventsUseCase,
@@ -22,5 +23,6 @@ class NotificationEventRelayScheduler(
 
 @Configuration
 @EnableScheduling
+@ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
 class NotificationEventRelaySchedulingConfig
