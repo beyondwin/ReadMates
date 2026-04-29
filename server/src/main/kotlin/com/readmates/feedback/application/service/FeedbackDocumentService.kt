@@ -11,6 +11,7 @@ import com.readmates.feedback.application.model.FeedbackMetadataItemResult
 import com.readmates.feedback.application.model.FeedbackParticipantResult
 import com.readmates.feedback.application.model.FeedbackProblemResult
 import com.readmates.feedback.application.model.FeedbackRevealingQuoteResult
+import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
 import com.readmates.feedback.application.port.`in`.AuthorizeHostFeedbackDocumentUploadUseCase
 import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentStatusUseCase
@@ -43,9 +44,16 @@ class FeedbackDocumentService(
     override fun listMyReadableFeedbackDocuments(currentMember: CurrentMember): List<FeedbackDocumentListItemResult> {
         requireReadableFeedbackMember(currentMember)
         return feedbackDocumentStorePort.listLatestReadableDocuments(currentMember).mapNotNull { document ->
-            val parsedDocument = parseStoredListDocument(document.sourceText)
             when {
-                parsedDocument != null -> document.toListItem(parsedDocument)
+                document.title != null -> document.toListItem(document.title)
+                document.legacySourceText != null -> {
+                    val parsedDocument = parseStoredListDocument(document.legacySourceText)
+                    when {
+                        parsedDocument != null -> document.toListItem(parsedDocument.title)
+                        currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
+                        else -> null
+                    }
+                }
                 currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
                 else -> null
             }
@@ -103,6 +111,7 @@ class FeedbackDocumentService(
                 command = command,
                 version = version,
                 documentId = UUID.randomUUID(),
+                title = parsedDocument.title,
             )
             recordNotificationEventUseCase.recordFeedbackDocumentPublished(
                 clubId = currentMember.clubId,
@@ -149,18 +158,7 @@ class FeedbackDocumentService(
                 throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, reason)
             }
 
-    private fun StoredFeedbackDocumentResult.toListItem(parsedDocument: ParsedFeedbackDocument): FeedbackDocumentListItemResult =
-        FeedbackDocumentListItemResult(
-            sessionId = sessionId.toString(),
-            sessionNumber = sessionNumber,
-            title = parsedDocument.title,
-            bookTitle = bookTitle,
-            date = date.toString(),
-            fileName = fileName,
-            uploadedAt = uploadedAt.toString(),
-        )
-
-    private fun StoredFeedbackDocumentResult.toListItem(title: String): FeedbackDocumentListItemResult =
+    private fun StoredFeedbackDocumentListResult.toListItem(title: String): FeedbackDocumentListItemResult =
         FeedbackDocumentListItemResult(
             sessionId = sessionId.toString(),
             sessionNumber = sessionNumber,

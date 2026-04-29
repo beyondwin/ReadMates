@@ -12,10 +12,13 @@ import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.Statement
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -42,13 +45,31 @@ private data class ReminderNotificationRecipient(
     val bookTitle: String,
 )
 
+private data class OutboxInsertCommand(
+    val clubId: UUID,
+    val eventType: NotificationEventType,
+    val aggregateId: UUID,
+    val recipientMembershipId: UUID,
+    val recipientEmail: String,
+    val recipientDisplayName: String?,
+    val subject: String,
+    val bodyText: String,
+    val deepLinkPath: String,
+)
+
+private data class OutboxInsertBatchEntry(
+    val id: UUID,
+    val command: OutboxInsertCommand,
+)
+
 @Repository
 class JdbcNotificationOutboxAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : NotificationOutboxPort {
     @Transactional
     override fun enqueueFeedbackDocumentPublished(clubId: UUID, sessionId: UUID): Int {
-        val recipients = jdbcTemplate().query(
+        val jdbcTemplate = jdbcTemplate()
+        val recipients = jdbcTemplate.query(
             """
             select
               memberships.id as recipient_membership_id,
@@ -74,29 +95,33 @@ class JdbcNotificationOutboxAdapter(
             sessionId.dbString(),
         )
 
-        return recipients.sumOf { recipient ->
-            insertOutbox(
-                clubId = clubId,
-                eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
-                aggregateId = sessionId,
-                recipientMembershipId = recipient.membershipId,
-                recipientEmail = recipient.email,
-                recipientDisplayName = recipient.displayName,
-                subject = "피드백 문서가 올라왔습니다",
-                bodyText = """
-                    ${recipient.displayName ?: "멤버"}님,
+        return batchInsertOutbox(
+            jdbcTemplate,
+            recipients.map { recipient ->
+                OutboxInsertCommand(
+                    clubId = clubId,
+                    eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                    aggregateId = sessionId,
+                    recipientMembershipId = recipient.membershipId,
+                    recipientEmail = recipient.email,
+                    recipientDisplayName = recipient.displayName,
+                    subject = "피드백 문서가 올라왔습니다",
+                    bodyText = """
+                        ${recipient.displayName ?: "멤버"}님,
 
-                    ${recipient.sessionNumber}회차 ${recipient.bookTitle} 피드백 문서가 올라왔습니다.
-                    ReadMates에서 확인해 주세요.
-                """.trimIndent(),
-                deepLinkPath = "/feedback-documents",
-            )
-        }
+                        ${recipient.sessionNumber}회차 ${recipient.bookTitle} 피드백 문서가 올라왔습니다.
+                        ReadMates에서 확인해 주세요.
+                    """.trimIndent(),
+                    deepLinkPath = "/feedback-documents",
+                )
+            },
+        )
     }
 
     @Transactional
     override fun enqueueNextBookPublished(clubId: UUID, sessionId: UUID): Int {
-        val recipients = jdbcTemplate().query(
+        val jdbcTemplate = jdbcTemplate()
+        val recipients = jdbcTemplate.query(
             """
             select
               memberships.id as recipient_membership_id,
@@ -118,29 +143,33 @@ class JdbcNotificationOutboxAdapter(
             sessionId.dbString(),
         )
 
-        return recipients.sumOf { recipient ->
-            insertOutbox(
-                clubId = clubId,
-                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-                aggregateId = sessionId,
-                recipientMembershipId = recipient.membershipId,
-                recipientEmail = recipient.email,
-                recipientDisplayName = recipient.displayName,
-                subject = "다음 책이 공개되었습니다",
-                bodyText = """
-                    ${recipient.displayName ?: "멤버"}님,
+        return batchInsertOutbox(
+            jdbcTemplate,
+            recipients.map { recipient ->
+                OutboxInsertCommand(
+                    clubId = clubId,
+                    eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                    aggregateId = sessionId,
+                    recipientMembershipId = recipient.membershipId,
+                    recipientEmail = recipient.email,
+                    recipientDisplayName = recipient.displayName,
+                    subject = "다음 책이 공개되었습니다",
+                    bodyText = """
+                        ${recipient.displayName ?: "멤버"}님,
 
-                    ${recipient.sessionNumber}회차 책은 ${recipient.bookTitle}입니다.
-                    ReadMates에서 모임 정보를 확인해 주세요.
-                """.trimIndent(),
-                deepLinkPath = "/sessions/$sessionId",
-            )
-        }
+                        ${recipient.sessionNumber}회차 책은 ${recipient.bookTitle}입니다.
+                        ReadMates에서 모임 정보를 확인해 주세요.
+                    """.trimIndent(),
+                    deepLinkPath = "/sessions/$sessionId",
+                )
+            },
+        )
     }
 
     @Transactional
     override fun enqueueSessionReminderDue(targetDate: LocalDate): Int {
-        val recipients = jdbcTemplate().query(
+        val jdbcTemplate = jdbcTemplate()
+        val recipients = jdbcTemplate.query(
             """
             select
               sessions.club_id,
@@ -162,24 +191,27 @@ class JdbcNotificationOutboxAdapter(
             targetDate,
         )
 
-        return recipients.sumOf { recipient ->
-            insertOutbox(
-                clubId = recipient.clubId,
-                eventType = NotificationEventType.SESSION_REMINDER_DUE,
-                aggregateId = recipient.sessionId,
-                recipientMembershipId = recipient.membershipId,
-                recipientEmail = recipient.email,
-                recipientDisplayName = recipient.displayName,
-                subject = "내일 독서모임이 있습니다",
-                bodyText = """
-                    ${recipient.displayName ?: "멤버"}님,
+        return batchInsertOutbox(
+            jdbcTemplate,
+            recipients.map { recipient ->
+                OutboxInsertCommand(
+                    clubId = recipient.clubId,
+                    eventType = NotificationEventType.SESSION_REMINDER_DUE,
+                    aggregateId = recipient.sessionId,
+                    recipientMembershipId = recipient.membershipId,
+                    recipientEmail = recipient.email,
+                    recipientDisplayName = recipient.displayName,
+                    subject = "내일 독서모임이 있습니다",
+                    bodyText = """
+                        ${recipient.displayName ?: "멤버"}님,
 
-                    내일 ${recipient.sessionNumber}회차 ${recipient.bookTitle} 모임이 있습니다.
-                    ReadMates에서 준비 내용을 확인해 주세요.
-                """.trimIndent(),
-                deepLinkPath = "/sessions/${recipient.sessionId}",
-            )
-        }
+                        내일 ${recipient.sessionNumber}회차 ${recipient.bookTitle} 모임이 있습니다.
+                        ReadMates에서 준비 내용을 확인해 주세요.
+                    """.trimIndent(),
+                    deepLinkPath = "/sessions/${recipient.sessionId}",
+                )
+            },
+        )
     }
 
     @Transactional
@@ -347,18 +379,18 @@ class JdbcNotificationOutboxAdapter(
         )
     }
 
-    private fun insertOutbox(
-        clubId: UUID,
-        eventType: NotificationEventType,
-        aggregateId: UUID,
-        recipientMembershipId: UUID,
-        recipientEmail: String,
-        recipientDisplayName: String?,
-        subject: String,
-        bodyText: String,
-        deepLinkPath: String,
-    ): Int =
-        jdbcTemplate().update(
+    private fun batchInsertOutbox(jdbcTemplate: JdbcTemplate, commands: List<OutboxInsertCommand>): Int {
+        if (commands.isEmpty()) {
+            return 0
+        }
+
+        val entries = commands.map { command ->
+            OutboxInsertBatchEntry(
+                id = UUID.randomUUID(),
+                command = command,
+            )
+        }
+        val inserted = jdbcTemplate.batchUpdate(
             """
             insert ignore into notification_outbox (
               id,
@@ -377,19 +409,48 @@ class JdbcNotificationOutboxAdapter(
             )
             values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
             """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            clubId.dbString(),
-            eventType.name,
-            AGGREGATE_TYPE_SESSION,
-            aggregateId.dbString(),
-            recipientMembershipId.dbString(),
-            recipientEmail.trim(),
-            recipientDisplayName,
-            subject,
-            bodyText,
-            deepLinkPath,
-            dedupeKey(eventType, aggregateId, recipientMembershipId),
+            object : BatchPreparedStatementSetter {
+                override fun setValues(ps: PreparedStatement, i: Int) {
+                    val entry = entries[i]
+                    val command = entry.command
+                    ps.setString(1, entry.id.dbString())
+                    ps.setString(2, command.clubId.dbString())
+                    ps.setString(3, command.eventType.name)
+                    ps.setString(4, AGGREGATE_TYPE_SESSION)
+                    ps.setString(5, command.aggregateId.dbString())
+                    ps.setString(6, command.recipientMembershipId.dbString())
+                    ps.setString(7, command.recipientEmail.trim())
+                    ps.setString(8, command.recipientDisplayName)
+                    ps.setString(9, command.subject)
+                    ps.setString(10, command.bodyText)
+                    ps.setString(11, command.deepLinkPath)
+                    ps.setString(12, dedupeKey(command.eventType, command.aggregateId, command.recipientMembershipId))
+                }
+
+                override fun getBatchSize(): Int = entries.size
+            },
         )
+
+        if (inserted.any { it == Statement.SUCCESS_NO_INFO }) {
+            return countInsertedOutboxRows(jdbcTemplate, entries.map { it.id })
+        }
+
+        return inserted.sumOf { rows -> max(0, rows) }
+    }
+
+    private fun countInsertedOutboxRows(jdbcTemplate: JdbcTemplate, ids: List<UUID>): Int {
+        val placeholders = ids.joinToString(",") { "?" }
+        val args = ids.map { it.dbString() as Any }.toTypedArray()
+        return jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_outbox
+            where id in ($placeholders)
+            """.trimIndent(),
+            Int::class.java,
+            *args,
+        ) ?: 0
+    }
 
     private fun countByStatus(clubId: UUID, status: NotificationOutboxStatus): Int =
         jdbcTemplate().queryForObject(

@@ -79,3 +79,14 @@ data class StoredFeedbackDocumentResult(
     val fileName: String,
     val uploadedAt: OffsetDateTime,
 )
+
+data class StoredFeedbackDocumentListResult(
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val date: LocalDate,
+    val title: String?,
+    val legacySourceText: String?,
+    val fileName: String,
+    val uploadedAt: OffsetDateTime,
+)

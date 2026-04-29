@@ -2,12 +2,13 @@ package com.readmates.feedback.application.port.out
 
 import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
 import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
+import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface FeedbackDocumentStorePort {
-    fun listLatestReadableDocuments(currentMember: CurrentMember): List<StoredFeedbackDocumentResult>
+    fun listLatestReadableDocuments(currentMember: CurrentMember): List<StoredFeedbackDocumentListResult>
 
     fun findReadableSession(
         clubId: UUID,
@@ -39,5 +40,6 @@ interface FeedbackDocumentStorePort {
         command: FeedbackDocumentUploadCommand,
         version: Int,
         documentId: UUID,
+        title: String,
     )
 }

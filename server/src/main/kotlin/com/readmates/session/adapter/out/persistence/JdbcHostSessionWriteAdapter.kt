@@ -19,7 +19,6 @@ import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.requireHost
-import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
 import com.readmates.session.application.model.HostDashboardResult
@@ -38,9 +37,11 @@ import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -716,26 +717,33 @@ class JdbcHostSessionWriteAdapter(
     ): HostAttendanceResponse {
         requireHostSession(command.host, command.sessionId)
         val jdbcTemplate = jdbcTemplate()
-        command.entries.forEach { entry: AttendanceEntryCommand ->
-            val membershipId = parseMembershipId(entry.membershipId)
-            val updated = jdbcTemplate.update(
-                """
-                update session_participants
-                set attendance_status = ?,
-                    updated_at = utc_timestamp(6)
-                where session_id = ?
-                  and club_id = ?
-                  and membership_id = ?
-                  and participation_status = 'ACTIVE'
-                """.trimIndent(),
-                entry.attendanceStatus,
-                command.sessionId.dbString(),
-                command.host.clubId.dbString(),
-                membershipId.dbString(),
-            )
-            if (updated == 0) {
-                throw HostSessionParticipantNotFoundException()
-            }
+        val entries = command.entries.map { entry ->
+            parseMembershipId(entry.membershipId) to entry.attendanceStatus
+        }
+        val updated = jdbcTemplate.batchUpdate(
+            """
+            update session_participants
+            set attendance_status = ?,
+                updated_at = utc_timestamp(6)
+            where session_id = ?
+              and club_id = ?
+              and membership_id = ?
+              and participation_status = 'ACTIVE'
+            """.trimIndent(),
+            object : BatchPreparedStatementSetter {
+                override fun setValues(ps: PreparedStatement, i: Int) {
+                    val (membershipId, attendanceStatus) = entries[i]
+                    ps.setString(1, attendanceStatus)
+                    ps.setString(2, command.sessionId.dbString())
+                    ps.setString(3, command.host.clubId.dbString())
+                    ps.setString(4, membershipId.dbString())
+                }
+
+                override fun getBatchSize(): Int = entries.size
+            },
+        )
+        if (updated.any { it == 0 }) {
+            throw HostSessionParticipantNotFoundException()
         }
 
         return HostAttendanceResponse(
@@ -818,26 +826,34 @@ class JdbcHostSessionWriteAdapter(
             { resultSet, _ -> resultSet.uuid("id") },
             clubId.dbString(),
         )
-        activeMembershipIds.forEach { membershipId ->
-            jdbcTemplate.update(
-                """
-                insert into session_participants (
-                  id, club_id, session_id, membership_id,
-                  rsvp_status, attendance_status, participation_status
-                )
-                values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE')
-                on duplicate key update
-                  rsvp_status = values(rsvp_status),
-                  attendance_status = values(attendance_status),
-                  participation_status = values(participation_status),
-                  updated_at = utc_timestamp(6)
-                """.trimIndent(),
-                UUID.randomUUID().dbString(),
-                clubId.dbString(),
-                sessionId.dbString(),
-                membershipId.dbString(),
-            )
+        if (activeMembershipIds.isEmpty()) {
+            return
         }
+
+        jdbcTemplate.batchUpdate(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id,
+              rsvp_status, attendance_status, participation_status
+            )
+            values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE')
+            on duplicate key update
+              rsvp_status = values(rsvp_status),
+              attendance_status = values(attendance_status),
+              participation_status = values(participation_status),
+              updated_at = utc_timestamp(6)
+            """.trimIndent(),
+            object : BatchPreparedStatementSetter {
+                override fun setValues(ps: PreparedStatement, i: Int) {
+                    ps.setString(1, UUID.randomUUID().dbString())
+                    ps.setString(2, clubId.dbString())
+                    ps.setString(3, sessionId.dbString())
+                    ps.setString(4, activeMembershipIds[i].dbString())
+                }
+
+                override fun getBatchSize(): Int = activeMembershipIds.size
+            },
+        )
     }
 
     private fun requireHostSession(member: CurrentMember, sessionId: UUID) {

@@ -44,7 +44,7 @@ class JdbcNotificationOutboxAdapterTest(
 ) {
     @Test
     fun `enqueue feedback notification creates one pending row per active attended participant`() {
-        adapter.enqueueFeedbackDocumentPublished(
+        val inserted = adapter.enqueueFeedbackDocumentPublished(
             clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
             sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301"),
         )
@@ -60,7 +60,8 @@ class JdbcNotificationOutboxAdapterTest(
             Int::class.java,
         )
 
-        assertThat(rows).isGreaterThan(0)
+        assertThat(inserted).isEqualTo(rows)
+        assertThat(rows).isGreaterThan(1)
     }
 
     @Test
@@ -68,8 +69,8 @@ class JdbcNotificationOutboxAdapterTest(
         val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
 
-        adapter.enqueueFeedbackDocumentPublished(clubId, sessionId)
-        adapter.enqueueFeedbackDocumentPublished(clubId, sessionId)
+        val firstInserted = adapter.enqueueFeedbackDocumentPublished(clubId, sessionId)
+        val duplicateInserted = adapter.enqueueFeedbackDocumentPublished(clubId, sessionId)
 
         val duplicateCount = jdbcTemplate.queryForObject(
             """
@@ -82,6 +83,8 @@ class JdbcNotificationOutboxAdapterTest(
             sessionId.toString(),
         )
 
+        assertThat(firstInserted).isGreaterThan(0)
+        assertThat(duplicateInserted).isZero()
         assertThat(duplicateCount).isZero()
     }
 
