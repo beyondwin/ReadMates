@@ -8,6 +8,8 @@ async function expectPracticalTapTarget(locator: Locator) {
   expect(box!.width).toBeGreaterThanOrEqual(44);
 }
 
+const memberMobileTabs = ["홈", "이번 세션", "클럽 노트", "아카이브", "알림", "내 공간"];
+
 test.beforeEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
 });
@@ -92,8 +94,12 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expectPracticalTapTarget(mobileHeader.getByRole("link", { name: "호스트 화면" }));
   await expect(mobileHeader.locator(".m-hdr-side")).toHaveCount(2);
   const memberTabs = page.getByRole("navigation", { name: "앱 탭" });
-  await expect(memberTabs.getByRole("link")).toHaveText(["홈", "이번 세션", "클럽 노트", "아카이브", "내 공간"]);
+  await expect(memberTabs.getByRole("link")).toHaveText(memberMobileTabs);
   await expectPracticalTapTarget(memberTabs.getByRole("link", { name: "이번 세션" }));
+  await memberTabs.getByRole("link", { name: "알림" }).click();
+  await expect(page).toHaveURL(/\/app\/notifications$/);
+  await expect(page.getByRole("heading", { name: "알림" })).toBeVisible();
+  await expect(page.getByText("아직 받은 알림이 없습니다.")).toBeVisible();
   await memberTabs.getByRole("link", { name: "홈" }).click();
   await mobileHeader.getByRole("link", { name: "호스트 화면" }).click();
   await expect(page).toHaveURL(/\/app\/host$/);
@@ -108,7 +114,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
   await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveText("");
   await expect(mobileHeader.getByRole("link", { name: "호스트 화면" })).toHaveClass(/m-hdr-link--icon/);
-  await expect(memberTabs.getByRole("link")).toHaveText(["홈", "이번 세션", "클럽 노트", "아카이브", "내 공간"]);
+  await expect(memberTabs.getByRole("link")).toHaveText(memberMobileTabs);
   await expect(memberTabs.getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
   await expect(memberTabs.getByRole("link", { name: "기록" })).toHaveCount(0);
 

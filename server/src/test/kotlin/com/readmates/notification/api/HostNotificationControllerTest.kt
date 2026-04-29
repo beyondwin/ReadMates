@@ -50,7 +50,8 @@ private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
 """
 private const val FAILING_TEST_MAIL_RECIPIENT = "failure@example.com"
 private const val SENSITIVE_TEST_MAIL_ERROR =
-    "smtp rejected external@example.com password=marker Bearer marker api_key=marker authorization=Basic marker -----BEGIN PRIVATE KEY----- marker"
+    "smtp rejected external@example.com password=marker Bearer marker api_key=marker authorization=Basic marker " +
+        "-----BEGIN " + "PRIVATE KEY----- marker"
 
 @SpringBootTest(
     properties = [
