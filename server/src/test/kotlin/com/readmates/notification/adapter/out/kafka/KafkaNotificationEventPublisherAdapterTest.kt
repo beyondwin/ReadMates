@@ -22,7 +22,9 @@ import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.kafka.support.SendResult
 import org.springframework.context.annotation.Bean
 import org.springframework.messaging.Message
+import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -65,6 +67,51 @@ class KafkaNotificationEventPublisherAdapterTest {
     }
 
     @Test
+    fun `producer value serializer writes design JSON with string temporals`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                val factory = context.getBean(
+                    "notificationEventProducerFactory",
+                    DefaultKafkaProducerFactory::class.java,
+                ) as DefaultKafkaProducerFactory<String, NotificationEventMessage>
+                val valueSerializerSupplier = factory.valueSerializerSupplier
+
+                assertThat(valueSerializerSupplier).isNotNull
+                val json = String(
+                    valueSerializerSupplier!!.get()!!.serialize(
+                        "readmates.notification.events.v1",
+                        notificationEventMessage(
+                            payload = NotificationEventPayload(
+                                sessionId = UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                                targetDate = LocalDate.of(2026, 4, 30),
+                            ),
+                        ),
+                    ),
+                    StandardCharsets.UTF_8,
+                )
+
+                assertThat(json).contains(
+                    """"schemaVersion":1""",
+                    """"eventId":"00000000-0000-0000-0000-000000000001"""",
+                    """"clubId":"00000000-0000-0000-0000-000000000002"""",
+                    """"eventType":"NEXT_BOOK_PUBLISHED"""",
+                    """"aggregateType":"session"""",
+                    """"aggregateId":"00000000-0000-0000-0000-000000000003"""",
+                    """"occurredAt":"2026-04-29T00:00:00Z"""",
+                    """"payload"""",
+                    """"targetDate":"2026-04-30"""",
+                )
+                assertThat(json).doesNotContain(
+                    """"occurredAt":1777420800""",
+                    """"targetDate":[2026,4,30]""",
+                )
+            }
+    }
+
+    @Test
     fun `publisher sends headers and waits with configured timeout`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
         val sendFuture = RecordingKafkaSendFuture()
@@ -98,6 +145,20 @@ class KafkaNotificationEventPublisherAdapterTest {
         }.isInstanceOf(NotificationKafkaPublishException::class.java)
             .hasMessageContaining("Timed out publishing notification event")
             .hasCauseInstanceOf(TimeoutException::class.java)
+    }
+
+    @Test
+    fun `publisher wraps synchronous send failure in meaningful exception`() {
+        val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
+        Mockito.`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
+            .thenThrow(IllegalStateException("producer closed"))
+        val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(10))
+
+        assertThatThrownBy {
+            adapter.publish(notificationEventMessage(), topic = "topic", key = "key")
+        }.isInstanceOf(NotificationKafkaPublishException::class.java)
+            .hasMessageContaining("Failed publishing notification event")
+            .hasCauseInstanceOf(IllegalStateException::class.java)
     }
 
     @Test
@@ -145,7 +206,10 @@ private class RecordingKafkaSendFuture(
     }
 }
 
-private fun notificationEventMessage(): NotificationEventMessage =
+private fun notificationEventMessage(
+    payload: NotificationEventPayload =
+        NotificationEventPayload(sessionId = UUID.fromString("00000000-0000-0000-0000-000000000003")),
+): NotificationEventMessage =
     NotificationEventMessage(
         eventId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
         clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
@@ -153,5 +217,5 @@ private fun notificationEventMessage(): NotificationEventMessage =
         aggregateType = "session",
         aggregateId = UUID.fromString("00000000-0000-0000-0000-000000000003"),
         occurredAt = OffsetDateTime.of(2026, 4, 29, 0, 0, 0, 0, ZoneOffset.UTC),
-        payload = NotificationEventPayload(sessionId = UUID.fromString("00000000-0000-0000-0000-000000000003")),
+        payload = payload,
     )
