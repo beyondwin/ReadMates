@@ -6,6 +6,8 @@ import type {
   CurrentSessionResponse as HostCurrentSessionResponse,
   HostInvitationListItem,
   HostMemberListItem,
+  HostNotificationDeliveryListResponse,
+  HostNotificationEventListResponse,
   HostSessionDetailResponse,
   HostSessionPublication,
 } from "@/features/host/api/host-contracts";
@@ -275,6 +277,42 @@ export const hostSessionDetailContractFixture = {
     uploadedAt: "2026-04-20T09:00:00Z",
   },
 } satisfies HostSessionDetailResponse;
+
+export const hostNotificationEventListContractFixture = {
+  items: [
+    {
+      id: "00000000-0000-0000-0000-000000000701",
+      eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      status: "PENDING",
+      attemptCount: 1,
+      createdAt: "2026-04-29T00:00:00Z",
+      updatedAt: "2026-04-29T00:01:00Z",
+    },
+  ],
+} satisfies HostNotificationEventListResponse;
+
+export const hostNotificationDeliveryListContractFixture = {
+  items: [
+    {
+      id: "00000000-0000-0000-0000-000000000801",
+      eventId: "00000000-0000-0000-0000-000000000701",
+      channel: "EMAIL",
+      status: "FAILED",
+      recipientEmail: "m***@example.com",
+      attemptCount: 3,
+      updatedAt: "2026-04-29T00:02:00Z",
+    },
+    {
+      id: "00000000-0000-0000-0000-000000000802",
+      eventId: "00000000-0000-0000-0000-000000000701",
+      channel: "IN_APP",
+      status: "SKIPPED",
+      recipientEmail: null,
+      attemptCount: 0,
+      updatedAt: "2026-04-29T00:02:00Z",
+    },
+  ],
+} satisfies HostNotificationDeliveryListResponse;
 
 export const feedbackDocumentContractFixture = {
   sessionId: "session-1",

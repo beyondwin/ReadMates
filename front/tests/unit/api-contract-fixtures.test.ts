@@ -8,6 +8,8 @@ import {
   hostCurrentSessionContractFixture,
   hostInvitationContractFixture,
   hostMemberContractFixture,
+  hostNotificationDeliveryListContractFixture,
+  hostNotificationEventListContractFixture,
   hostSessionDetailContractFixture,
   hostSessionPublicationContractFixture,
 } from "./api-contract-fixtures";
@@ -25,7 +27,32 @@ describe("API contract fixtures", () => {
     expect(hostSessionDetailContractFixture.publication).toEqual(hostSessionPublicationContractFixture);
     expect(hostSessionPublicationContractFixture.visibility).toBe("PUBLIC");
     expect(hostSessionPublicationContractFixture).not.toHaveProperty("isPublic");
+    expect(hostNotificationEventListContractFixture.items[0]?.status).toBe("PENDING");
+    expect(hostNotificationDeliveryListContractFixture.items[0]?.channel).toBe("EMAIL");
     expect(feedbackDocumentContractFixture.participants[0]?.revealingQuote.quote).toBeTruthy();
+  });
+
+  it("represents notification event and delivery ledgers separately", () => {
+    const event = hostNotificationEventListContractFixture.items[0];
+    const delivery = hostNotificationDeliveryListContractFixture.items[0];
+    const skippedDelivery = hostNotificationDeliveryListContractFixture.items[1];
+
+    expect(event).toMatchObject({
+      eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      status: "PENDING",
+    });
+    expect(event).not.toHaveProperty("recipientEmail");
+    expect(delivery).toMatchObject({
+      eventId: event?.id,
+      channel: "EMAIL",
+      status: "FAILED",
+      recipientEmail: "m***@example.com",
+    });
+    expect(skippedDelivery).toMatchObject({
+      channel: "IN_APP",
+      status: "SKIPPED",
+      recipientEmail: null,
+    });
   });
 
   it("represents the reading progress and shared review contract migration", () => {

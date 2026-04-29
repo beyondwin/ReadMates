@@ -8,7 +8,9 @@ import type {
   HostDashboardResponse,
   HostInvitationListItem,
   HostInvitationResponse,
+  HostNotificationDeliveryListResponse,
   HostMemberListItem,
+  HostNotificationEventListResponse,
   HostMemberProfileResponse,
   HostNotificationDetailResponse,
   HostNotificationItemListResponse,
@@ -48,6 +50,14 @@ export function processHostNotifications() {
 export function fetchHostNotificationItems(status?: HostNotificationStatus) {
   const search = status ? `?status=${encodeURIComponent(status)}` : "";
   return readmatesFetch<HostNotificationItemListResponse>(`/api/host/notifications/items${search}`);
+}
+
+export function fetchHostNotificationEvents() {
+  return readmatesFetch<HostNotificationEventListResponse>("/api/host/notifications/events");
+}
+
+export function fetchHostNotificationDeliveries() {
+  return readmatesFetch<HostNotificationDeliveryListResponse>("/api/host/notifications/deliveries");
 }
 
 export function fetchHostNotificationDetail(id: string) {
