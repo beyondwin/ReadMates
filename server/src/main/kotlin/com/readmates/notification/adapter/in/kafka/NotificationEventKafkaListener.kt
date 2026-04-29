@@ -14,6 +14,7 @@ class NotificationEventKafkaListener(
     @KafkaListener(
         topics = ["\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}"],
         groupId = "\${readmates.notifications.kafka.consumer-group:readmates-notification-dispatcher}",
+        containerFactory = "notificationKafkaListenerContainerFactory",
     )
     fun onMessage(message: NotificationEventMessage) {
         require(message.schemaVersion == 1) {
