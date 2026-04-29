@@ -167,6 +167,7 @@ describe("SPA AppRouteLayout", () => {
       "이번 세션",
       "클럽 노트",
       "아카이브",
+      "알림",
       "내 공간",
     ]);
     expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.getAttribute("href"))).toEqual([
