@@ -32,6 +32,7 @@ class MemberProfileServiceTest {
             membershipId = membershipId,
             userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
             clubId = clubId,
+            clubSlug = "reading-sai",
             email = "member@example.com",
             displayName = "멤버",
             accountName = "계정",

@@ -87,6 +87,52 @@ class GoogleOAuthLoginSessionTest(
     }
 
     @Test
+    fun `successful google login issues readmates session cookie for platform admin without membership`() {
+        val userId = createPlatformAdminUser(
+            googleSubjectId = "google-oauth-platform-admin",
+            email = "oauth.platform.admin@example.com",
+            displayName = "OAuth Platform Admin",
+        )
+        val servletSession = securitySession()
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.addHeader(HttpHeaders.USER_AGENT, "MockMvc")
+        request.remoteAddr = "127.0.0.1"
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication = TestingAuthenticationToken(
+            googleOidcUser(
+                googleSubjectId = "google-oauth-platform-admin",
+                email = "oauth.platform.admin@example.com",
+                name = "OAuth Platform Admin",
+            ),
+            "credentials",
+        )
+        SecurityContextHolder.getContext().authentication = authentication
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/app", response.redirectedUrl)
+        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
+        assertNotNull(setCookie)
+        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}="))
+        assertTrue(servletSession.isInvalid)
+        assertNull(SecurityContextHolder.getContext().authentication)
+
+        val issuedSessionCount = jdbcTemplate.queryForObject(
+            "select count(*) from auth_sessions where user_id = ?",
+            Int::class.java,
+            userId,
+        )
+        assertEquals(1, issuedSessionCount)
+        val membershipCount = jdbcTemplate.queryForObject(
+            "select count(*) from memberships where user_id = ?",
+            Int::class.java,
+            userId,
+        )
+        assertEquals(0, membershipCount)
+    }
+
+    @Test
     fun `expected google account link failure redirects to login error and clears auth state`() {
         createGoogleMember(
             googleSubjectId = "google-oauth-conflict-subject",
@@ -298,10 +344,23 @@ class GoogleOAuthLoginSessionTest(
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
+                   'google-oauth-platform-admin',
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
                    'google-oauth-invited',
                    'google-oauth-invite-mismatch'
+                 )
+            );
+
+            delete from platform_admins
+            where user_id in (
+              select id
+              from users
+              where email in (
+                'oauth.platform.admin@example.com'
+              )
+                 or google_subject_id in (
+                   'google-oauth-platform-admin'
                  )
             );
 
@@ -315,12 +374,14 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
                 'oauth.left@example.com',
+                'oauth.platform.admin@example.com',
                 'oauth.invited@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
               )
                  or users.google_subject_id in (
                    'google-oauth-session-existing',
+                   'google-oauth-platform-admin',
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
                    'google-oauth-invited',
@@ -346,12 +407,14 @@ class GoogleOAuthLoginSessionTest(
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
                 'oauth.left@example.com',
+                'oauth.platform.admin@example.com',
                 'oauth.invited@example.com',
                 'oauth.invite.owner@example.com',
                 'oauth.invite.other@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
+                   'google-oauth-platform-admin',
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
                    'google-oauth-invited',
@@ -365,12 +428,14 @@ class GoogleOAuthLoginSessionTest(
               'oauth.owner@example.com',
               'oauth.other@example.com',
               'oauth.left@example.com',
+              'oauth.platform.admin@example.com',
               'oauth.invited@example.com',
               'oauth.invite.owner@example.com',
               'oauth.invite.other@example.com'
             )
                or google_subject_id in (
                  'google-oauth-session-existing',
+                 'google-oauth-platform-admin',
                  'google-oauth-conflict-subject',
                  'google-oauth-left-member',
                  'google-oauth-invited',
@@ -419,6 +484,33 @@ class GoogleOAuthLoginSessionTest(
             status,
             email,
         )
+    }
+
+    private fun createPlatformAdminUser(
+        googleSubjectId: String,
+        email: String,
+        displayName: String,
+    ): String {
+        val userId = java.util.UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
+            values (?, ?, ?, ?, ?, null, 'GOOGLE')
+            """.trimIndent(),
+            userId,
+            googleSubjectId,
+            email,
+            displayName,
+            displayName,
+        )
+        jdbcTemplate.update(
+            """
+            insert into platform_admins (user_id, role, status)
+            values (?, 'OWNER', 'ACTIVE')
+            """.trimIndent(),
+            userId,
+        )
+        return userId
     }
 
     private fun createInvitation(token: String, email: String, name: String): String {

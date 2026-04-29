@@ -21,6 +21,7 @@ class MemberLifecycleServiceTest {
         userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
         membershipId = hostMembershipId,
         clubId = clubId,
+        clubSlug = "reading-sai",
         email = "host@example.com",
         displayName = "호스트",
         accountName = "호스트계정",

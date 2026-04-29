@@ -140,6 +140,7 @@ class MemberProfileService(
             userId = userId,
             membershipId = membershipId,
             clubId = clubId,
+            clubSlug = clubSlug,
             email = email.lowercase(Locale.ROOT),
             displayName = displayName,
             accountName = accountName,

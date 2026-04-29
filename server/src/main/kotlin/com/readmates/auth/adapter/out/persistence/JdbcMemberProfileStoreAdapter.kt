@@ -31,6 +31,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.id as membership_id,
               users.id as user_id,
               memberships.club_id,
+              clubs.slug as club_slug,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -39,6 +40,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.status
             from users
             join memberships on memberships.user_id = users.id
+            join clubs on clubs.id = memberships.club_id
             where lower(users.email) = ?
               and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
             order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
@@ -56,6 +58,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.id as membership_id,
               users.id as user_id,
               memberships.club_id,
+              clubs.slug as club_slug,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -64,6 +67,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.status
             from users
             join memberships on memberships.user_id = users.id
+            join clubs on clubs.id = memberships.club_id
             where users.id = ?
               and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
             order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
@@ -80,6 +84,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.id as membership_id,
               users.id as user_id,
               memberships.club_id,
+              clubs.slug as club_slug,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -88,6 +93,7 @@ class JdbcMemberProfileStoreAdapter(
               memberships.status
             from memberships
             join users on users.id = memberships.user_id
+            join clubs on clubs.id = memberships.club_id
             where memberships.id = ?
               and memberships.club_id = ?
               and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
@@ -202,6 +208,7 @@ class JdbcMemberProfileStoreAdapter(
             membershipId = uuid("membership_id"),
             userId = uuid("user_id"),
             clubId = uuid("club_id"),
+            clubSlug = getString("club_slug"),
             email = getString("email"),
             displayName = getString("display_name"),
             accountName = getString("account_name"),

@@ -45,18 +45,21 @@ class AuthMeControllerTest(
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
+    private val createdPlatformAdminUserIds = linkedSetOf<String>()
 
     @AfterEach
     fun cleanupCreatedRows() {
         try {
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
+            deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
             deleteWhereIn("memberships", "id", createdMembershipIds)
             deleteWhereIn("memberships", "user_id", createdUserIds)
             deleteWhereIn("users", "id", createdUserIds)
         } finally {
             createdSessionTokenHashes.clear()
             createdMembershipIds.clear()
+            createdPlatformAdminUserIds.clear()
             createdUserIds.clear()
             SecurityContextHolder.clearContext()
         }
@@ -100,6 +103,117 @@ class AuthMeControllerTest(
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
             }
+    }
+
+    @Test
+    fun `auth me reports current membership for requested club and joined clubs`() {
+        val sampleMembershipId = insertSampleClubMembershipForMember5()
+        val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
+
+        mockMvc.get("/api/auth/me") {
+            header("X-Readmates-Club-Slug", "sample-book-club")
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.authenticated") { value(true) }
+            jsonPath("$.currentMembership.clubSlug") { value("sample-book-club") }
+            jsonPath("$.joinedClubs.length()") { value(2) }
+            jsonPath("$.membershipId") { value(sampleMembershipId) }
+            jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000002") }
+            jsonPath("$.displayName") { value("샘플멤버5") }
+            jsonPath("$.role") { value("MEMBER") }
+            jsonPath("$.membershipStatus") { value("ACTIVE") }
+            jsonPath("$.approvalState") { value("ACTIVE") }
+        }
+    }
+
+    @Test
+    fun `auth me reports platform admin without club membership`() {
+        val userId = UUID.randomUUID().toString()
+        val email = "platform.${UUID.randomUUID()}@example.com"
+        jdbcTemplate.update(
+            """
+            insert into users (id, email, name, short_name, auth_provider)
+            values (?, ?, 'Platform Admin', 'Admin', 'GOOGLE')
+            """.trimIndent(),
+            userId,
+            email,
+        )
+        createdUserIds += userId
+        jdbcTemplate.update(
+            """
+            insert into platform_admins (user_id, role, status)
+            values (?, 'OWNER', 'ACTIVE')
+            """.trimIndent(),
+            userId,
+        )
+        createdPlatformAdminUserIds += userId
+
+        val cookie = sessionCookieForUser(userId)
+
+        mockMvc.get("/api/auth/me") {
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.authenticated") { value(true) }
+            jsonPath("$.userId") { value(userId) }
+            jsonPath("$.currentMembership") { value(null) }
+            jsonPath("$.joinedClubs.length()") { value(0) }
+            jsonPath("$.platformAdmin.role") { value("OWNER") }
+            jsonPath("$.platformAdmin.email") { value(email) }
+            jsonPath("$.role") { value(null) }
+        }
+    }
+
+    @Test
+    fun `session cookie host role is scoped to requested club`() {
+        insertSampleClubMembershipForHost(role = "MEMBER")
+        val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000101")
+
+        mockMvc.get("/api/host/dashboard") {
+            header("X-Readmates-Club-Slug", "sample-book-club")
+            cookie(cookie)
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
+    fun `auth me does not fall back to another club when requested club has no membership`() {
+        val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
+
+        mockMvc.get("/api/auth/me") {
+            header("X-Readmates-Club-Slug", "sample-book-club")
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.authenticated") { value(true) }
+            jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
+            jsonPath("$.currentMembership") { value(null) }
+            jsonPath("$.joinedClubs.length()") { value(1) }
+            jsonPath("$.joinedClubs[0].clubSlug") { value("reading-sai") }
+            jsonPath("$.clubId") { value(null) }
+            jsonPath("$.role") { value(null) }
+        }
+    }
+
+    @Test
+    fun `auth me does not fall back to another club when requested club slug is unresolved`() {
+        val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
+
+        mockMvc.get("/api/auth/me") {
+            header("X-Readmates-Club-Slug", "missing-club")
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.authenticated") { value(true) }
+            jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
+            jsonPath("$.currentMembership") { value(null) }
+            jsonPath("$.joinedClubs.length()") { value(1) }
+            jsonPath("$.joinedClubs[0].clubSlug") { value("reading-sai") }
+            jsonPath("$.clubId") { value(null) }
+            jsonPath("$.role") { value(null) }
+        }
     }
 
     @Test
@@ -346,6 +460,39 @@ class AuthMeControllerTest(
         createdMembershipIds += membershipId
 
         return sessionCookieForUser(userId)
+    }
+
+    private fun insertSampleClubMembershipForMember5(): String {
+        val membershipId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select ?, clubs.id, users.id, 'MEMBER', 'ACTIVE', utc_timestamp(6), '샘플멤버5'
+            from clubs
+            join users on users.email = 'member5@example.com'
+            where clubs.slug = 'sample-book-club'
+            """.trimIndent(),
+            membershipId,
+        )
+        createdMembershipIds += membershipId
+        return membershipId
+    }
+
+    private fun insertSampleClubMembershipForHost(role: String): String {
+        val membershipId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select ?, clubs.id, users.id, ?, 'ACTIVE', utc_timestamp(6), '샘플호스트'
+            from clubs
+            join users on users.email = 'host@example.com'
+            where clubs.slug = 'sample-book-club'
+            """.trimIndent(),
+            membershipId,
+            role,
+        )
+        createdMembershipIds += membershipId
+        return membershipId
     }
 
     private fun loginAsLifecycleUser(email: String, status: String): Cookie {

@@ -13,6 +13,7 @@ data class CurrentMember(
     val userId: UUID,
     val membershipId: UUID,
     val clubId: UUID,
+    val clubSlug: String,
     val email: String,
     val displayName: String,
     val accountName: String,

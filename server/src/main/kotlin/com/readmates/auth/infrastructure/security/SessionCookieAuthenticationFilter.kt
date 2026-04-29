@@ -2,7 +2,11 @@ package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.application.AuthSessionService
 import com.readmates.auth.application.AuthenticatedMemberResolver
+import com.readmates.club.adapter.`in`.web.ClubContextHeader
+import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentUser
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -17,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 class SessionCookieAuthenticationFilter(
     private val authSessionService: AuthSessionService,
     private val authenticatedMemberResolver: AuthenticatedMemberResolver,
+    private val resolveClubContextUseCase: ResolveClubContextUseCase,
 ) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -33,7 +38,12 @@ class SessionCookieAuthenticationFilter(
                 ?.takeUnless { it.revoked }
 
             if (session != null) {
-                val member = authenticatedMemberResolver.resolveByUserId(session.userId)
+                val requestedClubContext = request.resolveRequestedClubContext()
+                val member = if (requestedClubContext.supplied && requestedClubContext.context == null) {
+                    null
+                } else {
+                    authenticatedMemberResolver.resolveByUserId(session.userId, requestedClubContext.context)
+                }
                 val authentication = if (member != null) {
                     UsernamePasswordAuthenticationToken(
                         member.email,
@@ -58,6 +68,14 @@ class SessionCookieAuthenticationFilter(
                                 emptyList(),
                             )
                         }
+                        ?: authenticatedMemberResolver.resolveUserById(session.userId)
+                            ?.let { currentUser ->
+                                UsernamePasswordAuthenticationToken(
+                                    currentUser,
+                                    null,
+                                    emptyList(),
+                                )
+                            }
                 } else {
                     null
                 }
@@ -84,4 +102,27 @@ class SessionCookieAuthenticationFilter(
 
     private fun HttpServletRequest.isAuthMeGet(): Boolean =
         method == "GET" && requestURI == "/api/auth/me"
+
+    private fun HttpServletRequest.resolveRequestedClubContext(): RequestedClubContext {
+        val slug = getHeader(ClubContextHeader.CLUB_SLUG)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        if (slug != null) {
+            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveBySlug(slug))
+        }
+
+        val host = getHeader(ClubContextHeader.CLUB_HOST)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+        if (host != null) {
+            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveByHost(host))
+        }
+
+        return RequestedClubContext(supplied = false, context = null)
+    }
+
+    private data class RequestedClubContext(
+        val supplied: Boolean,
+        val context: ResolvedClubContext?,
+    )
 }

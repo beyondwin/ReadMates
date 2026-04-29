@@ -37,6 +37,7 @@ class HostSessionCommandServiceTest {
         userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
         membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
         clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+        clubSlug = "reading-sai",
         email = "host@example.com",
         displayName = "호스트",
         accountName = "김호스트",

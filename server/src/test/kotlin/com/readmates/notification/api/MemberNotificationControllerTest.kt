@@ -4,6 +4,9 @@ import com.readmates.auth.adapter.`in`.security.CurrentMemberArgumentResolver
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.club.application.model.JoinedClubSummary
+import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.notification.adapter.`in`.web.MemberNotificationController
 import com.readmates.notification.adapter.`in`.web.MemberNotificationPreferenceController
 import com.readmates.notification.application.model.MemberNotificationItem
@@ -13,6 +16,7 @@ import com.readmates.notification.application.port.`in`.ManageMemberNotification
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentPlatformAdmin
 import org.junit.jupiter.api.Test
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.test.web.servlet.MockMvc
@@ -29,7 +33,7 @@ class MemberNotificationControllerTest {
             MemberNotificationController(memberNotificationsUseCase),
             MemberNotificationPreferenceController(notificationPreferencesUseCase),
         )
-        .setCustomArgumentResolvers(CurrentMemberArgumentResolver(resolveCurrentMemberUseCase))
+        .setCustomArgumentResolvers(CurrentMemberArgumentResolver(resolveCurrentMemberUseCase, resolveClubContextUseCase))
         .build()
 
     @Test
@@ -81,6 +85,16 @@ class MemberNotificationControllerTest {
 
 private val resolveCurrentMemberUseCase = object : ResolveCurrentMemberUseCase {
     override fun resolveByEmail(email: String): CurrentMember? = currentMember
+    override fun findUserIdByEmail(email: String): UUID? = currentMember.userId
+    override fun resolveByUserAndClub(userId: UUID, clubId: UUID): CurrentMember? = currentMember
+    override fun resolveByEmailAndClub(email: String, clubId: UUID): CurrentMember? = currentMember
+    override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
+    override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
+}
+
+private val resolveClubContextUseCase = object : ResolveClubContextUseCase {
+    override fun resolveBySlug(slug: String): ResolvedClubContext? = null
+    override fun resolveByHost(host: String?): ResolvedClubContext? = null
 }
 
 private val memberNotificationsUseCase = object : ManageMemberNotificationsUseCase {
@@ -117,6 +131,7 @@ private val currentMember = CurrentMember(
     userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
     membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
     clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+    clubSlug = "reading-sai",
     email = "member@example.com",
     displayName = "멤버",
     accountName = "김멤버",
