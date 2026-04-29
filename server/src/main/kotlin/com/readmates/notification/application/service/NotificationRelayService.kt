@@ -14,6 +14,7 @@ private const val MISSING_EVENT_MESSAGE_ERROR = "Notification event message miss
 private val PUBLISH_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 
 @Service
+@ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
 class NotificationRelayService(
     private val notificationEventOutboxPort: NotificationEventOutboxPort,

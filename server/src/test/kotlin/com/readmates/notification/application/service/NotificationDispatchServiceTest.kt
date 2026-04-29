@@ -54,14 +54,15 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
-    fun `dispatch marks failed and rethrows mail exception before max attempts`() {
+    fun `dispatch marks failed and throws retryable exception before max attempts`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 1)))
         val mailPort = FailingMailPort("smtp rejected")
         val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
 
         assertThatThrownBy { service.dispatch(message()) }
-            .isInstanceOf(IllegalStateException::class.java)
+            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
             .hasMessageContaining("smtp rejected")
+            .hasCauseInstanceOf(IllegalStateException::class.java)
 
         assertThat(deliveryPort.failed.map { it.id }).containsExactly(emailDelivery().id)
         assertThat(deliveryPort.failed.map { it.delayMinutes }).containsExactly(15L)
@@ -85,6 +86,60 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
+    fun `dispatch throws when mark sent lease compare and swap fails`() {
+        val deliveryPort = FakeDeliveryPort(
+            deliveries = listOf(emailDelivery()),
+            markSentResult = false,
+        )
+        val mailPort = RecordingMailPort()
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("Could not mark email delivery")
+            .hasMessageContaining("SENT")
+
+        assertThat(mailPort.sent).hasSize(1)
+        assertThat(deliveryPort.sent).containsExactly(emailDelivery().id to claimedEmailDelivery().lockedAt)
+    }
+
+    @Test
+    fun `dispatch throws when mark failed lease compare and swap fails`() {
+        val deliveryPort = FakeDeliveryPort(
+            deliveries = listOf(emailDelivery(attemptCount = 1)),
+            markFailedResult = false,
+        )
+        val mailPort = FailingMailPort("smtp rejected")
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("Could not mark email delivery")
+            .hasMessageContaining("FAILED")
+
+        assertThat(deliveryPort.failed.map { it.id }).containsExactly(emailDelivery().id)
+        assertThat(deliveryPort.dead).isEmpty()
+    }
+
+    @Test
+    fun `dispatch throws when mark dead lease compare and swap fails`() {
+        val deliveryPort = FakeDeliveryPort(
+            deliveries = listOf(emailDelivery(attemptCount = 4)),
+            markDeadResult = false,
+        )
+        val mailPort = FailingMailPort("smtp rejected")
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("Could not mark email delivery")
+            .hasMessageContaining("DEAD")
+
+        assertThat(deliveryPort.dead.map { it.id }).containsExactly(emailDelivery().id)
+        assertThat(deliveryPort.failed).isEmpty()
+    }
+
+    @Test
     fun `dispatch throws when failed email delivery is not claimable yet`() {
         val deliveryPort = FakeDeliveryPort(
             deliveries = listOf(emailDelivery(status = NotificationDeliveryStatus.FAILED)),
@@ -94,7 +149,7 @@ class NotificationDispatchServiceTest {
         val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
 
         assertThatThrownBy { service.dispatch(message()) }
-            .isInstanceOf(IllegalStateException::class.java)
+            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
             .hasMessageContaining("not claimable")
 
         assertThat(deliveryPort.claimedIds).containsExactly(emailDelivery().id)
@@ -216,6 +271,9 @@ class NotificationDispatchServiceTest {
     private class FakeDeliveryPort(
         private val deliveries: List<NotificationDeliveryItem>,
         private val claimable: Boolean = true,
+        private val markSentResult: Boolean = true,
+        private val markFailedResult: Boolean = true,
+        private val markDeadResult: Boolean = true,
     ) : NotificationDeliveryPort {
         val persistedMessages = mutableListOf<NotificationEventMessage>()
         val claimedIds = mutableListOf<UUID>()
@@ -260,7 +318,7 @@ class NotificationDispatchServiceTest {
 
         override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean {
             sent += id to lockedAt
-            return true
+            return markSentResult
         }
 
         override fun markDeliveryFailed(
@@ -270,12 +328,12 @@ class NotificationDispatchServiceTest {
             nextAttemptDelayMinutes: Long,
         ): Boolean {
             failed += FailedMark(id, lockedAt, error, nextAttemptDelayMinutes)
-            return true
+            return markFailedResult
         }
 
         override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean {
             dead += DeadMark(id, lockedAt, error)
-            return true
+            return markDeadResult
         }
 
         override fun countByStatus(

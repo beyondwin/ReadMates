@@ -10,6 +10,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.header.internals.RecordHeaders
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Bean
@@ -26,8 +28,11 @@ import org.springframework.kafka.core.DefaultKafkaProducerFactory
 import org.springframework.kafka.core.KafkaOperations
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.listener.CommonErrorHandler
+import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.kafka.support.SendResult
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+import org.springframework.kafka.support.serializer.SerializationUtils
 import org.springframework.messaging.Message
 import java.nio.charset.StandardCharsets
 import java.time.Duration
@@ -55,6 +60,7 @@ class KafkaNotificationEventPublisherAdapterTest {
     fun `producer factory uses notification bootstrap servers`() {
         contextRunner
             .withPropertyValues(
+                "readmates.notifications.enabled=true",
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092,kafka-b:9092",
             ).run { context ->
@@ -77,6 +83,7 @@ class KafkaNotificationEventPublisherAdapterTest {
     fun `consumer factory uses notification bootstrap servers and consumer group`() {
         contextRunner
             .withPropertyValues(
+                "readmates.notifications.enabled=true",
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092,kafka-b:9092",
                 "readmates.notifications.kafka.consumer-group=notification-workers",
@@ -100,9 +107,26 @@ class KafkaNotificationEventPublisherAdapterTest {
     }
 
     @Test
+    fun `kafka beans require global notifications and kafka notifications enabled`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.enabled=false",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                assertThat(context).doesNotHaveBean(NotificationKafkaProperties::class.java)
+                assertThat(context).doesNotHaveBean(NotificationEventPublisherPort::class.java)
+                assertThat(context).doesNotHaveBean("notificationEventProducerFactory")
+                assertThat(context).doesNotHaveBean("notificationEventConsumerFactory")
+                assertThat(context).doesNotHaveBean("notificationKafkaListenerContainerFactory")
+            }
+    }
+
+    @Test
     fun `listener container factory uses notification error handler`() {
         contextRunner
             .withPropertyValues(
+                "readmates.notifications.enabled=true",
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
@@ -118,6 +142,23 @@ class KafkaNotificationEventPublisherAdapterTest {
                 val container = factory.createContainer("readmates.notification.events.v1")
 
                 assertThat(container.commonErrorHandler).isSameAs(errorHandler)
+            }
+    }
+
+    @Test
+    fun `error handler is configured for bounded retry before dead letter publishing`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                val errorHandler = context.getBean("notificationKafkaErrorHandler", CommonErrorHandler::class.java)
+                val properties = context.getBean(NotificationKafkaProperties::class.java)
+
+                assertThat(errorHandler).isInstanceOf(DefaultErrorHandler::class.java)
+                assertThat(properties.deliveryRetryBackoff).isEqualTo(Duration.ofMinutes(5))
+                assertThat(properties.deliveryRetryMaxAttempts).isEqualTo(72)
             }
     }
 
@@ -163,6 +204,7 @@ class KafkaNotificationEventPublisherAdapterTest {
     fun `producer value serializer writes design JSON with string temporals`() {
         contextRunner
             .withPropertyValues(
+                "readmates.notifications.enabled=true",
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
@@ -201,6 +243,33 @@ class KafkaNotificationEventPublisherAdapterTest {
                     """"occurredAt":1777420800""",
                     """"targetDate":[2026,4,30]""",
                 )
+            }
+    }
+
+    @Test
+    fun `consumer value deserializer wraps JSON deserialization errors for listener error handling`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                val factory = context.getBean(
+                    "notificationEventConsumerFactory",
+                    DefaultKafkaConsumerFactory::class.java,
+                ) as DefaultKafkaConsumerFactory<String, NotificationEventMessage>
+                val headers = RecordHeaders()
+
+                val deserializer = factory.valueDeserializer
+                val result = deserializer!!.deserialize(
+                    "readmates.notification.events.v1",
+                    headers,
+                    """{"schemaVersion":""".toByteArray(StandardCharsets.UTF_8),
+                )
+
+                assertThat(deserializer).isInstanceOf(ErrorHandlingDeserializer::class.java)
+                assertThat(result).isNull()
+                assertThat(headers.lastHeader(SerializationUtils.VALUE_DESERIALIZER_EXCEPTION_HEADER)).isNotNull
             }
     }
 
@@ -274,6 +343,7 @@ class KafkaNotificationEventPublisherAdapterTest {
 @TestConfiguration
 private class KafkaPublisherAdapterTestConfiguration {
     @Bean
+    @ConditionalOnBean(KafkaTemplate::class)
     fun kafkaNotificationEventPublisherAdapter(
         @Qualifier("notificationEventKafkaTemplate")
         kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,

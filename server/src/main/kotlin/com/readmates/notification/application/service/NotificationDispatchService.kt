@@ -34,19 +34,18 @@ class NotificationDispatchService(
 
     private fun dispatchEmail(delivery: NotificationDeliveryItem) {
         val claimed = deliveryPort.claimEmailDelivery(delivery.id) ?: return handleUnclaimedEmailDelivery(delivery.id)
+        val command = MailDeliveryCommand(
+            to = requiredDeliveryField(claimed.id, "recipientEmail", claimed.recipientEmail),
+            subject = requiredDeliveryField(claimed.id, "subject", claimed.subject),
+            text = requiredDeliveryField(claimed.id, "bodyText", claimed.bodyText),
+        )
         try {
-            mailDeliveryPort.send(
-                MailDeliveryCommand(
-                    to = requiredDeliveryField(claimed.id, "recipientEmail", claimed.recipientEmail),
-                    subject = requiredDeliveryField(claimed.id, "subject", claimed.subject),
-                    text = requiredDeliveryField(claimed.id, "bodyText", claimed.bodyText),
-                ),
-            )
-            deliveryPort.markDeliverySent(claimed.id, claimed.lockedAt)
+            mailDeliveryPort.send(command)
         } catch (exception: Exception) {
-            if (!markFailure(claimed, exception)) {
-                throw exception
-            }
+            return markFailure(claimed, exception)
+        }
+        if (!deliveryPort.markDeliverySent(claimed.id, claimed.lockedAt)) {
+            throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.SENT)
         }
     }
 
@@ -61,24 +60,35 @@ class NotificationDispatchService(
             NotificationDeliveryStatus.PENDING,
             NotificationDeliveryStatus.FAILED,
             NotificationDeliveryStatus.SENDING,
+            -> throw NotificationDeliveryRetryableException(
+                "Email delivery $deliveryId is not claimable with status $status",
+            )
+
             null,
             -> throw IllegalStateException("Email delivery $deliveryId is not claimable with status ${status ?: "UNKNOWN"}")
         }
     }
 
-    private fun markFailure(claimed: ClaimedNotificationDeliveryItem, exception: Exception): Boolean {
+    private fun markFailure(claimed: ClaimedNotificationDeliveryItem, exception: Exception) {
         val error = exception.toStorageError()
-        return if (claimed.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
-            deliveryPort.markDeliveryDead(claimed.id, claimed.lockedAt, error)
-            true
+        if (claimed.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
+            if (!deliveryPort.markDeliveryDead(claimed.id, claimed.lockedAt, error)) {
+                throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.DEAD)
+            }
         } else {
-            deliveryPort.markDeliveryFailed(
+            val marked = deliveryPort.markDeliveryFailed(
                 id = claimed.id,
                 lockedAt = claimed.lockedAt,
                 error = error,
                 nextAttemptDelayMinutes = retryDelayMinutes(claimed.attemptCount),
             )
-            false
+            if (!marked) {
+                throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.FAILED)
+            }
+            throw NotificationDeliveryRetryableException(
+                "Email delivery ${claimed.id} failed and is scheduled for retry: $error",
+                exception,
+            )
         }
     }
 
@@ -89,7 +99,15 @@ class NotificationDispatchService(
         value?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Claimed email delivery $deliveryId missing $name")
 
+    private fun staleDeliveryLeaseException(id: UUID, status: NotificationDeliveryStatus): IllegalStateException =
+        IllegalStateException("Could not mark email delivery $id $status; delivery lease changed")
+
     private fun Exception.toStorageError(): String =
         sanitizeNotificationError(message ?: javaClass.simpleName, MAX_DISPATCH_ERROR_LENGTH)
             ?: javaClass.simpleName.take(MAX_DISPATCH_ERROR_LENGTH)
 }
+
+class NotificationDeliveryRetryableException(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)

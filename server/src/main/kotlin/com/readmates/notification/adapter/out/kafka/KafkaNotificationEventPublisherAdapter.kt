@@ -14,6 +14,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 @Component
+@ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
 class KafkaNotificationEventPublisherAdapter(
     @param:Qualifier("notificationEventKafkaTemplate")

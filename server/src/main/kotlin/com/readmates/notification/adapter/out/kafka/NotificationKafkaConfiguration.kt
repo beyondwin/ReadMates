@@ -1,6 +1,7 @@
 package com.readmates.notification.adapter.out.kafka
 
 import com.readmates.notification.application.model.NotificationEventMessage
+import com.readmates.notification.application.service.NotificationDeliveryRetryableException
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.TopicPartition
@@ -25,6 +26,7 @@ import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.JacksonMapperUtils
+import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer
 import org.springframework.util.backoff.FixedBackOff
@@ -32,6 +34,7 @@ import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 
 @Configuration(proxyBeanMethods = false)
+@ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
 @EnableConfigurationProperties(NotificationKafkaProperties::class)
 class NotificationKafkaConfiguration {
@@ -78,8 +81,15 @@ class NotificationKafkaConfiguration {
     fun notificationKafkaErrorHandler(
         @Qualifier("notificationEventDeadLetterPublishingRecoverer")
         recoverer: DeadLetterPublishingRecoverer,
+        properties: NotificationKafkaProperties,
     ): CommonErrorHandler =
-        DefaultErrorHandler(recoverer, FixedBackOff(NO_INTERVAL, NO_RETRIES))
+        DefaultErrorHandler(
+            recoverer,
+            FixedBackOff(properties.deliveryRetryBackoff.toMillis(), properties.deliveryRetryMaxAttempts),
+        ).also {
+            it.defaultFalse()
+            it.addRetryableExceptions(NotificationDeliveryRetryableException::class.java)
+        }
 
     @Bean
     fun notificationKafkaListenerContainerFactory(
@@ -123,6 +133,9 @@ class NotificationKafkaConfiguration {
         JacksonJsonSerializer<NotificationEventMessage>(notificationEventJsonMapper()).noTypeInfo()
 
     private fun notificationEventValueDeserializer(): Deserializer<NotificationEventMessage> =
+        ErrorHandlingDeserializer(notificationEventJsonValueDeserializer())
+
+    private fun notificationEventJsonValueDeserializer(): Deserializer<NotificationEventMessage> =
         JacksonJsonDeserializer(
             NotificationEventMessage::class.java,
             notificationEventJsonMapper(),
@@ -134,8 +147,6 @@ class NotificationKafkaConfiguration {
 
     private companion object {
         private const val NO_PARTITION = -1
-        private const val NO_INTERVAL = 0L
-        private const val NO_RETRIES = 0L
     }
 }
 
@@ -145,4 +156,6 @@ data class NotificationKafkaProperties(
     val sendTimeout: Duration = Duration.ofSeconds(10),
     val dlqTopic: String = "readmates.notification.events.dlq.v1",
     val consumerGroup: String = "readmates-notification-dispatcher",
+    val deliveryRetryBackoff: Duration = Duration.ofMinutes(5),
+    val deliveryRetryMaxAttempts: Long = 72,
 )
