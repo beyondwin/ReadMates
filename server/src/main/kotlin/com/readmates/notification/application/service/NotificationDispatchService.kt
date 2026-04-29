@@ -98,7 +98,6 @@ class NotificationDispatchService(
             }
             return NotificationDeliveryRetryableException(
                 "Email delivery ${claimed.id} failed and is scheduled for retry: $error",
-                exception,
             )
         }
     }
@@ -109,7 +108,6 @@ class NotificationDispatchService(
         val noun = if (failures.size == 1) "email delivery" else "email deliveries"
         return NotificationDeliveryRetryableException(
             "${failures.size} $noun remain retryable after dispatch pass: ${failures.first().message}",
-            failures.first().cause,
         )
     }
 
@@ -130,5 +128,4 @@ class NotificationDispatchService(
 
 class NotificationDeliveryRetryableException(
     message: String,
-    cause: Throwable? = null,
-) : RuntimeException(message, cause)
+) : RuntimeException(message)

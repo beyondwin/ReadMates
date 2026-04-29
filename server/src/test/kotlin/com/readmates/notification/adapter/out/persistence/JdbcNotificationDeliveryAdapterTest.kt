@@ -7,6 +7,7 @@ import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -88,6 +89,21 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(member1Notifications).hasSize(1)
         assertThat(member1Notifications.single().title).isEqualTo("피드백 문서가 올라왔습니다")
         assertThat(memberNotificationAdapter.unreadCount(clubId, member1)).isEqualTo(1)
+    }
+
+    @Test
+    fun `persistPlannedDeliveries throws when event outbox row is missing`() {
+        val missingEventId = UUID.fromString("00000000-0000-0000-0000-000000009799")
+
+        assertThatThrownBy {
+            deliveryAdapter.persistPlannedDeliveries(message(eventId = missingEventId))
+        }
+            .isInstanceOf(MissingNotificationEventOutboxException::class.java)
+            .hasMessageContaining("Notification event outbox row not found")
+            .hasMessageContaining(missingEventId.toString())
+
+        assertThat(deliveryRows(missingEventId)).isZero()
+        assertThat(memberNotificationRows(missingEventId)).isZero()
     }
 
     @Test
@@ -429,14 +445,14 @@ class JdbcNotificationDeliveryAdapterTest(
         return UUID.fromString(row["membership_id"].toString()) to UUID.fromString(row["club_id"].toString())
     }
 
-    private fun deliveryRows(): Int =
+    private fun deliveryRows(eventId: UUID = this.eventId): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from notification_deliveries where event_id = ?",
             Int::class.java,
             eventId.toString(),
         ) ?: 0
 
-    private fun memberNotificationRows(): Int =
+    private fun memberNotificationRows(eventId: UUID = this.eventId): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from member_notifications where event_id = ?",
             Int::class.java,
