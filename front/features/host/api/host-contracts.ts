@@ -248,12 +248,18 @@ export type HostNotificationMetadata = {
   bookTitle?: string;
 };
 
-export type HostNotificationDetailResponse = HostNotificationItem & {
+export type HostNotificationDetailResponse = {
+  id: string;
+  eventType: HostNotificationEventType;
+  status: HostNotificationStatus;
+  recipientEmail: string;
   subject: string;
   deepLinkPath: string;
   metadata: HostNotificationMetadata;
+  attemptCount: number;
   lastError: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 export type SendNotificationTestMailRequest = {
