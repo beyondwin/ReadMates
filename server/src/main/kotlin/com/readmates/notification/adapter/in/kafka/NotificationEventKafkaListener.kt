@@ -18,9 +18,17 @@ class NotificationEventKafkaListener(
         containerFactory = "notificationKafkaListenerContainerFactory",
     )
     fun onMessage(message: NotificationEventMessage) {
-        require(message.schemaVersion == 1) {
-            "Unsupported notification event schemaVersion ${message.schemaVersion}"
+        if (message.schemaVersion != SUPPORTED_SCHEMA_VERSION) {
+            throw NotificationUnsupportedSchemaVersionException(message.schemaVersion)
         }
         dispatchNotificationEventUseCase.dispatch(message)
     }
+
+    private companion object {
+        private const val SUPPORTED_SCHEMA_VERSION = 1
+    }
 }
+
+class NotificationUnsupportedSchemaVersionException(
+    schemaVersion: Int,
+) : RuntimeException("Unsupported notification event schemaVersion $schemaVersion")
