@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
 import { Link } from "@/src/app/router-link";
@@ -69,6 +69,12 @@ function jsonResponse(body: unknown) {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+function CurrentLocationText() {
+  const location = useLocation();
+
+  return <span>{`${location.pathname}${location.search}${location.hash}`}</span>;
 }
 
 afterEach(() => {
@@ -239,6 +245,80 @@ describe("SPA AppRouteLayout", () => {
       expect(screen.getByLabelText("클럽멤버")).toBeInTheDocument();
     });
     expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
+  });
+
+  it("switches clubs while keeping the same app-relative route", async () => {
+    const user = userEvent.setup();
+    const scopedAuth: AuthMeResponse = {
+      ...activeMemberAuth,
+      currentMembership: {
+        membershipId: "membership-active-member",
+        clubId: "club-2",
+        clubSlug: "reading-sai",
+        displayName: "클럽멤버",
+        role: "MEMBER",
+        membershipStatus: "ACTIVE",
+        approvalState: "ACTIVE",
+      },
+      joinedClubs: [
+        {
+          clubId: "club-2",
+          clubSlug: "reading-sai",
+          clubName: "읽는사이",
+          membershipId: "membership-active-member",
+          role: "MEMBER",
+          status: "ACTIVE",
+          primaryHost: "reading-sai.example.test",
+        },
+        {
+          clubId: "club-3",
+          clubSlug: "sample-book-club",
+          clubName: "샘플 북클럽",
+          membershipId: "membership-sample",
+          role: "HOST",
+          status: "ACTIVE",
+          primaryHost: null,
+        },
+      ],
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(hostAuth));
+      }
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(scopedAuth));
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app/archive"]}>
+          <Routes>
+            <Route path="/clubs/:clubSlug/app" element={<AppRouteLayout />}>
+              <Route
+                path="archive"
+                element={
+                  <main>
+                    archive child <CurrentLocationText />
+                  </main>
+                }
+              />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText(/archive child/)).toBeInTheDocument();
+    await user.selectOptions(await screen.findByLabelText("클럽 전환"), "sample-book-club");
+
+    expect(await screen.findByText("/clubs/sample-book-club/app/archive")).toBeInTheDocument();
   });
 
   it("keeps host users on member mobile chrome after opening archive from the member workspace", async () => {

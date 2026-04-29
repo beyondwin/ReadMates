@@ -11,6 +11,8 @@ import {
   ArchiveRouteError,
   ArchiveRouteLoading,
 } from "@/features/archive/route/archive-route-state";
+import { clubSelectionLoader } from "@/features/club-selection/route/club-selection-data";
+import { ClubSelectionRoute } from "@/features/club-selection/route/club-selection-route";
 import { publicClubLoader, publicSessionLoader } from "@/features/public/route/public-route-data";
 import { PublicRouteError } from "@/features/public/route/public-route-state";
 import { feedbackDocumentLoader } from "@/features/feedback/route/feedback-document-data";
@@ -70,15 +72,20 @@ const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...
   );
 };
 
-function memberAppRoutes(): RouteObject[] {
+function memberHomeRoute(): RouteObject {
+  return {
+    index: true,
+    element: <AppHomePage />,
+    loader: memberHomeLoader,
+    errorElement: <ArchiveRouteError />,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
+  };
+}
+
+function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[] {
+  const { includeIndex = true } = options;
   return [
-    {
-      index: true,
-      element: <AppHomePage />,
-      loader: memberHomeLoader,
-      errorElement: <ArchiveRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
-    },
+    ...(includeIndex ? [memberHomeRoute()] : []),
     {
       path: "session/current",
       element: <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
@@ -268,14 +275,29 @@ export const routes: RouteObject[] = [
     ),
   },
   {
-    id: "app",
     path: "/app",
-    element: (
-      <RequireMemberApp>
-        <AppRouteLayout />
-      </RequireMemberApp>
-    ),
-    children: memberAppRoutes(),
+    children: [
+      {
+        index: true,
+        element: (
+          <RequireAuth>
+            <ClubSelectionRoute />
+          </RequireAuth>
+        ),
+        loader: clubSelectionLoader,
+        errorElement: <ArchiveRouteError />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="클럽을 확인하는 중" variant="member" />,
+      },
+      {
+        id: "app",
+        element: (
+          <RequireMemberApp>
+            <AppRouteLayout />
+          </RequireMemberApp>
+        ),
+        children: memberAppRoutes({ includeIndex: false }),
+      },
+    ],
   },
   {
     id: "club-app",
