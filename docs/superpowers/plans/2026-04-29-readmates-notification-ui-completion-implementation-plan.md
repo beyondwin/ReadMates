@@ -2497,7 +2497,7 @@ git commit -m "feat: link host dashboard to notification ledger"
 - Modify when runtime behavior guidance changes: `docs/deploy/oci-backend.md`
 - Modify when test command guidance changes: `docs/development/test-guide.md`
 
-- [ ] **Step 1: Run server notification tests**
+- [x] **Step 1: Run server notification tests**
 
 Run:
 
@@ -2507,7 +2507,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 2: Run archive review tests**
+- [x] **Step 2: Run archive review tests**
 
 Run:
 
@@ -2517,7 +2517,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 3: Run full server tests**
+- [x] **Step 3: Run full server tests**
 
 Run:
 
@@ -2527,7 +2527,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 4: Run frontend checks**
+- [x] **Step 4: Run frontend checks**
 
 Run:
 
@@ -2539,7 +2539,7 @@ pnpm --dir front build
 
 Expected: all three commands exit 0.
 
-- [ ] **Step 5: Run e2e because this changes API/user flow surfaces**
+- [x] **Step 5: Run e2e because this changes API/user flow surfaces**
 
 Run:
 
@@ -2549,7 +2549,7 @@ pnpm --dir front test:e2e
 
 Expected: exit 0. When environment dependencies prevent this command from running, record the exact missing dependency or server startup failure in the final implementation note.
 
-- [ ] **Step 6: Check docs need**
+- [x] **Step 6: Check docs need**
 
 If test-mail cooldown, host restore, or member preferences require operator guidance, update `docs/deploy/oci-backend.md` under Email Notification Operations with:
 
@@ -2568,7 +2568,7 @@ git diff --check -- docs/deploy/oci-backend.md docs/development/test-guide.md
 
 Expected: no output.
 
-- [ ] **Step 7: Final status check**
+- [x] **Step 7: Final status check**
 
 Run:
 
