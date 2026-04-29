@@ -14,11 +14,20 @@ import java.time.LocalDate
 import java.util.UUID
 
 private const val CLEANUP_NOTIFICATION_OUTBOX_SQL = """
+    delete from notification_preferences
+    where club_id in (
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002'
+    );
     delete from notification_outbox
     where club_id in (
       '00000000-0000-0000-0000-000000000001',
       '00000000-0000-0000-0000-000000000002'
     );
+    update sessions
+    set state = 'PUBLISHED',
+        visibility = 'PUBLIC'
+    where id = '00000000-0000-0000-0000-000000000302';
     delete from sessions
     where id = '00000000-0000-0000-0000-000000009401';
     delete from clubs
@@ -42,6 +51,32 @@ class JdbcNotificationOutboxAdapterTest(
     @param:Autowired private val adapter: JdbcNotificationOutboxAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) {
+    @Test
+    fun `enqueue next book skips member with disabled event preference`() {
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000302")
+        makeNextBookSessionEligible(sessionId)
+        disableMemberPreference("member1@example.com", "next_book_published_enabled")
+
+        adapter.enqueueNextBookPublished(clubId, sessionId)
+
+        val member1Rows = notificationRowsFor("NEXT_BOOK_PUBLISHED", "member1@example.com")
+        assertThat(member1Rows).isZero()
+    }
+
+    @Test
+    fun `enqueue feedback skips member with global email disabled`() {
+        disableMemberEmail("member1@example.com")
+
+        adapter.enqueueFeedbackDocumentPublished(
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301"),
+        )
+
+        val member1Rows = notificationRowsFor("FEEDBACK_DOCUMENT_PUBLISHED", "member1@example.com")
+        assertThat(member1Rows).isZero()
+    }
+
     @Test
     fun `enqueue feedback notification creates one pending row per active attended participant`() {
         adapter.enqueueFeedbackDocumentPublished(
@@ -342,6 +377,79 @@ class JdbcNotificationOutboxAdapterTest(
     private fun insertPendingNotification(id: String, clubId: String, dedupeKey: String) {
         insertNotification(id = id, clubId = clubId, status = NotificationOutboxStatus.PENDING, dedupeKey = dedupeKey)
     }
+
+    private fun disableMemberEmail(email: String) {
+        disableMemberPreference(email, "email_enabled")
+    }
+
+    private fun makeNextBookSessionEligible(sessionId: UUID) {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'DRAFT',
+                visibility = 'MEMBER'
+            where id = ?
+            """.trimIndent(),
+            sessionId.toString(),
+        )
+    }
+
+    private fun disableMemberPreference(email: String, column: String) {
+        val allowedColumns = setOf(
+            "email_enabled",
+            "next_book_published_enabled",
+            "session_reminder_due_enabled",
+            "feedback_document_published_enabled",
+            "review_published_enabled",
+        )
+        require(column in allowedColumns) { "Unsupported notification preference column: $column" }
+        upsertPreference(email, column)
+    }
+
+    private fun upsertPreference(email: String, column: String) {
+        val membership = jdbcTemplate.queryForMap(
+            """
+            select memberships.id as membership_id, memberships.club_id as club_id
+            from memberships
+            join users on users.id = memberships.user_id
+            where users.email = ?
+              and memberships.club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            email,
+        )
+        jdbcTemplate.update(
+            """
+            insert into notification_preferences (membership_id, club_id)
+            values (?, ?)
+            on duplicate key update updated_at = utc_timestamp(6)
+            """.trimIndent(),
+            membership["membership_id"].toString(),
+            membership["club_id"].toString(),
+        )
+        jdbcTemplate.update(
+            """
+            update notification_preferences
+            set $column = false
+            where membership_id = ?
+              and club_id = ?
+            """.trimIndent(),
+            membership["membership_id"].toString(),
+            membership["club_id"].toString(),
+        )
+    }
+
+    private fun notificationRowsFor(eventType: String, email: String): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_outbox
+            where event_type = ?
+              and recipient_email = ?
+            """.trimIndent(),
+            Int::class.java,
+            eventType,
+            email,
+        ) ?: 0
 
     private fun insertNotification(
         id: String,

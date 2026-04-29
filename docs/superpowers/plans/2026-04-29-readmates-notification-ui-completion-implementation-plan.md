@@ -525,7 +525,7 @@ git commit -m "feat: add member notification preferences"
 - Modify: `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationOutboxAdapter.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationOutboxAdapterTest.kt`
 
-- [ ] **Step 1: Add failing tests for disabled preferences**
+- [x] **Step 1: Add failing tests for disabled preferences**
 
 Append tests to `JdbcNotificationOutboxAdapterTest.kt`:
 
@@ -612,7 +612,7 @@ private fun notificationRowsFor(eventType: String, email: String): Int =
     ) ?: 0
 ```
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -622,7 +622,7 @@ Run:
 
 Expected: FAIL because enqueue SQL does not filter by `notification_preferences`.
 
-- [ ] **Step 3: Add preference predicates to recipient queries**
+- [x] **Step 3: Add preference predicates to recipient queries**
 
 In each recipient query in `JdbcNotificationOutboxAdapter.kt`, add a left join:
 
@@ -652,7 +652,7 @@ and coalesce(notification_preferences.email_enabled, true)
 and coalesce(notification_preferences.session_reminder_due_enabled, true)
 ```
 
-- [ ] **Step 4: Run adapter tests**
+- [x] **Step 4: Run adapter tests**
 
 Run:
 
@@ -662,7 +662,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationOutboxAdapter.kt \
