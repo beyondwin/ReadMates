@@ -6,23 +6,37 @@ import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.model.NotificationPreferences
+import com.readmates.notification.application.model.NotificationTestMailAuditItem
+import com.readmates.notification.application.model.NotificationTestMailStatus
+import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
+import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationOutboxPort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
+import java.security.MessageDigest
 import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 private const val MAX_LAST_ERROR_LENGTH = 500
+private const val TEST_MAIL_COOLDOWN_SECONDS = 60L
+private const val TEST_MAIL_SUBJECT = "ReadMates 알림 테스트"
+private const val TEST_MAIL_BODY = "ReadMates 알림 발송 설정을 확인하기 위한 테스트 메일입니다."
 private val RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
+private val EMAIL_PATTERN = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
 
 @Service
 class NotificationOutboxService(
@@ -35,7 +49,8 @@ class NotificationOutboxService(
     ProcessNotificationOutboxUseCase,
     GetHostNotificationSummaryUseCase,
     ManageHostNotificationsUseCase,
-    ManageNotificationPreferencesUseCase {
+    ManageNotificationPreferencesUseCase,
+    SendNotificationTestMailUseCase {
 
     override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID) {
         notificationOutboxPort.enqueueFeedbackDocumentPublished(clubId, sessionId)
@@ -107,6 +122,55 @@ class NotificationOutboxService(
             ?: throw notificationAccessDenied()
     }
 
+    override fun sendTestMail(
+        host: CurrentMember,
+        command: SendNotificationTestMailCommand,
+    ): NotificationTestMailAuditItem {
+        val currentHost = requireHost(host)
+        val recipient = command.recipientEmail.trim().lowercase()
+        if (!EMAIL_PATTERN.matches(recipient)) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid email address")
+        }
+        val latest = notificationOutboxPort.latestTestMailCreatedAt(currentHost.clubId, currentHost.membershipId)
+        if (latest != null && latest.isAfter(OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(TEST_MAIL_COOLDOWN_SECONDS))) {
+            throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Test mail cooldown is active")
+        }
+
+        val maskedRecipient = recipient.maskEmail()
+        val recipientHash = sha256Hex(recipient)
+        return try {
+            mailDeliveryPort.send(
+                MailDeliveryCommand(
+                    to = recipient,
+                    subject = TEST_MAIL_SUBJECT,
+                    text = TEST_MAIL_BODY,
+                ),
+            )
+            notificationOutboxPort.recordTestMailAudit(
+                clubId = currentHost.clubId,
+                hostMembershipId = currentHost.membershipId,
+                recipientMaskedEmail = maskedRecipient,
+                recipientEmailHash = recipientHash,
+                status = NotificationTestMailStatus.SENT,
+                lastError = null,
+            )
+        } catch (exception: Exception) {
+            notificationOutboxPort.recordTestMailAudit(
+                clubId = currentHost.clubId,
+                hostMembershipId = currentHost.membershipId,
+                recipientMaskedEmail = maskedRecipient,
+                recipientEmailHash = recipientHash,
+                status = NotificationTestMailStatus.FAILED,
+                lastError = exception.toTestMailStorageError(),
+            )
+        }
+    }
+
+    override fun listTestMailAudit(host: CurrentMember): List<NotificationTestMailAuditItem> {
+        val currentHost = requireHost(host)
+        return notificationOutboxPort.listTestMailAudit(currentHost.clubId)
+    }
+
     override fun getPreferences(member: CurrentMember): NotificationPreferences =
         notificationOutboxPort.getPreferences(member)
 
@@ -169,4 +233,29 @@ class NotificationOutboxService(
 
     private fun Exception.toStorageError(): String =
         (message ?: javaClass.simpleName).take(MAX_LAST_ERROR_LENGTH)
+
+    private fun Exception.toTestMailStorageError(): String =
+        toStorageError()
+            .replace(EMAIL_LIKE_PATTERN, "[redacted-email]")
+            .take(MAX_LAST_ERROR_LENGTH)
+
+    private fun String.maskEmail(): String {
+        val atIndex = indexOf('@')
+        if (atIndex <= 0 || atIndex == lastIndex) {
+            return "숨김"
+        }
+
+        val local = substring(0, atIndex)
+        val domain = substring(atIndex + 1)
+        return if (local.isBlank() || domain.isBlank()) {
+            "숨김"
+        } else {
+            "${local.first()}***@$domain"
+        }
+    }
+
+    private fun sha256Hex(value: String): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
 }

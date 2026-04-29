@@ -1,9 +1,11 @@
 package com.readmates.notification.adapter.`in`.web
 
 import com.readmates.notification.application.model.HostNotificationItemQuery
+import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
+import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.security.AccessDeniedException
@@ -11,6 +13,7 @@ import com.readmates.shared.security.CurrentMember
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -22,6 +25,7 @@ class HostNotificationController(
     private val getHostNotificationSummaryUseCase: GetHostNotificationSummaryUseCase,
     private val processNotificationOutboxUseCase: ProcessNotificationOutboxUseCase,
     private val manageHostNotificationsUseCase: ManageHostNotificationsUseCase,
+    private val sendNotificationTestMailUseCase: SendNotificationTestMailUseCase,
 ) {
     @GetMapping("/summary")
     fun summary(host: CurrentMember): HostNotificationSummaryResponse =
@@ -42,6 +46,20 @@ class HostNotificationController(
                 limit = limit,
             ),
         ).toResponse()
+
+    @PostMapping("/test-mail")
+    fun sendTestMail(
+        host: CurrentMember,
+        @RequestBody request: SendNotificationTestMailRequest,
+    ): NotificationTestMailAuditResponse =
+        sendNotificationTestMailUseCase.sendTestMail(
+            host,
+            SendNotificationTestMailCommand(request.recipientEmail),
+        ).toResponse()
+
+    @GetMapping("/test-mail/audit")
+    fun testMailAudit(host: CurrentMember): List<NotificationTestMailAuditResponse> =
+        sendNotificationTestMailUseCase.listTestMailAudit(host).map { it.toResponse() }
 
     @GetMapping("/items/{id}")
     fun detail(

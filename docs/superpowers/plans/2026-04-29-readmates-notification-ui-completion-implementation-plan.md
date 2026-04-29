@@ -1059,7 +1059,7 @@ git commit -m "feat: add host notification operations"
 - Modify: `server/src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt`
 
-- [ ] **Step 1: Add tests for test mail**
+- [x] **Step 1: Add tests for test mail**
 
 Append to `HostNotificationControllerTest.kt`:
 
@@ -1105,7 +1105,7 @@ fun `host test mail rejects second send within cooldown`() {
 
 Add `import org.springframework.http.MediaType`.
 
-- [ ] **Step 2: Run tests and verify failure**
+- [x] **Step 2: Run tests and verify failure**
 
 Run:
 
@@ -1115,7 +1115,7 @@ Run:
 
 Expected: FAIL because `/test-mail` does not exist.
 
-- [ ] **Step 3: Add models and ports**
+- [x] **Step 3: Add models and ports**
 
 Append to `NotificationModels.kt`:
 
@@ -1162,7 +1162,7 @@ fun recordTestMailAudit(
 fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem>
 ```
 
-- [ ] **Step 4: Implement service**
+- [x] **Step 4: Implement service**
 
 Make `NotificationOutboxService` implement `SendNotificationTestMailUseCase`. Add:
 
@@ -1219,7 +1219,7 @@ import java.security.MessageDigest
 import java.time.ZoneOffset
 ```
 
-- [ ] **Step 5: Implement controller and DTOs**
+- [x] **Step 5: Implement controller and DTOs**
 
 Add DTOs to `NotificationWebDtos.kt`:
 
@@ -1262,7 +1262,7 @@ fun testMailAudit(host: CurrentMember): List<NotificationTestMailAuditResponse> 
     sendNotificationTestMailUseCase.listTestMailAudit(host).map { it.toResponse() }
 ```
 
-- [ ] **Step 6: Implement JDBC audit**
+- [x] **Step 6: Implement JDBC audit**
 
 In `JdbcNotificationOutboxAdapter.kt`, insert audit rows with `recipient_masked_email` and `recipient_email_hash`, and return `recipientEmail = recipient_masked_email` in the model. Use:
 
@@ -1289,7 +1289,7 @@ order by created_at desc
 limit 1
 ```
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 Run:
 
@@ -1299,7 +1299,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt

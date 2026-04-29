@@ -9,6 +9,9 @@ import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.model.NotificationPreferences
+import com.readmates.notification.application.model.NotificationTestMailAuditItem
+import com.readmates.notification.application.model.NotificationTestMailStatus
+import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationOutboxPort
@@ -260,6 +263,23 @@ class NotificationOutboxServiceTest {
         }.hasMessageContaining("Host role required")
     }
 
+    @Test
+    fun `sendTestMail records failed audit without raw email in stored error`() {
+        val port = FakeNotificationOutboxPort(items = emptyList())
+        val mail = FailingMailDeliveryPort("smtp rejected external@example.com")
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
+
+        val result = service.sendTestMail(host(), SendNotificationTestMailCommand("External@Example.com"))
+
+        assertThat(result.status).isEqualTo(NotificationTestMailStatus.FAILED)
+        assertThat(result.recipientEmail).isEqualTo("e***@example.com")
+        assertThat(port.testMailAudits.single().status).isEqualTo(NotificationTestMailStatus.FAILED)
+        assertThat(port.testMailAudits.single().lastError).contains("[redacted-email]")
+        assertThat(port.testMailAudits.single().lastError).doesNotContain("external@example.com")
+        assertThat(port.testMailAudits.single().recipientEmail).doesNotContain("External@Example.com")
+        assertThat(port.testMailHashes.single()).matches("^[0-9a-f]{64}$")
+    }
+
     private fun sampleItem(attemptCount: Int = 0): NotificationOutboxItem =
         NotificationOutboxItem(
             id = UUID.fromString("00000000-0000-0000-0000-000000000701"),
@@ -344,6 +364,8 @@ private class FakeNotificationOutboxPort(
     val deadIds = mutableListOf<UUID>()
     val deadErrors = mutableListOf<String>()
     val reminderDates = mutableListOf<LocalDate>()
+    val testMailAudits = mutableListOf<NotificationTestMailAuditItem>()
+    val testMailHashes = mutableListOf<String>()
 
     override fun enqueueFeedbackDocumentPublished(clubId: UUID, sessionId: UUID): Int = 0
 
@@ -435,4 +457,26 @@ private class FakeNotificationOutboxPort(
         member: CurrentMember,
         preferences: NotificationPreferences,
     ): NotificationPreferences = preferences
+
+    override fun latestTestMailCreatedAt(clubId: UUID, hostMembershipId: UUID): OffsetDateTime? = null
+
+    override fun recordTestMailAudit(
+        clubId: UUID,
+        hostMembershipId: UUID,
+        recipientMaskedEmail: String,
+        recipientEmailHash: String,
+        status: NotificationTestMailStatus,
+        lastError: String?,
+    ): NotificationTestMailAuditItem {
+        testMailHashes += recipientEmailHash
+        return NotificationTestMailAuditItem(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000901"),
+            recipientEmail = recipientMaskedEmail,
+            status = status,
+            lastError = lastError,
+            createdAt = OffsetDateTime.of(2026, 4, 29, 0, 0, 0, 123456000, ZoneOffset.UTC),
+        ).also { testMailAudits += it }
+    }
+
+    override fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem> = emptyList()
 }

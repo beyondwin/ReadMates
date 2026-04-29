@@ -7,6 +7,8 @@ import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.model.NotificationPreferences
+import com.readmates.notification.application.model.NotificationTestMailAuditItem
+import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.notification.application.port.out.NotificationOutboxPort
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.security.CurrentMember
@@ -180,4 +182,24 @@ private class FixedBacklogNotificationOutboxPort(
         member: CurrentMember,
         preferences: NotificationPreferences,
     ): NotificationPreferences = preferences
+
+    override fun latestTestMailCreatedAt(clubId: UUID, hostMembershipId: UUID): OffsetDateTime? = null
+
+    override fun recordTestMailAudit(
+        clubId: UUID,
+        hostMembershipId: UUID,
+        recipientMaskedEmail: String,
+        recipientEmailHash: String,
+        status: NotificationTestMailStatus,
+        lastError: String?,
+    ): NotificationTestMailAuditItem =
+        NotificationTestMailAuditItem(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000901"),
+            recipientEmail = recipientMaskedEmail,
+            status = status,
+            lastError = lastError,
+            createdAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
+        )
+
+    override fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem> = emptyList()
 }
