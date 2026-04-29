@@ -74,7 +74,7 @@ describe("PublicSessionPage", () => {
 
     expect(await screen.findByRole("img", { name: "팩트풀니스 표지" })).toBeInTheDocument();
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/public/sessions/00000000-0000-0000-0000-000000000301",
+      "/api/bff/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000301",
       expect.any(Object),
     );
   });

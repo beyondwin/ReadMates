@@ -31,22 +31,29 @@ function RouteOutlet() {
   );
 }
 
+function publicBasePath(pathname: string) {
+  const match = /^\/clubs\/([^/]+)/.exec(pathname);
+  return match ? `/clubs/${encodeURIComponent(match[1])}` : "";
+}
+
 export function PublicRouteLayout() {
   const state = useAuth();
+  const location = useLocation();
   const authenticated = state.status === "ready" ? state.auth.authenticated : undefined;
+  const basePath = publicBasePath(location.pathname);
 
   return (
     <div className="public-shell m-app">
       <div className="desktop-only">
-        <TopNav authenticated={authenticated} />
+        <TopNav authenticated={authenticated} publicBasePath={basePath} />
       </div>
       <div className="mobile-only">
-        <PublicMobileHeader authenticated={authenticated} />
+        <PublicMobileHeader authenticated={authenticated} publicBasePath={basePath} />
       </div>
       <div className="rm-route-stage">
         <RouteOutlet />
       </div>
-      <PublicFooter showGuestMemberActions={false} />
+      <PublicFooter publicBasePath={basePath} showGuestMemberActions={false} />
     </div>
   );
 }

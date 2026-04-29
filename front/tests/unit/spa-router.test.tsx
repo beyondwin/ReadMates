@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/src/app/auth-context";
@@ -54,6 +54,30 @@ const inactiveAuth = {
   role: "MEMBER",
   membershipStatus: "INACTIVE",
   approvalState: "INACTIVE",
+};
+
+const publicClubResponse = {
+  clubName: "읽는사이",
+  tagline: "함께 읽고 각자의 언어로 남기는 독서모임",
+  about: "초대받은 멤버들이 매달 한 권의 책을 읽고 기록을 남깁니다.",
+  stats: {
+    sessions: 1,
+    books: 1,
+    members: 9,
+  },
+  recentSessions: [
+    {
+      sessionId: "00000000-0000-0000-0000-000000000306",
+      sessionNumber: 6,
+      bookTitle: "가난한 찰리의 연감",
+      bookAuthor: "찰리 멍거",
+      bookImageUrl: "https://example.com/book.jpg",
+      date: "2026-04-15",
+      summary: "공개 요약",
+      highlightCount: 3,
+      oneLinerCount: 5,
+    },
+  ],
 };
 
 function isArchiveChildDataEndpoint(url: string) {
@@ -180,6 +204,53 @@ describe("SPA router", () => {
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
       `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
+    );
+  });
+
+  it("renders the club-scoped public home route with scoped public API and links", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/public/clubs/reading-sai") {
+        return Promise.resolve(jsonResponse(publicClubResponse));
+      }
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(anonymousAuth));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "읽는사이" })).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/public/clubs/reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(screen.getByRole("link", { name: "최근 공개 기록 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/records",
+    );
+    expect(screen.getAllByRole("link", { name: /가난한 찰리의 연감/ }).at(0)).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306",
+    );
+    expect(within(screen.getByRole("navigation", { name: "공개 내비게이션" })).getByRole("link", { name: "공개 기록" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/records",
+    );
+    expect(within(screen.getByRole("navigation", { name: "공개 하단 탐색" })).getByRole("link", { name: "클럽 소개" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/about",
     );
   });
 

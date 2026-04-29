@@ -778,6 +778,37 @@ class ArchiveAndNotesDbTest(
             }
     }
 
+    @Test
+    fun `public club endpoint resolves by slug`() {
+        mockMvc.get("/api/public/clubs/reading-sai")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.clubName") { exists() }
+            }
+    }
+
+    @Test
+    fun `public club endpoint returns not found for unknown slug`() {
+        mockMvc.get("/api/public/clubs/missing-club")
+            .andExpect {
+                status { isNotFound() }
+            }
+    }
+
+    @Test
+    fun `public session endpoint resolves by slug and rejects a session from another club`() {
+        mockMvc.get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000306") }
+            }
+
+        mockMvc.get("/api/public/clubs/sample-book-club/sessions/00000000-0000-0000-0000-000000000306")
+            .andExpect {
+                status { isNotFound() }
+            }
+    }
+
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
 

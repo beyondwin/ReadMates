@@ -1,21 +1,18 @@
 import { useEffect } from "react";
 import { Link } from "@/features/public/ui/public-link";
-import { readmatesReturnState, publicRecordsReturnTarget, restoreReadmatesPublicRecordsScroll } from "@/features/public/ui/public-route-continuity";
+import { readmatesReturnState, restoreReadmatesPublicRecordsScroll } from "@/features/public/ui/public-route-continuity";
 import type { PublicClubView, PublicSessionListItemView } from "@/features/public/model/public-display-model";
 import { getPublicRecordsDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { BookCover } from "@/shared/ui/book-cover";
+import { publicAboutHref, publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
 
-function sessionHref(session: PublicSessionListItemView) {
-  return `/sessions/${encodeURIComponent(session.sessionId)}`;
-}
-
-function PublicRecordIndexRow({ session }: { session: PublicSessionListItemView }) {
+function PublicRecordIndexRow({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView }) {
   const display = getPublicSessionListItemDisplay(session);
 
   return (
     <Link
-      to={sessionHref(session)}
-      state={readmatesReturnState(publicRecordsReturnTarget)}
+      to={publicSessionHref(session, publicBasePath)}
+      state={readmatesReturnState({ href: publicRecordsHref(publicBasePath), label: "공개 기록" })}
       className="rm-record-row public-record-index-row"
     >
       <BookCover title={display.title} author={display.author} imageUrl={session.bookImageUrl} width={72} />
@@ -42,10 +39,12 @@ function PublicRecordIndexRow({ session }: { session: PublicSessionListItemView 
 
 export default function PublicRecordsPage({
   data,
+  publicBasePath = "",
   routePathname,
   routeSearch,
 }: {
   data: PublicClubView;
+  publicBasePath?: string;
   routePathname: string;
   routeSearch: string;
 }) {
@@ -92,7 +91,7 @@ export default function PublicRecordsPage({
           {display.recentCount > 0 ? (
             <div className="public-record-list">
               {data.recentSessions.map((session) => (
-                <PublicRecordIndexRow key={session.sessionId} session={session} />
+                <PublicRecordIndexRow key={session.sessionId} publicBasePath={publicBasePath} session={session} />
               ))}
             </div>
           ) : (
@@ -104,7 +103,7 @@ export default function PublicRecordsPage({
               <p className="body" style={{ margin: "12px 0 0" }}>
                 아직 공개된 기록이 없어도 이 자리는 열어둡니다. 모임 이후 발행된 요약과 한줄평이 생기면 이 목록에서 먼저 볼 수 있습니다.
               </p>
-              <Link to="/about" className="btn btn-ghost btn-sm" style={{ marginTop: 18 }}>
+              <Link to={publicAboutHref(publicBasePath)} className="btn btn-ghost btn-sm" style={{ marginTop: 18 }}>
                 클럽 소개 보기
               </Link>
             </div>

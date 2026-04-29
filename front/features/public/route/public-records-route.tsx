@@ -6,5 +6,12 @@ export function PublicRecordsRoute() {
   const data = useLoaderData() as PublicClubRouteData;
   const location = useLocation();
 
-  return <PublicRecordsPage data={data} routePathname={location.pathname} routeSearch={location.search} />;
+  return (
+    <PublicRecordsPage
+      data={data}
+      publicBasePath={data.publicBasePath}
+      routePathname={location.pathname}
+      routeSearch={location.search}
+    />
+  );
 }

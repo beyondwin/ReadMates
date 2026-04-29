@@ -22,19 +22,8 @@ type TopNavProps = {
   memberName?: string | null;
   showHostEntry?: boolean;
   authenticated?: boolean;
+  publicBasePath?: string;
 };
-
-const guestLinks: NavLink[] = [
-  { key: "home", href: "/", label: READMATES_NAV_LABELS.public.intro, current: (pathname) => pathname === "/" },
-  { key: "club", href: "/about", label: READMATES_NAV_LABELS.public.club, current: (pathname) => pathname === "/about" },
-  {
-    key: "public-record",
-    href: "/records",
-    label: READMATES_NAV_LABELS.public.publicRecords,
-    current: (pathname) => pathname === "/records" || pathname.startsWith("/sessions/"),
-  },
-  { key: "login", href: "/login", label: READMATES_NAV_LABELS.public.login, current: (pathname) => pathname === "/login" },
-];
 
 const memberLinks: NavLink[] = [
   { key: "home", href: "/app", label: READMATES_NAV_LABELS.member.home, current: (pathname) => pathname === "/app" },
@@ -113,6 +102,36 @@ const memberReturnLink: NavLink = {
   current: (pathname) => pathname === "/app",
 };
 
+function prefixedPath(publicBasePath: string, path: string) {
+  return publicBasePath ? `${publicBasePath}${path === "/" ? "" : path}` : path;
+}
+
+function guestLinks(publicBasePath: string): NavLink[] {
+  return [
+    {
+      key: "home",
+      href: prefixedPath(publicBasePath, "/"),
+      label: READMATES_NAV_LABELS.public.intro,
+      current: (pathname) => pathname === prefixedPath(publicBasePath, "/"),
+    },
+    {
+      key: "club",
+      href: prefixedPath(publicBasePath, "/about"),
+      label: READMATES_NAV_LABELS.public.club,
+      current: (pathname) => pathname === prefixedPath(publicBasePath, "/about"),
+    },
+    {
+      key: "public-record",
+      href: prefixedPath(publicBasePath, "/records"),
+      label: READMATES_NAV_LABELS.public.publicRecords,
+      current: (pathname) =>
+        pathname === prefixedPath(publicBasePath, "/records") ||
+        pathname.startsWith(prefixedPath(publicBasePath, "/sessions/")),
+    },
+    { key: "login", href: "/login", label: READMATES_NAV_LABELS.public.login, current: (pathname) => pathname === "/login" },
+  ];
+}
+
 function Brand({ href }: { href: string }) {
   return (
     <Link to={href} className="row" style={{ gap: "10px" }}>
@@ -190,8 +209,8 @@ function TopNavFrame({
   );
 }
 
-function guestLinksWithAction(authAction: PublicAuthAction): NavLink[] {
-  return guestLinks.map((link) =>
+function guestLinksWithAction(links: NavLink[], authAction: PublicAuthAction): NavLink[] {
+  return links.map((link) =>
     link.key === "login"
       ? {
           ...link,
@@ -203,15 +222,16 @@ function guestLinksWithAction(authAction: PublicAuthAction): NavLink[] {
   );
 }
 
-function GuestTopNav({ authenticated }: { authenticated?: boolean }) {
+function GuestTopNav({ authenticated, publicBasePath = "" }: { authenticated?: boolean; publicBasePath?: string }) {
   const pathname = useLocation().pathname;
   const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login }, authenticated);
+  const links = guestLinks(publicBasePath);
 
   return (
     <TopNavFrame
-      brandHref="/"
+      brandHref={prefixedPath(publicBasePath, "/")}
       navLabel="공개 내비게이션"
-      links={guestLinksWithAction(authAction)}
+      links={guestLinksWithAction(links, authAction)}
       pathname={pathname}
     />
   );
@@ -242,9 +262,9 @@ function AppTopNav({
   );
 }
 
-export function TopNav({ variant = "guest", memberName, showHostEntry, authenticated }: TopNavProps) {
+export function TopNav({ variant = "guest", memberName, showHostEntry, authenticated, publicBasePath }: TopNavProps) {
   if (variant === "guest") {
-    return <GuestTopNav authenticated={authenticated} />;
+    return <GuestTopNav authenticated={authenticated} publicBasePath={publicBasePath} />;
   }
 
   return <AppTopNav variant={variant} memberName={memberName} showHostEntry={showHostEntry} />;

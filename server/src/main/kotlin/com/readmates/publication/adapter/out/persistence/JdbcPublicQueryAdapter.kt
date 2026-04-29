@@ -1,5 +1,6 @@
 package com.readmates.publication.adapter.out.persistence
 
+import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicHighlightResult
@@ -19,14 +20,18 @@ import java.util.UUID
 class JdbcPublicQueryAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : LoadPublishedPublicDataPort {
-    override fun loadClub(): PublicClubResult? {
+    override fun loadClub(): PublicClubResult? =
+        loadClub(LEGACY_PUBLIC_CLUB_SLUG)
+
+    override fun loadClub(clubSlug: String): PublicClubResult? {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
 
         return jdbcTemplate.query(
             """
             select id, name, tagline, about
             from clubs
-            where slug = 'reading-sai'
+            where slug = ?
+              and status = 'ACTIVE'
             """.trimIndent(),
             { rs, _ ->
                 val clubId = rs.uuid("id")
@@ -38,10 +43,14 @@ class JdbcPublicQueryAdapter(
                     recentSessions = publicSessions(jdbcTemplate, clubId),
                 )
             },
+            clubSlug,
         ).firstOrNull()
     }
 
-    override fun loadSession(sessionId: UUID): PublicSessionDetailResult? {
+    override fun loadSession(sessionId: UUID): PublicSessionDetailResult? =
+        loadSession(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
+
+    override fun loadSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult? {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
 
         return jdbcTemplate.query(
@@ -49,9 +58,12 @@ class JdbcPublicQueryAdapter(
             select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
                    public_session_publications.public_summary
             from sessions
+            join clubs on clubs.id = sessions.club_id
             join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
-            where sessions.id = ?
+            where clubs.slug = ?
+              and clubs.status = 'ACTIVE'
+              and sessions.id = ?
               and sessions.state = 'PUBLISHED'
               and public_session_publications.visibility = 'PUBLIC'
             """.trimIndent(),
@@ -68,6 +80,7 @@ class JdbcPublicQueryAdapter(
                     oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), sessionId),
                 )
             },
+            clubSlug,
             sessionId.dbString(),
         ).firstOrNull()
     }

@@ -12,11 +12,13 @@ class PublicQueryService(
     private val loadPublishedPublicDataPort: LoadPublishedPublicDataPort,
     private val cache: PublicReadCachePort = PublicReadCachePort.Noop(),
 ) : GetPublicClubUseCase, GetPublicSessionUseCase {
-    override fun getClub() =
-        cache.getClub() ?: loadPublishedPublicDataPort.loadClub()?.also(cache::putClub)
+    override fun getClub(clubSlug: String) =
+        cache.getClub(clubSlug) ?: loadPublishedPublicDataPort.loadClub(clubSlug)?.also {
+            cache.putClub(clubSlug, it)
+        }
 
-    override fun getSession(sessionId: UUID) =
-        cache.getSession(sessionId) ?: loadPublishedPublicDataPort.loadSession(sessionId)?.also {
-            cache.putSession(sessionId, it)
+    override fun getSession(clubSlug: String, sessionId: UUID) =
+        cache.getSession(clubSlug, sessionId) ?: loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)?.also {
+            cache.putSession(clubSlug, sessionId, it)
         }
 }

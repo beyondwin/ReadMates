@@ -3,9 +3,14 @@ import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public
 
 type PublicFooterProps = {
   showGuestMemberActions?: boolean;
+  publicBasePath?: string;
 };
 
-export function PublicFooter({ showGuestMemberActions = true }: PublicFooterProps) {
+function prefixedPath(publicBasePath: string, path: string) {
+  return publicBasePath ? `${publicBasePath}${path === "/" ? "" : path}` : path;
+}
+
+export function PublicFooter({ publicBasePath = "", showGuestMemberActions = true }: PublicFooterProps) {
   return (
     <footer className="public-footer">
       <div className="container public-footer__inner">
@@ -21,13 +26,13 @@ export function PublicFooter({ showGuestMemberActions = true }: PublicFooterProp
               클럽
             </div>
             <div className="small public-footer__links">
-              <Link to="/" resetScroll>
+              <Link to={prefixedPath(publicBasePath, "/")} resetScroll>
                 공개 홈
               </Link>
-              <Link to="/about" resetScroll>
+              <Link to={prefixedPath(publicBasePath, "/about")} resetScroll>
                 클럽 소개
               </Link>
-              <Link to="/records" resetScroll>
+              <Link to={prefixedPath(publicBasePath, "/records")} resetScroll>
                 공개 기록
               </Link>
             </div>

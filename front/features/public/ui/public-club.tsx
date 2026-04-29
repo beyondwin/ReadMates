@@ -5,24 +5,22 @@ import { BookCover } from "@/shared/ui/book-cover";
 import { PublicGuestOnlyActions } from "@/shared/ui/public-auth-action";
 import { getPublicClubDisplay, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { PUBLIC_MEMBERSHIP_NOTE, STATIC_OPERATION_INTRO } from "@/features/public/model/public-copy";
+import { publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
 
 type PublicClubProps = {
   data: PublicClubView;
+  publicBasePath?: string;
 };
-
-function sessionHref(session: PublicSessionListItemView) {
-  return `/sessions/${encodeURIComponent(session.sessionId)}`;
-}
 
 function sessionDisplay(session: PublicSessionListItemView) {
   return getPublicSessionListItemDisplay(session);
 }
 
-function PublicRecordLink({ session }: { session: PublicSessionListItemView }) {
+function PublicRecordLink({ publicBasePath, session }: { publicBasePath: string; session: PublicSessionListItemView }) {
   const display = sessionDisplay(session);
 
   return (
-    <Link to={sessionHref(session)} className="rm-record-row public-archive-row">
+    <Link to={publicSessionHref(session, publicBasePath)} className="rm-record-row public-archive-row">
       <BookCover
         title={display.title}
         author={display.author}
@@ -45,7 +43,7 @@ function PublicRecordLink({ session }: { session: PublicSessionListItemView }) {
   );
 }
 
-export default function PublicClub({ data }: PublicClubProps) {
+export default function PublicClub({ data, publicBasePath = "" }: PublicClubProps) {
   const publicRecordPreviewSessions = data.recentSessions.slice(0, 3);
   const { clubName, tagline, about, stats } = getPublicClubDisplay(data);
   const memberCount = stats.members;
@@ -174,7 +172,7 @@ export default function PublicClub({ data }: PublicClubProps) {
                 공개된 모임 기록
               </h2>
             </div>
-            <Link to="/records" className="public-records-link">
+            <Link to={publicRecordsHref(publicBasePath)} className="public-records-link">
               전체 보기
             </Link>
           </div>
@@ -182,7 +180,7 @@ export default function PublicClub({ data }: PublicClubProps) {
           {publicRecordPreviewSessions.length > 0 ? (
             <div className="public-record-list">
               {publicRecordPreviewSessions.map((session) => (
-                <PublicRecordLink key={session.sessionId} session={session} />
+                <PublicRecordLink key={session.sessionId} publicBasePath={publicBasePath} session={session} />
               ))}
             </div>
           ) : (
