@@ -2,7 +2,9 @@ package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxItem
+import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
+import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.notification.application.port.out.MailDeliveryCommand
@@ -27,7 +29,8 @@ class NotificationOutboxService(
     @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
 ) : RecordNotificationEventUseCase,
     ProcessNotificationOutboxUseCase,
-    GetHostNotificationSummaryUseCase {
+    GetHostNotificationSummaryUseCase,
+    ManageNotificationPreferencesUseCase {
 
     override fun recordFeedbackDocumentPublished(clubId: UUID, sessionId: UUID) {
         notificationOutboxPort.enqueueFeedbackDocumentPublished(clubId, sessionId)
@@ -65,6 +68,15 @@ class NotificationOutboxService(
         }
         return notificationOutboxPort.hostSummary(host.clubId)
     }
+
+    override fun getPreferences(member: CurrentMember): NotificationPreferences =
+        notificationOutboxPort.getPreferences(member)
+
+    override fun savePreferences(
+        member: CurrentMember,
+        preferences: NotificationPreferences,
+    ): NotificationPreferences =
+        notificationOutboxPort.savePreferences(member, preferences)
 
     private fun deliver(item: NotificationOutboxItem) {
         try {

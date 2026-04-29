@@ -3,6 +3,8 @@ package com.readmates.notification.application.port.out
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
+import com.readmates.notification.application.model.NotificationPreferences
+import com.readmates.shared.security.CurrentMember
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -18,4 +20,6 @@ interface NotificationOutboxPort {
     fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean
     fun hostSummary(clubId: UUID): HostNotificationSummary
     fun outboxBacklog(): NotificationOutboxBacklog
+    fun getPreferences(member: CurrentMember): NotificationPreferences
+    fun savePreferences(member: CurrentMember, preferences: NotificationPreferences): NotificationPreferences
 }

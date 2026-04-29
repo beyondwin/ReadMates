@@ -171,7 +171,7 @@ git commit -m "feat: add notification preference schema"
 - Create: `server/src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/api/MemberNotificationPreferenceControllerTest.kt`
 
-- [ ] **Step 1: Write controller tests**
+- [x] **Step 1: Write controller tests**
 
 Create `server/src/test/kotlin/com/readmates/notification/api/MemberNotificationPreferenceControllerTest.kt`:
 
@@ -275,7 +275,7 @@ class MemberNotificationPreferenceControllerTest(
 }
 ```
 
-- [ ] **Step 2: Run the new tests and verify failure**
+- [x] **Step 2: Run the new tests and verify failure**
 
 Run:
 
@@ -285,7 +285,7 @@ Run:
 
 Expected: FAIL with no route for `/api/me/notifications/preferences` or missing model classes.
 
-- [ ] **Step 3: Add preference models and ports**
+- [x] **Step 3: Add preference models and ports**
 
 Append to `server/src/main/kotlin/com/readmates/notification/application/model/NotificationModels.kt`:
 
@@ -337,7 +337,7 @@ import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.shared.security.CurrentMember
 ```
 
-- [ ] **Step 4: Implement service methods**
+- [x] **Step 4: Implement service methods**
 
 Modify the class declaration in `NotificationOutboxService.kt`:
 
@@ -358,7 +358,7 @@ override fun savePreferences(member: CurrentMember, preferences: NotificationPre
     notificationOutboxPort.savePreferences(member, preferences)
 ```
 
-- [ ] **Step 5: Implement DTOs and controller**
+- [x] **Step 5: Implement DTOs and controller**
 
 Create `server/src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt`:
 
@@ -426,7 +426,7 @@ class MemberNotificationController(
 }
 ```
 
-- [ ] **Step 6: Implement JDBC preference persistence**
+- [x] **Step 6: Implement JDBC preference persistence**
 
 Add methods to `JdbcNotificationOutboxAdapter.kt`:
 
@@ -500,7 +500,7 @@ import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.shared.security.CurrentMember
 ```
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 Run:
 
@@ -510,7 +510,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification/api/MemberNotificationPreferenceControllerTest.kt

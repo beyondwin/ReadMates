@@ -1,6 +1,7 @@
 package com.readmates.notification.application.port.`in`
 
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.shared.security.CurrentMember
 import java.time.LocalDate
 import java.util.UUID
@@ -18,4 +19,9 @@ interface ProcessNotificationOutboxUseCase {
 
 interface GetHostNotificationSummaryUseCase {
     fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary
+}
+
+interface ManageNotificationPreferencesUseCase {
+    fun getPreferences(member: CurrentMember): NotificationPreferences
+    fun savePreferences(member: CurrentMember, preferences: NotificationPreferences): NotificationPreferences
 }
