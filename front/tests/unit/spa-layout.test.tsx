@@ -182,6 +182,7 @@ describe("SPA AppRouteLayout", () => {
       "이번 세션",
       "클럽 노트",
       "아카이브",
+      "알림",
       "내 공간",
     ]);
     expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
@@ -229,6 +230,7 @@ describe("SPA AppRouteLayout", () => {
       "이번 세션",
       "클럽 노트",
       "아카이브",
+      "알림",
       "내 공간",
     ]);
     expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
