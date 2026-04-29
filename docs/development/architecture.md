@@ -72,25 +72,25 @@ adapter.in.web
 
 현재 full port/outbound adapter chain을 따르는 범위는 `publication`, `archive`, `feedback`, `session`, `note`, `auth`의 운영 API surface와 `notification` 운영 slice입니다. Disabled password/password-reset/dev-invitation accept endpoint는 `410 Gone` stub으로 남습니다. Auth의 OAuth filter, success handler, cookie/session 보안 구성은 `auth.infrastructure.security`와 `auth.adapter.in.security`에 따로 둡니다.
 
-Notification slice는 MySQL transactional outbox를 source of truth로 유지하고, 이메일 발송은 재시도 가능한 side effect 작업으로 처리합니다. 멤버 알림 선호도와 테스트 메일 audit은 같은 notification slice 안에서 관리하지만, 테스트 메일은 `notification_outbox`에 넣지 않고 별도 audit table에 masked email과 hash만 저장합니다. 발송 조건, 생성 시점, worker 주기, 재시도 정책은 [OCI backend runbook](../deploy/oci-backend.md#email-notification-operations)을 기준으로 운영합니다. 패키지 경계는 아래처럼 web/scheduler inbound adapter, application service, outbound port, persistence/mail adapter로 나눕니다.
+Notification slice는 MySQL `notification_event_outbox`를 이벤트 source of truth로 유지합니다. Relay scheduler가 publish 가능한 row를 Kafka topic `readmates.notification.events.v1`로 발행하고, 같은 Spring Boot 모듈의 Kafka consumer가 이벤트별 수신자를 계산해 멤버 선호도를 적용한 뒤 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 발송은 `notification_deliveries`의 `EMAIL` row를 기준으로 재시도 가능한 side effect로 처리하고, in-app 알림은 `member_notifications`가 멤버 inbox source of truth입니다. 이벤트 발행 상태는 `notification_event_outbox`, 채널별 발송/skip 상태는 `notification_deliveries`, 멤버 inbox 상태는 `member_notifications`에 저장합니다. 테스트 메일 audit은 별도 `notification_test_mail_audit` table에 masked email과 hash만 저장합니다. 발행 조건, 생성 시점, relay/consumer 주기, 재시도 정책은 [OCI backend runbook](../deploy/oci-backend.md#email-notification-operations)을 기준으로 운영합니다. 패키지 경계는 아래처럼 web/scheduler/Kafka inbound adapter, application service, outbound port, persistence/mail/Kafka adapter로 나눕니다.
 
 ```text
 notification
-  adapter.in.web / adapter.in.scheduler
+  adapter.in.web / adapter.in.scheduler / adapter.in.kafka
   application.port.in
   application.service
   application.port.out
-  adapter.out.persistence / adapter.out.mail
+  adapter.out.persistence / adapter.out.mail / adapter.out.kafka
 ```
 
 | 영역 | 현재 패키지 | 역할 |
 | --- | --- | --- |
-| Web/scheduler adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, response mapping; shared health endpoint |
+| Web/scheduler/Kafka adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `notification.adapter.in.kafka`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, Kafka listener dispatch, response mapping; shared health endpoint |
 | Security adapter/infrastructure | `auth.adapter.in.security`, `auth.infrastructure.security` | Spring Security `Authentication` 해석, OAuth/session filter, cookie/security wiring |
 | Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in` | controller나 scheduler가 의존하는 use case contract |
 | Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
 | Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out` | application service가 persistence/mail 세부사항 없이 호출하는 contract |
-| Persistence/mail adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `notification.adapter.out.persistence`, `notification.adapter.out.mail` | JDBC query와 row mapping, 외부 mail delivery 세부 구현을 소유하는 outbound adapter |
+| Persistence/mail/Kafka adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `notification.adapter.out.persistence`, `notification.adapter.out.mail`, `notification.adapter.out.kafka` | JDBC query와 row mapping, 외부 mail delivery와 Kafka publish 세부 구현을 소유하는 outbound adapter |
 | Redis adapter | `auth.adapter.out.redis`, `publication.adapter.out.redis`, `note.adapter.out.redis`, `shared.adapter.out.redis` | 선택적 Redis rate limit/cache/invalidation 구현. application service는 Redis adapter가 아니라 port에만 의존 |
 
 전환된 controller는 legacy repository, `JdbcTemplate`, persistence adapter를 직접 주입받지 않습니다. 인증된 사용자는 controller method에서 `CurrentMember`로 받으며, resolver가 `ResolveCurrentMemberUseCase`를 통해 멤버 정보를 조회합니다.
@@ -183,7 +183,7 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 멤버 알림 설정은 `/api/me/notifications/preferences`에서 읽고 저장합니다. 선호도 row가 없으면 기존 운영 알림(`NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED`)은 켜짐, 서평 공개 알림(`REVIEW_PUBLISHED`)은 꺼짐으로 해석합니다. `/app/me`는 정식 멤버와 호스트에게 이 설정을 보여주며, 둘러보기 멤버는 저장 가능한 알림 설정을 보지 않습니다.
 
-호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 outbox row 목록과 상세, pending/failed 처리, 개별 retry, `DEAD` row 복구, 고정 템플릿 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
+호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, 고정 템플릿 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
 
 테스트 메일은 SMTP 호출 전 audit row를 먼저 예약해 host membership 단위 60초 cooldown을 직렬화합니다. 실패한 테스트 메일은 같은 audit row를 `FAILED`로 갱신하고, 저장/응답되는 error는 email, secret, token, credential 형태를 redaction한 뒤 길이를 제한합니다.
 
