@@ -27,6 +27,20 @@ private const val CLEANUP_NOTIFICATION_DELIVERY_SQL = """
     where club_id = '00000000-0000-0000-0000-000000000001';
     delete from notification_preferences
     where club_id = '00000000-0000-0000-0000-000000000001';
+    delete session_participants
+    from session_participants
+    join memberships on memberships.id = session_participants.membership_id
+      and memberships.club_id = session_participants.club_id
+    join users on users.id = memberships.user_id
+    where session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+      and users.email like 'joined.after.event.%@example.com';
+    delete memberships
+    from memberships
+    join users on users.id = memberships.user_id
+    where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+      and users.email like 'joined.after.event.%@example.com';
+    delete from users
+    where email like 'joined.after.event.%@example.com';
 """
 
 @SpringBootTest(
@@ -74,6 +88,37 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(member1Notifications).hasSize(1)
         assertThat(member1Notifications.single().title).isEqualTo("피드백 문서가 올라왔습니다")
         assertThat(memberNotificationAdapter.unreadCount(clubId, member1)).isEqualTo(1)
+    }
+
+    @Test
+    fun `persistPlannedDeliveries replays existing event delivery snapshot without adding newly joined recipient`() {
+        insertEventOutboxRow()
+        val member1 = membershipIdForEmail("member1@example.com")
+
+        val first = deliveryAdapter.persistPlannedDeliveries(message())
+        val newlyJoinedMember = insertActiveMember("joined.after.event")
+        try {
+            insertAttendedParticipant(newlyJoinedMember.membershipId)
+            val duplicate = deliveryAdapter.persistPlannedDeliveries(message())
+
+            assertThat(duplicate).hasSize(first.size)
+            assertThat(duplicate.map { it.recipientMembershipId }).doesNotContain(newlyJoinedMember.membershipId)
+            assertThat(
+                deliveryRowsFor(newlyJoinedMember.membershipId, NotificationChannel.IN_APP, NotificationDeliveryStatus.SENT),
+            ).isZero()
+            assertThat(
+                deliveryRowsFor(newlyJoinedMember.membershipId, NotificationChannel.EMAIL, NotificationDeliveryStatus.PENDING),
+            ).isZero()
+
+            val existingEmailDelivery = duplicate.single {
+                it.recipientMembershipId == member1 && it.channel == NotificationChannel.EMAIL
+            }
+            assertThat(existingEmailDelivery.recipientEmail).isEqualTo("member1@example.com")
+            assertThat(existingEmailDelivery.subject).isEqualTo("피드백 문서가 올라왔습니다")
+            assertThat(existingEmailDelivery.bodyText).contains("팩트풀니스")
+        } finally {
+            deleteInsertedMember(newlyJoinedMember)
+        }
     }
 
     @Test
@@ -206,6 +251,61 @@ class JdbcNotificationDeliveryAdapterTest(
         )
     }
 
+    private fun insertActiveMember(emailPrefix: String): InsertedMember {
+        val idSuffix = UUID.randomUUID().toString()
+        val userId = UUID.randomUUID()
+        val membershipId = UUID.randomUUID()
+        val email = "$emailPrefix.$idSuffix@example.com"
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+            values (?, ?, ?, 'Joined After Event', ?, 'GOOGLE')
+            """.trimIndent(),
+            userId.toString(),
+            "google-$idSuffix",
+            email,
+            "joined-${idSuffix.take(8)}",
+        )
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), ?)
+            """.trimIndent(),
+            membershipId.toString(),
+            clubId.toString(),
+            userId.toString(),
+            "joined-${idSuffix.take(8)}",
+        )
+        return InsertedMember(userId = userId, membershipId = membershipId)
+    }
+
+    private fun insertAttendedParticipant(membershipId: UUID) {
+        jdbcTemplate.update(
+            """
+            insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
+            values (?, ?, ?, ?, 'GOING', 'ATTENDED')
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            clubId.toString(),
+            sessionId.toString(),
+            membershipId.toString(),
+        )
+    }
+
+    private fun deleteInsertedMember(member: InsertedMember) {
+        jdbcTemplate.update(
+            "delete from session_participants where club_id = ? and membership_id = ?",
+            clubId.toString(),
+            member.membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            "delete from memberships where club_id = ? and id = ?",
+            clubId.toString(),
+            member.membershipId.toString(),
+        )
+        jdbcTemplate.update("delete from users where id = ?", member.userId.toString())
+    }
+
     private fun membershipIdForEmail(email: String): UUID = membershipForEmail(email).first
 
     private fun membershipForEmail(email: String): Pair<UUID, UUID> {
@@ -292,4 +392,9 @@ class JdbcNotificationDeliveryAdapterTest(
             MySqlTestContainer.registerDatasourceProperties(registry)
         }
     }
+
+    private data class InsertedMember(
+        val userId: UUID,
+        val membershipId: UUID,
+    )
 }
