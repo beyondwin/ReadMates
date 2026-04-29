@@ -42,11 +42,11 @@ private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
     delete from notification_event_outbox
     where dedupe_key like 'host-notification-controller-test-%';
     delete from memberships
-    where club_id = '00000000-0000-0000-0000-000000000002';
+    where club_id = '00000000-0000-0000-0000-000000000902';
     delete from users
     where id = '00000000-0000-0000-0000-000000009102';
     delete from clubs
-    where id = '00000000-0000-0000-0000-000000000002';
+    where id = '00000000-0000-0000-0000-000000000902';
 """
 private const val FAILING_TEST_MAIL_RECIPIENT = "failure@example.com"
 private const val SENSITIVE_TEST_MAIL_ERROR =
@@ -129,7 +129,7 @@ class HostNotificationControllerTest(
         )
         insertNotificationEvent(
             id = "00000000-0000-0000-0000-000000009502",
-            clubId = "00000000-0000-0000-0000-000000000002",
+            clubId = "00000000-0000-0000-0000-000000000902",
             eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
             status = NotificationEventOutboxStatus.PUBLISHED,
             dedupeKey = "host-notification-controller-test-event-list-other-club",
@@ -408,7 +408,7 @@ class HostNotificationControllerTest(
         )
         insertPendingNotification(
             id = "00000000-0000-0000-0000-000000009102",
-            clubId = "00000000-0000-0000-0000-000000000002",
+            clubId = "00000000-0000-0000-0000-000000000902",
             dedupeKey = "host-notification-controller-test-other-club",
         )
 
@@ -458,7 +458,7 @@ class HostNotificationControllerTest(
             """
             insert into clubs (id, slug, name, tagline, about)
             values (
-              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000000902',
               'other-club',
               'Other Club',
               'Separate reading club',
@@ -484,7 +484,7 @@ class HostNotificationControllerTest(
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
             values (
               '00000000-0000-0000-0000-000000000292',
-              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000000902',
               '00000000-0000-0000-0000-000000009102',
               'MEMBER',
               'ACTIVE',
@@ -632,7 +632,7 @@ class HostNotificationControllerTest(
 
     private fun recipientMembershipIdForClub(clubId: String): String =
         when (clubId) {
-            "00000000-0000-0000-0000-000000000002" -> "00000000-0000-0000-0000-000000000292"
+            "00000000-0000-0000-0000-000000000902" -> "00000000-0000-0000-0000-000000000292"
             else -> "00000000-0000-0000-0000-000000000202"
         }
 
