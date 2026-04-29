@@ -69,6 +69,43 @@ READMATES_NOTES_CACHE_ENABLED=true \
 
 기본 Redis URL은 `redis://localhost:6379`입니다. 다른 Redis를 쓰면 `READMATES_REDIS_URL`에 placeholder-safe 값을 넣고, 실제 secret이나 private endpoint는 Git에 남기지 않습니다.
 
+## Optional Kafka Notification Pipeline
+
+Kafka 알림 relay/consumer를 로컬에서 확인할 때는 Compose의 `kafka` service를 MySQL과 함께 띄웁니다. 현재 Compose service는 Redpanda를 사용하지만 Spring에서는 Kafka bootstrap server로만 바라봅니다.
+
+```bash
+docker compose up -d mysql kafka
+```
+
+로컬 기본 bootstrap server는 `localhost:9092`입니다. Kafka/Testcontainers integration test만 실행하려면 backend를 `bootRun`으로 띄우거나 `READMATES_NOTIFICATIONS_ENABLED=true`를 설정하지 않습니다. Testcontainers가 테스트용 Kafka를 직접 띄우고 test configuration이 mail sender를 대체하므로 SMTP 환경 변수도 필요하지 않습니다.
+
+```bash
+./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
+```
+
+로컬 backend에서 Kafka relay/consumer와 실제 이메일 delivery까지 함께 켜서 실행할 때는 backend env에 현재 코드의 Kafka property와 Spring mail property를 모두 넣습니다. `READMATES_NOTIFICATIONS_ENABLED=true`는 `SmtpMailDeliveryAdapter`를 선택하므로 `JavaMailSender`가 생성될 수 있게 `SPRING_MAIL_HOST` 같은 mail 설정이 필요합니다.
+
+```bash
+READMATES_NOTIFICATIONS_ENABLED=true \
+READMATES_KAFKA_ENABLED=true \
+READMATES_KAFKA_BOOTSTRAP_SERVERS=localhost:9092 \
+READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC=readmates.notification.events.v1 \
+READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC=readmates.notification.events.dlq.v1 \
+READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher \
+READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50 \
+READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5 \
+READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5 \
+SPRING_MAIL_HOST='<smtp-host>' \
+SPRING_MAIL_PORT='<smtp-port>' \
+SPRING_MAIL_USERNAME='<smtp-username>' \
+SPRING_MAIL_PASSWORD='<smtp-password>' \
+READMATES_NOTIFICATION_SENDER_EMAIL='no-reply@example.com' \
+READMATES_NOTIFICATION_SENDER_NAME='ReadMates' \
+./server/gradlew -p server bootRun
+```
+
+SMTP provider가 auth 또는 TLS를 요구하면 `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true`, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true` 같은 Spring mail property도 로컬 환경에만 추가합니다. 예시에는 실제 credential이나 private endpoint를 남기지 않습니다.
+
 ## Backend 실행
 
 로컬 개발은 `dev` profile을 사용합니다. 이 profile은 sample seed data와 dev-login fixture를 켭니다.
@@ -99,6 +136,12 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `READMATES_BFF_SECRET_REQUIRED` | 기본 `true`입니다. `application-dev.yml`에서는 `false`로 완화되어 있지만, `READMATES_BFF_SECRET`을 설정하면 `/api/**` 요청은 `X-Readmates-Bff-Secret`이 필요합니다. |
 | `READMATES_AUTH_SESSION_COOKIE_SECURE` | 로컬 HTTP에서 `readmates_session` cookie를 테스트하려면 `false`로 둡니다. |
 | `READMATES_FLYWAY_LOCATIONS` | Flyway migration 위치입니다. 기본은 `classpath:db/mysql/migration`이고, `dev` profile은 `classpath:db/mysql/dev`를 추가합니다. |
+| `READMATES_NOTIFICATIONS_ENABLED` | 알림 relay/consumer bean을 켜는 상위 flag입니다. 기본은 `false`입니다. |
+| `READMATES_KAFKA_ENABLED` | Kafka notification relay/consumer를 켭니다. 기본은 `false`입니다. |
+| `READMATES_KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap server 목록입니다. 로컬 Compose 기본값은 `localhost:9092`입니다. |
+| `READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC` | notification event topic입니다. 기본은 `readmates.notification.events.v1`입니다. |
+| `READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC` | consumer error handler가 사용하는 DLQ topic입니다. 기본은 `readmates.notification.events.dlq.v1`입니다. |
+| `READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP` | notification consumer group입니다. 기본은 `readmates-notification-dispatcher`입니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID` | Google OAuth를 로컬에서 직접 시험할 때 필요한 client id입니다. dev-login만 쓰면 필요하지 않습니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET` | Google OAuth를 로컬에서 직접 시험할 때 필요한 client secret입니다. dev-login만 쓰면 필요하지 않습니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE` | Google OAuth scope입니다. 기본 운영 예시는 `openid,email,profile`입니다. |

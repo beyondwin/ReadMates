@@ -1,14 +1,23 @@
 package com.readmates.notification.adapter.`in`.web
 
 import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationDelivery
+import com.readmates.notification.application.model.HostNotificationDeliveryList
+import com.readmates.notification.application.model.HostNotificationEvent
+import com.readmates.notification.application.model.HostNotificationEventList
 import com.readmates.notification.application.model.HostNotificationFailure
 import com.readmates.notification.application.model.HostNotificationItem
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.MemberNotificationItem
+import com.readmates.notification.application.model.MemberNotificationList
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.notification.application.model.sanitizeNotificationError
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
+import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import java.util.UUID
@@ -38,6 +47,33 @@ data class HostNotificationFailureResponse(
 
 data class HostNotificationItemListResponse(
     val items: List<HostNotificationItemResponse>,
+)
+
+data class HostNotificationEventListResponse(
+    val items: List<HostNotificationEventResponse>,
+)
+
+data class HostNotificationEventResponse(
+    val id: UUID,
+    val eventType: NotificationEventType,
+    val status: NotificationEventOutboxStatus,
+    val attemptCount: Int,
+    val createdAt: String,
+    val updatedAt: String,
+)
+
+data class HostNotificationDeliveryListResponse(
+    val items: List<HostNotificationDeliveryResponse>,
+)
+
+data class HostNotificationDeliveryResponse(
+    val id: UUID,
+    val eventId: UUID,
+    val channel: NotificationChannel,
+    val status: NotificationDeliveryStatus,
+    val recipientEmail: String?,
+    val attemptCount: Int,
+    val updatedAt: String,
 )
 
 data class HostNotificationItemResponse(
@@ -94,10 +130,42 @@ data class NotificationPreferencesResponse(
     val events: Map<NotificationEventType, Boolean>,
 )
 
+data class MemberNotificationListResponse(
+    val items: List<MemberNotificationResponse>,
+    val unreadCount: Int,
+)
+
+data class MemberNotificationResponse(
+    val id: UUID,
+    val eventType: NotificationEventType,
+    val title: String,
+    val body: String,
+    val deepLinkPath: String,
+    val readAt: String?,
+    val createdAt: String,
+)
+
 fun NotificationPreferences.toResponse(): NotificationPreferencesResponse =
     NotificationPreferencesResponse(
         emailEnabled = emailEnabled,
         events = NotificationEventType.entries.associateWith(::eventPreference),
+    )
+
+fun MemberNotificationList.toResponse(): MemberNotificationListResponse =
+    MemberNotificationListResponse(
+        items = items.map { it.toResponse() },
+        unreadCount = unreadCount,
+    )
+
+fun MemberNotificationItem.toResponse(): MemberNotificationResponse =
+    MemberNotificationResponse(
+        id = id,
+        eventType = eventType,
+        title = title,
+        body = body,
+        deepLinkPath = deepLinkPath,
+        readAt = readAt?.toString(),
+        createdAt = createdAt.toString(),
     )
 
 fun HostNotificationSummary.toResponse(): HostNotificationSummaryResponse =
@@ -121,6 +189,37 @@ private fun HostNotificationFailure.toResponse(): HostNotificationFailureRespons
 fun HostNotificationItemList.toResponse(): HostNotificationItemListResponse =
     HostNotificationItemListResponse(
         items = items.map { it.toResponse() },
+    )
+
+fun HostNotificationEventList.toResponse(): HostNotificationEventListResponse =
+    HostNotificationEventListResponse(
+        items = items.map { it.toResponse() },
+    )
+
+private fun HostNotificationEvent.toResponse(): HostNotificationEventResponse =
+    HostNotificationEventResponse(
+        id = id,
+        eventType = eventType,
+        status = status,
+        attemptCount = attemptCount,
+        createdAt = createdAt.toString(),
+        updatedAt = updatedAt.toString(),
+    )
+
+fun HostNotificationDeliveryList.toResponse(): HostNotificationDeliveryListResponse =
+    HostNotificationDeliveryListResponse(
+        items = items.map { it.toResponse() },
+    )
+
+private fun HostNotificationDelivery.toResponse(): HostNotificationDeliveryResponse =
+    HostNotificationDeliveryResponse(
+        id = id,
+        eventId = eventId,
+        channel = channel,
+        status = status,
+        recipientEmail = recipientEmail?.let(::maskEmail),
+        attemptCount = attemptCount,
+        updatedAt = updatedAt.toString(),
     )
 
 fun HostNotificationItem.toResponse(): HostNotificationItemResponse =

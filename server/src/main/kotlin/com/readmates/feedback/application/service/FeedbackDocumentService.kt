@@ -116,6 +116,9 @@ class FeedbackDocumentService(
             recordNotificationEventUseCase.recordFeedbackDocumentPublished(
                 clubId = currentMember.clubId,
                 sessionId = command.sessionId,
+                sessionNumber = session.sessionNumber,
+                bookTitle = session.bookTitle,
+                documentVersion = version,
             )
 
             val storedDocument = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)

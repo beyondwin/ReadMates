@@ -4,8 +4,11 @@ import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
-import com.readmates.notification.application.port.`in`.ProcessNotificationOutboxUseCase
+import com.readmates.notification.application.port.`in`.ProcessNotificationDeliveriesUseCase
 import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
+import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.security.AccessDeniedException
@@ -23,7 +26,7 @@ import java.util.UUID
 @RequestMapping("/api/host/notifications")
 class HostNotificationController(
     private val getHostNotificationSummaryUseCase: GetHostNotificationSummaryUseCase,
-    private val processNotificationOutboxUseCase: ProcessNotificationOutboxUseCase,
+    private val processNotificationDeliveriesUseCase: ProcessNotificationDeliveriesUseCase,
     private val manageHostNotificationsUseCase: ManageHostNotificationsUseCase,
     private val sendNotificationTestMailUseCase: SendNotificationTestMailUseCase,
 ) {
@@ -46,6 +49,23 @@ class HostNotificationController(
                 limit = limit,
             ),
         ).toResponse()
+
+    @GetMapping("/events")
+    fun events(
+        host: CurrentMember,
+        @RequestParam(required = false) status: NotificationEventOutboxStatus?,
+        @RequestParam(defaultValue = "50") limit: Int,
+    ): HostNotificationEventListResponse =
+        manageHostNotificationsUseCase.listEvents(host, status, limit).toResponse()
+
+    @GetMapping("/deliveries")
+    fun deliveries(
+        host: CurrentMember,
+        @RequestParam(required = false) status: NotificationDeliveryStatus?,
+        @RequestParam(required = false) channel: NotificationChannel?,
+        @RequestParam(defaultValue = "50") limit: Int,
+    ): HostNotificationDeliveryListResponse =
+        manageHostNotificationsUseCase.listDeliveries(host, status, channel, limit).toResponse()
 
     @PostMapping("/test-mail")
     fun sendTestMail(
@@ -74,7 +94,7 @@ class HostNotificationController(
             throw AccessDeniedException("Host role required")
         }
 
-        return mapOf("processed" to processNotificationOutboxUseCase.processPendingForClub(host.clubId, PROCESS_BATCH_SIZE))
+        return mapOf("processed" to processNotificationDeliveriesUseCase.processPendingForClub(host.clubId, PROCESS_BATCH_SIZE))
     }
 
     @PostMapping("/items/{id}/retry")

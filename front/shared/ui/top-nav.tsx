@@ -57,6 +57,12 @@ const memberLinks: NavLink[] = [
     current: (pathname) =>
       pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/"),
   },
+  {
+    key: "notifications",
+    href: "/app/notifications",
+    label: READMATES_NAV_LABELS.member.notifications,
+    current: (pathname) => pathname.startsWith("/app/notifications"),
+  },
   { key: "me", href: "/app/me", label: READMATES_NAV_LABELS.member.mySpace, current: (pathname) => pathname.startsWith("/app/me") },
 ];
 

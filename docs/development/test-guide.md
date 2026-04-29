@@ -48,6 +48,7 @@ pnpm --dir front test:e2e
 
 - 기본 frontend port는 `PLAYWRIGHT_PORT`가 없으면 `3100`입니다.
 - 기본 backend origin은 `READMATES_API_BASE_URL`이 없으면 `http://127.0.0.1:18080`입니다.
+- E2E backend의 Actuator management port는 `READMATES_MANAGEMENT_PORT=0`으로 실행해 로컬 `8081` 점유 상태와 충돌하지 않게 합니다. Playwright readiness는 여전히 backend API origin의 `/internal/health`를 기준으로 확인하므로 backend startup failure는 숨기지 않습니다.
 - E2E backend는 `SPRING_PROFILES_ACTIVE=dev`, `READMATES_FLYWAY_LOCATIONS=classpath:db/mysql/migration,classpath:db/mysql/dev`, BFF secret placeholder로 실행됩니다.
 - E2E database 연결은 `READMATES_E2E_DB_HOST`, `READMATES_E2E_DB_PORT`, `READMATES_E2E_DB_USER`, `READMATES_E2E_DB_PASSWORD`, `READMATES_E2E_DB_NAME`으로 조정할 수 있습니다. 공개 문서에서는 정확한 로컬 DB 이름 대신 placeholder를 사용합니다.
 - Playwright config는 `mysql` CLI로 E2E database를 생성하므로 로컬 MySQL server와 MySQL client가 필요합니다.
@@ -91,14 +92,16 @@ Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관
 
 ## Notification Operations
 
-알림 outbox, OCI Email Delivery adapter 설정, 운영 metrics, host dashboard/notification operations UI, 멤버 알림 설정을 바꿨다면 아래 targeted command를 먼저 실행합니다.
+알림 event outbox, Kafka relay/consumer, OCI Email Delivery adapter 설정, 운영 metrics, host dashboard/notification operations UI, 멤버 알림 설정과 알림함을 바꿨다면 아래 targeted command를 먼저 실행합니다. Kafka notification integration test는 Testcontainers Kafka를 사용하므로 Docker 또는 Colima가 실행 중이어야 합니다.
 
 ```bash
+./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
 ./server/gradlew -p server test --tests 'com.readmates.notification.*'
 ./server/gradlew -p server test --tests com.readmates.archive.api.MemberArchiveReviewControllerTest
 ./server/gradlew -p server clean test
 pnpm --dir front exec vitest run tests/unit/host-dashboard.test.tsx
 pnpm --dir front exec vitest run tests/unit/host-notifications.test.tsx
+pnpm --dir front exec vitest run tests/unit/member-notifications.test.tsx
 pnpm --dir front exec vitest run tests/unit/my-page.test.tsx
 pnpm --dir front lint
 ```

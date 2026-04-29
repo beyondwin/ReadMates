@@ -10,7 +10,9 @@ import {
 } from "react";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
-type HostNotificationStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD";
+type NotificationEventOutboxStatus = "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
+type NotificationDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD" | "SKIPPED";
+type NotificationChannel = "EMAIL" | "IN_APP";
 type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
@@ -24,13 +26,22 @@ type HostNotificationSummary = {
   sentLast24h: number;
 };
 
-type HostNotificationItem = {
+type HostNotificationEventItem = {
   id: string;
   eventType: HostNotificationEventType;
-  status: HostNotificationStatus;
-  recipientEmail: string;
+  status: NotificationEventOutboxStatus;
   attemptCount: number;
-  nextAttemptAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type HostNotificationDeliveryItem = {
+  id: string;
+  eventId: string;
+  channel: NotificationChannel;
+  status: NotificationDeliveryStatus;
+  recipientEmail: string | null;
+  attemptCount: number;
   updatedAt: string;
 };
 
@@ -48,7 +59,8 @@ type SendNotificationTestMailRequest = {
 
 type HostNotificationsPageProps = {
   summary: HostNotificationSummary;
-  items: HostNotificationItem[];
+  events: HostNotificationEventItem[];
+  deliveries: HostNotificationDeliveryItem[];
   audit: NotificationTestMailAuditItem[];
   onProcess: () => Promise<unknown>;
   onRetry: (id: string) => Promise<unknown>;
@@ -68,6 +80,13 @@ type PendingAction =
   | { kind: "restore"; id: string }
   | { kind: "test-mail" };
 
+type NotificationLedgerTab = "events" | "deliveries";
+
+const notificationLedgerTabs: Array<{ key: NotificationLedgerTab; label: string }> = [
+  { key: "events", label: "이벤트" },
+  { key: "deliveries", label: "배송" },
+];
+
 const eventLabels: Record<HostNotificationEventType, string> = {
   NEXT_BOOK_PUBLISHED: "다음 책 공개",
   SESSION_REMINDER_DUE: "세션 리마인더",
@@ -75,17 +94,27 @@ const eventLabels: Record<HostNotificationEventType, string> = {
   REVIEW_PUBLISHED: "리뷰 공개",
 };
 
-const statusLabels: Record<HostNotificationStatus, string> = {
-  PENDING: "대기",
-  SENDING: "발송 중",
-  SENT: "발송됨",
-  FAILED: "실패",
-  DEAD: "중단",
+const eventOutboxStatusLabels: Record<NotificationEventOutboxStatus, string> = {
+  PENDING: "Kafka 발행 대기",
+  PUBLISHING: "Kafka 발행 중",
+  PUBLISHED: "Kafka 발행됨",
+  FAILED: "Kafka 발행 실패",
+  DEAD: "Kafka 발행 중단",
+};
+
+const deliveryStatusLabels: Record<NotificationDeliveryStatus, string> = {
+  PENDING: "배송 대기",
+  SENDING: "배송 중",
+  SENT: "배송됨",
+  FAILED: "배송 실패",
+  DEAD: "배송 중단",
+  SKIPPED: "건너뜀",
 };
 
 export function HostNotificationsPage({
   summary,
-  items,
+  events,
+  deliveries,
   audit,
   onProcess,
   onRetry,
@@ -93,7 +122,8 @@ export function HostNotificationsPage({
   onSendTestMail,
   isRefreshing = false,
 }: HostNotificationsPageProps) {
-  const [restoreTarget, setRestoreTarget] = useState<HostNotificationItem | null>(null);
+  const [activeLedgerTab, setActiveLedgerTab] = useState<NotificationLedgerTab>("events");
+  const [restoreTarget, setRestoreTarget] = useState<HostNotificationDeliveryItem | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState("");
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
@@ -136,11 +166,11 @@ export function HostNotificationsPage({
     void runAction({ kind: "process" }, onProcess, "대기/실패 알림 처리를 요청했습니다.");
   };
 
-  const handleRetry = (item: HostNotificationItem) => {
+  const handleRetry = (item: HostNotificationDeliveryItem) => {
     void runAction({ kind: "retry", id: item.id }, () => onRetry(item.id), "알림 재시도를 요청했습니다.");
   };
 
-  const handleRestore = (item: HostNotificationItem) => {
+  const handleRestore = (item: HostNotificationDeliveryItem) => {
     if (isBusy) {
       return;
     }
@@ -188,7 +218,7 @@ export function HostNotificationsPage({
                 알림 발송 장부
               </h1>
               <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                대기, 실패, 중단 상태를 한 화면에서 확인하고 필요한 작업만 실행합니다.
+                Kafka 이벤트와 배송 상태를 나누어 확인하고 필요한 작업만 실행합니다.
               </p>
             </div>
             <button
@@ -250,36 +280,61 @@ export function HostNotificationsPage({
           <section className="surface" aria-labelledby="notification-items-title" style={{ padding: 22 }}>
             <div className="row-between" style={{ gap: 14, alignItems: "baseline", marginBottom: 12 }}>
               <h2 id="notification-items-title" className="h3 editorial" style={{ margin: 0 }}>
-                발송 목록
+                운영 장부
               </h2>
               <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-                {items.length}건
+                이벤트 {events.length}건 · 배송 {deliveries.length}건
               </span>
             </div>
 
-            {items.length > 0 ? (
-              <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-                {items.map((item, index) => (
-                  <NotificationRow
-                    key={item.id}
-                    item={item}
-                    isFirst={index === 0}
-                    retryPending={isPending("retry", item.id)}
-                    restorePending={isPending("restore", item.id)}
-                    disabled={isBusy}
-                    onRetry={() => handleRetry(item)}
-                    onRestore={() => {
-                      setRestoreError(null);
-                      setRestoreTarget(item);
-                    }}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-                표시할 알림 발송 기록이 없습니다.
-              </p>
-            )}
+            <div
+              role="tablist"
+              aria-label="알림 운영 장부"
+              onKeyDown={(event) => handleLedgerTabKeyDown(event, activeLedgerTab, setActiveLedgerTab)}
+              style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}
+            >
+              {notificationLedgerTabs.map((tab) => {
+                const selected = activeLedgerTab === tab.key;
+
+                return (
+                  <button
+                    key={tab.key}
+                    id={`host-notifications-tab-${tab.key}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls={`host-notifications-panel-${tab.key}`}
+                    className={`btn btn-sm ${selected ? "btn-primary" : "btn-quiet"}`}
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setActiveLedgerTab(tab.key)}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <section
+              id={`host-notifications-panel-${activeLedgerTab}`}
+              role="tabpanel"
+              aria-labelledby={`host-notifications-tab-${activeLedgerTab}`}
+            >
+              {activeLedgerTab === "events" ? (
+                <NotificationEventLedger events={events} />
+              ) : (
+                <NotificationDeliveryLedger
+                  deliveries={deliveries}
+                  retryPendingId={pendingAction?.kind === "retry" ? pendingAction.id : null}
+                  restorePendingId={pendingAction?.kind === "restore" ? pendingAction.id : null}
+                  disabled={isBusy}
+                  onRetry={handleRetry}
+                  onRestore={(item) => {
+                    setRestoreError(null);
+                    setRestoreTarget(item);
+                  }}
+                />
+              )}
+            </section>
           </section>
 
           <section className="surface" aria-labelledby="test-mail-title" style={{ padding: 22 }}>
@@ -384,7 +439,131 @@ function SummaryCount({
   );
 }
 
-function NotificationRow({
+function handleLedgerTabKeyDown(
+  event: ReactKeyboardEvent<HTMLDivElement>,
+  activeTab: NotificationLedgerTab,
+  setActiveTab: (tab: NotificationLedgerTab) => void,
+) {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+    return;
+  }
+
+  event.preventDefault();
+
+  const currentIndex = notificationLedgerTabs.findIndex((tab) => tab.key === activeTab);
+  const lastIndex = notificationLedgerTabs.length - 1;
+  let nextIndex = currentIndex;
+
+  if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = lastIndex;
+  } else if (event.key === "ArrowLeft") {
+    nextIndex = currentIndex <= 0 ? lastIndex : currentIndex - 1;
+  } else {
+    nextIndex = currentIndex >= lastIndex ? 0 : currentIndex + 1;
+  }
+
+  const nextTab = notificationLedgerTabs[nextIndex]?.key;
+
+  if (nextTab) {
+    setActiveTab(nextTab);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`host-notifications-tab-${nextTab}`)?.focus();
+    });
+  }
+}
+
+function NotificationEventLedger({ events }: { events: HostNotificationEventItem[] }) {
+  if (events.length === 0) {
+    return (
+      <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+        표시할 알림 이벤트가 없습니다.
+      </p>
+    );
+  }
+
+  return (
+    <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
+      {events.map((event, index) => (
+        <NotificationEventRow key={event.id} event={event} isFirst={index === 0} />
+      ))}
+    </div>
+  );
+}
+
+function NotificationEventRow({ event, isFirst }: { event: HostNotificationEventItem; isFirst: boolean }) {
+  return (
+    <article
+      className="row-between"
+      style={{
+        gap: 14,
+        alignItems: "center",
+        padding: "14px 0",
+        borderTop: isFirst ? undefined : "1px solid var(--line-soft)",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <strong className="body" style={{ minWidth: 0 }}>
+            {eventLabels[event.eventType]}
+          </strong>
+          <span className={eventOutboxStatusBadgeClass(event.status)}>{event.status}</span>
+        </div>
+        <div className="tiny" style={{ color: "var(--text-2)", marginTop: 5 }}>
+          <span>{eventOutboxStatusLabels[event.status]}</span>
+          <span> · {Math.max(0, event.attemptCount)}회 시도</span>
+        </div>
+        <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
+          생성 {formatDateOnlyLabel(event.createdAt)} · 업데이트 {formatDateOnlyLabel(event.updatedAt)}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function NotificationDeliveryLedger({
+  deliveries,
+  retryPendingId,
+  restorePendingId,
+  disabled,
+  onRetry,
+  onRestore,
+}: {
+  deliveries: HostNotificationDeliveryItem[];
+  retryPendingId: string | null;
+  restorePendingId: string | null;
+  disabled: boolean;
+  onRetry: (item: HostNotificationDeliveryItem) => void;
+  onRestore: (item: HostNotificationDeliveryItem) => void;
+}) {
+  if (deliveries.length === 0) {
+    return (
+      <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+        표시할 알림 배송 기록이 없습니다.
+      </p>
+    );
+  }
+
+  return (
+    <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
+      {deliveries.map((delivery, index) => (
+        <NotificationDeliveryRow
+          key={delivery.id}
+          item={delivery}
+          isFirst={index === 0}
+          retryPending={retryPendingId === delivery.id}
+          restorePending={restorePendingId === delivery.id}
+          disabled={disabled}
+          onRetry={() => onRetry(delivery)}
+          onRestore={() => onRestore(delivery)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function NotificationDeliveryRow({
   item,
   isFirst,
   retryPending,
@@ -393,7 +572,7 @@ function NotificationRow({
   onRetry,
   onRestore,
 }: {
-  item: HostNotificationItem;
+  item: HostNotificationDeliveryItem;
   isFirst: boolean;
   retryPending: boolean;
   restorePending: boolean;
@@ -417,17 +596,17 @@ function NotificationRow({
       <div style={{ minWidth: 0 }}>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <strong className="body" style={{ minWidth: 0 }}>
-            {eventLabels[item.eventType]}
+            {item.channel}
           </strong>
-          <span className={statusBadgeClass(item.status)}>{item.status}</span>
+          <span className={deliveryStatusBadgeClass(item.status)}>{item.status}</span>
         </div>
         <div className="tiny" style={{ color: "var(--text-2)", marginTop: 5 }}>
           <span>{maskRecipient(item.recipientEmail)}</span>
-          <span> · {statusLabels[item.status]} · </span>
+          <span> · {deliveryStatusLabels[item.status]} · </span>
           <span>{Math.max(0, item.attemptCount)}회 시도</span>
         </div>
         <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
-          업데이트 {formatDateOnlyLabel(item.updatedAt)}
+          이벤트 {shortId(item.eventId)} · 업데이트 {formatDateOnlyLabel(item.updatedAt)}
         </div>
       </div>
       <div className="row" style={{ gap: 8, flex: "0 0 auto" }}>
@@ -453,7 +632,7 @@ function RestoreNotificationDialog({
   onClose,
   onConfirm,
 }: {
-  item: HostNotificationItem;
+  item: HostNotificationDeliveryItem;
   submitting: boolean;
   error: string | null;
   onClose: () => void;
@@ -537,14 +716,14 @@ function RestoreNotificationDialog({
           중단된 알림을 복구할까요?
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 18px" }}>
-          {maskRecipient(item.recipientEmail)} 알림을 다시 발송 대기 상태로 돌립니다.
+          {maskRecipient(item.recipientEmail)} 배송을 다시 대기 상태로 돌립니다.
         </p>
         <div className="surface-quiet" style={{ padding: 14 }}>
           <div className="tiny mono" style={{ color: "var(--text)" }}>
-            {item.eventType}
+            {item.channel} · {item.status}
           </div>
           <div className="tiny" style={{ color: "var(--text-3)", marginTop: 4 }}>
-            {Math.max(0, item.attemptCount)}회 시도 · {formatDateOnlyLabel(item.updatedAt)}
+            이벤트 {shortId(item.eventId)} · {Math.max(0, item.attemptCount)}회 시도 · {formatDateOnlyLabel(item.updatedAt)}
           </div>
         </div>
         {error ? (
@@ -565,7 +744,11 @@ function RestoreNotificationDialog({
   );
 }
 
-function maskRecipient(email: string) {
+function maskRecipient(email: string | null) {
+  if (!email) {
+    return "수신자 없음";
+  }
+
   if (email.includes("***")) {
     return email;
   }
@@ -578,8 +761,28 @@ function maskRecipient(email: string) {
   return `${localPart[0]}***@${domain}`;
 }
 
-function statusBadgeClass(status: HostNotificationStatus) {
-  if (status === "SENT") {
+function shortId(id: string) {
+  return id.length > 8 ? id.slice(0, 8) : id;
+}
+
+function eventOutboxStatusBadgeClass(status: NotificationEventOutboxStatus) {
+  if (status === "PUBLISHED") {
+    return "badge badge-ok badge-dot";
+  }
+
+  if (status === "FAILED" || status === "DEAD") {
+    return "badge badge-warn badge-dot";
+  }
+
+  if (status === "PENDING" || status === "PUBLISHING") {
+    return "badge badge-accent badge-dot";
+  }
+
+  return "badge";
+}
+
+function deliveryStatusBadgeClass(status: NotificationDeliveryStatus) {
+  if (status === "SENT" || status === "SKIPPED") {
     return "badge badge-ok badge-dot";
   }
 

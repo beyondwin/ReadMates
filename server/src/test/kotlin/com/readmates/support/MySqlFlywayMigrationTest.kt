@@ -1,5 +1,6 @@
 package com.readmates.support
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -37,6 +38,8 @@ class MySqlFlywayMigrationTest(
         )
 
         assertEquals(3, tableCount)
+        assertKafkaNotificationTablesExist(jdbcTemplate)
+        assertKafkaNotificationForeignKeys()
         assertEquals("YES", columnValue("users", "password_hash", "is_nullable"))
         assertEquals("NO", columnValue("users", "short_name", "is_nullable"))
         assertEquals("NO", columnValue("memberships", "short_name", "is_nullable"))
@@ -186,6 +189,80 @@ class MySqlFlywayMigrationTest(
             Int::class.java,
         )
         assertEquals(0, publicSeedSessionVisibilityMismatchCount)
+    }
+
+    @Test
+    fun `mysql notification pipeline prevents cross club ledger rows`() {
+        val suffix = UUID.randomUUID().toString().take(8)
+        val firstClubId = UUID.randomUUID().toString()
+        val secondClubId = UUID.randomUUID().toString()
+        val firstUserId = UUID.randomUUID().toString()
+        val secondUserId = UUID.randomUUID().toString()
+        val firstMembershipId = UUID.randomUUID().toString()
+        val secondMembershipId = UUID.randomUUID().toString()
+        val firstEventId = UUID.randomUUID().toString()
+        val secondEventId = UUID.randomUUID().toString()
+        val firstDeliveryId = UUID.randomUUID().toString()
+        val secondDeliveryId = UUID.randomUUID().toString()
+        val crossClubDeliveryId = UUID.randomUUID().toString()
+        val crossClubMemberNotificationId = UUID.randomUUID().toString()
+
+        try {
+            insertClub(firstClubId, "ledger-a-$suffix")
+            insertClub(secondClubId, "ledger-b-$suffix")
+            insertProfileUser(firstUserId, "ledger-a-$suffix@example.com", "Ledger A", "LedgerA$suffix")
+            insertProfileUser(secondUserId, "ledger-b-$suffix@example.com", "Ledger B", "LedgerB$suffix")
+            insertMembership(firstMembershipId, firstClubId, firstUserId, "LedgerA$suffix")
+            insertMembership(secondMembershipId, secondClubId, secondUserId, "LedgerB$suffix")
+            insertNotificationEventOutbox(firstEventId, firstClubId, "ledger-event-a-$suffix")
+            insertNotificationEventOutbox(secondEventId, secondClubId, "ledger-event-b-$suffix")
+
+            assertThrows(DataIntegrityViolationException::class.java) {
+                insertNotificationDelivery(
+                    id = crossClubDeliveryId,
+                    eventId = firstEventId,
+                    clubId = secondClubId,
+                    recipientMembershipId = secondMembershipId,
+                    dedupeKey = "ledger-cross-delivery-$suffix",
+                )
+            }
+
+            insertNotificationDelivery(
+                id = firstDeliveryId,
+                eventId = firstEventId,
+                clubId = firstClubId,
+                recipientMembershipId = firstMembershipId,
+                dedupeKey = "ledger-delivery-a-$suffix",
+            )
+            insertNotificationDelivery(
+                id = secondDeliveryId,
+                eventId = secondEventId,
+                clubId = secondClubId,
+                recipientMembershipId = secondMembershipId,
+                dedupeKey = "ledger-delivery-b-$suffix",
+            )
+
+            assertThrows(DataIntegrityViolationException::class.java) {
+                insertMemberNotification(
+                    id = crossClubMemberNotificationId,
+                    eventId = firstEventId,
+                    deliveryId = secondDeliveryId,
+                    clubId = secondClubId,
+                    recipientMembershipId = secondMembershipId,
+                )
+            }
+        } finally {
+            deleteWhereIn("member_notifications", "id", setOf(crossClubMemberNotificationId))
+            deleteWhereIn(
+                "notification_deliveries",
+                "id",
+                setOf(firstDeliveryId, secondDeliveryId, crossClubDeliveryId),
+            )
+            deleteWhereIn("notification_event_outbox", "id", setOf(firstEventId, secondEventId))
+            deleteWhereIn("memberships", "id", setOf(firstMembershipId, secondMembershipId))
+            deleteWhereIn("users", "id", setOf(firstUserId, secondUserId))
+            deleteWhereIn("clubs", "id", setOf(firstClubId, secondClubId))
+        }
     }
 
     @Test
@@ -374,6 +451,20 @@ class MySqlFlywayMigrationTest(
         }
     }
 
+    private fun insertClub(
+        clubId: String,
+        slug: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (?, ?, '테스트 클럽', '테스트 클럽', '테스트 클럽입니다.')
+            """.trimIndent(),
+            clubId,
+            slug,
+        )
+    }
+
     private fun insertProfileUser(
         userId: String,
         email: String,
@@ -411,6 +502,91 @@ class MySqlFlywayMigrationTest(
         )
     }
 
+    private fun insertNotificationEventOutbox(
+        id: String,
+        clubId: String,
+        dedupeKey: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_event_outbox (
+              id,
+              club_id,
+              event_type,
+              aggregate_type,
+              aggregate_id,
+              payload_json,
+              kafka_key,
+              dedupe_key
+            )
+            values (?, ?, 'SESSION_REMINDER_DUE', 'SESSION', ?, json_object('eventId', ?), ?, ?)
+            """.trimIndent(),
+            id,
+            clubId,
+            id,
+            id,
+            clubId,
+            dedupeKey,
+        )
+    }
+
+    private fun insertNotificationDelivery(
+        id: String,
+        eventId: String,
+        clubId: String,
+        recipientMembershipId: String,
+        dedupeKey: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_deliveries (
+              id,
+              event_id,
+              club_id,
+              recipient_membership_id,
+              channel,
+              dedupe_key
+            )
+            values (?, ?, ?, ?, 'IN_APP', ?)
+            """.trimIndent(),
+            id,
+            eventId,
+            clubId,
+            recipientMembershipId,
+            dedupeKey,
+        )
+    }
+
+    private fun insertMemberNotification(
+        id: String,
+        eventId: String,
+        deliveryId: String,
+        clubId: String,
+        recipientMembershipId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into member_notifications (
+              id,
+              event_id,
+              delivery_id,
+              club_id,
+              recipient_membership_id,
+              event_type,
+              title,
+              body,
+              deep_link_path
+            )
+            values (?, ?, ?, ?, ?, 'SESSION_REMINDER_DUE', 'Reminder', 'Body', '/clubs/test')
+            """.trimIndent(),
+            id,
+            eventId,
+            deliveryId,
+            clubId,
+            recipientMembershipId,
+        )
+    }
+
     private fun insertTestMailAudit(
         id: String,
         clubId: String,
@@ -433,6 +609,59 @@ class MySqlFlywayMigrationTest(
             clubId,
             hostMembershipId,
             recipientEmailHash,
+        )
+    }
+
+    private fun assertKafkaNotificationTablesExist(jdbcTemplate: JdbcTemplate) {
+        val tables = jdbcTemplate.queryForList(
+            """
+            select table_name
+            from information_schema.tables
+            where table_schema = database()
+              and table_name in (
+                'notification_event_outbox',
+                'notification_deliveries',
+                'member_notifications'
+              )
+            """.trimIndent(),
+            String::class.java,
+        ).toSet()
+
+        assertThat(tables).containsExactlyInAnyOrder(
+            "notification_event_outbox",
+            "notification_deliveries",
+            "member_notifications",
+        )
+    }
+
+    private fun assertKafkaNotificationForeignKeys() {
+        assertEquals(
+            "id,club_id",
+            indexColumns("notification_event_outbox", "notification_event_outbox_id_club_uk"),
+        )
+        assertEquals(
+            "id,event_id,club_id,recipient_membership_id",
+            indexColumns("notification_deliveries", "notification_deliveries_id_context_uk"),
+        )
+        assertEquals(
+            "event_id,club_id",
+            foreignKeyColumns("notification_deliveries", "notification_deliveries_event_club_fk"),
+        )
+        assertEquals(
+            "notification_event_outbox:id,club_id",
+            foreignKeyReference("notification_deliveries", "notification_deliveries_event_club_fk"),
+        )
+        assertEquals(
+            "delivery_id,event_id,club_id,recipient_membership_id",
+            foreignKeyColumns("member_notifications", "member_notifications_delivery_context_fk"),
+        )
+        assertEquals(
+            "notification_deliveries:id,event_id,club_id,recipient_membership_id",
+            foreignKeyReference("member_notifications", "member_notifications_delivery_context_fk"),
+        )
+        assertEquals(
+            "recipient_membership_id,created_at",
+            indexColumns("member_notifications", "member_notifications_recipient_created_idx"),
         )
     }
 

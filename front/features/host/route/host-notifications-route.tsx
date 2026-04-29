@@ -14,7 +14,8 @@ export function HostNotificationsRoute() {
   return (
     <HostNotificationsPage
       summary={data.summary}
-      items={data.items}
+      events={data.events}
+      deliveries={data.deliveries}
       audit={data.audit}
       isRefreshing={revalidator.state !== "idle"}
       onProcess={() => refreshAfter(hostNotificationsActions.process)}

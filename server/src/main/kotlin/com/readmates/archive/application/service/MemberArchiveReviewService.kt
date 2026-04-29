@@ -34,6 +34,8 @@ class MemberArchiveReviewService(
             recordNotificationEventUseCase.recordReviewPublished(
                 clubId = command.member.clubId,
                 sessionId = command.sessionId,
+                sessionNumber = result.sessionNumber,
+                bookTitle = result.bookTitle,
                 authorMembershipId = command.member.membershipId,
             )
         }
