@@ -35,5 +35,6 @@ export type PlatformAdminSummaryResponse = {
   platformRole: PlatformAdminRole;
   activeClubCount: number;
   domainActionRequiredCount: number;
+  domains?: PlatformAdminDomainResponse[];
   domainsRequiringAction: PlatformAdminDomainResponse[];
 };

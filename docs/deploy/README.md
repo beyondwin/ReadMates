@@ -87,6 +87,7 @@ ReadMates는 제품 수준에서 invite-only 흐름을 사용합니다.
 Cloudflare Pages Functions:
 
 ```text
+VITE_PUBLIC_PRIMARY_DOMAIN={primary-domain}
 READMATES_API_BASE_URL=https://api.example.com
 READMATES_BFF_SECRET=<bff-secret>
 ```

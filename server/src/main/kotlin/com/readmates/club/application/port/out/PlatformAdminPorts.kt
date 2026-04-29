@@ -7,6 +7,7 @@ import java.util.UUID
 interface LoadPlatformAdminSummaryPort {
     fun countActiveClubs(): Long
     fun countDomainsRequiringAction(): Long
+    fun listDomains(limit: Int): List<PlatformAdminClubDomain>
     fun listDomainsRequiringAction(limit: Int): List<PlatformAdminClubDomain>
 }
 

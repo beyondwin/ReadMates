@@ -203,6 +203,69 @@ where memberships.club_id = ${sqlString(secondClubId)}
 `);
 }
 
+export function createSecondClubInviteFixture(email: string, invitedName = "샘플 초대 멤버") {
+  const normalizedEmail = normalizeEmail(email);
+  const token = `sample-${randomBytes(18).toString("base64url")}`;
+  const tokenHash = sha256Hex(token);
+  const invitationId = randomUUID();
+
+  runMysql(`
+insert into invitations (
+  id,
+  club_id,
+  invited_by_membership_id,
+  invited_email,
+  invited_name,
+  role,
+  token_hash,
+  status,
+  expires_at
+)
+values (
+  ${sqlString(invitationId)},
+  ${sqlString(secondClubId)},
+  ${sqlString(secondClubHostMembershipId)},
+  ${sqlString(normalizedEmail)},
+  ${sqlString(invitedName)},
+  'MEMBER',
+  ${sqlString(tokenHash)},
+  'PENDING',
+  timestampadd(day, 7, utc_timestamp(6))
+);
+`);
+
+  return token;
+}
+
+export function cleanupSecondClubInvitedMembers(emails: string[]) {
+  const emailList = sqlEmailList(emails);
+
+  runMysql(`
+delete auth_sessions
+from auth_sessions
+join users on users.id = auth_sessions.user_id
+where lower(users.email) in (${emailList});
+
+delete from invitations
+where club_id = ${sqlString(secondClubId)}
+  and lower(invited_email) in (${emailList});
+
+delete memberships
+from memberships
+join users on users.id = memberships.user_id
+where memberships.club_id = ${sqlString(secondClubId)}
+  and lower(users.email) in (${emailList});
+
+delete from users
+where lower(email) in (${emailList})
+  and not exists (
+    select 1
+    from memberships
+    where memberships.user_id = users.id
+  );
+`);
+}
+
 function ensureViewerGoogleUserFixture(email: string, options: GoogleFixtureOptions = {}) {
   const normalizedEmail = normalizeEmail(email);
   const userId = randomUUID();

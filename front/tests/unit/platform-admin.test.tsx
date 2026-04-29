@@ -184,7 +184,7 @@ describe("platform admin frontend shell", () => {
           platformRole: "OPERATOR",
           activeClubCount: 2,
           domainActionRequiredCount: 1,
-          domainsRequiringAction: [
+          domains: [
             {
               id: "domain-1",
               clubId: "club-1",
@@ -198,7 +198,21 @@ describe("platform admin frontend shell", () => {
               verifiedAt: null,
               lastCheckedAt: null,
             },
+            {
+              id: "domain-2",
+              clubId: "club-1",
+              hostname: "failed.example.test",
+              kind: "SUBDOMAIN",
+              status: "FAILED",
+              desiredState: "ENABLED",
+              manualAction: "NONE",
+              errorCode: "DNS_NOT_CONNECTED",
+              isPrimary: false,
+              verifiedAt: null,
+              lastCheckedAt: null,
+            },
           ],
+          domainsRequiringAction: [],
         }}
       />,
     );
@@ -207,6 +221,9 @@ describe("platform admin frontend shell", () => {
     expect(screen.getByText("reading-sai.example.test")).toBeInTheDocument();
     expect(screen.getByText("ACTION_REQUIRED")).toBeInTheDocument();
     expect(screen.getByText("Cloudflare Pages custom domain 연결 후 상태 확인을 실행하세요.")).toBeInTheDocument();
+    expect(screen.getByText("failed.example.test")).toBeInTheDocument();
+    expect(screen.getByText("FAILED")).toBeInTheDocument();
+    expect(screen.getByText("DNS_NOT_CONNECTED")).toBeInTheDocument();
   });
 
   it("mounts the platform admin route at /admin", async () => {
