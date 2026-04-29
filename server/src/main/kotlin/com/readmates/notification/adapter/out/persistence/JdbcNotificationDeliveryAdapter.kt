@@ -63,13 +63,13 @@ class JdbcNotificationDeliveryAdapter(
     @Transactional
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> {
         val jdbcTemplate = jdbcTemplate()
-        verifyEventOutboxExists(jdbcTemplate, message)
-        val existingDeliveries = deliveryItemsForEvent(jdbcTemplate, message)
+        val persistedMessage = loadPersistedEventMessage(jdbcTemplate, message.eventId)
+        val existingDeliveries = deliveryItemsForEvent(jdbcTemplate, persistedMessage)
         if (existingDeliveries.isNotEmpty()) {
             return existingDeliveries
         }
 
-        val recipients = recipientsFor(jdbcTemplate, message)
+        val recipients = recipientsFor(jdbcTemplate, persistedMessage)
         if (recipients.isEmpty()) {
             return emptyList()
         }
@@ -97,9 +97,9 @@ class JdbcNotificationDeliveryAdapter(
             )
         }
 
-        insertDeliveryRows(jdbcTemplate, message, rows)
-        insertMemberNotifications(jdbcTemplate, message, recipients)
-        return deliveryItemsForEvent(jdbcTemplate, message)
+        insertDeliveryRows(jdbcTemplate, persistedMessage, rows)
+        insertMemberNotifications(jdbcTemplate, persistedMessage, recipients)
+        return deliveryItemsForEvent(jdbcTemplate, persistedMessage)
     }
 
     @Transactional
@@ -288,26 +288,19 @@ class JdbcNotificationDeliveryAdapter(
                 reviewRecipients(jdbcTemplate, message)
         }
 
-    private fun verifyEventOutboxExists(jdbcTemplate: JdbcTemplate, message: NotificationEventMessage) {
-        val exists = jdbcTemplate.queryForObject(
+    private fun loadPersistedEventMessage(jdbcTemplate: JdbcTemplate, eventId: UUID): NotificationEventMessage =
+        jdbcTemplate.query(
             """
-            select exists(
-              select 1
-              from notification_event_outbox
-              where id = ?
-                and club_id = ?
-            )
+            select id, club_id, event_type, aggregate_type, aggregate_id, payload_json, created_at
+            from notification_event_outbox
+            where id = ?
             """.trimIndent(),
-            Boolean::class.java,
-            message.eventId.dbString(),
-            message.clubId.dbString(),
-        ) ?: false
-        if (!exists) {
-            throw MissingNotificationEventOutboxException(
-                "Notification event outbox row not found for eventId=${message.eventId} clubId=${message.clubId}",
+            { resultSet, _ -> resultSet.toNotificationEventMessage() },
+            eventId.dbString(),
+        ).firstOrNull()
+            ?: throw MissingNotificationEventOutboxException(
+                "Notification event outbox row not found for eventId=$eventId",
             )
-        }
-    }
 
     private fun sessionViewerRecipients(
         jdbcTemplate: JdbcTemplate,
@@ -641,6 +634,17 @@ class JdbcNotificationDeliveryAdapter(
             bodyText = copy?.emailBodyText,
         )
     }
+
+    private fun ResultSet.toNotificationEventMessage(): NotificationEventMessage =
+        NotificationEventMessage(
+            eventId = uuid("id"),
+            clubId = uuid("club_id"),
+            eventType = NotificationEventType.valueOf(getString("event_type")),
+            aggregateType = getString("aggregate_type"),
+            aggregateId = uuid("aggregate_id"),
+            occurredAt = utcOffsetDateTime("created_at"),
+            payload = parsePayload(getString("payload_json")),
+        )
 
     private fun ResultSet.toClaimedNotificationDeliveryItem(): ClaimedNotificationDeliveryItem {
         val eventType = NotificationEventType.valueOf(getString("event_type"))
