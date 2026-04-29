@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InviteAcceptanceRouteContent } from "@/features/auth/route/invite-route";
+import { googleInviteHref } from "@/features/auth/model/invite-oauth";
 
 afterEach(() => {
   cleanup();
@@ -15,11 +16,25 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+const pendingPreview = {
+  clubName: "읽는사이",
+  clubSlug: "reading-sai",
+  canonicalPath: "/clubs/reading-sai/invite/raw-token",
+  email: "member@example.com",
+  name: "새멤버",
+  emailHint: "me****@example.com",
+  status: "PENDING" as const,
+  expiresAt: "2026-05-20T12:00:00Z",
+  canAccept: true,
+};
+
 describe("InviteAcceptanceRouteContent", () => {
   it("shows pending invitation details after the legacy password endpoint is gone", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       jsonResponse({
         clubName: "읽는사이",
+        clubSlug: "reading-sai",
+        canonicalPath: "/clubs/reading-sai/invite/raw-token",
         email: "member@example.com",
         name: "새멤버",
         emailHint: "me****@example.com",
@@ -45,7 +60,7 @@ describe("InviteAcceptanceRouteContent", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?inviteToken=raw-token",
+      `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
     );
     expect(screen.queryByLabelText("비밀번호")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("비밀번호 확인")).not.toBeInTheDocument();
@@ -57,6 +72,8 @@ describe("InviteAcceptanceRouteContent", () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       jsonResponse({
         clubName: "읽는사이",
+        clubSlug: "reading-sai",
+        canonicalPath: "/clubs/reading-sai/invite/raw-token",
         email: "member@example.com",
         name: "새멤버",
         emailHint: "me****@example.com",
@@ -72,9 +89,35 @@ describe("InviteAcceptanceRouteContent", () => {
     expect(await screen.findByText("member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?inviteToken=raw-token",
+      `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads club-scoped invitation previews from the route slug", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({
+        clubName: "읽는사이",
+        clubSlug: "reading-sai",
+        canonicalPath: "/clubs/reading-sai/invite/raw-token",
+        email: "member@example.com",
+        name: "새멤버",
+        emailHint: "me****@example.com",
+        status: "PENDING",
+        expiresAt: "2026-05-20T12:00:00Z",
+        canAccept: true,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<InviteAcceptanceRouteContent clubSlug="reading-sai" token="raw-token" />);
+
+    expect(await screen.findByText("member@example.com")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/clubs/reading-sai/invitations/raw-token");
+    expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
+      "href",
+      `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
+    );
   });
 
   it("renders expired invitation state", async () => {
@@ -85,6 +128,8 @@ describe("InviteAcceptanceRouteContent", () => {
         .mockResolvedValueOnce(
           jsonResponse({
             clubName: "읽는사이",
+            clubSlug: "reading-sai",
+            canonicalPath: "/clubs/reading-sai/invite/expired-token",
             email: "expired@example.com",
             name: "만료 멤버",
             emailHint: "ex****@example.com",
@@ -112,6 +157,8 @@ describe("InviteAcceptanceRouteContent", () => {
         .mockResolvedValueOnce(
           jsonResponse({
             clubName: "읽는사이",
+            clubSlug: "reading-sai",
+            canonicalPath: "/clubs/reading-sai/invite/accepted-token",
             email: "accepted@example.com",
             name: "수락 멤버",
             emailHint: "ac****@example.com",
@@ -135,6 +182,8 @@ describe("InviteAcceptanceRouteContent", () => {
       .mockResolvedValueOnce(
         jsonResponse({
           clubName: "읽는사이",
+          clubSlug: "reading-sai",
+          canonicalPath: "/clubs/reading-sai/invite/old-token",
           email: "old-member@example.com",
           name: "이전멤버",
           emailHint: "ol****@example.com",
@@ -156,7 +205,7 @@ describe("InviteAcceptanceRouteContent", () => {
     expect(await screen.findByText("old-member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?inviteToken=old-token",
+      `/oauth2/authorization/google?inviteToken=old-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/old-token")}`,
     );
 
     rerender(<InviteAcceptanceRouteContent token="new-token" />);
@@ -170,6 +219,8 @@ describe("InviteAcceptanceRouteContent", () => {
     resolveSecondPreview(
       jsonResponse({
         clubName: "읽는사이",
+        clubSlug: "reading-sai",
+        canonicalPath: "/clubs/reading-sai/invite/new-token",
         email: "new-member@example.com",
         name: "새멤버",
         emailHint: "ne****@example.com",
@@ -182,7 +233,87 @@ describe("InviteAcceptanceRouteContent", () => {
     expect(await screen.findByText("new-member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?inviteToken=new-token",
+      `/oauth2/authorization/google?inviteToken=new-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/new-token")}`,
+    );
+  });
+
+  it("clears previous invitation details when the route slug changes for the same token", async () => {
+    let resolveSecondPreview: (response: Response) => void = () => {};
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          clubName: "읽는사이",
+          clubSlug: "reading-sai",
+          canonicalPath: "/clubs/reading-sai/invite/shared-token",
+          email: "reading-member@example.com",
+          name: "읽는 멤버",
+          emailHint: "re****@example.com",
+          status: "PENDING",
+          expiresAt: "2026-05-20T12:00:00Z",
+          canAccept: true,
+        }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveSecondPreview = resolve;
+          }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { rerender } = render(<InviteAcceptanceRouteContent clubSlug="reading-sai" token="shared-token" />);
+
+    expect(await screen.findByText("reading-member@example.com")).toBeInTheDocument();
+
+    rerender(<InviteAcceptanceRouteContent clubSlug="sample-book-club" token="shared-token" />);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText("reading-member@example.com")).not.toBeInTheDocument());
+    expect(screen.queryByRole("link", { name: "Google로 초대 수락" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "초대장을 확인하는 중입니다." })).toBeInTheDocument();
+
+    resolveSecondPreview(
+      jsonResponse({
+        clubName: "샘플 독서클럽",
+        clubSlug: "sample-book-club",
+        canonicalPath: "/clubs/sample-book-club/invite/shared-token",
+        email: "sample-member@example.com",
+        name: "샘플 멤버",
+        emailHint: "sa****@example.com",
+        status: "PENDING",
+        expiresAt: "2026-05-21T12:00:00Z",
+        canAccept: true,
+      }),
+    );
+
+    expect(await screen.findByText("sample-member@example.com")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/bff/api/clubs/sample-book-club/invitations/shared-token");
+  });
+});
+
+describe("googleInviteHref", () => {
+  it("uses the canonical club path on local development origins", () => {
+    expect(
+      googleInviteHref("raw-token", pendingPreview, {
+        origin: "http://localhost:3100",
+        hostname: "localhost",
+        pathname: "/invite/raw-token",
+      }),
+    ).toBe(
+      `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
+    );
+  });
+
+  it("preserves the current custom-domain invite URL as OAuth returnTo", () => {
+    expect(
+      googleInviteHref("raw-token", pendingPreview, {
+        origin: "https://reading.example.test",
+        hostname: "reading.example.test",
+        pathname: "/invite/raw-token",
+      }),
+    ).toBe(
+      `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("https://reading.example.test/invite/raw-token")}`,
     );
   });
 });

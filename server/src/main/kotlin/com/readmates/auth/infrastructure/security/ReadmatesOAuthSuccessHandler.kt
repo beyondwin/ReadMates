@@ -46,10 +46,15 @@ class ReadmatesOAuthSuccessHandler(
                     email = oidcUser.email,
                     displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
                     profileImageUrl = oidcUser.getClaimAsString("picture"),
+                    expectedClubSlug = oauthReturnState.inviteClubSlugFromReturnState(signedReturnState, inviteToken),
                 )
                 OAuthLoginRedirect(
                     userId = acceptedMember.userId,
-                    returnTarget = oauthReturnState.inviteReturnTarget(acceptedMember.clubSlug, inviteToken),
+                    returnTarget = oauthReturnState.inviteReturnTargetFromState(
+                        signedState = signedReturnState,
+                        clubSlug = acceptedMember.clubSlug,
+                        inviteToken = inviteToken,
+                    ) ?: oauthReturnState.inviteReturnTarget(acceptedMember.clubSlug, inviteToken),
                 )
             } else {
                 val loginResult = googleLoginService.loginVerifiedGoogleUserForSession(

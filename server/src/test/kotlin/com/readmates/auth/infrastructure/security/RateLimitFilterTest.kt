@@ -45,6 +45,29 @@ class RateLimitFilterTest {
     }
 
     @Test
+    fun `rate limits club scoped invitation endpoints without leaking slug or token`() {
+        val port = RecordingRateLimitPort(RateLimitDecision.allowed())
+        val filter = RateLimitFilter(port, RateLimitProperties(enabled = true))
+
+        filter.doFilter(
+            MockHttpServletRequest("GET", "/api/clubs/reading-sai/invitations/raw-token"),
+            MockHttpServletResponse(),
+            MockFilterChain(),
+        )
+        filter.doFilter(
+            MockHttpServletRequest("POST", "/api/clubs/reading-sai/invitations/raw-token/accept"),
+            MockHttpServletResponse(),
+            MockFilterChain(),
+        )
+
+        assertEquals(2, port.checks.size)
+        assertTrue(port.checks[0].key.contains(":invite-preview:"))
+        assertTrue(port.checks[1].key.contains(":invite-accept:"))
+        assertFalse(port.checks.any { it.key.contains("reading-sai") })
+        assertFalse(port.checks.any { it.key.contains("raw-token") })
+    }
+
+    @Test
     fun `uses trusted bff client ip header for anonymous rate limit key`() {
         val port = RecordingRateLimitPort(RateLimitDecision.allowed())
         val filter = RateLimitFilter(port, RateLimitProperties(enabled = true), "test-bff-secret")

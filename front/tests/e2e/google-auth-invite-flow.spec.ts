@@ -21,8 +21,9 @@ function inviteTokenFromUrl(inviteUrl: string) {
 }
 
 function expectedGoogleInviteHref(inviteUrl: string) {
+  const url = new URL(inviteUrl, appOrigin);
   const token = inviteTokenFromUrl(inviteUrl);
-  return `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}`;
+  return `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}&returnTo=${encodeURIComponent(url.pathname)}`;
 }
 
 test.beforeEach(() => {

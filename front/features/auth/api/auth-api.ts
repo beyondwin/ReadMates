@@ -10,7 +10,13 @@ export async function submitDevLogin(email: string): Promise<Response> {
   });
 }
 
-export async function fetchInvitationPreview(token: string): Promise<Response> {
+export async function fetchInvitationPreview(token: string, clubSlug?: string): Promise<Response> {
+  if (clubSlug) {
+    return fetch(
+      `/api/bff/api/clubs/${encodeURIComponent(clubSlug)}/invitations/${encodeURIComponent(token)}`,
+    );
+  }
+
   return fetch(`/api/bff/api/invitations/${encodeURIComponent(token)}`);
 }
 

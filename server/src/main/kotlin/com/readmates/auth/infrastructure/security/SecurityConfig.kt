@@ -78,6 +78,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/me/notifications/read-all$")),
                     methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$")),
                     methodAndPath("POST", Regex("^/api/invitations/[^/]+/accept$")),
+                    methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$")),
                     methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$")),
                 )
             }
@@ -96,6 +97,8 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.GET, "/api/auth/me").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                     .requestMatchers("/api/invitations/**").permitAll()
+                    .requestMatchers(methodAndPath("GET", Regex("^/api/clubs/[^/]+/invitations/[^/]+$"))).permitAll()
+                    .requestMatchers(methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$"))).permitAll()
                     .requestMatchers(methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$"))).permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/sessions/current").hasAnyRole("HOST", "MEMBER", "VIEWER")
                     .requestMatchers(HttpMethod.GET, "/api/sessions/upcoming").hasAnyRole("HOST", "MEMBER", "VIEWER")

@@ -123,6 +123,8 @@ describe("SPA router", () => {
         return Promise.resolve(
           jsonResponse({
             clubName: "읽는사이",
+            clubSlug: "reading-sai",
+            canonicalPath: "/clubs/reading-sai/invite/raw-token",
             email: "member@example.com",
             name: "새멤버",
             emailHint: "me****@example.com",
@@ -143,7 +145,41 @@ describe("SPA router", () => {
     expect(await screen.findByText("member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
-      "/oauth2/authorization/google?inviteToken=raw-token",
+      `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
+    );
+  });
+
+  it("renders the club-scoped invite route with the route slug and token", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/clubs/reading-sai/invitations/raw-token") {
+        return Promise.resolve(
+          jsonResponse({
+            clubName: "읽는사이",
+            clubSlug: "reading-sai",
+            canonicalPath: "/clubs/reading-sai/invite/raw-token",
+            email: "member@example.com",
+            name: "새멤버",
+            emailHint: "me****@example.com",
+            status: "PENDING",
+            expiresAt: "2026-05-20T12:00:00Z",
+            canAccept: true,
+          }),
+        );
+      }
+
+      return Promise.resolve(jsonResponse({ authenticated: false }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai/invite/raw-token"] });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("member@example.com")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
+      "href",
+      `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
     );
   });
 

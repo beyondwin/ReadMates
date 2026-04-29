@@ -12,8 +12,9 @@ function resetSessionFlowState() {
 }
 
 function expectedGoogleInviteHref(inviteUrl: string) {
-  const token = new URL(inviteUrl, appOrigin).pathname.split("/").pop() ?? "";
-  return `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}`;
+  const url = new URL(inviteUrl, appOrigin);
+  const token = url.pathname.split("/").pop() ?? "";
+  return `/oauth2/authorization/google?inviteToken=${encodeURIComponent(token)}&returnTo=${encodeURIComponent(url.pathname)}`;
 }
 
 async function loginAsDevAccount(page: Page, accountName: RegExp) {

@@ -24,7 +24,7 @@ interface ManageHostInvitationsUseCase {
 }
 
 interface PreviewInvitationUseCase {
-    fun previewInvitation(rawToken: String): InvitationPreviewResponse
+    fun previewInvitation(rawToken: String, clubSlug: String? = null): InvitationPreviewResponse
 }
 
 interface ManageMemberApprovalsUseCase {

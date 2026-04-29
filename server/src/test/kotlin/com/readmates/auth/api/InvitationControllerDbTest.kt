@@ -44,12 +44,59 @@ class InvitationControllerDbTest(
             .andExpect {
                 status { isOk() }
                 jsonPath("$.clubName") { value("읽는사이") }
+                jsonPath("$.clubSlug") { value("reading-sai") }
+                jsonPath("$.canonicalPath") { value("/clubs/reading-sai/invite/$token") }
                 jsonPath("$.email") { value("preview.member@example.com") }
                 jsonPath("$.name") { value("미리보기 멤버") }
                 jsonPath("$.emailHint") { value("pr****@example.com") }
                 jsonPath("$.status") { value("PENDING") }
                 jsonPath("$.canAccept") { value(true) }
             }
+    }
+
+    @Test
+    fun `club scoped preview returns invitation when route slug matches token club`() {
+        val token = createInvitation("scoped.preview@example.com", "클럽 초대 멤버")
+
+        mockMvc.get("/api/clubs/reading-sai/invitations/$token")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.clubName") { value("읽는사이") }
+                jsonPath("$.clubSlug") { value("reading-sai") }
+                jsonPath("$.canonicalPath") { value("/clubs/reading-sai/invite/$token") }
+                jsonPath("$.email") { value("scoped.preview@example.com") }
+                jsonPath("$.status") { value("PENDING") }
+            }
+    }
+
+    @Test
+    fun `club scoped preview rejects route slug that does not match token club`() {
+        val token = createInvitation("wrong.club.preview@example.com", "다른 클럽 초대")
+
+        mockMvc.get("/api/clubs/sample-book-club/invitations/$token")
+            .andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("INVITATION_CLUB_MISMATCH") }
+            }
+    }
+
+    @Test
+    fun `club scoped password invitation accept endpoint is gone`() {
+        val token = createInvitation("scoped.accepted.member@example.com", "초대 멤버")
+
+        val result = mockMvc.post("/api/clubs/reading-sai/invitations/$token/accept") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "password": "correct horse battery staple",
+                  "passwordConfirmation": "correct horse battery staple"
+                }
+            """.trimIndent()
+        }.andExpect {
+            status { isGone() }
+        }.andReturn()
+
+        assertEquals("Password invitation acceptance has been removed", result.response.errorMessage)
     }
 
     @Test
@@ -326,6 +373,9 @@ class InvitationControllerDbTest(
             delete from invitations
             where invited_email in (
               'preview.member@example.com',
+              'scoped.preview@example.com',
+              'wrong.club.preview@example.com',
+              'scoped.accepted.member@example.com',
               'accepted.member@example.com',
               'intent.disabled@example.com',
               'intent.enabled@example.com',
