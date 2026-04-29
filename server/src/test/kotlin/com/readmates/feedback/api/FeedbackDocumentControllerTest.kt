@@ -338,6 +338,37 @@ class FeedbackDocumentControllerTest(
     }
 
     @Test
+    fun `uploaded feedback document stores title for list projection`() {
+        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+            with(user("host@example.com"))
+            file(validMarkdownFile())
+        }.andExpect {
+            status { isCreated() }
+            jsonPath("$.title") { value("독서모임 6차 피드백") }
+        }
+
+        mockMvc.get("/api/feedback-documents/me") {
+            with(user("host@example.com"))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$[?(@.sessionNumber == 6)].title") { value(hasItem("독서모임 6차 피드백")) }
+        }
+
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select document_title
+                from session_feedback_documents
+                where session_id = '00000000-0000-0000-0000-000000000306'
+                order by version desc
+                limit 1
+                """.trimIndent(),
+                String::class.java,
+            ),
+        ).isEqualTo("독서모임 6차 피드백")
+    }
+
+    @Test
     fun `host feedback upload enqueues attendee notification`() {
         mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
             with(user("host@example.com"))
