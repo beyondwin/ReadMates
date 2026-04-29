@@ -8,6 +8,9 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import java.util.UUID
 
+private const val MAX_HOST_LAST_ERROR_LENGTH = 200
+private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
+
 data class HostNotificationItemListResponse(
     val items: List<HostNotificationItemResponse>,
 )
@@ -86,7 +89,7 @@ fun HostNotificationDetail.toResponse(): HostNotificationDetailResponse =
         deepLinkPath = deepLinkPath,
         metadata = metadata,
         attemptCount = attemptCount,
-        lastError = lastError,
+        lastError = lastError.toHostSafeLastError(),
         createdAt = createdAt.toString(),
         updatedAt = updatedAt.toString(),
     )
@@ -106,3 +109,10 @@ private fun maskEmail(email: String): String {
 
     return "${local.first()}***@$domain"
 }
+
+private fun String?.toHostSafeLastError(): String? =
+    this
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+        ?.replace(EMAIL_LIKE_PATTERN, "[redacted-email]")
+        ?.take(MAX_HOST_LAST_ERROR_LENGTH)

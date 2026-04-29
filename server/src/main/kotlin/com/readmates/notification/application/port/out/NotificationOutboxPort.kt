@@ -24,6 +24,7 @@ interface NotificationOutboxPort {
     fun hostSummary(clubId: UUID): HostNotificationSummary
     fun listHostItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList
     fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail?
+    fun retryableHostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail?
     fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem?
     fun restoreDeadForClub(clubId: UUID, id: UUID): Boolean
     fun outboxBacklog(): NotificationOutboxBacklog

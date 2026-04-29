@@ -162,6 +162,8 @@ private class FixedBacklogNotificationOutboxPort(
 
     override fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
 
+    override fun retryableHostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
+
     override fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem? = null
 
     override fun restoreDeadForClub(clubId: UUID, id: UUID): Boolean = false

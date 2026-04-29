@@ -407,6 +407,22 @@ class JdbcNotificationOutboxAdapter(
             id.dbString(),
         ).firstOrNull()
 
+    override fun retryableHostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
+        jdbcTemplate().query(
+            """
+            select id, event_type, status, recipient_email, subject, deep_link_path, metadata,
+                   attempt_count, last_error, created_at, updated_at
+            from notification_outbox
+            where club_id = ?
+              and id = ?
+              and status in ('PENDING', 'FAILED')
+              and next_attempt_at <= utc_timestamp(6)
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationDetail() },
+            clubId.dbString(),
+            id.dbString(),
+        ).firstOrNull()
+
     @Transactional
     override fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem? {
         val jdbcTemplate = jdbcTemplate()
