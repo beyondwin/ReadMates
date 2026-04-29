@@ -922,6 +922,31 @@ function NotificationSwitchRow({
 }) {
   const id = useId();
   const descriptionId = useId();
+  const [isFocused, setFocused] = useState(false);
+  const trackStyle: CSSProperties = {
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+    width: "34px",
+    height: "18px",
+    padding: "2px",
+    borderRadius: "999px",
+    border: checked ? "1px solid var(--accent-line)" : "1px solid var(--line-soft)",
+    background: checked ? "var(--accent-soft)" : "var(--bg-sub)",
+    boxShadow: isFocused ? "0 0 0 3px var(--focus-ring-soft)" : "inset 0 1px 0 color-mix(in oklch, white 64%, transparent)",
+    opacity: disabled ? 0.58 : 1,
+    transition: "background 140ms ease, border-color 140ms ease, box-shadow 140ms ease, opacity 140ms ease",
+  };
+  const thumbStyle: CSSProperties = {
+    display: "block",
+    width: "12px",
+    height: "12px",
+    borderRadius: "999px",
+    background: checked ? "var(--accent)" : "var(--text-3)",
+    transform: checked ? "translateX(14px)" : "translateX(0)",
+    boxShadow: checked ? "0 2px 5px color-mix(in oklch, var(--accent), transparent 70%)" : "0 1px 3px color-mix(in oklch, black, transparent 84%)",
+    transition: "transform 140ms ease, background 140ms ease, box-shadow 140ms ease",
+  };
 
   return (
     <div
@@ -941,22 +966,40 @@ function NotificationSwitchRow({
           {sub}
         </div>
       </div>
-      <input
-        id={id}
-        type="checkbox"
-        role="switch"
-        aria-label={label}
-        aria-describedby={descriptionId}
-        checked={checked}
-        disabled={disabled}
-        onChange={(event) => onChange(event.currentTarget.checked)}
+      <label
+        htmlFor={id}
         style={{
-          width: "40px",
-          height: "22px",
-          accentColor: "var(--accent)",
+          position: "relative",
+          display: "inline-flex",
           flexShrink: 0,
+          cursor: disabled ? "not-allowed" : "pointer",
         }}
-      />
+      >
+        <input
+          id={id}
+          type="checkbox"
+          role="switch"
+          aria-label={label}
+          aria-describedby={descriptionId}
+          checked={checked}
+          disabled={disabled}
+          onChange={(event) => onChange(event.currentTarget.checked)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            margin: 0,
+            opacity: 0,
+            cursor: disabled ? "not-allowed" : "pointer",
+          }}
+        />
+        <span aria-hidden="true" style={trackStyle}>
+          <span style={thumbStyle} />
+        </span>
+      </label>
     </div>
   );
 }
