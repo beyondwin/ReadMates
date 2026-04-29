@@ -57,6 +57,20 @@ data class NotificationDeliveryItem(
     val bodyText: String?,
 )
 
+data class ClaimedNotificationDeliveryItem(
+    val id: UUID,
+    val eventId: UUID,
+    val clubId: UUID,
+    val recipientMembershipId: UUID,
+    val channel: NotificationChannel,
+    val status: NotificationDeliveryStatus,
+    val attemptCount: Int,
+    val lockedAt: OffsetDateTime,
+    val recipientEmail: String?,
+    val subject: String?,
+    val bodyText: String?,
+)
+
 data class MemberNotificationItem(
     val id: UUID,
     val eventId: UUID,
