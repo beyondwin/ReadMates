@@ -73,10 +73,10 @@ ReadMates는 제품 수준에서 invite-only 흐름을 사용합니다.
 - 초대 없이 Google로 로그인한 사용자는 둘러보기 멤버가 될 수 있고, 멤버 공개 예정 세션 같은 읽기 전용 멤버 화면 일부를 볼 수 있습니다.
 - 호스트는 둘러보기 멤버를 정식 멤버로 전환하거나, 정식 멤버를 현재 세션에서 제외/복구/비활성화/삭제하고 같은 클럽 멤버의 표시 이름을 정리할 수 있습니다.
 - 호스트는 여러 `DRAFT` 예정 세션을 준비하고 `HOST_ONLY`, `MEMBER`, `PUBLIC` 공개 범위를 지정할 수 있지만, 같은 클럽에서 현재 `OPEN` 세션은 하나만 시작할 수 있습니다. 진행이 끝난 세션은 `CLOSED`로 닫고, 공개 요약과 `MEMBER` 또는 `PUBLIC` 범위가 준비된 닫힌 기록만 `PUBLISHED`로 발행합니다.
-- 호스트는 `/app/host/notifications`에서 알림 outbox 상태를 보고 pending/failed 처리, `DEAD` 복구, 고정 템플릿 테스트 메일 audit 확인을 수행할 수 있습니다.
+- 호스트는 `/app/host/notifications`에서 notification event publication row와 channel delivery row를 보고, pending/failed email delivery 처리, `DEAD` delivery 복구, 고정 템플릿 테스트 메일 audit 확인을 수행할 수 있습니다.
 - 호스트 API는 활성 `host` role을 요구합니다.
 - 멤버 API는 허용된 `member` 상태를 요구하며, 현재 세션 쓰기는 해당 세션 참여 상태도 확인합니다. `/api/sessions/upcoming`은 `DRAFT`이면서 `MEMBER` 또는 `PUBLIC`인 세션만 반환합니다.
-- 멤버 알림 설정은 기존 운영 알림을 기본 켜짐으로, 서평 공개 알림을 기본 꺼짐으로 시작합니다.
+- 멤버 알림 설정은 기존 운영 알림을 기본 켜짐으로, 서평 공개 알림을 기본 꺼짐으로 시작합니다. 멤버 알림함은 `/app/notifications`에서 unread count, 개별 읽음, 전체 읽음 처리를 제공합니다.
 - 본인 프로필 수정은 인증된 멤버 앱 읽기 가능 상태에서만 허용하고, 같은 클럽 안의 표시 이름 중복과 예약어는 서버에서 막습니다.
 - Public API는 `sessions.state=PUBLISHED`이고 `public_session_publications.visibility=PUBLIC`인 공개 기록만 반환합니다.
 - 피드백 문서는 권한과 참석 여부를 통과한 정식 멤버 또는 호스트에게만 노출합니다.
