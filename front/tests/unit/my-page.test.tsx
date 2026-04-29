@@ -7,6 +7,7 @@ import type {
   FeedbackDocumentListItem,
   MemberProfileResponse,
   MyPageResponse,
+  NotificationPreferencesResponse,
 } from "@/features/archive/api/archive-contracts";
 import { myPageLoader } from "@/features/archive/route/my-page-data";
 import MyPage from "@/features/archive/ui/my-page";
@@ -143,6 +144,16 @@ const regularMemberAuth: AuthMeResponse = {
   role: "MEMBER",
 };
 
+const notificationPreferences: NotificationPreferencesResponse = {
+  emailEnabled: true,
+  events: {
+    NEXT_BOOK_PUBLISHED: true,
+    SESSION_REMINDER_DUE: true,
+    FEEDBACK_DOCUMENT_PUBLISHED: true,
+    REVIEW_PUBLISHED: false,
+  },
+};
+
 function memberProfileResponse(displayName: string): MemberProfileResponse {
   return {
     membershipId: "member-membership",
@@ -173,6 +184,8 @@ function renderMyPage(overrides: Partial<MyPageProps> = {}) {
     questionCount: 7,
     LogoutButtonComponent: TestLogoutButton,
     onLeaveMembership: testLeaveMembership,
+    notificationPreferences,
+    onSaveNotificationPreferences: async (preferences) => preferences,
     ...overrides,
   };
 
@@ -189,6 +202,8 @@ function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
     onLeaveMembership: testLeaveMembership,
     canEditProfile: true,
     onUpdateProfile: async (displayName: string) => memberProfileResponse(displayName),
+    notificationPreferences,
+    onSaveNotificationPreferences: async (preferences) => preferences,
     ...overrides,
   };
 
@@ -233,6 +248,10 @@ function renderMyRouteWithProfileFetch({
 
     if (url === "/api/bff/api/archive/me/reviews") {
       return Promise.resolve(jsonResponse(new Array(3).fill(null)));
+    }
+
+    if (url === "/api/bff/api/me/notifications/preferences") {
+      return Promise.resolve(jsonResponse(notificationPreferences));
     }
 
     if (url === "/api/bff/api/me/profile") {
@@ -593,6 +612,8 @@ describe("MyPage", () => {
                 questionCount={7}
                 LogoutButtonComponent={TestLogoutButton}
                 onLeaveMembership={testLeaveMembership}
+                notificationPreferences={notificationPreferences}
+                onSaveNotificationPreferences={async (preferences) => preferences}
               />
             }
           />
@@ -653,26 +674,61 @@ describe("MyPage", () => {
     const scoped = desktopScope(container);
 
     expect(scoped.getByText("알림")).toBeInTheDocument();
-    expect(scoped.getByText("다음 모임 7일 전 리마인더")).toBeInTheDocument();
-    expect(scoped.getByText("책·일정·미팅 URL")).toBeInTheDocument();
-    expect(scoped.getByText("질문 마감 전날 알림")).toBeInTheDocument();
+    expect(scoped.getByText("다음 책 공개")).toBeInTheDocument();
+    expect(scoped.getByText("예정 세션이 멤버에게 열릴 때")).toBeInTheDocument();
+    expect(scoped.getByText("모임 전날 리마인더")).toBeInTheDocument();
     expect(scoped.getByText("개인 설정")).toBeInTheDocument();
     expect(scoped.getByText("이름")).toBeInTheDocument();
     expect(scoped.getByText("기록 공개 범위")).toBeInTheDocument();
     expect(scoped.getByText("클럽 탈퇴 · 내 기록은 유지, 내 이름은 비공개 처리됩니다.")).toBeInTheDocument();
   });
 
-  it("renders notifications as read-only pending status rows", () => {
+  it("renders editable notification preferences and saves changes", async () => {
+    const user = userEvent.setup();
+    const onSaveNotificationPreferences = vi.fn().mockResolvedValue({
+      ...notificationPreferences,
+      emailEnabled: false,
+    });
+    const { container } = renderMyPage({ onSaveNotificationPreferences });
+    const scoped = desktopScope(container);
+
+    await user.click(scoped.getByRole("switch", { name: "이메일 알림" }));
+    await user.click(scoped.getByRole("button", { name: "알림 설정 저장" }));
+
+    expect(onSaveNotificationPreferences).toHaveBeenCalledWith({
+      emailEnabled: false,
+      events: notificationPreferences.events,
+    });
+  });
+
+  it("keeps edited notification preferences visible after a save failure", async () => {
+    const user = userEvent.setup();
+    const onSaveNotificationPreferences = vi.fn().mockRejectedValue(new Error("temporary failure"));
+    const { container } = renderMyPage({ onSaveNotificationPreferences });
+    const scoped = desktopScope(container);
+
+    await user.click(scoped.getByRole("switch", { name: "모임 전날 리마인더" }));
+    await user.click(scoped.getByRole("button", { name: "알림 설정 저장" }));
+
+    expect(await scoped.findByRole("alert")).toHaveTextContent(
+      "알림 설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    );
+    expect(scoped.getByRole("switch", { name: "모임 전날 리마인더" })).not.toBeChecked();
+  });
+
+  it("disables event notification controls while preserving their choices when email is off", async () => {
+    const user = userEvent.setup();
     const { container } = renderMyPage();
     const scoped = desktopScope(container);
-    const reminderRow = scoped.getByText("다음 모임 7일 전 리마인더").closest(".row-between") as HTMLElement;
-    const reviewRow = scoped.getByText("다른 멤버의 서평 공개").closest(".row-between") as HTMLElement;
+    const reminderSwitch = scoped.getByRole("switch", { name: "모임 전날 리마인더" });
 
-    expect(scoped.queryAllByRole("switch")).toHaveLength(0);
-    expect(within(reminderRow).getByText("준비 중")).toBeInTheDocument();
-    expect(within(reviewRow).getByText("준비 중")).toBeInTheDocument();
-    expect(scoped.getByLabelText("다음 모임 7일 전 리마인더 알림 설정 준비 중")).toBeInTheDocument();
-    expect(scoped.getByLabelText("다른 멤버의 서평 공개 알림 설정 준비 중")).toBeInTheDocument();
+    expect(reminderSwitch).toBeChecked();
+
+    await user.click(scoped.getByRole("switch", { name: "이메일 알림" }));
+
+    expect(reminderSwitch).toBeChecked();
+    expect(reminderSwitch).toBeDisabled();
+    expect(scoped.getAllByText("전체 알림 꺼짐")).toHaveLength(4);
   });
 
   it("uses contextual names for read-only account preference states", () => {
@@ -861,6 +917,10 @@ describe("MyPage", () => {
 
       if (url === "/api/bff/api/archive/me/questions" || url === "/api/bff/api/archive/me/reviews") {
         return Promise.resolve(jsonResponse([]));
+      }
+
+      if (url === "/api/bff/api/me/notifications/preferences") {
+        return Promise.resolve(jsonResponse(notificationPreferences));
       }
 
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));

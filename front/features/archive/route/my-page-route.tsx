@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useLoaderData, useRevalidator } from "react-router-dom";
-import { leaveMembership, updateMyProfile } from "@/features/archive/api/archive-api";
+import { leaveMembership, saveNotificationPreferences, updateMyProfile } from "@/features/archive/api/archive-api";
 import type { MemberProfileErrorCode, MemberProfileResponse } from "@/features/archive/api/archive-contracts";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import type { MyPageRouteData } from "@/features/archive/route/my-page-data";
@@ -68,6 +68,8 @@ export function MyPageRoute({
       onLeaveMembership={submitLeaveMembership}
       canEditProfile={canEditProfile}
       onUpdateProfile={submitProfileUpdate}
+      notificationPreferences={data.notificationPreferences}
+      onSaveNotificationPreferences={saveNotificationPreferences}
     />
   );
 }

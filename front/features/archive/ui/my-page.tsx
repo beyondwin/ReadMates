@@ -1,11 +1,17 @@
 import { type CSSProperties, type FormEvent, type ReactNode, useId, useRef, useState } from "react";
-import type { FeedbackDocumentListItem, MyPageProfile } from "@/features/archive/model/archive-model";
+import type {
+  FeedbackDocumentListItem,
+  MyPageProfile,
+  NotificationPreferences,
+} from "@/features/archive/model/archive-model";
 import {
   attendanceSummary,
   clubDisplayName,
   feedbackReportActionLabel,
   formatJoinedMonth,
   membershipIdentityLabel,
+  notificationEventLabels,
+  notificationEventOrder,
   profileSaveErrorMessage,
 } from "@/features/archive/model/archive-model";
 import { Link } from "@/features/archive/ui/archive-link";
@@ -13,13 +19,6 @@ import { appFeedbackHref, readmatesReturnState } from "@/features/archive/ui/arc
 import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
-
-const notifications = [
-  { label: "다음 모임 7일 전 리마인더", sub: "책·일정·미팅 URL" },
-  { label: "질문 마감 전날 알림", sub: "모임 전날 21시" },
-  { label: "피드백 문서 등록 알림", sub: "내 문서가 올라오면" },
-  { label: "다른 멤버의 서평 공개", sub: "같은 책에 한해" },
-];
 
 const profileFailureMessages = new Set([
   profileSaveErrorMessage("DISPLAY_NAME_REQUIRED"),
@@ -44,6 +43,8 @@ type MyPageProps = {
   onLeaveMembership: () => Promise<void>;
   canEditProfile?: boolean;
   onUpdateProfile?: (displayName: string) => Promise<ProfileUpdateResult>;
+  notificationPreferences: NotificationPreferences;
+  onSaveNotificationPreferences: (preferences: NotificationPreferences) => Promise<NotificationPreferences>;
 };
 
 type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "accountName">;
@@ -63,6 +64,8 @@ export default function MyPage({
   onLeaveMembership,
   canEditProfile = false,
   onUpdateProfile,
+  notificationPreferences,
+  onSaveNotificationPreferences,
 }: MyPageProps) {
   const [profileOverrideState, setProfileOverrideState] = useState<{
     sourceData: MyPageProfile;
@@ -100,6 +103,8 @@ export default function MyPage({
           onLeaveMembership={onLeaveMembership}
           canEditProfile={profileUpdateEnabled}
           onUpdateProfile={submitProfileUpdate}
+          notificationPreferences={notificationPreferences}
+          onSaveNotificationPreferences={onSaveNotificationPreferences}
         />
       </div>
       <div className="mobile-only">
@@ -127,6 +132,8 @@ function MyDesktop({
   onLeaveMembership,
   canEditProfile,
   onUpdateProfile,
+  notificationPreferences,
+  onSaveNotificationPreferences,
 }: {
   data: MyPageProfile;
   reports: FeedbackDocumentListItem[];
@@ -136,6 +143,8 @@ function MyDesktop({
   onLeaveMembership: () => Promise<void>;
   canEditProfile: boolean;
   onUpdateProfile: (displayName: string) => Promise<ProfileUpdateResult>;
+  notificationPreferences: NotificationPreferences;
+  onSaveNotificationPreferences: (preferences: NotificationPreferences) => Promise<NotificationPreferences>;
 }) {
   return (
     <>
@@ -163,7 +172,7 @@ function MyDesktop({
           </div>
 
           <div className="stack" style={{ "--stack": "36px" } as CSSProperties}>
-            <NotificationsSection />
+            <NotificationsSection preferences={notificationPreferences} onSave={onSaveNotificationPreferences} />
             <PreferencesSection data={data} canEditProfile={canEditProfile} onUpdateProfile={onUpdateProfile} />
             <DangerZone onLeaveMembership={onLeaveMembership} />
           </div>
@@ -738,46 +747,159 @@ function WritingCountCard({ label, value, body, href }: { label: string; value: 
   );
 }
 
-function NotificationsSection() {
+function NotificationsSection({
+  preferences,
+  onSave,
+}: {
+  preferences: NotificationPreferences;
+  onSave: (preferences: NotificationPreferences) => Promise<NotificationPreferences>;
+}) {
+  const [draftState, setDraftState] = useState({ source: preferences, draft: preferences });
+  const draft = draftState.source === preferences ? draftState.draft : preferences;
+  const [saving, setSaving] = useState(false);
+  const [errorState, setErrorState] = useState<{ source: NotificationPreferences; message: string | null }>({
+    source: preferences,
+    message: null,
+  });
+  const error = errorState.source === preferences ? errorState.message : null;
+  const savingRef = useRef(false);
+
+  function setDraft(updater: (current: NotificationPreferences) => NotificationPreferences) {
+    setDraftState({ source: preferences, draft: updater(draft) });
+  }
+
+  function setError(message: string | null) {
+    setErrorState({ source: preferences, message });
+  }
+
+  async function submitNotificationPreferences() {
+    if (savingRef.current) {
+      return;
+    }
+
+    savingRef.current = true;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const saved = await onSave(draft);
+      setDraftState({ source: preferences, draft: saved });
+    } catch {
+      setError("알림 설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+
   return (
     <section>
-      <SectionHeader eyebrow="읽기 전용 설정" title="알림" />
+      <SectionHeader eyebrow="설정" title="알림" />
       <div className="surface" style={{ padding: "6px" }}>
-        {notifications.map((notification, index) => (
-          <div
-            key={notification.label}
-            className="row-between"
-            style={{ padding: "14px 18px", borderTop: index === 0 ? "none" : "1px solid var(--line-soft)" }}
-          >
-            <div>
-              <div className="body" style={{ fontSize: "14px", fontWeight: 500 }}>
-                {notification.label}
-              </div>
-              <div className="tiny">{notification.sub}</div>
-            </div>
-            <span
-              className="tiny"
-              aria-label={`${notification.label} 알림 설정 준비 중`}
-              style={{
-                minWidth: "74px",
-                height: "24px",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "0 9px",
-                borderRadius: 999,
-                border: "1px solid var(--line-soft)",
-                color: "var(--text-3)",
-                background: "var(--bg-sub)",
-                flexShrink: 0,
-              }}
-            >
-              준비 중
-            </span>
-          </div>
+        <NotificationSwitchRow
+          label="이메일 알림"
+          sub="ReadMates에서 보내는 이메일 알림 전체"
+          checked={draft.emailEnabled}
+          disabled={saving}
+          first
+          onChange={(checked) => {
+            setDraft((current) => ({ ...current, emailEnabled: checked }));
+            setError(null);
+          }}
+        />
+        {notificationEventOrder.map((event) => (
+          <NotificationSwitchRow
+            key={event}
+            label={notificationEventLabels[event].label}
+            sub={draft.emailEnabled ? notificationEventLabels[event].sub : "전체 알림 꺼짐"}
+            checked={draft.events[event]}
+            disabled={saving || !draft.emailEnabled}
+            onChange={(checked) => {
+              setDraft((current) => ({ ...current, events: { ...current.events, [event]: checked } }));
+              setError(null);
+            }}
+          />
         ))}
+        {error ? (
+          <div
+            className="small"
+            role="alert"
+            style={{
+              margin: "10px 12px 0",
+              color: "var(--danger)",
+              wordBreak: "keep-all",
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "14px 12px 12px" }}>
+          <button
+            className="btn btn-primary btn-sm"
+            type="button"
+            disabled={saving}
+            onClick={() => void submitNotificationPreferences()}
+          >
+            {saving ? "저장 중" : "알림 설정 저장"}
+          </button>
+        </div>
       </div>
     </section>
+  );
+}
+
+function NotificationSwitchRow({
+  label,
+  sub,
+  checked,
+  disabled = false,
+  first = false,
+  onChange,
+}: {
+  label: string;
+  sub: string;
+  checked: boolean;
+  disabled?: boolean;
+  first?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const id = useId();
+  const descriptionId = useId();
+
+  return (
+    <div
+      className="row-between"
+      style={{
+        padding: "14px 18px",
+        borderTop: first ? "none" : "1px solid var(--line-soft)",
+        alignItems: "center",
+      }}
+    >
+      <div style={{ minWidth: 0 }}>
+        <label className="body" htmlFor={id} style={{ display: "block", fontSize: "14px", fontWeight: 500 }}>
+          {label}
+        </label>
+        <div id={descriptionId} className="tiny" style={{ color: disabled ? "var(--text-3)" : undefined, wordBreak: "keep-all" }}>
+          {sub}
+        </div>
+      </div>
+      <input
+        id={id}
+        type="checkbox"
+        role="switch"
+        aria-label={label}
+        aria-describedby={descriptionId}
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange(event.currentTarget.checked)}
+        style={{
+          width: "40px",
+          height: "22px",
+          accentColor: "var(--accent)",
+          flexShrink: 0,
+        }}
+      />
+    </div>
   );
 }
 
