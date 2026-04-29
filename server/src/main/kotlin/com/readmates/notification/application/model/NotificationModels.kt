@@ -1,9 +1,85 @@
 package com.readmates.notification.application.model
 
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
+import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
+
+data class NotificationEventPayload(
+    val sessionId: UUID? = null,
+    val sessionNumber: Int? = null,
+    val bookTitle: String? = null,
+    val documentVersion: Int? = null,
+    val authorMembershipId: UUID? = null,
+    val targetDate: LocalDate? = null,
+)
+
+data class NotificationEventOutboxItem(
+    val id: UUID,
+    val clubId: UUID,
+    val eventType: NotificationEventType,
+    val aggregateType: String,
+    val aggregateId: UUID,
+    val payload: NotificationEventPayload,
+    val status: NotificationEventOutboxStatus,
+    val kafkaTopic: String,
+    val kafkaKey: String,
+    val attemptCount: Int,
+    val lockedAt: OffsetDateTime,
+)
+
+data class NotificationEventMessage(
+    val schemaVersion: Int = 1,
+    val eventId: UUID,
+    val clubId: UUID,
+    val eventType: NotificationEventType,
+    val aggregateType: String,
+    val aggregateId: UUID,
+    val occurredAt: OffsetDateTime,
+    val payload: NotificationEventPayload,
+)
+
+data class NotificationDeliveryItem(
+    val id: UUID,
+    val eventId: UUID,
+    val clubId: UUID,
+    val recipientMembershipId: UUID,
+    val channel: NotificationChannel,
+    val status: NotificationDeliveryStatus,
+    val attemptCount: Int,
+    val lockedAt: OffsetDateTime?,
+    val recipientEmail: String?,
+    val subject: String?,
+    val bodyText: String?,
+)
+
+data class MemberNotificationItem(
+    val id: UUID,
+    val eventId: UUID,
+    val eventType: NotificationEventType,
+    val title: String,
+    val body: String,
+    val deepLinkPath: String,
+    val readAt: OffsetDateTime?,
+    val createdAt: OffsetDateTime,
+) {
+    val isUnread: Boolean = readAt == null
+}
+
+data class MemberNotificationList(
+    val items: List<MemberNotificationItem>,
+    val unreadCount: Int,
+)
+
+fun notificationDeliveryDedupeKey(
+    eventId: UUID,
+    recipientMembershipId: UUID,
+    channel: NotificationChannel,
+): String = "$eventId:$recipientMembershipId:${channel.name}"
 
 data class NotificationOutboxItem(
     val id: UUID,
