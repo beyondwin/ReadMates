@@ -15,6 +15,8 @@ private data class ArchiveReviewWriteTarget(
     val sessionId: UUID,
     val clubId: UUID,
     val membershipId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
     val previousVisibility: String?,
 )
 
@@ -29,6 +31,8 @@ class JdbcMemberArchiveReviewWriteAdapter(
             select
               sessions.id as session_id,
               sessions.club_id as club_id,
+              sessions.number as session_number,
+              sessions.book_title,
               session_participants.membership_id,
               long_reviews.visibility as previous_visibility
             from sessions
@@ -71,6 +75,8 @@ class JdbcMemberArchiveReviewWriteAdapter(
 
         return SaveMemberArchiveLongReviewResult(
             sessionId = target.sessionId,
+            sessionNumber = target.sessionNumber,
+            bookTitle = target.bookTitle,
             body = command.body,
             newlyPublic = target.previousVisibility != "PUBLIC",
         )
@@ -81,6 +87,8 @@ class JdbcMemberArchiveReviewWriteAdapter(
             sessionId = uuid("session_id"),
             clubId = uuid("club_id"),
             membershipId = uuid("membership_id"),
+            sessionNumber = getInt("session_number"),
+            bookTitle = getString("book_title"),
             previousVisibility = getString("previous_visibility"),
         )
 }

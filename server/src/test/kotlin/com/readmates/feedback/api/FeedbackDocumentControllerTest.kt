@@ -386,6 +386,8 @@ class FeedbackDocumentControllerTest(
             select
               dedupe_key,
               json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
               cast(json_unquote(json_extract(payload_json, '$.documentVersion')) as signed) as document_version
             from notification_event_outbox
             where event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
@@ -406,6 +408,8 @@ class FeedbackDocumentControllerTest(
             "feedback-document:00000000-0000-0000-0000-000000000306:$documentVersion",
         )
         assertThat(event["session_id"]).isEqualTo("00000000-0000-0000-0000-000000000306")
+        assertThat((event["session_number"] as Number).toInt()).isEqualTo(6)
+        assertThat(event["book_title"]).isEqualTo("가난한 찰리의 연감")
         assertThat((event["document_version"] as Number).toInt()).isEqualTo(documentVersion)
     }
 

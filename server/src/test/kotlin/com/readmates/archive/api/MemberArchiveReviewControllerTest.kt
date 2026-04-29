@@ -81,6 +81,8 @@ class MemberArchiveReviewControllerTest(
             select
               dedupe_key,
               json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
               json_unquote(json_extract(payload_json, '$.authorMembershipId')) as author_membership_id
             from notification_event_outbox
             where event_type = 'REVIEW_PUBLISHED'
@@ -91,6 +93,8 @@ class MemberArchiveReviewControllerTest(
             "review-published:00000000-0000-0000-0000-000000000306:$authorMembershipId",
         )
         assertThat(event["session_id"]).isEqualTo("00000000-0000-0000-0000-000000000306")
+        assertThat((event["session_number"] as Number).toInt()).isEqualTo(6)
+        assertThat(event["book_title"]).isEqualTo("가난한 찰리의 연감")
         assertThat(event["author_membership_id"]).isEqualTo(authorMembershipId)
     }
 

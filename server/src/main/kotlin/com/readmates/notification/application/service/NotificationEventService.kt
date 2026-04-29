@@ -17,6 +17,8 @@ class NotificationEventService(
     override fun recordFeedbackDocumentPublished(
         clubId: UUID,
         sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
         documentVersion: Int,
     ) {
         eventOutboxPort.enqueueEvent(
@@ -26,6 +28,8 @@ class NotificationEventService(
             aggregateId = sessionId,
             payload = NotificationEventPayload(
                 sessionId = sessionId,
+                sessionNumber = sessionNumber,
+                bookTitle = bookTitle,
                 documentVersion = documentVersion,
             ),
             dedupeKey = "feedback-document:$sessionId:$documentVersion",
@@ -55,6 +59,8 @@ class NotificationEventService(
     override fun recordReviewPublished(
         clubId: UUID,
         sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
         authorMembershipId: UUID,
     ) {
         eventOutboxPort.enqueueEvent(
@@ -64,6 +70,8 @@ class NotificationEventService(
             aggregateId = sessionId,
             payload = NotificationEventPayload(
                 sessionId = sessionId,
+                sessionNumber = sessionNumber,
+                bookTitle = bookTitle,
                 authorMembershipId = authorMembershipId,
             ),
             dedupeKey = "review-published:$sessionId:$authorMembershipId",
