@@ -2389,7 +2389,7 @@ git commit -m "feat: show kafka notification ledger"
 - Create: `server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt`
 - Modify: `server/src/test/resources/application.yml` if test properties are needed.
 
-- [ ] **Step 1: Write integration test**
+- [x] **Step 1: Write integration test**
 
 Create `NotificationKafkaPipelineIntegrationTest.kt`:
 
@@ -2458,7 +2458,7 @@ object TestKafkaSink {
 }
 ```
 
-- [ ] **Step 2: Add Awaitility dependency if absent**
+- [x] **Step 2: Add Awaitility dependency if absent**
 
 If the test does not compile because Awaitility is missing, add to `server/build.gradle.kts`:
 
@@ -2466,7 +2466,7 @@ If the test does not compile because Awaitility is missing, add to `server/build
 testImplementation("org.awaitility:awaitility-kotlin:4.2.2")
 ```
 
-- [ ] **Step 3: Run integration test**
+- [x] **Step 3: Run integration test**
 
 Run:
 
@@ -2476,7 +2476,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt server/build.gradle.kts server/src/test/resources/application.yml
