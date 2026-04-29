@@ -19,7 +19,10 @@ function toSafeAppHref(value: string) {
       return null;
     }
 
-    const isAppHref = url.pathname === "/app" || url.pathname.startsWith("/app/");
+    const isAppHref =
+      url.pathname === "/app" ||
+      url.pathname.startsWith("/app/") ||
+      /^\/clubs\/[^/]+\/app(?:\/|$)/.test(url.pathname);
     return isAppHref ? `${url.pathname}${url.search}${url.hash}` : null;
   } catch {
     return null;

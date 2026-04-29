@@ -1,4 +1,4 @@
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
+import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
 import type {
   ArchiveSessionItem,
   CurrentSessionPolicy,
@@ -23,20 +23,20 @@ function jsonRequest(init: Omit<RequestInit, "headers" | "body">, body: unknown)
   };
 }
 
-export async function fetchArchiveSessions() {
-  return readmatesFetch<ArchiveSessionItem[]>("/api/archive/sessions");
+export async function fetchArchiveSessions(context?: ReadmatesApiContext) {
+  return readmatesFetch<ArchiveSessionItem[]>("/api/archive/sessions", undefined, context);
 }
 
-export async function fetchMyArchiveQuestions() {
-  return readmatesFetch<MyArchiveQuestionItem[]>("/api/archive/me/questions");
+export async function fetchMyArchiveQuestions(context?: ReadmatesApiContext) {
+  return readmatesFetch<MyArchiveQuestionItem[]>("/api/archive/me/questions", undefined, context);
 }
 
-export async function fetchMyArchiveReviews() {
-  return readmatesFetch<MyArchiveReviewItem[]>("/api/archive/me/reviews");
+export async function fetchMyArchiveReviews(context?: ReadmatesApiContext) {
+  return readmatesFetch<MyArchiveReviewItem[]>("/api/archive/me/reviews", undefined, context);
 }
 
-export async function fetchMyFeedbackDocuments(): Promise<FeedbackDocumentListItem[]> {
-  const response = await readmatesFetchResponse("/api/feedback-documents/me");
+export async function fetchMyFeedbackDocuments(context?: ReadmatesApiContext): Promise<FeedbackDocumentListItem[]> {
+  const response = await readmatesFetchResponse("/api/feedback-documents/me", undefined, context);
 
   if (response.status === 403) {
     return [];
@@ -49,8 +49,8 @@ export async function fetchMyFeedbackDocuments(): Promise<FeedbackDocumentListIt
   return response.json() as Promise<FeedbackDocumentListItem[]>;
 }
 
-export async function fetchMemberArchiveSession(sessionId: string) {
-  const response = await readmatesFetchResponse(`/api/archive/sessions/${encodeURIComponent(sessionId)}`);
+export async function fetchMemberArchiveSession(sessionId: string, context?: ReadmatesApiContext) {
+  const response = await readmatesFetchResponse(`/api/archive/sessions/${encodeURIComponent(sessionId)}`, undefined, context);
 
   if (response.status === 404) {
     return null;
@@ -63,8 +63,8 @@ export async function fetchMemberArchiveSession(sessionId: string) {
   return response.json() as Promise<MemberArchiveSessionDetailResponse>;
 }
 
-export async function fetchMyPage() {
-  return readmatesFetch<MyPageResponse>("/api/app/me");
+export async function fetchMyPage(context?: ReadmatesApiContext) {
+  return readmatesFetch<MyPageResponse>("/api/app/me", undefined, context);
 }
 
 export async function updateMyProfile(displayName: string) {
@@ -76,12 +76,12 @@ export async function updateMyProfile(displayName: string) {
   ) as Promise<Response & { json(): Promise<MemberProfileResponse> }>;
 }
 
-export async function fetchNoteSessions() {
-  return readmatesFetch<NoteSessionItem[]>("/api/notes/sessions");
+export async function fetchNoteSessions(context?: ReadmatesApiContext) {
+  return readmatesFetch<NoteSessionItem[]>("/api/notes/sessions", undefined, context);
 }
 
-export async function fetchNotesFeed(sessionId: string) {
-  return readmatesFetch<NoteFeedItem[]>(`/api/notes/feed?sessionId=${encodeURIComponent(sessionId)}`);
+export async function fetchNotesFeed(sessionId: string, context?: ReadmatesApiContext) {
+  return readmatesFetch<NoteFeedItem[]>(`/api/notes/feed?sessionId=${encodeURIComponent(sessionId)}`, undefined, context);
 }
 
 export async function leaveMembership(currentSessionPolicy: CurrentSessionPolicy = "APPLY_NOW") {
@@ -91,8 +91,8 @@ export async function leaveMembership(currentSessionPolicy: CurrentSessionPolicy
   );
 }
 
-export function fetchNotificationPreferences() {
-  return readmatesFetch<NotificationPreferencesResponse>("/api/me/notifications/preferences");
+export function fetchNotificationPreferences(context?: ReadmatesApiContext) {
+  return readmatesFetch<NotificationPreferencesResponse>("/api/me/notifications/preferences", undefined, context);
 }
 
 export function saveNotificationPreferences(request: NotificationPreferencesRequest) {

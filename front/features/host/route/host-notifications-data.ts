@@ -14,7 +14,9 @@ import type {
   HostNotificationSummary,
   NotificationTestMailAuditItem,
 } from "@/features/host/api/host-contracts";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 export type HostNotificationsRouteData = {
   summary: HostNotificationSummary;
@@ -23,14 +25,15 @@ export type HostNotificationsRouteData = {
   audit: NotificationTestMailAuditItem[];
 };
 
-export async function hostNotificationsLoader(): Promise<HostNotificationsRouteData> {
-  await requireHostLoaderAuth();
+export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promise<HostNotificationsRouteData> {
+  await requireHostLoaderAuth(args);
+  const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
   const [summary, events, deliveries, audit] = await Promise.all([
-    fetchHostNotificationSummary(),
-    fetchHostNotificationEvents(),
-    fetchHostNotificationDeliveries(),
-    fetchHostNotificationTestMailAudit(),
+    fetchHostNotificationSummary(context),
+    fetchHostNotificationEvents(context),
+    fetchHostNotificationDeliveries(context),
+    fetchHostNotificationTestMailAudit(context),
   ]);
 
   return { summary, events: events.items, deliveries: deliveries.items, audit };

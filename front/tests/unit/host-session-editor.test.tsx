@@ -536,6 +536,30 @@ describe("HostSessionEditor", () => {
     expect(location.href).toBe("/app/host/sessions/created-session-8/edit");
   });
 
+  it("keeps new-session save redirects inside the scoped host route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ sessionId: "created-session-8" }),
+    });
+    const location = { href: "", pathname: "/clubs/reading-sai/app/host/sessions/new" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditorForTest />);
+
+    await user.clear(screen.getByLabelText("세션 제목"));
+    await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
+    await user.type(screen.getByLabelText("책 제목"), "새 책");
+    await user.type(screen.getByLabelText("저자"), "새 저자");
+    await user.clear(screen.getByLabelText("모임 날짜"));
+    await user.type(screen.getByLabelText("모임 날짜"), "2026-05-20");
+    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/created-session-8/edit");
+  });
+
   it("patches the existing session with the persisted non-default start time when editing", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     const location = { href: "" };
@@ -1143,6 +1167,37 @@ describe("HostSessionEditor", () => {
       })),
     );
     expect(location.href).toBe("/app/host/sessions/new");
+  });
+
+  it("keeps delete redirects inside the scoped host route", async () => {
+    const location = { href: "", pathname: "/clubs/reading-sai/app/host/sessions/open-session-7/edit" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue(deletionPreview),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          sessionId: "open-session-7",
+          sessionNumber: 7,
+          deleted: true,
+          counts: deletionPreview.counts,
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditorForTest session={openSession} />);
+
+    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/new");
   });
 
   it("keeps keyboard focus inside the delete modal and restores focus when Escape closes", async () => {

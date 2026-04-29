@@ -8,7 +8,8 @@ import type {
   MemberHomeNoteFeedItem,
   MemberHomeUpcomingSession,
 } from "@/features/member-home/api/member-home-contracts";
-import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
+import type { LoaderFunctionArgs } from "react-router-dom";
+import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 
 export type MemberHomeRouteData = {
   current: MemberHomeCurrentSessionResponse;
@@ -16,8 +17,9 @@ export type MemberHomeRouteData = {
   upcomingSessions: MemberHomeUpcomingSession[];
 };
 
-export async function memberHomeLoader(): Promise<MemberHomeRouteData> {
-  const access = await loadMemberAppAuth();
+export async function memberHomeLoader(args?: LoaderFunctionArgs): Promise<MemberHomeRouteData> {
+  const access = await loadMemberAppAuth(args);
+  const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
   if (!access.allowed) {
     return {
@@ -28,9 +30,9 @@ export async function memberHomeLoader(): Promise<MemberHomeRouteData> {
   }
 
   const [current, noteFeedItems, upcomingSessions] = await Promise.all([
-    fetchMemberHomeCurrentSession(),
-    fetchMemberHomeNoteFeed(),
-    fetchMemberHomeUpcomingSessions(),
+    fetchMemberHomeCurrentSession(context),
+    fetchMemberHomeNoteFeed(context),
+    fetchMemberHomeUpcomingSessions(context),
   ]);
 
   return { current, noteFeedItems, upcomingSessions };

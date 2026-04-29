@@ -18,10 +18,10 @@ const viewerAuth: AuthMeResponse = {
   approvalState: "VIEWER",
 };
 
-function renderPendingPage(auth: AuthMeResponse) {
+function renderPendingPage(auth: AuthMeResponse, initialEntry = "/app/pending") {
   return render(
     <AuthContext.Provider value={{ status: "ready", auth }}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <PendingApprovalPage />
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -44,6 +44,19 @@ describe("PendingApprovalPage", () => {
     expect(screen.getByText("초대 링크를 받았다면 해당 링크에서 같은 Google 계정으로 수락해 주세요.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute("href", "/app/archive");
     expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute("href", "/app/session/current");
+  });
+
+  it("keeps member-app CTAs inside the scoped pending route", () => {
+    renderPendingPage(viewerAuth, "/clubs/reading-sai/app/pending");
+
+    expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/archive",
+    );
+    expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/session/current",
+    );
   });
 
   it("explains blocked approval states without member-app dead controls", () => {

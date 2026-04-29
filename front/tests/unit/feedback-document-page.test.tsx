@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import FeedbackDocumentPage, {
   FeedbackDocumentUnavailablePage,
@@ -38,6 +39,19 @@ describe("FeedbackDocumentPage", () => {
     expect(returnLink).toHaveAttribute("href", "/app/archive?view=report");
     expect(returnLink).toHaveTextContent("← 아카이브");
     expect(screen.queryByRole("button", { name: "PDF로 저장" })).not.toBeInTheDocument();
+  });
+
+  it("keeps feedback return links inside the scoped app route", () => {
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/feedback/session-1"]}>
+        <FeedbackDocumentPage document={feedbackDocument} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "아카이브로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/archive?view=report",
+    );
   });
 
   it("omits PDF saving while document downloads are disabled", () => {

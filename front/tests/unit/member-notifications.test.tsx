@@ -1,9 +1,10 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter, RouterProvider, useLocation } from "react-router-dom";
+import { createMemoryRouter, MemoryRouter, RouterProvider, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MemberNotificationListResponse } from "@/features/notifications/api/notifications-contracts";
-import { memberNotificationsActions } from "@/features/notifications/route/member-notifications-data";
+import { memberNotificationsActions, memberNotificationsLoader } from "@/features/notifications/route/member-notifications-data";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { MemberNotificationsRoute } from "@/features/notifications/route/member-notifications-route";
 import { MemberNotificationsPage } from "@/features/notifications/ui/member-notifications-page";
 
@@ -34,6 +35,26 @@ const notificationData: MemberNotificationListResponse = {
   unreadCount: 1,
   items: [unreadNotification],
 };
+
+const activeMemberAuth: AuthMeResponse = {
+  authenticated: true,
+  userId: "member-user",
+  membershipId: "member-membership",
+  clubId: "club-id",
+  email: "member@example.com",
+  displayName: "이멤버5",
+  accountName: "멤버",
+  role: "MEMBER",
+  membershipStatus: "ACTIVE",
+  approvalState: "ACTIVE",
+};
+
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 function DestinationProbe() {
   const location = useLocation();
@@ -68,9 +89,43 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  window.history.pushState({}, "", "/");
 });
 
 describe("MemberNotificationsPage", () => {
+  it("passes club slug context before loading scoped member notifications", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(activeMemberAuth));
+      }
+
+      if (url === "/api/bff/api/me/notifications?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(notificationData));
+      }
+
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      memberNotificationsLoader({
+        params: { clubSlug: "reading-sai" },
+        request: new Request("https://readmates.test/clubs/reading-sai/app/notifications"),
+      } as Parameters<typeof memberNotificationsLoader>[0]),
+    ).resolves.toEqual(notificationData);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/me/notifications?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
   it("renders unread notification rows", () => {
     render(
       <MemberNotificationsPage
@@ -84,6 +139,24 @@ describe("MemberNotificationsPage", () => {
     expect(screen.getByText("알림")).toBeInTheDocument();
     expect(screen.getByText("다음 책이 공개되었습니다")).toBeInTheDocument();
     expect(screen.getByText("읽지 않은 알림 1개")).toBeInTheDocument();
+  });
+
+  it("keeps notification deep links inside the scoped app route", () => {
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/notifications"]}>
+        <MemberNotificationsPage
+          unreadCount={1}
+          items={[unreadNotification]}
+          onMarkRead={() => undefined}
+          onMarkAllRead={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "다음 책이 공개되었습니다" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000002",
+    );
   });
 
   it("renders pending read actions and route action failures from props", () => {

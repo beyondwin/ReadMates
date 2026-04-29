@@ -13,6 +13,8 @@ import type {
 import { defaultNotificationPreferences } from "@/features/archive/model/archive-model";
 import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-auth";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
+import type { LoaderFunctionArgs } from "react-router-dom";
 
 export type MyPageRouteData = {
   data: MyPageResponse;
@@ -42,8 +44,9 @@ function canManageNotificationPreferences(auth: AuthMeResponse) {
   return auth.membershipStatus !== "VIEWER";
 }
 
-export async function myPageLoader(): Promise<MyPageRouteData> {
-  const access = await loadArchiveMemberAuth();
+export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRouteData> {
+  const access = await loadArchiveMemberAuth(args);
+  const context = { clubSlug: clubSlugFromLoaderArgs(args) };
   const notificationPreferencesAvailable = access.allowed && canManageNotificationPreferences(access.auth);
 
   if (!access.allowed) {
@@ -58,11 +61,11 @@ export async function myPageLoader(): Promise<MyPageRouteData> {
   }
 
   const [data, reports, questions, reviews, notificationPreferences] = await Promise.all([
-    fetchMyPage(),
-    fetchMyFeedbackDocuments(),
-    fetchMyArchiveQuestions(),
-    fetchMyArchiveReviews(),
-    notificationPreferencesAvailable ? fetchNotificationPreferences() : Promise.resolve(defaultNotificationPreferences),
+    fetchMyPage(context),
+    fetchMyFeedbackDocuments(context),
+    fetchMyArchiveQuestions(context),
+    fetchMyArchiveReviews(context),
+    notificationPreferencesAvailable ? fetchNotificationPreferences(context) : Promise.resolve(defaultNotificationPreferences),
   ]);
 
   return {

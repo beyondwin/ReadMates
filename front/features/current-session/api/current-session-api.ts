@@ -1,4 +1,4 @@
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
+import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
 import type {
   CheckinRequest,
   CurrentSessionResponse,
@@ -16,8 +16,8 @@ function jsonRequest(init: Omit<RequestInit, "headers" | "body">, body: unknown)
   };
 }
 
-export async function getCurrentSession() {
-  return readmatesFetch<CurrentSessionResponse>("/api/sessions/current");
+export async function getCurrentSession(context?: ReadmatesApiContext) {
+  return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
 }
 
 export async function updateCurrentSessionRsvp(status: RsvpStatus) {

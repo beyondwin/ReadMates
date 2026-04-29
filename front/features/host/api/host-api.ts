@@ -1,4 +1,4 @@
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
+import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
 import type {
   CreatedSessionResponse,
   CreateHostInvitationRequest,
@@ -31,37 +31,41 @@ import type {
   ViewerMember,
 } from "./host-contracts";
 
-export function fetchHostCurrentSession() {
-  return readmatesFetch<CurrentSessionResponse>("/api/sessions/current");
+export function fetchHostCurrentSession(context?: ReadmatesApiContext) {
+  return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
 }
 
-export function fetchHostDashboard() {
-  return readmatesFetch<HostDashboardResponse>("/api/host/dashboard");
+export function fetchHostDashboard(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostDashboardResponse>("/api/host/dashboard", undefined, context);
 }
 
-export function fetchHostNotificationSummary() {
-  return readmatesFetch<HostNotificationSummary>("/api/host/notifications/summary");
+export function fetchHostNotificationSummary(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostNotificationSummary>("/api/host/notifications/summary", undefined, context);
 }
 
 export function processHostNotifications() {
   return readmatesFetchResponse("/api/host/notifications/process", { method: "POST" });
 }
 
-export function fetchHostNotificationItems(status?: HostNotificationStatus) {
+export function fetchHostNotificationItems(status?: HostNotificationStatus, context?: ReadmatesApiContext) {
   const search = status ? `?status=${encodeURIComponent(status)}` : "";
-  return readmatesFetch<HostNotificationItemListResponse>(`/api/host/notifications/items${search}`);
+  return readmatesFetch<HostNotificationItemListResponse>(`/api/host/notifications/items${search}`, undefined, context);
 }
 
-export function fetchHostNotificationEvents() {
-  return readmatesFetch<HostNotificationEventListResponse>("/api/host/notifications/events");
+export function fetchHostNotificationEvents(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostNotificationEventListResponse>("/api/host/notifications/events", undefined, context);
 }
 
-export function fetchHostNotificationDeliveries() {
-  return readmatesFetch<HostNotificationDeliveryListResponse>("/api/host/notifications/deliveries");
+export function fetchHostNotificationDeliveries(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostNotificationDeliveryListResponse>("/api/host/notifications/deliveries", undefined, context);
 }
 
-export function fetchHostNotificationDetail(id: string) {
-  return readmatesFetch<HostNotificationDetailResponse>(`/api/host/notifications/items/${encodeURIComponent(id)}`);
+export function fetchHostNotificationDetail(id: string, context?: ReadmatesApiContext) {
+  return readmatesFetch<HostNotificationDetailResponse>(
+    `/api/host/notifications/items/${encodeURIComponent(id)}`,
+    undefined,
+    context,
+  );
 }
 
 export function retryHostNotification(id: string) {
@@ -86,16 +90,16 @@ export function sendHostNotificationTestMail(request: SendNotificationTestMailRe
   });
 }
 
-export function fetchHostNotificationTestMailAudit() {
-  return readmatesFetch<NotificationTestMailAuditItem[]>("/api/host/notifications/test-mail/audit");
+export function fetchHostNotificationTestMailAudit(context?: ReadmatesApiContext) {
+  return readmatesFetch<NotificationTestMailAuditItem[]>("/api/host/notifications/test-mail/audit", undefined, context);
 }
 
-export function fetchHostSessions() {
-  return readmatesFetch<HostSessionListItem[]>("/api/host/sessions");
+export function fetchHostSessions(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostSessionListItem[]>("/api/host/sessions", undefined, context);
 }
 
-export function fetchHostSessionDetail(sessionId: string) {
-  return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`);
+export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApiContext) {
+  return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, undefined, context);
 }
 
 export function createHostSession(request: HostSessionRequest) {
@@ -114,10 +118,10 @@ export function updateHostSession(sessionId: string, request: HostSessionRequest
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
-export function fetchHostSessionDeletionPreview(sessionId: string) {
+export function fetchHostSessionDeletionPreview(sessionId: string, context?: ReadmatesApiContext) {
   return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
     method: "GET",
-  }) as Promise<Response & { json(): Promise<HostSessionDeletionPreviewResponse> }>;
+  }, context) as Promise<Response & { json(): Promise<HostSessionDeletionPreviewResponse> }>;
 }
 
 export function deleteHostSession(sessionId: string) {
@@ -175,8 +179,8 @@ export function uploadHostSessionFeedbackDocument(sessionId: string, formData: F
   }) as Promise<Response & { json(): Promise<FeedbackDocumentResponse> }>;
 }
 
-export function fetchHostMembers() {
-  return readmatesFetch<HostMemberListItem[]>("/api/host/members");
+export function fetchHostMembers(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostMemberListItem[]>("/api/host/members", undefined, context);
 }
 
 export function submitHostMemberLifecycle(
@@ -206,12 +210,12 @@ export function submitHostMemberProfile(membershipId: string, displayName: strin
   }) as Promise<Response & { json(): Promise<HostMemberProfileResponse> }>;
 }
 
-export function fetchHostInvitations() {
-  return readmatesFetch<HostInvitationListItem[]>("/api/host/invitations");
+export function fetchHostInvitations(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostInvitationListItem[]>("/api/host/invitations", undefined, context);
 }
 
-export function listHostInvitationsResponse() {
-  return readmatesFetchResponse("/api/host/invitations") as Promise<Response & {
+export function listHostInvitationsResponse(context?: ReadmatesApiContext) {
+  return readmatesFetchResponse("/api/host/invitations", undefined, context) as Promise<Response & {
     json(): Promise<HostInvitationListItem[]>;
   }>;
 }

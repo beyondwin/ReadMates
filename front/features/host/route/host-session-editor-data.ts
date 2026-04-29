@@ -13,15 +13,17 @@ import {
 } from "@/features/host/api/host-api";
 import type { HostSessionEditorActions } from "@/features/host/components/host-session-editor";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 export async function hostSessionEditorLoader({ params }: LoaderFunctionArgs) {
-  await requireHostLoaderAuth();
+  await requireHostLoaderAuth({ params });
+  const context = { clubSlug: clubSlugFromLoaderArgs({ params }) };
 
   if (!params.sessionId) {
     throw new Error("Missing host session id");
   }
 
-  return fetchHostSessionDetail(params.sessionId);
+  return fetchHostSessionDetail(params.sessionId, context);
 }
 
 export const hostSessionEditorActions = {

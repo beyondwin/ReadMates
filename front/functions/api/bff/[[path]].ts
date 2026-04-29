@@ -15,6 +15,7 @@ type HeadersWithSetCookie = Headers & {
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const MAX_CLIENT_IP_LENGTH = 128;
+const CLUB_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 
 function pathSegments(path: string | string[] | undefined) {
   if (Array.isArray(path)) {
@@ -61,6 +62,7 @@ function copyUpstreamHeaders(headers: Headers) {
   copiedHeaders.delete("x-readmates-bff-secret");
   copiedHeaders.delete("x-readmates-client-ip");
   copiedHeaders.delete("x-readmates-club-host");
+  copiedHeaders.delete("x-readmates-club-slug");
 
   const setCookies = (headers as HeadersWithSetCookie).getSetCookie?.() ?? [];
   if (setCookies.length > 0) {
@@ -116,6 +118,17 @@ function normalizedHostFromRequest(request: Request) {
   return host.endsWith(".") ? host.slice(0, -1) : host;
 }
 
+function normalizedClubSlugFromRequest(request: Request) {
+  const params = new URL(request.url).searchParams;
+  if (!params.has("clubSlug")) {
+    return null;
+  }
+
+  const value = params.get("clubSlug") ?? "";
+  const normalized = value.trim();
+  return CLUB_SLUG_PATTERN.test(normalized) && !normalized.includes("--") ? normalized : "";
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   const upstreamPath = buildApiUpstreamPath(pathSegments(context.params.path));
   if (!upstreamPath) {
@@ -131,7 +144,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return new Response(null, { status: 403 });
   }
 
-  upstreamUrl.search = new URL(context.request.url).search;
+  const requestUrl = new URL(context.request.url);
+  const clubSlug = normalizedClubSlugFromRequest(context.request);
+  if (clubSlug === "") {
+    return new Response(null, { status: 400 });
+  }
+
+  upstreamUrl.search = requestUrl.search;
 
   const headers = new Headers();
   const contentType = context.request.headers.get("content-type");
@@ -152,6 +171,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(context.request));
+  if (clubSlug) {
+    headers.set("X-Readmates-Club-Slug", clubSlug);
+  }
 
   const bffSecret = context.env.READMATES_BFF_SECRET?.trim();
   if (bffSecret) {

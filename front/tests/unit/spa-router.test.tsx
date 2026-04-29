@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router-dom";
+import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/src/app/auth-context";
 import { routes } from "@/src/app/router";
@@ -8,6 +8,7 @@ import { currentSessionContractFixture } from "./api-contract-fixtures";
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  window.history.pushState({}, "", "/");
 });
 
 function jsonResponse(body: unknown, status = 200) {
@@ -114,7 +115,40 @@ function expectNoMemberHomeChildDataFetch(fetchMock: ReturnType<typeof vi.fn>) {
   expect(childDataCalls).toEqual([]);
 }
 
+function routePathSet(routeObjects: RouteObject[], parent = ""): Set<string> {
+  const paths = new Set<string>();
+
+  for (const route of routeObjects) {
+    const ownPath =
+      route.path === undefined
+        ? parent
+        : route.path.startsWith("/")
+          ? route.path
+          : `${parent.replace(/\/$/, "")}/${route.path}`;
+
+    if (route.index) {
+      paths.add(parent);
+    } else if (route.path) {
+      paths.add(ownPath);
+    }
+
+    if (route.children) {
+      routePathSet(route.children, ownPath).forEach((path) => paths.add(path));
+    }
+  }
+
+  return paths;
+}
+
 describe("SPA router", () => {
+  it("defines club-scoped member and host app routes", () => {
+    const paths = routePathSet(routes);
+
+    expect(paths).toContain("/clubs/:clubSlug/app");
+    expect(paths).toContain("/clubs/:clubSlug/app/host");
+    expect(paths).toContain("/clubs/:clubSlug/app/archive");
+  });
+
   it("renders the login route", () => {
     const router = createMemoryRouter(routes, { initialEntries: ["/login"] });
 
@@ -340,6 +374,56 @@ describe("SPA router", () => {
     );
   });
 
+  it("passes club slug context when loading a club-scoped current session route", async () => {
+    const auth = {
+      authenticated: true,
+      userId: "member-user",
+      membershipId: "member-membership",
+      clubId: "club-id",
+      email: "member@example.com",
+      displayName: "이멤버5",
+      accountName: "멤버",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+    };
+    const current = {
+      currentSession: currentSessionContractFixture.currentSession,
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(auth));
+      }
+
+      if (url === "/api/bff/api/sessions/current?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(current));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai/app/session/current"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/sessions/current?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
   it("redirects anonymous current session navigation without fetching current session data", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
@@ -525,6 +609,81 @@ describe("SPA router", () => {
 
     expect(await screen.findAllByText("가난한 찰리의 연감")).not.toHaveLength(0);
     expect(screen.queryByRole("heading", { name: "페이지를 불러오지 못했습니다." })).not.toBeInTheDocument();
+  });
+
+  it("passes club slug context when loading a club-scoped archive route", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(
+          jsonResponse({
+            authenticated: true,
+            userId: "viewer-user",
+            membershipId: "viewer-membership",
+            clubId: "club-id",
+            email: "viewer@example.com",
+            displayName: "둘러보기 멤버",
+            accountName: "둘러보기",
+            role: "MEMBER",
+            membershipStatus: "VIEWER",
+            approvalState: "VIEWER",
+          }),
+        );
+      }
+
+      if (url === "/api/bff/api/archive/sessions?clubSlug=reading-sai") {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              sessionId: "session-6",
+              sessionNumber: 6,
+              title: "6회차 모임 · 가난한 찰리의 연감",
+              bookTitle: "가난한 찰리의 연감",
+              bookAuthor: "찰리 멍거",
+              bookImageUrl: null,
+              date: "2026-04-15",
+              attendance: 6,
+              total: 6,
+              published: true,
+              state: "CLOSED",
+            },
+          ]),
+        );
+      }
+
+      if (
+        url === "/api/bff/api/archive/me/questions?clubSlug=reading-sai" ||
+        url === "/api/bff/api/archive/me/reviews?clubSlug=reading-sai"
+      ) {
+        return Promise.resolve(jsonResponse([]));
+      }
+
+      if (url === "/api/bff/api/feedback-documents/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai/app/archive"] });
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findAllByText("가난한 찰리의 연감")).not.toHaveLength(0);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/archive/sessions?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it.each([

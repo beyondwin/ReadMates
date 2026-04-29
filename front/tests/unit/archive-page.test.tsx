@@ -248,6 +248,37 @@ describe("ArchivePage", () => {
     expect(desktop.getAllByText("피드백 X").length).toBe(seededSessions.length - 1);
   });
 
+  it("keeps archive item links inside the scoped app route", () => {
+    const sessionRender = render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/archive"]}>
+        <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByRole("link", { name: "No.6 가난한 찰리의 연감 열기" })[0]).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/sessions/session-6",
+    );
+    sessionRender.unmount();
+
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/archive?view=report"]}>
+        <ArchivePage
+          sessions={seededSessions}
+          questions={seededQuestions}
+          reviews={seededReviews}
+          reports={seededReports}
+          initialView="report"
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getAllByRole("link", { name: seededReportReadLabel })[0]).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/feedback/session-1",
+    );
+  });
+
   it("shows locked feedback status from archive session metadata without readable reports", () => {
     const lockedSession: ArchiveSessionItem = {
       ...seededSessions[0],

@@ -1,8 +1,8 @@
-import { readmatesFetch } from "@/shared/api/client";
+import { readmatesFetch, type ReadmatesApiContext } from "@/shared/api/client";
 import type { MemberNotificationListResponse } from "./notifications-contracts";
 
-export function fetchMemberNotifications(): Promise<MemberNotificationListResponse> {
-  return readmatesFetch<MemberNotificationListResponse>("/api/me/notifications");
+export function fetchMemberNotifications(context?: ReadmatesApiContext): Promise<MemberNotificationListResponse> {
+  return readmatesFetch<MemberNotificationListResponse>("/api/me/notifications", undefined, context);
 }
 
 export async function markMemberNotificationRead(id: string): Promise<void> {

@@ -47,6 +47,15 @@ describe("TopNav responsive variants", () => {
     expect(screen.getByLabelText("이멤버5")).toHaveTextContent("이");
   });
 
+  it("keeps member desktop navigation inside the scoped app route", () => {
+    renderAt("/clubs/reading-sai/app/archive", <TopNav variant="member" memberName="이멤버5" appBasePath="/clubs/reading-sai/app" />);
+
+    const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
+    expect(within(nav).getByRole("link", { name: "홈" })).toHaveAttribute("href", "/clubs/reading-sai/app");
+    expect(within(nav).getByRole("link", { name: "아카이브" })).toHaveAttribute("href", "/clubs/reading-sai/app/archive");
+    expect(within(nav).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("shows a desktop host workspace entry only when requested from member navigation", () => {
     renderAt("/app", <TopNav variant="member" memberName="김호스트" showHostEntry />);
 
@@ -138,6 +147,14 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/app");
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveClass("m-hdr-link--icon");
     expect(screen.getByRole("link", { name: "멤버 화면으로" }).textContent).toBe("");
+  });
+
+  it("keeps scoped host mobile header actions inside the scoped app route", () => {
+    renderAt("/clubs/reading-sai/app/host/sessions/session-6/edit", <MobileHeader variant="host" appBasePath="/clubs/reading-sai/app" />);
+
+    expect(screen.getByText("세션")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/clubs/reading-sai/app/host");
+    expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/clubs/reading-sai/app");
   });
 
   it("renders the public session mobile title and authenticated entry action", async () => {
@@ -310,6 +327,22 @@ describe("MobileHeader route titles and actions", () => {
     expect(memberReturn).toHaveClass("m-hdr-link--icon");
     expect(memberReturn.textContent).toBe("");
     expect(screen.queryByRole("link", { name: "뒤로" })).not.toBeInTheDocument();
+  });
+
+  it("keeps scoped mobile tabs inside the scoped app route", () => {
+    renderAt(
+      "/clubs/reading-sai/app/archive",
+      <MobileTabBar variant="host" currentSessionId="session-6" appBasePath="/clubs/reading-sai/app" />,
+    );
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(tabs).getByRole("link", { name: "홈" })).toHaveAttribute("href", "/clubs/reading-sai/app/host");
+    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/sessions/session-6/edit",
+    );
+    expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("href", "/clubs/reading-sai/app/archive");
+    expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("aria-current", "page");
   });
 
   it("renders the host notifications route as an alert page on mobile", () => {

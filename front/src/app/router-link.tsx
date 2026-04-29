@@ -6,6 +6,7 @@ import {
   type LinkProps as RouterLinkProps,
 } from "react-router-dom";
 import { rememberReadmatesListScroll, resetReadmatesNavigationScroll } from "@/src/app/route-continuity";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 type ReadmatesLinkProps = RouterLinkProps & {
   resetScroll?: boolean;
@@ -18,11 +19,12 @@ function isModifiedEvent(event: MouseEvent<HTMLAnchorElement>) {
 
 function RouterAwareLink({ to, children, onClick, resetScroll = false, ...props }: ReadmatesLinkProps) {
   const location = useLocation();
+  const resolvedTo = scopedAppLinkTarget(location.pathname, to);
 
   return (
     <RouterLink
       {...props}
-      to={to}
+      to={resolvedTo}
       onClick={(event) => {
         onClick?.(event);
 
@@ -31,7 +33,7 @@ function RouterAwareLink({ to, children, onClick, resetScroll = false, ...props 
             resetReadmatesNavigationScroll();
           }
 
-          rememberReadmatesListScroll(location.pathname, location.search, to);
+          rememberReadmatesListScroll(location.pathname, location.search, resolvedTo);
         }
       }}
     >

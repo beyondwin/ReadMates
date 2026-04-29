@@ -9,6 +9,7 @@ export type MobileTabBarVariant = "member" | "host";
 type MobileTabBarProps = {
   variant: MobileTabBarVariant;
   currentSessionId?: string | null | undefined;
+  appBasePath?: string;
 };
 
 export type TabIconName =
@@ -73,6 +74,21 @@ const memberTabs: TabLink[] = [
     current: (pathname) => pathname.startsWith("/app/me"),
   },
 ];
+
+function prefixedAppPath(appBasePath: string, path: string) {
+  return appBasePath ? `${appBasePath}${path === "/app" ? "" : path.replace(/^\/app/, "")}` : path;
+}
+
+function appPathname(pathname: string) {
+  return pathname.replace(/^\/clubs\/[^/]+(?=\/app(?:\/|$))/, "");
+}
+
+function scopedTabs(tabs: TabLink[], appBasePath: string): TabLink[] {
+  return tabs.map((tab) => ({
+    ...tab,
+    href: tab.href ? prefixedAppPath(appBasePath, tab.href) : tab.href,
+  }));
+}
 
 function hostTabs(currentSessionId?: string | null): TabLink[] {
   const editHref =
@@ -216,9 +232,10 @@ export function TabIcon({ name }: { name: TabIconName }) {
   }
 }
 
-export function MobileTabBar({ variant, currentSessionId }: MobileTabBarProps) {
+export function MobileTabBar({ variant, currentSessionId, appBasePath = "" }: MobileTabBarProps) {
   const pathname = useLocation().pathname;
-  const tabs = variant === "host" ? hostTabs(currentSessionId) : memberTabs;
+  const appPath = appPathname(pathname);
+  const tabs = scopedTabs(variant === "host" ? hostTabs(currentSessionId) : memberTabs, appBasePath);
 
   return (
     <nav
@@ -234,7 +251,7 @@ export function MobileTabBar({ variant, currentSessionId }: MobileTabBarProps) {
             to={tab.href}
             state={tab.state}
             className="m-tab"
-            aria-current={tab.current(pathname) ? "page" : undefined}
+            aria-current={tab.current(appPath) ? "page" : undefined}
           >
             <TabIcon name={tab.icon} />
             <span className="m-tab-label">{tab.label}</span>
@@ -244,7 +261,7 @@ export function MobileTabBar({ variant, currentSessionId }: MobileTabBarProps) {
             key={tab.key}
             className="m-tab is-pending"
             aria-disabled="true"
-            aria-current={tab.current(pathname) ? "page" : undefined}
+            aria-current={tab.current(appPath) ? "page" : undefined}
             aria-label={`${tab.label} 불러오는 중`}
           >
             <TabIcon name={tab.icon} />

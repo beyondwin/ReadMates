@@ -34,6 +34,19 @@ const suspendedMemberAuth: AuthMeResponse = {
   approvalState: "SUSPENDED",
 };
 
+const activeMemberAuth: AuthMeResponse = {
+  authenticated: true,
+  userId: "member-2",
+  membershipId: "membership-active-member",
+  clubId: "club-2",
+  email: "member2@example.com",
+  displayName: "클럽멤버",
+  accountName: "멤버2",
+  role: "MEMBER",
+  membershipStatus: "ACTIVE",
+  approvalState: "ACTIVE",
+};
+
 type Deferred<T> = {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -191,6 +204,41 @@ describe("SPA AppRouteLayout", () => {
     const appContent = document.querySelector(".app-content");
     expect(appContent?.querySelector(":scope > .rm-route-reveal")).toBeInTheDocument();
     expect(appContent?.querySelector(".topnav")).not.toBeInTheDocument();
+  });
+
+  it("uses club-scoped auth for scoped app chrome decisions", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(hostAuth));
+      }
+
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(activeMemberAuth));
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app"]}>
+          <Routes>
+            <Route path="/clubs/:clubSlug/app" element={<AppRouteLayout />}>
+              <Route index element={<main>scoped member child</main>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByText("scoped member child")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText("클럽멤버")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("link", { name: "호스트 화면" })).not.toBeInTheDocument();
   });
 
   it("keeps host users on member mobile chrome after opening archive from the member workspace", async () => {

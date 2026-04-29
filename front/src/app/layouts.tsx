@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import { useAuth } from "@/src/app/auth-state";
+import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { authMePath } from "@/shared/auth/member-app-loader";
 import {
   readReadmatesWorkspaceState,
   readStoredReadmatesMobileWorkspace,
@@ -11,6 +13,7 @@ import {
 } from "@/src/app/route-continuity";
 import { readmatesFetch } from "@/shared/api/client";
 import { PublicUrlPolicyHead } from "@/features/public/ui/public-url-policy-head";
+import { canUseHostApp } from "@/shared/auth/member-app-access";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
@@ -35,6 +38,20 @@ function RouteOutlet() {
 function publicBasePath(pathname: string) {
   const match = /^\/clubs\/([^/]+)/.exec(pathname);
   return match ? `/clubs/${encodeURIComponent(match[1])}` : "";
+}
+
+function appPathname(pathname: string) {
+  return pathname.replace(/^\/clubs\/[^/]+(?=\/app(?:\/|$))/, "");
+}
+
+function appBasePath(pathname: string) {
+  const match = /^\/clubs\/([^/]+)\/app(?:\/|$)/.exec(pathname);
+  return match ? `/clubs/${encodeURIComponent(match[1])}/app` : "";
+}
+
+function appClubSlug(pathname: string) {
+  const match = /^\/clubs\/([^/]+)\/app(?:\/|$)/.exec(pathname);
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 export function PublicRouteLayout() {
@@ -64,11 +81,21 @@ export function AppRouteLayout() {
   const state = useAuth();
   const location = useLocation();
   const pathname = location.pathname;
-  const auth = state.status === "ready" ? state.auth : null;
-  const isHostWorkspace = pathname.startsWith("/app/host");
+  const appPath = appPathname(pathname);
+  const basePath = appBasePath(pathname);
+  const clubSlug = appClubSlug(pathname);
+  const [scopedAuth, setScopedAuth] = useState<{ clubSlug: string; auth: AuthMeResponse | null } | null>(null);
+  const auth = clubSlug
+    ? scopedAuth?.clubSlug === clubSlug
+      ? scopedAuth.auth
+      : null
+    : state.status === "ready"
+      ? state.auth
+      : null;
+  const isHostWorkspace = appPath.startsWith("/app/host");
   const isHostRecordRoute =
-    pathname.startsWith("/app/archive") || pathname.startsWith("/app/sessions/") || pathname.startsWith("/app/feedback/");
-  const isActiveHost = auth?.role === "HOST" && auth.approvalState === "ACTIVE";
+    appPath.startsWith("/app/archive") || appPath.startsWith("/app/sessions/") || appPath.startsWith("/app/feedback/");
+  const isActiveHost = auth ? canUseHostApp(auth) : false;
   const desktopVariant = isHostWorkspace ? "host" : "member";
   const explicitWorkspace = readReadmatesWorkspaceState(location.state);
   const storedWorkspace = readStoredReadmatesMobileWorkspace();
@@ -88,6 +115,30 @@ export function AppRouteLayout() {
   } | null>(null);
   const currentSessionId =
     activeHostKey === null ? null : hostCurrentSession?.hostKey === activeHostKey ? hostCurrentSession.sessionId : undefined;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!clubSlug) {
+      return;
+    }
+
+    readmatesFetch<AuthMeResponse>(authMePath(clubSlug))
+      .then((nextAuth) => {
+        if (!cancelled) {
+          setScopedAuth({ clubSlug, auth: nextAuth });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setScopedAuth({ clubSlug, auth: null });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [clubSlug]);
 
   useEffect(() => {
     let cancelled = false;
@@ -130,10 +181,10 @@ export function AppRouteLayout() {
   return (
     <div className="app-shell">
       <div className="desktop-only">
-        <TopNav variant={desktopVariant} memberName={memberName} showHostEntry={showHostEntry} />
+        <TopNav variant={desktopVariant} memberName={memberName} showHostEntry={showHostEntry} appBasePath={basePath} />
       </div>
       <div className="mobile-only">
-        <MobileHeader variant={mobileVariant} showHostEntry={showHostEntry} />
+        <MobileHeader variant={mobileVariant} showHostEntry={showHostEntry} appBasePath={basePath} />
       </div>
       <div className="app-content">
         <RouteOutlet />
@@ -142,7 +193,7 @@ export function AppRouteLayout() {
         <PublicFooter showGuestMemberActions={false} />
       </div>
       <div className="mobile-only">
-        <MobileTabBar variant={mobileVariant} currentSessionId={currentSessionId} />
+        <MobileTabBar variant={mobileVariant} currentSessionId={currentSessionId} appBasePath={basePath} />
       </div>
     </div>
   );

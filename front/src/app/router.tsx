@@ -40,6 +40,8 @@ import {
   HostNotificationsRouteElement,
   NewHostSessionRouteElement,
 } from "@/src/app/host-route-elements";
+import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
+import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
@@ -67,6 +69,121 @@ const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...
     </Link>
   );
 };
+
+function memberAppRoutes(): RouteObject[] {
+  return [
+    {
+      index: true,
+      element: <AppHomePage />,
+      loader: memberHomeLoader,
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
+    },
+    {
+      path: "session/current",
+      element: <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
+      loader: currentSessionLoader,
+      action: currentSessionAction,
+      errorElement: <CurrentSessionRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+    },
+    {
+      path: "notes",
+      element: <NotesPage />,
+      loader: notesFeedLoader,
+      shouldRevalidate: notesFeedShouldRevalidate,
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="클럽 노트를 불러오는 중" />,
+    },
+    {
+      path: "archive",
+      element: <ArchiveRoutePage />,
+      loader: archiveListLoader,
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
+    },
+    {
+      path: "me",
+      element: <MyRoutePage />,
+      loader: myPageLoader,
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,
+    },
+    {
+      path: "notifications",
+      element: <MemberNotificationsRoute />,
+      loader: memberNotificationsLoader,
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="알림을 불러오는 중" />,
+    },
+    {
+      path: "sessions/:sessionId",
+      element: <MemberSessionDetailRoutePage />,
+      loader: memberSessionDetailLoader,
+      errorElement: <ArchiveRouteError />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+    },
+    {
+      path: "feedback/:sessionId",
+      element: <FeedbackDocumentRoutePage />,
+      loader: feedbackDocumentLoader,
+      errorElement: <FeedbackRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
+    },
+    {
+      path: "feedback/:sessionId/print",
+      element: <FeedbackDocumentPrintRoutePage />,
+      loader: feedbackDocumentLoader,
+      errorElement: <FeedbackRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
+    },
+  ];
+}
+
+function hostAppRoutes(): RouteObject[] {
+  return [
+    {
+      index: true,
+      element: <HostDashboardRouteElement />,
+      loader: hostDashboardLoader,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
+    },
+    {
+      path: "members",
+      element: <HostMembersRoute />,
+      loader: hostMembersLoader,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
+    },
+    {
+      path: "invitations",
+      element: <HostInvitationsRoute />,
+      loader: hostInvitationsLoader,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
+    },
+    {
+      path: "notifications",
+      element: <HostNotificationsRouteElement />,
+      loader: hostNotificationsLoader,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="알림 발송 장부를 불러오는 중" variant="host" />,
+    },
+    {
+      path: "sessions/new",
+      element: <NewHostSessionRouteElement />,
+      errorElement: <HostRouteError />,
+    },
+    {
+      path: "sessions/:sessionId/edit",
+      element: <EditHostSessionRouteElement />,
+      loader: hostSessionEditorLoader,
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+    },
+  ];
+}
 
 export const routes: RouteObject[] = [
   {
@@ -143,129 +260,55 @@ export const routes: RouteObject[] = [
     ),
   },
   {
+    path: "/clubs/:clubSlug/app/pending",
+    element: (
+      <RequireAuth>
+        <PendingApprovalPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    id: "app",
     path: "/app",
     element: (
       <RequireMemberApp>
         <AppRouteLayout />
       </RequireMemberApp>
     ),
-    children: [
-      {
-        index: true,
-        element: <AppHomePage />,
-        loader: memberHomeLoader,
-        errorElement: <ArchiveRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
-      },
-      {
-        path: "session/current",
-        element: <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
-        loader: currentSessionLoader,
-        action: currentSessionAction,
-        errorElement: <CurrentSessionRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
-      },
-      {
-        path: "notes",
-        element: <NotesPage />,
-        loader: notesFeedLoader,
-        shouldRevalidate: notesFeedShouldRevalidate,
-        errorElement: <ArchiveRouteError />,
-        hydrateFallbackElement: <ArchiveRouteLoading label="클럽 노트를 불러오는 중" />,
-      },
-      {
-        path: "archive",
-        element: <ArchiveRoutePage />,
-        loader: archiveListLoader,
-        errorElement: <ArchiveRouteError />,
-        hydrateFallbackElement: <ArchiveRouteLoading label="아카이브를 불러오는 중" />,
-      },
-      {
-        path: "me",
-        element: <MyRoutePage />,
-        loader: myPageLoader,
-        errorElement: <ArchiveRouteError />,
-        hydrateFallbackElement: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,
-      },
-      {
-        path: "notifications",
-        element: <MemberNotificationsRoute />,
-        loader: memberNotificationsLoader,
-        errorElement: <ArchiveRouteError />,
-        hydrateFallbackElement: <ArchiveRouteLoading label="알림을 불러오는 중" />,
-      },
-      {
-        path: "sessions/:sessionId",
-        element: <MemberSessionDetailRoutePage />,
-        loader: memberSessionDetailLoader,
-        errorElement: <ArchiveRouteError />,
-        hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
-      },
-      {
-        path: "feedback/:sessionId",
-        element: <FeedbackDocumentRoutePage />,
-        loader: feedbackDocumentLoader,
-        errorElement: <FeedbackRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
-      },
-      {
-        path: "feedback/:sessionId/print",
-        element: <FeedbackDocumentPrintRoutePage />,
-        loader: feedbackDocumentLoader,
-        errorElement: <FeedbackRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
-      },
-    ],
+    children: memberAppRoutes(),
   },
   {
+    id: "club-app",
+    path: "/clubs/:clubSlug/app",
+    element: (
+      <RequireMemberApp>
+        <AppRouteLayout />
+      </RequireMemberApp>
+    ),
+    loader: loadMemberAppAuth,
+    children: memberAppRoutes(),
+  },
+  {
+    id: "app-host",
     path: "/app/host",
     element: (
       <RequireHost>
         <AppRouteLayout />
       </RequireHost>
     ),
-    children: [
-      {
-        index: true,
-        element: <HostDashboardRouteElement />,
-        loader: hostDashboardLoader,
-        errorElement: <HostRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
-      },
-      {
-        path: "members",
-        element: <HostMembersRoute />,
-        loader: hostMembersLoader,
-        errorElement: <HostRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
-      },
-      {
-        path: "invitations",
-        element: <HostInvitationsRoute />,
-        loader: hostInvitationsLoader,
-        errorElement: <HostRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
-      },
-      {
-        path: "notifications",
-        element: <HostNotificationsRouteElement />,
-        loader: hostNotificationsLoader,
-        errorElement: <HostRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="알림 발송 장부를 불러오는 중" variant="host" />,
-      },
-      {
-        path: "sessions/new",
-        element: <NewHostSessionRouteElement />,
-        errorElement: <HostRouteError />,
-      },
-      {
-        path: "sessions/:sessionId/edit",
-        element: <EditHostSessionRouteElement />,
-        loader: hostSessionEditorLoader,
-        errorElement: <HostRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
-      },
-    ],
+    loader: requireHostLoaderAuth,
+    children: hostAppRoutes(),
+  },
+  {
+    id: "club-app-host",
+    path: "/clubs/:clubSlug/app/host",
+    element: (
+      <RequireHost>
+        <AppRouteLayout />
+      </RequireHost>
+    ),
+    loader: requireHostLoaderAuth,
+    children: hostAppRoutes(),
   },
 ];
 
