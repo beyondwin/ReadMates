@@ -989,7 +989,7 @@ git commit -m "feat: persist notification event outbox"
 - Modify: `server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationRelayServiceTest.kt`
 
-- [ ] **Step 1: Write relay service test**
+- [x] **Step 1: Write relay service test**
 
 Create `NotificationRelayServiceTest.kt` with fake ports:
 
@@ -1068,7 +1068,7 @@ class NotificationRelayServiceTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1078,7 +1078,7 @@ Run:
 
 Expected: FAIL because `NotificationRelayService` does not exist.
 
-- [ ] **Step 3: Add use case and service**
+- [x] **Step 3: Add use case and service**
 
 In `NotificationUseCases.kt`, add:
 
@@ -1136,7 +1136,7 @@ class NotificationRelayService(
 }
 ```
 
-- [ ] **Step 4: Add Kafka publisher adapter**
+- [x] **Step 4: Add Kafka publisher adapter**
 
 Create `KafkaNotificationEventPublisherAdapter.kt`:
 
@@ -1169,7 +1169,7 @@ class KafkaNotificationEventPublisherAdapter(
 }
 ```
 
-- [ ] **Step 5: Replace scheduler**
+- [x] **Step 5: Replace scheduler**
 
 Create `NotificationEventRelayScheduler.kt`:
 
@@ -1197,7 +1197,7 @@ class NotificationEventRelayScheduler(
 
 Leave `NotificationOutboxScheduler` in place until Task 10 removes old references, but disable its worker property in configuration so Kafka is the new path.
 
-- [ ] **Step 6: Run relay tests**
+- [x] **Step 6: Run relay tests**
 
 Run:
 
@@ -1207,7 +1207,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationRelayService.kt server/src/main/kotlin/com/readmates/notification/adapter/out/kafka/KafkaNotificationEventPublisherAdapter.kt server/src/main/kotlin/com/readmates/notification/adapter/in/scheduler/NotificationEventRelayScheduler.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/application/service/NotificationRelayServiceTest.kt
