@@ -235,9 +235,17 @@ class JdbcNotificationEventOutboxAdapter(
     override fun loadMessage(eventId: UUID): NotificationEventMessage? =
         jdbcTemplate().query(
             """
-            select id, club_id, event_type, aggregate_type, aggregate_id, payload_json, created_at
+            select notification_event_outbox.id,
+                   notification_event_outbox.club_id,
+                   clubs.slug as club_slug,
+                   notification_event_outbox.event_type,
+                   notification_event_outbox.aggregate_type,
+                   notification_event_outbox.aggregate_id,
+                   notification_event_outbox.payload_json,
+                   notification_event_outbox.created_at
             from notification_event_outbox
-            where id = ?
+            join clubs on clubs.id = notification_event_outbox.club_id
+            where notification_event_outbox.id = ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNotificationEventMessage() },
             eventId.dbString(),
@@ -285,6 +293,7 @@ class JdbcNotificationEventOutboxAdapter(
         NotificationEventMessage(
             eventId = uuid("id"),
             clubId = uuid("club_id"),
+            clubSlug = getString("club_slug"),
             eventType = NotificationEventType.valueOf(getString("event_type")),
             aggregateType = getString("aggregate_type"),
             aggregateId = uuid("aggregate_id"),

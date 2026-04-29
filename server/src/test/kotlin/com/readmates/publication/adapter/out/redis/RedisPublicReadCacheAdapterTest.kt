@@ -126,6 +126,34 @@ class RedisPublicReadCacheAdapterTest(
     }
 
     @Test
+    fun `non legacy slug overloads do not create slug scoped public cache keys`() {
+        val slug = "sample-book-club"
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+        val slugKeyPattern = "public:club:slug:$slug:*"
+        redisTemplate.delete(redisTemplate.keys(slugKeyPattern))
+
+        adapter.putClub(slug, publicClub())
+        adapter.putSession(slug, sessionId, publicSession(sessionId))
+
+        assertNull(adapter.getClub(slug))
+        assertNull(adapter.getSession(slug, sessionId))
+        assertThat(redisTemplate.keys(slugKeyPattern)).isEmpty()
+    }
+
+    @Test
+    fun `stores and loads public club id lookup by slug`() {
+        val slug = "sample-book-club"
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000099")
+        val key = "public:club-slug:$slug:id:v1"
+        redisTemplate.delete(key)
+
+        adapter.putClubId(slug, clubId)
+
+        assertEquals(clubId, adapter.getClubId(slug))
+        assertEquals(clubId.toString(), redisTemplate.opsForValue().get(key))
+    }
+
+    @Test
     fun `missing public club records cache miss metric`() {
         redisTemplate.delete(CLUB_KEY)
         val missesBefore = counterValue("readmates.public_cache.miss", "scope", "club")
@@ -222,9 +250,10 @@ class RedisPublicReadCacheAdapterTest(
         )
 
     companion object {
-        private const val CLUB_KEY = "public:club:v1"
+        private val BASELINE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        private val CLUB_KEY = "public:club:$BASELINE_CLUB_ID:home:v1"
 
-        private fun sessionKey(sessionId: UUID) = "public:session:$sessionId:v1"
+        private fun sessionKey(sessionId: UUID) = "public:club:$BASELINE_CLUB_ID:session:$sessionId:v1"
 
         @JvmStatic
         @DynamicPropertySource

@@ -31,6 +31,11 @@ const unreadNotification = {
   createdAt: "2026-04-29T00:00:00Z",
 };
 
+const scopedUnreadNotification = {
+  ...unreadNotification,
+  deepLinkPath: "/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000002",
+};
+
 const notificationData: MemberNotificationListResponse = {
   unreadCount: 1,
   items: [unreadNotification],
@@ -147,6 +152,24 @@ describe("MemberNotificationsPage", () => {
         <MemberNotificationsPage
           unreadCount={1}
           items={[unreadNotification]}
+          onMarkRead={() => undefined}
+          onMarkAllRead={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("link", { name: "다음 책이 공개되었습니다" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000002",
+    );
+  });
+
+  it("preserves already scoped notification deep links", () => {
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/notifications"]}>
+        <MemberNotificationsPage
+          unreadCount={1}
+          items={[scopedUnreadNotification]}
           onMarkRead={() => undefined}
           onMarkAllRead={() => undefined}
         />

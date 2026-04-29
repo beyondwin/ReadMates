@@ -10,6 +10,7 @@ import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
+import com.readmates.notification.application.model.clubScopedAppPath
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
@@ -26,6 +27,12 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 class NotificationDispatchServiceTest {
+    @Test
+    fun `member notification deep link includes club scoped app path`() {
+        assertThat(clubScopedAppPath("reading-sai", "/sessions/00000000-0000-0000-0000-000000000301"))
+            .isEqualTo("/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000301")
+    }
+
     @Test
     fun `dispatch persists planned deliveries sends claimed email and marks sent`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery()))

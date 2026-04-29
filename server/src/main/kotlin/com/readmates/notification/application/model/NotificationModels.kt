@@ -36,12 +36,16 @@ data class NotificationEventMessage(
     val schemaVersion: Int = 1,
     val eventId: UUID,
     val clubId: UUID,
+    val clubSlug: String? = null,
     val eventType: NotificationEventType,
     val aggregateType: String,
     val aggregateId: UUID,
     val occurredAt: OffsetDateTime,
     val payload: NotificationEventPayload,
 )
+
+fun clubScopedAppPath(clubSlug: String, path: String): String =
+    "/clubs/$clubSlug/app/${path.trimStart('/')}"
 
 data class NotificationDeliveryItem(
     val id: UUID,

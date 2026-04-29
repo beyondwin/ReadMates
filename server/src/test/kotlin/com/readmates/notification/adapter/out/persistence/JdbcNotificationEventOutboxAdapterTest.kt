@@ -339,6 +339,7 @@ class JdbcNotificationEventOutboxAdapterTest(
         assertThat(message).isNotNull
         assertThat(message!!.eventId.toString()).isEqualTo(eventId)
         assertThat(message.clubId).isEqualTo(clubId)
+        assertThat(message.clubSlug).isEqualTo("readmates-event-outbox-test")
         assertThat(message.eventType).isEqualTo(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED)
         assertThat(message.aggregateType).isEqualTo("SESSION")
         assertThat(message.aggregateId).isEqualTo(sessionId)
