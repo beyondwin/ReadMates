@@ -17,6 +17,7 @@ class ServerArchitectureBoundaryTest {
         "com.readmates.archive.adapter.in.web..",
         "com.readmates.feedback.adapter.in.web..",
         "com.readmates.auth.adapter.in.web..",
+        "com.readmates.notification.adapter.in.web..",
         "com.readmates.shared.adapter.in.web..",
     )
 
@@ -27,6 +28,7 @@ class ServerArchitectureBoundaryTest {
         "com.readmates.archive.application..",
         "com.readmates.feedback.application..",
         "com.readmates.auth.application..",
+        "com.readmates.notification.application..",
     )
 
     @Test

@@ -121,7 +121,7 @@ The phases should be implemented in order. Phase 1 creates the product value. Ph
 - Create: `server/src/main/resources/db/mysql/migration/V16__notification_outbox.sql`
 - Test: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
-- [ ] **Step 1: Write the migration**
+- [x] **Step 1: Write the migration**
 
 Create `V16__notification_outbox.sql`:
 
@@ -163,7 +163,7 @@ create table notification_outbox (
 );
 ```
 
-- [ ] **Step 2: Run migration test**
+- [x] **Step 2: Run migration test**
 
 Run:
 
@@ -173,7 +173,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add server/src/main/resources/db/mysql/migration/V16__notification_outbox.sql
@@ -193,7 +193,7 @@ git commit -m "feat: add notification outbox schema"
 - Create: `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationOutboxAdapterTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 
-- [ ] **Step 1: Write failing persistence tests**
+- [x] **Step 1: Write failing persistence tests**
 
 Create `JdbcNotificationOutboxAdapterTest.kt` with tests that prove:
 
@@ -244,7 +244,7 @@ fun `enqueue is idempotent for the same event and recipient`() {
 
 Use existing testcontainer setup style from `FeedbackDocumentControllerTest.kt`: `@SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])`.
 
-- [ ] **Step 2: Run tests to verify failure**
+- [x] **Step 2: Run tests to verify failure**
 
 Run:
 
@@ -254,7 +254,7 @@ Run:
 
 Expected: compile failure because notification classes do not exist.
 
-- [ ] **Step 3: Add domain enums**
+- [x] **Step 3: Add domain enums**
 
 `NotificationEventType.kt`:
 
@@ -282,7 +282,7 @@ enum class NotificationOutboxStatus {
 }
 ```
 
-- [ ] **Step 4: Add models and port**
+- [x] **Step 4: Add models and port**
 
 `NotificationModels.kt`:
 
@@ -319,7 +319,6 @@ data class HostNotificationFailure(
     val eventType: NotificationEventType,
     val recipientEmail: String,
     val attemptCount: Int,
-    val lastError: String?,
     val updatedAt: OffsetDateTime,
 )
 ```
@@ -346,7 +345,7 @@ interface NotificationOutboxPort {
 }
 ```
 
-- [ ] **Step 5: Implement JDBC adapter**
+- [x] **Step 5: Implement JDBC adapter**
 
 Create `JdbcNotificationOutboxAdapter.kt`. Use `insert ignore` with a deterministic `dedupe_key`:
 
@@ -399,11 +398,11 @@ where sessions.session_date = ?
   and memberships.status = 'ACTIVE'
 ```
 
-- [ ] **Step 6: Update architecture boundary**
+- [x] **Step 6: Update architecture boundary**
 
 Add `com.readmates.notification.adapter.in.web..` to web adapter packages and `com.readmates.notification.application..` to application packages in `ServerArchitectureBoundaryTest.kt`.
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationOutboxAdapterTest --tests com.readmates.architecture.ServerArchitectureBoundaryTest
@@ -411,7 +410,7 @@ Add `com.readmates.notification.adapter.in.web..` to web adapter packages and `c
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt
@@ -433,7 +432,7 @@ git commit -m "feat: add notification outbox persistence"
 - Create: `server/src/main/kotlin/com/readmates/notification/adapter/in/scheduler/NotificationOutboxScheduler.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationOutboxServiceTest.kt`
 
-- [ ] **Step 1: Add dependencies**
+- [x] **Step 1: Add dependencies**
 
 Add to `server/build.gradle.kts`:
 
@@ -441,7 +440,7 @@ Add to `server/build.gradle.kts`:
 implementation("org.springframework.boot:spring-boot-starter-mail")
 ```
 
-- [ ] **Step 2: Add config defaults**
+- [x] **Step 2: Add config defaults**
 
 Append to `application.yml`:
 
@@ -460,7 +459,7 @@ readmates:
 
 Add SMTP placeholders in Task 7 deploy docs, not to committed runtime defaults.
 
-- [ ] **Step 3: Write service tests**
+- [x] **Step 3: Write service tests**
 
 Create tests for:
 
@@ -491,7 +490,7 @@ fun `processPending marks dead after max attempts`() {
 }
 ```
 
-- [ ] **Step 4: Add use cases and service**
+- [x] **Step 4: Add use cases and service**
 
 `NotificationUseCases.kt`:
 
@@ -544,7 +543,7 @@ interface MailDeliveryPort {
 - mark dead when `attemptCount + 1 >= maxAttempts`;
 - truncate `lastError` to 500 characters before persistence.
 
-- [ ] **Step 5: Add mail adapters**
+- [x] **Step 5: Add mail adapters**
 
 `SmtpMailDeliveryAdapter`:
 
@@ -569,7 +568,7 @@ class SmtpMailDeliveryAdapter(
 
 `LoggingMailDeliveryAdapter` must be active when `readmates.notifications.enabled=false` and log recipient domain only, not full addresses.
 
-- [ ] **Step 6: Add scheduler**
+- [x] **Step 6: Add scheduler**
 
 `NotificationOutboxScheduler.kt`:
 
@@ -595,7 +594,7 @@ Enable scheduling with a small config class:
 class NotificationSchedulingConfig
 ```
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.application.service.NotificationOutboxServiceTest
@@ -603,7 +602,7 @@ class NotificationSchedulingConfig
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/build.gradle.kts server/src/main/resources/application.yml server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/notification
@@ -620,7 +619,7 @@ git commit -m "feat: process notification outbox email delivery"
 - Test: `server/src/test/kotlin/com/readmates/feedback/api/FeedbackDocumentControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt`
 
-- [ ] **Step 1: Add failing feedback upload test**
+- [x] **Step 1: Add failing feedback upload test**
 
 Extend `FeedbackDocumentControllerTest`:
 
@@ -655,7 +654,7 @@ fun `host feedback upload enqueues attendee notification`() {
 }
 ```
 
-- [ ] **Step 2: Inject notification event use case into feedback service**
+- [x] **Step 2: Inject notification event use case into feedback service**
 
 Modify constructor:
 
@@ -677,7 +676,7 @@ recordNotificationEventUseCase.recordFeedbackDocumentPublished(
 
 This runs in the same transaction as document insert. If the request rolls back, the outbox insert rolls back too.
 
-- [ ] **Step 3: Add failing next-book visibility test**
+- [x] **Step 3: Add failing next-book visibility test**
 
 Extend `HostSessionControllerDbTest` with:
 
@@ -706,7 +705,7 @@ fun `member visible draft session enqueues next book notification`() {
 }
 ```
 
-- [ ] **Step 4: Inject notification event use case into host session service**
+- [x] **Step 4: Inject notification event use case into host session service**
 
 Modify constructor:
 
@@ -729,7 +728,7 @@ override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): Host
 }
 ```
 
-- [ ] **Step 5: Add reminder scheduler entry point**
+- [x] **Step 5: Add reminder scheduler entry point**
 
 Add a daily scheduled method in `NotificationOutboxScheduler`:
 
@@ -742,7 +741,7 @@ fun enqueueTomorrowReminders() {
 
 Inject `RecordNotificationEventUseCase` into the scheduler. Keep the cron disabled in tests by setting `readmates.notifications.worker.enabled=false`.
 
-- [ ] **Step 6: Run focused tests**
+- [x] **Step 6: Run focused tests**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.feedback.api.FeedbackDocumentControllerTest --tests com.readmates.session.api.HostSessionControllerDbTest
@@ -750,7 +749,7 @@ Inject `RecordNotificationEventUseCase` into the scheduler. Keep the cron disabl
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/feedback/application/service/FeedbackDocumentService.kt server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/feedback/api/FeedbackDocumentControllerTest.kt server/src/test/kotlin/com/readmates/session/api/HostSessionControllerDbTest.kt
@@ -771,7 +770,7 @@ git commit -m "feat: enqueue session notification events"
 - Modify: `front/features/host/components/host-dashboard.tsx`
 - Test: `front/tests/unit/host-dashboard.test.tsx`
 
-- [ ] **Step 1: Add API controller test**
+- [x] **Step 1: Add API controller test**
 
 Create `HostNotificationControllerTest.kt`:
 
@@ -809,7 +808,7 @@ fun `host can read notification status summary`() {
 }
 ```
 
-- [ ] **Step 2: Add controller**
+- [x] **Step 2: Add controller**
 
 `HostNotificationController.kt`:
 
@@ -834,7 +833,7 @@ class HostNotificationController(
 }
 ```
 
-- [ ] **Step 3: Update security**
+- [x] **Step 3: Update security**
 
 Add CSRF ignore matcher:
 
@@ -844,7 +843,7 @@ methodAndPath("POST", Regex("^/api/host/notifications/process$"))
 
 No new `authorizeHttpRequests` rule is needed because `/api/host/**` already requires host role.
 
-- [ ] **Step 4: Add frontend contracts**
+- [x] **Step 4: Add frontend contracts**
 
 In `host-contracts.ts`:
 
@@ -859,7 +858,6 @@ export type HostNotificationSummary = {
     eventType: "NEXT_BOOK_PUBLISHED" | "SESSION_REMINDER_DUE" | "FEEDBACK_DOCUMENT_PUBLISHED";
     recipientEmail: string;
     attemptCount: number;
-    lastError: string | null;
     updatedAt: string;
   }>;
 };
@@ -877,7 +875,7 @@ export function processHostNotifications() {
 }
 ```
 
-- [ ] **Step 5: Load status in dashboard route**
+- [x] **Step 5: Load status in dashboard route**
 
 Modify `HostDashboardRouteData`:
 
@@ -892,7 +890,7 @@ export type HostDashboardRouteData = {
 
 Add `fetchHostNotificationSummary()` to the existing `Promise.all`.
 
-- [ ] **Step 6: Render compact host ledger section**
+- [x] **Step 6: Render compact host ledger section**
 
 Add to dashboard props:
 
@@ -928,7 +926,7 @@ Render a section near `공개 · 피드백`:
 
 Use existing CSS classes where possible. Do not expose full email addresses in UI if the current host dashboard does not already show them in that context. Mask as `m***@example.com` in the server DTO or frontend model before rendering.
 
-- [ ] **Step 7: Run checks**
+- [x] **Step 7: Run checks**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.api.HostNotificationControllerTest
@@ -938,7 +936,7 @@ pnpm --dir front lint
 
 Expected: all pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/in/web server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt server/src/test/kotlin/com/readmates/notification/api front/features/host front/tests/unit/host-dashboard.test.tsx
@@ -958,7 +956,7 @@ git commit -m "feat: show host notification status"
 - Test: `server/src/test/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetricsTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/shared/adapter/in/web/HealthControllerTest.kt`
 
-- [ ] **Step 1: Add Prometheus registry**
+- [x] **Step 1: Add Prometheus registry**
 
 Add:
 
@@ -966,7 +964,7 @@ Add:
 runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 ```
 
-- [ ] **Step 2: Configure management endpoints**
+- [x] **Step 2: Configure management endpoints**
 
 Change management exposure:
 
@@ -990,7 +988,7 @@ management:
 
 Keep `/actuator/**` off the public Caddy route. `HealthControllerTest` must continue to assert the main application port does not expose `/actuator/health` anonymously.
 
-- [ ] **Step 3: Add metrics service**
+- [x] **Step 3: Add metrics service**
 
 `ReadmatesOperationalMetrics.kt`:
 
@@ -1028,7 +1026,9 @@ class ReadmatesOperationalMetrics(private val meterRegistry: MeterRegistry) {
 }
 ```
 
-- [ ] **Step 4: Wire metrics**
+Final implementation also registers `readmates.notifications.outbox.backlog` gauges with a low-cardinality `status` tag for `pending`, `failed`, `dead`, and `sending`.
+
+- [x] **Step 4: Wire metrics**
 
 In `NotificationOutboxService`, call:
 
@@ -1050,7 +1050,7 @@ return runCatching {
 
 Inject `ReadmatesOperationalMetrics` into both notification and feedback services. Do not create a second metrics helper class.
 
-- [ ] **Step 5: Add metric tests**
+- [x] **Step 5: Add metric tests**
 
 Assert counters increment using `SimpleMeterRegistry`:
 
@@ -1070,7 +1070,7 @@ fun `sent metric increments with event type tag`() {
 }
 ```
 
-- [ ] **Step 6: Run checks**
+- [x] **Step 6: Run checks**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.notification.application.service.ReadmatesOperationalMetricsTest --tests com.readmates.shared.adapter.in.web.HealthControllerTest
@@ -1082,7 +1082,7 @@ Expected:
 - `/internal/health` remains public;
 - `/actuator/health` remains unauthorized.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/build.gradle.kts server/src/main/resources/application.yml server/src/main/kotlin/com/readmates/notification/application/service server/src/main/kotlin/com/readmates/feedback/application/service/FeedbackDocumentService.kt server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/shared/adapter/in/web/HealthControllerTest.kt
@@ -1097,7 +1097,7 @@ git commit -m "feat: add operations metrics"
 - Modify: `docs/deploy/oci-backend.md`
 - Modify: `docs/development/test-guide.md`
 
-- [ ] **Step 1: Add production env placeholders**
+- [x] **Step 1: Add production env placeholders**
 
 Add this block to `docs/deploy/oci-backend.md`:
 
@@ -1119,7 +1119,7 @@ SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
 
 Use `<oci-region>` and placeholders only. Do not use the real region, sender domain, SMTP username, or SMTP password.
 
-- [ ] **Step 2: Add local metrics verification**
+- [x] **Step 2: Add local metrics verification**
 
 Document VM-local check:
 
@@ -1129,7 +1129,7 @@ curl -sS http://127.0.0.1:8081/actuator/prometheus | grep readmates_notification
 
 Document that `READMATES_MANAGEMENT_ADDRESS=127.0.0.1` and `READMATES_MANAGEMENT_PORT=8081` are required for VM-local scraping. Do not suggest exposing `/actuator/prometheus` through Caddy.
 
-- [ ] **Step 3: Add test guide section**
+- [x] **Step 3: Add test guide section**
 
 Add targeted commands:
 
@@ -1140,7 +1140,7 @@ pnpm --dir front test -- host-dashboard
 pnpm --dir front lint
 ```
 
-- [ ] **Step 4: Run docs check**
+- [x] **Step 4: Run docs check**
 
 ```bash
 git diff --check -- docs/deploy/oci-backend.md docs/development/test-guide.md
@@ -1148,7 +1148,7 @@ git diff --check -- docs/deploy/oci-backend.md docs/development/test-guide.md
 
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/deploy/oci-backend.md docs/development/test-guide.md
@@ -1163,7 +1163,7 @@ git commit -m "docs: document notification operations deployment"
 - Create: `deploy/oci/backup-mysql-to-object-storage.sh`
 - Modify: `docs/deploy/oci-mysql-heatwave.md`
 
-- [ ] **Step 1: Write backup script**
+- [x] **Step 1: Write backup script**
 
 Create `deploy/oci/backup-mysql-to-object-storage.sh`:
 
@@ -1190,10 +1190,15 @@ export_path="$(
 )"
 
 checksum_path="${export_path}.sha256"
-sha256sum "$export_path" > "$checksum_path"
+export_dir="$(dirname "$export_path")"
+backup_name="$(basename "$export_path")"
+
+(
+  cd "$export_dir"
+  sha256sum "$backup_name"
+) > "$checksum_path"
 
 object_prefix="${READMATES_BACKUP_OBJECT_PREFIX:-mysql}"
-backup_name="$(basename "$export_path")"
 checksum_name="$(basename "$checksum_path")"
 
 oci os object put \
@@ -1214,13 +1219,13 @@ echo "UPLOADED: $object_prefix/$backup_name"
 echo "UPLOADED: $object_prefix/$checksum_name"
 ```
 
-- [ ] **Step 2: Make script executable**
+- [x] **Step 2: Make script executable**
 
 ```bash
 chmod +x deploy/oci/backup-mysql-to-object-storage.sh
 ```
 
-- [ ] **Step 3: Add docs**
+- [x] **Step 3: Add docs**
 
 In `docs/deploy/oci-mysql-heatwave.md`, document:
 
@@ -1235,7 +1240,7 @@ sha256sum -c readmates-YYYYMMDDTHHMMSSZ.sql.gz.sha256
 
 - restore rehearsal command using a non-production DB.
 
-- [ ] **Step 4: Run shell syntax and docs checks**
+- [x] **Step 4: Run shell syntax and docs checks**
 
 ```bash
 bash -n deploy/oci/backup-mysql-to-object-storage.sh
@@ -1244,7 +1249,7 @@ git diff --check -- deploy/oci/backup-mysql-to-object-storage.sh docs/deploy/oci
 
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add deploy/oci/backup-mysql-to-object-storage.sh docs/deploy/oci-mysql-heatwave.md
@@ -1260,7 +1265,7 @@ git commit -m "feat: upload mysql backups to object storage"
 - Modify: `docs/development/architecture.md`
 - Modify: `docs/deploy/security-public-repo.md` only if scanner behavior changes.
 
-- [ ] **Step 1: Add concise README highlight**
+- [x] **Step 1: Add concise README highlight**
 
 Add one bullet under highlights:
 
@@ -1268,7 +1273,7 @@ Add one bullet under highlights:
 - 운영 파이프라인: MySQL transactional outbox 기반 이메일 알림, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 ```
 
-- [ ] **Step 2: Add architecture note**
+- [x] **Step 2: Add architecture note**
 
 In `docs/development/architecture.md`, document:
 
@@ -1282,7 +1287,7 @@ notification
 
 State that MySQL remains the source of truth and email delivery is retryable side effect work.
 
-- [ ] **Step 3: Run full checks**
+- [x] **Step 3: Run full checks**
 
 ```bash
 ./server/gradlew -p server clean test
@@ -1294,7 +1299,7 @@ git diff --check -- README.md docs/development/architecture.md docs/deploy/oci-b
 
 Expected: all pass.
 
-- [ ] **Step 4: Run public release checks if docs mention deployment or public safety changes**
+- [x] **Step 4: Run public release checks if docs mention deployment or public safety changes**
 
 ```bash
 ./scripts/build-public-release-candidate.sh
@@ -1303,7 +1308,7 @@ Expected: all pass.
 
 Expected: no new public-safety findings caused by the changed files.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add README.md docs/development/architecture.md
@@ -1349,7 +1354,7 @@ READMATES_NOTIFICATION_WORKER_ENABLED=true
 
 ```bash
 sudo journalctl -u readmates-server -n 120 --no-pager
-curl -sS http://127.0.0.1:8080/actuator/prometheus | grep readmates_notifications
+curl -sS http://127.0.0.1:8081/actuator/prometheus | grep readmates_notifications
 ```
 
 8. Enable Object Storage backup script from a manual command before adding a timer.

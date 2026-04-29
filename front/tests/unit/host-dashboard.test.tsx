@@ -11,6 +11,7 @@ import {
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
+  HostNotificationSummary,
   HostSessionListItem,
 } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -34,6 +35,30 @@ const emptyDashboard: HostDashboardResponse = {
   checkinMissing: 0,
   publishPending: 0,
   feedbackPending: 0,
+};
+
+const notificationSummary = {
+  pending: 2,
+  failed: 1,
+  dead: 1,
+  sentLast24h: 5,
+  latestFailures: [
+    {
+      id: "notification-failed-1",
+      eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      recipientEmail: "member@example.com",
+      attemptCount: 3,
+      updatedAt: "2026-04-28T10:30:00Z",
+    },
+  ],
+} satisfies HostNotificationSummary;
+
+const emptyNotificationSummary = {
+  pending: 0,
+  failed: 0,
+  dead: 0,
+  sentLast24h: 0,
+  latestFailures: [],
 };
 
 const hostAuth: AuthMeResponse = {
@@ -359,16 +384,24 @@ describe("HostDashboard", () => {
         return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       }
 
+      if (url === "/api/bff/api/host/notifications/summary") {
+        return Promise.resolve(new Response(JSON.stringify(notificationSummary), { status: 200 }));
+      }
+
       return Promise.resolve(new Response(JSON.stringify({ message: "unexpected request" }), { status: 404 }));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader()).resolves.toEqual({ current, data: dashboard, hostSessions: [] });
+    await expect(hostDashboardLoader()).resolves.toEqual({ current, data: dashboard, hostSessions: [], notifications: notificationSummary });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/dashboard", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/notifications/summary",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it("loads host session list for the dashboard", async () => {
@@ -377,6 +410,7 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
       if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -385,6 +419,80 @@ describe("HostDashboard", () => {
 
     expect(data.hostSessions).toEqual([]);
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({}));
+  });
+
+  it("loads host notification status for the dashboard", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
+      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const data = await hostDashboardLoader();
+
+    expect(data).toMatchObject({ notifications: notificationSummary });
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/notifications/summary", expect.objectContaining({}));
+  });
+
+  it("keeps host dashboard loader usable when notification status is temporarily unavailable", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
+      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/notifications/summary") {
+        return Promise.resolve(new Response(JSON.stringify({ message: "notification status unavailable" }), { status: 503 }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(hostDashboardLoader()).resolves.toEqual({
+      current,
+      data: dashboard,
+      hostSessions: [],
+      notifications: emptyNotificationSummary,
+    });
+  });
+
+  it("does not hide notification status authorization failures", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
+      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/notifications/summary") {
+        return Promise.resolve(new Response(JSON.stringify({ message: "forbidden" }), { status: 403 }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(hostDashboardLoader()).rejects.toThrow("ReadMates API failed: 403");
+  });
+
+  it("renders notification status without full recipient email addresses", () => {
+    const props = {
+      data: dashboard,
+      notifications: notificationSummary,
+    } as HostDashboardProps & { notifications: typeof notificationSummary };
+    const { container } = render(<HostDashboardForTest {...props} />);
+    const desktop = getDesktopView(container);
+    const mobile = getMobileView(container);
+
+    expect(desktop.getByRole("heading", { name: "알림 발송" })).toBeInTheDocument();
+    expect(desktop.getByText("최근 24시간 5건")).toBeInTheDocument();
+    expect(desktop.getByText("대기 2")).toBeInTheDocument();
+    expect(desktop.getByText("실패 1")).toBeInTheDocument();
+    expect(desktop.getByText("중단 1")).toBeInTheDocument();
+    expect(desktop.getByText("FEEDBACK_DOCUMENT_PUBLISHED")).toBeInTheDocument();
+    expect(desktop.getByText("m***@example.com")).toBeInTheDocument();
+    expect(mobile.getByText("최근 24시간 5건")).toBeInTheDocument();
+    expect(screen.queryByText("member@example.com")).not.toBeInTheDocument();
   });
 
   it("renders upcoming session management on desktop and mobile", () => {

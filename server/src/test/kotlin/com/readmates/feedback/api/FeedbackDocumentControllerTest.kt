@@ -3,6 +3,7 @@ package com.readmates.feedback.api
 import com.readmates.support.MySqlTestContainer
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -19,6 +20,10 @@ import org.springframework.test.web.servlet.multipart
 import java.nio.charset.StandardCharsets
 
 private const val CLEANUP_SESSION_SIX_TEST_UPLOAD_SQL = """
+    delete from notification_outbox
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
+      and aggregate_id = '00000000-0000-0000-0000-000000000306';
     delete from session_feedback_documents
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id = '00000000-0000-0000-0000-000000000306'
@@ -330,6 +335,28 @@ class FeedbackDocumentControllerTest(
             status { isCreated() }
             jsonPath("$.title") { value("독서모임 6차 피드백") }
         }
+    }
+
+    @Test
+    fun `host feedback upload enqueues attendee notification`() {
+        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+            with(user("host@example.com"))
+            file(validMarkdownFile())
+        }.andExpect {
+            status { isCreated() }
+        }
+
+        val count = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_outbox
+            where event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
+              and aggregate_id = '00000000-0000-0000-0000-000000000306'
+            """.trimIndent(),
+            Int::class.java,
+        ) ?: 0
+
+        assertThat(count).isGreaterThan(0)
     }
 
     @Test
