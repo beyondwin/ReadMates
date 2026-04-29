@@ -2,10 +2,14 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import { afterEach, describe, expect, it, vi } from "vitest";
 import PublicClub from "@/features/public/ui/public-club";
 import type { PublicClubResponse } from "@/features/public/api/public-contracts";
+import { buildCanonicalUrl, publicClubSlugFromPath, shouldNoIndex } from "@/features/public/model/public-url-policy";
+import { PublicUrlPolicyHead } from "@/features/public/ui/public-url-policy-head";
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  document.head.innerHTML = "";
 });
 
 const publicClubFixture: PublicClubResponse = {
@@ -31,6 +35,41 @@ const publicClubFixture: PublicClubResponse = {
     },
   ],
 };
+
+describe("public URL policy", () => {
+  it("builds club-domain canonicals from scoped public routes", () => {
+    expect(
+      buildCanonicalUrl({
+        host: "readmates.pages.dev",
+        clubSlug: "reading-sai",
+        path: "/clubs/reading-sai",
+        primaryDomain: "example.test",
+      }),
+    ).toBe("https://reading-sai.example.test/");
+  });
+
+  it("marks Cloudflare Pages hosts as noindex", () => {
+    expect(shouldNoIndex("readmates.pages.dev")).toBe(true);
+    expect(shouldNoIndex("preview.readmates.pages.dev")).toBe(true);
+    expect(shouldNoIndex("reading-sai.example.test")).toBe(false);
+  });
+
+  it("keeps legacy public routes canonicalized to the baseline club", () => {
+    expect(publicClubSlugFromPath("/records")).toBe("reading-sai");
+    expect(
+      buildCanonicalUrl({
+        host: "readmates.pages.dev",
+        clubSlug: "reading-sai",
+        path: "/records",
+        primaryDomain: "example.test",
+      }),
+    ).toBe("https://reading-sai.example.test/records");
+  });
+
+  it("does not canonicalize private invite-token routes", () => {
+    expect(publicClubSlugFromPath("/clubs/reading-sai/invite/raw-token")).toBeNull();
+  });
+});
 
 describe("PublicClub", () => {
   it("renders API about and tagline, dynamic member count, and static operational introduction", () => {
@@ -112,6 +151,41 @@ describe("PublicClub", () => {
       "href",
       "/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306",
     );
+  });
+
+  it("renders canonical and pages.dev noindex head tags without changing scoped links", () => {
+    render(
+      <>
+        <PublicUrlPolicyHead host="readmates.pages.dev" path="/clubs/reading-sai/about" primaryDomain="example.test" />
+        <PublicClub data={publicClubFixture} publicBasePath="/clubs/reading-sai" />
+      </>,
+    );
+
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute("href", "https://reading-sai.example.test/about");
+    expect(document.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex");
+    expect(screen.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/clubs/reading-sai/records");
+  });
+
+  it("replaces public head tags when the public route changes", () => {
+    const { rerender } = render(
+      <PublicUrlPolicyHead host="readmates.pages.dev" path="/clubs/reading-sai" primaryDomain="example.test" />,
+    );
+
+    expect(document.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute("href", "https://reading-sai.example.test/");
+
+    rerender(<PublicUrlPolicyHead host="readmates.pages.dev" path="/clubs/reading-sai/records" primaryDomain="example.test" />);
+
+    expect(document.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute("href", "https://reading-sai.example.test/records");
+    expect(document.querySelectorAll('meta[name="robots"]')).toHaveLength(1);
+  });
+
+  it("does not render token-bearing canonical links for invite routes", () => {
+    render(<PublicUrlPolicyHead host="readmates.pages.dev" path="/clubs/reading-sai/invite/raw-token" primaryDomain="example.test" />);
+
+    expect(document.querySelector('link[rel="canonical"]')).toBeNull();
+    expect(document.querySelector('meta[name="robots"]')).toHaveAttribute("content", "noindex");
   });
 
   it("shows only the latest three public records with book thumbnails in the about list", () => {

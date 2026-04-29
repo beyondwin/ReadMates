@@ -1,8 +1,7 @@
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { fetchPublicClub, fetchPublicSession } from "@/features/public/api/public-api";
 import type { PublicClubResponse, PublicSessionDetailResponse } from "@/features/public/api/public-contracts";
-
-const BASELINE_PUBLIC_CLUB_SLUG = "reading-sai";
+import { BASELINE_PUBLIC_CLUB_SLUG } from "@/features/public/model/public-url-policy";
 
 export type PublicClubRouteData = PublicClubResponse & {
   clubSlug: string;
