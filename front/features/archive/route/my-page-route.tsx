@@ -70,6 +70,7 @@ export function MyPageRoute({
       onUpdateProfile={submitProfileUpdate}
       notificationPreferences={data.notificationPreferences}
       onSaveNotificationPreferences={saveNotificationPreferences}
+      canManageNotificationPreferences={data.canManageNotificationPreferences}
     />
   );
 }
