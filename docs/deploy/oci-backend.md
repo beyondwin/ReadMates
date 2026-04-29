@@ -2,7 +2,7 @@
 
 백엔드는 OCI Compute VM에서 Spring Boot JAR로 실행되고 systemd가 프로세스를 관리합니다. Caddy가 운영 HTTPS endpoint를 받아 로컬 Spring `127.0.0.1:8080`으로 reverse proxy합니다.
 
-상위 배포 허브는 [README.md](README.md)입니다. Cloudflare Pages와 Pages Functions 설정은 [cloudflare-pages.md](cloudflare-pages.md)를 함께 확인합니다.
+상위 배포 허브는 [README.md](README.md)입니다. Cloudflare Pages와 Pages Functions 설정은 [cloudflare-pages.md](cloudflare-pages.md)를 함께 확인합니다. 멀티 클럽 domain alias와 OAuth origin 운영은 [multi-club-domains.md](multi-club-domains.md)를 기준으로 맞춥니다.
 
 ## 런타임 기준
 
@@ -25,6 +25,8 @@ SPRING_DATASOURCE_URL=jdbc:mysql://<mysql-private-host>:3306/readmates?useSSL=tr
 SPRING_DATASOURCE_USERNAME=readmates
 SPRING_DATASOURCE_PASSWORD=<db-password>
 READMATES_APP_BASE_URL=https://readmates.pages.dev
+READMATES_AUTH_BASE_URL=https://readmates.pages.dev
+READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
 READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
 READMATES_BFF_SECRET=<same-secret-as-cloudflare>
 READMATES_BFF_SECRET_REQUIRED=true
@@ -77,6 +79,8 @@ APP_DB_PASS='<db-password>' \
 BFF_SECRET='<same-secret-as-cloudflare>' \
 MYSQL_PRIVATE_IP='<mysql-private-ip>' \
 READMATES_APP_BASE_URL='https://readmates.pages.dev' \
+READMATES_AUTH_BASE_URL='https://readmates.pages.dev' \
+READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}' \
 READMATES_ALLOWED_ORIGINS='https://readmates.pages.dev' \
 CADDY_SITE='api.example.com' \
 GOOGLE_CLIENT_ID='<google-oauth-client-id>' \
@@ -93,7 +97,23 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-conf
 - `readmates-server` 서비스 enable
 - Caddy reverse proxy 설정, `${CADDY_SITE} -> 127.0.0.1:8080`
 
-`02-configure.sh`는 baseline OAuth, DB, BFF 값으로 `/etc/readmates/readmates.env`를 다시 생성합니다. 알림 발송을 켜는 배포에서는 스크립트 실행 뒤 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*`, `READMATES_MANAGEMENT_*` 값을 같은 env 파일에 운영 값으로 추가한 뒤 `readmates-server`를 재시작합니다.
+`02-configure.sh`는 baseline OAuth, DB, BFF 값으로 `/etc/readmates/readmates.env`를 다시 생성합니다. 알림 발송을 켜는 배포에서는 실행 뒤 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*`, `READMATES_MANAGEMENT_*` 값을 같은 env 파일에 운영 값으로 추가하고 `readmates-server`를 재시작합니다.
+
+## Multi-club Origin and OAuth Settings
+
+Spring은 OAuth callback origin과 app return origin을 분리합니다.
+
+| 변수 | 운영 기준 |
+| --- | --- |
+| `READMATES_APP_BASE_URL` | 기본 app origin입니다. primary domain이 준비되지 않은 배포에서는 `https://readmates.pages.dev`를 사용합니다. |
+| `READMATES_AUTH_BASE_URL` | Google OAuth `redirect_uri`에 쓰는 primary auth origin입니다. fallback-only 배포에서는 `READMATES_APP_BASE_URL`과 같게 두고, primary domain을 쓰면 `https://<primary-domain>`으로 둡니다. |
+| `READMATES_AUTH_RETURN_STATE_SECRET` | OAuth return target 서명 secret입니다. 운영에서는 공개 기본값이나 짧은 샘플 문자열을 사용하지 않습니다. |
+| `READMATES_ALLOWED_ORIGINS` | mutating request의 `Origin`/`Referer` 허용 목록입니다. `https://readmates.pages.dev`, primary origin, active registered club host를 comma-separated로 명시합니다. |
+| `READMATES_AUTH_SESSION_COOKIE_DOMAIN` | subdomain 간 세션 공유가 필요한 경우에만 설정합니다. Cookie domain 밖의 external custom domain은 같은 platform session을 공유할 수 없으므로 OAuth return URL 허용 대상에서 제외될 수 있습니다. |
+
+현재 allowlist는 DB-backed dynamic allowlist가 아니라 startup 시 읽는 정적 comma-separated 설정입니다. 새 club host를 `ACTIVE`로 운영하기 전에는 Spring env의 `READMATES_ALLOWED_ORIGINS`를 갱신하고 서비스를 재시작합니다. Wildcard origin이나 실제 운영 domain 목록은 공개 문서에 넣지 않습니다.
+
+Google Cloud OAuth client에는 `READMATES_AUTH_BASE_URL`의 `/login/oauth2/code/google` callback을 등록합니다. `https://readmates.pages.dev` fallback을 계속 운영하면 fallback callback도 유지합니다.
 
 ## JAR 배포
 
@@ -170,8 +190,9 @@ curl -sS http://127.0.0.1:8080/internal/health
 Cloudflare 경유:
 
 ```bash
+CLUB_SLUG='{club-slug}'
 curl -sS https://readmates.pages.dev/api/bff/api/auth/me
-curl -sS https://readmates.pages.dev/api/bff/api/public/club
+curl -sS "https://readmates.pages.dev/api/bff/api/public/clubs/${CLUB_SLUG}"
 ```
 
 OAuth:

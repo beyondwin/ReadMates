@@ -2,7 +2,7 @@
 
 Cloudflare Pages는 Vite SPA와 같은 origin에서 동작하는 BFF/OAuth proxy 함수를 배포합니다.
 
-상위 배포 허브는 [README.md](README.md)입니다. 승인된 포트폴리오 데모 URL은 `https://readmates.pages.dev`입니다.
+상위 배포 허브는 [README.md](README.md)입니다. 승인된 포트폴리오 데모 URL은 `https://readmates.pages.dev`입니다. 멀티 클럽 도메인 운영 절차는 [multi-club-domains.md](multi-club-domains.md)를 함께 확인합니다.
 
 ## 프로젝트 설정
 
@@ -19,13 +19,17 @@ Cloudflare Pages는 Vite SPA와 같은 origin에서 동작하는 BFF/OAuth proxy
 
 Cloudflare 프로젝트 root가 `front`이므로 Pages Functions는 `front/functions`에서 배포됩니다.
 
+`https://readmates.pages.dev`는 무료 플랜에서도 항상 유지하는 fallback과 preview origin입니다. 클럽 공개 사이트는 기본적으로 `https://readmates.pages.dev/clubs/<club-slug>`로 접근할 수 있어야 하며, primary domain이나 등록된 club host를 추가해도 이 fallback을 제거하지 않습니다.
+
 ## 현재 함수 라우트
 
 - `/api/bff/**`: 브라우저 API 호출을 Spring `/api/**`로 전달합니다.
 - `/oauth2/authorization/**`: Google OAuth 시작 요청을 Spring으로 전달합니다.
 - `/login/oauth2/code/**`: Google OAuth 콜백을 Spring으로 전달하고 upstream `Set-Cookie` 헤더를 보존합니다.
 
-`front/public/_redirects`는 함수 pass-through 규칙을 SPA fallback보다 위에 둬야 합니다.
+Pages Functions는 browser가 보낸 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host`를 그대로 신뢰하지 않습니다. `/clubs/<club-slug>` path fallback은 검증된 slug를 `clubSlug` query로 BFF에 전달하고, registered host alias는 request host를 Spring에 전달합니다.
+
+`front/public/_redirects`는 함수 pass-through 규칙을 SPA fallback보다 위에 둬야 합니다. Club path와 registered host alias deep link는 모두 SPA fallback으로 진입해야 합니다.
 
 ```text
 /api/bff/* /api/bff/:splat 200
@@ -67,44 +71,61 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 
 ## Google OAuth 설정
 
-Google Cloud OAuth client의 승인된 redirect URI:
+Google Cloud OAuth client의 승인된 redirect URI는 OAuth callback이 실제로 도착하는 auth origin마다 등록합니다. 기본 fallback만 운영할 때는 아래 URI가 필요합니다.
 
 ```text
 https://readmates.pages.dev/login/oauth2/code/google
 ```
 
-커스텀 도메인을 추가하면 Google Cloud에도 같은 callback을 추가하고, Spring의 `READMATES_APP_BASE_URL`과 `READMATES_ALLOWED_ORIGINS`를 새 HTTPS origin으로 맞춥니다.
+Primary auth domain을 별도로 쓰면 같은 path를 primary origin에도 추가합니다.
+
+```text
+https://<primary-domain>/login/oauth2/code/google
+```
+
+ReadMates의 기본 전략은 OAuth start는 현재 Pages 또는 registered host에서 시작할 수 있게 두고, Google에 전달하는 callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모으는 방식입니다. 성공 후에는 검증된 `returnTo`가 있는 흐름만 원래 클럽 path나 registered club host로 복귀하고, 일반 로그인은 `/app` smart entry로 이동합니다. 따라서 club별 registered host를 Google redirect URI에 모두 추가하지 않습니다. 단, 운영자가 OAuth callback 자체를 특정 registered host에서 받도록 바꾸는 경우에는 해당 host의 `/login/oauth2/code/google`도 Google Cloud에 등록해야 합니다.
 
 ## Spring과 맞춰야 하는 값
 
-Cloudflare origin과 Spring 설정은 같은 origin을 바라봐야 합니다.
+Cloudflare origin과 Spring 설정은 같은 browser-facing origin 집합을 바라봐야 합니다. Primary auth origin을 아직 쓰지 않는 배포에서는 `READMATES_AUTH_BASE_URL`을 `READMATES_APP_BASE_URL`과 같은 fallback origin으로 둡니다.
 
 ```bash
 READMATES_APP_BASE_URL=https://readmates.pages.dev
-READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
+READMATES_AUTH_BASE_URL=https://readmates.pages.dev
+READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
+READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev,https://<primary-domain>,https://<registered-club-host>
 READMATES_BFF_SECRET=<same-secret-as-cloudflare>
 READMATES_BFF_SECRET_REQUIRED=true
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 ```
+
+`READMATES_ALLOWED_ORIGINS`에는 실제로 활성화한 primary origin과 registered club host만 넣습니다. 공개 문서나 설정 예시에는 실제 운영 domain, Cloudflare account id, zone id, API token을 적지 않습니다.
 
 `READMATES_API_BASE_URL`은 HTTPS여야 합니다. Cloudflare Pages가 사용자 cookie와 BFF secret을 upstream으로 전달하므로 운영에서 plaintext Spring listener를 직접 가리키지 않습니다. Caddy, Nginx, OCI Load Balancer, 또는 Cloudflare proxy 등으로 TLS를 종료한 뒤 `127.0.0.1:8080`의 Spring으로 넘깁니다.
 
 ## 배포 확인
 
 ```bash
+CLUB_SLUG='{club-slug}'
 curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/app
 curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/api/bff/api/auth/me
 curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.pages.dev/oauth2/authorization/google
-curl -sS https://readmates.pages.dev/api/bff/api/public/club
+curl -sS "https://readmates.pages.dev/api/bff/api/public/clubs/${CLUB_SLUG}"
 ```
 
 기대값:
 
-- `/app`은 `200`으로 SPA를 반환합니다.
+- `/app`은 `200`으로 SPA를 반환하고 로그인 후 가입 클럽이 하나면 해당 클럽으로, 여러 개면 클럽 선택 화면으로 이어집니다.
 - `/api/bff/api/auth/me`는 BFF를 통해 Spring에 도달합니다. 로그아웃 상태여도 anonymous auth state를 담은 `200`일 수 있습니다.
 - `/oauth2/authorization/google`은 Google 또는 Spring OAuth 흐름으로 redirect됩니다.
-- `/api/bff/api/public/club`은 `PUBLISHED` 상태이면서 `PUBLIC` 공개 범위인 기록에 노출 가능한 club 정보만 반환해야 합니다.
-- deep route와 legacy route인 `/app/session/current`, `/app/host`, `/app/host/sessions/new`, `/app/host/sessions/<session-id>/edit`, `/app/host/members`, `/invite/<token>`, `/reset-password/<token>`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
+- `/api/bff/api/public/clubs/<club-slug>`은 해당 club의 공개 가능한 정보만 반환해야 합니다.
+- deep route와 legacy route인 `/clubs/<club-slug>/app/session/current`, `/clubs/<club-slug>/app/host`, `/clubs/<club-slug>/app/host/sessions/new`, `/clubs/<club-slug>/app/host/sessions/<session-id>/edit`, `/clubs/<club-slug>/app/host/members`, `/clubs/<club-slug>/invite/<token>`, `/invite/<token>`, `/reset-password/<token>`, `/app`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
+
+## Registered Club Host 운영
+
+등록형 subdomain 또는 custom domain은 DB의 `club_domains.status` workflow state와 실제 Cloudflare Pages custom domain 연결 상태를 분리해서 관리합니다. Platform admin UI에서 domain을 만들면 초기 상태는 `ACTION_REQUIRED`이며, 운영자가 Cloudflare dashboard 또는 Wrangler에서 Pages custom domain을 연결해야 합니다. Cloudflare 연결과 인증서 상태가 확인되기 전까지 public fallback URL인 `/clubs/<club-slug>`를 사용자에게 안내합니다.
+
+`ACTION_REQUIRED`, `PROVISIONING`, `ACTIVE`, `FAILED`, `DISABLED` 상태의 의미와 수동 처리 절차는 [multi-club-domains.md](multi-club-domains.md#cloudflare-pages-custom-domain-runbook)를 기준으로 운영합니다.
 
 ## 비용 상태 확인
 
