@@ -2,9 +2,14 @@ package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.HostNotificationDelivery
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
+import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
@@ -391,6 +396,17 @@ class NotificationDispatchServiceTest {
                 .take(limit.coerceAtLeast(0))
                 .mapNotNull { claimEmailDelivery(it.id) }
 
+        override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
+            deliveries
+                .filter { it.clubId == clubId && it.channel == NotificationChannel.EMAIL }
+                .take(limit.coerceAtLeast(0))
+                .mapNotNull { claimEmailDelivery(it.id) }
+
+        override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? =
+            deliveries
+                .firstOrNull { it.clubId == clubId && it.id == id && it.channel == NotificationChannel.EMAIL }
+                ?.let { claimEmailDelivery(it.id) }
+
         override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
             deliveries.firstOrNull { it.id == id }?.status
 
@@ -414,11 +430,23 @@ class NotificationDispatchServiceTest {
             return markDeadResult
         }
 
+        override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = false
+
+        override fun deliveryBacklog(): NotificationDeliveryBacklog =
+            NotificationDeliveryBacklog(pending = 0, failed = 0, dead = 0, sending = 0)
+
         override fun countByStatus(
             clubId: UUID,
             channel: NotificationChannel?,
             status: NotificationDeliveryStatus,
         ): Int = 0
+
+        override fun hostSummary(clubId: UUID): HostNotificationSummary = error("unused")
+
+        override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
+            error("unused")
+
+        override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? = error("unused")
 
         override fun listHostDeliveries(
             clubId: UUID,

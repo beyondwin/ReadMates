@@ -1,22 +1,22 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
+import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
-import com.readmates.notification.application.model.NotificationOutboxBacklog
-import com.readmates.notification.application.model.NotificationOutboxItem
-import com.readmates.notification.application.model.NotificationPreferences
-import com.readmates.notification.application.model.NotificationTestMailAuditItem
-import com.readmates.notification.application.model.NotificationTestMailStatus
-import com.readmates.notification.application.port.out.NotificationOutboxPort
+import com.readmates.notification.application.model.NotificationDeliveryItem
+import com.readmates.notification.application.model.NotificationEventMessage
+import com.readmates.notification.application.model.NotificationDeliveryBacklog
+import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.shared.security.CurrentMember
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -103,10 +103,10 @@ class ReadmatesOperationalMetricsTest {
     }
 
     @Test
-    fun `notification outbox backlog gauges expose only status counts`() {
+    fun `notification delivery backlog gauges expose only status counts`() {
         val registry = SimpleMeterRegistry()
-        val outboxPort = FixedBacklogNotificationOutboxPort(
-            NotificationOutboxBacklog(
+        val deliveryPort = FixedBacklogNotificationDeliveryPort(
+            NotificationDeliveryBacklog(
                 pending = 2,
                 failed = 3,
                 dead = 5,
@@ -114,13 +114,13 @@ class ReadmatesOperationalMetricsTest {
             ),
         )
 
-        ReadmatesOperationalMetrics(registry, outboxPort)
+        ReadmatesOperationalMetrics(registry, deliveryPort)
 
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "pending").gauge()?.value()).isEqualTo(2.0)
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "failed").gauge()?.value()).isEqualTo(3.0)
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "dead").gauge()?.value()).isEqualTo(5.0)
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "sending").gauge()?.value()).isEqualTo(7.0)
-        assertThat(outboxPort.backlogReads).isGreaterThan(0)
+        assertThat(deliveryPort.backlogReads).isGreaterThan(0)
         assertThat(
             registry.find("readmates.notifications.outbox.backlog")
                 .meters()
@@ -129,28 +129,33 @@ class ReadmatesOperationalMetricsTest {
     }
 }
 
-private class FixedBacklogNotificationOutboxPort(
-    private val backlog: NotificationOutboxBacklog,
-) : NotificationOutboxPort {
+private class FixedBacklogNotificationDeliveryPort(
+    private val backlog: NotificationDeliveryBacklog,
+) : NotificationDeliveryPort {
     var backlogReads = 0
 
-    override fun enqueueFeedbackDocumentPublished(clubId: UUID, sessionId: UUID): Int = 0
+    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
+        emptyList()
 
-    override fun enqueueNextBookPublished(clubId: UUID, sessionId: UUID): Int = 0
+    override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = null
 
-    override fun enqueueReviewPublished(clubId: UUID, sessionId: UUID, authorMembershipId: UUID): Int = 0
+    override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = emptyList()
 
-    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int = 0
+    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
+        emptyList()
 
-    override fun claimPending(limit: Int): List<NotificationOutboxItem> = emptyList()
+    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? = null
 
-    override fun claimPendingForClub(clubId: UUID, limit: Int): List<NotificationOutboxItem> = emptyList()
+    override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = null
 
-    override fun markSent(id: UUID, lockedAt: OffsetDateTime): Boolean = false
+    override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean = false
 
-    override fun markFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean = false
+    override fun markDeliveryFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean =
+        false
 
-    override fun markDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = false
+    override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = false
+
+    override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = false
 
     override fun hostSummary(clubId: UUID): HostNotificationSummary =
         HostNotificationSummary(
@@ -161,53 +166,26 @@ private class FixedBacklogNotificationOutboxPort(
             latestFailures = emptyList(),
         )
 
-    override fun listHostItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
+    override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
         HostNotificationItemList(emptyList())
 
-    override fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
+    override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
 
-    override fun retryableHostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
-
-    override fun claimOneForClub(clubId: UUID, id: UUID): NotificationOutboxItem? = null
-
-    override fun restoreDeadForClub(clubId: UUID, id: UUID): Boolean = false
-
-    override fun outboxBacklog(): NotificationOutboxBacklog {
+    override fun deliveryBacklog(): NotificationDeliveryBacklog {
         backlogReads += 1
         return backlog
     }
 
-    override fun getPreferences(member: CurrentMember): NotificationPreferences =
-        NotificationPreferences.defaults()
-
-    override fun savePreferences(
-        member: CurrentMember,
-        preferences: NotificationPreferences,
-    ): NotificationPreferences = preferences
-
-    override fun reserveTestMailAuditAttempt(
+    override fun countByStatus(
         clubId: UUID,
-        hostMembershipId: UUID,
-        recipientMaskedEmail: String,
-        recipientEmailHash: String,
-        cooldownStartedAfter: OffsetDateTime,
-    ): NotificationTestMailAuditItem? =
-        NotificationTestMailAuditItem(
-            id = UUID.fromString("00000000-0000-0000-0000-000000000901"),
-            recipientEmail = recipientMaskedEmail,
-            status = NotificationTestMailStatus.SENT,
-            lastError = null,
-            createdAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
-        )
+        channel: NotificationChannel?,
+        status: NotificationDeliveryStatus,
+    ): Int = 0
 
-    override fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem =
-        NotificationTestMailAuditItem(
-            id = id,
-            recipientEmail = "e***@example.com",
-            status = NotificationTestMailStatus.FAILED,
-            lastError = lastError,
-            createdAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
-        )
-
-    override fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem> = emptyList()
+    override fun listHostDeliveries(
+        clubId: UUID,
+        status: NotificationDeliveryStatus?,
+        channel: NotificationChannel?,
+        limit: Int,
+    ): List<HostNotificationDelivery> = emptyList()
 }

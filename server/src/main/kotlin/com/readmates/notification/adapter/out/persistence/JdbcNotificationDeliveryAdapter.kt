@@ -2,15 +2,23 @@ package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.HostNotificationDelivery
+import com.readmates.notification.application.model.HostNotificationDetail
+import com.readmates.notification.application.model.HostNotificationFailure
+import com.readmates.notification.application.model.HostNotificationItem
+import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationItemQuery
+import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.application.model.notificationDeliveryDedupeKey
 import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
@@ -184,6 +192,94 @@ class JdbcNotificationDeliveryAdapter(
         return claimedDeliveryItems(jdbcTemplate, ids)
     }
 
+    @Transactional
+    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> {
+        if (limit <= 0) {
+            return emptyList()
+        }
+
+        val jdbcTemplate = jdbcTemplate()
+        resetStaleSendingRows(jdbcTemplate, clubId)
+        val ids = jdbcTemplate.query(
+            """
+            select id
+            from notification_deliveries
+            where club_id = ?
+              and channel = 'EMAIL'
+              and status in ('PENDING', 'FAILED')
+              and next_attempt_at <= utc_timestamp(6)
+            order by next_attempt_at, created_at
+            limit ?
+            for update skip locked
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.uuid("id") },
+            clubId.dbString(),
+            limit,
+        )
+        if (ids.isEmpty()) {
+            return emptyList()
+        }
+
+        val placeholders = ids.joinToString(",") { "?" }
+        jdbcTemplate.update(
+            """
+            update notification_deliveries
+            set status = 'SENDING',
+                locked_at = utc_timestamp(6),
+                updated_at = utc_timestamp(6)
+            where club_id = ?
+              and id in ($placeholders)
+              and channel = 'EMAIL'
+              and status in ('PENDING', 'FAILED')
+            """.trimIndent(),
+            *(listOf(clubId.dbString() as Any) + ids.map { it.dbString() as Any }).toTypedArray(),
+        )
+
+        return claimedDeliveryItems(jdbcTemplate, ids)
+    }
+
+    @Transactional
+    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? {
+        val jdbcTemplate = jdbcTemplate()
+        resetStaleSendingRows(jdbcTemplate, clubId)
+        val selectedId = jdbcTemplate.query(
+            """
+            select id
+            from notification_deliveries
+            where club_id = ?
+              and id = ?
+              and channel = 'EMAIL'
+              and status in ('PENDING', 'FAILED')
+              and next_attempt_at <= utc_timestamp(6)
+            limit 1
+            for update skip locked
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.uuid("id") },
+            clubId.dbString(),
+            id.dbString(),
+        ).firstOrNull() ?: return null
+
+        val updated = jdbcTemplate.update(
+            """
+            update notification_deliveries
+            set status = 'SENDING',
+                locked_at = utc_timestamp(6),
+                updated_at = utc_timestamp(6)
+            where club_id = ?
+              and id = ?
+              and channel = 'EMAIL'
+              and status in ('PENDING', 'FAILED')
+            """.trimIndent(),
+            clubId.dbString(),
+            selectedId.dbString(),
+        )
+        if (updated == 0) {
+            return null
+        }
+
+        return claimedDeliveryItems(jdbcTemplate, listOf(selectedId)).firstOrNull()
+    }
+
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
         jdbcTemplate().query(
             """
@@ -256,6 +352,45 @@ class JdbcNotificationDeliveryAdapter(
             lockedAt.toUtcLocalDateTime(),
         ) > 0
 
+    override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean =
+        jdbcTemplate().update(
+            """
+            update notification_deliveries
+            set status = 'PENDING',
+                next_attempt_at = utc_timestamp(6),
+                locked_at = null,
+                updated_at = utc_timestamp(6)
+            where club_id = ?
+              and id = ?
+              and channel = 'EMAIL'
+              and status = 'DEAD'
+            """.trimIndent(),
+            clubId.dbString(),
+            id.dbString(),
+        ) > 0
+
+    override fun deliveryBacklog(): NotificationDeliveryBacklog {
+        val counts = jdbcTemplate().query(
+            """
+            select status, count(*) as status_count
+            from notification_deliveries
+            where channel = 'EMAIL'
+              and status in ('PENDING', 'FAILED', 'DEAD', 'SENDING')
+            group by status
+            """.trimIndent(),
+            { resultSet, _ ->
+                NotificationDeliveryStatus.valueOf(resultSet.getString("status")) to resultSet.getInt("status_count")
+            },
+        ).toMap()
+
+        return NotificationDeliveryBacklog(
+            pending = counts[NotificationDeliveryStatus.PENDING] ?: 0,
+            failed = counts[NotificationDeliveryStatus.FAILED] ?: 0,
+            dead = counts[NotificationDeliveryStatus.DEAD] ?: 0,
+            sending = counts[NotificationDeliveryStatus.SENDING] ?: 0,
+        )
+    }
+
     override fun countByStatus(
         clubId: UUID,
         channel: NotificationChannel?,
@@ -276,6 +411,100 @@ class JdbcNotificationDeliveryAdapter(
             *args.toTypedArray(),
         ) ?: 0
     }
+
+    override fun hostSummary(clubId: UUID): HostNotificationSummary =
+        HostNotificationSummary(
+            pending = countByStatus(clubId, NotificationChannel.EMAIL, NotificationDeliveryStatus.PENDING),
+            failed = countByStatus(clubId, NotificationChannel.EMAIL, NotificationDeliveryStatus.FAILED),
+            dead = countByStatus(clubId, NotificationChannel.EMAIL, NotificationDeliveryStatus.DEAD),
+            sentLast24h = jdbcTemplate().queryForObject(
+                """
+                select count(*)
+                from notification_deliveries
+                where club_id = ?
+                  and channel = 'EMAIL'
+                  and status = 'SENT'
+                  and sent_at >= timestampadd(HOUR, -24, utc_timestamp(6))
+                """.trimIndent(),
+                Int::class.java,
+                clubId.dbString(),
+            ) ?: 0,
+            latestFailures = latestFailures(clubId),
+        )
+
+    override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList {
+        val predicates = mutableListOf(
+            "notification_deliveries.club_id = ?",
+            "notification_deliveries.channel = 'EMAIL'",
+        )
+        val args = mutableListOf<Any>(clubId.dbString())
+        query.status?.let {
+            predicates += "notification_deliveries.status = ?"
+            args += it.name
+        }
+        query.eventType?.let {
+            predicates += "notification_event_outbox.event_type = ?"
+            args += it.name
+        }
+        args += query.limit.coerceIn(1, 100)
+
+        val items = jdbcTemplate().query(
+            """
+            select
+              notification_deliveries.id,
+              notification_event_outbox.event_type,
+              notification_deliveries.status,
+              users.email as recipient_email,
+              notification_deliveries.attempt_count,
+              notification_deliveries.next_attempt_at,
+              notification_deliveries.updated_at
+            from notification_deliveries
+            join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
+              and notification_event_outbox.club_id = notification_deliveries.club_id
+            join memberships on memberships.id = notification_deliveries.recipient_membership_id
+              and memberships.club_id = notification_deliveries.club_id
+            join users on users.id = memberships.user_id
+            where ${predicates.joinToString(" and ")}
+            order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc
+            limit ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationItem() },
+            *args.toTypedArray(),
+        )
+
+        return HostNotificationItemList(items)
+    }
+
+    override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
+        jdbcTemplate().query(
+            """
+            select
+              notification_deliveries.id,
+              notification_deliveries.event_id,
+              notification_deliveries.status,
+              notification_deliveries.attempt_count,
+              notification_deliveries.last_error,
+              notification_deliveries.created_at,
+              notification_deliveries.updated_at,
+              notification_event_outbox.event_type,
+              notification_event_outbox.aggregate_id,
+              notification_event_outbox.payload_json,
+              users.email as recipient_email,
+              coalesce(memberships.short_name, users.name) as display_name
+            from notification_deliveries
+            join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
+              and notification_event_outbox.club_id = notification_deliveries.club_id
+            join memberships on memberships.id = notification_deliveries.recipient_membership_id
+              and memberships.club_id = notification_deliveries.club_id
+            join users on users.id = memberships.user_id
+            where notification_deliveries.club_id = ?
+              and notification_deliveries.id = ?
+              and notification_deliveries.channel = 'EMAIL'
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationDetail() },
+            clubId.dbString(),
+            id.dbString(),
+        ).firstOrNull()
 
     override fun listHostDeliveries(
         clubId: UUID,
@@ -632,7 +861,34 @@ class JdbcNotificationDeliveryAdapter(
         )
     }
 
-    private fun resetStaleSendingRows(jdbcTemplate: JdbcTemplate) {
+    private fun latestFailures(clubId: UUID): List<HostNotificationFailure> =
+        jdbcTemplate().query(
+            """
+            select
+              notification_deliveries.id,
+              notification_event_outbox.event_type,
+              users.email as recipient_email,
+              notification_deliveries.attempt_count,
+              notification_deliveries.updated_at
+            from notification_deliveries
+            join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
+              and notification_event_outbox.club_id = notification_deliveries.club_id
+            join memberships on memberships.id = notification_deliveries.recipient_membership_id
+              and memberships.club_id = notification_deliveries.club_id
+            join users on users.id = memberships.user_id
+            where notification_deliveries.club_id = ?
+              and notification_deliveries.channel = 'EMAIL'
+              and notification_deliveries.status in ('FAILED', 'DEAD')
+            order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc
+            limit 10
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toHostNotificationFailure() },
+            clubId.dbString(),
+        )
+
+    private fun resetStaleSendingRows(jdbcTemplate: JdbcTemplate, clubId: UUID? = null) {
+        val clubPredicate = if (clubId == null) "" else "and club_id = ?"
+        val args = if (clubId == null) emptyArray() else arrayOf(clubId.dbString() as Any)
         jdbcTemplate.update(
             """
             update notification_deliveries
@@ -643,8 +899,10 @@ class JdbcNotificationDeliveryAdapter(
             where channel = 'EMAIL'
               and status = 'SENDING'
               and locked_at < timestampadd(MINUTE, ?, utc_timestamp(6))
+              $clubPredicate
             """.trimIndent(),
             -DELIVERY_LEASE_TIMEOUT_MINUTES,
+            *args,
         )
     }
 
@@ -717,6 +975,53 @@ class JdbcNotificationDeliveryAdapter(
             attemptCount = getInt("attempt_count"),
             updatedAt = utcOffsetDateTime("updated_at"),
         )
+
+    private fun ResultSet.toHostNotificationFailure(): HostNotificationFailure =
+        HostNotificationFailure(
+            id = uuid("id"),
+            eventType = NotificationEventType.valueOf(getString("event_type")),
+            recipientEmail = getString("recipient_email"),
+            attemptCount = getInt("attempt_count"),
+            updatedAt = utcOffsetDateTime("updated_at"),
+        )
+
+    private fun ResultSet.toHostNotificationItem(): HostNotificationItem =
+        HostNotificationItem(
+            id = uuid("id"),
+            eventType = NotificationEventType.valueOf(getString("event_type")),
+            status = NotificationDeliveryStatus.valueOf(getString("status")).toOutboxStatus(),
+            recipientEmail = getString("recipient_email"),
+            attemptCount = getInt("attempt_count"),
+            nextAttemptAt = utcOffsetDateTime("next_attempt_at"),
+            updatedAt = utcOffsetDateTime("updated_at"),
+        )
+
+    private fun ResultSet.toHostNotificationDetail(): HostNotificationDetail {
+        val eventType = NotificationEventType.valueOf(getString("event_type"))
+        val payload = parsePayload(getString("payload_json"))
+        val copy = copyFor(
+            eventType = eventType,
+            aggregateId = uuid("aggregate_id"),
+            payload = payload,
+            displayName = getString("display_name"),
+        )
+        return HostNotificationDetail(
+            id = uuid("id"),
+            eventType = eventType,
+            status = NotificationDeliveryStatus.valueOf(getString("status")).toOutboxStatus(),
+            recipientEmail = getString("recipient_email"),
+            subject = copy.emailSubject,
+            deepLinkPath = copy.deepLinkPath,
+            metadata = mapOf(
+                "sessionNumber" to payload.sessionNumber,
+                "bookTitle" to payload.bookTitle,
+            ).filterValues { it != null },
+            attemptCount = getInt("attempt_count"),
+            lastError = getString("last_error"),
+            createdAt = utcOffsetDateTime("created_at"),
+            updatedAt = utcOffsetDateTime("updated_at"),
+        )
+    }
 
     private fun copyFor(message: NotificationEventMessage, displayName: String?): DeliveryCopy =
         copyFor(
@@ -805,6 +1110,16 @@ class JdbcNotificationDeliveryAdapter(
 
     private fun parsePayload(rawPayload: String): NotificationEventPayload =
         objectMapper.readValue(rawPayload, payloadType)
+
+    private fun NotificationDeliveryStatus.toOutboxStatus(): NotificationOutboxStatus =
+        when (this) {
+            NotificationDeliveryStatus.PENDING -> NotificationOutboxStatus.PENDING
+            NotificationDeliveryStatus.SENDING -> NotificationOutboxStatus.SENDING
+            NotificationDeliveryStatus.SENT -> NotificationOutboxStatus.SENT
+            NotificationDeliveryStatus.FAILED -> NotificationOutboxStatus.FAILED
+            NotificationDeliveryStatus.DEAD -> NotificationOutboxStatus.DEAD
+            NotificationDeliveryStatus.SKIPPED -> NotificationOutboxStatus.SENT
+        }
 
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateProvider.ifAvailable

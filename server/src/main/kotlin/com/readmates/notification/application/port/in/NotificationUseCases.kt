@@ -37,7 +37,7 @@ interface RecordNotificationEventUseCase {
     fun recordSessionReminderDue(targetDate: LocalDate)
 }
 
-interface ProcessNotificationOutboxUseCase {
+interface ProcessNotificationDeliveriesUseCase {
     fun processPending(limit: Int): Int
     fun processPendingForClub(clubId: UUID, limit: Int): Int
 }
