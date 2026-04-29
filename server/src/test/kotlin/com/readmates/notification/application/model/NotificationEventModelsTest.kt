@@ -3,6 +3,7 @@ package com.readmates.notification.application.model
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
+import com.readmates.notification.domain.NotificationEventType
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.OffsetDateTime
@@ -33,7 +34,7 @@ class NotificationEventModelsTest {
         val item = MemberNotificationItem(
             id = UUID.randomUUID(),
             eventId = UUID.randomUUID(),
-            eventType = com.readmates.notification.domain.NotificationEventType.NEXT_BOOK_PUBLISHED,
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
             title = "다음 책이 공개되었습니다",
             body = "12회차 책을 확인해 주세요.",
             deepLinkPath = "/sessions/00000000-0000-0000-0000-000000000001",
@@ -42,5 +43,25 @@ class NotificationEventModelsTest {
         )
 
         assertThat(item.isUnread).isTrue()
+    }
+
+    @Test
+    fun `claimed delivery model carries a non-null lock token`() {
+        val lockedAt = OffsetDateTime.parse("2026-04-29T00:01:00Z")
+        val item = ClaimedNotificationDeliveryItem(
+            id = UUID.randomUUID(),
+            eventId = UUID.randomUUID(),
+            clubId = UUID.randomUUID(),
+            recipientMembershipId = UUID.randomUUID(),
+            channel = NotificationChannel.EMAIL,
+            status = NotificationDeliveryStatus.SENDING,
+            attemptCount = 1,
+            lockedAt = lockedAt,
+            recipientEmail = "member@example.test",
+            subject = "Notification subject",
+            bodyText = "Notification body",
+        )
+
+        assertThat(item.lockedAt).isEqualTo(lockedAt)
     }
 }
