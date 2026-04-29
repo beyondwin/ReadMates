@@ -59,6 +59,29 @@ describe("Cloudflare BFF function", () => {
     expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("203.0.113.10");
   });
 
+  it("forwards normalized club host from request host and overwrites browser header", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await onRequest(
+      context(
+        new Request("https://reading-sai.example.test./api/bff/api/auth/me", {
+          headers: {
+            "X-Readmates-Club-Host": "attacker.example.test",
+          },
+        }),
+        {
+          path: ["api", "auth", "me"],
+        },
+      ),
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe(
+      "reading-sai.example.test",
+    );
+  });
+
   it("falls back to first x-forwarded-for value for client ip handoff", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -113,6 +136,7 @@ describe("Cloudflare BFF function", () => {
             "Set-Cookie": "readmates.sid=next",
             "X-Readmates-Bff-Secret": "upstream-placeholder-secret",
             "X-Readmates-Client-IP": "upstream-placeholder-client",
+            "X-Readmates-Club-Host": "upstream-placeholder-club",
           },
         });
       }),
@@ -148,6 +172,7 @@ describe("Cloudflare BFF function", () => {
     expect(response.headers.get("set-cookie")).toBe("readmates.sid=next");
     expect(response.headers.get("x-readmates-bff-secret")).toBeNull();
     expect(response.headers.get("x-readmates-client-ip")).toBeNull();
+    expect(response.headers.get("x-readmates-club-host")).toBeNull();
   });
 
   it("forwards multiple logout Set-Cookie headers", async () => {

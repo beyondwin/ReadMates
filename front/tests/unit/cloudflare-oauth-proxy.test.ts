@@ -30,6 +30,7 @@ describe("Cloudflare OAuth proxy functions", () => {
           "Set-Cookie": "OAUTH2_STATE=state; Path=/; HttpOnly",
           "X-Readmates-Bff-Secret": "upstream-placeholder-secret",
           "X-Readmates-Client-IP": "upstream-placeholder-client",
+          "X-Readmates-Club-Host": "upstream-placeholder-club",
         },
       })
     ));
@@ -68,6 +69,24 @@ describe("Cloudflare OAuth proxy functions", () => {
     expect(response.headers.get("set-cookie")).toBe("OAUTH2_STATE=state; Path=/; HttpOnly");
     expect(response.headers.get("x-readmates-bff-secret")).toBeNull();
     expect(response.headers.get("x-readmates-client-ip")).toBeNull();
+    expect(response.headers.get("x-readmates-club-host")).toBeNull();
+  });
+
+  it("forwards club host during OAuth authorization start", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 302 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await authorizationGet(
+      context(
+        new Request("https://reading-sai.example.test/oauth2/authorization/google?returnTo=/app"),
+        "google",
+      ),
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe(
+      "reading-sai.example.test",
+    );
   });
 
   it("proxies OAuth callback requests to backend OAuth with query, cookies, and forwarded host headers", async () => {
@@ -79,6 +98,7 @@ describe("Cloudflare OAuth proxy functions", () => {
           "Set-Cookie": "readmates_session=issued; Path=/; HttpOnly",
           "X-Readmates-Bff-Secret": "upstream-placeholder-secret",
           "X-Readmates-Client-IP": "upstream-placeholder-client",
+          "X-Readmates-Club-Host": "upstream-placeholder-club",
         },
       })
     ));
@@ -115,6 +135,28 @@ describe("Cloudflare OAuth proxy functions", () => {
     expect(response.headers.get("set-cookie")).toBe("readmates_session=issued; Path=/; HttpOnly");
     expect(response.headers.get("x-readmates-bff-secret")).toBeNull();
     expect(response.headers.get("x-readmates-client-ip")).toBeNull();
+    expect(response.headers.get("x-readmates-club-host")).toBeNull();
+  });
+
+  it("overwrites browser-provided club host during OAuth callback", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 302 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await callbackGet(
+      context(
+        new Request("https://reading-sai.example.test./login/oauth2/code/google?code=test", {
+          headers: {
+            "X-Readmates-Club-Host": "attacker.example.test",
+          },
+        }),
+        "google",
+      ),
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe(
+      "reading-sai.example.test",
+    );
   });
 
   it.each([

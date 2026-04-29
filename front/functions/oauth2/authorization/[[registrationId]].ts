@@ -46,6 +46,7 @@ function copyUpstreamHeaders(headers: Headers) {
   copiedHeaders.delete("set-cookie");
   copiedHeaders.delete("x-readmates-bff-secret");
   copiedHeaders.delete("x-readmates-client-ip");
+  copiedHeaders.delete("x-readmates-club-host");
 
   const setCookies = (headers as HeadersWithSetCookie).getSetCookie?.() ?? [];
   if (setCookies.length > 0) {
@@ -73,6 +74,11 @@ function clientIpFromRequest(request: Request) {
   return forwardedFor ? forwardedFor.slice(0, MAX_CLIENT_IP_LENGTH) : null;
 }
 
+function normalizedHostFromRequest(request: Request) {
+  const host = new URL(request.url).host.trim().toLowerCase();
+  return host.endsWith(".") ? host.slice(0, -1) : host;
+}
+
 function forwardedRequestHeaders(request: Request, env: Env) {
   const sourceUrl = new URL(request.url);
   const headers = new Headers();
@@ -86,6 +92,7 @@ function forwardedRequestHeaders(request: Request, env: Env) {
 
   headers.set("x-forwarded-host", sourceUrl.host);
   headers.set("x-forwarded-proto", sourceUrl.protocol.replace(":", ""));
+  headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(request));
 
   const bffSecret = env.READMATES_BFF_SECRET?.trim();
   if (bffSecret) {
