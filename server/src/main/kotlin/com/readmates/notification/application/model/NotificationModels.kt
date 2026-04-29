@@ -53,6 +53,7 @@ data class HostNotificationDetail(
     val recipientEmail: String,
     val subject: String,
     val deepLinkPath: String,
+    val metadata: Map<String, Any?>,
     val attemptCount: Int,
     val lastError: String?,
     val createdAt: OffsetDateTime,

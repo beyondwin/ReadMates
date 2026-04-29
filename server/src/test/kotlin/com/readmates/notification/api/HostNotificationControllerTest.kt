@@ -153,6 +153,8 @@ class HostNotificationControllerTest(
             jsonPath("$.recipientEmail") { value("m***@example.com") }
             jsonPath("$.subject") { value("피드백 문서가 올라왔습니다") }
             jsonPath("$.status") { value("PENDING") }
+            jsonPath("$.metadata.sessionNumber") { value(3) }
+            jsonPath("$.metadata.bookTitle") { value("메타데이터 테스트 책") }
         }.andReturn().response.contentAsString
 
         assertThat(response).doesNotContain("bodyText")
@@ -254,7 +256,7 @@ class HostNotificationControllerTest(
             """
             insert into notification_outbox (
               id, club_id, event_type, aggregate_type, aggregate_id,
-              recipient_email, subject, body_text, deep_link_path, status, dedupe_key
+              recipient_email, subject, body_text, deep_link_path, metadata, status, dedupe_key
             ) values (
               ?,
               ?,
@@ -265,6 +267,12 @@ class HostNotificationControllerTest(
               '피드백 문서가 올라왔습니다',
               'ReadMates에서 확인해 주세요.',
               '/app/feedback/00000000-0000-0000-0000-000000000301',
+              json_object(
+                'sessionNumber', 3,
+                'bookTitle', '메타데이터 테스트 책',
+                'recipientEmail', 'member@example.com',
+                'bodyText', 'ReadMates에서 확인해 주세요.'
+              ),
               ?,
               ?
             )

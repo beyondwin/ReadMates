@@ -21,6 +21,7 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.ObjectMapper
 import java.sql.ResultSet
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -29,6 +30,11 @@ import kotlin.math.max
 
 private const val AGGREGATE_TYPE_SESSION = "SESSION"
 private const val MAX_LAST_ERROR_LENGTH = 500
+private const val MAX_METADATA_JSON_LENGTH = 4_000
+private const val MAX_METADATA_ENTRIES = 25
+private const val MAX_METADATA_LIST_ITEMS = 20
+private const val MAX_METADATA_STRING_LENGTH = 200
+private val EMAIL_LIKE_PATTERN = Regex("""[^\s@]+@[^\s@]+\.[^\s@]+""")
 
 private data class SessionNotificationRecipient(
     val membershipId: UUID,
@@ -51,7 +57,10 @@ private data class ReminderNotificationRecipient(
 @Repository
 class JdbcNotificationOutboxAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val objectMapper: ObjectMapper,
 ) : NotificationOutboxPort {
+    private val metadataType = objectMapper.typeFactory.constructMapType(Map::class.java, String::class.java, Any::class.java)
+
     @Transactional
     override fun enqueueFeedbackDocumentPublished(clubId: UUID, sessionId: UUID): Int {
         val recipients = jdbcTemplate().query(
@@ -100,6 +109,10 @@ class JdbcNotificationOutboxAdapter(
                     ReadMates에서 확인해 주세요.
                 """.trimIndent(),
                 deepLinkPath = "/feedback-documents",
+                metadata = mapOf(
+                    "sessionNumber" to recipient.sessionNumber,
+                    "bookTitle" to recipient.bookTitle,
+                ),
             )
         }
     }
@@ -148,6 +161,10 @@ class JdbcNotificationOutboxAdapter(
                     ReadMates에서 모임 정보를 확인해 주세요.
                 """.trimIndent(),
                 deepLinkPath = "/sessions/$sessionId",
+                metadata = mapOf(
+                    "sessionNumber" to recipient.sessionNumber,
+                    "bookTitle" to recipient.bookTitle,
+                ),
             )
         }
     }
@@ -196,6 +213,10 @@ class JdbcNotificationOutboxAdapter(
                     ReadMates에서 준비 내용을 확인해 주세요.
                 """.trimIndent(),
                 deepLinkPath = "/sessions/${recipient.sessionId}",
+                metadata = mapOf(
+                    "sessionNumber" to recipient.sessionNumber,
+                    "bookTitle" to recipient.bookTitle,
+                ),
             )
         }
     }
@@ -375,7 +396,7 @@ class JdbcNotificationOutboxAdapter(
     override fun hostItemDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
         jdbcTemplate().query(
             """
-            select id, event_type, status, recipient_email, subject, deep_link_path,
+            select id, event_type, status, recipient_email, subject, deep_link_path, metadata,
                    attempt_count, last_error, created_at, updated_at
             from notification_outbox
             where club_id = ?
@@ -539,6 +560,7 @@ class JdbcNotificationOutboxAdapter(
         subject: String,
         bodyText: String,
         deepLinkPath: String,
+        metadata: Map<String, Any?>,
     ): Int =
         jdbcTemplate().update(
             """
@@ -554,10 +576,11 @@ class JdbcNotificationOutboxAdapter(
               subject,
               body_text,
               deep_link_path,
+              metadata,
               status,
               dedupe_key
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
             clubId.dbString(),
@@ -570,6 +593,7 @@ class JdbcNotificationOutboxAdapter(
             subject,
             bodyText,
             deepLinkPath,
+            metadataJson(metadata),
             dedupeKey(eventType, aggregateId, recipientMembershipId),
         )
 
@@ -697,11 +721,80 @@ class JdbcNotificationOutboxAdapter(
             recipientEmail = getString("recipient_email"),
             subject = getString("subject"),
             deepLinkPath = getString("deep_link_path"),
+            metadata = parseMetadata(getString("metadata")),
             attemptCount = getInt("attempt_count"),
             lastError = getString("last_error"),
             createdAt = utcOffsetDateTime("created_at"),
             updatedAt = utcOffsetDateTime("updated_at"),
         )
+
+    private fun metadataJson(metadata: Map<String, Any?>): String =
+        objectMapper.writeValueAsString(sanitizeMetadata(metadata))
+
+    private fun parseMetadata(rawMetadata: String?): Map<String, Any?> {
+        val raw = rawMetadata
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() && it.length <= MAX_METADATA_JSON_LENGTH }
+            ?: return emptyMap()
+
+        val decoded = runCatching {
+            objectMapper.readValue<Map<String, Any?>>(raw, metadataType)
+        }.getOrNull() ?: return emptyMap()
+
+        return sanitizeMetadata(decoded)
+    }
+
+    private fun sanitizeMetadata(metadata: Map<String, Any?>, depth: Int = 0): Map<String, Any?> {
+        val safe = linkedMapOf<String, Any?>()
+        metadata.entries
+            .asSequence()
+            .filterNot { it.key.isSensitiveMetadataKey() }
+            .take(MAX_METADATA_ENTRIES)
+            .forEach { (key, value) ->
+                val sanitized = sanitizeMetadataValue(value, depth)
+                if (sanitized !== UnsafeMetadataValue) {
+                    safe[key] = sanitized
+                }
+            }
+        return safe
+    }
+
+    private fun sanitizeMetadataValue(value: Any?, depth: Int): Any? =
+        when (value) {
+            null -> null
+            is String -> value
+                .take(MAX_METADATA_STRING_LENGTH)
+                .takeUnless { EMAIL_LIKE_PATTERN.containsMatchIn(it) }
+                ?: UnsafeMetadataValue
+            is Number, is Boolean -> value
+            is Map<*, *> -> {
+                if (depth >= 2) {
+                    emptyMap<String, Any?>()
+                } else {
+                    sanitizeMetadata(
+                        value.entries
+                            .mapNotNull { (key, nestedValue) -> (key as? String)?.let { it to nestedValue } }
+                            .toMap(),
+                        depth = depth + 1,
+                    )
+                }
+            }
+            is Iterable<*> -> value
+                .asSequence()
+                .take(MAX_METADATA_LIST_ITEMS)
+                .map { sanitizeMetadataValue(it, depth + 1) }
+                .filterNot { it === UnsafeMetadataValue }
+                .toList()
+            else -> value.toString().take(MAX_METADATA_STRING_LENGTH)
+        }
+
+    private fun String.isSensitiveMetadataKey(): Boolean {
+        val normalized = lowercase()
+        return normalized.contains("email") ||
+            normalized.contains("recipient") ||
+            normalized.contains("body") ||
+            normalized.endsWith("text")
+    }
 
     private fun String.truncateForStorage(): String =
         take(MAX_LAST_ERROR_LENGTH)
@@ -710,3 +803,5 @@ class JdbcNotificationOutboxAdapter(
         jdbcTemplateProvider.ifAvailable
             ?: throw IllegalStateException("Notification outbox storage is unavailable")
 }
+
+private object UnsafeMetadataValue

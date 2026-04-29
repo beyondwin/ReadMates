@@ -261,6 +261,7 @@ class NotificationOutboxServiceTest {
             recipientEmail = "member@example.com",
             subject = "피드백 문서가 올라왔습니다",
             deepLinkPath = "/feedback-documents",
+            metadata = mapOf("sessionNumber" to 3, "bookTitle" to "메타데이터 테스트 책"),
             attemptCount = 1,
             lastError = null,
             createdAt = OffsetDateTime.of(2026, 4, 29, 0, 0, 0, 123456000, ZoneOffset.UTC),
