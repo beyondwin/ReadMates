@@ -31,7 +31,7 @@ private const val PUBLISHING_LEASE_TIMEOUT_MINUTES = 15
 class JdbcNotificationEventOutboxAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
     private val objectMapper: ObjectMapper,
-    @param:Value("\${readmates.notifications.kafka.events-topic}") private val eventsTopic: String,
+    @param:Value("\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}") private val eventsTopic: String,
 ) : NotificationEventOutboxPort {
     private val payloadType = objectMapper.typeFactory.constructType(NotificationEventPayload::class.java)
 

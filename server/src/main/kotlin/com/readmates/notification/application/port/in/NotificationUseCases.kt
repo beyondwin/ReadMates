@@ -23,6 +23,10 @@ interface ProcessNotificationOutboxUseCase {
     fun processPendingForClub(clubId: UUID, limit: Int): Int
 }
 
+interface PublishNotificationEventsUseCase {
+    fun publishPending(limit: Int): Int
+}
+
 interface GetHostNotificationSummaryUseCase {
     fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary
 }
