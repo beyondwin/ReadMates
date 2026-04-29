@@ -216,7 +216,7 @@ git commit -m "chore: add kafka notification infrastructure"
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/support/ReadmatesMySqlSeedTest.kt` if seed assumptions need notification table names.
 
-- [ ] **Step 1: Write failing migration assertions**
+- [x] **Step 1: Write failing migration assertions**
 
 In `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`, add assertions after the existing Flyway migration succeeds:
 
@@ -246,7 +246,7 @@ private fun assertKafkaNotificationTablesExist(jdbcTemplate: JdbcTemplate) {
 
 Call `assertKafkaNotificationTablesExist(jdbcTemplate)` in the migration test method after `flyway.migrate()`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -256,7 +256,7 @@ Run:
 
 Expected: FAIL because the new tables do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
 Create `server/src/main/resources/db/mysql/migration/V18__kafka_notification_pipeline.sql`:
 
@@ -346,7 +346,7 @@ create table member_notifications (
 );
 ```
 
-- [ ] **Step 4: Run migration tests**
+- [x] **Step 4: Run migration tests**
 
 Run:
 
@@ -356,7 +356,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/resources/db/mysql/migration/V18__kafka_notification_pipeline.sql server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt server/src/test/kotlin/com/readmates/support/ReadmatesMySqlSeedTest.kt
