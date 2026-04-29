@@ -39,7 +39,7 @@ private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
 """
 private const val FAILING_TEST_MAIL_RECIPIENT = "failure@example.com"
 private const val SENSITIVE_TEST_MAIL_ERROR =
-    "smtp rejected external@example.com password=raw-password Bearer raw-bearer-token api_key=raw-api-key authorization=Basic raw-basic-token -----BEGIN PRIVATE KEY----- raw-private-key"
+    "smtp rejected external@example.com password=marker Bearer marker api_key=marker authorization=Basic marker -----BEGIN PRIVATE KEY----- marker"
 
 @SpringBootTest(
     properties = [
@@ -293,15 +293,15 @@ class HostNotificationControllerTest(
         assertThat(response).doesNotContain("member@example.com")
         assertThat(response).doesNotContain("ReadMates에서 확인해 주세요.")
         assertThat(response).doesNotContain("inviteToken")
-        assertThat(response).doesNotContain("sample-secret-value")
+        assertThat(response).doesNotContain("secret marker")
         assertThat(response).doesNotContain("apiKey")
-        assertThat(response).doesNotContain("sample-api-key")
+        assertThat(response).doesNotContain("api key marker")
         assertThat(response).doesNotContain("password")
-        assertThat(response).doesNotContain("sample-password")
+        assertThat(response).doesNotContain("password marker")
         assertThat(response).doesNotContain("accessKeyId")
-        assertThat(response).doesNotContain("AKIAIOSFODNN7EXAMPLE")
+        assertThat(response).doesNotContain("access key marker")
         assertThat(response).doesNotContain("privateKeyPem")
-        assertThat(response).doesNotContain("BEGIN PRIVATE KEY")
+        assertThat(response).doesNotContain("private key marker")
         assertThat(response).doesNotContain("signingKeyId")
         assertThat(response).doesNotContain("authorization")
         assertThat(response).doesNotContain("credential")
@@ -467,14 +467,14 @@ class HostNotificationControllerTest(
                 'bookTitle', '메타데이터 테스트 책',
                 'recipientEmail', 'member@example.com',
                 'bodyText', 'ReadMates에서 확인해 주세요.',
-                'inviteToken', 'sample-secret-value',
-                'apiKey', 'sample-api-key',
-                'password', 'sample-password',
-                'accessKeyId', 'AKIAIOSFODNN7EXAMPLE',
-                'privateKeyPem', '-----BEGIN PRIVATE KEY-----',
+                'inviteToken', 'secret marker',
+                'apiKey', 'api key marker',
+                'password', 'password marker',
+                'accessKeyId', 'access key marker',
+                'privateKeyPem', 'private key marker',
                 'signingKeyId', 'signing-key-id',
-                'authorization', 'Bearer sample-token',
-                'credential', 'sample-credential'
+                'authorization', 'authorization marker',
+                'credential', 'credential marker'
               ),
               ?,
               ?,
@@ -491,11 +491,10 @@ class HostNotificationControllerTest(
 
     private fun assertNoSensitiveErrorValues(value: String) {
         assertThat(value).doesNotContain("external@example.com")
-        assertThat(value).doesNotContain("raw-password")
-        assertThat(value).doesNotContain("raw-bearer-token")
-        assertThat(value).doesNotContain("raw-api-key")
-        assertThat(value).doesNotContain("raw-basic-token")
-        assertThat(value).doesNotContain("raw-private-key")
+        assertThat(value).doesNotContain("password=marker")
+        assertThat(value).doesNotContain("Bearer marker")
+        assertThat(value).doesNotContain("api_key=marker")
+        assertThat(value).doesNotContain("authorization=Basic marker")
         assertThat(value).doesNotContain("BEGIN PRIVATE KEY")
     }
 

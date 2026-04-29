@@ -22,6 +22,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.springframework.web.server.ResponseStatusException
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -268,8 +269,8 @@ class NotificationOutboxServiceTest {
         val port = FakeNotificationOutboxPort(items = emptyList())
         val mail = FailingMailDeliveryPort(
             """
-            smtp rejected external@example.com password=raw-password Bearer raw-bearer-token api_key=raw-api-key
-            -----BEGIN PRIVATE KEY----- raw-private-key
+            smtp rejected external@example.com password=marker Bearer marker api_key=marker
+            -----BEGIN PRIVATE KEY----- marker
             """.trimIndent(),
         )
         val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
@@ -283,13 +284,59 @@ class NotificationOutboxServiceTest {
         assertThat(audit.lastError).contains("[redacted-email]")
         assertThat(audit.lastError).contains("[redacted-secret]")
         assertThat(audit.lastError).doesNotContain("external@example.com")
-        assertThat(audit.lastError).doesNotContain("raw-password")
-        assertThat(audit.lastError).doesNotContain("raw-bearer-token")
-        assertThat(audit.lastError).doesNotContain("raw-api-key")
-        assertThat(audit.lastError).doesNotContain("raw-private-key")
+        assertThat(audit.lastError).doesNotContain("password=marker")
+        assertThat(audit.lastError).doesNotContain("Bearer marker")
+        assertThat(audit.lastError).doesNotContain("api_key=marker")
         assertThat(audit.lastError).doesNotContain("BEGIN PRIVATE KEY")
         assertThat(audit.recipientEmail).doesNotContain("External@Example.com")
         assertThat(port.testMailHashes.single()).matches("^[0-9a-f]{64}$")
+    }
+
+    @Test
+    fun `sendTestMail refuses cooldown reservation before delivery`() {
+        val port = FakeNotificationOutboxPort(items = emptyList(), reserveTestMailResult = null)
+        val mail = RecordingMailDeliveryPort()
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
+
+        assertThatThrownBy {
+            service.sendTestMail(host(), SendNotificationTestMailCommand("external@example.com"))
+        }.isInstanceOf(ResponseStatusException::class.java)
+            .hasMessageContaining("429")
+
+        assertThat(mail.sentSubjects).isEmpty()
+        assertThat(port.reserveRequests).hasSize(1)
+        assertThat(port.testMailAudits).isEmpty()
+    }
+
+    @Test
+    fun `sendTestMail validates recipient length`() {
+        val port = FakeNotificationOutboxPort(items = emptyList())
+        val mail = RecordingMailDeliveryPort()
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
+        val longRecipient = "${"a".repeat(309)}@example.com"
+
+        assertThat(longRecipient).hasSize(321)
+        assertThatThrownBy {
+            service.sendTestMail(host(), SendNotificationTestMailCommand(longRecipient))
+        }.isInstanceOf(ResponseStatusException::class.java)
+            .hasMessageContaining("400")
+
+        assertThat(mail.sentSubjects).isEmpty()
+        assertThat(port.reserveRequests).isEmpty()
+    }
+
+    @Test
+    fun `sendTestMail does not deliver when audit reservation fails`() {
+        val port = FakeNotificationOutboxPort(items = emptyList(), failReserve = true)
+        val mail = RecordingMailDeliveryPort()
+        val service = NotificationOutboxService(port, mail, testMetrics(), maxAttempts = 5)
+
+        assertThatThrownBy {
+            service.sendTestMail(host(), SendNotificationTestMailCommand("external@example.com"))
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("reservation failed")
+
+        assertThat(mail.sentSubjects).isEmpty()
     }
 
     private fun sampleItem(attemptCount: Int = 0): NotificationOutboxItem =
@@ -362,6 +409,8 @@ private class FakeNotificationOutboxPort(
     private val claimOneItems: Map<UUID, NotificationOutboxItem> = emptyMap(),
     private val itemDetails: Map<UUID, HostNotificationDetail> = emptyMap(),
     private val restoreResults: Map<UUID, Boolean> = emptyMap(),
+    private val reserveTestMailResult: NotificationTestMailAuditItem? = sampleTestMailAudit(),
+    private val failReserve: Boolean = false,
 ) : NotificationOutboxPort {
     val sentIds = mutableListOf<UUID>()
     val claimRequests = mutableListOf<Int>()
@@ -378,6 +427,7 @@ private class FakeNotificationOutboxPort(
     val reminderDates = mutableListOf<LocalDate>()
     val testMailAudits = mutableListOf<NotificationTestMailAuditItem>()
     val testMailHashes = mutableListOf<String>()
+    val reserveRequests = mutableListOf<Pair<UUID, UUID>>()
 
     override fun enqueueFeedbackDocumentPublished(clubId: UUID, sessionId: UUID): Int = 0
 
@@ -470,25 +520,41 @@ private class FakeNotificationOutboxPort(
         preferences: NotificationPreferences,
     ): NotificationPreferences = preferences
 
-    override fun latestTestMailCreatedAt(clubId: UUID, hostMembershipId: UUID): OffsetDateTime? = null
-
-    override fun recordTestMailAudit(
+    override fun reserveTestMailAuditAttempt(
         clubId: UUID,
         hostMembershipId: UUID,
         recipientMaskedEmail: String,
         recipientEmailHash: String,
-        status: NotificationTestMailStatus,
-        lastError: String?,
-    ): NotificationTestMailAuditItem {
+        cooldownStartedAfter: OffsetDateTime,
+    ): NotificationTestMailAuditItem? {
+        if (failReserve) {
+            error("reservation failed")
+        }
+        reserveRequests += clubId to hostMembershipId
         testMailHashes += recipientEmailHash
-        return NotificationTestMailAuditItem(
-            id = UUID.fromString("00000000-0000-0000-0000-000000000901"),
+        return reserveTestMailResult?.copy(
             recipientEmail = recipientMaskedEmail,
-            status = status,
+        )?.also { testMailAudits += it }
+    }
+
+    override fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem {
+        val failed = (testMailAudits.firstOrNull { it.id == id } ?: sampleTestMailAudit()).copy(
+            status = NotificationTestMailStatus.FAILED,
             lastError = lastError,
-            createdAt = OffsetDateTime.of(2026, 4, 29, 0, 0, 0, 123456000, ZoneOffset.UTC),
-        ).also { testMailAudits += it }
+        )
+        testMailAudits.removeIf { it.id == id }
+        testMailAudits += failed
+        return failed
     }
 
     override fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem> = emptyList()
 }
+
+private fun sampleTestMailAudit(): NotificationTestMailAuditItem =
+    NotificationTestMailAuditItem(
+        id = UUID.fromString("00000000-0000-0000-0000-000000000901"),
+        recipientEmail = "e***@example.com",
+        status = NotificationTestMailStatus.SENT,
+        lastError = null,
+        createdAt = OffsetDateTime.of(2026, 4, 29, 0, 0, 0, 123456000, ZoneOffset.UTC),
+    )
