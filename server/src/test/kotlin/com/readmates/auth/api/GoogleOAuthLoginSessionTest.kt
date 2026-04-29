@@ -2,6 +2,7 @@ package com.readmates.auth.api
 
 import com.readmates.auth.application.AuthSessionService
 import com.readmates.auth.application.InvitationTokenService
+import com.readmates.auth.infrastructure.security.OAuthReturnState
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
 import com.readmates.auth.infrastructure.security.readmatesAppOrigin
@@ -36,6 +37,9 @@ import java.time.Instant
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
         "readmates.app-base-url=https://readmates.pages.dev",
+        "readmates.auth.auth-base-url=https://auth.readmates.example",
+        "readmates.auth.return-state-secret=oauth-return-state-test-secret",
+        "readmates.auth.session-cookie-domain=.readmates.example",
         "spring.security.oauth2.client.registration.google.client-id=test-client",
         "spring.security.oauth2.client.registration.google.client-secret=test-secret",
         "spring.security.oauth2.client.registration.google.scope=openid,email,profile",
@@ -45,6 +49,7 @@ import java.time.Instant
 @Sql(statements = [GoogleOAuthLoginSessionTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 class GoogleOAuthLoginSessionTest(
     @param:Autowired private val successHandler: ReadmatesOAuthSuccessHandler,
+    @param:Autowired private val oauthReturnState: OAuthReturnState,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val invitationTokenService: InvitationTokenService,
 ) {
@@ -71,6 +76,78 @@ class GoogleOAuthLoginSessionTest(
                 googleSubjectId = "google-oauth-session-existing",
                 email = "oauth.session@example.com",
                 name = "OAuth Session",
+            ),
+            "credentials",
+        )
+        SecurityContextHolder.getContext().authentication = authentication
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/app", response.redirectedUrl)
+        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
+        assertNotNull(setCookie)
+        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}="))
+        assertTrue(setCookie.contains("Domain=.readmates.example"))
+        assertTrue(servletSession.isInvalid)
+        assertNull(SecurityContextHolder.getContext().authentication)
+    }
+
+    @Test
+    fun `successful google login redirects to signed return target`() {
+        createGoogleMember(
+            googleSubjectId = "google-oauth-session-return-target",
+            email = "oauth.session.return@example.com",
+            displayName = "OAuth Return Target",
+        )
+        val servletSession = securitySession()
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("/clubs/reading-sai/app/sessions/current"),
+        )
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.addHeader(HttpHeaders.USER_AGENT, "MockMvc")
+        request.remoteAddr = "127.0.0.1"
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication = TestingAuthenticationToken(
+            googleOidcUser(
+                googleSubjectId = "google-oauth-session-return-target",
+                email = "oauth.session.return@example.com",
+                name = "OAuth Return Target",
+            ),
+            "credentials",
+        )
+        SecurityContextHolder.getContext().authentication = authentication
+
+        successHandler.onAuthenticationSuccess(request, response, authentication)
+
+        assertEquals("https://readmates.pages.dev/clubs/reading-sai/app/sessions/current", response.redirectedUrl)
+        val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
+        assertNotNull(setCookie)
+        assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}="))
+        assertTrue(servletSession.isInvalid)
+        assertNull(SecurityContextHolder.getContext().authentication)
+    }
+
+    @Test
+    fun `successful google login falls back to app for invalid return state`() {
+        createGoogleMember(
+            googleSubjectId = "google-oauth-invalid-return-state",
+            email = "oauth.invalid.return@example.com",
+            displayName = "OAuth Invalid Return",
+        )
+        val servletSession = securitySession()
+        servletSession.setAttribute(OAuthReturnState.SESSION_ATTRIBUTE, "not-a-valid-state")
+        val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.addHeader(HttpHeaders.USER_AGENT, "MockMvc")
+        request.remoteAddr = "127.0.0.1"
+        request.setSession(servletSession)
+        val response = MockHttpServletResponse()
+        val authentication = TestingAuthenticationToken(
+            googleOidcUser(
+                googleSubjectId = "google-oauth-invalid-return-state",
+                email = "oauth.invalid.return@example.com",
+                name = "OAuth Invalid Return",
             ),
             "credentials",
         )
@@ -205,6 +282,10 @@ class GoogleOAuthLoginSessionTest(
         createOpenSession()
         val servletSession = securitySession()
         servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
+        servletSession.setAttribute(
+            OAuthReturnState.SESSION_ATTRIBUTE,
+            oauthReturnState.signReturnTarget("/clubs/sample-book-club/invite/$token"),
+        )
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.addHeader(HttpHeaders.USER_AGENT, "MockMvc")
         request.remoteAddr = "127.0.0.1"
@@ -222,7 +303,7 @@ class GoogleOAuthLoginSessionTest(
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
 
-        assertEquals("https://readmates.pages.dev/app", response.redirectedUrl)
+        assertEquals("https://readmates.pages.dev/clubs/reading-sai/invite/$token", response.redirectedUrl)
         val setCookie = response.getHeader(HttpHeaders.SET_COOKIE)
         assertNotNull(setCookie)
         assertTrue(setCookie!!.startsWith("${AuthSessionService.COOKIE_NAME}="))
@@ -338,12 +419,16 @@ class GoogleOAuthLoginSessionTest(
               from users
               where email in (
                 'oauth.session@example.com',
+                'oauth.session.return@example.com',
+                'oauth.invalid.return@example.com',
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
                 'oauth.left@example.com'
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
+                   'google-oauth-session-return-target',
+                   'google-oauth-invalid-return-state',
                    'google-oauth-platform-admin',
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
@@ -371,6 +456,8 @@ class GoogleOAuthLoginSessionTest(
               join users on users.id = memberships.user_id
               where users.email in (
                 'oauth.session@example.com',
+                'oauth.session.return@example.com',
+                'oauth.invalid.return@example.com',
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
                 'oauth.left@example.com',
@@ -381,6 +468,8 @@ class GoogleOAuthLoginSessionTest(
               )
                  or users.google_subject_id in (
                    'google-oauth-session-existing',
+                   'google-oauth-session-return-target',
+                   'google-oauth-invalid-return-state',
                    'google-oauth-platform-admin',
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
@@ -404,6 +493,8 @@ class GoogleOAuthLoginSessionTest(
               from users
               where email in (
                 'oauth.session@example.com',
+                'oauth.session.return@example.com',
+                'oauth.invalid.return@example.com',
                 'oauth.owner@example.com',
                 'oauth.other@example.com',
                 'oauth.left@example.com',
@@ -414,6 +505,8 @@ class GoogleOAuthLoginSessionTest(
               )
                  or google_subject_id in (
                    'google-oauth-session-existing',
+                   'google-oauth-session-return-target',
+                   'google-oauth-invalid-return-state',
                    'google-oauth-platform-admin',
                    'google-oauth-conflict-subject',
                    'google-oauth-left-member',
@@ -425,6 +518,8 @@ class GoogleOAuthLoginSessionTest(
             delete from users
             where email in (
               'oauth.session@example.com',
+              'oauth.session.return@example.com',
+              'oauth.invalid.return@example.com',
               'oauth.owner@example.com',
               'oauth.other@example.com',
               'oauth.left@example.com',
@@ -435,6 +530,8 @@ class GoogleOAuthLoginSessionTest(
             )
                or google_subject_id in (
                  'google-oauth-session-existing',
+                 'google-oauth-session-return-target',
+                 'google-oauth-invalid-return-state',
                  'google-oauth-platform-admin',
                  'google-oauth-conflict-subject',
                  'google-oauth-left-member',

@@ -1,6 +1,7 @@
 package com.readmates.auth.infrastructure.security
 
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -26,6 +27,8 @@ class SecurityConfig(
     private val googleOidcUserService: GoogleOidcUserService,
     private val readmatesOAuthSuccessHandler: ReadmatesOAuthSuccessHandler,
     private val clientRegistrationRepository: ObjectProvider<ClientRegistrationRepository>,
+    @param:Value("\${readmates.auth.auth-base-url:\${readmates.app-base-url:http://localhost:3000}}")
+    private val authBaseUrl: String,
 ) {
     private val oAuthForwardedHeaderFilter = ForwardedHeaderFilter()
 
@@ -120,8 +123,14 @@ class SecurityConfig(
             .addFilterBefore(oAuthInviteTokenCaptureFilter, OAuth2AuthorizationRequestRedirectFilter::class.java)
             .addFilterAfter(memberAuthoritiesFilter, AnonymousAuthenticationFilter::class.java)
 
-        if (clientRegistrationRepository.ifAvailable != null) {
+        val registrations = clientRegistrationRepository.ifAvailable
+        if (registrations != null) {
             http.oauth2Login {
+                it.authorizationEndpoint { endpoint ->
+                    endpoint.authorizationRequestResolver(
+                        PrimaryOriginOAuthAuthorizationRequestResolver(registrations, authBaseUrl),
+                    )
+                }
                 it.userInfoEndpoint { endpoint ->
                     endpoint.oidcUserService(googleOidcUserService)
                 }

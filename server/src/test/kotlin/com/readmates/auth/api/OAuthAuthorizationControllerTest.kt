@@ -18,6 +18,7 @@ import org.springframework.web.util.UriComponentsBuilder
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.auth.auth-base-url=https://auth.readmates.example",
         "spring.security.oauth2.client.registration.google.client-id=test-client",
         "spring.security.oauth2.client.registration.google.client-secret=test-secret",
         "spring.security.oauth2.client.registration.google.scope=openid,email,profile",
@@ -42,9 +43,9 @@ class OAuthAuthorizationControllerTest(
     }
 
     @Test
-    fun `google authorization redirect uri uses forwarded public origin`() {
+    fun `google authorization redirect uri uses primary auth origin despite forwarded club host`() {
         val result = mockMvc.get("/oauth2/authorization/google") {
-            header("X-Forwarded-Host", "readmates.pages.dev")
+            header("X-Forwarded-Host", "reading-sai.example.test")
             header("X-Forwarded-Proto", "https")
         }
             .andExpect {
@@ -58,7 +59,7 @@ class OAuthAuthorizationControllerTest(
             .queryParams
             .getFirst("redirect_uri")
 
-        assertEquals("https://readmates.pages.dev/login/oauth2/code/google", redirectUri)
+        assertEquals("https://auth.readmates.example/login/oauth2/code/google", redirectUri)
     }
 
     @Test

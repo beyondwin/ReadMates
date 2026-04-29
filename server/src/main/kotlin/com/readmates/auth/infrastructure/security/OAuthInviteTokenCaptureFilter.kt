@@ -7,7 +7,9 @@ import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
 @Component
-class OAuthInviteTokenCaptureFilter : OncePerRequestFilter() {
+class OAuthInviteTokenCaptureFilter(
+    private val oauthReturnState: OAuthReturnState,
+) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,
@@ -20,6 +22,14 @@ class OAuthInviteTokenCaptureFilter : OncePerRequestFilter() {
                     OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE,
                     inviteToken,
                 )
+            }
+
+            val signedReturnState = oauthReturnState.signReturnTarget(request.getParameter("returnTo"))
+            val session = request.getSession(false)
+            if (signedReturnState != null) {
+                request.session.setAttribute(OAuthReturnState.SESSION_ATTRIBUTE, signedReturnState)
+            } else {
+                session?.removeAttribute(OAuthReturnState.SESSION_ATTRIBUTE)
             }
         }
 
