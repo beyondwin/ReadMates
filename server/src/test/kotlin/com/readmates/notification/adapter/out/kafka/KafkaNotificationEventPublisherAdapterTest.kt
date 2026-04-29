@@ -2,9 +2,11 @@
 
 package com.readmates.notification.adapter.out.kafka
 
+import com.readmates.notification.adapter.`in`.kafka.NotificationUnsupportedSchemaVersionException
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
+import com.readmates.notification.application.service.NotificationDeliveryRetryableException
 import com.readmates.notification.domain.NotificationEventType
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -29,6 +31,9 @@ import org.springframework.kafka.core.KafkaOperations
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.listener.DefaultErrorHandler
+import org.springframework.kafka.listener.ExceptionClassifier
+import org.springframework.kafka.listener.ListenerExecutionFailedException
+import org.springframework.kafka.support.ExceptionMatcher
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.kafka.support.SendResult
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
@@ -159,6 +164,60 @@ class KafkaNotificationEventPublisherAdapterTest {
                 assertThat(errorHandler).isInstanceOf(DefaultErrorHandler::class.java)
                 assertThat(properties.deliveryRetryBackoff).isEqualTo(Duration.ofMinutes(5))
                 assertThat(properties.deliveryRetryMaxAttempts).isEqualTo(72)
+            }
+    }
+
+    @Test
+    fun `error handler treats generic consumer processing failures as retryable`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                val errorHandler = context.getBean("notificationKafkaErrorHandler", DefaultErrorHandler::class.java)
+                val exceptionMatcher = errorHandler.exceptionMatcher()
+
+                assertThat(exceptionMatcher.match(RuntimeException("database temporarily unavailable"))).isTrue()
+                assertThat(
+                    exceptionMatcher.match(
+                        ListenerExecutionFailedException(
+                            "listener failed",
+                            RuntimeException("database temporarily unavailable"),
+                        ),
+                    ),
+                ).isTrue()
+                assertThat(exceptionMatcher.match(NotificationDeliveryRetryableException("email provider unavailable")))
+                    .isTrue()
+            }
+    }
+
+    @Test
+    fun `error handler treats unsupported notification schema as non retryable`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                val errorHandler = context.getBean("notificationKafkaErrorHandler", DefaultErrorHandler::class.java)
+                val exceptionMatcher = errorHandler.exceptionMatcher()
+
+                assertThat(
+                    exceptionMatcher.match(
+                        NotificationUnsupportedSchemaVersionException(
+                            schemaVersion = 2,
+                        ),
+                    ),
+                ).isFalse()
+                assertThat(
+                    exceptionMatcher.match(
+                        ListenerExecutionFailedException(
+                            "listener failed",
+                            NotificationUnsupportedSchemaVersionException(schemaVersion = 2),
+                        ),
+                    ),
+                ).isFalse()
             }
     }
 
@@ -367,6 +426,12 @@ private class RecordingKafkaSendFuture(
         interruptFailure?.let { throw it }
         return Mockito.mock(SendResult::class.java) as SendResult<String, NotificationEventMessage>
     }
+}
+
+private fun DefaultErrorHandler.exceptionMatcher(): ExceptionMatcher {
+    val method = ExceptionClassifier::class.java.getDeclaredMethod("getExceptionMatcher")
+    method.isAccessible = true
+    return method.invoke(this) as ExceptionMatcher
 }
 
 private fun notificationEventMessage(

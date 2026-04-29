@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.kafka
 
+import com.readmates.notification.adapter.`in`.kafka.NotificationUnsupportedSchemaVersionException
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.service.NotificationDeliveryRetryableException
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -87,8 +88,8 @@ class NotificationKafkaConfiguration {
             recoverer,
             FixedBackOff(properties.deliveryRetryBackoff.toMillis(), properties.deliveryRetryMaxAttempts),
         ).also {
-            it.defaultFalse()
             it.addRetryableExceptions(NotificationDeliveryRetryableException::class.java)
+            it.addNotRetryableExceptions(NotificationUnsupportedSchemaVersionException::class.java)
         }
 
     @Bean
