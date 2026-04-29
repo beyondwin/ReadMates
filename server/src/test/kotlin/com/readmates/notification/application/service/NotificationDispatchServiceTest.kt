@@ -11,6 +11,7 @@ import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.OffsetDateTime
@@ -69,13 +70,13 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
-    fun `dispatch marks dead and rethrows mail exception when attempts are exhausted`() {
+    fun `dispatch marks dead and completes when attempts are exhausted`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 4)))
         val mailPort = FailingMailPort("token=secret member@example.com " + "x".repeat(600))
         val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
 
-        assertThatThrownBy { service.dispatch(message()) }
-            .isInstanceOf(IllegalStateException::class.java)
+        assertThatCode { service.dispatch(message()) }
+            .doesNotThrowAnyException()
 
         assertThat(deliveryPort.dead.map { it.id }).containsExactly(emailDelivery().id)
         assertThat(deliveryPort.dead.single().error).hasSize(500)

@@ -22,7 +22,7 @@ private val DISPATCH_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 class NotificationDispatchService(
     private val deliveryPort: NotificationDeliveryPort,
     private val mailDeliveryPort: MailDeliveryPort,
-    @param:Value("\${readmates.notifications.worker.max-attempts:5}") private val maxAttempts: Int,
+    @param:Value("\${readmates.notifications.kafka.max-delivery-attempts:5}") private val maxAttempts: Int,
 ) : DispatchNotificationEventUseCase {
     override fun dispatch(message: NotificationEventMessage) {
         val deliveries = deliveryPort.persistPlannedDeliveries(message)
@@ -44,8 +44,9 @@ class NotificationDispatchService(
             )
             deliveryPort.markDeliverySent(claimed.id, claimed.lockedAt)
         } catch (exception: Exception) {
-            markFailure(claimed, exception)
-            throw exception
+            if (!markFailure(claimed, exception)) {
+                throw exception
+            }
         }
     }
 
@@ -65,10 +66,11 @@ class NotificationDispatchService(
         }
     }
 
-    private fun markFailure(claimed: ClaimedNotificationDeliveryItem, exception: Exception) {
+    private fun markFailure(claimed: ClaimedNotificationDeliveryItem, exception: Exception): Boolean {
         val error = exception.toStorageError()
-        if (claimed.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
+        return if (claimed.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
             deliveryPort.markDeliveryDead(claimed.id, claimed.lockedAt, error)
+            true
         } else {
             deliveryPort.markDeliveryFailed(
                 id = claimed.id,
@@ -76,6 +78,7 @@ class NotificationDispatchService(
                 error = error,
                 nextAttemptDelayMinutes = retryDelayMinutes(claimed.attemptCount),
             )
+            false
         }
     }
 
