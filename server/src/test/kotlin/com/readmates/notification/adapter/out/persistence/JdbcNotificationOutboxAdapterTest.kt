@@ -11,9 +11,16 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 private const val CLEANUP_NOTIFICATION_OUTBOX_SQL = """
+    delete from notification_test_mail_audit
+    where club_id in (
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002'
+    );
     delete from notification_preferences
     where club_id in (
       '00000000-0000-0000-0000-000000000001',
@@ -229,6 +236,74 @@ class JdbcNotificationOutboxAdapterTest(
         assertThat(backlog.failed).isEqualTo(1)
         assertThat(backlog.dead).isEqualTo(1)
         assertThat(backlog.sending).isEqualTo(1)
+    }
+
+    @Test
+    fun `reserveTestMailAuditAttempt inserts one row and refuses recent host attempt`() {
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
+        val cooldownStartedAfter = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(60)
+
+        val first = adapter.reserveTestMailAuditAttempt(
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            recipientMaskedEmail = "e***@example.com",
+            recipientEmailHash = "0".repeat(64),
+            cooldownStartedAfter = cooldownStartedAfter,
+        )
+        val second = adapter.reserveTestMailAuditAttempt(
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            recipientMaskedEmail = "o***@example.com",
+            recipientEmailHash = "1".repeat(64),
+            cooldownStartedAfter = cooldownStartedAfter,
+        )
+
+        assertThat(first).isNotNull
+        assertThat(first?.status?.name).isEqualTo("SENT")
+        assertThat(second).isNull()
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from notification_test_mail_audit
+                where club_id = ?
+                  and host_membership_id = ?
+                """.trimIndent(),
+                Int::class.java,
+                clubId.toString(),
+                hostMembershipId.toString(),
+            ),
+        ).isEqualTo(1)
+    }
+
+    @Test
+    fun `markTestMailAuditFailed updates reserved audit row`() {
+        val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
+        val reserved = adapter.reserveTestMailAuditAttempt(
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            recipientMaskedEmail = "e***@example.com",
+            recipientEmailHash = "0".repeat(64),
+            cooldownStartedAfter = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(60),
+        )
+
+        val failed = adapter.markTestMailAuditFailed(reserved!!.id, "smtp rejected")
+
+        assertThat(failed.status.name).isEqualTo("FAILED")
+        assertThat(failed.lastError).isEqualTo("smtp rejected")
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select status
+                from notification_test_mail_audit
+                where id = ?
+                """.trimIndent(),
+                String::class.java,
+                reserved.id.toString(),
+            ),
+        ).isEqualTo("FAILED")
     }
 
     @Test

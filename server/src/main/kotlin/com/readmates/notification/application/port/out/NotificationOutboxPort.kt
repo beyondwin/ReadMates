@@ -8,7 +8,6 @@ import com.readmates.notification.application.model.NotificationOutboxBacklog
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
-import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.shared.security.CurrentMember
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -32,14 +31,13 @@ interface NotificationOutboxPort {
     fun outboxBacklog(): NotificationOutboxBacklog
     fun getPreferences(member: CurrentMember): NotificationPreferences
     fun savePreferences(member: CurrentMember, preferences: NotificationPreferences): NotificationPreferences
-    fun latestTestMailCreatedAt(clubId: UUID, hostMembershipId: UUID): OffsetDateTime?
-    fun recordTestMailAudit(
+    fun reserveTestMailAuditAttempt(
         clubId: UUID,
         hostMembershipId: UUID,
         recipientMaskedEmail: String,
         recipientEmailHash: String,
-        status: NotificationTestMailStatus,
-        lastError: String?,
-    ): NotificationTestMailAuditItem
+        cooldownStartedAfter: OffsetDateTime,
+    ): NotificationTestMailAuditItem?
+    fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem
     fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem>
 }

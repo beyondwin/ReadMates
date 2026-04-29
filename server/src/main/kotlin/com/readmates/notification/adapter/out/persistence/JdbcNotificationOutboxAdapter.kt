@@ -570,31 +570,52 @@ class JdbcNotificationOutboxAdapter(
         return getPreferences(member)
     }
 
-    override fun latestTestMailCreatedAt(clubId: UUID, hostMembershipId: UUID): OffsetDateTime? =
-        jdbcTemplate().query(
-            """
-            select created_at
-            from notification_test_mail_audit
-            where club_id = ?
-              and host_membership_id = ?
-            order by created_at desc
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.utcOffsetDateTime("created_at") },
-            clubId.dbString(),
-            hostMembershipId.dbString(),
-        ).firstOrNull()
-
-    override fun recordTestMailAudit(
+    @Transactional
+    override fun reserveTestMailAuditAttempt(
         clubId: UUID,
         hostMembershipId: UUID,
         recipientMaskedEmail: String,
         recipientEmailHash: String,
-        status: NotificationTestMailStatus,
-        lastError: String?,
-    ): NotificationTestMailAuditItem {
+        cooldownStartedAfter: OffsetDateTime,
+    ): NotificationTestMailAuditItem? {
+        val jdbcTemplate = jdbcTemplate()
+        // Serialize host test-mail reservations on the membership row so cooldown check and insert are one critical section.
+        val lockedHostMembershipId = jdbcTemplate.query(
+            """
+            select id
+            from memberships
+            where id = ?
+              and club_id = ?
+            limit 1
+            for update
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.uuid("id") },
+            hostMembershipId.dbString(),
+            clubId.dbString(),
+        ).firstOrNull() ?: return null
+
+        val recentAttemptId = jdbcTemplate.query(
+            """
+            select id
+            from notification_test_mail_audit
+            where club_id = ?
+              and host_membership_id = ?
+              and created_at > ?
+            order by created_at desc
+            limit 1
+            for update
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.uuid("id") },
+            clubId.dbString(),
+            lockedHostMembershipId.dbString(),
+            cooldownStartedAfter.toUtcLocalDateTime(),
+        ).firstOrNull()
+        if (recentAttemptId != null) {
+            return null
+        }
+
         val id = UUID.randomUUID()
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into notification_test_mail_audit (
               id,
@@ -604,16 +625,41 @@ class JdbcNotificationOutboxAdapter(
               recipient_email_hash,
               status,
               last_error
-            ) values (?, ?, ?, ?, ?, ?, ?)
+            ) values (?, ?, ?, ?, ?, 'SENT', null)
             """.trimIndent(),
             id.dbString(),
             clubId.dbString(),
-            hostMembershipId.dbString(),
+            lockedHostMembershipId.dbString(),
             recipientMaskedEmail,
             recipientEmailHash,
-            status.name,
-            lastError?.truncateForStorage(),
         )
+
+        return jdbcTemplate.query(
+            """
+            select id, recipient_masked_email, status, last_error, created_at
+            from notification_test_mail_audit
+            where id = ?
+            """.trimIndent(),
+            { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
+            id.dbString(),
+        ).single()
+    }
+
+    override fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem {
+        val updated = jdbcTemplate().update(
+            """
+            update notification_test_mail_audit
+            set status = 'FAILED',
+                last_error = ?,
+                updated_at = utc_timestamp(6)
+            where id = ?
+            """.trimIndent(),
+            lastError.truncateForStorage(),
+            id.dbString(),
+        )
+        if (updated == 0) {
+            throw IllegalStateException("Notification test mail audit row not found")
+        }
 
         return jdbcTemplate().query(
             """

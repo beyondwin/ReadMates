@@ -7,7 +7,6 @@ import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationOutboxItem
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
-import com.readmates.notification.application.model.NotificationTestMailStatus
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
@@ -32,6 +31,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 private const val MAX_LAST_ERROR_LENGTH = 500
+private const val MAX_EMAIL_LENGTH = 320
 private const val TEST_MAIL_COOLDOWN_SECONDS = 60L
 private const val TEST_MAIL_SUBJECT = "ReadMates 알림 테스트"
 private const val TEST_MAIL_BODY = "ReadMates 알림 발송 설정을 확인하기 위한 테스트 메일입니다."
@@ -128,16 +128,20 @@ class NotificationOutboxService(
     ): NotificationTestMailAuditItem {
         val currentHost = requireHost(host)
         val recipient = command.recipientEmail.trim().lowercase()
-        if (!EMAIL_PATTERN.matches(recipient)) {
+        if (recipient.length > MAX_EMAIL_LENGTH || !EMAIL_PATTERN.matches(recipient)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid email address")
-        }
-        val latest = notificationOutboxPort.latestTestMailCreatedAt(currentHost.clubId, currentHost.membershipId)
-        if (latest != null && latest.isAfter(OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(TEST_MAIL_COOLDOWN_SECONDS))) {
-            throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Test mail cooldown is active")
         }
 
         val maskedRecipient = recipient.maskEmail()
         val recipientHash = sha256Hex(recipient)
+        val audit = notificationOutboxPort.reserveTestMailAuditAttempt(
+            clubId = currentHost.clubId,
+            hostMembershipId = currentHost.membershipId,
+            recipientMaskedEmail = maskedRecipient,
+            recipientEmailHash = recipientHash,
+            cooldownStartedAfter = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(TEST_MAIL_COOLDOWN_SECONDS),
+        ) ?: throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Test mail cooldown is active")
+
         return try {
             mailDeliveryPort.send(
                 MailDeliveryCommand(
@@ -146,23 +150,9 @@ class NotificationOutboxService(
                     text = TEST_MAIL_BODY,
                 ),
             )
-            notificationOutboxPort.recordTestMailAudit(
-                clubId = currentHost.clubId,
-                hostMembershipId = currentHost.membershipId,
-                recipientMaskedEmail = maskedRecipient,
-                recipientEmailHash = recipientHash,
-                status = NotificationTestMailStatus.SENT,
-                lastError = null,
-            )
+            audit
         } catch (exception: Exception) {
-            notificationOutboxPort.recordTestMailAudit(
-                clubId = currentHost.clubId,
-                hostMembershipId = currentHost.membershipId,
-                recipientMaskedEmail = maskedRecipient,
-                recipientEmailHash = recipientHash,
-                status = NotificationTestMailStatus.FAILED,
-                lastError = exception.toTestMailStorageError(),
-            )
+            notificationOutboxPort.markTestMailAuditFailed(audit.id, exception.toTestMailStorageError())
         }
     }
 

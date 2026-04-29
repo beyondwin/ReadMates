@@ -183,20 +183,26 @@ private class FixedBacklogNotificationOutboxPort(
         preferences: NotificationPreferences,
     ): NotificationPreferences = preferences
 
-    override fun latestTestMailCreatedAt(clubId: UUID, hostMembershipId: UUID): OffsetDateTime? = null
-
-    override fun recordTestMailAudit(
+    override fun reserveTestMailAuditAttempt(
         clubId: UUID,
         hostMembershipId: UUID,
         recipientMaskedEmail: String,
         recipientEmailHash: String,
-        status: NotificationTestMailStatus,
-        lastError: String?,
-    ): NotificationTestMailAuditItem =
+        cooldownStartedAfter: OffsetDateTime,
+    ): NotificationTestMailAuditItem? =
         NotificationTestMailAuditItem(
             id = UUID.fromString("00000000-0000-0000-0000-000000000901"),
             recipientEmail = recipientMaskedEmail,
-            status = status,
+            status = NotificationTestMailStatus.SENT,
+            lastError = null,
+            createdAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
+        )
+
+    override fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem =
+        NotificationTestMailAuditItem(
+            id = id,
+            recipientEmail = "e***@example.com",
+            status = NotificationTestMailStatus.FAILED,
             lastError = lastError,
             createdAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
         )
