@@ -47,6 +47,7 @@ export default defineConfig({
         `${envAssignment("SPRING_DATASOURCE_USERNAME", dbUser)} ${envAssignment("SPRING_DATASOURCE_PASSWORD", dbPassword)} ` +
         `${envAssignment("READMATES_APP_BASE_URL", baseURL)} ${envAssignment("READMATES_ALLOWED_ORIGINS", allowedOrigins)} ` +
         `${envAssignment("READMATES_BFF_SECRET", "e2e-secret")} ` +
+        `${envAssignment("READMATES_MANAGEMENT_PORT", "0")} ` +
         `${envAssignment("READMATES_FLYWAY_LOCATIONS", "classpath:db/mysql/migration,classpath:db/mysql/dev")} ` +
         `${envAssignment("READMATES_AUTH_SESSION_COOKIE_SECURE", "false")} ` +
         "../server/gradlew -p ../server bootRun",
