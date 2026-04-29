@@ -1620,7 +1620,7 @@ git commit -m "feat: record notification domain events"
 - Create: `server/src/main/kotlin/com/readmates/notification/application/service/MemberNotificationService.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt`
 
-- [ ] **Step 1: Write controller test**
+- [x] **Step 1: Write controller test**
 
 Create `MemberNotificationControllerTest.kt`:
 
@@ -1682,7 +1682,7 @@ class MemberNotificationControllerTest(
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run:
 
@@ -1692,7 +1692,7 @@ Run:
 
 Expected: FAIL because `ManageMemberNotificationsUseCase` and endpoints do not exist.
 
-- [ ] **Step 3: Add use case and service**
+- [x] **Step 3: Add use case and service**
 
 In `NotificationUseCases.kt`, add:
 
@@ -1743,7 +1743,7 @@ class MemberNotificationService(
 }
 ```
 
-- [ ] **Step 4: Add DTOs and endpoints**
+- [x] **Step 4: Add DTOs and endpoints**
 
 Add DTOs to `NotificationWebDtos.kt`:
 
@@ -1808,7 +1808,7 @@ Make sure controller class request mapping is:
 @RequestMapping("/api/me/notifications")
 ```
 
-- [ ] **Step 5: Run controller test**
+- [x] **Step 5: Run controller test**
 
 Run:
 
@@ -1818,7 +1818,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/in/web/MemberNotificationController.kt server/src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt server/src/main/kotlin/com/readmates/notification/application/service/MemberNotificationService.kt server/src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt
