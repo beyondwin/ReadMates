@@ -125,6 +125,76 @@ class JdbcNotificationEventOutboxAdapterTest(
         ).isEqualTo("PUBLISHING")
     }
 
+    @Test
+    fun `claim publishable reclaims stale publishing rows but not fresh publishing rows`() {
+        insertClub()
+        adapter.enqueueEvent(
+            clubId = clubId,
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+            aggregateType = "SESSION",
+            aggregateId = sessionId,
+            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Stale Lease"),
+            dedupeKey = "event-outbox-adapter-test-stale-publishing",
+        )
+        adapter.enqueueEvent(
+            clubId = clubId,
+            eventType = NotificationEventType.SESSION_REMINDER_DUE,
+            aggregateType = "SESSION",
+            aggregateId = sessionId,
+            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Fresh Lease"),
+            dedupeKey = "event-outbox-adapter-test-fresh-publishing",
+        )
+        val stalePublishingId = eventIdForDedupeKey("event-outbox-adapter-test-stale-publishing")
+        val freshPublishingId = eventIdForDedupeKey("event-outbox-adapter-test-fresh-publishing")
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set status = 'PUBLISHING',
+                locked_at = timestampadd(MINUTE, -16, utc_timestamp(6)),
+                next_attempt_at = timestampadd(MINUTE, -16, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
+            stalePublishingId,
+        )
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set status = 'PUBLISHING',
+                locked_at = utc_timestamp(6),
+                next_attempt_at = timestampadd(MINUTE, -16, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
+            freshPublishingId,
+        )
+
+        val claimed = adapter.claimPublishable(10)
+
+        assertThat(claimed.map { it.id.toString() }).contains(stalePublishingId)
+        assertThat(claimed.map { it.id.toString() }).doesNotContain(freshPublishingId)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select status
+                from notification_event_outbox
+                where id = ?
+                """.trimIndent(),
+                String::class.java,
+                stalePublishingId,
+            ),
+        ).isEqualTo("PUBLISHING")
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select locked_at > timestampadd(MINUTE, -1, utc_timestamp(6))
+                from notification_event_outbox
+                where id = ?
+                """.trimIndent(),
+                Boolean::class.java,
+                stalePublishingId,
+            ),
+        ).isTrue()
+    }
+
     private fun eventRows(): Int =
         jdbcTemplate.queryForObject(
             """
@@ -135,6 +205,17 @@ class JdbcNotificationEventOutboxAdapterTest(
             Int::class.java,
             clubId.toString(),
         ) ?: 0
+
+    private fun eventIdForDedupeKey(dedupeKey: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select id
+            from notification_event_outbox
+            where dedupe_key = ?
+            """.trimIndent(),
+            String::class.java,
+            dedupeKey,
+        ) ?: error("Missing notification event outbox row for dedupe key $dedupeKey")
 
     private fun insertClub() {
         jdbcTemplate.update(

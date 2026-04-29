@@ -25,6 +25,7 @@ import java.util.UUID
 import kotlin.math.max
 
 private const val MAX_EVENT_LAST_ERROR_LENGTH = 500
+private const val PUBLISHING_LEASE_TIMEOUT_MINUTES = 15
 
 @Repository
 class JdbcNotificationEventOutboxAdapter(
@@ -82,6 +83,7 @@ class JdbcNotificationEventOutboxAdapter(
         }
 
         val jdbcTemplate = jdbcTemplate()
+        resetStalePublishingRows(jdbcTemplate)
         val ids = jdbcTemplate.query(
             """
             select id
@@ -227,6 +229,21 @@ class JdbcNotificationEventOutboxAdapter(
 
     private fun parsePayload(rawPayload: String): NotificationEventPayload =
         objectMapper.readValue(rawPayload, payloadType)
+
+    private fun resetStalePublishingRows(jdbcTemplate: JdbcTemplate) {
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set status = 'PENDING',
+                locked_at = null,
+                next_attempt_at = utc_timestamp(6),
+                updated_at = utc_timestamp(6)
+            where status = 'PUBLISHING'
+              and locked_at < timestampadd(MINUTE, ?, utc_timestamp(6))
+            """.trimIndent(),
+            -PUBLISHING_LEASE_TIMEOUT_MINUTES,
+        )
+    }
 
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateProvider.ifAvailable
