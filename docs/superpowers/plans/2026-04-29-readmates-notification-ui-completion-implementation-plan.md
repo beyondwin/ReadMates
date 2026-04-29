@@ -20,7 +20,7 @@ Important existing-code gap: current long-review save uses `/api/sessions/curren
 
 Server migrations:
 
-- Create `server/src/main/resources/db/mysql/migration/V17__notification_preferences_and_test_mail_audit.sql`: notification preference table, test-mail audit table, and supporting indexes.
+- Create `server/src/main/resources/db/mysql/migration/V18__notification_preferences_and_test_mail_audit.sql`: notification preference table, test-mail audit table, and supporting indexes.
 
 Server notification domain/application:
 
@@ -77,13 +77,13 @@ Tests:
 ### Task 1: Add Notification Preference And Test-Mail Audit Schema
 
 **Files:**
-- Create: `server/src/main/resources/db/mysql/migration/V17__notification_preferences_and_test_mail_audit.sql`
+- Create: `server/src/main/resources/db/mysql/migration/V18__notification_preferences_and_test_mail_audit.sql`
 - Modify: `server/src/main/kotlin/com/readmates/notification/domain/NotificationEventType.kt`
 - Test: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
 - [x] **Step 1: Write the migration**
 
-Create `server/src/main/resources/db/mysql/migration/V17__notification_preferences_and_test_mail_audit.sql`:
+Create `server/src/main/resources/db/mysql/migration/V18__notification_preferences_and_test_mail_audit.sql`:
 
 ```sql
 create table notification_preferences (
@@ -152,7 +152,7 @@ Expected: `BUILD SUCCESSFUL`.
 - [x] **Step 4: Commit**
 
 ```bash
-git add server/src/main/resources/db/mysql/migration/V17__notification_preferences_and_test_mail_audit.sql \
+git add server/src/main/resources/db/mysql/migration/V18__notification_preferences_and_test_mail_audit.sql \
   server/src/main/kotlin/com/readmates/notification/domain/NotificationEventType.kt
 git commit -m "feat: add notification preference schema"
 ```

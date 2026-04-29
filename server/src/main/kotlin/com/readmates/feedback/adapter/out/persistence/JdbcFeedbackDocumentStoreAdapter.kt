@@ -2,6 +2,7 @@ package com.readmates.feedback.adapter.out.persistence
 
 import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
 import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
+import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
 import com.readmates.shared.db.dbString
@@ -21,7 +22,7 @@ import java.util.UUID
 class JdbcFeedbackDocumentStoreAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : FeedbackDocumentStorePort {
-    override fun listLatestReadableDocuments(currentMember: CurrentMember): List<StoredFeedbackDocumentResult> {
+    override fun listLatestReadableDocuments(currentMember: CurrentMember): List<StoredFeedbackDocumentListResult> {
         val jdbcTemplate = jdbcTemplate()
         val sql = if (currentMember.isHost) {
             """
@@ -32,7 +33,11 @@ class JdbcFeedbackDocumentStoreAdapter(
                 sessions.number as session_number,
                 sessions.book_title,
                 sessions.session_date,
-                session_feedback_documents.source_text,
+                session_feedback_documents.document_title,
+                case
+                  when session_feedback_documents.document_title is null then session_feedback_documents.source_text
+                  else null
+                end as legacy_source_text,
                 session_feedback_documents.file_name,
                 session_feedback_documents.created_at,
                 row_number() over (
@@ -57,7 +62,11 @@ class JdbcFeedbackDocumentStoreAdapter(
                 sessions.number as session_number,
                 sessions.book_title,
                 sessions.session_date,
-                session_feedback_documents.source_text,
+                session_feedback_documents.document_title,
+                case
+                  when session_feedback_documents.document_title is null then session_feedback_documents.source_text
+                  else null
+                end as legacy_source_text,
                 session_feedback_documents.file_name,
                 session_feedback_documents.created_at,
                 row_number() over (
@@ -86,7 +95,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         }
 
         return jdbcTemplate.query(sql, { resultSet, _ ->
-            resultSet.toStoredFeedbackDocument()
+            resultSet.toStoredFeedbackDocumentList()
         }, *args)
     }
 
@@ -192,6 +201,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         command: FeedbackDocumentUploadCommand,
         version: Int,
         documentId: UUID,
+        title: String,
     ) {
         jdbcTemplate().update(
             """
@@ -201,22 +211,36 @@ class JdbcFeedbackDocumentStoreAdapter(
               session_id,
               version,
               source_text,
+              document_title,
               file_name,
               content_type,
               file_size
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             documentId.dbString(),
             currentMember.clubId.dbString(),
             command.sessionId.dbString(),
             version,
             command.sourceText,
+            title,
             command.fileName,
             command.contentType,
             command.fileSize,
         )
     }
+
+    private fun ResultSet.toStoredFeedbackDocumentList(): StoredFeedbackDocumentListResult =
+        StoredFeedbackDocumentListResult(
+            sessionId = uuid("session_id"),
+            sessionNumber = getInt("session_number"),
+            bookTitle = getString("book_title"),
+            date = getObject("session_date", LocalDate::class.java),
+            title = getString("document_title"),
+            legacySourceText = getString("legacy_source_text"),
+            fileName = getString("file_name"),
+            uploadedAt = utcOffsetDateTime("created_at"),
+        )
 
     private fun ResultSet.toStoredFeedbackDocument(): StoredFeedbackDocumentResult =
         StoredFeedbackDocumentResult(
