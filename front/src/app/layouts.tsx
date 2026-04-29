@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
 import { useAuth } from "@/src/app/auth-state";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -19,6 +19,7 @@ import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
 import { PublicMobileHeader } from "@/shared/ui/public-mobile-header";
 import { TopNav } from "@/shared/ui/top-nav";
+import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
 
 function RouteOutlet() {
   const location = useLocation();
@@ -52,6 +53,81 @@ function appBasePath(pathname: string) {
 function appClubSlug(pathname: string) {
   const match = /^\/clubs\/([^/]+)\/app(?:\/|$)/.exec(pathname);
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+function clubSwitcherTargetPath({
+  clubSlug,
+  appPath,
+  search,
+  hash,
+  canOpenHostPath,
+}: {
+  clubSlug: string;
+  appPath: string;
+  search: string;
+  hash: string;
+  canOpenHostPath: boolean;
+}) {
+  const nextAppPath = appPath.startsWith("/app/host") && !canOpenHostPath ? "/app" : appPath;
+  return `/clubs/${encodeURIComponent(clubSlug)}${nextAppPath}${search}${hash}`;
+}
+
+function ClubSwitcher({
+  auth,
+  currentClubSlug,
+  appPath,
+  search,
+  hash,
+}: {
+  auth: AuthMeResponse | null;
+  currentClubSlug: string | null;
+  appPath: string;
+  search: string;
+  hash: string;
+}) {
+  const navigate = useNavigate();
+  const clubs = usableJoinedClubs(auth?.joinedClubs ?? []);
+
+  if (clubs.length < 2) {
+    return null;
+  }
+
+  return (
+    <div className="club-switcher" aria-live="polite">
+      <label className="club-switcher__label" htmlFor="club-switcher-select">
+        클럽
+      </label>
+      <select
+        id="club-switcher-select"
+        aria-label="클럽 전환"
+        className="club-switcher__select"
+        value={currentClubSlug ?? ""}
+        onChange={(event) => {
+          const nextSlug = event.currentTarget.value;
+          if (!nextSlug || nextSlug === currentClubSlug) {
+            return;
+          }
+          const nextClub = clubs.find((club) => club.clubSlug === nextSlug);
+          navigate(
+            clubSwitcherTargetPath({
+              clubSlug: nextSlug,
+              appPath,
+              search,
+              hash,
+              canOpenHostPath: nextClub?.role === "HOST" && nextClub.status === "ACTIVE",
+            }),
+          );
+        }}
+      >
+        {!currentClubSlug ? <option value="">클럽 선택</option> : null}
+        {clubs.map((club) => (
+          <option key={club.membershipId} value={club.clubSlug}>
+            {club.clubName}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 export function PublicRouteLayout() {
@@ -187,6 +263,13 @@ export function AppRouteLayout() {
         <MobileHeader variant={mobileVariant} showHostEntry={showHostEntry} appBasePath={basePath} />
       </div>
       <div className="app-content">
+        <ClubSwitcher
+          auth={auth}
+          currentClubSlug={clubSlug ?? auth?.currentMembership?.clubSlug ?? null}
+          appPath={appPath}
+          search={location.search}
+          hash={location.hash}
+        />
         <RouteOutlet />
       </div>
       <div className="desktop-only">

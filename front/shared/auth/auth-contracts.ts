@@ -13,4 +13,34 @@ export type AuthMeResponse = {
   role: MemberRole | null;
   membershipStatus: MembershipStatus | null;
   approvalState: ApprovalState;
+  currentMembership?: AuthCurrentMembership | null;
+  joinedClubs?: AuthJoinedClub[];
+  platformAdmin?: AuthPlatformAdmin | null;
+  recommendedAppEntryUrl?: string | null;
+};
+
+export type AuthCurrentMembership = {
+  membershipId: string;
+  clubId: string;
+  clubSlug: string;
+  displayName: string;
+  role: MemberRole;
+  membershipStatus: MembershipStatus;
+  approvalState: ApprovalState;
+};
+
+export type AuthJoinedClub = {
+  clubId: string;
+  clubSlug: string;
+  clubName: string;
+  membershipId: string;
+  role: MemberRole;
+  status: MembershipStatus;
+  primaryHost: string | null;
+};
+
+export type AuthPlatformAdmin = {
+  userId: string;
+  email: string;
+  role: string;
 };

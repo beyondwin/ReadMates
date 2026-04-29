@@ -522,7 +522,7 @@ describe("SPA router", () => {
     expectNoMemberHomeChildDataFetch(fetchMock);
   });
 
-  it("blocks inactive member home navigation before child data fetches", async () => {
+  it("shows club selection for inactive member home navigation before child data fetches", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -542,7 +542,8 @@ describe("SPA router", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByRole("heading", { name: "멤버 공간에 들어갈 수 없습니다." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "클럽을 선택하세요" })).toBeInTheDocument();
+    expect(screen.getByText("열 수 있는 클럽이 없습니다.")).toBeInTheDocument();
     expectNoMemberHomeChildDataFetch(fetchMock);
   });
 
