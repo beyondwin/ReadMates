@@ -6,7 +6,7 @@ ReadMates는 정기 독서모임의 세션 준비, 참여 관리, 기록 공개,
 - Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`, optional `Redis`
 - Scope: 정기 독서모임의 현재·예정 회차 준비부터 참여 관리, 기록 공개, 피드백 문서 열람까지 아우르는 운영형 서비스
 - Highlight: Google OAuth, 서버 측 session cookie, Cloudflare BFF 보안 경계, optional Redis rate limit/cache, 현재/예정 세션 공개 범위, 역할 기반 권한 제어, 멤버 알림 설정, 피드백 문서 접근 제어, Playwright E2E, 공개 릴리즈 후보 scan
-- 운영 파이프라인: MySQL transactional outbox 기반 이메일 알림, 호스트 알림 운영 장부, 고정 템플릿 테스트 메일 audit, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
+- 운영 파이프라인: MySQL transactional event outbox, Kafka relay/consumer 기반 이메일 및 in-app 알림, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 
 이 저장소는 외부 공개를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
 
