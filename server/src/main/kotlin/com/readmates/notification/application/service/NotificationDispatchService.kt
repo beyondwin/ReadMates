@@ -26,13 +26,19 @@ class NotificationDispatchService(
 ) : DispatchNotificationEventUseCase {
     override fun dispatch(message: NotificationEventMessage) {
         val deliveries = deliveryPort.persistPlannedDeliveries(message)
+        val retryableFailures = mutableListOf<NotificationDeliveryRetryableException>()
         deliveries
             .asSequence()
             .filter { it.channel == NotificationChannel.EMAIL }
-            .forEach(::dispatchEmail)
+            .forEach { delivery ->
+                dispatchEmail(delivery)?.let(retryableFailures::add)
+            }
+        if (retryableFailures.isNotEmpty()) {
+            throw retryableDispatchException(retryableFailures)
+        }
     }
 
-    private fun dispatchEmail(delivery: NotificationDeliveryItem) {
+    private fun dispatchEmail(delivery: NotificationDeliveryItem): NotificationDeliveryRetryableException? {
         val claimed = deliveryPort.claimEmailDelivery(delivery.id) ?: return handleUnclaimedEmailDelivery(delivery.id)
         val command = MailDeliveryCommand(
             to = requiredDeliveryField(claimed.id, "recipientEmail", claimed.recipientEmail),
@@ -47,20 +53,21 @@ class NotificationDispatchService(
         if (!deliveryPort.markDeliverySent(claimed.id, claimed.lockedAt)) {
             throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.SENT)
         }
+        return null
     }
 
-    private fun handleUnclaimedEmailDelivery(deliveryId: UUID) {
+    private fun handleUnclaimedEmailDelivery(deliveryId: UUID): NotificationDeliveryRetryableException? {
         val status = deliveryPort.findDeliveryStatus(deliveryId)
         when (status) {
             NotificationDeliveryStatus.SENT,
             NotificationDeliveryStatus.SKIPPED,
             NotificationDeliveryStatus.DEAD,
-            -> return
+            -> return null
 
             NotificationDeliveryStatus.PENDING,
             NotificationDeliveryStatus.FAILED,
             NotificationDeliveryStatus.SENDING,
-            -> throw NotificationDeliveryRetryableException(
+            -> return NotificationDeliveryRetryableException(
                 "Email delivery $deliveryId is not claimable with status $status",
             )
 
@@ -69,12 +76,16 @@ class NotificationDispatchService(
         }
     }
 
-    private fun markFailure(claimed: ClaimedNotificationDeliveryItem, exception: Exception) {
+    private fun markFailure(
+        claimed: ClaimedNotificationDeliveryItem,
+        exception: Exception,
+    ): NotificationDeliveryRetryableException? {
         val error = exception.toStorageError()
         if (claimed.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
             if (!deliveryPort.markDeliveryDead(claimed.id, claimed.lockedAt, error)) {
                 throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.DEAD)
             }
+            return null
         } else {
             val marked = deliveryPort.markDeliveryFailed(
                 id = claimed.id,
@@ -85,11 +96,21 @@ class NotificationDispatchService(
             if (!marked) {
                 throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.FAILED)
             }
-            throw NotificationDeliveryRetryableException(
+            return NotificationDeliveryRetryableException(
                 "Email delivery ${claimed.id} failed and is scheduled for retry: $error",
                 exception,
             )
         }
+    }
+
+    private fun retryableDispatchException(
+        failures: List<NotificationDeliveryRetryableException>,
+    ): NotificationDeliveryRetryableException {
+        val noun = if (failures.size == 1) "email delivery" else "email deliveries"
+        return NotificationDeliveryRetryableException(
+            "${failures.size} $noun remain retryable after dispatch pass: ${failures.first().message}",
+            failures.first().cause,
+        )
     }
 
     private fun retryDelayMinutes(attemptCount: Int): Long =

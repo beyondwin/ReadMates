@@ -108,6 +108,8 @@ class KafkaNotificationEventPublisherAdapterTest {
                     .isEqualTo(listOf("kafka-a:9092", "kafka-b:9092"))
                 assertThat(consumerFactory.configurationProperties[ConsumerConfig.GROUP_ID_CONFIG])
                     .isEqualTo("notification-workers")
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG])
+                    .isEqualTo("earliest")
             }
     }
 

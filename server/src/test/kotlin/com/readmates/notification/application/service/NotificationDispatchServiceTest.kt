@@ -71,6 +71,63 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
+    fun `dispatch continues after failed email delivery and throws retryable after sending later delivery`() {
+        val failedDelivery = emailDelivery(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000401"),
+            email = "first@example.com",
+            attemptCount = 1,
+        )
+        val laterDelivery = emailDelivery(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000402"),
+            email = "second@example.com",
+        )
+        val deliveryPort = FakeDeliveryPort(deliveries = listOf(failedDelivery, laterDelivery))
+        val mailPort = SelectiveFailingMailPort(failures = mapOf("first@example.com" to "smtp rejected"))
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
+            .hasMessageContaining("1 email delivery")
+            .hasCauseInstanceOf(IllegalStateException::class.java)
+
+        assertThat(deliveryPort.claimedIds).containsExactly(failedDelivery.id, laterDelivery.id)
+        assertThat(deliveryPort.failed.map { it.id }).containsExactly(failedDelivery.id)
+        assertThat(deliveryPort.sent).containsExactly(laterDelivery.id to claimedEmailDelivery(laterDelivery).lockedAt)
+        assertThat(mailPort.sent.map { it.to }).containsExactly("first@example.com", "second@example.com")
+        assertThat(deliveryPort.dead).isEmpty()
+    }
+
+    @Test
+    fun `dispatch continues after parked email delivery and throws retryable after sending later delivery`() {
+        val parkedDelivery = emailDelivery(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000401"),
+            email = "parked@example.com",
+            status = NotificationDeliveryStatus.FAILED,
+        )
+        val laterDelivery = emailDelivery(
+            id = UUID.fromString("00000000-0000-0000-0000-000000000402"),
+            email = "second@example.com",
+        )
+        val deliveryPort = FakeDeliveryPort(
+            deliveries = listOf(parkedDelivery, laterDelivery),
+            unclaimableIds = setOf(parkedDelivery.id),
+        )
+        val mailPort = RecordingMailPort()
+        val service = NotificationDispatchService(deliveryPort, mailPort, maxAttempts = 5)
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
+            .hasMessageContaining("1 email delivery")
+            .hasNoCause()
+
+        assertThat(deliveryPort.claimedIds).containsExactly(parkedDelivery.id, laterDelivery.id)
+        assertThat(mailPort.sent.map { it.to }).containsExactly("second@example.com")
+        assertThat(deliveryPort.sent).containsExactly(laterDelivery.id to claimedEmailDelivery(laterDelivery).lockedAt)
+        assertThat(deliveryPort.failed).isEmpty()
+        assertThat(deliveryPort.dead).isEmpty()
+    }
+
+    @Test
     fun `dispatch marks dead and completes when attempts are exhausted`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 4)))
         val mailPort = FailingMailPort("token=secret member@example.com " + "x".repeat(600))
@@ -211,11 +268,13 @@ class NotificationDispatchServiceTest {
         )
 
     private fun emailDelivery(
+        id: UUID = UUID.fromString("00000000-0000-0000-0000-000000000401"),
+        email: String = "member@example.com",
         attemptCount: Int = 0,
         status: NotificationDeliveryStatus = NotificationDeliveryStatus.PENDING,
     ): NotificationDeliveryItem =
         NotificationDeliveryItem(
-            id = UUID.fromString("00000000-0000-0000-0000-000000000401"),
+            id = id,
             eventId = message().eventId,
             clubId = message().clubId,
             recipientMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000501"),
@@ -223,7 +282,7 @@ class NotificationDispatchServiceTest {
             status = status,
             attemptCount = attemptCount,
             lockedAt = null,
-            recipientEmail = "member@example.com",
+            recipientEmail = email,
             subject = "다음 책이 공개되었습니다",
             bodyText = "다음 책을 확인해 주세요.",
         )
@@ -238,8 +297,8 @@ class NotificationDispatchServiceTest {
             bodyText = null,
         )
 
-    private fun claimedEmailDelivery(): ClaimedNotificationDeliveryItem =
-        emailDelivery().let {
+    private fun claimedEmailDelivery(delivery: NotificationDeliveryItem = emailDelivery()): ClaimedNotificationDeliveryItem =
+        delivery.let {
             ClaimedNotificationDeliveryItem(
                 id = it.id,
                 eventId = it.eventId,
@@ -271,6 +330,7 @@ class NotificationDispatchServiceTest {
     private class FakeDeliveryPort(
         private val deliveries: List<NotificationDeliveryItem>,
         private val claimable: Boolean = true,
+        private val unclaimableIds: Set<UUID> = emptySet(),
         private val markSentResult: Boolean = true,
         private val markFailedResult: Boolean = true,
         private val markDeadResult: Boolean = true,
@@ -288,7 +348,7 @@ class NotificationDispatchServiceTest {
 
         override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? {
             claimedIds += id
-            if (!claimable) {
+            if (!claimable || id in unclaimableIds) {
                 return null
             }
             val planned = deliveries.firstOrNull { it.id == id } ?: return null
@@ -354,6 +414,15 @@ class NotificationDispatchServiceTest {
     private class FailingMailPort(private val message: String) : MailDeliveryPort {
         override fun send(command: MailDeliveryCommand) {
             throw IllegalStateException(message)
+        }
+    }
+
+    private class SelectiveFailingMailPort(private val failures: Map<String, String>) : MailDeliveryPort {
+        val sent = mutableListOf<MailDeliveryCommand>()
+
+        override fun send(command: MailDeliveryCommand) {
+            sent += command
+            failures[command.to]?.let { throw IllegalStateException(it) }
         }
     }
 }

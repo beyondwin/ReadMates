@@ -127,6 +127,7 @@ class NotificationKafkaConfiguration {
         return mapOf(
             ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers,
             ConsumerConfig.GROUP_ID_CONFIG to properties.consumerGroup,
+            ConsumerConfig.AUTO_OFFSET_RESET_CONFIG to "earliest",
         )
     }
 

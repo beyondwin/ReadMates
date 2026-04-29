@@ -58,6 +58,11 @@ class JdbcNotificationDeliveryAdapter(
     @Transactional
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> {
         val jdbcTemplate = jdbcTemplate()
+        val existingDeliveries = deliveryItemsForEvent(jdbcTemplate, message)
+        if (existingDeliveries.isNotEmpty()) {
+            return existingDeliveries
+        }
+
         val recipients = recipientsFor(jdbcTemplate, message)
         if (recipients.isEmpty()) {
             return emptyList()
