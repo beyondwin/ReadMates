@@ -294,6 +294,7 @@ describe("SPA AppRouteLayout", () => {
       expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
         "홈",
         "세션",
+        "알림",
         "멤버",
         "아카이브",
       ]);
@@ -360,6 +361,7 @@ describe("SPA AppRouteLayout", () => {
       expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
         "홈",
         "세션",
+        "알림",
         "멤버",
         "아카이브",
       ]);

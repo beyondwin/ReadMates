@@ -77,11 +77,13 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "운영",
       "세션 문서",
+      "알림 발송",
       "멤버 초대",
       "멤버 승인",
     ]);
     expect(within(nav).getByRole("link", { name: "운영" })).toHaveAttribute("href", "/app/host");
     expect(within(nav).getByRole("link", { name: "세션 문서" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(within(nav).getByRole("link", { name: "알림 발송" })).toHaveAttribute("href", "/app/host/notifications");
     expect(within(nav).getByRole("link", { name: "세션 문서" })).toHaveAttribute("aria-current", "page");
     const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
     expect(memberReturn).toHaveAttribute("href", "/app");
@@ -260,6 +262,13 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.queryByRole("link", { name: "뒤로" })).not.toBeInTheDocument();
   });
 
+  it("renders the host notifications route as an alert page on mobile", () => {
+    renderAt("/app/host/notifications", <MobileHeader variant="host" />);
+
+    expect(screen.getByText("알림")).toBeInTheDocument();
+    expect(screen.queryByText("오늘")).not.toBeInTheDocument();
+  });
+
   it("uses stable mobile feedback titles and source-aware back links", () => {
     render(
       <MemoryRouter
@@ -407,6 +416,7 @@ describe("MobileTabBar app tabs", () => {
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
       "홈",
       "세션",
+      "알림",
       "멤버",
       "아카이브",
     ]);
@@ -415,6 +425,7 @@ describe("MobileTabBar app tabs", () => {
       "href",
       "/app/host/sessions/session-6/edit",
     );
+    expect(within(tabs).getByRole("link", { name: "알림" })).toHaveAttribute("href", "/app/host/notifications");
     expect(within(tabs).getByRole("link", { name: "멤버" })).toHaveAttribute("href", "/app/host/members");
     expect(within(tabs).getByRole("link", { name: "아카이브" })).toHaveAttribute("href", "/app/archive");
     expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
@@ -445,6 +456,15 @@ describe("MobileTabBar app tabs", () => {
 
     const approvalTabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(approvalTabs).getByRole("link", { name: "멤버" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("marks the host notifications tab active on the notifications route", () => {
+    renderAt("/app/host/notifications", <MobileTabBar variant="host" currentSessionId={null} />);
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(tabs).getByRole("link", { name: "알림" })).toHaveAttribute("href", "/app/host/notifications");
+    expect(within(tabs).getByRole("link", { name: "알림" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "홈" })).not.toHaveAttribute("aria-current");
   });
 
   it("marks host records active on archive routes", () => {

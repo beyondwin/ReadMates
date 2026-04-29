@@ -11,7 +11,17 @@ type MobileTabBarProps = {
   currentSessionId?: string | null | undefined;
 };
 
-export type TabIconName = "home" | "session" | "notes" | "archive" | "me" | "host" | "edit" | "invite" | "approve";
+export type TabIconName =
+  | "home"
+  | "session"
+  | "notes"
+  | "archive"
+  | "me"
+  | "host"
+  | "edit"
+  | "notify"
+  | "invite"
+  | "approve";
 
 type TabLink = {
   key: string;
@@ -79,6 +89,13 @@ function hostTabs(currentSessionId?: string | null): TabLink[] {
       pendingLabel: currentSessionId === undefined ? READMATES_MOBILE_TAB_LABELS.hostSessionPending : undefined,
       icon: "edit",
       current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
+    },
+    {
+      key: "host-notifications",
+      href: "/app/host/notifications",
+      label: READMATES_MOBILE_TAB_LABELS.hostNotifications,
+      icon: "notify",
+      current: (pathname) => pathname === "/app/host/notifications",
     },
     {
       key: "host-members",
@@ -158,6 +175,13 @@ export function TabIcon({ name }: { name: TabIconName }) {
         <svg {...common}>
           <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" />
           <path d="M13.5 7.5l3 3" />
+        </svg>
+      );
+    case "notify":
+      return (
+        <svg {...common}>
+          <path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2.5 6.5H3.5C4.5 15.5 6 14 6 10z" />
+          <path d="M10 20a2.2 2.2 0 0 0 4 0" />
         </svg>
       );
     case "invite":

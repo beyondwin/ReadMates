@@ -13,7 +13,7 @@ import {
 import { Link } from "@/src/app/router-link";
 import { usePublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
-import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
+import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
 import { TabIcon, type TabIconName } from "./mobile-tab-bar";
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
@@ -63,6 +63,10 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
 
   if (pathname.startsWith("/app/host/sessions/")) {
     return variant === "host" ? "세션" : READMATES_NAV_LABELS.host.sessionEditor;
+  }
+
+  if (variant === "host" && pathname === "/app/host/notifications") {
+    return READMATES_MOBILE_TAB_LABELS.hostNotifications;
   }
 
   if (variant === "host" && (pathname === "/app/host/invitations" || pathname === "/app/host/members")) {
