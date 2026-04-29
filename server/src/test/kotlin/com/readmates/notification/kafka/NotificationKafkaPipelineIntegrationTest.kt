@@ -1,10 +1,13 @@
 package com.readmates.notification.kafka
 
 import com.readmates.notification.adapter.`in`.kafka.NotificationEventKafkaListener
+import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
+import com.readmates.notification.adapter.out.kafka.NotificationKafkaProperties
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.`in`.DispatchNotificationEventUseCase
+import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.support.KafkaTestContainer
 import org.apache.kafka.clients.admin.AdminClient
@@ -50,8 +53,7 @@ import java.util.concurrent.TimeUnit
 )
 class NotificationKafkaPipelineIntegrationTest(
     @param:Autowired
-    @param:Qualifier("notificationEventKafkaTemplate")
-    private val kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,
+    private val notificationEventPublisherPort: NotificationEventPublisherPort,
     @param:Autowired private val recordingDispatchUseCase: RecordingDispatchNotificationEventUseCase,
     @param:Autowired private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry,
 ) {
@@ -65,7 +67,7 @@ class NotificationKafkaPipelineIntegrationTest(
         val message = notificationEventMessage()
         waitForListenerAssignment()
 
-        kafkaTemplate.send(eventsTopic, message.clubId.toString(), message).get(10, TimeUnit.SECONDS)
+        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString())
 
         await()
             .atMost(Duration.ofSeconds(20))
@@ -89,6 +91,13 @@ class NotificationKafkaPipelineIntegrationTest(
         @Bean
         fun recordingDispatchNotificationEventUseCase(): RecordingDispatchNotificationEventUseCase =
             RecordingDispatchNotificationEventUseCase()
+
+        @Bean
+        fun notificationEventPublisherPort(
+            @Qualifier("notificationEventKafkaTemplate")
+            kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,
+            properties: NotificationKafkaProperties,
+        ): NotificationEventPublisherPort = KafkaNotificationEventPublisherAdapter(kafkaTemplate, properties)
     }
 
     companion object {
