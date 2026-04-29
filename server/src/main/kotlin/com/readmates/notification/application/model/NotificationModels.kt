@@ -38,6 +38,9 @@ data class NotificationPreferences(
     val events: Map<NotificationEventType, Boolean>,
 ) {
     fun enabled(eventType: NotificationEventType): Boolean =
+        emailEnabled && eventPreference(eventType)
+
+    fun eventPreference(eventType: NotificationEventType): Boolean =
         events[eventType] ?: defaultEventEnabled(eventType)
 
     companion object {

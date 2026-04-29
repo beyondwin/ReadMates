@@ -24,5 +24,5 @@ data class NotificationPreferencesResponse(
 fun NotificationPreferences.toResponse(): NotificationPreferencesResponse =
     NotificationPreferencesResponse(
         emailEnabled = emailEnabled,
-        events = NotificationEventType.entries.associateWith(::enabled),
+        events = NotificationEventType.entries.associateWith(::eventPreference),
     )

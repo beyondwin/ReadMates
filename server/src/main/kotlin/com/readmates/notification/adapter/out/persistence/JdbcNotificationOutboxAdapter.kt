@@ -394,10 +394,10 @@ class JdbcNotificationOutboxAdapter(
             member.membershipId.dbString(),
             member.clubId.dbString(),
             preferences.emailEnabled,
-            preferences.enabled(NotificationEventType.NEXT_BOOK_PUBLISHED),
-            preferences.enabled(NotificationEventType.SESSION_REMINDER_DUE),
-            preferences.enabled(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED),
-            preferences.enabled(NotificationEventType.REVIEW_PUBLISHED),
+            preferences.eventPreference(NotificationEventType.NEXT_BOOK_PUBLISHED),
+            preferences.eventPreference(NotificationEventType.SESSION_REMINDER_DUE),
+            preferences.eventPreference(NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED),
+            preferences.eventPreference(NotificationEventType.REVIEW_PUBLISHED),
         )
 
         return getPreferences(member)
