@@ -13,7 +13,7 @@ import type {
   CurrentSessionResponse,
   HostDashboardResponse,
   HostNotificationSummary,
-  HostSessionListItem,
+  HostSessionListPage,
 } from "@/features/host/api/host-contracts";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
@@ -30,7 +30,7 @@ const EMPTY_HOST_NOTIFICATION_SUMMARY: HostNotificationSummary = {
 export type HostDashboardRouteData = {
   current: CurrentSessionResponse;
   data: HostDashboardResponse;
-  hostSessions: HostSessionListItem[];
+  hostSessions: HostSessionListPage;
   notifications: HostNotificationSummary;
 };
 
@@ -48,7 +48,7 @@ export async function hostDashboardLoader(args?: LoaderFunctionArgs): Promise<Ho
   return {
     current,
     data,
-    hostSessions: Array.isArray(hostSessions) ? hostSessions : hostSessions.items,
+    hostSessions,
     notifications,
   };
 }
@@ -89,4 +89,5 @@ export const hostDashboardActions = {
       throw new Error("Host session open failed");
     }
   },
+  loadHostSessions: (page) => fetchHostSessions(undefined, page),
 } satisfies HostDashboardActions;

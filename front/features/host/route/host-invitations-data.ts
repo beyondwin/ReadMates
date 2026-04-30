@@ -18,7 +18,7 @@ export async function hostInvitationsLoader(args?: LoaderFunctionArgs) {
 }
 
 export const hostInvitationsActions = {
-  listInvitations: listHostInvitationsResponse,
+  listInvitations: (page) => listHostInvitationsResponse(undefined, page),
   createInvitation: createHostInvitation,
   revokeInvitation: revokeHostInvitation,
   parseInvitation: parseHostInvitationResponse,

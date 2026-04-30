@@ -5,9 +5,11 @@ import type {
   CurrentSessionResponse,
   HostDashboardResponse,
   HostNotificationSummary,
+  HostSessionListPage,
   HostSessionListItem,
   SessionRecordVisibility,
 } from "@/features/host/api/host-contracts";
+import type { PageRequest } from "@/shared/model/paging";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   getHostDashboardChecklist,
@@ -110,6 +112,7 @@ export type HostDashboardActions = {
   ) => Promise<void>;
   updateSessionVisibility: (sessionId: string, visibility: SessionRecordVisibility) => Promise<void>;
   openSession: (sessionId: string) => Promise<void>;
+  loadHostSessions: (page?: PageRequest) => Promise<HostSessionListPage>;
 };
 
 const newSessionHref = "/app/host/sessions/new";
@@ -199,23 +202,38 @@ export default function HostDashboard({
   auth?: AuthMeResponse;
   current?: CurrentSessionResponse;
   data: HostDashboardResponse;
-  hostSessions: HostSessionListItem[];
+  hostSessions: HostSessionListPage;
   notifications?: HostNotificationSummary;
   actions: HostDashboardActions;
 }) {
   const hostName = auth?.displayName ?? "호스트";
   const session = current?.currentSession ?? null;
+  const [appendedHostSessions, setAppendedHostSessions] = useState<null | {
+    base: HostSessionListPage;
+    items: HostSessionListItem[];
+    nextCursor: string | null;
+  }>(null);
   const [hostSessionVisibilityOverrides, setHostSessionVisibilityOverrides] = useState<Record<string, SessionRecordVisibility>>({});
   const [locallyOpenedSessionId, setLocallyOpenedSessionId] = useState<string | null>(null);
   const [pendingUpcomingAction, setPendingUpcomingAction] = useState<string | null>(null);
+  const [isLoadingMoreHostSessions, setIsLoadingMoreHostSessions] = useState(false);
   const [upcomingMessage, setUpcomingMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
-  const localHostSessions = hostSessions
+  const hostSessionPage =
+    appendedHostSessions?.base === hostSessions
+      ? {
+          items: [...hostSessions.items, ...appendedHostSessions.items],
+          nextCursor: appendedHostSessions.nextCursor,
+        }
+      : hostSessions;
+
+  const localHostSessions = hostSessionPage.items
     .filter((item) => item.sessionId !== locallyOpenedSessionId)
     .map((item) => {
       const visibility = hostSessionVisibilityOverrides[item.sessionId];
       return visibility ? { ...item, visibility } : item;
     });
-  const upcomingSessions = localHostSessions.filter((item) => item.state === "DRAFT").slice(0, 6);
+  const upcomingSessions = localHostSessions.filter((item) => item.state === "DRAFT");
+  const nextHostSessionsCursor = hostSessionPage.nextCursor;
   const hasCurrentSession = session !== null || locallyOpenedSessionId !== null;
   const sessionSpecificEditHref = session ? hostSessionEditHref(session.sessionId) : null;
   const sessionEditHref = sessionSpecificEditHref ?? newSessionHref;
@@ -279,6 +297,28 @@ export default function HostDashboard({
       setUpcomingMessage({ kind: "alert", text: "저장하지 못했습니다" });
     } finally {
       setPendingUpcomingAction(null);
+    }
+  };
+
+  const handleLoadMoreHostSessions = async () => {
+    if (!nextHostSessionsCursor || isLoadingMoreHostSessions) {
+      return;
+    }
+
+    setIsLoadingMoreHostSessions(true);
+    setUpcomingMessage(null);
+
+    try {
+      const nextPage = await actions.loadHostSessions({ limit: 50, cursor: nextHostSessionsCursor });
+      setAppendedHostSessions((current) => ({
+        base: hostSessions,
+        items: [...(current?.base === hostSessions ? current.items : []), ...nextPage.items],
+        nextCursor: nextPage.nextCursor,
+      }));
+    } catch {
+      setUpcomingMessage({ kind: "alert", text: "예정 세션을 더 불러오지 못했습니다" });
+    } finally {
+      setIsLoadingMoreHostSessions(false);
     }
   };
 
@@ -450,6 +490,17 @@ export default function HostDashboard({
                       </div>
                     </div>
                   )}
+                  {nextHostSessionsCursor ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      style={{ marginTop: 12 }}
+                      disabled={isLoadingMoreHostSessions}
+                      onClick={() => void handleLoadMoreHostSessions()}
+                    >
+                      {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
+                    </button>
+                  ) : null}
                   {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} /> : null}
                 </section>
 
@@ -588,6 +639,9 @@ export default function HostDashboard({
         upcomingSessions={upcomingSessions}
         upcomingActions={upcomingActions}
         upcomingMessage={upcomingMessage}
+        hasMoreUpcomingSessions={Boolean(nextHostSessionsCursor)}
+        isLoadingMoreHostSessions={isLoadingMoreHostSessions}
+        onLoadMoreHostSessions={handleLoadMoreHostSessions}
       />
     </>
   );
@@ -683,6 +737,9 @@ function MobileHostDashboard({
   upcomingSessions,
   upcomingActions,
   upcomingMessage,
+  hasMoreUpcomingSessions,
+  isLoadingMoreHostSessions,
+  onLoadMoreHostSessions,
 }: {
   hostName: string;
   session: CurrentSession | null;
@@ -702,6 +759,9 @@ function MobileHostDashboard({
   upcomingSessions: HostSessionListItem[];
   upcomingActions: UpcomingActionHandlers;
   upcomingMessage: null | { kind: "alert" | "status"; text: string };
+  hasMoreUpcomingSessions: boolean;
+  isLoadingMoreHostSessions: boolean;
+  onLoadMoreHostSessions: () => void;
 }) {
   const mobileAlerts = hostAlertMetrics(data);
 
@@ -844,6 +904,17 @@ function MobileHostDashboard({
         ) : (
           <div className="m-card-quiet">아직 등록된 예정 세션이 없습니다.</div>
         )}
+        {hasMoreUpcomingSessions ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            style={{ marginTop: 10 }}
+            disabled={isLoadingMoreHostSessions}
+            onClick={() => onLoadMoreHostSessions()}
+          >
+            {isLoadingMoreHostSessions ? "불러오는 중" : "더 보기"}
+          </button>
+        ) : null}
         {upcomingMessage ? <UpcomingActionMessage message={upcomingMessage} mobile /> : null}
       </section>
 
