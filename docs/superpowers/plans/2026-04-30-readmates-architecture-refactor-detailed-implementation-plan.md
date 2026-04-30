@@ -659,7 +659,7 @@ Acceptance criteria completed: archive sessions/questions/reviews, feedback docu
 - Test: `front/tests/unit/feedback-document-page.test.tsx`
 - Test: `front/tests/unit/api-contract-fixtures.test.ts`
 
-- [ ] **Step 1: Update contract types**
+- [x] **Step 1: Update contract types**
 
 In `front/features/archive/api/archive-contracts.ts`, import `PagedResponse`:
 
@@ -678,7 +678,7 @@ export type NoteFeedPage = PagedResponse<NoteFeedItem>;
 export type FeedbackDocumentListPage = PagedResponse<FeedbackDocumentListItem>;
 ```
 
-- [ ] **Step 2: Update archive API fetchers**
+- [x] **Step 2: Update archive API fetchers**
 
 In `front/features/archive/api/archive-api.ts`, make list fetchers accept `PageRequest`:
 
@@ -711,7 +711,7 @@ export function fetchNotesFeed(sessionId?: string | null, request?: PageRequest,
 }
 ```
 
-- [ ] **Step 3: Update route data models**
+- [x] **Step 3: Update route data models**
 
 In `archive-list-data.ts`, store pages instead of arrays:
 
@@ -736,7 +736,7 @@ const [sessions, questions, reviews, reports] = await Promise.all([
 ]);
 ```
 
-- [ ] **Step 4: Add explicit load-more UI**
+- [x] **Step 4: Add explicit load-more UI**
 
 In archive, notes, and my-page UI components, pass `page.items` to existing lists and render a button when `nextCursor !== null`:
 
@@ -757,7 +757,7 @@ setSessionPage((current) => ({
 }));
 ```
 
-- [ ] **Step 5: Update unit tests**
+- [x] **Step 5: Update unit tests**
 
 Update tests so mocked data uses:
 
@@ -770,7 +770,7 @@ const sessionPage = {
 
 Add a test that clicks `더 보기` and asserts new items append without replacing existing ones.
 
-- [ ] **Step 6: Run frontend targeted tests**
+- [x] **Step 6: Run frontend targeted tests**
 
 Run:
 
@@ -785,7 +785,7 @@ pnpm --dir front test -- --run \
 
 Expected: all pass.
 
-- [ ] **Step 7: Commit member-facing frontend pagination**
+- [x] **Step 7: Commit member-facing frontend pagination**
 
 Run:
 
@@ -793,6 +793,9 @@ Run:
 git add front/features/archive front/features/feedback front/shared/model front/tests/unit
 git commit -m "feat: use paged archive notes and feedback data"
 ```
+
+COMPACT CHECKPOINT Task 3 - Convert Frontend Archive, Feedback, And Notes To Paged Contracts:
+Acceptance criteria completed: archive/feedback/notes frontend contracts and fetchers use `PagedResponse`/`PageRequest`; route loaders fetch first pages; archive, notes, my-page, member-home, and adjacent route consumers no longer assume raw arrays; UI renders `page.items` and exposes explicit `더 보기` append actions; tests cover append behavior and edge regressions. Changed files: frontend archive/feedback API/route/ui files, member-home paged notes consumer, related unit fixtures/tests, and this plan document. Key decisions: member-home unwraps first-page notes feed into its existing preview array instead of adding home pagination; my-page count labels render `30+` when first page has `nextCursor` rather than pretending exact totals; notes deep links outside the first sessions page preserve the requested id and do not silently select another session, including empty-feed sessions. Contracts/API/state/test expectations: scoped frontend consumers call paged endpoints with limit/cursor, load-more appends returned items and replaces `nextCursor`, club slug context is preserved on subsequent requests. Reviews: initial Task 3 spec/quality reviews found member-home raw notes consumer, notes deep-link fallback, and capped count issues; follow-up fixes `9f3e3bd` and `699700f` resolved them; final Task 3 re-review approved. Verification: red targeted suite failed on raw-array assumptions (`reports.slice`, `items.filter`, `noteSessions.find`); `pnpm --dir front test --run tests/unit/archive-page.test.tsx tests/unit/notes-feed-page.test.tsx tests/unit/my-page.test.tsx tests/unit/feedback-document-page.test.tsx tests/unit/api-contract-fixtures.test.ts` passed; additional `notes-page`, `spa-router`, and `member-home` targeted tests passed; final targeted regression command `pnpm --dir front test --run tests/unit/archive-page.test.tsx tests/unit/notes-feed-page.test.tsx tests/unit/my-page.test.tsx tests/unit/feedback-document-page.test.tsx tests/unit/api-contract-fixtures.test.ts tests/unit/member-home.test.tsx tests/unit/notes-page.test.tsx tests/unit/spa-router.test.tsx` passed 149 tests; `pnpm --dir front lint` passed; final reviewer also ran full `pnpm --dir front test` (614 tests) and `pnpm --dir front build`, both passed. Remaining risks: existing React Router HydrateFallback warning remains in `spa-router.test.tsx`; no new functional risk known. Next first action: dispatch Task 4 implementer for host, notification, and admin cursor pagination. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 3 subagents closed; no session-owned ports open.
 
 ## Task 4: Convert Host, Notification, And Admin Lists To Cursor Pagination
 
