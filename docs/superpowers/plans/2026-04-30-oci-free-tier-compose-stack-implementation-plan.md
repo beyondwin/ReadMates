@@ -519,8 +519,9 @@ git commit -m "deploy: add compose stack deploy script"
 **Files:**
 - Modify: `.env.example`
 - Modify: `docs/deploy/oci-backend.md`
+- Modify: `docs/deploy/README.md` (docs quality review fix)
 - Create: `docs/deploy/compose-stack.md`
-- Test: `git diff --check -- .env.example docs/deploy/oci-backend.md docs/deploy/compose-stack.md`
+- Test: `git diff --check -- .env.example docs/deploy/oci-backend.md docs/deploy/compose-stack.md docs/deploy/README.md`
 
 - [x] **Step 1: Add compose examples to `.env.example`**
 
@@ -639,6 +640,15 @@ Expected: `git diff --check` has no output. Public release scanning runs in Task
 ```bash
 git add .env.example docs/deploy/oci-backend.md docs/deploy/compose-stack.md
 git commit -m "docs: document oci compose stack operations"
+```
+
+- [x] **Step 6: Address docs quality review**
+
+Clarified compose stack prerequisites, rollback commands, and deploy hub status. Committed follow-up with:
+
+```bash
+git add docs/deploy/compose-stack.md docs/deploy/README.md docs/superpowers/plans/2026-04-30-oci-free-tier-compose-stack-implementation-plan.md
+git commit -m "docs: clarify compose stack prerequisites and rollback"
 ```
 
 ## Task 6: Local Verification Before Production Cutover
