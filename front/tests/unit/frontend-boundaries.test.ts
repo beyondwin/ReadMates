@@ -498,7 +498,7 @@ describe("frontend architecture boundaries", () => {
       );
       expect(source, `${relativePath} must not call fetch directly`).not.toMatch(/\bfetch\s*\(/);
       expect(source, `${relativePath} must not export route-owned action types`).not.toMatch(
-        /export\s+type\s+\w+Actions\b/,
+        /(?:export\s+(?:type|interface)\s+\w+Actions\b|export\s+type\s+\{[^}]*\w+Actions\b)/,
       );
     }
   });
