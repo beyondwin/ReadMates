@@ -720,6 +720,8 @@ git status --short
 
 Expected: clean worktree or only intentionally generated ignored artifacts.
 
+Progress note, 2026-04-30: Task 7 is blocked in this session because production cutover requires a private VM target and secrets, a fresh DB backup, an explicit cutover window, and destructive remote service stop/disable authority. Task 8 depends on Task 7 and is also blocked. Task 9 is not reached because this plan proceeds sequentially and production cutover has not shipped. Task 6 Step 4's exact compose config command remains a VM-environment validation item because the local substitute only validated syntax without resolving VM env files.
+
 ## Task 7: Production Cutover Runbook
 
 **Files:**
