@@ -1,15 +1,26 @@
 "use client";
 
+import type { ComponentType, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { Link } from "@/src/app/router-link";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS } from "./readmates-copy";
 
 export type MobileTabBarVariant = "member" | "host";
+
+type AppLinkProps = {
+  to: string;
+  state?: unknown;
+  className?: string;
+  children: ReactNode;
+  "aria-current"?: "page";
+};
+
+export type AppLinkComponent = ComponentType<AppLinkProps>;
 
 type MobileTabBarProps = {
   variant: MobileTabBarVariant;
   currentSessionId?: string | null | undefined;
   appBasePath?: string;
+  LinkComponent?: AppLinkComponent;
 };
 
 export type TabIconName =
@@ -34,6 +45,16 @@ type TabLink = {
   state?: { readmatesWorkspace: "host" | "member" };
   current: (pathname: string) => boolean;
 };
+
+function DefaultLink({ to, state: _state, children, ...props }: AppLinkProps) {
+  void _state;
+
+  return (
+    <a {...props} href={to}>
+      {children}
+    </a>
+  );
+}
 
 const memberTabs: TabLink[] = [
   { key: "home", href: "/app", label: READMATES_NAV_LABELS.member.home, icon: "home", current: (pathname) => pathname === "/app" },
@@ -232,7 +253,7 @@ export function TabIcon({ name }: { name: TabIconName }) {
   }
 }
 
-export function MobileTabBar({ variant, currentSessionId, appBasePath = "" }: MobileTabBarProps) {
+export function MobileTabBar({ variant, currentSessionId, appBasePath = "", LinkComponent = DefaultLink }: MobileTabBarProps) {
   const pathname = useLocation().pathname;
   const appPath = appPathname(pathname);
   const tabs = scopedTabs(variant === "host" ? hostTabs(currentSessionId) : memberTabs, appBasePath);
@@ -246,7 +267,7 @@ export function MobileTabBar({ variant, currentSessionId, appBasePath = "" }: Mo
     >
       {tabs.map((tab) =>
         tab.href ? (
-          <Link
+          <LinkComponent
             key={tab.key}
             to={tab.href}
             state={tab.state}
@@ -255,7 +276,7 @@ export function MobileTabBar({ variant, currentSessionId, appBasePath = "" }: Mo
           >
             <TabIcon name={tab.icon} />
             <span className="m-tab-label">{tab.label}</span>
-          </Link>
+          </LinkComponent>
         ) : (
           <span
             key={tab.key}

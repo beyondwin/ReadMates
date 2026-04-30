@@ -7,7 +7,7 @@ import {
   saveHostSessionVisibility,
   submitHostMemberLifecycle,
 } from "@/features/host/api/host-api";
-import type { HostDashboardActions } from "@/features/host/components/host-dashboard";
+import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import type {
   CurrentSessionResponse,

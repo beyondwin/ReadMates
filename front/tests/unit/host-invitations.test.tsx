@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostInvitations, { type HostInvitationsActions } from "@/features/host/components/host-invitations";
+import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
+import HostInvitations from "@/features/host/ui/host-invitations";
 import { hostInvitationsActions } from "@/features/host";
 import type { HostInvitationListItem } from "@/features/host/api/host-contracts";
 

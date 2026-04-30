@@ -1,16 +1,7 @@
 "use client";
 
+import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import {
-  archiveReportReturnTarget,
-  archiveSessionsReturnTarget,
-  publicRecordsReturnTarget,
-  readPublicReadmatesReturnTarget,
-  readReadmatesReturnTarget,
-  readmatesReturnState,
-  type ReadmatesReturnState,
-} from "@/src/app/route-continuity";
-import { Link } from "@/src/app/router-link";
 import { usePublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-copy";
@@ -19,12 +10,157 @@ import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
 
+type AppLinkProps = {
+  to: string;
+  state?: unknown;
+  className?: string;
+  children: ReactNode;
+  "aria-label"?: string;
+  title?: string;
+  style?: CSSProperties;
+};
+
+export type AppLinkComponent = ComponentType<AppLinkProps>;
+
+export type ReadmatesReturnState = {
+  readmatesReturnTo: string;
+  readmatesReturnLabel: string;
+  readmatesReturnState?: ReadmatesReturnState;
+};
+
+type ReadmatesReturnTarget = {
+  href: string;
+  label: string;
+  state?: ReadmatesReturnState;
+};
+
+type ReadmatesNavigationContinuity = {
+  archiveReportReturnTarget: ReadmatesReturnTarget;
+  archiveSessionsReturnTarget: ReadmatesReturnTarget;
+  publicRecordsReturnTarget: ReadmatesReturnTarget;
+  readPublicReadmatesReturnTarget: (state: unknown, fallback: ReadmatesReturnTarget) => ReadmatesReturnTarget;
+  readReadmatesReturnTarget: (state: unknown, fallback: ReadmatesReturnTarget) => ReadmatesReturnTarget;
+  readmatesReturnState: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
+};
+
 type MobileHeaderProps = {
   variant: MobileHeaderVariant;
   showHostEntry?: boolean;
   authenticated?: boolean;
   publicBasePath?: string;
   appBasePath?: string;
+  LinkComponent?: AppLinkComponent;
+  navigationContinuity?: ReadmatesNavigationContinuity;
+};
+
+const defaultArchiveSessionsReturnTarget: ReadmatesReturnTarget = {
+  href: "/app/archive?view=sessions",
+  label: "아카이브로",
+};
+const defaultArchiveReportReturnTarget: ReadmatesReturnTarget = {
+  href: "/app/archive?view=report",
+  label: "아카이브로 돌아가기",
+};
+const defaultPublicRecordsReturnTarget: ReadmatesReturnTarget = {
+  href: "/records",
+  label: "공개 기록",
+};
+
+function DefaultLink({ to, state: _state, children, ...props }: AppLinkProps) {
+  void _state;
+
+  return (
+    <a {...props} href={to}>
+      {children}
+    </a>
+  );
+}
+
+type ReadmatesRouteState = {
+  readmatesReturnTo?: unknown;
+  readmatesReturnLabel?: unknown;
+  readmatesReturnState?: unknown;
+};
+
+function toSafeReadmatesHref(value: string, scope: "app" | "public") {
+  try {
+    const base = typeof window === "undefined" ? "https://readmates.local" : window.location.origin;
+    const url = new URL(value, base);
+
+    if (url.origin !== base) {
+      return null;
+    }
+
+    const isAppHref =
+      url.pathname === "/app" ||
+      url.pathname.startsWith("/app/") ||
+      /^\/clubs\/[^/]+\/app(?:\/|$)/.test(url.pathname);
+    const isPublicHref = url.pathname === "/" || url.pathname === "/records" || url.pathname.startsWith("/sessions/");
+
+    if ((scope === "app" && !isAppHref) || (scope === "public" && !isPublicHref)) {
+      return null;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return null;
+  }
+}
+
+function defaultReadmatesReturnState(target: ReadmatesReturnTarget) {
+  const state: ReadmatesReturnState = {
+    readmatesReturnTo: target.href,
+    readmatesReturnLabel: target.label,
+  };
+
+  if (target.state) {
+    state.readmatesReturnState = target.state;
+  }
+
+  return state;
+}
+
+function readReturnTargetFromState(state: unknown, scope: "app" | "public"): ReadmatesReturnTarget | null {
+  if (!state || typeof state !== "object") {
+    return null;
+  }
+
+  const routeState = state as ReadmatesRouteState;
+  const href = typeof routeState.readmatesReturnTo === "string" ? toSafeReadmatesHref(routeState.readmatesReturnTo, scope) : null;
+
+  if (!href) {
+    return null;
+  }
+
+  const nestedTarget = readReturnTargetFromState(routeState.readmatesReturnState, scope);
+
+  return {
+    href,
+    label: typeof routeState.readmatesReturnLabel === "string" ? routeState.readmatesReturnLabel : "",
+    ...(nestedTarget ? { state: defaultReadmatesReturnState(nestedTarget) } : {}),
+  };
+}
+
+function defaultReadReturnTarget(state: unknown, fallback: ReadmatesReturnTarget, scope: "app" | "public") {
+  const target = readReturnTargetFromState(state, scope);
+
+  if (!target) {
+    return fallback;
+  }
+
+  return {
+    ...target,
+    label: target.label || fallback.label,
+  };
+}
+
+const defaultNavigationContinuity: ReadmatesNavigationContinuity = {
+  archiveReportReturnTarget: defaultArchiveReportReturnTarget,
+  archiveSessionsReturnTarget: defaultArchiveSessionsReturnTarget,
+  publicRecordsReturnTarget: defaultPublicRecordsReturnTarget,
+  readPublicReadmatesReturnTarget: (state, fallback) => defaultReadReturnTarget(state, fallback, "public"),
+  readReadmatesReturnTarget: (state, fallback) => defaultReadReturnTarget(state, fallback, "app"),
+  readmatesReturnState: defaultReadmatesReturnState,
 };
 
 function prefixedPath(publicBasePath: string, path: string) {
@@ -140,7 +276,12 @@ type HeaderAction = {
   icon?: "workspace-switch";
 };
 
-function appBackTarget(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string, state: unknown): HeaderBackTarget | null {
+function appBackTarget(
+  variant: Exclude<MobileHeaderVariant, "guest">,
+  pathname: string,
+  state: unknown,
+  navigationContinuity: ReadmatesNavigationContinuity,
+): HeaderBackTarget | null {
   if (pathname === "/app/session" || pathname.startsWith("/app/session/")) {
     return { href: "/app", label: "홈", icon: "brand" };
   }
@@ -154,16 +295,19 @@ function appBackTarget(variant: Exclude<MobileHeaderVariant, "guest">, pathname:
   }
 
   if (pathname.startsWith("/app/feedback/") && pathname.endsWith("/print")) {
-    const sourceTarget = readReadmatesReturnTarget(state, archiveReportReturnTarget);
+    const sourceTarget = navigationContinuity.readReadmatesReturnTarget(
+      state,
+      navigationContinuity.archiveReportReturnTarget,
+    );
     return {
       href: pathname.replace(/\/print$/, ""),
-      state: readmatesReturnState(sourceTarget),
+      state: navigationContinuity.readmatesReturnState(sourceTarget),
       label: "문서",
     };
   }
 
   if (pathname.startsWith("/app/feedback/")) {
-    const target = readReadmatesReturnTarget(state, archiveReportReturnTarget);
+    const target = navigationContinuity.readReadmatesReturnTarget(state, navigationContinuity.archiveReportReturnTarget);
     return {
       href: target.href,
       state: target.state,
@@ -172,7 +316,7 @@ function appBackTarget(variant: Exclude<MobileHeaderVariant, "guest">, pathname:
   }
 
   if (pathname.startsWith("/app/sessions/")) {
-    const target = readReadmatesReturnTarget(state, archiveSessionsReturnTarget);
+    const target = navigationContinuity.readReadmatesReturnTarget(state, navigationContinuity.archiveSessionsReturnTarget);
     return { href: target.href, state: target.state, label: "뒤로" };
   }
 
@@ -206,6 +350,7 @@ function HeaderShell({
   backTarget,
   rightAction,
   brandHref,
+  LinkComponent,
 }: {
   workspace: MobileHeaderVariant;
   title: string;
@@ -213,6 +358,7 @@ function HeaderShell({
   backTarget?: HeaderBackTarget | null;
   rightAction?: HeaderAction | null;
   brandHref?: string;
+  LinkComponent: AppLinkComponent;
 }) {
   const resolvedBrandHref = brandHref ?? (workspace === "host" ? "/app/host" : workspace === "member" ? "/app" : "/");
   const actionTitle = rightAction?.ariaLabel ?? rightAction?.label;
@@ -221,7 +367,7 @@ function HeaderShell({
     <header className={`m-hdr m-hdr--${workspace}`} data-workspace={workspace}>
       <div className="m-hdr-side m-hdr-side--left">
         {backTarget ? (
-          <Link
+          <LinkComponent
             to={backTarget.href}
             state={backTarget.state}
             className={`m-hdr-back${backTarget.icon ? " m-hdr-back--icon" : ""}`}
@@ -230,11 +376,11 @@ function HeaderShell({
           >
             <HeaderBackIcon icon={backTarget.icon} />
             {backTarget.icon ? null : <span className="m-hdr-back__label">{backTarget.label}</span>}
-          </Link>
+          </LinkComponent>
         ) : (
-          <Link to={resolvedBrandHref} className="m-hdr-brand" aria-label="읽는사이 홈">
+          <LinkComponent to={resolvedBrandHref} className="m-hdr-brand" aria-label="읽는사이 홈">
             <ReadmatesBrandMark />
-          </Link>
+          </LinkComponent>
         )}
       </div>
       <div className="m-hdr-heading">
@@ -243,21 +389,31 @@ function HeaderShell({
       </div>
       <div className="m-hdr-side m-hdr-side--right">
         {rightAction ? (
-          <Link
+          <LinkComponent
             to={rightAction.href}
             className={`m-hdr-link${rightAction.icon ? " m-hdr-link--icon" : ""}`}
             aria-label={rightAction.ariaLabel}
             title={actionTitle}
           >
             {rightAction.icon === "workspace-switch" ? <WorkspaceSwitchIcon /> : rightAction.label}
-          </Link>
+          </LinkComponent>
         ) : null}
       </div>
     </header>
   );
 }
 
-function GuestMobileHeader({ authenticated, publicBasePath = "" }: { authenticated?: boolean; publicBasePath?: string }) {
+function GuestMobileHeader({
+  authenticated,
+  publicBasePath = "",
+  LinkComponent,
+  navigationContinuity,
+}: {
+  authenticated?: boolean;
+  publicBasePath?: string;
+  LinkComponent: AppLinkComponent;
+  navigationContinuity: ReadmatesNavigationContinuity;
+}) {
   const location = useLocation();
   const pathname = location.pathname;
   const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login }, authenticated);
@@ -265,7 +421,10 @@ function GuestMobileHeader({ authenticated, publicBasePath = "" }: { authenticat
   const recordsHref = prefixedPath(publicBasePath, "/records");
   const isEntryRoute = pathname === "/login" || pathname.startsWith("/invite/") || pathname.startsWith(prefixedPath(publicBasePath, "/invite/"));
   const publicSessionReturnTarget = pathname.startsWith(prefixedPath(publicBasePath, "/sessions/"))
-    ? readPublicReadmatesReturnTarget(location.state, { ...publicRecordsReturnTarget, href: recordsHref })
+    ? navigationContinuity.readPublicReadmatesReturnTarget(location.state, {
+        ...navigationContinuity.publicRecordsReturnTarget,
+        href: recordsHref,
+      })
     : null;
   const backTarget: HeaderBackTarget | null = isEntryRoute
     ? { href: homeHref, label: "홈" }
@@ -280,6 +439,7 @@ function GuestMobileHeader({ authenticated, publicBasePath = "" }: { authenticat
       backTarget={backTarget}
       rightAction={isEntryRoute ? null : authAction}
       brandHref={homeHref}
+      LinkComponent={LinkComponent}
     />
   );
 }
@@ -310,10 +470,14 @@ function AppMobileHeader({
   variant,
   showHostEntry = false,
   appBasePath = "",
+  LinkComponent,
+  navigationContinuity,
 }: {
   variant: Exclude<MobileHeaderVariant, "guest">;
   showHostEntry?: boolean;
   appBasePath?: string;
+  LinkComponent: AppLinkComponent;
+  navigationContinuity: ReadmatesNavigationContinuity;
 }) {
   const location = useLocation();
   const pathname = location.pathname;
@@ -324,17 +488,41 @@ function AppMobileHeader({
       workspace={variant}
       kicker={variant === "host" ? "호스트" : null}
       title={appTitle(variant, appPath)}
-      backTarget={scopeAppBackTarget(appBackTarget(variant, appPath, location.state), appBasePath)}
+      backTarget={scopeAppBackTarget(appBackTarget(variant, appPath, location.state, navigationContinuity), appBasePath)}
       rightAction={appRightAction(variant, showHostEntry, appBasePath)}
       brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
+      LinkComponent={LinkComponent}
     />
   );
 }
 
-export function MobileHeader({ variant, showHostEntry, authenticated, publicBasePath, appBasePath }: MobileHeaderProps) {
+export function MobileHeader({
+  variant,
+  showHostEntry,
+  authenticated,
+  publicBasePath,
+  appBasePath,
+  LinkComponent = DefaultLink,
+  navigationContinuity = defaultNavigationContinuity,
+}: MobileHeaderProps) {
   if (variant === "guest") {
-    return <GuestMobileHeader authenticated={authenticated} publicBasePath={publicBasePath} />;
+    return (
+      <GuestMobileHeader
+        authenticated={authenticated}
+        publicBasePath={publicBasePath}
+        LinkComponent={LinkComponent}
+        navigationContinuity={navigationContinuity}
+      />
+    );
   }
 
-  return <AppMobileHeader variant={variant} showHostEntry={showHostEntry} appBasePath={appBasePath} />;
+  return (
+    <AppMobileHeader
+      variant={variant}
+      showHostEntry={showHostEntry}
+      appBasePath={appBasePath}
+      LinkComponent={LinkComponent}
+      navigationContinuity={navigationContinuity}
+    />
+  );
 }
