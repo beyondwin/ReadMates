@@ -21,6 +21,8 @@ import com.readmates.feedback.application.port.`in`.UploadHostFeedbackDocumentUs
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.notification.application.service.ReadmatesOperationalMetrics
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
@@ -41,23 +43,30 @@ class FeedbackDocumentService(
     UploadHostFeedbackDocumentUseCase {
     private val parser = FeedbackDocumentParser()
 
-    override fun listMyReadableFeedbackDocuments(currentMember: CurrentMember): List<FeedbackDocumentListItemResult> {
+    override fun listMyReadableFeedbackDocuments(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<FeedbackDocumentListItemResult> {
         requireReadableFeedbackMember(currentMember)
-        return feedbackDocumentStorePort.listLatestReadableDocuments(currentMember).mapNotNull { document ->
-            when {
-                document.title != null -> document.toListItem(document.title)
-                document.legacySourceText != null -> {
-                    val parsedDocument = parseStoredListDocument(document.legacySourceText)
-                    when {
-                        parsedDocument != null -> document.toListItem(parsedDocument.title)
-                        currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
-                        else -> null
+        val page = feedbackDocumentStorePort.listLatestReadableDocuments(currentMember, pageRequest)
+        return CursorPage(
+            items = page.items.mapNotNull { document ->
+                when {
+                    document.title != null -> document.toListItem(document.title)
+                    document.legacySourceText != null -> {
+                        val parsedDocument = parseStoredListDocument(document.legacySourceText)
+                        when {
+                            parsedDocument != null -> document.toListItem(parsedDocument.title)
+                            currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
+                            else -> null
+                        }
                     }
+                    currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
+                    else -> null
                 }
-                currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
-                else -> null
-            }
-        }
+            },
+            nextCursor = page.nextCursor,
+        )
     }
 
     override fun getReadableFeedbackDocument(

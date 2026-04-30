@@ -6,8 +6,12 @@ import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
@@ -16,19 +20,25 @@ import org.springframework.stereotype.Repository
 import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
 class JdbcFeedbackDocumentStoreAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : FeedbackDocumentStorePort {
-    override fun listLatestReadableDocuments(currentMember: CurrentMember): List<StoredFeedbackDocumentListResult> {
+    override fun listLatestReadableDocuments(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<StoredFeedbackDocumentListResult> {
         val jdbcTemplate = jdbcTemplate()
+        val cursor = FeedbackDocumentCursor.from(pageRequest.cursor)
         val sql = if (currentMember.isHost) {
             """
             select *
             from (
               select
+                session_feedback_documents.id as document_id,
                 session_feedback_documents.session_id,
                 sessions.number as session_number,
                 sessions.book_title,
@@ -51,13 +61,21 @@ class JdbcFeedbackDocumentStoreAdapter(
                 and sessions.state in ('CLOSED', 'PUBLISHED')
             ) ranked_documents
             where document_rank = 1
-            order by session_number desc
+              and (
+                ? is null
+                or session_number < ?
+                or (session_number = ? and created_at < ?)
+                or (session_number = ? and created_at = ? and document_id < ?)
+              )
+            order by session_number desc, created_at desc, document_id desc
+            limit ?
             """.trimIndent()
         } else {
             """
             select *
             from (
               select
+                session_feedback_documents.id as document_id,
                 session_feedback_documents.session_id,
                 sessions.number as session_number,
                 sessions.book_title,
@@ -85,18 +103,47 @@ class JdbcFeedbackDocumentStoreAdapter(
                 and sessions.state in ('CLOSED', 'PUBLISHED')
             ) ranked_documents
             where document_rank = 1
-            order by session_number desc
+              and (
+                ? is null
+                or session_number < ?
+                or (session_number = ? and created_at < ?)
+                or (session_number = ? and created_at = ? and document_id < ?)
+              )
+            order by session_number desc, created_at desc, document_id desc
+            limit ?
             """.trimIndent()
         }
         val args = if (currentMember.isHost) {
-            arrayOf<Any>(currentMember.clubId.dbString())
+            arrayOf<Any?>(
+                currentMember.clubId.dbString(),
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.id,
+                pageRequest.limit + 1,
+            )
         } else {
-            arrayOf<Any>(currentMember.membershipId.dbString(), currentMember.clubId.dbString())
+            arrayOf<Any?>(
+                currentMember.membershipId.dbString(),
+                currentMember.clubId.dbString(),
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
+                cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.sessionNumber,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.id,
+                pageRequest.limit + 1,
+            )
         }
 
-        return jdbcTemplate.query(sql, { resultSet, _ ->
+        val rows = jdbcTemplate.query(sql, { resultSet, _ ->
             resultSet.toStoredFeedbackDocumentList()
         }, *args)
+        return pageFromRows(rows, pageRequest.limit, ::feedbackDocumentCursor)
     }
 
     override fun findReadableSession(
@@ -232,6 +279,7 @@ class JdbcFeedbackDocumentStoreAdapter(
 
     private fun ResultSet.toStoredFeedbackDocumentList(): StoredFeedbackDocumentListResult =
         StoredFeedbackDocumentListResult(
+            documentId = uuid("document_id"),
             sessionId = uuid("session_id"),
             sessionNumber = getInt("session_number"),
             bookTitle = getString("book_title"),
@@ -264,4 +312,37 @@ class JdbcFeedbackDocumentStoreAdapter(
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateProvider.ifAvailable
             ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Feedback document storage is unavailable")
+
+    private fun feedbackDocumentCursor(item: StoredFeedbackDocumentListResult): String? =
+        CursorCodec.encode(
+            mapOf(
+                "sessionNumber" to item.sessionNumber.toString(),
+                "createdAt" to item.uploadedAt.toString(),
+                "id" to item.documentId.toString(),
+            ),
+        )
+
+    private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+        val visibleRows = rows.take(limit)
+        return CursorPage(
+            items = visibleRows,
+            nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+        )
+    }
+
+    private data class FeedbackDocumentCursor(
+        val sessionNumber: Int,
+        val createdAt: OffsetDateTime,
+        val id: String,
+    ) {
+        companion object {
+            fun from(cursor: Map<String, String>): FeedbackDocumentCursor? {
+                val sessionNumber = cursor["sessionNumber"]?.toIntOrNull() ?: return null
+                val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
+                val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+                return FeedbackDocumentCursor(sessionNumber, createdAt, id)
+            }
+        }
+    }
 }
