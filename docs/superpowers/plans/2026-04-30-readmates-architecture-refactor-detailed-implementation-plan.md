@@ -201,7 +201,7 @@ Acceptance criteria completed: worktree branch/status confirmed on `codex/readma
 - Create: `front/shared/model/paging.ts`
 - Modify: `front/tests/unit/api-contract-fixtures.test.ts`
 
-- [ ] **Step 1: Write server cursor codec tests**
+- [x] **Step 1: Write server cursor codec tests**
 
 Create `server/src/test/kotlin/com/readmates/shared/paging/CursorCodecTest.kt`:
 
@@ -247,7 +247,7 @@ class CursorCodecTest {
 }
 ```
 
-- [ ] **Step 2: Run the failing test**
+- [x] **Step 2: Run the failing test**
 
 Run:
 
@@ -257,7 +257,7 @@ Run:
 
 Expected: fail because `CursorCodec`, `CursorPage`, and `PageRequest` do not exist.
 
-- [ ] **Step 3: Add server paging primitives**
+- [x] **Step 3: Add server paging primitives**
 
 Create `server/src/main/kotlin/com/readmates/shared/paging/CursorPage.kt`:
 
@@ -350,7 +350,7 @@ object CursorCodec {
 }
 ```
 
-- [ ] **Step 4: Add frontend shared paged type**
+- [x] **Step 4: Add frontend shared paged type**
 
 Create `front/shared/model/paging.ts`:
 
@@ -378,7 +378,7 @@ export function pagingSearchParams(request?: PageRequest): string {
 }
 ```
 
-- [ ] **Step 5: Run foundation tests**
+- [x] **Step 5: Run foundation tests**
 
 Run:
 
@@ -389,7 +389,7 @@ pnpm --dir front test -- --run tests/unit/api-contract-fixtures.test.ts
 
 Expected: pass.
 
-- [ ] **Step 6: Commit foundation**
+- [x] **Step 6: Commit foundation**
 
 Run:
 
@@ -397,6 +397,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/shared/paging server/src/test/kotlin/com/readmates/shared/paging front/shared/model/paging.ts
 git commit -m "feat: add cursor pagination primitives"
 ```
+
+COMPACT CHECKPOINT Task 1 - Add Shared Cursor Pagination Foundation:
+Acceptance criteria completed: server cursor codec test was written first and failed red before primitives existed; server `CursorPage`, `PageRequest`, and `CursorCodec` added; frontend `PagedResponse`, `PageRequest`, and `pagingSearchParams` added; foundation checks passed; implementation committed as `39fa2b4b19925c716842f065731aadb44ae0002e`. Changed files: `server/src/main/kotlin/com/readmates/shared/paging/CursorPage.kt`, `server/src/main/kotlin/com/readmates/shared/paging/CursorCodec.kt`, `server/src/test/kotlin/com/readmates/shared/paging/CursorCodecTest.kt`, `front/shared/model/paging.ts`, and this plan document. Key decision: `front/tests/unit/api-contract-fixtures.test.ts` was not changed because Task 1 only adds shared primitives and the existing fixture test remained the targeted frontend guard. Contracts/API/state/test expectations: server cursors are opaque URL-safe Base64 values with deterministic key ordering and invalid/blank decode to null; page limits clamp into `[1, maxLimit]`; frontend page helper emits query strings only for provided `limit` and non-empty `cursor`. Reviews: Task 1 spec review approved; Task 1 code-quality review approved; no review issues open. Verification: red `./server/gradlew -p server test --tests com.readmates.shared.paging.CursorCodecTest` failed with unresolved `CursorCodec`/`PageRequest`; green same command passed; `pnpm --dir front test --run tests/unit/api-contract-fixtures.test.ts` passed; `pnpm --dir front lint` passed; reviewers also ran `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest` and `git show --check 39fa2b4b19925c716842f065731aadb44ae0002e`, both passed. Remaining risks: none known for the foundation slice; future tasks must validate cursor predicates per endpoint. Next first action: dispatch Task 2 implementer for archive, feedback, and notes server paged contracts. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 1 subagents closed; no session-owned ports open.
 
 ## Task 2: Convert Archive, Feedback, And Notes Server APIs To Paged Contracts
 
