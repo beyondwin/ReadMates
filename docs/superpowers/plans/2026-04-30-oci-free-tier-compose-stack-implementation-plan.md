@@ -282,7 +282,7 @@ git commit -m "deploy: add oci compose stack"
 - Create: `deploy/oci/04-install-docker.sh`
 - Test: `bash -n deploy/oci/04-install-docker.sh`
 
-- [ ] **Step 1: Create `deploy/oci/04-install-docker.sh`**
+- [x] **Step 1: Create `deploy/oci/04-install-docker.sh`**
 
 Write exactly:
 
@@ -328,7 +328,7 @@ echo ""
 echo "Docker 설치 완료. 다음: 로컬에서 deploy/oci/05-deploy-compose-stack.sh 실행"
 ```
 
-- [ ] **Step 2: Make the script executable**
+- [x] **Step 2: Make the script executable**
 
 Run:
 
@@ -336,7 +336,7 @@ Run:
 chmod +x deploy/oci/04-install-docker.sh
 ```
 
-- [ ] **Step 3: Validate shell syntax**
+- [x] **Step 3: Validate shell syntax**
 
 Run:
 
@@ -346,7 +346,7 @@ bash -n deploy/oci/04-install-docker.sh
 
 Expected: no output and exit code 0.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add deploy/oci/04-install-docker.sh
