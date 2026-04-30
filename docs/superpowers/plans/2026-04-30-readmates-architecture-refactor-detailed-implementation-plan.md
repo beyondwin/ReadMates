@@ -801,7 +801,7 @@ Acceptance criteria completed: archive/feedback/notes frontend contracts and fet
 
 **Files:** host, auth, session, notification, and club files listed in the Target File Map.
 
-- [ ] **Step 1: Add server tests for host paged contracts**
+- [x] **Step 1: Add server tests for host paged contracts**
 
 Add tests in existing host controller test files to assert:
 
@@ -821,7 +821,7 @@ GET /api/host/members?limit=2
 GET /api/host/members/pending-approvals?limit=2
 ```
 
-- [ ] **Step 2: Update host server use cases and ports**
+- [x] **Step 2: Update host server use cases and ports**
 
 Change host list methods to accept `PageRequest` and return `CursorPage<T>`.
 
@@ -834,7 +834,7 @@ host members: role rank asc, status rank asc, display_name asc, email asc, id as
 pending viewers: created_at desc, id desc
 ```
 
-- [ ] **Step 3: Update notification list endpoints**
+- [x] **Step 3: Update notification list endpoints**
 
 Convert:
 
@@ -848,7 +848,7 @@ GET /api/host/notifications/test-mail/audit
 
 to return `CursorPage` responses. Keep existing `limit` behavior but add `cursor`.
 
-- [ ] **Step 4: Update frontend host and notification contracts**
+- [x] **Step 4: Update frontend host and notification contracts**
 
 In `front/features/host/api/host-contracts.ts` and `front/features/notifications/api/notifications-contracts.ts`, wrap list types in `PagedResponse<T>`.
 
@@ -863,7 +863,7 @@ front/features/host/route/host-notifications-data.ts
 front/features/notifications/route/member-notifications-data.ts
 ```
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 
@@ -887,7 +887,7 @@ pnpm --dir front test -- --run \
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit host and notification pagination**
+- [x] **Step 6: Commit host and notification pagination**
 
 Run:
 
@@ -895,6 +895,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/auth server/src/main/kotlin/com/readmates/session server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/session server/src/test/kotlin/com/readmates/notification front/features/host front/features/notifications front/tests/unit
 git commit -m "feat: paginate host and notification lists"
 ```
+
+COMPACT CHECKPOINT Task 4 - Convert Host, Notification, And Admin Lists To Cursor Pagination:
+Acceptance criteria completed: host sessions, invitations, members, pending approvals/viewers, member notifications, host notification items/events/deliveries/test-mail audit now return paged contracts and frontend consumers use paged responses with explicit `더 보기` append behavior; implementation committed as `c192f2c`; review fixes committed as `d453552`. Changed files: server auth/session/notification API, service, port, persistence, and tests; frontend host/notification API, route, UI/component, and tests; this plan document. Key decisions: platform admin pagination was not implemented because current admin surface exposes bounded `/api/admin/summary` nested arrays and mutation/check endpoints, not a standalone paginated admin domain list; final spec review accepted this as out of Task 4's explicit endpoint list. Contracts/API/state/test expectations: host operational lists use `50/100`; notification lists preserve `50/100`; cursor predicates use stable id tie-breakers; host dashboard preserves `HostSessionListPage.nextCursor`; host members/invitations load-more wrappers pass page args in the correct API parameter position. Reviews: initial spec/quality reviews found host member/invitation cursor wiring bugs and host dashboard dropped page contract; fixes landed in `d453552`; final Task 4 re-review approved. Verification: red server compile failed before `MemberNotificationList.nextCursor`; red frontend tests caught raw-array/unpaged assumptions; `./server/gradlew -p server test --rerun-tasks --tests com.readmates.auth.api.HostInvitationControllerTest --tests com.readmates.auth.api.HostMemberApprovalControllerTest --tests com.readmates.auth.api.HostMemberLifecycleControllerTest --tests com.readmates.session.api.HostSessionControllerDbTest --tests com.readmates.notification.api.HostNotificationControllerTest --tests com.readmates.notification.api.MemberNotificationControllerTest` passed; `pnpm --dir front test --run tests/unit/host-dashboard.test.tsx tests/unit/host-invitations.test.tsx tests/unit/host-members.test.tsx tests/unit/host-session-editor.test.tsx tests/unit/host-notifications.test.tsx tests/unit/member-notifications.test.tsx` passed 160 tests after fixes; `pnpm --dir front lint` passed; `CI=1 pnpm --dir front build` passed; `./server/gradlew -p server test --rerun-tasks --tests com.readmates.architecture.ServerArchitectureBoundaryTest` passed; `git diff --check` passed. Remaining risks: platform admin summary remains bounded but unpaged by design; no open Task 4 review issues. Next first action: dispatch Task 5 implementer for server application HTTP dependency removal and OAuthReturnState persistence split. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 4 subagents closed; no session-owned ports open.
 
 ## Task 5: Harden Server Application And Security Boundaries
 
