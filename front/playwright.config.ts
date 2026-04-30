@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+delete process.env.NO_COLOR;
+
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const baseURL = `http://localhost:${port}`;
 const loopbackBaseURL = `http://127.0.0.1:${port}`;
