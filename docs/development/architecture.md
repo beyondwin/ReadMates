@@ -56,7 +56,7 @@ Spring Boot API
 MySQL
 ```
 
-Production에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 직접 Spring API origin을 신뢰하지 않고, 같은 origin의 `/api/bff/**`로 요청합니다. Pages Functions는 upstream Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙이고 cookie를 전달합니다. 또한 path fallback의 `clubSlug` query와 요청 host에서 클럽 context를 계산해 Spring으로 신뢰 가능한 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host` header를 전달합니다. Cloudflare Functions의 `front/functions/_shared/proxy.ts`는 upstream response header 복사, 내부 `x-readmates-*` response header 제거, host 정규화, client IP 계산, OAuth forwarded header 생성처럼 재사용되는 trusted header forwarding policy를 소유합니다. BFF route별 API path와 `clubSlug` 검증은 각 route가 맡되, browser가 보낸 내부 header를 신뢰값으로 전달하지 않는 정책은 shared helper와 route tests가 함께 지킵니다.
+Production에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 직접 Spring API origin을 신뢰하지 않고, 같은 origin의 `/api/bff/**`로 요청합니다. Pages Functions는 upstream Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙이고 cookie를 전달합니다. 또한 path fallback의 `clubSlug` query와 요청 host에서 클럽 context를 계산해 Spring으로 신뢰 가능한 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host` header를 전달합니다. Cloudflare Functions의 `front/functions/_shared/proxy.ts`는 upstream response header 복사, 내부 `x-readmates-*` response header 제거, host 정규화, client IP 계산, OAuth forwarded header 생성처럼 재사용되는 trusted header/cookie/host/IP helper policy를 제공합니다. `/api/bff/**` route 함수는 API path와 `clubSlug`를 검증한 뒤 shared helper와 route-local header 구성을 조합해 upstream trusted header를 만듭니다. browser가 보낸 내부 header를 신뢰값으로 전달하지 않는 정책은 shared helper와 route tests가 함께 지킵니다.
 
 로컬 Vite dev server는 `front/vite.config.ts`의 proxy로 같은 구조를 흉내 냅니다. Cloudflare Pages Functions 코드는 production/preview 배포에서 실행되고, 로컬 개발에서는 Vite proxy가 `/api/bff/**`, `/oauth2/authorization/**`, `/login/oauth2/code/**`를 backend로 넘깁니다. 로컬 proxy도 browser-supplied club context header를 제거하고 `clubSlug` query에서 검증한 slug만 trusted header로 다시 붙입니다.
 
@@ -213,11 +213,11 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 ## 페이지된 목록 API contract
 
-범위가 있는 목록 endpoint는 cursor 기반 page object를 반환합니다. 응답 형태는 항상 `{ "items": [...], "nextCursor": string | null }`이고, 다음 page가 없으면 `nextCursor`는 `null`입니다. Request query는 endpoint별 기본값과 최대값을 둔 `limit`, `cursor`를 사용합니다.
+범위가 있는 목록 endpoint는 cursor 기반 page object를 반환합니다. 공통 응답 필드는 `{ "items": [...], "nextCursor": string | null }`이고, 다음 page가 없으면 `nextCursor`는 `null`입니다. Endpoint에 따라 `/api/me/notifications`의 `unreadCount`처럼 목록 전체 상태를 나타내는 추가 field가 붙을 수 있습니다. Request query는 endpoint별 기본값과 최대값을 둔 `limit`, `cursor`를 사용합니다.
 
-이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/test-mail/audit`입니다.
+이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/test-mail/audit`입니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
 
-위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 page object를 사용합니다.
+위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 공통 page field를 사용합니다.
 
 ## 멤버 프로필과 표시 이름
 
