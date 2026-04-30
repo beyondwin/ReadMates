@@ -1143,17 +1143,17 @@ Acceptance criteria completed: test-only query counting datasource and query bud
 - Modify/split `JdbcHostSessionWriteAdapter.kt`
 - Modify/split `JdbcArchiveQueryAdapter.kt`
 
-- [ ] **Step 1: Split notification delivery mappers**
+- [x] **Step 1: Split notification delivery mappers**
 
 Create `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/NotificationDeliveryRowMappers.kt`.
 
 Move `ResultSet` mapper extension functions from `JdbcNotificationDeliveryAdapter` into this file. Keep them `internal`.
 
-- [ ] **Step 2: Split notification delivery queries**
+- [x] **Step 2: Split notification delivery queries**
 
 Create `NotificationDeliveryQueries.kt` for read-only SQL and `NotificationDeliveryWriteOperations.kt` for update/batch write operations. `JdbcNotificationDeliveryAdapter` remains the only class implementing outbound ports.
 
-- [ ] **Step 3: Split host session mappers and deletion helpers**
+- [x] **Step 3: Split host session mappers and deletion helpers**
 
 Create:
 
@@ -1165,7 +1165,7 @@ server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostSession
 
 Move SQL groups without changing SQL text unless tests require imports to move.
 
-- [ ] **Step 4: Split archive query mappers**
+- [x] **Step 4: Split archive query mappers**
 
 Create:
 
@@ -1177,7 +1177,7 @@ server/src/main/kotlin/com/readmates/archive/adapter/out/persistence/ArchiveList
 
 Keep `JdbcArchiveQueryAdapter` as the port implementation facade.
 
-- [ ] **Step 5: Run adapter-focused tests**
+- [x] **Step 5: Run adapter-focused tests**
 
 Run:
 
@@ -1193,7 +1193,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit JDBC adapter split**
+- [x] **Step 6: Commit JDBC adapter split**
 
 Run:
 
@@ -1201,6 +1201,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/notification/adapter/out/persistence server/src/main/kotlin/com/readmates/session/adapter/out/persistence server/src/main/kotlin/com/readmates/archive/adapter/out/persistence server/src/test/kotlin/com/readmates
 git commit -m "refactor: split large jdbc adapters"
 ```
+
+COMPACT CHECKPOINT Task 7 - Split High-Risk JDBC Adapters Without Behavior Changes:
+Acceptance criteria completed: notification delivery, host session write, and archive query JDBC adapters were split into planned internal mapper/query/write-operation helpers while preserving adapter facades as the only outbound port implementations; implementation committed as `8d6fa4e`; related `ViewerSecurityTest` application-exception expectation alignment committed as `d08bf09`. Changed files: `JdbcNotificationDeliveryAdapter.kt`, `NotificationDeliveryRowMappers.kt`, `NotificationDeliveryQueries.kt`, `NotificationDeliveryWriteOperations.kt`, `JdbcHostSessionWriteAdapter.kt`, `HostSessionRowMappers.kt`, `HostSessionQueries.kt`, `HostSessionWriteOperations.kt`, `JdbcArchiveQueryAdapter.kt`, `ArchiveRowMappers.kt`, `ArchiveDetailQueries.kt`, `ArchiveListQueries.kt`, `ViewerSecurityTest.kt`, and this plan document. Key decisions: helper classes are internal delegates rather than Spring beans so transaction boundaries remain on the Spring-managed adapter methods; SQL text/parameters were preserved except consolidating an existing duplicate session-state lookup helper; the viewer security test now asserts `FeedbackDocumentException.ACTIVE_MEMBERSHIP_REQUIRED` at the direct use-case boundary because Task 5 intentionally removed Spring web exceptions from application code while keeping the HTTP `403` assertion. Contracts/API/state/test expectations: no API or DB contract changed; `JdbcNotificationDeliveryAdapter`, `JdbcHostSessionWriteAdapter`, and `JdbcArchiveQueryAdapter` remain the port facades; feedback viewer HTTP access remains forbidden and application code raises the feature exception mapped by `FeedbackDocumentErrorHandler`. Reviews: initial spec and code-quality reviews found no Task 7 issues; code-quality full-suite run surfaced `ViewerSecurityTest` still expecting the old web exception; RCA fixed this as test-only contract alignment; final spec/code-quality re-reviews found no issues. Verification: implementer ran `./server/gradlew -p server compileKotlin --rerun-tasks`, Task 7 adapter-focused test command, and `git diff --check`, all passed; root-cause worker reproduced `./server/gradlew -p server test --tests com.readmates.auth.api.ViewerSecurityTest`, fixed it, then reran ViewerSecurityTest, Task 7 adapter-focused command, and `git diff --check`, all passed; final reviewers ran combined Task 7 plus ViewerSecurityTest and architecture boundary tests, passed; final code-quality reviewer ran `./server/gradlew -p server clean test`, passed. Remaining risks: mechanical split risk remains limited to untested edge paths around helper delegation, covered by adapter/controller suites and full server suite; no known open Task 7 issue. Next first action: dispatch Task 8 frontend implementer to remove shared-to-app and host component legacy boundary exceptions. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 7 subagents closed; no session-owned ports open.
 
 ## Task 8: Remove Frontend Shared-To-App And Host Components Legacy Boundaries
 
