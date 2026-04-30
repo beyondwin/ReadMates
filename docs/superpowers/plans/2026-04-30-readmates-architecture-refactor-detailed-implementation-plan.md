@@ -909,7 +909,7 @@ Acceptance criteria completed: host sessions, invitations, members, pending appr
 - Modify: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/OAuthReturnState.kt`
 - Modify application error classes and web mappers in archive, feedback, club, auth, notification.
 
-- [ ] **Step 1: Strengthen boundary test first**
+- [x] **Step 1: Strengthen boundary test first**
 
 In `ServerArchitectureBoundaryTest.kt`, add:
 
@@ -937,7 +937,7 @@ Run:
 
 Expected: fail while application code still imports Spring web/http types.
 
-- [ ] **Step 2: Move application HTTP exceptions to feature errors**
+- [x] **Step 2: Move application HTTP exceptions to feature errors**
 
 For each feature with `ResponseStatusException` in application packages, introduce a feature error exception. Example for feedback:
 
@@ -975,7 +975,7 @@ fun handleFeedbackDocumentException(exception: FeedbackDocumentException): Respo
 
 Repeat for archive, platform admin, member lifecycle, pending approval, notification member/host operations, and parser errors. Keep web status mapping in `adapter.in.web`.
 
-- [ ] **Step 3: Extract trusted return host port**
+- [x] **Step 3: Extract trusted return host port**
 
 Create `TrustedReturnHostPort.kt`:
 
@@ -1021,7 +1021,7 @@ class JdbcTrustedReturnHostAdapter(
 
 Update `OAuthReturnState` constructor to receive `TrustedReturnHostPort` and remove `JdbcTemplate`.
 
-- [ ] **Step 4: Run server boundary and affected tests**
+- [x] **Step 4: Run server boundary and affected tests**
 
 Run:
 
@@ -1037,7 +1037,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit server boundary hardening**
+- [x] **Step 5: Commit server boundary hardening**
 
 Run:
 
@@ -1045,6 +1045,9 @@ Run:
 git add server/src/main/kotlin server/src/test/kotlin/com/readmates/architecture server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/club server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/notification
 git commit -m "refactor: harden server application boundaries"
 ```
+
+COMPACT CHECKPOINT Task 5 - Harden Server Application And Security Boundaries:
+Acceptance criteria completed: `ServerArchitectureBoundaryTest` now rejects Spring `http`/`web` dependencies from migrated application packages; application HTTP exceptions were moved to feature-owned errors and mapped in web adapters; shared `AccessDeniedException` no longer uses Spring `@ResponseStatus` and is mapped by shared web advice; `OAuthReturnState` now depends on `TrustedReturnHostPort`; `JdbcTrustedReturnHostAdapter` owns active club host lookup. Changed files: server architecture test, archive/auth/club/feedback/notification/session application errors and web handlers, `OAuthReturnState`, `TrustedReturnHostPort`, `JdbcTrustedReturnHostAdapter`, shared access-denied web advice, related tests, and this plan document. Key decisions: `SessionApplicationErrorHandler` is global rather than controller-scoped because member/note write controllers also surface session application exceptions; shared access denied remains a shared application/security exception but HTTP mapping is in `shared.adapter.in.web`. Contracts/API/state/test expectations: previous HTTP statuses are preserved through adapter advice (`403`, `409`, `400`, `404`, `422`, `429`, `503` as applicable); OAuth return state still trusts primary app host, Pages host, and active shared-cookie club domains only. Reviews: initial spec/quality reviews found missing note/member session exception mapping and hidden `@ResponseStatus` on shared `AccessDeniedException`; follow-up `2ef5348` fixed both; final Task 5 re-review approved. Verification: red `./server/gradlew -p server test --rerun-tasks --tests com.readmates.architecture.ServerArchitectureBoundaryTest` failed on new boundary before migration; post-fix required command `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest --tests com.readmates.feedback.api.FeedbackDocumentControllerTest --tests com.readmates.archive.api.ArchiveControllerTest --tests com.readmates.club.api.PlatformAdminControllerTest --tests com.readmates.auth.infrastructure.security.InviteAwareOAuthTest --tests com.readmates.notification.api.HostNotificationControllerTest` passed; regression command `./server/gradlew -p server test --tests com.readmates.note.api.MemberActionControllerDbTest --tests com.readmates.note.api.QuestionControllerTest --tests com.readmates.session.adapter.in.web.RsvpControllerTest` passed; reviewer ran an expanded affected suite including `ReviewBffSecurityTest` and `HostSessionControllerDbTest`, passed; `git diff --check` passed. A parallel local rerun of two Gradle test commands failed only because both tried to write XML test results into the same build directory; rerunning the required command alone passed. Remaining risks: none known for Task 5. Next first action: dispatch Task 6 implementer for DB query budget, EXPLAIN, and transaction guard tests. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 5 subagents closed; no session-owned ports open.
 
 ## Task 6: Add DB Query Budget, EXPLAIN, And Transaction Guard Tests
 
