@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HostInvitations, { type HostInvitationsActions } from "@/features/host/components/host-invitations";
+import { hostInvitationsActions } from "@/features/host";
 import type { HostInvitationListItem } from "@/features/host/api/host-contracts";
 
 const invitations: HostInvitationListItem[] = [
@@ -122,6 +123,18 @@ describe("HostInvitations", () => {
     expect(actions.listInvitations).toHaveBeenCalledWith({ limit: 50, cursor: "cursor-1" });
     expect(await screen.findByText("다음 멤버")).toBeInTheDocument();
     expect(screen.getByText("대기 멤버")).toBeInTheDocument();
+  });
+
+  it("keeps load-more pagination on the route action URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [], nextCursor: null })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await hostInvitationsActions.listInvitations({ limit: 50, cursor: "cursor-1" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/invitations?limit=50&cursor=cursor-1",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it("creates an invitation and copies the returned link", async () => {

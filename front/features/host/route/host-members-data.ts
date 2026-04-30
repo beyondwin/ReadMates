@@ -16,7 +16,7 @@ export async function hostMembersLoader(args?: LoaderFunctionArgs) {
 }
 
 export const hostMembersActions = {
-  loadMembers: fetchHostMembers,
+  loadMembers: (page) => fetchHostMembers(undefined, page),
   submitLifecycle: submitHostMemberLifecycle,
   submitProfile: submitHostMemberProfile,
   submitViewerAction: submitHostViewerAction,

@@ -3,7 +3,7 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HostMembers, { type HostMembersActions } from "@/features/host/components/host-members";
-import { hostMembersLoader } from "@/features/host";
+import { hostMembersActions, hostMembersLoader } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -550,6 +550,18 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("멤버1")).toBeInTheDocument();
   });
 
+  it("keeps load-more pagination on the route action URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(memberListResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await hostMembersActions.loadMembers({ limit: 50, cursor: "cursor-1" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/members?limit=50&cursor=cursor-1",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
   it("keeps each viewer row locked while multiple viewer actions are in flight", async () => {
     const user = userEvent.setup();
     const secondPending = {
@@ -677,7 +689,7 @@ describe("HostMembersPage", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members",
+      "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
 
@@ -761,7 +773,7 @@ describe("HostMembersPage", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members",
+      "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
 
@@ -788,7 +800,7 @@ describe("HostMembersPage", () => {
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members",
+      "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
