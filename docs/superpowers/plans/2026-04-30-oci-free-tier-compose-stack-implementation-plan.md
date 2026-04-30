@@ -359,7 +359,7 @@ git commit -m "deploy: add docker install bootstrap"
 - Create: `deploy/oci/05-deploy-compose-stack.sh`
 - Test: `bash -n deploy/oci/05-deploy-compose-stack.sh`
 
-- [ ] **Step 1: Create `deploy/oci/05-deploy-compose-stack.sh`**
+- [x] **Step 1: Create `deploy/oci/05-deploy-compose-stack.sh`**
 
 Write exactly:
 
@@ -477,7 +477,7 @@ echo "VM health: ssh -i ${SSH_KEY} ${REMOTE_USER}@${VM_PUBLIC_IP} 'cd ${REMOTE_D
 echo "Logs: ssh -i ${SSH_KEY} ${REMOTE_USER}@${VM_PUBLIC_IP} 'sudo docker compose -f ${REMOTE_DIR}/compose.yml logs -f --tail=200'"
 ```
 
-- [ ] **Step 2: Make the script executable**
+- [x] **Step 2: Make the script executable**
 
 Run:
 
@@ -485,7 +485,7 @@ Run:
 chmod +x deploy/oci/05-deploy-compose-stack.sh
 ```
 
-- [ ] **Step 3: Validate shell syntax**
+- [x] **Step 3: Validate shell syntax**
 
 Run:
 
@@ -495,7 +495,7 @@ bash -n deploy/oci/05-deploy-compose-stack.sh
 
 Expected: no output and exit code 0.
 
-- [ ] **Step 4: Add a manual DB backup gate before production execution**
+- [x] **Step 4: Add a manual DB backup gate before production execution**
 
 Insert this block immediately before `echo "==> [7/9] 기존 host Caddy/Spring 서비스 정지"`:
 
@@ -507,7 +507,7 @@ ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
 
 Then renumber the later progress messages from `[7/9]`, `[8/9]`, `[9/9]` to `[8/10]`, `[9/10]`, `[10/10]`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add deploy/oci/05-deploy-compose-stack.sh
