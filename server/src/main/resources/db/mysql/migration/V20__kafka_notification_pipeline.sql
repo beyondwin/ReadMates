@@ -27,7 +27,7 @@ create table notification_event_outbox (
   constraint notification_event_outbox_dedupe_key_check check (length(trim(dedupe_key)) > 0),
   constraint notification_event_outbox_kafka_topic_check check (length(trim(kafka_topic)) > 0),
   constraint notification_event_outbox_kafka_key_check check (length(trim(kafka_key)) > 0)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
 create table notification_deliveries (
   id char(36) not null,
@@ -58,7 +58,7 @@ create table notification_deliveries (
   constraint notification_deliveries_status_check check (status in ('PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD', 'SKIPPED')),
   constraint notification_deliveries_attempt_count_check check (attempt_count >= 0),
   constraint notification_deliveries_dedupe_key_check check (length(trim(dedupe_key)) > 0)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
 create table member_notifications (
   id char(36) not null,
@@ -87,4 +87,4 @@ create table member_notifications (
   constraint member_notifications_title_check check (length(trim(title)) > 0),
   constraint member_notifications_body_check check (length(trim(body)) > 0),
   constraint member_notifications_deep_link_path_check check (deep_link_path like '/%')
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;

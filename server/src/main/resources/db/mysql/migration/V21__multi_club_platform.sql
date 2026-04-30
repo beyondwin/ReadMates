@@ -23,7 +23,7 @@ create table club_domains (
   constraint club_domains_kind_check check (kind in ('SUBDOMAIN', 'CUSTOM_DOMAIN')),
   constraint club_domains_status_check check (status in ('REQUESTED', 'ACTION_REQUIRED', 'PROVISIONING', 'ACTIVE', 'FAILED', 'DISABLED')),
   constraint club_domains_hostname_check check (length(trim(hostname)) > 0)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
 create table platform_admins (
   user_id char(36) not null,
@@ -35,7 +35,7 @@ create table platform_admins (
   constraint platform_admins_user_fk foreign key (user_id) references users(id),
   constraint platform_admins_role_check check (role in ('OWNER', 'OPERATOR', 'SUPPORT')),
   constraint platform_admins_status_check check (status in ('ACTIVE', 'DISABLED'))
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
 create table club_audit_events (
   id char(36) not null,
@@ -51,7 +51,7 @@ create table club_audit_events (
   constraint club_audit_events_actor_fk foreign key (actor_user_id) references users(id),
   constraint club_audit_events_club_fk foreign key (club_id) references clubs(id),
   constraint club_audit_events_event_type_check check (length(trim(event_type)) > 0)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
 create table platform_audit_events (
   id char(36) not null,
@@ -67,7 +67,7 @@ create table platform_audit_events (
   constraint platform_audit_events_actor_fk foreign key (actor_user_id) references users(id),
   constraint platform_audit_events_target_fk foreign key (target_user_id) references users(id),
   constraint platform_audit_events_event_type_check check (length(trim(event_type)) > 0)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
 create table support_access_grants (
   id char(36) not null,
@@ -87,4 +87,4 @@ create table support_access_grants (
   constraint support_access_grants_grantee_fk foreign key (grantee_user_id) references users(id),
   constraint support_access_grants_scope_check check (scope in ('METADATA_READ', 'HOST_SUPPORT_READ')),
   constraint support_access_grants_reason_check check (length(trim(reason)) > 0)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
