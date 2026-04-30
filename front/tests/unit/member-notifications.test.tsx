@@ -39,6 +39,7 @@ const scopedUnreadNotification = {
 const notificationData: MemberNotificationListResponse = {
   unreadCount: 1,
   items: [unreadNotification],
+  nextCursor: null,
 };
 
 const activeMemberAuth: AuthMeResponse = {
@@ -268,5 +269,29 @@ describe("MemberNotificationsPage", () => {
 
     resolveMarkAllRead();
     await waitFor(() => expect(readAllButton).not.toBeDisabled());
+  });
+
+  it("loads the next notification page and appends it", async () => {
+    const user = userEvent.setup();
+    const nextNotification = {
+      ...unreadNotification,
+      id: "00000000-0000-0000-0000-000000000003",
+      title: "새 알림",
+      body: "추가 알림입니다.",
+    };
+    const loadMore = vi.spyOn(memberNotificationsActions, "loadMore").mockResolvedValue({
+      unreadCount: 2,
+      items: [nextNotification],
+      nextCursor: null,
+    });
+
+    renderMemberNotificationsRoute({ ...notificationData, nextCursor: "cursor-1" });
+
+    await user.click(await screen.findByRole("button", { name: "더 보기" }));
+
+    expect(loadMore).toHaveBeenCalledWith(undefined, { limit: 50, cursor: "cursor-1" });
+    expect(await screen.findByText("새 알림")).toBeInTheDocument();
+    expect(screen.getByText("다음 책이 공개되었습니다")).toBeInTheDocument();
+    expect(screen.getByText("읽지 않은 알림 2개")).toBeInTheDocument();
   });
 });

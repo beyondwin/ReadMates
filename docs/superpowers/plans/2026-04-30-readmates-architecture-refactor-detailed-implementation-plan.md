@@ -154,7 +154,7 @@ The spec covers several related subsystems. Execute this plan in order and stop 
 
 **Files:** none.
 
-- [ ] **Step 1: Confirm worktree state**
+- [x] **Step 1: Confirm worktree state**
 
 Run:
 
@@ -164,7 +164,7 @@ git status --short --branch
 
 Expected: Git prints the current branch. If tracked files are modified, inspect them and do not revert unrelated work.
 
-- [ ] **Step 2: Run current targeted architecture baselines**
+- [x] **Step 2: Run current targeted architecture baselines**
 
 Run:
 
@@ -175,7 +175,7 @@ pnpm --dir front test -- --run tests/unit/frontend-boundaries.test.ts tests/unit
 
 Expected: all selected tests pass.
 
-- [ ] **Step 3: Run current full smoke baselines if time allows**
+- [x] **Step 3: Run current full smoke baselines if time allows**
 
 Run:
 
@@ -188,6 +188,9 @@ pnpm --dir front build
 
 Expected: all pass. If a baseline fails before edits, record the failing command and stop for triage.
 
+COMPACT CHECKPOINT Task 0 - Baseline And Branch State:
+Acceptance criteria completed: worktree branch/status confirmed on `codex/readmates-architecture-refactor`; server architecture boundary baseline passed; frontend boundary/BFF/OAuth targeted baseline passed with the corrected Vitest invocation; full server/frontend smoke passed. Changed files: this plan document only. Key decision: the plan's `pnpm --dir front test -- --run ...` form runs broader Vitest selection because the package script already includes `vitest run`; recorded and used `pnpm --dir front test --run ...` for the intended targeted files, then verified full `pnpm --dir front test` passed. Contracts/API/state/test expectations: no code contracts changed. Reviews: Task 0 spec review approved; Task 0 process/code-quality review approved; no issues left open. Verification: `git status --short --branch` -> `## codex/readmates-architecture-refactor`; `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest` passed; `pnpm --dir front test --run tests/unit/frontend-boundaries.test.ts tests/unit/cloudflare-bff.test.ts tests/unit/cloudflare-oauth-proxy.test.ts` passed 36 tests; `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed 607 tests; `pnpm --dir front build` passed. Remaining risks: one transient all-suite run failure was observed before full suite passed; monitor if it recurs. Next first action: dispatch Task 1 implementer for shared cursor pagination primitives. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed subagents closed; no session-owned ports open.
+
 ## Task 1: Add Shared Cursor Pagination Foundation
 
 **Files:**
@@ -198,7 +201,7 @@ Expected: all pass. If a baseline fails before edits, record the failing command
 - Create: `front/shared/model/paging.ts`
 - Modify: `front/tests/unit/api-contract-fixtures.test.ts`
 
-- [ ] **Step 1: Write server cursor codec tests**
+- [x] **Step 1: Write server cursor codec tests**
 
 Create `server/src/test/kotlin/com/readmates/shared/paging/CursorCodecTest.kt`:
 
@@ -244,7 +247,7 @@ class CursorCodecTest {
 }
 ```
 
-- [ ] **Step 2: Run the failing test**
+- [x] **Step 2: Run the failing test**
 
 Run:
 
@@ -254,7 +257,7 @@ Run:
 
 Expected: fail because `CursorCodec`, `CursorPage`, and `PageRequest` do not exist.
 
-- [ ] **Step 3: Add server paging primitives**
+- [x] **Step 3: Add server paging primitives**
 
 Create `server/src/main/kotlin/com/readmates/shared/paging/CursorPage.kt`:
 
@@ -347,7 +350,7 @@ object CursorCodec {
 }
 ```
 
-- [ ] **Step 4: Add frontend shared paged type**
+- [x] **Step 4: Add frontend shared paged type**
 
 Create `front/shared/model/paging.ts`:
 
@@ -375,7 +378,7 @@ export function pagingSearchParams(request?: PageRequest): string {
 }
 ```
 
-- [ ] **Step 5: Run foundation tests**
+- [x] **Step 5: Run foundation tests**
 
 Run:
 
@@ -386,7 +389,7 @@ pnpm --dir front test -- --run tests/unit/api-contract-fixtures.test.ts
 
 Expected: pass.
 
-- [ ] **Step 6: Commit foundation**
+- [x] **Step 6: Commit foundation**
 
 Run:
 
@@ -394,6 +397,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/shared/paging server/src/test/kotlin/com/readmates/shared/paging front/shared/model/paging.ts
 git commit -m "feat: add cursor pagination primitives"
 ```
+
+COMPACT CHECKPOINT Task 1 - Add Shared Cursor Pagination Foundation:
+Acceptance criteria completed: server cursor codec test was written first and failed red before primitives existed; server `CursorPage`, `PageRequest`, and `CursorCodec` added; frontend `PagedResponse`, `PageRequest`, and `pagingSearchParams` added; foundation checks passed; implementation committed as `39fa2b4b19925c716842f065731aadb44ae0002e`. Changed files: `server/src/main/kotlin/com/readmates/shared/paging/CursorPage.kt`, `server/src/main/kotlin/com/readmates/shared/paging/CursorCodec.kt`, `server/src/test/kotlin/com/readmates/shared/paging/CursorCodecTest.kt`, `front/shared/model/paging.ts`, and this plan document. Key decision: `front/tests/unit/api-contract-fixtures.test.ts` was not changed because Task 1 only adds shared primitives and the existing fixture test remained the targeted frontend guard. Contracts/API/state/test expectations: server cursors are opaque URL-safe Base64 values with deterministic key ordering and invalid/blank decode to null; page limits clamp into `[1, maxLimit]`; frontend page helper emits query strings only for provided `limit` and non-empty `cursor`. Reviews: Task 1 spec review approved; Task 1 code-quality review approved; no review issues open. Verification: red `./server/gradlew -p server test --tests com.readmates.shared.paging.CursorCodecTest` failed with unresolved `CursorCodec`/`PageRequest`; green same command passed; `pnpm --dir front test --run tests/unit/api-contract-fixtures.test.ts` passed; `pnpm --dir front lint` passed; reviewers also ran `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest` and `git show --check 39fa2b4b19925c716842f065731aadb44ae0002e`, both passed. Remaining risks: none known for the foundation slice; future tasks must validate cursor predicates per endpoint. Next first action: dispatch Task 2 implementer for archive, feedback, and notes server paged contracts. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 1 subagents closed; no session-owned ports open.
 
 ## Task 2: Convert Archive, Feedback, And Notes Server APIs To Paged Contracts
 
@@ -406,7 +412,7 @@ git commit -m "feat: add cursor pagination primitives"
 - Test: `server/src/test/kotlin/com/readmates/note/api/QuestionControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/note/api/MemberActionControllerDbTest.kt`
 
-- [ ] **Step 1: Write archive sessions paged response test**
+- [x] **Step 1: Write archive sessions paged response test**
 
 In `server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerTest.kt`, add a test that asserts `GET /api/archive/sessions` returns an object with `items` and `nextCursor`:
 
@@ -426,7 +432,7 @@ fun `archive sessions returns cursor page`() {
 
 Use the existing auth helper name from the same test file. If the helper has a different name, use that helper instead of creating a new auth mechanism.
 
-- [ ] **Step 2: Change archive inbound port signatures**
+- [x] **Step 2: Change archive inbound port signatures**
 
 In `server/src/main/kotlin/com/readmates/archive/application/port/in/ArchiveUseCases.kt`, change list use cases to accept `PageRequest` and return `CursorPage`:
 
@@ -447,7 +453,7 @@ interface ListMyArchiveReviewsUseCase {
 }
 ```
 
-- [ ] **Step 3: Change archive controller to parse pagination**
+- [x] **Step 3: Change archive controller to parse pagination**
 
 In `server/src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveController.kt`, update list endpoints:
 
@@ -499,7 +505,7 @@ fun <T, R> CursorPage<T>.mapItems(mapper: (T) -> R): CursorPageResponse<R> =
     CursorPageResponse(items = items.map(mapper), nextCursor = nextCursor)
 ```
 
-- [ ] **Step 4: Add archive outbound pagination**
+- [x] **Step 4: Add archive outbound pagination**
 
 In `LoadArchiveDataPort.kt`, mirror the inbound signatures:
 
@@ -511,7 +517,7 @@ fun loadMyReviews(currentMember: CurrentMember, pageRequest: PageRequest): Curso
 
 In `ArchiveQueryService.kt`, pass through the `PageRequest` after membership checks.
 
-- [ ] **Step 5: Implement keyset pagination in `JdbcArchiveQueryAdapter`**
+- [x] **Step 5: Implement keyset pagination in `JdbcArchiveQueryAdapter`**
 
 For `loadArchiveSessions`, select `limit + 1` rows and add cursor predicate:
 
@@ -589,7 +595,7 @@ notes feed:
              or (created_at = :createdAt and source_order = :sourceOrder and session_number = :sessionNumber and item_order = :itemOrder and id < :id)
 ```
 
-- [ ] **Step 6: Convert feedback document list**
+- [x] **Step 6: Convert feedback document list**
 
 Change `FeedbackDocumentUseCases.kt`, `FeedbackDocumentStorePort.kt`, `FeedbackDocumentService.kt`, `FeedbackDocumentController.kt`, and `FeedbackDocumentWebDtos.kt` so `/api/feedback-documents/me` returns:
 
@@ -608,7 +614,7 @@ order by session_number desc, session_feedback_documents.created_at desc, sessio
 
 The cursor payload must include `sessionNumber`, `createdAt`, and `id`.
 
-- [ ] **Step 7: Convert notes list and feed**
+- [x] **Step 7: Convert notes list and feed**
 
 Change `NotesFeedUseCases.kt`, `LoadNotesFeedPort.kt`, `NotesFeedService.kt`, `NotesFeedController.kt`, and `NotesFeedWebDtos.kt`.
 
@@ -616,7 +622,7 @@ Change `NotesFeedUseCases.kt`, `LoadNotesFeedPort.kt`, `NotesFeedService.kt`, `N
 
 `GET /api/notes/feed` returns `CursorPageResponse<NoteFeedItem>` for both whole-feed and `sessionId` modes. Remove the unpaged session-specific branch. Apply `limit + 1` to both.
 
-- [ ] **Step 8: Run targeted server tests**
+- [x] **Step 8: Run targeted server tests**
 
 Run:
 
@@ -630,7 +636,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 9: Commit member-facing pagination server changes**
+- [x] **Step 9: Commit member-facing pagination server changes**
 
 Run:
 
@@ -638,6 +644,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/archive server/src/main/kotlin/com/readmates/feedback server/src/main/kotlin/com/readmates/note server/src/test/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/note
 git commit -m "feat: paginate member archive notes and feedback APIs"
 ```
+
+COMPACT CHECKPOINT Task 2 - Convert Archive, Feedback, And Notes Server APIs To Paged Contracts:
+Acceptance criteria completed: archive sessions/questions/reviews, feedback documents, notes sessions, and notes feed server contracts now return `{ items, nextCursor }`; controllers parse `limit`/`cursor`; use cases and ports use `CursorPage`/`PageRequest`; JDBC adapters use keyset predicates with `limit + 1`; related server tests updated; implementation committed as `f0e5a87`; cache-bypass clarification follow-up committed as `13d122f`. Changed files: server archive/feedback/note API, service, port, model, persistence, and related server tests plus this plan document. Key decisions: invalid/undecodable cursors intentionally fall back to first page per shared cursor decode contract; notes reads intentionally bypass the legacy unpaged notes cache because it cannot produce correct keyset `nextCursor`, and tests now lock zero cache reads/writes for paged paths. Contracts/API/state/test expectations: scoped endpoints no longer preserve raw-array responses; archive/feedback/notes sort orders and cursor payloads match the Task 2 table; notes feed uses `60/120`, notes sessions and member-facing lists use `30/100`. Reviews: Task 2 spec review approved; initial quality review raised malformed-cursor and notes-cache concerns; malformed-cursor behavior was adjudicated as accepted contract, notes-cache clarity was fixed and quality re-review approved. Verification: red `./server/gradlew -p server test --tests com.readmates.archive.api.ArchiveControllerTest` failed on missing `$.items`; `./server/gradlew -p server test --rerun-tasks --tests com.readmates.archive.api.ArchiveControllerTest --tests com.readmates.feedback.api.FeedbackDocumentControllerTest --tests com.readmates.note.api.QuestionControllerTest --tests com.readmates.note.api.MemberActionControllerDbTest --tests com.readmates.archive.api.MemberArchiveReviewControllerTest` passed; `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest` passed; `./server/gradlew -p server test --tests com.readmates.archive.api.ArchiveControllerDbTest --tests com.readmates.archive.api.ArchiveAndNotesDbTest --tests com.readmates.note.application.service.NotesFeedServiceCacheTest` passed; after follow-up, `./server/gradlew -p server test --tests com.readmates.note.application.service.NotesFeedServiceCacheTest` passed and targeted Task 2 server command passed again. Remaining risks: frontend still consumes old array contracts until Task 3; do not run mixed server/frontend manually expecting compatibility before Task 3 lands. Next first action: dispatch Task 3 implementer for frontend archive, feedback, and notes paged contracts. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 2 subagents closed; no session-owned ports open.
 
 ## Task 3: Convert Frontend Archive, Feedback, And Notes To Paged Contracts
 
@@ -650,7 +659,7 @@ git commit -m "feat: paginate member archive notes and feedback APIs"
 - Test: `front/tests/unit/feedback-document-page.test.tsx`
 - Test: `front/tests/unit/api-contract-fixtures.test.ts`
 
-- [ ] **Step 1: Update contract types**
+- [x] **Step 1: Update contract types**
 
 In `front/features/archive/api/archive-contracts.ts`, import `PagedResponse`:
 
@@ -669,7 +678,7 @@ export type NoteFeedPage = PagedResponse<NoteFeedItem>;
 export type FeedbackDocumentListPage = PagedResponse<FeedbackDocumentListItem>;
 ```
 
-- [ ] **Step 2: Update archive API fetchers**
+- [x] **Step 2: Update archive API fetchers**
 
 In `front/features/archive/api/archive-api.ts`, make list fetchers accept `PageRequest`:
 
@@ -702,7 +711,7 @@ export function fetchNotesFeed(sessionId?: string | null, request?: PageRequest,
 }
 ```
 
-- [ ] **Step 3: Update route data models**
+- [x] **Step 3: Update route data models**
 
 In `archive-list-data.ts`, store pages instead of arrays:
 
@@ -727,7 +736,7 @@ const [sessions, questions, reviews, reports] = await Promise.all([
 ]);
 ```
 
-- [ ] **Step 4: Add explicit load-more UI**
+- [x] **Step 4: Add explicit load-more UI**
 
 In archive, notes, and my-page UI components, pass `page.items` to existing lists and render a button when `nextCursor !== null`:
 
@@ -748,7 +757,7 @@ setSessionPage((current) => ({
 }));
 ```
 
-- [ ] **Step 5: Update unit tests**
+- [x] **Step 5: Update unit tests**
 
 Update tests so mocked data uses:
 
@@ -761,7 +770,7 @@ const sessionPage = {
 
 Add a test that clicks `더 보기` and asserts new items append without replacing existing ones.
 
-- [ ] **Step 6: Run frontend targeted tests**
+- [x] **Step 6: Run frontend targeted tests**
 
 Run:
 
@@ -776,7 +785,7 @@ pnpm --dir front test -- --run \
 
 Expected: all pass.
 
-- [ ] **Step 7: Commit member-facing frontend pagination**
+- [x] **Step 7: Commit member-facing frontend pagination**
 
 Run:
 
@@ -785,11 +794,14 @@ git add front/features/archive front/features/feedback front/shared/model front/
 git commit -m "feat: use paged archive notes and feedback data"
 ```
 
+COMPACT CHECKPOINT Task 3 - Convert Frontend Archive, Feedback, And Notes To Paged Contracts:
+Acceptance criteria completed: archive/feedback/notes frontend contracts and fetchers use `PagedResponse`/`PageRequest`; route loaders fetch first pages; archive, notes, my-page, member-home, and adjacent route consumers no longer assume raw arrays; UI renders `page.items` and exposes explicit `더 보기` append actions; tests cover append behavior and edge regressions. Changed files: frontend archive/feedback API/route/ui files, member-home paged notes consumer, related unit fixtures/tests, and this plan document. Key decisions: member-home unwraps first-page notes feed into its existing preview array instead of adding home pagination; my-page count labels render `30+` when first page has `nextCursor` rather than pretending exact totals; notes deep links outside the first sessions page preserve the requested id and do not silently select another session, including empty-feed sessions. Contracts/API/state/test expectations: scoped frontend consumers call paged endpoints with limit/cursor, load-more appends returned items and replaces `nextCursor`, club slug context is preserved on subsequent requests. Reviews: initial Task 3 spec/quality reviews found member-home raw notes consumer, notes deep-link fallback, and capped count issues; follow-up fixes `9f3e3bd` and `699700f` resolved them; final Task 3 re-review approved. Verification: red targeted suite failed on raw-array assumptions (`reports.slice`, `items.filter`, `noteSessions.find`); `pnpm --dir front test --run tests/unit/archive-page.test.tsx tests/unit/notes-feed-page.test.tsx tests/unit/my-page.test.tsx tests/unit/feedback-document-page.test.tsx tests/unit/api-contract-fixtures.test.ts` passed; additional `notes-page`, `spa-router`, and `member-home` targeted tests passed; final targeted regression command `pnpm --dir front test --run tests/unit/archive-page.test.tsx tests/unit/notes-feed-page.test.tsx tests/unit/my-page.test.tsx tests/unit/feedback-document-page.test.tsx tests/unit/api-contract-fixtures.test.ts tests/unit/member-home.test.tsx tests/unit/notes-page.test.tsx tests/unit/spa-router.test.tsx` passed 149 tests; `pnpm --dir front lint` passed; final reviewer also ran full `pnpm --dir front test` (614 tests) and `pnpm --dir front build`, both passed. Remaining risks: existing React Router HydrateFallback warning remains in `spa-router.test.tsx`; no new functional risk known. Next first action: dispatch Task 4 implementer for host, notification, and admin cursor pagination. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 3 subagents closed; no session-owned ports open.
+
 ## Task 4: Convert Host, Notification, And Admin Lists To Cursor Pagination
 
 **Files:** host, auth, session, notification, and club files listed in the Target File Map.
 
-- [ ] **Step 1: Add server tests for host paged contracts**
+- [x] **Step 1: Add server tests for host paged contracts**
 
 Add tests in existing host controller test files to assert:
 
@@ -809,7 +821,7 @@ GET /api/host/members?limit=2
 GET /api/host/members/pending-approvals?limit=2
 ```
 
-- [ ] **Step 2: Update host server use cases and ports**
+- [x] **Step 2: Update host server use cases and ports**
 
 Change host list methods to accept `PageRequest` and return `CursorPage<T>`.
 
@@ -822,7 +834,7 @@ host members: role rank asc, status rank asc, display_name asc, email asc, id as
 pending viewers: created_at desc, id desc
 ```
 
-- [ ] **Step 3: Update notification list endpoints**
+- [x] **Step 3: Update notification list endpoints**
 
 Convert:
 
@@ -836,7 +848,7 @@ GET /api/host/notifications/test-mail/audit
 
 to return `CursorPage` responses. Keep existing `limit` behavior but add `cursor`.
 
-- [ ] **Step 4: Update frontend host and notification contracts**
+- [x] **Step 4: Update frontend host and notification contracts**
 
 In `front/features/host/api/host-contracts.ts` and `front/features/notifications/api/notifications-contracts.ts`, wrap list types in `PagedResponse<T>`.
 
@@ -851,7 +863,7 @@ front/features/host/route/host-notifications-data.ts
 front/features/notifications/route/member-notifications-data.ts
 ```
 
-- [ ] **Step 5: Run targeted tests**
+- [x] **Step 5: Run targeted tests**
 
 Run:
 
@@ -875,7 +887,7 @@ pnpm --dir front test -- --run \
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit host and notification pagination**
+- [x] **Step 6: Commit host and notification pagination**
 
 Run:
 
@@ -883,6 +895,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/auth server/src/main/kotlin/com/readmates/session server/src/main/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/session server/src/test/kotlin/com/readmates/notification front/features/host front/features/notifications front/tests/unit
 git commit -m "feat: paginate host and notification lists"
 ```
+
+COMPACT CHECKPOINT Task 4 - Convert Host, Notification, And Admin Lists To Cursor Pagination:
+Acceptance criteria completed: host sessions, invitations, members, pending approvals/viewers, member notifications, host notification items/events/deliveries/test-mail audit now return paged contracts and frontend consumers use paged responses with explicit `더 보기` append behavior; implementation committed as `c192f2c`; review fixes committed as `d453552`. Changed files: server auth/session/notification API, service, port, persistence, and tests; frontend host/notification API, route, UI/component, and tests; this plan document. Key decisions: platform admin pagination was not implemented because current admin surface exposes bounded `/api/admin/summary` nested arrays and mutation/check endpoints, not a standalone paginated admin domain list; final spec review accepted this as out of Task 4's explicit endpoint list. Contracts/API/state/test expectations: host operational lists use `50/100`; notification lists preserve `50/100`; cursor predicates use stable id tie-breakers; host dashboard preserves `HostSessionListPage.nextCursor`; host members/invitations load-more wrappers pass page args in the correct API parameter position. Reviews: initial spec/quality reviews found host member/invitation cursor wiring bugs and host dashboard dropped page contract; fixes landed in `d453552`; final Task 4 re-review approved. Verification: red server compile failed before `MemberNotificationList.nextCursor`; red frontend tests caught raw-array/unpaged assumptions; `./server/gradlew -p server test --rerun-tasks --tests com.readmates.auth.api.HostInvitationControllerTest --tests com.readmates.auth.api.HostMemberApprovalControllerTest --tests com.readmates.auth.api.HostMemberLifecycleControllerTest --tests com.readmates.session.api.HostSessionControllerDbTest --tests com.readmates.notification.api.HostNotificationControllerTest --tests com.readmates.notification.api.MemberNotificationControllerTest` passed; `pnpm --dir front test --run tests/unit/host-dashboard.test.tsx tests/unit/host-invitations.test.tsx tests/unit/host-members.test.tsx tests/unit/host-session-editor.test.tsx tests/unit/host-notifications.test.tsx tests/unit/member-notifications.test.tsx` passed 160 tests after fixes; `pnpm --dir front lint` passed; `CI=1 pnpm --dir front build` passed; `./server/gradlew -p server test --rerun-tasks --tests com.readmates.architecture.ServerArchitectureBoundaryTest` passed; `git diff --check` passed. Remaining risks: platform admin summary remains bounded but unpaged by design; no open Task 4 review issues. Next first action: dispatch Task 5 implementer for server application HTTP dependency removal and OAuthReturnState persistence split. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 4 subagents closed; no session-owned ports open.
 
 ## Task 5: Harden Server Application And Security Boundaries
 
@@ -894,7 +909,7 @@ git commit -m "feat: paginate host and notification lists"
 - Modify: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/OAuthReturnState.kt`
 - Modify application error classes and web mappers in archive, feedback, club, auth, notification.
 
-- [ ] **Step 1: Strengthen boundary test first**
+- [x] **Step 1: Strengthen boundary test first**
 
 In `ServerArchitectureBoundaryTest.kt`, add:
 
@@ -922,7 +937,7 @@ Run:
 
 Expected: fail while application code still imports Spring web/http types.
 
-- [ ] **Step 2: Move application HTTP exceptions to feature errors**
+- [x] **Step 2: Move application HTTP exceptions to feature errors**
 
 For each feature with `ResponseStatusException` in application packages, introduce a feature error exception. Example for feedback:
 
@@ -960,7 +975,7 @@ fun handleFeedbackDocumentException(exception: FeedbackDocumentException): Respo
 
 Repeat for archive, platform admin, member lifecycle, pending approval, notification member/host operations, and parser errors. Keep web status mapping in `adapter.in.web`.
 
-- [ ] **Step 3: Extract trusted return host port**
+- [x] **Step 3: Extract trusted return host port**
 
 Create `TrustedReturnHostPort.kt`:
 
@@ -1006,7 +1021,7 @@ class JdbcTrustedReturnHostAdapter(
 
 Update `OAuthReturnState` constructor to receive `TrustedReturnHostPort` and remove `JdbcTemplate`.
 
-- [ ] **Step 4: Run server boundary and affected tests**
+- [x] **Step 4: Run server boundary and affected tests**
 
 Run:
 
@@ -1022,7 +1037,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 5: Commit server boundary hardening**
+- [x] **Step 5: Commit server boundary hardening**
 
 Run:
 
@@ -1030,6 +1045,9 @@ Run:
 git add server/src/main/kotlin server/src/test/kotlin/com/readmates/architecture server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/club server/src/test/kotlin/com/readmates/auth server/src/test/kotlin/com/readmates/notification
 git commit -m "refactor: harden server application boundaries"
 ```
+
+COMPACT CHECKPOINT Task 5 - Harden Server Application And Security Boundaries:
+Acceptance criteria completed: `ServerArchitectureBoundaryTest` now rejects Spring `http`/`web` dependencies from migrated application packages; application HTTP exceptions were moved to feature-owned errors and mapped in web adapters; shared `AccessDeniedException` no longer uses Spring `@ResponseStatus` and is mapped by shared web advice; `OAuthReturnState` now depends on `TrustedReturnHostPort`; `JdbcTrustedReturnHostAdapter` owns active club host lookup. Changed files: server architecture test, archive/auth/club/feedback/notification/session application errors and web handlers, `OAuthReturnState`, `TrustedReturnHostPort`, `JdbcTrustedReturnHostAdapter`, shared access-denied web advice, related tests, and this plan document. Key decisions: `SessionApplicationErrorHandler` is global rather than controller-scoped because member/note write controllers also surface session application exceptions; shared access denied remains a shared application/security exception but HTTP mapping is in `shared.adapter.in.web`. Contracts/API/state/test expectations: previous HTTP statuses are preserved through adapter advice (`403`, `409`, `400`, `404`, `422`, `429`, `503` as applicable); OAuth return state still trusts primary app host, Pages host, and active shared-cookie club domains only. Reviews: initial spec/quality reviews found missing note/member session exception mapping and hidden `@ResponseStatus` on shared `AccessDeniedException`; follow-up `2ef5348` fixed both; final Task 5 re-review approved. Verification: red `./server/gradlew -p server test --rerun-tasks --tests com.readmates.architecture.ServerArchitectureBoundaryTest` failed on new boundary before migration; post-fix required command `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest --tests com.readmates.feedback.api.FeedbackDocumentControllerTest --tests com.readmates.archive.api.ArchiveControllerTest --tests com.readmates.club.api.PlatformAdminControllerTest --tests com.readmates.auth.infrastructure.security.InviteAwareOAuthTest --tests com.readmates.notification.api.HostNotificationControllerTest` passed; regression command `./server/gradlew -p server test --tests com.readmates.note.api.MemberActionControllerDbTest --tests com.readmates.note.api.QuestionControllerTest --tests com.readmates.session.adapter.in.web.RsvpControllerTest` passed; reviewer ran an expanded affected suite including `ReviewBffSecurityTest` and `HostSessionControllerDbTest`, passed; `git diff --check` passed. A parallel local rerun of two Gradle test commands failed only because both tried to write XML test results into the same build directory; rerunning the required command alone passed. Remaining risks: none known for Task 5. Next first action: dispatch Task 6 implementer for DB query budget, EXPLAIN, and transaction guard tests. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 5 subagents closed; no session-owned ports open.
 
 ## Task 6: Add DB Query Budget, EXPLAIN, And Transaction Guard Tests
 
@@ -1041,7 +1059,7 @@ git commit -m "refactor: harden server application boundaries"
 - Create: `server/src/test/kotlin/com/readmates/performance/MySqlQueryPlanTest.kt`
 - Modify: notification/session tests for transaction-required paths.
 
-- [ ] **Step 1: Add query counting datasource support**
+- [x] **Step 1: Add query counting datasource support**
 
 Create a test support wrapper that counts `prepareStatement` calls per test thread. Keep it test-only and opt-in so production wiring is unchanged.
 
@@ -1056,7 +1074,7 @@ object QueryCounter {
 
 Wrap `DataSource.getConnection()` and increment on `prepareStatement(sql)`.
 
-- [ ] **Step 2: Add query budget tests**
+- [x] **Step 2: Add query budget tests**
 
 Create `ServerQueryBudgetTest.kt` with MockMvc calls:
 
@@ -1082,15 +1100,15 @@ Add similar tests for:
 /api/host/sessions/{sessionId}/deletion-preview
 ```
 
-- [ ] **Step 3: Add MySQL EXPLAIN tests**
+- [x] **Step 3: Add MySQL EXPLAIN tests**
 
 Create `MySqlQueryPlanTest.kt` using existing MySQL Testcontainer support. Test the paged query shapes for archive, notes, host members, notification delivery claim, and public session detail. Assert no full table scan on the largest tables by checking the `key` column is non-null for the table under test.
 
-- [ ] **Step 4: Add transaction-required tests for lock paths**
+- [x] **Step 4: Add transaction-required tests for lock paths**
 
 For methods using `for update` or `for update skip locked`, add tests that call them through their application service or scheduler entrypoint, not directly without transaction. Assert claim methods do not produce duplicate ids when invoked twice inside concurrent transactions.
 
-- [ ] **Step 5: Run performance guard tests**
+- [x] **Step 5: Run performance guard tests**
 
 Run:
 
@@ -1105,7 +1123,7 @@ Run:
 
 Expected: all pass. If a budget is too strict for current behavior, adjust the budget in the test and record the reason in the test name or assertion message.
 
-- [ ] **Step 6: Commit DB guardrails**
+- [x] **Step 6: Commit DB guardrails**
 
 Run:
 
@@ -1113,6 +1131,9 @@ Run:
 git add server/src/test/kotlin/com/readmates/support server/src/test/kotlin/com/readmates/performance server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/session
 git commit -m "test: add db query and transaction guardrails"
 ```
+
+COMPACT CHECKPOINT Task 6 - Add DB Query Budget, EXPLAIN, And Transaction Guard Tests:
+Acceptance criteria completed: test-only query counting datasource and query budgets added; MySQL EXPLAIN support and production-shaped query plan tests added; notification claim/outbox and host session transaction guard coverage added; EXPLAIN assertion tightened; narrow note-count indexes added where tightened guard exposed a real full scan; implementation committed as `963afc6`, follow-up as `252d988`. Changed files: `QueryCountingDataSource.kt`, `MySqlExplainTestSupport.kt`, `MySqlExplainTestSupportTest.kt`, `ServerQueryBudgetTest.kt`, `MySqlQueryPlanTest.kt`, notification/session tests, `server/src/main/resources/db/mysql/migration/V22__note_count_query_indexes.sql`, and this plan document. Key decisions: query budgets use observed baselines with assertion reasons instead of forcing optimizations in this test task; V22 indexes are additive and tied to existing notes count query shapes (`one_line_reviews`/`long_reviews` by club/session/visibility/member), not speculative; `assertUsesIndexFor` rejects `ALL` and full `index` scans. Contracts/API/state/test expectations: current query budgets are current-session 5, archive detail 14, public club 5, public session detail 3, deletion preview 15; EXPLAIN tests cover archive page, notes production session count query, host member production query, global notification delivery claim, and public session detail. Reviews: initial Task 6 reviews found reduced EXPLAIN query shapes and weak index assertions; follow-up fixed them; final DB/migration and Task 6 re-reviews approved. Verification: initial red budget run failed with observed query counts before baselines were set; Task 6 suite `./server/gradlew -p server test --tests com.readmates.performance.ServerQueryBudgetTest --tests com.readmates.performance.MySqlQueryPlanTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapterTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapterTest --tests com.readmates.session.api.HostSessionControllerDbTest` passed; after follow-up, `./server/gradlew -p server test --tests com.readmates.performance.ServerQueryBudgetTest --tests com.readmates.performance.MySqlQueryPlanTest --tests com.readmates.support.MySqlExplainTestSupportTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapterTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapterTest --tests com.readmates.session.api.HostSessionControllerDbTest` passed; migration reviewer also ran `MySqlFlywayMigrationTest`, passed; `git diff --check` passed. Remaining risks: EXPLAIN tests are intentionally sensitive to MySQL planner changes; keep future failures as performance review signals, not automatic weakening candidates. Next first action: dispatch Task 7 implementer to split notification delivery, host session write, and archive JDBC adapters without behavior changes. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 6 subagents closed; no session-owned ports open.
 
 ## Task 7: Split High-Risk JDBC Adapters Without Behavior Changes
 
@@ -1122,17 +1143,17 @@ git commit -m "test: add db query and transaction guardrails"
 - Modify/split `JdbcHostSessionWriteAdapter.kt`
 - Modify/split `JdbcArchiveQueryAdapter.kt`
 
-- [ ] **Step 1: Split notification delivery mappers**
+- [x] **Step 1: Split notification delivery mappers**
 
 Create `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/NotificationDeliveryRowMappers.kt`.
 
 Move `ResultSet` mapper extension functions from `JdbcNotificationDeliveryAdapter` into this file. Keep them `internal`.
 
-- [ ] **Step 2: Split notification delivery queries**
+- [x] **Step 2: Split notification delivery queries**
 
 Create `NotificationDeliveryQueries.kt` for read-only SQL and `NotificationDeliveryWriteOperations.kt` for update/batch write operations. `JdbcNotificationDeliveryAdapter` remains the only class implementing outbound ports.
 
-- [ ] **Step 3: Split host session mappers and deletion helpers**
+- [x] **Step 3: Split host session mappers and deletion helpers**
 
 Create:
 
@@ -1144,7 +1165,7 @@ server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostSession
 
 Move SQL groups without changing SQL text unless tests require imports to move.
 
-- [ ] **Step 4: Split archive query mappers**
+- [x] **Step 4: Split archive query mappers**
 
 Create:
 
@@ -1156,7 +1177,7 @@ server/src/main/kotlin/com/readmates/archive/adapter/out/persistence/ArchiveList
 
 Keep `JdbcArchiveQueryAdapter` as the port implementation facade.
 
-- [ ] **Step 5: Run adapter-focused tests**
+- [x] **Step 5: Run adapter-focused tests**
 
 Run:
 
@@ -1172,7 +1193,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit JDBC adapter split**
+- [x] **Step 6: Commit JDBC adapter split**
 
 Run:
 
@@ -1180,6 +1201,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/notification/adapter/out/persistence server/src/main/kotlin/com/readmates/session/adapter/out/persistence server/src/main/kotlin/com/readmates/archive/adapter/out/persistence server/src/test/kotlin/com/readmates
 git commit -m "refactor: split large jdbc adapters"
 ```
+
+COMPACT CHECKPOINT Task 7 - Split High-Risk JDBC Adapters Without Behavior Changes:
+Acceptance criteria completed: notification delivery, host session write, and archive query JDBC adapters were split into planned internal mapper/query/write-operation helpers while preserving adapter facades as the only outbound port implementations; implementation committed as `8d6fa4e`; related `ViewerSecurityTest` application-exception expectation alignment committed as `d08bf09`. Changed files: `JdbcNotificationDeliveryAdapter.kt`, `NotificationDeliveryRowMappers.kt`, `NotificationDeliveryQueries.kt`, `NotificationDeliveryWriteOperations.kt`, `JdbcHostSessionWriteAdapter.kt`, `HostSessionRowMappers.kt`, `HostSessionQueries.kt`, `HostSessionWriteOperations.kt`, `JdbcArchiveQueryAdapter.kt`, `ArchiveRowMappers.kt`, `ArchiveDetailQueries.kt`, `ArchiveListQueries.kt`, `ViewerSecurityTest.kt`, and this plan document. Key decisions: helper classes are internal delegates rather than Spring beans so transaction boundaries remain on the Spring-managed adapter methods; SQL text/parameters were preserved except consolidating an existing duplicate session-state lookup helper; the viewer security test now asserts `FeedbackDocumentException.ACTIVE_MEMBERSHIP_REQUIRED` at the direct use-case boundary because Task 5 intentionally removed Spring web exceptions from application code while keeping the HTTP `403` assertion. Contracts/API/state/test expectations: no API or DB contract changed; `JdbcNotificationDeliveryAdapter`, `JdbcHostSessionWriteAdapter`, and `JdbcArchiveQueryAdapter` remain the port facades; feedback viewer HTTP access remains forbidden and application code raises the feature exception mapped by `FeedbackDocumentErrorHandler`. Reviews: initial spec and code-quality reviews found no Task 7 issues; code-quality full-suite run surfaced `ViewerSecurityTest` still expecting the old web exception; RCA fixed this as test-only contract alignment; final spec/code-quality re-reviews found no issues. Verification: implementer ran `./server/gradlew -p server compileKotlin --rerun-tasks`, Task 7 adapter-focused test command, and `git diff --check`, all passed; root-cause worker reproduced `./server/gradlew -p server test --tests com.readmates.auth.api.ViewerSecurityTest`, fixed it, then reran ViewerSecurityTest, Task 7 adapter-focused command, and `git diff --check`, all passed; final reviewers ran combined Task 7 plus ViewerSecurityTest and architecture boundary tests, passed; final code-quality reviewer ran `./server/gradlew -p server clean test`, passed. Remaining risks: mechanical split risk remains limited to untested edge paths around helper delegation, covered by adapter/controller suites and full server suite; no known open Task 7 issue. Next first action: dispatch Task 8 frontend implementer to remove shared-to-app and host component legacy boundary exceptions. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 7 subagents closed; no session-owned ports open.
 
 ## Task 8: Remove Frontend Shared-To-App And Host Components Legacy Boundaries
 
@@ -1195,7 +1219,7 @@ git commit -m "refactor: split large jdbc adapters"
 - Move host files from `front/features/host/components` to `front/features/host/ui`
 - Modify host route/data imports and unit tests.
 
-- [ ] **Step 1: Remove frontend boundary exceptions first**
+- [x] **Step 1: Remove frontend boundary exceptions first**
 
 In `frontend-boundaries.test.ts`, remove the legacy exceptions for:
 
@@ -1214,7 +1238,7 @@ pnpm --dir front test -- --run tests/unit/frontend-boundaries.test.ts
 
 Expected: fail with shared-to-app and host components import violations.
 
-- [ ] **Step 2: Inject app link behavior into shared UI**
+- [x] **Step 2: Inject app link behavior into shared UI**
 
 Change shared navigation components to accept a `LinkComponent` prop:
 
@@ -1230,7 +1254,7 @@ Use it instead of importing `Link` from `src/app/router-link`.
 
 In `front/src/app/layouts.tsx`, pass the app `Link` into shared UI components.
 
-- [ ] **Step 3: Move host presentation to ui**
+- [x] **Step 3: Move host presentation to ui**
 
 Move files:
 
@@ -1261,7 +1285,7 @@ front/tests/unit/host-members.test.tsx
 front/tests/unit/host-session-editor.test.tsx
 ```
 
-- [ ] **Step 4: Move host action types out of UI**
+- [x] **Step 4: Move host action types out of UI**
 
 For action type exports currently living beside host UI, create:
 
@@ -1274,7 +1298,7 @@ front/features/host/route/host-session-editor-actions.ts
 
 Update route data modules to import action types from these files, not UI files.
 
-- [ ] **Step 5: Run frontend boundary and host tests**
+- [x] **Step 5: Run frontend boundary and host tests**
 
 Run:
 
@@ -1291,7 +1315,7 @@ pnpm --dir front test -- --run \
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit frontend boundary cleanup**
+- [x] **Step 6: Commit frontend boundary cleanup**
 
 Run:
 
@@ -1299,6 +1323,9 @@ Run:
 git add front/shared front/src/app front/features/host front/tests/unit
 git commit -m "refactor: remove frontend legacy boundaries"
 ```
+
+COMPACT CHECKPOINT Task 8 - Remove Frontend Shared-To-App And Host Components Legacy Boundaries:
+Acceptance criteria completed: frontend boundary exceptions were removed; shared UI navigation/auth/footer/header components no longer import app router/continuity and receive app link behavior by prop injection; host presentation moved from `features/host/components` to `features/host/ui`; remaining host component legacy surface was removed; route-owned host action types live under `features/host/route`; boundary tests guard shared-to-app imports, host components imports, and host UI `*Actions` exports using AST inspection; implementation committed as `2f894e5`, follow-ups as `f9c2c2f`, `e408cf5`, `d9a6875`, and `7cca1e6`. Changed files: `front/shared/ui/*` navigation components, `front/src/app/layouts.tsx`, `front/src/app/host-route-elements.tsx`, `front/src/app/router.tsx`, host route/action/ui modules, host unit tests, `front/tests/unit/frontend-boundaries.test.ts`, and this plan document. Key decisions: shared UI defaults remain anchor-based for isolated tests while app composition injects SPA `Link`; host UI uses local structural props and route-owned action contracts to preserve route-first direction; AST export inspection is used because regex-only checks missed common TypeScript re-export forms. Contracts/API/state/test expectations: visual/runtime behavior is unchanged; no `front/features/host/components` surface or imports remain; `front/shared/ui` has no app/page/feature imports; route data imports action types from route files, not UI files. Reviews: initial spec review found `HostInvitationsActions` still exported from UI; follow-up made it private and added a boundary guard; subsequent reviews found remaining host components surface and weaker export guard forms; follow-ups moved the last files to `ui` and replaced the guard with AST export detection; final closure review found no Task 8 issues. Verification: red boundary test after removing exceptions failed with 17 expected shared-to-app/host-components violations; implementer ran the Task 8 frontend command, `pnpm --dir front lint`, and `git diff --check`, passed; follow-ups ran focused boundary/host editor/invitations tests, lint, `git diff --check`, and `rg -n "features/host/components|host/components" front`, passed/no matches; final local Task 8 command `pnpm --dir front test -- --run tests/unit/frontend-boundaries.test.ts tests/unit/responsive-navigation.test.tsx tests/unit/spa-layout.test.tsx tests/unit/host-dashboard.test.tsx tests/unit/host-invitations.test.tsx tests/unit/host-members.test.tsx tests/unit/host-session-editor.test.tsx` passed with 48 files and 621 tests because the package script already includes `vitest run`; code-quality reviewer also ran `pnpm --dir front test`, `pnpm --dir front build`, and `pnpm --dir front test:e2e`, passed. Existing non-failing stderr remains React Router `HydrateFallback` and jsdom navigation noise. Remaining risks: AST guard intentionally rejects any host UI named export ending in `Actions`; plain `export * from ...` cannot expose names statically but no such exports exist. Next first action: dispatch Task 9 implementer to extract shared Cloudflare BFF/OAuth proxy helpers and add header stripping assertions. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 8 subagents closed; no session-owned ports open.
 
 ## Task 9: Extract Shared BFF Proxy Helpers
 
@@ -1311,7 +1338,7 @@ git commit -m "refactor: remove frontend legacy boundaries"
 - Modify: `front/tests/unit/cloudflare-bff.test.ts`
 - Modify: `front/tests/unit/cloudflare-oauth-proxy.test.ts`
 
-- [ ] **Step 1: Add shared proxy helper tests**
+- [x] **Step 1: Add shared proxy helper tests**
 
 Extend BFF and OAuth proxy tests to assert browser-supplied headers are stripped:
 
@@ -1331,7 +1358,7 @@ headers: {
 }
 ```
 
-- [ ] **Step 2: Create shared proxy helper**
+- [x] **Step 2: Create shared proxy helper**
 
 Create `front/functions/_shared/proxy.ts` with exported helpers:
 
@@ -1389,7 +1416,7 @@ export function safeRouteSegment(value: string | string[] | undefined) {
 
 Move existing duplicate helpers into this file and import them from all three functions.
 
-- [ ] **Step 3: Run BFF tests**
+- [x] **Step 3: Run BFF tests**
 
 Run:
 
@@ -1399,7 +1426,7 @@ pnpm --dir front test -- --run tests/unit/cloudflare-bff.test.ts tests/unit/clou
 
 Expected: all pass.
 
-- [ ] **Step 4: Commit BFF helper extraction**
+- [x] **Step 4: Commit BFF helper extraction**
 
 Run:
 
@@ -1407,6 +1434,9 @@ Run:
 git add front/functions front/tests/unit/cloudflare-bff.test.ts front/tests/unit/cloudflare-oauth-proxy.test.ts
 git commit -m "refactor: share cloudflare proxy helpers"
 ```
+
+COMPACT CHECKPOINT Task 9 - Extract Shared BFF Proxy Helpers:
+Acceptance criteria completed: shared Cloudflare proxy helper module created; BFF and OAuth functions import shared header/cookie/host/IP/route-segment helpers; tests assert malicious browser-supplied internal headers are overwritten by trusted server values; OAuth forwarded header builder duplication removed in follow-up; implementation committed as `54becf2`, follow-up as `d1a33a2`. Changed files: `front/functions/_shared/proxy.ts`, BFF function, OAuth authorization/callback functions, Cloudflare BFF/OAuth unit tests, and this plan document. Key decisions: route-specific API path validation remains local to BFF, while reusable trust-boundary helpers live in `_shared/proxy.ts`; OAuth `forwardedOAuthRequestHeaders` is shared because authorization start and callback must not drift; upstream response copies strip internal `x-readmates-*` headers including club slug while preserving single and multi `Set-Cookie`. Contracts/API/state/test expectations: BFF secret is only server-side; request forwarding uses server-derived `X-Readmates-Bff-Secret`, `X-Readmates-Client-IP`, `X-Readmates-Club-Host`, and route-selected club slug; safe OAuth registration IDs still reject path traversal, slash, backslash, and multi-segment values; Cloudflare helper bundles as shared code, not a route. Reviews: spec/security review found no issues; code-quality review found duplicated OAuth forwarded header construction; follow-up extracted it; final closure review found no issues. Verification: newly added malicious-header tests passed before implementation because existing code already constructed trusted headers from scratch; Task 9 command `pnpm --dir front test -- --run tests/unit/cloudflare-bff.test.ts tests/unit/cloudflare-oauth-proxy.test.ts tests/unit/cloudflare-spa-redirects.test.ts` passed, though package script ran the full unit suite; focused `pnpm --dir front exec vitest run tests/unit/cloudflare-oauth-proxy.test.ts tests/unit/cloudflare-bff.test.ts` passed; `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `pnpm --dir front test:e2e`, `pnpm dlx wrangler pages functions build functions ...`, and `git diff --check` passed during review/follow-up. Remaining risks: none known; helper still deliberately derives trust headers from request/runtime context rather than inbound internal headers. Next first action: dispatch Task 10 docs implementer for architecture/test-guide/agent-guide updates, then run final full verification. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 9 subagents closed; no session-owned ports open.
 
 ## Task 10: Full Verification And Documentation Updates
 
@@ -1417,7 +1447,7 @@ git commit -m "refactor: share cloudflare proxy helpers"
 - Modify: `docs/agents/front.md`
 - Modify: `docs/agents/server.md`
 
-- [ ] **Step 1: Update architecture docs**
+- [x] **Step 1: Update architecture docs**
 
 In `docs/development/architecture.md`, update:
 
@@ -1428,7 +1458,7 @@ In `docs/development/architecture.md`, update:
 - application HTTP dependency is forbidden
 - BFF shared proxy helper owns trusted header forwarding policy
 
-- [ ] **Step 2: Update agent guides**
+- [x] **Step 2: Update agent guides**
 
 In `docs/agents/front.md`, remove language allowing documented legacy `shared/ui` exceptions.
 
@@ -1438,7 +1468,7 @@ In `docs/agents/server.md`, add:
 Application services must not throw Spring web/http exceptions. Use feature application errors and map them in adapter.in.web.
 ```
 
-- [ ] **Step 3: Run full verification**
+- [x] **Step 3: Run full verification**
 
 Run:
 
@@ -1453,7 +1483,7 @@ git diff --check -- docs/development/architecture.md docs/development/test-guide
 
 Expected: all pass.
 
-- [ ] **Step 4: Commit documentation**
+- [x] **Step 4: Commit documentation**
 
 Run:
 
@@ -1461,6 +1491,12 @@ Run:
 git add docs/development/architecture.md docs/development/test-guide.md docs/agents/front.md docs/agents/server.md
 git commit -m "docs: document architecture refactor"
 ```
+
+COMPACT CHECKPOINT Task 10 - Full Verification And Documentation Updates:
+Acceptance criteria completed: architecture/test/agent docs updated for paged contracts, frontend boundary cleanup, server application HTTP boundary, DB query/EXPLAIN guardrails, and Cloudflare proxy helper policy; docs implementation committed as `59fa99c`, docs accuracy follow-up as `f41c90e`; full verification passed. Changed files: `docs/development/architecture.md`, `docs/development/test-guide.md`, `docs/agents/front.md`, `docs/agents/server.md`, and this plan document. Key decisions: architecture docs describe common cursor-paged fields (`items`, `nextCursor`) while allowing endpoint-specific fields such as notification `unreadCount`; `/api/host/members/pending-approvals` is documented as a host cursor-paged list; BFF docs state route functions compose trusted headers using shared `_shared/proxy.ts` helpers rather than overstating that all request header construction lives in the helper. Contracts/API/state/test expectations: scoped archive, notes, feedback, host, and notification list endpoints no longer document legacy array contracts; `shared/ui` must not import app/page/feature code; host `ui` is the public presentation surface; application services must use feature errors mapped in `adapter.in.web`, not Spring web/http exceptions; BFF secret remains server-only. Reviews: first docs spec review found missing pending approvals documentation, incomplete notification page shape, and overstated BFF helper ownership; follow-up `f41c90e` fixed all; final docs re-review found no issues; docs quality/release review found no issues. Verification: `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed with 48 files and 621 tests; `pnpm --dir front build` passed; `pnpm --dir front test:e2e` passed with 22 tests; `git diff --check -- docs/development/architecture.md docs/development/test-guide.md docs/agents/front.md docs/agents/server.md` passed; reviewers also ran targeted docs safety/link scans and relevant architecture/BFF/frontend boundary tests. Remaining risks after Task 10: frontend test/e2e stderr warnings were still present and were handled in the warning-risk follow-up checkpoint below. Next first action: resolve remaining warning risks. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions left running; Playwright-managed web servers exited with `pnpm --dir front test:e2e`; completed Task 10 subagents closed; no session-owned ports open.
+
+COMPACT CHECKPOINT Follow-up - Resolve Remaining Warning Risks:
+Acceptance criteria completed: React Router `HydrateFallback` warning removed by adding hydration fallbacks to loader parent app/host routes and adding router coverage; jsdom navigation warning removed while preserving `PublicFooter` default anchor reset-scroll coverage; Playwright `NO_COLOR`/`FORCE_COLOR` child-process warning removed by clearing `NO_COLOR` in `playwright.config.ts` before Playwright starts workers/web servers. Changed files: `front/src/app/router.tsx`, `front/tests/unit/spa-router.test.tsx`, `front/tests/unit/public-navigation-auth.test.tsx`, `front/playwright.config.ts`, `front/package.json` follow-up reversion to the standard Playwright script, and this plan document. Key decisions: hydration fallback coverage is enforced for every loader route; the footer test cancels default document navigation at document bubble phase so the component default click handler still runs but jsdom does not attempt unsupported full navigation; Playwright config owns E2E child-process env cleanup instead of a POSIX-only package script. Contracts/API/state/test expectations: no runtime API contract changed; route loading UI is available for loader parent routes; `test:e2e` remains `playwright test`; full unit/e2e output no longer includes the previously listed non-failing warnings in the normal repo command environment. Reviews: first warning-fix review found the POSIX package-script cleanup was incomplete for pre-conflicted parent env and that the footer test had stopped covering the default anchor path; follow-up fixed both. Verification: focused `pnpm --dir front exec vitest run tests/unit/spa-router.test.tsx tests/unit/public-navigation-auth.test.tsx` passed with 37 tests and no React Router/jsdom warning output; `pnpm --dir front test:e2e --list` passed with no color warning in the normal repo command environment; `pnpm --dir front lint` passed; `pnpm --dir front test` passed with 48 files and 622 tests and no prior stderr warnings; `pnpm --dir front build` passed; `pnpm --dir front test:e2e` passed with 22 tests and no prior stderr warnings; `git diff --check` passed. Remaining risks: none known in repo-controlled commands; a caller that starts `pnpm` itself with both `NO_COLOR` and `FORCE_COLOR` already set can still make pnpm emit a Node warning before repository code is loaded, which is outside repo runtime control. Next first action: final status summary only. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions left running; Playwright-managed web servers exited; completed warning-risk subagents closed; no session-owned ports open.
 
 ## Final Completion Criteria
 

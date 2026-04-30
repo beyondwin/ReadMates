@@ -15,6 +15,7 @@ import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.port.`in`.ManageMemberNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.junit.jupiter.api.Test
@@ -44,6 +45,7 @@ class MemberNotificationControllerTest {
             status { isOk() }
             jsonPath("$.unreadCount") { value(1) }
             jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009101") }
+            jsonPath("$.nextCursor") { value("next-member-notifications") }
             jsonPath("$.items[0].eventType") { value("NEXT_BOOK_PUBLISHED") }
             jsonPath("$.items[0].title") { value("다음 책이 공개되었습니다") }
             jsonPath("$.items[0].body") { value("새로운 책을 확인해 주세요.") }
@@ -98,10 +100,11 @@ private val resolveClubContextUseCase = object : ResolveClubContextUseCase {
 }
 
 private val memberNotificationsUseCase = object : ManageMemberNotificationsUseCase {
-    override fun list(member: CurrentMember, limit: Int): MemberNotificationList =
+    override fun list(member: CurrentMember, pageRequest: PageRequest): MemberNotificationList =
         MemberNotificationList(
             items = listOf(notification),
             unreadCount = 1,
+            nextCursor = "next-member-notifications",
         )
 
     override fun unreadCount(member: CurrentMember): Int = 1

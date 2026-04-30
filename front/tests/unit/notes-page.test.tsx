@@ -5,18 +5,21 @@ import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archi
 import type { FeedFilter } from "@/features/archive/model/notes-feed-model";
 import { notesFeedLoader } from "@/features/archive/route/notes-feed-data";
 import NotesPage from "@/src/pages/notes";
+import type { PagedResponse } from "@/shared/model/paging";
 
 const { notesFeedPageMock } = vi.hoisted(() => ({
   notesFeedPageMock: vi.fn(),
 }));
 
 type NotesFeedProps = {
-  items: NoteFeedItem[];
-  noteSessions: NoteSessionItem[];
+  items: PagedResponse<NoteFeedItem>;
+  noteSessions: PagedResponse<NoteSessionItem>;
   selectedSessionId: string | null;
   selectedSession: NoteSessionItem | null;
   initialFilter?: FeedFilter;
   onFilterChange?: (filter: FeedFilter) => void;
+  onLoadMoreItems?: () => Promise<void>;
+  onLoadMoreNoteSessions?: () => Promise<void>;
 };
 
 vi.mock("@/features/archive/ui/notes-feed-page", () => ({
@@ -75,6 +78,23 @@ const feedItems: NoteFeedItem[] = [
   },
 ];
 
+const olderFeedItems: NoteFeedItem[] = [
+  {
+    sessionId: "session-older",
+    sessionNumber: 2,
+    bookTitle: "오래된 세션",
+    date: "2025-12-17",
+    authorName: "이멤버5",
+    authorShortName: "수",
+    kind: "QUESTION",
+    text: "첫 페이지 밖 세션의 기록입니다.",
+  },
+];
+
+function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
+  return { items, nextCursor };
+}
+
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -98,9 +118,11 @@ function installRouterRequestShim() {
 function mockNotesBff({
   sessions = noteSessions,
   feed = feedItems,
+  feedsBySession = {},
 }: {
   sessions?: NoteSessionItem[];
   feed?: NoteFeedItem[];
+  feedsBySession?: Record<string, NoteFeedItem[]>;
 } = {}) {
   vi.stubGlobal(
     "fetch",
@@ -124,12 +146,14 @@ function mockNotesBff({
         );
       }
 
-      if (url === "/api/bff/api/notes/sessions") {
-        return Promise.resolve(jsonResponse(sessions));
+      if (url === "/api/bff/api/notes/sessions?limit=30") {
+        return Promise.resolve(jsonResponse(pageOf(sessions)));
       }
 
       if (url.startsWith("/api/bff/api/notes/feed?sessionId=")) {
-        return Promise.resolve(jsonResponse(feed));
+        const requestUrl = new URL(url, "http://readmates.test");
+        const sessionId = requestUrl.searchParams.get("sessionId") ?? "";
+        return Promise.resolve(jsonResponse(pageOf(feedsBySession[sessionId] ?? feed)));
       }
 
       return Promise.reject(new Error(`Unexpected BFF path: ${url}`));
@@ -185,17 +209,19 @@ describe("NotesPage", () => {
     const props = await latestNotesProps();
 
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions,
+      items: pageOf(feedItems),
+      noteSessions: pageOf(noteSessions),
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
     expect(screen.getByTestId("notes-feed")).toHaveTextContent("session-6");
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-6",
+      "/api/bff/api/notes/feed?sessionId=session-6&limit=60",
       expect.any(Object),
     );
   });
@@ -206,18 +232,20 @@ describe("NotesPage", () => {
     renderNotesPage();
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-6",
+      "/api/bff/api/notes/feed?sessionId=session-6&limit=60",
       expect.any(Object),
     );
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions,
+      items: pageOf(feedItems),
+      noteSessions: pageOf(noteSessions),
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
   });
 
@@ -239,25 +267,61 @@ describe("NotesPage", () => {
     expect(props.initialFilter).toBe("all");
   });
 
-  it("falls back invalid sessionId to the first session with records", async () => {
-    mockNotesBff();
+  it("keeps a requested sessionId outside the first sessions page instead of selecting a different session", async () => {
+    mockNotesBff({ feedsBySession: { "session-older": olderFeedItems } });
 
-    renderNotesPage("missing-session");
+    renderNotesPage("session-older");
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-6",
+      "/api/bff/api/notes/feed?sessionId=session-older&limit=60",
       expect.any(Object),
     );
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions,
-      selectedSessionId: "session-6",
-      selectedSession: noteSessions[1],
+      items: pageOf(olderFeedItems),
+      noteSessions: pageOf(noteSessions),
+      selectedSessionId: "session-older",
+      selectedSession: {
+        sessionId: "session-older",
+        sessionNumber: 2,
+        bookTitle: "오래된 세션",
+        date: "2025-12-17",
+        questionCount: 1,
+        oneLinerCount: 0,
+        longReviewCount: 0,
+        highlightCount: 0,
+        totalCount: 1,
+      },
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
+  });
+
+  it("keeps an empty requested sessionId outside the first sessions page instead of selecting a different session", async () => {
+    mockNotesBff({ feedsBySession: { "session-empty": [] } });
+
+    renderNotesPage("session-empty");
+    const props = await latestNotesProps();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/bff/api/notes/feed?sessionId=session-empty&limit=60",
+      expect.any(Object),
+    );
+    expect(props).toEqual({
+      items: pageOf([]),
+      noteSessions: pageOf(noteSessions),
+      selectedSessionId: "session-empty",
+      selectedSession: null,
+      initialFilter: "all",
+      onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
+    });
+    expect(screen.getByTestId("notes-feed")).toHaveTextContent("session-empty");
   });
 
   it("falls back to the first session when every session has zero records", async () => {
@@ -275,18 +339,20 @@ describe("NotesPage", () => {
     renderNotesPage();
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-7",
+      "/api/bff/api/notes/feed?sessionId=session-7&limit=60",
       expect.any(Object),
     );
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions: zeroCountSessions,
+      items: pageOf(feedItems),
+      noteSessions: pageOf(zeroCountSessions),
       selectedSessionId: "session-7",
       selectedSession: zeroCountSessions[0],
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
   });
 
@@ -297,14 +363,16 @@ describe("NotesPage", () => {
     const props = await latestNotesProps();
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(props).toEqual({
-      items: [],
-      noteSessions: [],
+      items: pageOf([]),
+      noteSessions: pageOf([]),
       selectedSessionId: null,
       selectedSession: null,
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
   });
 });

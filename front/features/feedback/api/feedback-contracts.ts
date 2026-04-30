@@ -1,3 +1,19 @@
+import type { PagedResponse } from "@/shared/model/paging";
+
+export type FeedbackDocumentListItem = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor?: string | null;
+  bookImageUrl?: string | null;
+  date: string;
+  fileName: string;
+  uploadedAt: string;
+};
+
+export type FeedbackDocumentListPage = PagedResponse<FeedbackDocumentListItem>;
+
 export type FeedbackDocumentResponse = {
   sessionId: string;
   sessionNumber: number;

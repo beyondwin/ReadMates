@@ -81,6 +81,7 @@ data class StoredFeedbackDocumentResult(
 )
 
 data class StoredFeedbackDocumentListResult(
+    val documentId: UUID,
     val sessionId: UUID,
     val sessionNumber: Int,
     val bookTitle: String,

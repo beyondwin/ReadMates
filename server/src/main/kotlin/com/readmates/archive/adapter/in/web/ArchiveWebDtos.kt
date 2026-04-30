@@ -2,6 +2,11 @@ package com.readmates.archive.adapter.`in`.web
 
 import com.fasterxml.jackson.annotation.JsonProperty
 
+data class CursorPageResponse<T>(
+    val items: List<T>,
+    val nextCursor: String?,
+)
+
 data class ArchiveSessionItem(
     val sessionId: String,
     val sessionNumber: Int,

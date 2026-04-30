@@ -1,5 +1,7 @@
 package com.readmates.archive.application.service
 
+import com.readmates.archive.application.ArchiveApplicationError
+import com.readmates.archive.application.ArchiveApplicationException
 import com.readmates.archive.application.port.`in`.SaveMemberArchiveLongReviewCommand
 import com.readmates.archive.application.port.`in`.SaveMemberArchiveLongReviewResult
 import com.readmates.archive.application.port.`in`.SaveMemberArchiveLongReviewUseCase
@@ -7,10 +9,8 @@ import com.readmates.archive.application.port.out.MemberArchiveReviewWritePort
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AccessDeniedException
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 
 @Service
 class MemberArchiveReviewService(
@@ -24,11 +24,11 @@ class MemberArchiveReviewService(
             throw AccessDeniedException("Approved active membership is required")
         }
         if (command.body.isBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Review body is required")
+            throw ArchiveApplicationException(ArchiveApplicationError.REVIEW_BODY_REQUIRED, "Review body is required")
         }
 
         val result = writePort.saveLongReview(command)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Archive session not found")
+            ?: throw ArchiveApplicationException(ArchiveApplicationError.SESSION_NOT_FOUND, "Archive session not found")
 
         if (result.newlyPublic) {
             recordNotificationEventUseCase.recordReviewPublished(

@@ -62,10 +62,19 @@ type HostNotificationsPageProps = {
   events: HostNotificationEventItem[];
   deliveries: HostNotificationDeliveryItem[];
   audit: NotificationTestMailAuditItem[];
+  hasMoreEvents?: boolean;
+  hasMoreDeliveries?: boolean;
+  hasMoreAudit?: boolean;
+  isLoadingMoreEvents?: boolean;
+  isLoadingMoreDeliveries?: boolean;
+  isLoadingMoreAudit?: boolean;
   onProcess: () => Promise<unknown>;
   onRetry: (id: string) => Promise<unknown>;
   onRestore: (id: string) => Promise<unknown>;
   onSendTestMail: (request: SendNotificationTestMailRequest) => Promise<unknown>;
+  onLoadMoreEvents?: () => Promise<unknown>;
+  onLoadMoreDeliveries?: () => Promise<unknown>;
+  onLoadMoreAudit?: () => Promise<unknown>;
   isRefreshing?: boolean;
 };
 
@@ -116,10 +125,19 @@ export function HostNotificationsPage({
   events,
   deliveries,
   audit,
+  hasMoreEvents = false,
+  hasMoreDeliveries = false,
+  hasMoreAudit = false,
+  isLoadingMoreEvents = false,
+  isLoadingMoreDeliveries = false,
+  isLoadingMoreAudit = false,
   onProcess,
   onRetry,
   onRestore,
   onSendTestMail,
+  onLoadMoreEvents,
+  onLoadMoreDeliveries,
+  onLoadMoreAudit,
   isRefreshing = false,
 }: HostNotificationsPageProps) {
   const [activeLedgerTab, setActiveLedgerTab] = useState<NotificationLedgerTab>("events");
@@ -336,6 +354,12 @@ export function HostNotificationsPage({
                   }}
                 />
               )}
+              {activeLedgerTab === "events" && hasMoreEvents && onLoadMoreEvents ? (
+                <LoadMoreButton loading={isLoadingMoreEvents} onLoadMore={onLoadMoreEvents} />
+              ) : null}
+              {activeLedgerTab === "deliveries" && hasMoreDeliveries && onLoadMoreDeliveries ? (
+                <LoadMoreButton loading={isLoadingMoreDeliveries} onLoadMore={onLoadMoreDeliveries} />
+              ) : null}
             </section>
           </section>
 
@@ -399,6 +423,9 @@ export function HostNotificationsPage({
                   테스트 발송 기록이 없습니다.
                 </p>
               )}
+              {hasMoreAudit && onLoadMoreAudit ? (
+                <LoadMoreButton loading={isLoadingMoreAudit} onLoadMore={onLoadMoreAudit} />
+              ) : null}
             </div>
           </section>
         </div>
@@ -414,6 +441,20 @@ export function HostNotificationsPage({
         />
       ) : null}
     </main>
+  );
+}
+
+function LoadMoreButton({ loading, onLoadMore }: { loading: boolean; onLoadMore: () => Promise<unknown> }) {
+  return (
+    <button
+      type="button"
+      className="btn btn-quiet btn-sm"
+      disabled={loading}
+      style={{ marginTop: 12 }}
+      onClick={() => void onLoadMore()}
+    >
+      {loading ? "불러오는 중" : "더 보기"}
+    </button>
   );
 }
 

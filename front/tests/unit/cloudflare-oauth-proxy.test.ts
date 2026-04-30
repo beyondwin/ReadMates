@@ -43,6 +43,9 @@ describe("Cloudflare OAuth proxy functions", () => {
             Cookie: "readmates_session=existing",
             "CF-Connecting-IP": "203.0.113.10",
             "User-Agent": "vitest",
+            "X-Readmates-Bff-Secret": "attacker",
+            "X-Readmates-Client-IP": "attacker",
+            "X-Readmates-Club-Host": "attacker.example.test",
           },
         }),
         "google",
@@ -64,6 +67,7 @@ describe("Cloudflare OAuth proxy functions", () => {
     expect((init.headers as Headers).get("x-forwarded-proto")).toBe("https");
     expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
     expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("203.0.113.10");
+    expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe("readmates.pages.dev");
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("https://accounts.google.com/o/oauth2/v2/auth");
     expect(response.headers.get("set-cookie")).toBe("OAUTH2_STATE=state; Path=/; HttpOnly");
@@ -110,6 +114,9 @@ describe("Cloudflare OAuth proxy functions", () => {
           headers: {
             Cookie: "OAUTH2_STATE=state",
             "X-Forwarded-For": "198.51.100.10, 198.51.100.11",
+            "X-Readmates-Bff-Secret": "attacker",
+            "X-Readmates-Client-IP": "attacker",
+            "X-Readmates-Club-Host": "attacker.example.test",
           },
         }),
         "google",
@@ -130,6 +137,7 @@ describe("Cloudflare OAuth proxy functions", () => {
     expect((init.headers as Headers).get("x-forwarded-proto")).toBe("https");
     expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
     expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("198.51.100.10");
+    expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe("readmates.pages.dev");
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("https://readmates.pages.dev/app");
     expect(response.headers.get("set-cookie")).toBe("readmates_session=issued; Path=/; HttpOnly");

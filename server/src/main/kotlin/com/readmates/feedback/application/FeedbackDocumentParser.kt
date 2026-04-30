@@ -1,8 +1,5 @@
 package com.readmates.feedback.application
 
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
-
 data class ParsedFeedbackDocument(
     val title: String,
     val subtitle: String,
@@ -312,7 +309,7 @@ class FeedbackDocumentParser {
     }
 
     private fun invalidTemplate(): Nothing =
-        throw ResponseStatusException(HttpStatus.BAD_REQUEST, INVALID_TEMPLATE_MESSAGE)
+        throw FeedbackDocumentException(FeedbackDocumentError.INVALID_TEMPLATE, INVALID_TEMPLATE_MESSAGE)
 
     private companion object {
         private const val MARKER = "<!-- readmates-feedback:v1 -->"

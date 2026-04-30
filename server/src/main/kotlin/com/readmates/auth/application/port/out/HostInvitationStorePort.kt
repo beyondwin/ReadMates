@@ -2,6 +2,8 @@ package com.readmates.auth.application.port.out
 
 import com.readmates.auth.domain.InvitationStatus
 import com.readmates.auth.domain.MembershipRole
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -50,7 +52,7 @@ interface HostInvitationStorePort {
     fun activeMemberCountByEmail(clubId: UUID, email: String): Int
     fun revokeLivePendingInvitation(clubId: UUID, email: String)
     fun createInvitation(command: CreateHostInvitationCommand)
-    fun listHostInvitations(clubId: UUID): List<HostInvitationListRow>
+    fun listHostInvitations(clubId: UUID, pageRequest: PageRequest): CursorPage<HostInvitationListRow>
     fun findHostInvitation(clubId: UUID, invitationId: UUID): HostInvitationListRow?
     fun revokePendingInvitation(clubId: UUID, invitationId: UUID)
     fun findInvitationByTokenHash(tokenHash: String, forUpdate: Boolean): InvitationTokenRow?

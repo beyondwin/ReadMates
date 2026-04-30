@@ -1,11 +1,18 @@
-import { useCallback } from "react";
-import { useLoaderData, useRevalidator } from "react-router-dom";
-import { leaveMembership, saveNotificationPreferences, updateMyProfile } from "@/features/archive/api/archive-api";
+import { useCallback, useState } from "react";
+import { useLoaderData, useParams, useRevalidator } from "react-router-dom";
+import {
+  fetchMyFeedbackDocuments,
+  leaveMembership,
+  saveNotificationPreferences,
+  updateMyProfile,
+} from "@/features/archive/api/archive-api";
 import type { MemberProfileErrorCode, MemberProfileResponse } from "@/features/archive/api/archive-contracts";
 import { profileSaveErrorMessage } from "@/features/archive/model/archive-model";
 import type { MyPageRouteData } from "@/features/archive/route/my-page-data";
 import type { LogoutControlComponent } from "@/features/archive/ui/my-page";
 import MyPage from "@/features/archive/ui/my-page";
+
+const MY_PAGE_REPORTS_NEXT_PAGE_LIMIT = 30;
 
 async function submitLeaveMembership() {
   const response = await leaveMembership();
@@ -40,7 +47,11 @@ export function MyPageRoute({
   onProfileUpdated: () => Promise<void>;
 }) {
   const data = useLoaderData() as MyPageRouteData;
+  const [routeState, setRouteState] = useState({ source: data, routeData: data });
+  const routeData = routeState.source === data ? routeState.routeData : data;
+  const { clubSlug } = useParams();
   const revalidator = useRevalidator();
+
   const submitProfileUpdate = useCallback(
     async (displayName: string): Promise<MemberProfileResponse> => {
       if (!canEditProfile) {
@@ -60,17 +71,41 @@ export function MyPageRoute({
     },
     [canEditProfile, onProfileUpdated, revalidator],
   );
+  const loadMoreReports = useCallback(async () => {
+    const cursor = routeData.reports.nextCursor;
+
+    if (!cursor) {
+      return;
+    }
+
+    const nextPage = await fetchMyFeedbackDocuments(clubSlug ? { clubSlug } : undefined, { limit: MY_PAGE_REPORTS_NEXT_PAGE_LIMIT, cursor });
+    setRouteState((current) => {
+      const currentData = current.source === data ? current.routeData : data;
+
+      return {
+        source: data,
+        routeData: {
+          ...currentData,
+          reports: {
+            items: [...currentData.reports.items, ...nextPage.items],
+            nextCursor: nextPage.nextCursor,
+          },
+        },
+      };
+    });
+  }, [clubSlug, data, routeData.reports.nextCursor]);
 
   return (
     <MyPage
-      {...data}
+      {...routeData}
       LogoutButtonComponent={LogoutButtonComponent}
       onLeaveMembership={submitLeaveMembership}
       canEditProfile={canEditProfile}
       onUpdateProfile={submitProfileUpdate}
-      notificationPreferences={data.notificationPreferences}
+      notificationPreferences={routeData.notificationPreferences}
       onSaveNotificationPreferences={saveNotificationPreferences}
-      canManageNotificationPreferences={data.canManageNotificationPreferences}
+      canManageNotificationPreferences={routeData.canManageNotificationPreferences}
+      onLoadMoreReports={loadMoreReports}
     />
   );
 }

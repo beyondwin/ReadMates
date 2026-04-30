@@ -1,5 +1,7 @@
 package com.readmates.club.application.service
 
+import com.readmates.club.application.PlatformAdminError
+import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.CreateClubDomainCommand
 import com.readmates.club.application.model.PlatformAdminDashboardSummary
 import com.readmates.club.application.model.PlatformAdminClubDomain
@@ -14,9 +16,7 @@ import com.readmates.club.application.port.out.UpdateClubDomainProvisioningPort
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.AccessDeniedException
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Locale
@@ -53,7 +53,10 @@ class PlatformAdminService(
         val hostname = normalizeHostname(command.hostname)
         validateHostname(hostname)
         if (command.isPrimary) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Pending club domains cannot become primary")
+            throw PlatformAdminException(
+                PlatformAdminError.INVALID_DOMAIN,
+                "Pending club domains cannot become primary",
+            )
         }
 
         return createClubDomainPort.createClubDomain(
@@ -73,9 +76,12 @@ class PlatformAdminService(
         }
 
         val domain = loadClubDomainProvisioningPort.loadClubDomain(domainId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club domain not found")
+            ?: throw PlatformAdminException(PlatformAdminError.CLUB_DOMAIN_NOT_FOUND, "Club domain not found")
         if (domain.status == ClubDomainStatus.DISABLED) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Disabled club domain cannot be checked")
+            throw PlatformAdminException(
+                PlatformAdminError.CLUB_DOMAIN_CONFLICT,
+                "Disabled club domain cannot be checked",
+            )
         }
 
         val now = OffsetDateTime.now(ZoneOffset.UTC)
@@ -105,7 +111,10 @@ class PlatformAdminService(
             throw invalidHostname()
         }
         if (hostname == PAGES_DEV_FALLBACK_HOSTNAME) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Platform fallback hostname cannot be a club domain")
+            throw PlatformAdminException(
+                PlatformAdminError.INVALID_DOMAIN,
+                "Platform fallback hostname cannot be a club domain",
+            )
         }
         if (
             hostname.contains("://") ||
@@ -126,8 +135,8 @@ class PlatformAdminService(
         }
     }
 
-    private fun invalidHostname(): ResponseStatusException =
-        ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid domain hostname")
+    private fun invalidHostname(): PlatformAdminException =
+        PlatformAdminException(PlatformAdminError.INVALID_DOMAIN, "Invalid domain hostname")
 
     companion object {
         private const val PAGES_DEV_FALLBACK_HOSTNAME = "readmates.pages.dev"

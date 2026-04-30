@@ -7,6 +7,9 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -123,19 +126,34 @@ class JdbcNotificationTestMailAuditAdapter(
         ).single()
     }
 
-    override fun listTestMailAudit(clubId: UUID): List<NotificationTestMailAuditItem> =
-        jdbcTemplate().query(
+    override fun listTestMailAudit(clubId: UUID, pageRequest: PageRequest): CursorPage<NotificationTestMailAuditItem> {
+        val cursor = TestMailAuditCreatedAtDescCursor.from(pageRequest.cursor)
+        val rows = jdbcTemplate().query(
             """
             select id, recipient_masked_email, status, last_error, created_at
             from notification_test_mail_audit
             where club_id = ?
-            order by created_at desc
+              and (
+                ? is null
+                or created_at < ?
+                or (created_at = ? and id < ?)
+              )
+            order by created_at desc, id desc
             limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
             clubId.dbString(),
-            TEST_MAIL_AUDIT_LIMIT,
+            cursor?.createdAt,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.id,
+            pageRequest.limit.coerceAtMost(TEST_MAIL_AUDIT_LIMIT) + 1,
         )
+        val limit = pageRequest.limit.coerceAtMost(TEST_MAIL_AUDIT_LIMIT)
+        return pageFromRows(rows, limit) { row ->
+            testMailAuditCreatedAtDescCursor(row.createdAt, row.id.toString())
+        }
+    }
 
     private fun ResultSet.toNotificationTestMailAuditItem(): NotificationTestMailAuditItem =
         NotificationTestMailAuditItem(
@@ -149,4 +167,34 @@ class JdbcNotificationTestMailAuditAdapter(
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateProvider.ifAvailable
             ?: throw IllegalStateException("Notification test mail audit storage is unavailable")
+}
+
+private fun testMailAuditCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =
+    CursorCodec.encode(
+        mapOf(
+            "createdAt" to createdAt.toString(),
+            "id" to id,
+        ),
+    )
+
+private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    val visibleRows = rows.take(limit)
+    return CursorPage(
+        items = visibleRows,
+        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+    )
+}
+
+private data class TestMailAuditCreatedAtDescCursor(
+    val createdAt: OffsetDateTime,
+    val id: String,
+) {
+    companion object {
+        fun from(cursor: Map<String, String>): TestMailAuditCreatedAtDescCursor? {
+            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                ?: return null
+            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+            return TestMailAuditCreatedAtDescCursor(createdAt, id)
+        }
+    }
 }

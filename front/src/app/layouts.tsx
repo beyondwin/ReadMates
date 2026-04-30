@@ -5,21 +5,36 @@ import { useAuth } from "@/src/app/auth-state";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { authMePath } from "@/shared/auth/member-app-loader";
 import {
+  archiveReportReturnTarget,
+  archiveSessionsReturnTarget,
+  publicRecordsReturnTarget,
+  readPublicReadmatesReturnTarget,
+  readReadmatesReturnTarget,
   readReadmatesWorkspaceState,
+  readmatesReturnState,
   readStoredReadmatesMobileWorkspace,
   rememberReadmatesMobileWorkspace,
   resetReadmatesNavigationScroll,
   type ReadmatesMobileWorkspace,
 } from "@/src/app/route-continuity";
+import { Link } from "@/src/app/router-link";
 import { readmatesFetch } from "@/shared/api/client";
 import { PublicUrlPolicyHead } from "@/features/public/ui/public-url-policy-head";
 import { canUseHostApp } from "@/shared/auth/member-app-access";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 import { PublicFooter } from "@/shared/ui/public-footer";
-import { PublicMobileHeader } from "@/shared/ui/public-mobile-header";
 import { TopNav } from "@/shared/ui/top-nav";
 import { usableJoinedClubs } from "@/features/club-selection/model/club-entry";
+
+const readmatesNavigationContinuity = {
+  archiveReportReturnTarget,
+  archiveSessionsReturnTarget,
+  publicRecordsReturnTarget,
+  readPublicReadmatesReturnTarget,
+  readReadmatesReturnTarget,
+  readmatesReturnState,
+};
 
 function RouteOutlet() {
   const location = useLocation();
@@ -140,15 +155,21 @@ export function PublicRouteLayout() {
     <div className="public-shell m-app">
       <PublicUrlPolicyHead path={location.pathname} />
       <div className="desktop-only">
-        <TopNav authenticated={authenticated} publicBasePath={basePath} />
+        <TopNav authenticated={authenticated} publicBasePath={basePath} LinkComponent={Link} />
       </div>
       <div className="mobile-only">
-        <PublicMobileHeader authenticated={authenticated} publicBasePath={basePath} />
+        <MobileHeader
+          variant="guest"
+          authenticated={authenticated}
+          publicBasePath={basePath}
+          LinkComponent={Link}
+          navigationContinuity={readmatesNavigationContinuity}
+        />
       </div>
       <div className="rm-route-stage">
         <RouteOutlet />
       </div>
-      <PublicFooter publicBasePath={basePath} showGuestMemberActions={false} />
+      <PublicFooter publicBasePath={basePath} showGuestMemberActions={false} LinkComponent={Link} />
     </div>
   );
 }
@@ -257,10 +278,22 @@ export function AppRouteLayout() {
   return (
     <div className="app-shell">
       <div className="desktop-only">
-        <TopNav variant={desktopVariant} memberName={memberName} showHostEntry={showHostEntry} appBasePath={basePath} />
+        <TopNav
+          variant={desktopVariant}
+          memberName={memberName}
+          showHostEntry={showHostEntry}
+          appBasePath={basePath}
+          LinkComponent={Link}
+        />
       </div>
       <div className="mobile-only">
-        <MobileHeader variant={mobileVariant} showHostEntry={showHostEntry} appBasePath={basePath} />
+        <MobileHeader
+          variant={mobileVariant}
+          showHostEntry={showHostEntry}
+          appBasePath={basePath}
+          LinkComponent={Link}
+          navigationContinuity={readmatesNavigationContinuity}
+        />
       </div>
       <div className="app-content">
         <ClubSwitcher
@@ -273,10 +306,15 @@ export function AppRouteLayout() {
         <RouteOutlet />
       </div>
       <div className="desktop-only">
-        <PublicFooter showGuestMemberActions={false} />
+        <PublicFooter showGuestMemberActions={false} LinkComponent={Link} />
       </div>
       <div className="mobile-only">
-        <MobileTabBar variant={mobileVariant} currentSessionId={currentSessionId} appBasePath={basePath} />
+        <MobileTabBar
+          variant={mobileVariant}
+          currentSessionId={currentSessionId}
+          appBasePath={basePath}
+          LinkComponent={Link}
+        />
       </div>
     </div>
   );

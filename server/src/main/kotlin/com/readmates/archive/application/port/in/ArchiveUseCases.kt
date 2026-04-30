@@ -5,11 +5,13 @@ import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
 import com.readmates.archive.application.model.MyPageResult
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface ListArchiveSessionsUseCase {
-    fun listArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionResult>
+    fun listArchiveSessions(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<ArchiveSessionResult>
 }
 
 interface GetArchiveSessionDetailUseCase {
@@ -20,11 +22,11 @@ interface GetArchiveSessionDetailUseCase {
 }
 
 interface ListMyArchiveQuestionsUseCase {
-    fun listMyQuestions(currentMember: CurrentMember): List<MyArchiveQuestionResult>
+    fun listMyQuestions(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<MyArchiveQuestionResult>
 }
 
 interface ListMyArchiveReviewsUseCase {
-    fun listMyReviews(currentMember: CurrentMember): List<MyArchiveReviewResult>
+    fun listMyReviews(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<MyArchiveReviewResult>
 }
 
 interface GetMyPageSummaryUseCase {

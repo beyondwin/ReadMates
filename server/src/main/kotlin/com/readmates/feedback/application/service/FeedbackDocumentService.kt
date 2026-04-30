@@ -1,5 +1,7 @@
 package com.readmates.feedback.application.service
 
+import com.readmates.feedback.application.FeedbackDocumentError
+import com.readmates.feedback.application.FeedbackDocumentException
 import com.readmates.feedback.application.FeedbackDocumentParser
 import com.readmates.feedback.application.ParsedFeedbackDocument
 import com.readmates.feedback.application.model.FeedbackDocumentListItemResult
@@ -21,12 +23,12 @@ import com.readmates.feedback.application.port.`in`.UploadHostFeedbackDocumentUs
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.notification.application.service.ReadmatesOperationalMetrics
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
@@ -41,23 +43,30 @@ class FeedbackDocumentService(
     UploadHostFeedbackDocumentUseCase {
     private val parser = FeedbackDocumentParser()
 
-    override fun listMyReadableFeedbackDocuments(currentMember: CurrentMember): List<FeedbackDocumentListItemResult> {
+    override fun listMyReadableFeedbackDocuments(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<FeedbackDocumentListItemResult> {
         requireReadableFeedbackMember(currentMember)
-        return feedbackDocumentStorePort.listLatestReadableDocuments(currentMember).mapNotNull { document ->
-            when {
-                document.title != null -> document.toListItem(document.title)
-                document.legacySourceText != null -> {
-                    val parsedDocument = parseStoredListDocument(document.legacySourceText)
-                    when {
-                        parsedDocument != null -> document.toListItem(parsedDocument.title)
-                        currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
-                        else -> null
+        val page = feedbackDocumentStorePort.listLatestReadableDocuments(currentMember, pageRequest)
+        return CursorPage(
+            items = page.items.mapNotNull { document ->
+                when {
+                    document.title != null -> document.toListItem(document.title)
+                    document.legacySourceText != null -> {
+                        val parsedDocument = parseStoredListDocument(document.legacySourceText)
+                        when {
+                            parsedDocument != null -> document.toListItem(parsedDocument.title)
+                            currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
+                            else -> null
+                        }
                     }
+                    currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
+                    else -> null
                 }
-                currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
-                else -> null
-            }
-        }
+            },
+            nextCursor = page.nextCursor,
+        )
     }
 
     override fun getReadableFeedbackDocument(
@@ -82,7 +91,7 @@ class FeedbackDocumentService(
     ): FeedbackDocumentStatusResult {
         requireHostFeedbackDocumentUploadAccess(currentMember)
         feedbackDocumentStorePort.findReadableSession(currentMember.clubId, sessionId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+            ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
 
         val document = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, sessionId)
         return FeedbackDocumentStatusResult(
@@ -104,7 +113,7 @@ class FeedbackDocumentService(
         return runCatching {
             val parsedDocument = parser.parse(command.sourceText)
             val session = feedbackDocumentStorePort.findSessionForUpload(currentMember.clubId, command.sessionId)
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
             val version = feedbackDocumentStorePort.nextDocumentVersion(currentMember.clubId, command.sessionId)
             feedbackDocumentStorePort.insertDocument(
                 currentMember = currentMember,
@@ -122,7 +131,10 @@ class FeedbackDocumentService(
             )
 
             val storedDocument = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)
-                ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR)
+                ?: throw FeedbackDocumentException(
+                    FeedbackDocumentError.STORAGE_UNAVAILABLE,
+                    "Stored feedback document not found after upload",
+                )
             storedDocument.toResponse(session, parsedDocument)
         }.onSuccess {
             operationalMetrics.feedbackUploadSucceeded()
@@ -139,7 +151,10 @@ class FeedbackDocumentService(
 
     private fun requireReadableFeedbackMember(currentMember: CurrentMember) {
         if (!currentMember.isActive) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Feedback documents require active membership")
+            throw FeedbackDocumentException(
+                FeedbackDocumentError.ACTIVE_MEMBERSHIP_REQUIRED,
+                "Feedback documents require active membership",
+            )
         }
     }
 
@@ -158,7 +173,7 @@ class FeedbackDocumentService(
                 } else {
                     "피드백 문서를 불러올 수 없습니다."
                 }
-                throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, reason)
+                throw FeedbackDocumentException(FeedbackDocumentError.INVALID_STORED_DOCUMENT, reason)
             }
 
     private fun StoredFeedbackDocumentListResult.toListItem(title: String): FeedbackDocumentListItemResult =

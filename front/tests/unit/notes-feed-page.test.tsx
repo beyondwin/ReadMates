@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { MemoryRouter, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archive-contracts";
@@ -9,6 +10,11 @@ import {
   type FeedFilter,
 } from "@/features/archive/model/notes-feed-model";
 import NotesFeedPage from "@/features/archive/ui/notes-feed-page";
+import type { PagedResponse } from "@/shared/model/paging";
+
+function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
+  return { items, nextCursor };
+}
 
 afterEach(cleanup);
 
@@ -173,28 +179,38 @@ const otherSessionItem: NoteFeedItem = {
 type NotesFeedPageRenderOptions = {
   renderItems?: NoteFeedItem[];
   renderNoteSessions?: NoteSessionItem[];
+  renderItemsPage?: PagedResponse<NoteFeedItem>;
+  renderNoteSessionsPage?: PagedResponse<NoteSessionItem>;
   selectedSessionId?: string | null;
   renderSelectedSession?: NoteSessionItem | null;
   initialFilter?: FeedFilter;
   onFilterChange?: (filter: FeedFilter) => void;
+  onLoadMoreItems?: () => Promise<void>;
+  onLoadMoreNoteSessions?: () => Promise<void>;
 };
 
 function notesFeedPageElement({
   renderItems = selectedItems,
   renderNoteSessions = noteSessions,
+  renderItemsPage = pageOf(renderItems),
+  renderNoteSessionsPage = pageOf(renderNoteSessions),
   selectedSessionId = selectedSession.sessionId,
   renderSelectedSession = selectedSession,
   initialFilter,
   onFilterChange,
+  onLoadMoreItems,
+  onLoadMoreNoteSessions,
 }: NotesFeedPageRenderOptions = {}) {
   return (
     <NotesFeedPage
-      items={renderItems}
-      noteSessions={renderNoteSessions}
+      items={renderItemsPage}
+      noteSessions={renderNoteSessionsPage}
       selectedSessionId={selectedSessionId}
       selectedSession={renderSelectedSession}
       initialFilter={initialFilter}
       onFilterChange={onFilterChange}
+      onLoadMoreItems={onLoadMoreItems}
+      onLoadMoreNoteSessions={onLoadMoreNoteSessions}
     />
   );
 }
@@ -271,7 +287,8 @@ describe("NotesFeedPage", () => {
   it("resolves selected sessions without changing fallback order", () => {
     expect(resolveSelectedSession({ noteSessions, selectedSessionId: "session-1", selectedSession: noteSessions[8] })).toBe(noteSessions[8]);
     expect(resolveSelectedSession({ noteSessions, selectedSessionId: "session-8", selectedSession: null })).toBe(noteSessions[1]);
-    expect(resolveSelectedSession({ noteSessions, selectedSessionId: "missing-session", selectedSession: null })).toBe(noteSessions[0]);
+    expect(resolveSelectedSession({ noteSessions, selectedSessionId: "missing-session", selectedSession: null })).toBeNull();
+    expect(resolveSelectedSession({ noteSessions, selectedSessionId: null, selectedSession: null })).toBe(noteSessions[0]);
     expect(resolveSelectedSession({ noteSessions: [], selectedSessionId: null, selectedSession: null })).toBeNull();
   });
 
@@ -329,6 +346,47 @@ describe("NotesFeedPage", () => {
     expect(selectedLink).toHaveAttribute("aria-current", "page");
     expect(selectedLink).toHaveTextContent("선택됨");
     expect(selectedLink).toHaveTextContent("2026.04.15 · 기록 12");
+  });
+
+  it("appends selected-session feed items when 더 보기 is clicked", async () => {
+    const user = userEvent.setup();
+    const nextItem: NoteFeedItem = {
+      sessionId: "session-6",
+      sessionNumber: 6,
+      bookTitle: "가난한 찰리의 연감",
+      date: "2026-04-15",
+      authorName: "한멤버",
+      authorShortName: "한",
+      kind: "QUESTION",
+      text: "추가로 남긴 질문이 기존 기록 뒤에 이어집니다.",
+    };
+
+    function NotesLoadMoreHarness() {
+      const [itemsPage, setItemsPage] = useState<PagedResponse<NoteFeedItem>>(
+        pageOf([selectedItems[0]], "cursor-next"),
+      );
+
+      return notesFeedPageElement({
+        renderItemsPage: itemsPage,
+        onLoadMoreItems: async () => {
+          setItemsPage((current) => ({
+            items: [...current.items, nextItem],
+            nextCursor: null,
+          }));
+        },
+      });
+    }
+
+    render(<NotesLoadMoreHarness />);
+
+    expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
+    expect(screen.queryByText("추가로 남긴 질문이 기존 기록 뒤에 이어집니다.")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "더 보기" }));
+
+    expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
+    expect(screen.getByText("추가로 남긴 질문이 기존 기록 뒤에 이어집니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
   });
 
   it("renders missing note counts as zero", () => {
@@ -649,10 +707,10 @@ describe("NotesFeedPage", () => {
     expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
   });
 
-  it("falls back to the first note session with records when no selected session is supplied", () => {
+  it("falls back to the first note session with records when no selected session id is supplied", () => {
     renderNotesFeedPage({
       renderItems: [],
-      selectedSessionId: "missing-session",
+      selectedSessionId: null,
       renderSelectedSession: null,
     });
 
@@ -662,5 +720,22 @@ describe("NotesFeedPage", () => {
     const selectedLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" });
 
     expect(selectedLink).toHaveAttribute("aria-current", "page");
+  });
+
+  it("does not select a different session when an explicit selected session id is missing", () => {
+    renderNotesFeedPage({
+      renderItems: [],
+      selectedSessionId: "missing-session",
+      renderSelectedSession: null,
+    });
+
+    expect(screen.queryByRole("heading", { name: "다정한 것이 살아남는다" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "읽고 돌아오는 자리" })).toBeInTheDocument();
+    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
+
+    const rail = desktopRail();
+    const firstLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" });
+
+    expect(firstLink).not.toHaveAttribute("aria-current", "page");
   });
 });

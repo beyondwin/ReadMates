@@ -63,13 +63,13 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(6) }
-                jsonPath("$[0].sessionNumber") { value(6) }
-                jsonPath("$[0].bookTitle") { value("가난한 찰리의 연감") }
-                jsonPath("$[0].bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
-                jsonPath("$[0].state") { value("PUBLISHED") }
-                jsonPath("$[5].sessionNumber") { value(1) }
-                jsonPath("$[5].bookTitle") { value("팩트풀니스") }
+                jsonPath("$.items.length()") { value(6) }
+                jsonPath("$.items[0].sessionNumber") { value(6) }
+                jsonPath("$.items[0].bookTitle") { value("가난한 찰리의 연감") }
+                jsonPath("$.items[0].bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
+                jsonPath("$.items[0].state") { value("PUBLISHED") }
+                jsonPath("$.items[5].sessionNumber") { value(1) }
+                jsonPath("$.items[5].bookTitle") { value("팩트풀니스") }
             }
     }
 
@@ -101,13 +101,13 @@ class ArchiveAndNotesDbTest(
             cookie(cookie)
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(hasItems(997, 6)) }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(998))) }
-            jsonPath("$[?(@.sessionNumber == 997)].state") { value(hasItem("CLOSED")) }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(999))) }
-            jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
-            jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
-            jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+            jsonPath("$.items[*].sessionNumber") { value(hasItems(997, 6)) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(998))) }
+            jsonPath("$.items[?(@.sessionNumber == 997)].state") { value(hasItem("CLOSED")) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(999))) }
+            jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
+            jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
+            jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
         }
 
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009992") {
@@ -159,17 +159,18 @@ class ArchiveAndNotesDbTest(
     @Test
     fun `notes feed includes seeded prepared questions`() {
         mockMvc.get("/api/notes/feed") {
+            param("limit", "120")
             with(user("member5@example.com"))
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(greaterThan(0)) }
-                jsonPath("$[0].kind") { value(not(emptyOrNullString())) }
-                jsonPath("$[0].text") { value(not(emptyOrNullString())) }
-                jsonPath("$[*].kind") {
+                jsonPath("$.items.length()") { value(greaterThan(0)) }
+                jsonPath("$.items[0].kind") { value(not(emptyOrNullString())) }
+                jsonPath("$.items[0].text") { value(not(emptyOrNullString())) }
+                jsonPath("$.items[*].kind") {
                     value(hasItems("QUESTION", "ONE_LINE_REVIEW", "HIGHLIGHT"))
                 }
-                jsonPath("$[*].text") {
+                jsonPath("$.items[*].text") {
                     value(
                         hasItem(
                             "10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요? 그리고 왜 그 본능이 유독 자신에게 강하게 나타난다고 생각하나요?",
@@ -186,8 +187,8 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].bookTitle") { exists() }
-                jsonPath("$[0].date") { exists() }
+                jsonPath("$.items[0].bookTitle") { exists() }
+                jsonPath("$.items[0].date") { exists() }
             }
     }
 
@@ -211,17 +212,17 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(6) }
-                jsonPath("$[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
-                jsonPath("$[0].sessionNumber") { value(6) }
-                jsonPath("$[0].bookTitle") { value("가난한 찰리의 연감") }
-                jsonPath("$[0].date") { value("2026-04-15") }
-                jsonPath("$[0].questionCount") { value(6) }
-                jsonPath("$[0].oneLinerCount") { value(3) }
-                jsonPath("$[0].highlightCount") { value(3) }
-                jsonPath(removedJsonPath("$[0].", "check", "inCount")) { doesNotExist() }
-                jsonPath("$[0].totalCount") { value(12) }
-                jsonPath("$[5].sessionNumber") { value(1) }
+                jsonPath("$.items.length()") { value(6) }
+                jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
+                jsonPath("$.items[0].sessionNumber") { value(6) }
+                jsonPath("$.items[0].bookTitle") { value("가난한 찰리의 연감") }
+                jsonPath("$.items[0].date") { value("2026-04-15") }
+                jsonPath("$.items[0].questionCount") { value(6) }
+                jsonPath("$.items[0].oneLinerCount") { value(3) }
+                jsonPath("$.items[0].highlightCount") { value(3) }
+                jsonPath(removedJsonPath("$.items[0].", "check", "inCount")) { doesNotExist() }
+                jsonPath("$.items[0].totalCount") { value(12) }
+                jsonPath("$.items[5].sessionNumber") { value(1) }
             }
     }
 
@@ -245,15 +246,15 @@ class ArchiveAndNotesDbTest(
             with(user("member1@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(90))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(90))) }
         }
 
         mockMvc.get("/api/notes/feed") {
             with(user("member1@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(90))) }
-            jsonPath("$[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(90))) }
+            jsonPath("$.items[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
         }
 
         mockMvc.get("/api/notes/feed") {
@@ -261,8 +262,8 @@ class ArchiveAndNotesDbTest(
             with(user("member1@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$.length()") { value(0) }
-            jsonPath("$[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
+            jsonPath("$.items.length()") { value(0) }
+            jsonPath("$.items[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
         }
     }
 
@@ -275,14 +276,14 @@ class ArchiveAndNotesDbTest(
                 with(user("member1@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$[*].sessionNumber") { value(hasItem(91)) }
+                jsonPath("$.items[*].sessionNumber") { value(hasItem(91)) }
             }
 
             mockMvc.get("/api/notes/sessions") {
                 with(user("member1@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$[*].sessionNumber") { value(not(hasItem(91))) }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(91))) }
             }
 
             jdbcTemplate.update(
@@ -298,7 +299,7 @@ class ArchiveAndNotesDbTest(
                 with(user("member1@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$[*].sessionNumber") { value(hasItem(91)) }
+                jsonPath("$.items[*].sessionNumber") { value(hasItem(91)) }
             }
         } finally {
             cleanupClosedPublicSessionWithQuestion(sessionId)
@@ -424,8 +425,8 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.sessionNumber == 6)].longReviewCount") { value(hasItem(1)) }
-                jsonPath("$[?(@.sessionNumber == 6)].totalCount") { value(hasItem(13)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].longReviewCount") { value(hasItem(1)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].totalCount") { value(hasItem(13)) }
             }
 
         mockMvc.get("/api/notes/feed") {
@@ -434,10 +435,10 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(13) }
-                jsonPath("$[*].kind") { value(hasItem("LONG_REVIEW")) }
-                jsonPath("$[*].text") { value(hasItem(PUBLIC_NOTE_FEED_LONG_REVIEW_TEXT)) }
-                jsonPath("$[*].text") { value(not(hasItem(PRIVATE_NOTE_FEED_LONG_REVIEW_TEXT))) }
+                jsonPath("$.items.length()") { value(13) }
+                jsonPath("$.items[*].kind") { value(hasItem("LONG_REVIEW")) }
+                jsonPath("$.items[*].text") { value(hasItem(PUBLIC_NOTE_FEED_LONG_REVIEW_TEXT)) }
+                jsonPath("$.items[*].text") { value(not(hasItem(PRIVATE_NOTE_FEED_LONG_REVIEW_TEXT))) }
             }
     }
 
@@ -460,13 +461,13 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.sessionNumber == 6)].questionCount") { value(hasItem(4)) }
-                jsonPath("$[?(@.sessionNumber == 6)].oneLinerCount") { value(hasItem(2)) }
-                jsonPath("$[?(@.sessionNumber == 6)].highlightCount") { value(hasItem(2)) }
-                jsonPath(removedJsonPath("$[?(@.sessionNumber == 6)].", "check", "inCount")) {
+                jsonPath("$.items[?(@.sessionNumber == 6)].questionCount") { value(hasItem(4)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].oneLinerCount") { value(hasItem(2)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].highlightCount") { value(hasItem(2)) }
+                jsonPath(removedJsonPath("$.items[?(@.sessionNumber == 6)].", "check", "inCount")) {
                     value(empty<Any>())
                 }
-                jsonPath("$[?(@.sessionNumber == 6)].totalCount") { value(hasItem(8)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].totalCount") { value(hasItem(8)) }
             }
 
         mockMvc.get("/api/notes/feed") {
@@ -475,14 +476,14 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(8) }
-                jsonPath("$[*].text") {
+                jsonPath("$.items.length()") { value(8) }
+                jsonPath("$.items[*].text") {
                     value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?")))
                 }
-                jsonPath("$[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
-                jsonPath("$[*].text") { value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다."))) }
-                jsonPath("$[*].text") { value(not(hasItem("전기의 효용과 정의의 주장을 중심으로 질문을 정리했습니다."))) }
-                jsonPath("$[*].text") { value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")) }
+                jsonPath("$.items[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
+                jsonPath("$.items[*].text") { value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다."))) }
+                jsonPath("$.items[*].text") { value(not(hasItem("전기의 효용과 정의의 주장을 중심으로 질문을 정리했습니다."))) }
+                jsonPath("$.items[*].text") { value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")) }
             }
     }
 
@@ -494,15 +495,15 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(12) }
-                jsonPath("$[*].sessionId") { value(everyItem(equalTo("00000000-0000-0000-0000-000000000306"))) }
-                jsonPath("$[*].kind") {
+                jsonPath("$.items.length()") { value(12) }
+                jsonPath("$.items[*].sessionId") { value(everyItem(equalTo("00000000-0000-0000-0000-000000000306"))) }
+                jsonPath("$.items[*].kind") {
                     value(hasItems("QUESTION", "ONE_LINE_REVIEW", "HIGHLIGHT"))
                 }
-                jsonPath("$[*].kind") {
+                jsonPath("$.items[*].kind") {
                     value(not(hasItem("CHECKIN")))
                 }
-                jsonPath("$[*].text") {
+                jsonPath("$.items[*].text") {
                     value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다."))
                 }
             }
@@ -522,23 +523,25 @@ class ArchiveAndNotesDbTest(
         ],
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
-    fun `session notes feed does not use the recent feed limit`() {
+    fun `notes feed applies cursor page limit to whole feed and session feed`() {
         mockMvc.get("/api/notes/feed") {
             with(user("member5@example.com"))
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(120) }
+                jsonPath("$.items.length()") { value(60) }
+                jsonPath("$.nextCursor") { exists() }
             }
 
         mockMvc.get("/api/notes/feed") {
             param("sessionId", "00000000-0000-0000-0000-000000000306")
+            param("limit", "120")
             with(user("member5@example.com"))
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.length()") { value(137) }
-                jsonPath("$[*].text") { value(hasItem("세션 필터 무제한 하이라이트 125")) }
+                jsonPath("$.items.length()") { value(120) }
+                jsonPath("$.nextCursor") { exists() }
             }
     }
 
@@ -574,7 +577,7 @@ class ArchiveAndNotesDbTest(
             }
                 .andExpect {
                     status { isOk() }
-                    jsonPath("$.length()") { value(0) }
+                    jsonPath("$.items.length()") { value(0) }
                 }
         }
     }
@@ -582,12 +585,13 @@ class ArchiveAndNotesDbTest(
     @Test
     fun `notes feed uses seeded highlight authors`() {
         mockMvc.get("/api/notes/feed") {
+            param("limit", "120")
             with(user("member5@example.com"))
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItems("멤버5", "멤버2", "호스트")) }
-                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
+                jsonPath("$.items[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItems("멤버5", "멤버2", "호스트")) }
+                jsonPath("$.items[?(@.kind == 'HIGHLIGHT')].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
             }
     }
 
@@ -611,10 +615,10 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.kind == 'QUESTION')].authorName") { value(hasItem("새멤버5")) }
-                jsonPath("$[?(@.kind == 'ONE_LINE_REVIEW')].authorName") { value(hasItem("새멤버5")) }
-                jsonPath("$[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItem("새멤버5")) }
-                jsonPath("$[*].authorName") { value(not(hasItem("이멤버5"))) }
+                jsonPath("$.items[?(@.kind == 'QUESTION')].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.items[?(@.kind == 'ONE_LINE_REVIEW')].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.items[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItem("새멤버5")) }
+                jsonPath("$.items[*].authorName") { value(not(hasItem("이멤버5"))) }
             }
 
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
@@ -676,14 +680,14 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.authorName == '탈퇴한 멤버')].kind") {
+                jsonPath("$.items[?(@.authorName == '탈퇴한 멤버')].kind") {
                     value(hasItems("QUESTION", "ONE_LINE_REVIEW", "HIGHLIGHT"))
                 }
-                jsonPath("$[*].kind") {
+                jsonPath("$.items[*].kind") {
                     value(not(hasItem("CHECKIN")))
                 }
-                jsonPath("$[*].authorName") { value(not(hasItem("안멤버1"))) }
-                jsonPath("$[*].authorShortName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.items[*].authorName") { value(not(hasItem("안멤버1"))) }
+                jsonPath("$.items[*].authorShortName") { value(not(hasItem("멤버1"))) }
             }
     }
 
@@ -694,9 +698,9 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].sessionNumber") { exists() }
-                jsonPath("$[0].bookTitle") { exists() }
-                jsonPath("$[0].text") { exists() }
+                jsonPath("$.items[0].sessionNumber") { exists() }
+                jsonPath("$.items[0].bookTitle") { exists() }
+                jsonPath("$.items[0].text") { exists() }
             }
     }
 
@@ -720,10 +724,10 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[*].kind") { value(not(hasItem("ONE_LINE_REVIEW"))) }
-                jsonPath("$[0].kind") { value("LONG_REVIEW") }
-                jsonPath("$[0].bookTitle") { exists() }
-                jsonPath("$[0].text") { value(MY_ARCHIVE_LONG_REVIEW_TEXT) }
+                jsonPath("$.items[*].kind") { value(not(hasItem("ONE_LINE_REVIEW"))) }
+                jsonPath("$.items[0].kind") { value("LONG_REVIEW") }
+                jsonPath("$.items[0].bookTitle") { exists() }
+                jsonPath("$.items[0].text") { value(MY_ARCHIVE_LONG_REVIEW_TEXT) }
             }
     }
 
@@ -747,8 +751,8 @@ class ArchiveAndNotesDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].kind") { value("QUESTION") }
-                jsonPath("$[0].text") { value(LATEST_FEED_QUESTION_TEXT) }
+                jsonPath("$.items[0].kind") { value("QUESTION") }
+                jsonPath("$.items[0].text") { value(LATEST_FEED_QUESTION_TEXT) }
             }
     }
 

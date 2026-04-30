@@ -34,8 +34,10 @@ import { BookCover } from "@/shared/ui/book-cover";
 import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { Link } from "@/features/archive/ui/archive-link";
+import type { PagedResponse } from "@/shared/model/paging";
 
 type ReportActionIconName = "read" | "download";
+type LoadMoreCallback = () => Promise<void>;
 
 export type { ArchiveView };
 
@@ -126,26 +128,38 @@ export default function ArchivePage({
   routePathname,
   routeSearch,
   reviewAuthorName,
+  onLoadMoreSessions,
+  onLoadMoreQuestions,
+  onLoadMoreReviews,
+  onLoadMoreReports,
 }: {
-  sessions: ArchiveSessionItemLike[];
-  questions: ArchiveQuestionItem[];
-  reviews: ArchiveReviewItem[];
-  reports: FeedbackDocumentListItem[];
+  sessions: PagedResponse<ArchiveSessionItemLike>;
+  questions: PagedResponse<ArchiveQuestionItem>;
+  reviews: PagedResponse<ArchiveReviewItem>;
+  reports: PagedResponse<FeedbackDocumentListItem>;
   initialView?: ArchiveView;
   onViewChange?: (view: ArchiveView) => void;
   routePathname?: string;
   routeSearch?: string;
   reviewAuthorName?: string | null;
+  onLoadMoreSessions?: LoadMoreCallback;
+  onLoadMoreQuestions?: LoadMoreCallback;
+  onLoadMoreReviews?: LoadMoreCallback;
+  onLoadMoreReports?: LoadMoreCallback;
 }) {
   const [fallbackView, setFallbackView] = useState<ArchiveView>(initialView);
   const view = onViewChange ? initialView : fallbackView;
-  const archiveSessions = toArchiveSessionRecords(sessions, reports);
+  const sessionItems = sessions.items;
+  const questionItems = questions.items;
+  const reviewItems = reviews.items;
+  const reportItems = reports.items;
+  const archiveSessions = toArchiveSessionRecords(sessionItems, reportItems);
   const archivePathname = routePathname ?? (typeof window === "undefined" ? "" : window.location.pathname);
   const archiveSearch = routeSearch ?? (typeof window === "undefined" ? "" : window.location.search);
 
   useEffect(() => {
     return restoreReadmatesArchiveScroll(archivePathname, archiveSearch);
-  }, [archivePathname, archiveSearch, sessions.length, questions.length, reviews.length, reports.length]);
+  }, [archivePathname, archiveSearch, sessionItems.length, questionItems.length, reviewItems.length, reportItems.length]);
 
   const handleViewChange = (nextView: ArchiveView) => {
     if (onViewChange) {
@@ -163,10 +177,18 @@ export default function ArchivePage({
           view={view}
           setView={handleViewChange}
           sessions={archiveSessions}
-          questions={questions}
-          reviews={reviews}
-          reports={reports}
+          questions={questionItems}
+          reviews={reviewItems}
+          reports={reportItems}
           reviewAuthorName={reviewAuthorName}
+          hasMoreSessions={Boolean(sessions.nextCursor)}
+          hasMoreQuestions={Boolean(questions.nextCursor)}
+          hasMoreReviews={Boolean(reviews.nextCursor)}
+          hasMoreReports={Boolean(reports.nextCursor)}
+          onLoadMoreSessions={onLoadMoreSessions}
+          onLoadMoreQuestions={onLoadMoreQuestions}
+          onLoadMoreReviews={onLoadMoreReviews}
+          onLoadMoreReports={onLoadMoreReports}
         />
       </div>
       <div className="mobile-only">
@@ -174,9 +196,17 @@ export default function ArchivePage({
           view={view}
           setView={handleViewChange}
           sessions={archiveSessions}
-          questions={questions}
-          reviews={reviews}
-          reports={reports}
+          questions={questionItems}
+          reviews={reviewItems}
+          reports={reportItems}
+          hasMoreSessions={Boolean(sessions.nextCursor)}
+          hasMoreQuestions={Boolean(questions.nextCursor)}
+          hasMoreReviews={Boolean(reviews.nextCursor)}
+          hasMoreReports={Boolean(reports.nextCursor)}
+          onLoadMoreSessions={onLoadMoreSessions}
+          onLoadMoreQuestions={onLoadMoreQuestions}
+          onLoadMoreReviews={onLoadMoreReviews}
+          onLoadMoreReports={onLoadMoreReports}
         />
       </div>
     </main>
@@ -191,6 +221,14 @@ function ArchiveDesktop({
   reviews,
   reports,
   reviewAuthorName,
+  hasMoreSessions,
+  hasMoreQuestions,
+  hasMoreReviews,
+  hasMoreReports,
+  onLoadMoreSessions,
+  onLoadMoreQuestions,
+  onLoadMoreReviews,
+  onLoadMoreReports,
 }: {
   view: ArchiveView;
   setView: (view: ArchiveView) => void;
@@ -199,6 +237,14 @@ function ArchiveDesktop({
   reviews: ArchiveReviewItem[];
   reports: FeedbackDocumentListItem[];
   reviewAuthorName?: string | null;
+  hasMoreSessions: boolean;
+  hasMoreQuestions: boolean;
+  hasMoreReviews: boolean;
+  hasMoreReports: boolean;
+  onLoadMoreSessions?: LoadMoreCallback;
+  onLoadMoreQuestions?: LoadMoreCallback;
+  onLoadMoreReviews?: LoadMoreCallback;
+  onLoadMoreReports?: LoadMoreCallback;
 }) {
   return (
     <>
@@ -250,10 +296,30 @@ function ArchiveDesktop({
       <section style={{ padding: "28px 0 80px" }}>
         <div className="container">
           <ArchiveSelectedSection view={view}>
-            {view === "sessions" ? <ArchiveSessions sessions={sessions} /> : null}
-            {view === "reviews" ? <ArchiveReviews reviews={reviews} reviewAuthorName={reviewAuthorName} /> : null}
-            {view === "questions" ? <ArchiveQuestions questions={questions} /> : null}
-            {view === "report" ? <ArchiveReports reports={reports} sessions={sessions} /> : null}
+            {view === "sessions" ? (
+              <>
+                <ArchiveSessions sessions={sessions} />
+                <LoadMoreButton visible={hasMoreSessions} onLoadMore={onLoadMoreSessions} />
+              </>
+            ) : null}
+            {view === "reviews" ? (
+              <>
+                <ArchiveReviews reviews={reviews} reviewAuthorName={reviewAuthorName} />
+                <LoadMoreButton visible={hasMoreReviews} onLoadMore={onLoadMoreReviews} />
+              </>
+            ) : null}
+            {view === "questions" ? (
+              <>
+                <ArchiveQuestions questions={questions} />
+                <LoadMoreButton visible={hasMoreQuestions} onLoadMore={onLoadMoreQuestions} />
+              </>
+            ) : null}
+            {view === "report" ? (
+              <>
+                <ArchiveReports reports={reports} sessions={sessions} />
+                <LoadMoreButton visible={hasMoreReports} onLoadMore={onLoadMoreReports} />
+              </>
+            ) : null}
           </ArchiveSelectedSection>
         </div>
       </section>
@@ -268,6 +334,14 @@ function ArchiveMobile({
   questions,
   reviews,
   reports,
+  hasMoreSessions,
+  hasMoreQuestions,
+  hasMoreReviews,
+  hasMoreReports,
+  onLoadMoreSessions,
+  onLoadMoreQuestions,
+  onLoadMoreReviews,
+  onLoadMoreReports,
 }: {
   view: ArchiveView;
   setView: (view: ArchiveView) => void;
@@ -275,6 +349,14 @@ function ArchiveMobile({
   questions: ArchiveQuestionItem[];
   reviews: ArchiveReviewItem[];
   reports: FeedbackDocumentListItem[];
+  hasMoreSessions: boolean;
+  hasMoreQuestions: boolean;
+  hasMoreReviews: boolean;
+  hasMoreReports: boolean;
+  onLoadMoreSessions?: LoadMoreCallback;
+  onLoadMoreQuestions?: LoadMoreCallback;
+  onLoadMoreReviews?: LoadMoreCallback;
+  onLoadMoreReports?: LoadMoreCallback;
 }) {
   return (
     <div className="rm-archive-mobile m-body">
@@ -322,10 +404,30 @@ function ArchiveMobile({
       </div>
 
       <MobileArchiveSectionIntro view={view} />
-      {view === "sessions" ? <ArchiveMobileSessions sessions={sessions} /> : null}
-      {view === "reviews" ? <ArchiveMobileReviews reviews={reviews} /> : null}
-      {view === "questions" ? <ArchiveMobileQuestions questions={questions} /> : null}
-      {view === "report" ? <ArchiveMobileReports reports={reports} sessions={sessions} /> : null}
+      {view === "sessions" ? (
+        <>
+          <ArchiveMobileSessions sessions={sessions} />
+          <MobileLoadMoreButton visible={hasMoreSessions} onLoadMore={onLoadMoreSessions} />
+        </>
+      ) : null}
+      {view === "reviews" ? (
+        <>
+          <ArchiveMobileReviews reviews={reviews} />
+          <MobileLoadMoreButton visible={hasMoreReviews} onLoadMore={onLoadMoreReviews} />
+        </>
+      ) : null}
+      {view === "questions" ? (
+        <>
+          <ArchiveMobileQuestions questions={questions} />
+          <MobileLoadMoreButton visible={hasMoreQuestions} onLoadMore={onLoadMoreQuestions} />
+        </>
+      ) : null}
+      {view === "report" ? (
+        <>
+          <ArchiveMobileReports reports={reports} sessions={sessions} />
+          <MobileLoadMoreButton visible={hasMoreReports} onLoadMore={onLoadMoreReports} />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -365,6 +467,63 @@ function ArchiveSelectedSection({ view, children }: { view: ArchiveView; childre
         </span>
       </div>
       {children}
+    </section>
+  );
+}
+
+function LoadMoreButton({ visible, onLoadMore }: { visible: boolean; onLoadMore?: LoadMoreCallback }) {
+  const [pending, setPending] = useState(false);
+
+  if (!visible || !onLoadMore) {
+    return null;
+  }
+
+  return (
+    <div style={{ display: "flex", justifyContent: "center", paddingTop: "24px" }}>
+      <button
+        type="button"
+        className="btn btn-quiet"
+        disabled={pending}
+        onClick={async () => {
+          setPending(true);
+          try {
+            await onLoadMore();
+          } finally {
+            setPending(false);
+          }
+        }}
+      >
+        더 보기
+      </button>
+    </div>
+  );
+}
+
+function MobileLoadMoreButton({ visible, onLoadMore }: { visible: boolean; onLoadMore?: LoadMoreCallback }) {
+  const [pending, setPending] = useState(false);
+
+  if (!visible || !onLoadMore) {
+    return null;
+  }
+
+  return (
+    <section className="m-sec" style={{ paddingTop: 0 }}>
+      <button
+        type="button"
+        className="btn btn-quiet"
+        style={{ width: "100%", minHeight: 42 }}
+        disabled={pending}
+        onClick={async () => {
+          setPending(true);
+          try {
+            await onLoadMore();
+          } finally {
+            setPending(false);
+          }
+        }}
+      >
+        더 보기
+      </button>
     </section>
   );
 }

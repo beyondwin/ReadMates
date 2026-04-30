@@ -19,127 +19,7 @@ type BoundaryRuleId =
   | "readmates-api-compat"
   | "feature-components-public";
 
-const legacyBoundaryExceptions = [
-  {
-    sourcePath: "shared/ui/mobile-header.tsx",
-    importPath: "src/app/route-continuity",
-    ruleId: "shared-boundary",
-    reason: "Shared mobile navigation still calls app route continuity.",
-    removeWhen: "Navigation continuity is injected from app/page composition.",
-  },
-  {
-    sourcePath: "shared/ui/mobile-header.tsx",
-    importPath: "src/app/router-link",
-    ruleId: "shared-boundary",
-    reason: "Shared mobile navigation still depends on the app router link.",
-    removeWhen: "Router link is injected or moved to an allowed shared abstraction.",
-  },
-  {
-    sourcePath: "shared/ui/mobile-tab-bar.tsx",
-    importPath: "src/app/router-link",
-    ruleId: "shared-boundary",
-    reason: "Shared mobile tabs still depend on the app router link.",
-    removeWhen: "Router link is injected or moved to an allowed shared abstraction.",
-  },
-  {
-    sourcePath: "shared/ui/public-auth-action.tsx",
-    importPath: "src/app/router-link",
-    ruleId: "shared-boundary",
-    reason: "Shared public auth action still depends on the app router link.",
-    removeWhen: "Router link is injected or moved to an allowed shared abstraction.",
-  },
-  {
-    sourcePath: "shared/ui/public-footer.tsx",
-    importPath: "src/app/router-link",
-    ruleId: "shared-boundary",
-    reason: "Shared public footer still depends on the app router link.",
-    removeWhen: "Router link is injected or moved to an allowed shared abstraction.",
-  },
-  {
-    sourcePath: "shared/ui/top-nav.tsx",
-    importPath: "src/app/router-link",
-    ruleId: "shared-boundary",
-    reason: "Shared top nav still depends on the app router link.",
-    removeWhen: "Router link is injected or moved to an allowed shared abstraction.",
-  },
-  {
-    sourcePath: "features/host/components/host-session-editor.tsx",
-    importPath: "features/host/components/host-session-attendance-editor",
-    ruleId: "feature-components-public",
-    reason: "Host session editor still uses colocated legacy host component modules.",
-    removeWhen: "Host session editor presentation is migrated from components to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/components/host-session-editor.tsx",
-    importPath: "features/host/components/host-session-deletion-preview",
-    ruleId: "feature-components-public",
-    reason: "Host session editor still uses colocated legacy host component modules.",
-    removeWhen: "Host session editor presentation is migrated from components to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/components/host-session-editor.tsx",
-    importPath: "features/host/components/host-session-feedback-upload",
-    ruleId: "feature-components-public",
-    reason: "Host session editor still uses colocated legacy host component modules.",
-    removeWhen: "Host session editor presentation is migrated from components to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-dashboard-data.ts",
-    importPath: "features/host/components/host-dashboard",
-    ruleId: "feature-components-public",
-    reason: "Legacy host dashboard action types still live beside the presentation component.",
-    removeWhen: "Host dashboard presentation and action types are moved to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-dashboard-route.tsx",
-    importPath: "features/host/components/host-dashboard",
-    ruleId: "feature-components-public",
-    reason: "Legacy host dashboard presentation still lives under components.",
-    removeWhen: "Host dashboard presentation is moved to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-invitations-data.ts",
-    importPath: "features/host/components/host-invitations",
-    ruleId: "feature-components-public",
-    reason: "Legacy host invitation action types still live beside the presentation component.",
-    removeWhen: "Host invitation presentation and action types are moved to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-invitations-route.tsx",
-    importPath: "features/host/components/host-invitations",
-    ruleId: "feature-components-public",
-    reason: "Legacy host invitation presentation still lives under components.",
-    removeWhen: "Host invitation presentation is moved to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-members-data.ts",
-    importPath: "features/host/components/host-members",
-    ruleId: "feature-components-public",
-    reason: "Legacy host member action types still live beside the presentation component.",
-    removeWhen: "Host member presentation and action types are moved to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-members-route.tsx",
-    importPath: "features/host/components/host-members",
-    ruleId: "feature-components-public",
-    reason: "Legacy host member presentation still lives under components.",
-    removeWhen: "Host member presentation is moved to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-session-editor-data.ts",
-    importPath: "features/host/components/host-session-editor",
-    ruleId: "feature-components-public",
-    reason: "Legacy host session editor action types still live beside the presentation component.",
-    removeWhen: "Host session editor presentation and action types are moved to the host ui public surface.",
-  },
-  {
-    sourcePath: "features/host/route/host-session-editor-route.tsx",
-    importPath: "features/host/components/host-session-editor",
-    ruleId: "feature-components-public",
-    reason: "Legacy host session editor presentation still lives under components.",
-    removeWhen: "Host session editor presentation is moved to the host ui public surface.",
-  },
-] satisfies Array<{
+const legacyBoundaryExceptions = [] satisfies Array<{
   sourcePath: string;
   importPath: string;
   ruleId: BoundaryRuleId;
@@ -241,6 +121,70 @@ function parseStaticImportSpecifiers(source: string) {
   visit(sourceFile);
 
   return specifiers;
+}
+
+function isRouteOwnedActionsName(name: string) {
+  return name.endsWith("Actions") && name.length > "Actions".length;
+}
+
+function hasRouteOwnedActionTypeExport(source: string) {
+  const sourceFile = ts.createSourceFile(
+    "host-ui-action-export-source.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TSX,
+  );
+  let hasRouteOwnedActionExport = false;
+
+  function hasExportModifier(node: ts.Node) {
+    return (
+      ts.canHaveModifiers(node) &&
+      ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    );
+  }
+
+  function visit(node: ts.Node) {
+    if (
+      (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) &&
+      hasExportModifier(node) &&
+      isRouteOwnedActionsName(node.name.text)
+    ) {
+      hasRouteOwnedActionExport = true;
+      return;
+    }
+
+    if (ts.isExportDeclaration(node) && node.exportClause !== undefined) {
+      if (ts.isNamedExports(node.exportClause)) {
+        for (const element of node.exportClause.elements) {
+          const localName = element.propertyName?.text;
+          const exportedName = element.name.text;
+
+          if (
+            (localName !== undefined && isRouteOwnedActionsName(localName)) ||
+            isRouteOwnedActionsName(exportedName)
+          ) {
+            hasRouteOwnedActionExport = true;
+            return;
+          }
+        }
+      }
+
+      if (
+        ts.isNamespaceExport(node.exportClause) &&
+        isRouteOwnedActionsName(node.exportClause.name.text)
+      ) {
+        hasRouteOwnedActionExport = true;
+        return;
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return hasRouteOwnedActionExport;
 }
 
 function normalizeImportSpecifier(sourceFile: SourceFile, specifier: string): ImportSpecifier {
@@ -505,6 +449,21 @@ describe("frontend architecture boundaries", () => {
     expect(isSharedToFeaturePageOrAppImport(sourceFile, importSpecifier.projectPath)).toBe(true);
   });
 
+  it("detects route-owned action type exports from host UI modules", () => {
+    const invalidExports = [
+      "export type HostDashboardActions = {};",
+      "export interface HostDashboardActions {}",
+      "export type { HostDashboardActions } from './host-dashboard-actions';",
+      "export { type HostDashboardActions } from './host-dashboard-actions';",
+      "export { HostDashboardActions } from './host-dashboard-actions';",
+      "export { HostDashboardActions };",
+    ];
+
+    for (const invalidExport of invalidExports) {
+      expect(hasRouteOwnedActionTypeExport(invalidExport), `${invalidExport} must be rejected`).toBe(true);
+    }
+  });
+
   it("keeps shared, feature route, feature model, and feature UI dependencies inside their allowed boundaries", () => {
     assertLegacyBoundaryExceptionsAreUnique();
 
@@ -602,10 +561,10 @@ describe("frontend architecture boundaries", () => {
 
   it("keeps host presentation components free of API-backed defaults", () => {
     const hostPresentationComponents = [
-      "features/host/components/host-dashboard.tsx",
-      "features/host/components/host-session-editor.tsx",
-      "features/host/components/host-members.tsx",
-      "features/host/components/host-invitations.tsx",
+      "features/host/ui/host-dashboard.tsx",
+      "features/host/ui/host-session-editor.tsx",
+      "features/host/ui/host-members.tsx",
+      "features/host/ui/host-invitations.tsx",
     ];
 
     for (const relativePath of hostPresentationComponents) {
@@ -617,6 +576,9 @@ describe("frontend architecture boundaries", () => {
         "@/features/host/api/host-api",
       );
       expect(source, `${relativePath} must not call fetch directly`).not.toMatch(/\bfetch\s*\(/);
+      expect(hasRouteOwnedActionTypeExport(source), `${relativePath} must not export route-owned action types`).toBe(
+        false,
+      );
     }
   });
 

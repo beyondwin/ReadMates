@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import type { AttendanceStatus, RsvpStatus, SessionParticipationStatus } from "@/features/host/api/host-contracts";
+import type { AttendanceStatus, RsvpStatus, SessionParticipationStatus } from "@/features/host/ui/host-ui-types";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
 

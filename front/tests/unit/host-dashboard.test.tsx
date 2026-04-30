@@ -2,7 +2,8 @@ import userEvent from "@testing-library/user-event";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, type LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostDashboard, { type HostDashboardActions } from "@/features/host/components/host-dashboard";
+import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
+import HostDashboard from "@/features/host/ui/host-dashboard";
 import {
   hostDashboardLoader,
   hostInvitationsLoader,
@@ -13,6 +14,7 @@ import type {
   CurrentSessionResponse,
   HostDashboardResponse,
   HostNotificationSummary,
+  HostSessionListPage,
   HostSessionListItem,
 } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -239,6 +241,7 @@ const noopHostDashboardActions = {
   updateCurrentSessionParticipation: vi.fn(async () => undefined),
   updateSessionVisibility: vi.fn(async () => undefined),
   openSession: vi.fn(async () => undefined),
+  loadHostSessions: vi.fn(async () => ({ items: [], nextCursor: null })),
 } satisfies HostDashboardActions;
 
 type HostDashboardProps = Parameters<typeof HostDashboard>[0];
@@ -249,9 +252,13 @@ function HostDashboardForTest({
   ...props
 }: Omit<HostDashboardProps, "actions" | "hostSessions"> & {
   actions?: HostDashboardActions;
-  hostSessions?: HostSessionListItem[];
+  hostSessions?: HostSessionListPage | HostSessionListItem[];
 }) {
-  return <HostDashboard {...props} hostSessions={testHostSessions} actions={actions ?? noopHostDashboardActions} />;
+  const hostSessionPage = Array.isArray(testHostSessions)
+    ? { items: testHostSessions, nextCursor: null }
+    : testHostSessions;
+
+  return <HostDashboard {...props} hostSessions={hostSessionPage} actions={actions ?? noopHostDashboardActions} />;
 }
 
 function getDesktopView(container: HTMLElement) {
@@ -387,7 +394,7 @@ describe("HostDashboard", () => {
       }
 
       if (url === "/api/bff/api/host/sessions") {
-        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
 
       if (url === "/api/bff/api/host/notifications/summary") {
@@ -398,7 +405,12 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader()).resolves.toEqual({ current, data: dashboard, hostSessions: [], notifications: notificationSummary });
+    await expect(hostDashboardLoader()).resolves.toEqual({
+      current,
+      data: dashboard,
+      hostSessions: { items: [], nextCursor: null },
+      notifications: notificationSummary,
+    });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.objectContaining({ cache: "no-store" }));
@@ -428,7 +440,7 @@ describe("HostDashboard", () => {
       }
 
       if (url === "/api/bff/api/host/sessions") {
-        return Promise.resolve(jsonResponse([]));
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
 
       if (url === "/api/bff/api/host/notifications/summary") {
@@ -440,7 +452,7 @@ describe("HostDashboard", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(hostDashboardLoader({ params: {}, request: new Request("https://readmates.test/app/host") } as LoaderFunctionArgs))
-      .resolves.toEqual({ current, data: dashboard, hostSessions: [], notifications: notificationSummary });
+      .resolves.toEqual({ current, data: dashboard, hostSessions: { items: [], nextCursor: null }, notifications: notificationSummary });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url)).every((url) => !url.includes("clubSlug="))).toBe(true);
   });
@@ -462,7 +474,7 @@ describe("HostDashboard", () => {
       }
 
       if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse([]));
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: "cursor-1" }));
       }
 
       if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
@@ -481,7 +493,7 @@ describe("HostDashboard", () => {
     ).resolves.toEqual({
       current,
       data: dashboard,
-      hostSessions: [],
+      hostSessions: { items: [], nextCursor: "cursor-1" },
       notifications: notificationSummary,
     });
 
@@ -500,7 +512,7 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: "cursor-1" }));
       if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
@@ -508,7 +520,7 @@ describe("HostDashboard", () => {
 
     const data = await hostDashboardLoader();
 
-    expect(data.hostSessions).toEqual([]);
+    expect(data.hostSessions).toEqual({ items: [], nextCursor: "cursor-1" });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({}));
   });
 
@@ -517,7 +529,7 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
@@ -534,7 +546,7 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/summary") {
         return Promise.resolve(new Response(JSON.stringify({ message: "notification status unavailable" }), { status: 503 }));
       }
@@ -545,7 +557,7 @@ describe("HostDashboard", () => {
     await expect(hostDashboardLoader()).resolves.toEqual({
       current,
       data: dashboard,
-      hostSessions: [],
+      hostSessions: { items: [], nextCursor: null },
       notifications: emptyNotificationSummary,
     });
   });
@@ -555,7 +567,7 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/summary") {
         return Promise.resolve(new Response(JSON.stringify({ message: "forbidden" }), { status: 403 }));
       }
@@ -617,6 +629,34 @@ describe("HostDashboard", () => {
     expect(within(mobileUpcomingCard as HTMLElement).getByText("공개 범위")).toBeInTheDocument();
     expect(within(mobileUpcomingCard as HTMLElement).getByText("비공개")).toBeInTheDocument();
     expect(within(mobileUpcomingCard as HTMLElement).getByRole("button", { name: /멤버 공개/ })).toHaveTextContent("공개");
+  });
+
+  it("loads and appends more upcoming sessions from the host sessions cursor", async () => {
+    const user = userEvent.setup();
+    const nextSession = twoDraftHostSessions[1];
+    const actions = {
+      ...noopHostDashboardActions,
+      loadHostSessions: vi.fn(async () => ({ items: [nextSession], nextCursor: null })),
+    } satisfies HostDashboardActions;
+    const { container } = render(
+      <HostDashboardForTest
+        auth={hostAuth}
+        current={noCurrent}
+        data={dashboard}
+        hostSessions={{ items: [hostSessions[1]], nextCursor: "cursor-1" }}
+        actions={actions}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const upcomingSection = desktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section");
+    expect(upcomingSection).not.toBeNull();
+
+    await user.click(within(upcomingSection as HTMLElement).getByRole("button", { name: "더 보기" }));
+
+    expect(actions.loadHostSessions).toHaveBeenCalledWith({ limit: 50, cursor: "cursor-1" });
+    expect(within(upcomingSection as HTMLElement).getByText("다음 책")).toBeInTheDocument();
+    expect(await within(upcomingSection as HTMLElement).findByText("그 다음 책")).toBeInTheDocument();
+    expect(within(upcomingSection as HTMLElement).queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
   });
 
   it("calls visibility and open actions from upcoming session rows", async () => {

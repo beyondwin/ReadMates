@@ -1,8 +1,7 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.application.port.out.TrustedReturnHostPort
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.beans.factory.ObjectProvider
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import java.net.URI
 import java.security.MessageDigest
@@ -23,7 +22,7 @@ class OAuthReturnState(
     private val ttl: Duration,
     @Value("\${readmates.auth.session-cookie-domain:}")
     sessionCookieDomain: String,
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val trustedReturnHostPort: TrustedReturnHostPort,
 ) {
     private val normalizedSecret = secret.trim().ifEmpty { "dev-return-state-secret" }
     private val appOrigin = readmatesAppOrigin(appBaseUrl)
@@ -189,19 +188,7 @@ class OAuthReturnState(
     }
 
     private fun activeClubSlugForDomain(host: String): String? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
-        return jdbcTemplate.query(
-            """
-            select clubs.slug
-            from club_domains
-            join clubs on clubs.id = club_domains.club_id
-            where lower(hostname) = ?
-              and club_domains.status = 'ACTIVE'
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("slug") },
-            host,
-        ).firstOrNull()
+        return trustedReturnHostPort.activeClubSlugForHost(host)
     }
 
     private fun signature(returnTo: String, expiresAtEpochSeconds: Long): String {

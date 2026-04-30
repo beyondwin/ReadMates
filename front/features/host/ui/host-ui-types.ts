@@ -1,0 +1,247 @@
+import type { PagedResponse } from "@/shared/model/paging";
+import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
+
+export type { AttendanceStatus } from "@/shared/model/readmates-types";
+
+export type MemberRole = "HOST" | "MEMBER";
+export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED";
+export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
+export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
+export type CurrentSessionPolicyResult = "APPLIED" | "NOT_APPLICABLE" | "DEFERRED";
+export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
+
+export type FeedbackDocumentStatus = {
+  uploaded: boolean;
+  fileName: string | null;
+  uploadedAt: string | null;
+};
+
+export type FeedbackDocumentResponse = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  subtitle: string;
+  bookTitle: string;
+  date: string;
+  fileName: string;
+  uploadedAt: string;
+};
+
+export type CurrentSessionResponse = {
+  currentSession: null | {
+    sessionId: string;
+    sessionNumber: number;
+    title: string;
+    bookTitle: string;
+    bookAuthor: string;
+    bookLink: string | null;
+    bookImageUrl: string | null;
+    date: string;
+    startTime: string;
+    endTime: string;
+    locationLabel: string;
+    meetingUrl: string | null;
+    meetingPasscode: string | null;
+    questionDeadlineAt: string;
+    myRsvpStatus: RsvpStatus;
+    myCheckin: null | {
+      readingProgress: number;
+    };
+    attendees: Array<{
+      membershipId: string;
+      displayName: string;
+      accountName: string;
+      role: MemberRole;
+      rsvpStatus: RsvpStatus;
+      attendanceStatus: AttendanceStatus;
+      participationStatus?: SessionParticipationStatus;
+    }>;
+  };
+};
+
+export type HostInvitationListItem = {
+  invitationId: string;
+  email: string;
+  name: string;
+  role: MemberRole;
+  status: InvitationStatus;
+  effectiveStatus: InvitationStatus;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+  applyToCurrentSession: boolean;
+  canRevoke: boolean;
+  canReissue: boolean;
+};
+
+export type HostInvitationListPage = PagedResponse<HostInvitationListItem>;
+
+export type HostInvitationResponse = HostInvitationListItem & {
+  acceptUrl: string | null;
+};
+
+export type CreateHostInvitationRequest = {
+  email: string;
+  name: string;
+  applyToCurrentSession?: boolean;
+};
+
+export type ViewerMember = {
+  membershipId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  accountName: string;
+  profileImageUrl: string | null;
+  status: MembershipStatus;
+  createdAt: string;
+};
+
+export type HostMemberListItem = {
+  membershipId: string;
+  userId: string;
+  email: string;
+  displayName: string;
+  accountName: string;
+  profileImageUrl: string | null;
+  role: MemberRole;
+  status: MembershipStatus;
+  joinedAt: string | null;
+  createdAt: string;
+  currentSessionParticipationStatus: SessionParticipationStatus | null;
+  canSuspend: boolean;
+  canRestore: boolean;
+  canDeactivate: boolean;
+  canAddToCurrentSession: boolean;
+  canRemoveFromCurrentSession: boolean;
+};
+
+export type HostMemberListPage = PagedResponse<HostMemberListItem>;
+
+export type HostMemberProfileErrorCode =
+  | "DISPLAY_NAME_REQUIRED"
+  | "DISPLAY_NAME_TOO_LONG"
+  | "DISPLAY_NAME_INVALID"
+  | "DISPLAY_NAME_RESERVED"
+  | "DISPLAY_NAME_DUPLICATE"
+  | "HOST_ROLE_REQUIRED"
+  | "MEMBER_NOT_FOUND"
+  | "MEMBERSHIP_NOT_ALLOWED";
+
+export type HostMemberProfileResponse = HostMemberListItem;
+
+export type MemberLifecycleRequest = {
+  currentSessionPolicy: CurrentSessionPolicy;
+};
+
+export type MemberLifecycleResponse = {
+  member: HostMemberListItem;
+  currentSessionPolicyResult: CurrentSessionPolicyResult;
+};
+
+export type HostDashboardResponse = {
+  rsvpPending: number;
+  checkinMissing: number;
+  publishPending: number;
+  feedbackPending: number;
+  currentSessionMissingMemberCount?: number;
+  currentSessionMissingMembers?: Array<{
+    membershipId: string;
+    displayName: string;
+    email: string;
+  }>;
+};
+
+export type HostNotificationEventType =
+  | "NEXT_BOOK_PUBLISHED"
+  | "SESSION_REMINDER_DUE"
+  | "FEEDBACK_DOCUMENT_PUBLISHED"
+  | "REVIEW_PUBLISHED";
+
+export type HostNotificationSummary = {
+  pending: number;
+  failed: number;
+  dead: number;
+  sentLast24h: number;
+  latestFailures: Array<{
+    id: string;
+    eventType: HostNotificationEventType;
+    recipientEmail: string;
+    attemptCount: number;
+    updatedAt: string;
+  }>;
+};
+
+export type HostSessionListItem = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor: string;
+  bookImageUrl: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locationLabel: string;
+  state: SessionState;
+  visibility: SessionRecordVisibility;
+};
+
+export type HostSessionListPage = PagedResponse<HostSessionListItem>;
+
+export type HostSessionPublication = {
+  publicSummary: string;
+  visibility: SessionRecordVisibility;
+};
+
+export type HostSessionDetailResponse = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor: string;
+  bookLink: string | null;
+  bookImageUrl: string | null;
+  locationLabel: string;
+  meetingUrl: string | null;
+  meetingPasscode: string | null;
+  date: string;
+  startTime: string;
+  endTime: string;
+  questionDeadlineAt: string;
+  visibility: SessionRecordVisibility;
+  publication: HostSessionPublication | null;
+  state: SessionState;
+  attendees: Array<{
+    membershipId: string;
+    displayName: string;
+    accountName: string;
+    rsvpStatus: RsvpStatus;
+    attendanceStatus: AttendanceStatus;
+    participationStatus?: SessionParticipationStatus;
+  }>;
+  feedbackDocument: FeedbackDocumentStatus;
+};
+
+export type HostSessionDeletionCounts = {
+  participants: number;
+  rsvpResponses: number;
+  questions: number;
+  checkins: number;
+  oneLineReviews: number;
+  longReviews: number;
+  highlights: number;
+  publications: number;
+  feedbackReports: number;
+  feedbackDocuments: number;
+};
+
+export type HostSessionDeletionPreviewResponse = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  state: SessionState;
+  canDelete: boolean;
+  counts: HostSessionDeletionCounts;
+};

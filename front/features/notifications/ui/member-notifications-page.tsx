@@ -21,12 +21,15 @@ interface MemberNotificationItem {
 interface MemberNotificationsPageProps {
   unreadCount: number;
   items: MemberNotificationItem[];
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
   pendingReadIds?: ReadonlySet<string>;
   markAllReadPending?: boolean;
   actionError?: string | null;
   onMarkRead: (id: string) => void;
   onMarkAllRead: () => void;
   onOpenNotification?: (id: string, href: string) => void;
+  onLoadMore?: () => void;
 }
 
 const EMPTY_PENDING_READ_IDS = new Set<string>();
@@ -102,12 +105,15 @@ function RouterAwareMemberNotificationsPage(props: MemberNotificationsPageProps)
 function MemberNotificationsPageContent({
   unreadCount,
   items,
+  hasMore = false,
+  isLoadingMore = false,
   pendingReadIds = EMPTY_PENDING_READ_IDS,
   markAllReadPending = false,
   actionError = null,
   onMarkRead,
   onMarkAllRead,
   onOpenNotification,
+  onLoadMore,
   routePathname,
 }: MemberNotificationsPageProps & { routePathname: string }) {
   const unreadLabel = unreadCount > 0 ? `읽지 않은 알림 ${unreadCount}개` : "새 알림이 없습니다";
@@ -228,6 +234,17 @@ function MemberNotificationsPageContent({
               })}
             </div>
           )}
+          {hasMore && onLoadMore ? (
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm"
+              disabled={isLoadingMore}
+              style={{ marginTop: 12 }}
+              onClick={onLoadMore}
+            >
+              {isLoadingMore ? "불러오는 중" : "더 보기"}
+            </button>
+          ) : null}
         </section>
       </section>
     </main>

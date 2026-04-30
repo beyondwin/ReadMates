@@ -1,11 +1,12 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostSessionEditor, { type HostSessionEditorActions } from "@/features/host/components/host-session-editor";
+import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
+import HostSessionEditor from "@/features/host/ui/host-session-editor";
 import {
   buildHostSessionRequest,
   defaultSessionDateFrom,
-} from "@/features/host/components/host-session-schedule";
+} from "@/features/host/ui/host-session-schedule";
 import type {
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,

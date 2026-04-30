@@ -3,10 +3,12 @@
 import { type CSSProperties, type FormEvent, type InvalidEvent, useRef, useState } from "react";
 import type {
   CreateHostInvitationRequest,
+  HostInvitationListPage,
   HostInvitationListItem,
   HostInvitationResponse,
   InvitationStatus,
-} from "@/features/host/api/host-contracts";
+} from "@/features/host/ui/host-ui-types";
+import type { PageRequest } from "@/shared/model/paging";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 const statusLabels: Record<InvitationStatus, string> = {
@@ -30,12 +32,12 @@ type HostMessage = {
 
 type PendingRowAction = "revoke" | "reissue";
 
-export type HostInvitationsActions = {
-  listInvitations: () => Promise<Response>;
+type HostInvitationsActions = {
+  listInvitations: (page?: PageRequest) => Promise<Response>;
   createInvitation: (request: CreateHostInvitationRequest) => Promise<Response>;
   revokeInvitation: (invitationId: string) => Promise<Response>;
   parseInvitation: (response: Response) => Promise<HostInvitationResponse>;
-  parseInvitationList: (response: Response) => Promise<HostInvitationListItem[]>;
+  parseInvitationList: (response: Response) => Promise<HostInvitationListPage>;
 };
 
 function inviteStatusClass(status: InvitationStatus) {
@@ -67,17 +69,20 @@ export default function HostInvitations({
   initialInvitations,
   actions,
 }: {
-  initialInvitations: HostInvitationListItem[];
+  initialInvitations: HostInvitationListPage | HostInvitationListItem[];
   actions: HostInvitationsActions;
 }) {
+  const initialPage = normalizeInvitationPage(initialInvitations);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [applyToCurrentSession, setApplyToCurrentSession] = useState(true);
-  const [invitations, setInvitations] = useState(initialInvitations);
+  const [invitations, setInvitations] = useState(initialPage.items);
+  const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
   const [lastCreated, setLastCreated] = useState<HostInvitationResponse | null>(null);
   const [message, setMessage] = useState<HostMessage | null>(null);
   const [nameTouched, setNameTouched] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [copyPending, setCopyPending] = useState(false);
   const [pendingRows, setPendingRows] = useState<Record<string, PendingRowAction>>({});
   const lastCreatedRequestRef = useRef(0);
@@ -120,14 +125,39 @@ export default function HostInvitations({
   };
 
   const refreshInvitations = async () => {
-    const response = await actions.listInvitations();
+    const response = await actions.listInvitations({ limit: 50 });
     if (!response.ok) {
       showAlert("초대 목록 새로고침에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.");
       return false;
     }
 
-    setInvitations(await actions.parseInvitationList(response));
+    const page = normalizeInvitationPage(await actions.parseInvitationList(response));
+    setInvitations(page.items);
+    setNextCursor(page.nextCursor);
     return true;
+  };
+
+  const loadMoreInvitations = async () => {
+    if (!nextCursor || isLoadingMore) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    setMessage(null);
+    try {
+      const response = await actions.listInvitations({ limit: 50, cursor: nextCursor });
+      if (!response.ok) {
+        showAlert("초대 목록을 더 불러오지 못했습니다.");
+        return;
+      }
+      const page = normalizeInvitationPage(await actions.parseInvitationList(response));
+      setInvitations((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch {
+      showAlert("초대 목록을 더 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -497,12 +527,26 @@ export default function HostInvitations({
                   </div>
                 ))
               )}
+              {nextCursor ? (
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-sm"
+                  disabled={isLoadingMore}
+                  onClick={() => void loadMoreInvitations()}
+                >
+                  {isLoadingMore ? "불러오는 중" : "더 보기"}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
       </section>
     </main>
   );
+}
+
+function normalizeInvitationPage(value: HostInvitationListPage | HostInvitationListItem[]): HostInvitationListPage {
+  return Array.isArray(value) ? { items: value, nextCursor: null } : value;
 }
 
 function InviteCount({

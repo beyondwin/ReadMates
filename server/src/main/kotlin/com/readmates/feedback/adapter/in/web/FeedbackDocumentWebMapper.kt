@@ -7,6 +7,13 @@ import com.readmates.feedback.application.model.FeedbackMetadataItemResult
 import com.readmates.feedback.application.model.FeedbackParticipantResult
 import com.readmates.feedback.application.model.FeedbackProblemResult
 import com.readmates.feedback.application.model.FeedbackRevealingQuoteResult
+import com.readmates.shared.paging.CursorPage
+
+fun CursorPage<FeedbackDocumentListItemResult>.toWebDto(): FeedbackDocumentListPage =
+    FeedbackDocumentListPage(
+        items = items.map { it.toWebDto() },
+        nextCursor = nextCursor,
+    )
 
 fun FeedbackDocumentListItemResult.toWebDto(): FeedbackDocumentListItem =
     FeedbackDocumentListItem(

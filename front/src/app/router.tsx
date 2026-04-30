@@ -29,8 +29,6 @@ import {
   notesFeedShouldRevalidate,
 } from "@/features/archive/route/notes-feed-data";
 import {
-  HostInvitationsRoute,
-  HostMembersRoute,
   HostRouteError,
   hostDashboardLoader,
   hostInvitationsLoader,
@@ -41,6 +39,8 @@ import {
 import {
   EditHostSessionRouteElement,
   HostDashboardRouteElement,
+  HostInvitationsRouteElement,
+  HostMembersRouteElement,
   HostNotificationsRouteElement,
   NewHostSessionRouteElement,
 } from "@/src/app/host-route-elements";
@@ -160,14 +160,14 @@ function hostAppRoutes(): RouteObject[] {
     },
     {
       path: "members",
-      element: <HostMembersRoute />,
+      element: <HostMembersRouteElement />,
       loader: hostMembersLoader,
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
     },
     {
       path: "invitations",
-      element: <HostInvitationsRoute />,
+      element: <HostInvitationsRouteElement />,
       loader: hostInvitationsLoader,
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
@@ -321,6 +321,7 @@ export const routes: RouteObject[] = [
       </RequireMemberApp>
     ),
     loader: loadMemberAppAuth,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 공간을 불러오는 중" variant="member" />,
     children: memberAppRoutes(),
   },
   {
@@ -332,6 +333,7 @@ export const routes: RouteObject[] = [
       </RequireHost>
     ),
     loader: requireHostLoaderAuth,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
     children: hostAppRoutes(),
   },
   {
@@ -343,6 +345,7 @@ export const routes: RouteObject[] = [
       </RequireHost>
     ),
     loader: requireHostLoaderAuth,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
     children: hostAppRoutes(),
   },
 ];

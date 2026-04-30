@@ -15,6 +15,8 @@ import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 
 data class HostSessionTransitionResult(
@@ -23,7 +25,7 @@ data class HostSessionTransitionResult(
 )
 
 interface HostSessionWritePort {
-    fun list(host: CurrentMember): List<HostSessionListItem>
+    fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem>
     fun create(command: HostSessionCommand): CreatedSessionResponse
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
     fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse

@@ -1,18 +1,38 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Link } from "@/src/app/router-link";
+import type { ComponentType, ReactNode } from "react";
 import { usePublicAuthenticated, type PublicAuthAction } from "@/shared/ui/public-auth-action-state";
 
 export const PUBLIC_INVITE_ACCEPTANCE_LABEL = "초대 수락하기";
 export const PUBLIC_INVITE_ACCEPTANCE_GUIDANCE = "초대 메일의 개인 링크에서만 열립니다.";
 
+export type AppLinkProps = {
+  to: string;
+  resetScroll?: boolean;
+  className?: string;
+  children: ReactNode;
+};
+
+export type AppLinkComponent = ComponentType<AppLinkProps>;
+
+function DefaultLink({ to, resetScroll: _resetScroll, children, ...props }: AppLinkProps) {
+  void _resetScroll;
+
+  return (
+    <a {...props} href={to}>
+      {children}
+    </a>
+  );
+}
+
 export function PublicGuestOnlyLink({
   action,
   className,
+  LinkComponent = DefaultLink,
 }: {
   action: PublicAuthAction;
   className?: string;
+  LinkComponent?: AppLinkComponent;
 }) {
   const authenticated = usePublicAuthenticated();
 
@@ -21,9 +41,9 @@ export function PublicGuestOnlyLink({
   }
 
   return (
-    <Link to={action.href} className={className}>
+    <LinkComponent to={action.href} className={className}>
       {action.label}
-    </Link>
+    </LinkComponent>
   );
 }
 

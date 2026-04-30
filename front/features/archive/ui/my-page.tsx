@@ -19,6 +19,7 @@ import { appFeedbackHref, readmatesReturnState } from "@/features/archive/ui/arc
 import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import type { PagedResponse } from "@/shared/model/paging";
 
 const profileFailureMessages = new Set([
   profileSaveErrorMessage("DISPLAY_NAME_REQUIRED"),
@@ -34,11 +35,48 @@ function feedbackReportTotalLabel(total: number) {
   return `전체 ${total}개`;
 }
 
+function LoadMoreButton({
+  visible,
+  onLoadMore,
+  variant = "desktop",
+}: {
+  visible: boolean;
+  onLoadMore?: () => Promise<void>;
+  variant?: "desktop" | "mobile";
+}) {
+  const [pending, setPending] = useState(false);
+
+  if (!visible || !onLoadMore) {
+    return null;
+  }
+
+  return (
+    <div style={{ display: "flex", justifyContent: "center", paddingTop: variant === "mobile" ? 14 : 18 }}>
+      <button
+        type="button"
+        className="btn btn-quiet"
+        style={variant === "mobile" ? { width: "100%", minHeight: 42 } : undefined}
+        disabled={pending}
+        onClick={async () => {
+          setPending(true);
+          try {
+            await onLoadMore();
+          } finally {
+            setPending(false);
+          }
+        }}
+      >
+        더 보기
+      </button>
+    </div>
+  );
+}
+
 type MyPageProps = {
   data: MyPageProfile;
-  reports: FeedbackDocumentListItem[];
-  reviewCount: number;
-  questionCount: number;
+  reports: PagedResponse<FeedbackDocumentListItem>;
+  reviewCount: string;
+  questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile?: boolean;
@@ -46,6 +84,7 @@ type MyPageProps = {
   notificationPreferences: NotificationPreferences;
   onSaveNotificationPreferences: (preferences: NotificationPreferences) => Promise<NotificationPreferences>;
   canManageNotificationPreferences?: boolean;
+  onLoadMoreReports?: () => Promise<void>;
 };
 
 type ProfileUpdateResult = Pick<MyPageProfile, "displayName" | "accountName">;
@@ -68,6 +107,7 @@ export default function MyPage({
   notificationPreferences,
   onSaveNotificationPreferences,
   canManageNotificationPreferences = true,
+  onLoadMoreReports,
 }: MyPageProps) {
   const [profileOverrideState, setProfileOverrideState] = useState<{
     sourceData: MyPageProfile;
@@ -109,6 +149,7 @@ export default function MyPage({
           notificationPreferences={notificationPreferences}
           onSaveNotificationPreferences={onSaveNotificationPreferences}
           canManageNotificationPreferences={notificationPreferencesEnabled}
+          onLoadMoreReports={onLoadMoreReports}
         />
       </div>
       <div className="mobile-only">
@@ -124,6 +165,7 @@ export default function MyPage({
           notificationPreferences={notificationPreferences}
           onSaveNotificationPreferences={onSaveNotificationPreferences}
           canManageNotificationPreferences={notificationPreferencesEnabled}
+          onLoadMoreReports={onLoadMoreReports}
         />
       </div>
     </main>
@@ -142,11 +184,12 @@ function MyDesktop({
   notificationPreferences,
   onSaveNotificationPreferences,
   canManageNotificationPreferences,
+  onLoadMoreReports,
 }: {
   data: MyPageProfile;
-  reports: FeedbackDocumentListItem[];
-  reviewCount: number;
-  questionCount: number;
+  reports: PagedResponse<FeedbackDocumentListItem>;
+  reviewCount: string;
+  questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile: boolean;
@@ -154,6 +197,7 @@ function MyDesktop({
   notificationPreferences: NotificationPreferences;
   onSaveNotificationPreferences: (preferences: NotificationPreferences) => Promise<NotificationPreferences>;
   canManageNotificationPreferences: boolean;
+  onLoadMoreReports?: () => Promise<void>;
 }) {
   return (
     <>
@@ -177,7 +221,7 @@ function MyDesktop({
             <AccountSection data={data} LogoutButtonComponent={LogoutButtonComponent} canEditProfile={canEditProfile} />
             <RhythmSection data={data} reviewCount={reviewCount} questionCount={questionCount} />
             <WritingSection reviewCount={reviewCount} questionCount={questionCount} />
-            <FeedbackReports reports={reports} />
+            <FeedbackReports reports={reports} onLoadMoreReports={onLoadMoreReports} />
           </div>
 
           <div className="stack" style={{ "--stack": "36px" } as CSSProperties}>
@@ -205,11 +249,12 @@ function MyMobile({
   notificationPreferences,
   onSaveNotificationPreferences,
   canManageNotificationPreferences,
+  onLoadMoreReports,
 }: {
   data: MyPageProfile;
-  reports: FeedbackDocumentListItem[];
-  reviewCount: number;
-  questionCount: number;
+  reports: PagedResponse<FeedbackDocumentListItem>;
+  reviewCount: string;
+  questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile: boolean;
@@ -217,6 +262,7 @@ function MyMobile({
   notificationPreferences: NotificationPreferences;
   onSaveNotificationPreferences: (preferences: NotificationPreferences) => Promise<NotificationPreferences>;
   canManageNotificationPreferences: boolean;
+  onLoadMoreReports?: () => Promise<void>;
 }) {
   return (
     <div className="rm-my-mobile m-body">
@@ -288,7 +334,7 @@ function MyMobile({
         </div>
       </section>
 
-      <MobileFeedbackReports reports={reports} />
+      <MobileFeedbackReports reports={reports} onLoadMoreReports={onLoadMoreReports} />
 
       {canManageNotificationPreferences ? (
         <NotificationsSection
@@ -315,9 +361,15 @@ function mobileMembershipStatusLabel(data: Pick<MyPageProfile, "role" | "members
   return data.membershipStatus === "ACTIVE" ? "정식 멤버" : membershipIdentityLabel(data);
 }
 
-function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
+function MobileFeedbackReports({
+  reports,
+  onLoadMoreReports,
+}: {
+  reports: PagedResponse<FeedbackDocumentListItem>;
+  onLoadMoreReports?: () => Promise<void>;
+}) {
   const myPageReturnState = readmatesReturnState({ href: "/app/me", label: "내 공간으로 돌아가기" });
-  const recentReports = reports.slice(0, 3);
+  const reportItems = reports.items;
 
   return (
     <section className="m-sec">
@@ -325,14 +377,14 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
         <div className="m-row" style={{ gap: 8, minWidth: 0 }}>
           <div className="eyebrow">피드백 문서</div>
           <div className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-            · {feedbackReportTotalLabel(reports.length)}
+            · {feedbackReportTotalLabel(reportItems.length)}
           </div>
         </div>
         <Link className="btn btn-quiet btn-sm" to="/app/archive?view=report">
           전체 보기
         </Link>
       </div>
-      {reports.length === 0 ? (
+      {reportItems.length === 0 ? (
         <div className="m-card-quiet">
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
             아직 열람 가능한 피드백 문서가 없습니다.
@@ -340,7 +392,7 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
         </div>
       ) : (
         <div className="m-list">
-          {recentReports.map((report) => {
+          {reportItems.map((report) => {
             const readHref = appFeedbackHref(report.sessionId);
             const readLabel = feedbackReportActionLabel(report, "읽기");
             const feedbackDocumentLinkStyle: CSSProperties = {
@@ -420,6 +472,7 @@ function MobileFeedbackReports({ reports }: { reports: FeedbackDocumentListItem[
           })}
         </div>
       )}
+      <LoadMoreButton visible={Boolean(reports.nextCursor)} onLoadMore={onLoadMoreReports} variant="mobile" />
     </section>
   );
 }
@@ -588,8 +641,8 @@ function RhythmSection({
   questionCount,
 }: {
   data: MyPageProfile;
-  reviewCount: number;
-  questionCount: number;
+  reviewCount: string;
+  questionCount: string;
 }) {
   const summary = attendanceSummary(data);
   const recentAttendances = data.recentAttendances ?? [];
@@ -661,9 +714,15 @@ function RhythmSection({
   );
 }
 
-function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
+function FeedbackReports({
+  reports,
+  onLoadMoreReports,
+}: {
+  reports: PagedResponse<FeedbackDocumentListItem>;
+  onLoadMoreReports?: () => Promise<void>;
+}) {
   const myPageReturnState = readmatesReturnState({ href: "/app/me", label: "내 공간으로 돌아가기" });
-  const recentReports = reports.slice(0, 3);
+  const reportItems = reports.items;
 
   return (
     <section>
@@ -672,7 +731,7 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
         title="피드백 문서"
         eyebrowHelper={
           <span className="tiny" style={{ color: "var(--text-3)", whiteSpace: "nowrap" }}>
-            · {feedbackReportTotalLabel(reports.length)}
+            · {feedbackReportTotalLabel(reportItems.length)}
           </span>
         }
         right={
@@ -682,14 +741,14 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
         }
       />
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-        {reports.length === 0 ? (
+        {reportItems.length === 0 ? (
           <div className="surface-quiet" style={{ padding: "22px" }}>
             <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
               아직 열람 가능한 피드백 문서가 없습니다.
             </p>
           </div>
         ) : null}
-        {recentReports.map((report, index) => (
+        {reportItems.map((report, index) => (
           <article
             key={report.sessionId}
             style={{
@@ -734,12 +793,13 @@ function FeedbackReports({ reports }: { reports: FeedbackDocumentListItem[] }) {
             ) : null}
           </article>
         ))}
+        <LoadMoreButton visible={Boolean(reports.nextCursor)} onLoadMore={onLoadMoreReports} />
       </div>
     </section>
   );
 }
 
-function WritingSection({ reviewCount, questionCount }: { reviewCount: number; questionCount: number }) {
+function WritingSection({ reviewCount, questionCount }: { reviewCount: string; questionCount: string }) {
   return (
     <section>
       <SectionHeader eyebrow="내 글" title="내가 남긴 문장" />
@@ -753,7 +813,7 @@ function WritingSection({ reviewCount, questionCount }: { reviewCount: number; q
   );
 }
 
-function WritingCountCard({ label, value, body, href }: { label: string; value: number; body: string; href: string }) {
+function WritingCountCard({ label, value, body, href }: { label: string; value: string; body: string; href: string }) {
   return (
     <Link to={href} style={{ display: "block", padding: "18px 20px", background: "var(--bg-sub)", borderRadius: "var(--r-2)" }}>
       <div className="tiny mono" style={{ color: "var(--text-3)" }}>

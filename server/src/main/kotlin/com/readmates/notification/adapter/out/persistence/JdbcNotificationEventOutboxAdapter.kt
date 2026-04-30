@@ -12,6 +12,9 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.dao.DuplicateKeyException
@@ -254,24 +257,48 @@ class JdbcNotificationEventOutboxAdapter(
     override fun listHostEvents(
         clubId: UUID,
         status: NotificationEventOutboxStatus?,
-        limit: Int,
-    ): List<HostNotificationEvent> {
+        pageRequest: PageRequest,
+    ): CursorPage<HostNotificationEvent> {
+        val cursor = NotificationEventUpdatedAtDescCursor.from(pageRequest.cursor)
         val statusPredicate = if (status == null) "" else "and status = ?"
+        val cursorPredicate = if (cursor == null) {
+            ""
+        } else {
+            """
+            and (
+              updated_at < ?
+              or (updated_at = ? and created_at < ?)
+              or (updated_at = ? and created_at = ? and id < ?)
+            )
+            """.trimIndent()
+        }
         val args = mutableListOf<Any>(clubId.dbString())
         status?.let { args += it.name }
-        args += limit
-        return jdbcTemplate().query(
+        if (cursor != null) {
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.id
+        }
+        args += pageRequest.limit + 1
+        val rows = jdbcTemplate().query(
             """
             select id, event_type, status, attempt_count, created_at, updated_at
             from notification_event_outbox
             where club_id = ?
               $statusPredicate
+              $cursorPredicate
             order by updated_at desc, created_at desc, id desc
             limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostNotificationEvent() },
             *args.toTypedArray(),
         )
+        return pageFromRows(rows, pageRequest.limit) { row ->
+            notificationEventUpdatedAtDescCursor(row.updatedAt, row.createdAt, row.id.toString())
+        }
     }
 
     private fun ResultSet.toNotificationEventOutboxItem(): NotificationEventOutboxItem =
@@ -332,4 +359,38 @@ class JdbcNotificationEventOutboxAdapter(
     private fun jdbcTemplate(): JdbcTemplate =
         jdbcTemplateProvider.ifAvailable
             ?: throw IllegalStateException("Notification event outbox storage is unavailable")
+}
+
+private fun notificationEventUpdatedAtDescCursor(updatedAt: OffsetDateTime, createdAt: OffsetDateTime, id: String): String? =
+    CursorCodec.encode(
+        mapOf(
+            "updatedAt" to updatedAt.toString(),
+            "createdAt" to createdAt.toString(),
+            "id" to id,
+        ),
+    )
+
+private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    val visibleRows = rows.take(limit)
+    return CursorPage(
+        items = visibleRows,
+        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+    )
+}
+
+private data class NotificationEventUpdatedAtDescCursor(
+    val updatedAt: OffsetDateTime,
+    val createdAt: OffsetDateTime,
+    val id: String,
+) {
+    companion object {
+        fun from(cursor: Map<String, String>): NotificationEventUpdatedAtDescCursor? {
+            val updatedAt = cursor["updatedAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                ?: return null
+            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                ?: return null
+            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+            return NotificationEventUpdatedAtDescCursor(updatedAt, createdAt, id)
+        }
+    }
 }

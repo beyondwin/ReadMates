@@ -2,6 +2,12 @@ package com.readmates.note.adapter.`in`.web
 
 import com.readmates.note.application.model.NoteFeedResult
 import com.readmates.note.application.model.NoteSessionResult
+import com.readmates.shared.paging.CursorPage
+
+data class CursorPageResponse<T>(
+    val items: List<T>,
+    val nextCursor: String?,
+)
 
 data class NoteFeedItem(
     val sessionId: String,
@@ -48,3 +54,6 @@ internal fun NoteSessionResult.toNoteSessionItem() = NoteSessionItem(
     highlightCount = highlightCount,
     totalCount = totalCount,
 )
+
+internal fun <T, R> CursorPage<T>.mapItems(mapper: (T) -> R): CursorPageResponse<R> =
+    CursorPageResponse(items = items.map(mapper), nextCursor = nextCursor)

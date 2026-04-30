@@ -1,6 +1,7 @@
 package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
@@ -20,8 +22,14 @@ class HostInvitationController(
     private val invitations: ManageHostInvitationsUseCase,
 ) {
     @GetMapping
-    fun list(currentMember: CurrentMember) =
-        invitations.listHostInvitations(currentMember)
+    fun list(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ) = invitations.listHostInvitations(
+        currentMember,
+        PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
+    )
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

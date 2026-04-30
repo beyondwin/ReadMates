@@ -25,6 +25,9 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
@@ -193,9 +196,23 @@ class HostSessionControllerDbTest(
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[0].sessionId") { value(sessionId) }
-            jsonPath("$[0].state") { value("DRAFT") }
-            jsonPath("$[0].visibility") { value("HOST_ONLY") }
+            jsonPath("$.items[0].sessionId") { value(sessionId) }
+            jsonPath("$.items[0].state") { value("DRAFT") }
+            jsonPath("$.items[0].visibility") { value("HOST_ONLY") }
+        }
+    }
+
+    @Test
+    fun `host sessions list returns paged contract`() {
+        createDraftSessionSeven()
+
+        mockMvc.get("/api/host/sessions") {
+            with(user("host@example.com"))
+            param("limit", "2")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(2) }
+            jsonPath("$.nextCursor") { exists() }
         }
     }
 
@@ -940,6 +957,22 @@ class HostSessionControllerDbTest(
         }
     }
 
+    @Test
+    fun `concurrent host deletes remove open session once through controller lock path`() {
+        createSessionSeven()
+
+        val statuses = runConcurrently(workerCount = 2) {
+            mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andReturn().response.status
+        }
+
+        assertThat(statuses.count { it == 200 }).isEqualTo(1)
+        assertThat(statuses.count { it == 404 }).isEqualTo(1)
+        assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777'"))
+    }
+
     private fun hostSessionRequestJson() =
         """
         {
@@ -961,6 +994,26 @@ class HostSessionControllerDbTest(
     private fun createDraftSessionSeven(): String = createDraftSession("7회차 · 테스트 책", "테스트 책", "2026-05-20")
 
     private fun createDraftSessionEight(): String = createDraftSession("8회차 · 다음 책", "다음 책", "2026-06-17")
+
+    private fun <T> runConcurrently(workerCount: Int, action: () -> T): List<T> {
+        val executor = Executors.newFixedThreadPool(workerCount)
+        val ready = CountDownLatch(workerCount)
+        val start = CountDownLatch(1)
+        return try {
+            val futures = (1..workerCount).map {
+                executor.submit<T> {
+                    ready.countDown()
+                    check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
+                    action()
+                }
+            }
+            check(ready.await(5, TimeUnit.SECONDS)) { "Timed out waiting for concurrent workers" }
+            start.countDown()
+            futures.map { it.get(10, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
 
     private fun createDraftSession(title: String, bookTitle: String, date: String): String {
         val response = mockMvc.post("/api/host/sessions") {

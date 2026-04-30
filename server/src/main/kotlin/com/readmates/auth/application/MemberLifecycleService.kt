@@ -7,11 +7,11 @@ import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
@@ -19,10 +19,13 @@ class MemberLifecycleService(
     private val memberLifecycleStore: MemberLifecycleStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : ManageMemberLifecycleUseCase, LeaveMembershipUseCase {
-    override fun listMembers(host: CurrentMember): List<HostMemberListItem> {
+    override fun listMembers(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostMemberListItem> {
         requireHost(host)
-        return memberLifecycleStore.listMembers(host.clubId)
-            .map { row -> row.toHostMemberListItem(host.membershipId) }
+        val page = memberLifecycleStore.listMembers(host.clubId, pageRequest)
+        return CursorPage(
+            items = page.items.map { row -> row.toHostMemberListItem(host.membershipId) },
+            nextCursor = page.nextCursor,
+        )
     }
 
     @Transactional
@@ -125,7 +128,7 @@ class MemberLifecycleService(
             memberLifecycleStore.lockActiveHostRows(member.clubId)
         }
         val membership = memberLifecycleStore.findMembershipInClubForUpdate(member.clubId, member.membershipId)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required")
+            ?: throw AuthApplicationException(AuthApplicationError.AUTHENTICATION_REQUIRED, "Authentication required")
         if (membership.role == MembershipRole.HOST && memberLifecycleStore.activeHostCount(member.clubId) <= 1) {
             throw lifecycleConflict("Last active host cannot leave")
         }
@@ -188,13 +191,13 @@ class MemberLifecycleService(
 
     private fun requireHost(member: CurrentMember) {
         if (!member.isHost) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Host role required")
+            throw AuthApplicationException(AuthApplicationError.HOST_REQUIRED, "Host role required")
         }
     }
 
-    private fun lifecycleNotFound(): ResponseStatusException =
-        ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found")
+    private fun lifecycleNotFound(): AuthApplicationException =
+        AuthApplicationException(AuthApplicationError.MEMBER_NOT_FOUND, "Member not found")
 
-    private fun lifecycleConflict(message: String): ResponseStatusException =
-        ResponseStatusException(HttpStatus.CONFLICT, message)
+    private fun lifecycleConflict(message: String): AuthApplicationException =
+        AuthApplicationException(AuthApplicationError.MEMBER_CONFLICT, message)
 }
