@@ -141,7 +141,7 @@ describe("public navigation auth state", () => {
       JSON.stringify({ pathname: "/records", search: "", scrollY: 720 }),
     );
 
-    renderAt("/sessions/session-1", <PublicFooter showGuestMemberActions={false} />);
+    renderAt("/sessions/session-1", <PublicFooter showGuestMemberActions={false} LinkComponent={Link} />);
 
     fireEvent.click(screen.getByRole("link", { name: "공개 기록" }));
 
