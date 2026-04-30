@@ -27,6 +27,8 @@ Controller must not own SQL, inject `JdbcTemplate`, inject legacy repositories d
 
 Application services own orchestration, membership/role/session authorization, domain rules, and outbound port calls.
 
+Application services must not throw Spring web/http exceptions. Use feature application errors and map them in `adapter.in.web`.
+
 Persistence adapters own SQL/JPA details, DB rows, and column mapping.
 
 Security boundaries:

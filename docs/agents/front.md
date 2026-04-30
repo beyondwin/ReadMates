@@ -28,12 +28,12 @@ src/app -> src/pages -> features -> shared
 - `features/<name>/model`: pure calculation/mapping; no React, router, fetch, or API client imports.
 - `features/<name>/route`: loader/action behavior, API/model calls, route state, UI prop assembly.
 - `features/<name>/ui`: render from props/callbacks only; no `fetch`, `shared/api`, feature API, or route imports.
-- `shared`: reusable primitives; do not import feature/page/app code except documented legacy exceptions.
+- `shared`: reusable primitives; do not import feature/page/app code.
 - `functions`: Cloudflare Pages Functions for same-origin BFF and OAuth proxy routes; never expose BFF secrets through `VITE_*`.
 
 Do not add new imports from removed `shared/api/readmates`. Use feature-owned API modules or `shared/api` primitives.
 
-When touching a migrated feature, prefer `api`, `model`, `route`, `ui` placement over adding to legacy `components`.
+When touching a migrated feature, prefer `api`, `model`, `route`, `ui` placement over adding to legacy `components`. If a feature has `ui`, that directory is the public presentation surface; do not expose `components` as a new public import surface.
 
 Checks:
 
