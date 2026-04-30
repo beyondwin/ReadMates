@@ -103,6 +103,91 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-conf
 
 `02-configure.sh`는 baseline OAuth, DB, BFF 값으로 `/etc/readmates/readmates.env`를 다시 생성합니다. 알림 발송을 켜는 배포에서는 실행 뒤 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*`, `READMATES_MANAGEMENT_*` 값을 같은 env 파일에 운영 값으로 추가하고 `readmates-server`를 재시작합니다.
 
+## Optional Redis and Kafka Rollout
+
+Redis와 Kafka는 v1.3.0 기준 optional 운영 계층입니다. 서버는 Redis/Kafka 없이 먼저 배포할 수 있고, 기본값도 꺼져 있습니다. Redis는 MySQL을 대체하지 않는 cache/rate-limit 계층이고, Kafka는 알림 event outbox를 실제 in-app/email delivery로 fan-out하는 계층입니다.
+
+운영 권장 형태:
+
+- Redis: OCI Cache with Redis 같은 managed Redis를 private subnet에 둡니다. 로컬 `compose.yml`의 `redis:7.4-alpine`은 개발/테스트용입니다.
+- Kafka: OCI Streaming의 Kafka-compatible endpoint 또는 managed Kafka를 사용합니다. 로컬 `compose.yml`의 Redpanda는 개발/테스트용입니다.
+- 단일 VM에 Redis/Redpanda를 직접 띄우는 방식은 작은 demo에서는 가능하지만, backup, disk pressure, upgrade, broker 장애 복구를 직접 운영해야 하므로 production 기본값으로 두지 않습니다.
+
+빠른 단일 VM rollout이 필요하면 `deploy/oci/compose.infra.yml`로 Redis와 Redpanda만 보조 인프라로 띄울 수 있습니다. 이 파일은 Spring Boot JAR와 MySQL 배포 방식을 바꾸지 않고, Redis/Kafka-compatible endpoint를 `127.0.0.1`에만 bind합니다.
+
+```bash
+docker compose -f /opt/readmates/deploy/oci/compose.infra.yml up -d
+docker compose -f /opt/readmates/deploy/oci/compose.infra.yml ps
+```
+
+systemd로 재부팅 후 자동 복구를 맡기려면 VM에 아래 unit을 둡니다.
+
+```ini
+[Unit]
+Description=ReadMates optional Redis and Redpanda infrastructure
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/readmates
+ExecStart=/usr/bin/docker compose -f /opt/readmates/deploy/oci/compose.infra.yml up -d
+ExecStop=/usr/bin/docker compose -f /opt/readmates/deploy/oci/compose.infra.yml down
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Compose 기반 보조 인프라를 쓰는 서버 env 예시:
+
+```bash
+READMATES_REDIS_URL=redis://127.0.0.1:6379
+READMATES_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092
+```
+
+OCI security list나 host firewall에서 `6379`, `9092`를 public internet에 열지 않습니다. 다른 VM에서 접근해야 하면 public bind 대신 private subnet address와 보안 그룹으로 제한합니다.
+
+첫 v1.3.0 서버 배포에서는 아래처럼 모두 끈 상태로 Flyway와 기존 앱 smoke를 먼저 통과시킵니다.
+
+```bash
+READMATES_REDIS_ENABLED=false
+READMATES_RATE_LIMIT_ENABLED=false
+READMATES_AUTH_SESSION_CACHE_ENABLED=false
+READMATES_PUBLIC_CACHE_ENABLED=false
+READMATES_NOTES_CACHE_ENABLED=false
+READMATES_NOTIFICATIONS_ENABLED=false
+READMATES_KAFKA_ENABLED=false
+```
+
+Redis를 켤 때는 endpoint 접근성을 먼저 확인한 뒤 기능 flag를 단계적으로 켭니다.
+
+```bash
+READMATES_REDIS_URL=redis://<redis-private-host>:6379
+READMATES_REDIS_ENABLED=true
+READMATES_RATE_LIMIT_ENABLED=true
+READMATES_AUTH_SESSION_CACHE_ENABLED=true
+READMATES_PUBLIC_CACHE_ENABLED=true
+READMATES_NOTES_CACHE_ENABLED=true
+```
+
+문제가 생기면 해당 기능 flag만 끕니다. Redis 장애가 반복되면 `READMATES_REDIS_ENABLED=false`로 되돌리면 MySQL-only 동작으로 복귀합니다.
+
+Kafka 알림은 Redis와 별도 rollout로 켭니다. 알림 topic과 DLQ topic을 먼저 만들고, Spring runtime에는 아래 값이 필요합니다.
+
+```bash
+READMATES_NOTIFICATIONS_ENABLED=true
+READMATES_KAFKA_ENABLED=true
+READMATES_KAFKA_BOOTSTRAP_SERVERS=<kafka-bootstrap-host>:9092
+READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC=readmates.notification.events.v1
+READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC=readmates.notification.events.dlq.v1
+READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher
+```
+
+`READMATES_NOTIFICATIONS_ENABLED=false` 또는 `READMATES_KAFKA_ENABLED=false`이면 Kafka relay/consumer가 뜨지 않습니다. 이 상태에서도 도메인 이벤트 row는 `notification_event_outbox`에 쌓일 수 있으므로, 알림을 실제 사용자 기능으로 열기 전에는 pending row 수를 확인하고 Kafka/SMTP를 켠 뒤 처리 결과를 봅니다.
+
+실제 이메일 발송까지 켤 때만 SMTP 값을 함께 설정합니다.
+
 ## Multi-club Origin and OAuth Settings
 
 Spring은 OAuth callback origin과 app return origin을 분리합니다.
