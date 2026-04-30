@@ -6,7 +6,7 @@ import HostSessionEditor from "@/features/host/ui/host-session-editor";
 import {
   buildHostSessionRequest,
   defaultSessionDateFrom,
-} from "@/features/host/components/host-session-schedule";
+} from "@/features/host/ui/host-session-schedule";
 import type {
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,

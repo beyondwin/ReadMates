@@ -9,6 +9,8 @@ const sourceRoots = ["src", "features", "shared"];
 const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
 const featuresWithUiPublicSurface = collectFeaturesWithUiPublicSurface();
 const removedReadmatesApiCompatibilityPath = ["shared", "api", "readmates"].join("/");
+const routeOwnedActionTypeExportPattern =
+  /(?:export\s+(?:type|interface)\s+\w+Actions\b|export\s+(?:type\s+\{[^}]*\w+Actions\b|\{[^}]*\btype\s+\w+Actions\b))/;
 
 type BoundaryRuleId =
   | "shared-boundary"
@@ -385,6 +387,19 @@ describe("frontend architecture boundaries", () => {
     expect(isSharedToFeaturePageOrAppImport(sourceFile, importSpecifier.projectPath)).toBe(true);
   });
 
+  it("detects route-owned action type exports from host UI modules", () => {
+    const invalidExports = [
+      "export type HostDashboardActions = {};",
+      "export interface HostDashboardActions {}",
+      "export type { HostDashboardActions } from './host-dashboard-actions';",
+      "export { type HostDashboardActions } from './host-dashboard-actions';",
+    ];
+
+    for (const invalidExport of invalidExports) {
+      expect(invalidExport, `${invalidExport} must be rejected`).toMatch(routeOwnedActionTypeExportPattern);
+    }
+  });
+
   it("keeps shared, feature route, feature model, and feature UI dependencies inside their allowed boundaries", () => {
     assertLegacyBoundaryExceptionsAreUnique();
 
@@ -497,9 +512,7 @@ describe("frontend architecture boundaries", () => {
         "@/features/host/api/host-api",
       );
       expect(source, `${relativePath} must not call fetch directly`).not.toMatch(/\bfetch\s*\(/);
-      expect(source, `${relativePath} must not export route-owned action types`).not.toMatch(
-        /(?:export\s+(?:type|interface)\s+\w+Actions\b|export\s+type\s+\{[^}]*\w+Actions\b)/,
-      );
+      expect(source, `${relativePath} must not export route-owned action types`).not.toMatch(routeOwnedActionTypeExportPattern);
     }
   });
 
