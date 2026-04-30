@@ -10,6 +10,16 @@ ReadMates는 여러 정기 독서모임의 세션 준비, 참여 관리, 기록 
 
 이 저장소는 외부 공개를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
 
+## 문서 사용 기준
+
+README는 제품과 아키텍처의 첫 진입점입니다. 실제 작업에서는 아래 source of truth를 우선합니다.
+
+- 현재 동작과 경계: 코드, 테스트, [아키텍처 문서](docs/development/architecture.md)
+- 로컬 실행과 검증: [개발자 문서](docs/development/README.md), [테스트 가이드](docs/development/test-guide.md)
+- 운영 배포와 공개 안전: [배포 문서](docs/deploy/README.md), [공개 저장소 보안](docs/deploy/security-public-repo.md), [scripts 문서](scripts/README.md)
+
+문서나 예시를 고칠 때는 실제 운영값 대신 placeholder를 사용하고, 변경한 표면에 맞는 최소 검증을 실행합니다. 실행하지 못한 검증은 통과한 것처럼 쓰지 않고 이유를 남깁니다.
+
 ## 왜 만들었나
 
 소규모 독서모임은 규모가 작아도 운영 정보가 쉽게 흩어집니다. 모임 공지, RSVP, 읽은 분량, 질문, 하이라이트, 한줄평, 장문 서평, 참석 기록, 모임 후 피드백 문서가 채팅방과 문서 도구 사이에 분산되면 다음 회차를 준비하거나 지난 기록을 다시 찾기 어렵습니다.

@@ -4,6 +4,10 @@ Cloudflare Pages는 Vite SPA와 같은 origin에서 동작하는 BFF/OAuth proxy
 
 상위 배포 허브는 [README.md](README.md)입니다. 승인된 포트폴리오 데모 URL은 `https://readmates.pages.dev`입니다. 멀티 클럽 도메인 운영 절차는 [multi-club-domains.md](multi-club-domains.md)를 함께 확인합니다.
 
+이 runbook은 Pages project 설정, Functions routing, Spring origin 설정, OAuth redirect URI가 서로 맞을 때 완료입니다. 배포 후에는 SPA deep route, `/api/bff/api/auth/me`, OAuth start redirect, domain marker, club-scoped public API를 확인합니다.
+
+Cloudflare 계정 ID, API token, custom domain 목록, production secret 값은 문서에 쓰지 않습니다. Provider UI나 plan limit은 바뀔 수 있으므로 실제 설정 전에는 현재 Cloudflare 문서를 확인합니다.
+
 ## 프로젝트 설정
 
 | 항목 | 값 |

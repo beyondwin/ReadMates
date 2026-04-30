@@ -2,6 +2,10 @@
 
 이 문서는 ReadMates를 로컬에서 실행하기 위한 최소 절차를 정리합니다. 운영 배포 절차는 [배포 문서](../deploy/README.md)를 참고합니다.
 
+로컬 실행은 backend health check와 frontend dev server가 모두 응답하고, dev-login 또는 OAuth 흐름 중 작업 목적에 맞는 경로를 확인했을 때 완료로 봅니다. 운영 secret, private endpoint, 실제 멤버 데이터는 로컬 env 파일이나 shell history에만 두더라도 Git에 남기지 않습니다.
+
+문서의 placeholder를 실제 운영값으로 바꿔 커밋하려는 상황, `docker compose down -v`처럼 로컬 데이터를 삭제하는 작업, 또는 SMTP/Google OAuth 같은 외부 provider 설정이 현재 코드와 맞는지 확신할 수 없는 상황에서는 먼저 멈추고 범위를 확인합니다.
+
 ## 필수 도구
 
 - `JDK 21`

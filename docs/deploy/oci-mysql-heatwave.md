@@ -2,6 +2,10 @@
 
 현재 기준 문서는 [README.md](README.md)와 [oci-backend.md](oci-backend.md)입니다. 이 문서는 OCI MySQL HeatWave, 논리 export, 복구 rehearsal을 위한 하위 참고 문서입니다.
 
+백업 운영은 dump 생성, checksum 생성, private Object Storage 업로드, 비운영 restore rehearsal이 모두 검증됐을 때 신뢰할 수 있습니다. 단순히 export script가 한 번 성공한 것만으로 복구 가능성을 보장하지 않습니다.
+
+OCI Always Free, Object Storage, networking 한도는 바뀔 수 있으므로 실제 리소스를 만들기 전에는 현재 OCI 콘솔 또는 공식 문서에서 확인합니다. Bucket 이름, namespace, private host, OCID, backup object 목록은 공개 문서에 남기지 않습니다.
+
 ## 리소스 기준
 
 - Cloudflare Pages: `front/` SPA와 Pages Functions

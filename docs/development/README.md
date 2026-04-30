@@ -32,3 +32,10 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 - 운영 secret, 실제 멤버 데이터, DB dump, private deployment state, 로컬 절대 경로는 문서에 넣지 않습니다.
 - 직접 backend/API origin 예시는 `https://api.example.com` 같은 placeholder만 사용합니다.
 - 배포 절차의 상세 runbook은 `docs/deploy`에 두고, 이 디렉터리에서는 개발자가 알아야 할 연결점만 다룹니다.
+
+## 문서 업데이트 완료 기준
+
+- 코드, 설정, 테스트, 스크립트와 맞는 사실만 현재 동작으로 설명합니다.
+- `docs/superpowers`의 과거 계획은 맥락으로만 보고, 현재 동작의 기준으로 승격하지 않습니다.
+- 개발 문서가 배포, public release, secret handling을 설명하면 관련 `docs/deploy` 또는 `scripts/README.md`도 함께 확인합니다.
+- 변경한 문서에 대해 `git diff --check -- <changed-docs>`를 실행하고, public-safe 내용이면 targeted safety scan 또는 공개 릴리즈 후보 검사를 실행했는지 명시합니다.

@@ -10,6 +10,10 @@ ReadMates는 Git tag, GitHub Releases, `CHANGELOG.md`를 함께 사용합니다.
 - GitHub 자동 생성 노트는 초안으로만 사용하고, 최종 노트는 사람이 읽기 좋게 정리합니다.
 - 서버 API나 DB migration이 포함된 릴리즈는 `Deployment Notes`를 반드시 둡니다.
 
+릴리즈 문서가 완료되려면 변경 범위, 배포 순서, DB migration 여부, 실행한 검증, 공개 릴리즈 후보 검사 결과가 서로 맞아야 합니다. 실행하지 못한 검증은 `Verification`에 성공처럼 쓰지 않고 스킵 사유와 남은 리스크를 적습니다.
+
+Tag push, GitHub Release 생성, production 배포, secret rotation은 문서 편집보다 영향이 큰 운영 작업입니다. 사용자가 명시적으로 요청하지 않았으면 절차를 문서화하거나 준비만 하고 실행하지 않습니다.
+
 ## 버전 규칙
 
 ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
