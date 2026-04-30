@@ -4,8 +4,9 @@ import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-
 
 export type FeedbackDocumentRouteData = FeedbackLoadResult;
 
-export async function feedbackDocumentLoader({ params }: LoaderFunctionArgs): Promise<FeedbackDocumentRouteData> {
-  const access = await loadMemberAppAuth({ params });
+export async function feedbackDocumentLoader(args: LoaderFunctionArgs): Promise<FeedbackDocumentRouteData> {
+  const { params } = args;
+  const access = await loadMemberAppAuth(args);
 
   if (!access.allowed) {
     return { status: "unavailable", reason: "forbidden" };

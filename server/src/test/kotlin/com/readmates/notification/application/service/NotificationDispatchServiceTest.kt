@@ -48,6 +48,7 @@ class NotificationDispatchServiceTest {
                 to = "member@example.com",
                 subject = "다음 책이 공개되었습니다",
                 text = "다음 책을 확인해 주세요.",
+                html = "<html><body>다음 책을 확인해 주세요.</body></html>",
             ),
         )
         assertThat(deliveryPort.sent).containsExactly(emailDelivery().id to claimedEmailDelivery().lockedAt)
@@ -370,6 +371,7 @@ class NotificationDispatchServiceTest {
             recipientEmail = email,
             subject = "다음 책이 공개되었습니다",
             bodyText = "다음 책을 확인해 주세요.",
+            bodyHtml = "<html><body>다음 책을 확인해 주세요.</body></html>",
         )
 
     private fun inAppDelivery(): NotificationDeliveryItem =
@@ -380,6 +382,7 @@ class NotificationDispatchServiceTest {
             recipientEmail = null,
             subject = null,
             bodyText = null,
+            bodyHtml = null,
         )
 
     private fun claimedEmailDelivery(delivery: NotificationDeliveryItem = emailDelivery()): ClaimedNotificationDeliveryItem =
@@ -397,6 +400,7 @@ class NotificationDispatchServiceTest {
                 recipientEmail = it.recipientEmail,
                 subject = it.subject,
                 bodyText = it.bodyText,
+                bodyHtml = it.bodyHtml,
             )
         }
 
@@ -452,6 +456,7 @@ class NotificationDispatchServiceTest {
                 recipientEmail = planned.recipientEmail,
                 subject = planned.subject,
                 bodyText = planned.bodyText,
+                bodyHtml = planned.bodyHtml,
             )
         }
 

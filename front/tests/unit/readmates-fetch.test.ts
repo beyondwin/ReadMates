@@ -13,9 +13,16 @@ describe("readmatesFetchResponse", () => {
     const assignMock = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
-    vi.stubGlobal("location", { assign: assignMock });
+    vi.stubGlobal("location", {
+      assign: assignMock,
+      hash: "",
+      pathname: "/clubs/reading-sai/app/feedback/session-1",
+      search: "?from=email",
+    });
 
-    await expect(readmatesFetchResponse("/api/app/me")).rejects.toThrow("ReadMates session expired");
+    await expect(readmatesFetchResponse("/api/app/me", undefined, { clubSlug: undefined })).rejects.toThrow(
+      "ReadMates session expired",
+    );
 
     expect(fetch).toHaveBeenCalledWith(
       "/api/bff/api/app/me",
@@ -26,7 +33,9 @@ describe("readmatesFetchResponse", () => {
     const headers = fetchMock.mock.calls[0]?.[1]?.headers;
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).get("Content-Type")).toBe("application/json");
-    expect(assignMock).toHaveBeenCalledWith("/login");
+    expect(assignMock).toHaveBeenCalledWith(
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
+    );
   });
 
   it("preserves FormData uploads by leaving Content-Type unset", async () => {

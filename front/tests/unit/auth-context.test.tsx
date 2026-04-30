@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/src/app/auth-context";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
@@ -155,13 +155,20 @@ async function rejectAuthRequest(deferred: Deferred<Response>, reason: unknown) 
   });
 }
 
-function renderGuard(element: React.ReactElement) {
+function LoginLocationProbe() {
+  const location = useLocation();
+
+  return <main>login page {location.search}</main>;
+}
+
+function renderGuard(element: React.ReactElement, initialEntry = "/guard") {
   render(
     <AuthProvider>
-      <MemoryRouter initialEntries={["/guard"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route path="/guard" element={element} />
-          <Route path="/login" element={<main>login page</main>} />
+          <Route path="/clubs/:clubSlug/app/feedback/:sessionId" element={element} />
+          <Route path="/login" element={<LoginLocationProbe />} />
           <Route path="/app" element={<main>member app</main>} />
           <Route path="/app/pending" element={<main>pending page</main>} />
         </Routes>
@@ -396,7 +403,7 @@ describe("route guards", () => {
       </RequireAuth>,
     );
 
-    expect(await screen.findByText("login page")).toBeInTheDocument();
+    expect(await screen.findByText(/login page/)).toBeInTheDocument();
     expect(screen.queryByText("protected app")).not.toBeInTheDocument();
   });
 
@@ -409,7 +416,23 @@ describe("route guards", () => {
       </RequireMemberApp>,
     );
 
-    expect(await screen.findByText("login page")).toBeInTheDocument();
+    expect(await screen.findByText(/login page/)).toBeInTheDocument();
+    expect(screen.queryByText("member app boundary")).not.toBeInTheDocument();
+  });
+
+  it("redirects anonymous member app routes to login with returnTo", async () => {
+    mockAuthFetch(anonymousAuth);
+
+    renderGuard(
+      <RequireMemberApp>
+        <main>member app boundary</main>
+      </RequireMemberApp>,
+      "/clubs/reading-sai/app/feedback/session-1?from=email",
+    );
+
+    expect(
+      await screen.findByText(/returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail/),
+    ).toBeInTheDocument();
     expect(screen.queryByText("member app boundary")).not.toBeInTheDocument();
   });
 

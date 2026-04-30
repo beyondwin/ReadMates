@@ -61,6 +61,7 @@ class NotificationEventModelsTest {
             recipientEmail = "member@example.test",
             subject = "Notification subject",
             bodyText = "Notification body",
+            bodyHtml = "<html><body>Notification body</body></html>",
         )
 
         assertThat(item.lockedAt).isEqualTo(lockedAt)

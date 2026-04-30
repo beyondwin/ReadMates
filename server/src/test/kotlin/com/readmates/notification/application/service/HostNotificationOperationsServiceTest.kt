@@ -218,6 +218,7 @@ private fun claimedDelivery(
         recipientEmail = "member@example.com",
         subject = "Feedback document is ready",
         bodyText = "ReadMates에서 확인해 주세요.",
+        bodyHtml = "<html><body>피드백 문서</body></html>",
     )
 
 private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")

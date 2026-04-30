@@ -41,10 +41,9 @@ export function enrichSessionDetailHighlightAuthors(
   };
 }
 
-export async function memberSessionDetailLoader({
-  params,
-}: LoaderFunctionArgs): Promise<MemberSessionDetailRouteData> {
-  const access = await loadArchiveMemberAuth({ params });
+export async function memberSessionDetailLoader(args: LoaderFunctionArgs): Promise<MemberSessionDetailRouteData> {
+  const { params } = args;
+  const access = await loadArchiveMemberAuth(args);
   const context = { clubSlug: clubSlugFromLoaderArgs({ params }) };
 
   if (!access.allowed) {
