@@ -1670,7 +1670,7 @@ Run:
 ```bash
 git diff --check
 git diff --cached --check
-git grep -n -E 'gmail[.]com|READMATES_BFF_SECRET=|SPRING_DATASOURCE_PASSWORD=|BEGIN PRIVATE KEY|app password|password=|token=' -- server front docs ':!docs/superpowers/plans/2026-04-30-readmates-email-template-redesign-implementation-plan.md' || true
+git grep -n -E '<public-safety-secret-patterns>' -- server front docs ':!docs/superpowers/plans/2026-04-30-readmates-email-template-redesign-implementation-plan.md' || true
 ```
 
 Expected: no newly introduced real secrets, private hosts, real member data, or token-shaped examples. Known public-safe fixture domains such as `example.com`, `example.test`, and `app.readmates.example` are acceptable.
@@ -1759,7 +1759,7 @@ Next first action:
 
 Worktree/branch:
 
-- `/Users/kws/.config/superpowers/worktrees/ReadMates/codex-email-template-redesign`
+- `<local-worktree>/ReadMates/codex-email-template-redesign`
 - `codex/email-template-redesign`
 
 Session-owned process/port state:
