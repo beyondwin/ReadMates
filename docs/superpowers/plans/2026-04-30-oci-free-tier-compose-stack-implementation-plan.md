@@ -115,7 +115,7 @@ git commit -m "build: add readmates server docker image"
 - Modify: `deploy/oci/compose.infra.yml`
 - Test: `docker compose -f deploy/oci/compose.yml config`
 
-- [ ] **Step 1: Create `deploy/oci/compose.yml`**
+- [x] **Step 1: Create `deploy/oci/compose.yml`**
 
 Write exactly:
 
@@ -211,7 +211,7 @@ volumes:
   readmates-redpanda-data:
 ```
 
-- [ ] **Step 2: Create `deploy/oci/Caddyfile`**
+- [x] **Step 2: Create `deploy/oci/Caddyfile`**
 
 Write exactly:
 
@@ -226,7 +226,7 @@ Write exactly:
 }
 ```
 
-- [ ] **Step 3: Create `deploy/oci/readmates-stack.service`**
+- [x] **Step 3: Create `deploy/oci/readmates-stack.service`**
 
 Write exactly:
 
@@ -250,7 +250,7 @@ TimeoutStopSec=120
 WantedBy=multi-user.target
 ```
 
-- [ ] **Step 4: Add a transition warning to `deploy/oci/compose.infra.yml`**
+- [x] **Step 4: Add a transition warning to `deploy/oci/compose.infra.yml`**
 
 Insert this comment at the top of the file:
 
@@ -269,7 +269,7 @@ READMATES_SERVER_IMAGE=readmates-server:local docker compose -f deploy/oci/compo
 
 Expected: normalized compose configuration prints without errors. If local Docker Compose is unavailable, run this check on the VM after Task 3.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add deploy/oci/compose.yml deploy/oci/Caddyfile deploy/oci/readmates-stack.service deploy/oci/compose.infra.yml

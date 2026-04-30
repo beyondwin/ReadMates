@@ -1,0 +1,89 @@
+name: readmates
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file:
+      - /etc/readmates/caddy.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - readmates-caddy-data:/data
+      - readmates-caddy-config:/config
+    depends_on:
+      readmates-api:
+        condition: service_healthy
+
+  readmates-api:
+    image: ${READMATES_SERVER_IMAGE:-readmates-server:local}
+    restart: unless-stopped
+    env_file:
+      - /etc/readmates/readmates.env
+    environment:
+      READMATES_REDIS_URL: redis://redis:6379
+      READMATES_KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      READMATES_MANAGEMENT_ADDRESS: 0.0.0.0
+      READMATES_MANAGEMENT_PORT: 8081
+    expose:
+      - "8080"
+      - "8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/internal/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    expose:
+      - "6379"
+    volumes:
+      - readmates-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.7
+    restart: unless-stopped
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+    expose:
+      - "9092"
+    volumes:
+      - readmates-redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health --exit-when-healthy --watch=false"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  readmates-caddy-data:
+  readmates-caddy-config:
+  readmates-redis-data:
+  readmates-redpanda-data:
