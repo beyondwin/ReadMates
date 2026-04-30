@@ -108,7 +108,68 @@ class MySqlQueryPlanTest(
               sessions.id,
               sessions.number,
               sessions.book_title,
-              sessions.session_date
+              sessions.session_date,
+              (
+                select count(*)
+                from questions
+                where questions.club_id = sessions.club_id
+                  and questions.session_id = sessions.id
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = questions.session_id
+                      and session_participants.club_id = questions.club_id
+                      and session_participants.membership_id = questions.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
+              ) as question_count,
+              (
+                select count(*)
+                from one_line_reviews
+                where one_line_reviews.club_id = sessions.club_id
+                  and one_line_reviews.session_id = sessions.id
+                  and one_line_reviews.visibility = 'PUBLIC'
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = one_line_reviews.session_id
+                      and session_participants.club_id = one_line_reviews.club_id
+                      and session_participants.membership_id = one_line_reviews.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
+              ) as one_liner_count,
+              (
+                select count(*)
+                from long_reviews
+                where long_reviews.club_id = sessions.club_id
+                  and long_reviews.session_id = sessions.id
+                  and long_reviews.visibility = 'PUBLIC'
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = long_reviews.session_id
+                      and session_participants.club_id = long_reviews.club_id
+                      and session_participants.membership_id = long_reviews.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
+              ) as long_review_count,
+              (
+                select count(*)
+                from highlights
+                where highlights.club_id = sessions.club_id
+                  and highlights.session_id = sessions.id
+                  and (
+                    highlights.membership_id is null
+                    or exists (
+                      select 1
+                      from session_participants
+                      where session_participants.session_id = highlights.session_id
+                        and session_participants.club_id = highlights.club_id
+                        and session_participants.membership_id = highlights.membership_id
+                        and session_participants.participation_status = 'ACTIVE'
+                    )
+                  )
+              ) as highlight_count
             from sessions
             where sessions.club_id = ?
               and sessions.state = 'PUBLISHED'
@@ -130,6 +191,11 @@ class MySqlQueryPlanTest(
         )
 
         plan.assertUsesIndexFor("sessions", "notes session cursor page")
+        plan.assertUsesIndexFor("questions", "notes session question count")
+        plan.assertUsesIndexFor("one_line_reviews", "notes session one-line review count")
+        plan.assertUsesIndexFor("long_reviews", "notes session long review count")
+        plan.assertUsesIndexFor("highlights", "notes session highlight count")
+        plan.assertUsesIndexFor("session_participants", "notes session active participant filters")
     }
 
     @Test
@@ -142,8 +208,13 @@ class MySqlQueryPlanTest(
               email,
               account_name,
               display_name,
+              profile_image_url,
               role,
-              status
+              status,
+              joined_at,
+              created_at,
+              current_session_id,
+              participation_status
             from (
               select
                 memberships.id as membership_id,
@@ -151,8 +222,13 @@ class MySqlQueryPlanTest(
                 users.email,
                 users.name as account_name,
                 coalesce(memberships.short_name, users.name) as display_name,
+                users.profile_image_url,
                 memberships.role,
                 memberships.status,
+                memberships.joined_at,
+                memberships.created_at,
+                current_session.id as current_session_id,
+                session_participants.participation_status,
                 case memberships.role when 'HOST' then 0 else 1 end as role_rank,
                 case memberships.status
                   when 'ACTIVE' then 0
@@ -164,6 +240,19 @@ class MySqlQueryPlanTest(
                 end as status_rank
               from memberships
               join users on users.id = memberships.user_id
+              left join sessions current_session on current_session.club_id = memberships.club_id
+                and current_session.state = 'OPEN'
+                and current_session.id = (
+                  select sessions.id
+                  from sessions
+                  where sessions.club_id = memberships.club_id
+                    and sessions.state = 'OPEN'
+                  order by sessions.number desc
+                  limit 1
+                )
+              left join session_participants on session_participants.session_id = current_session.id
+                and session_participants.club_id = memberships.club_id
+                and session_participants.membership_id = memberships.id
               where memberships.club_id = ?
             ) ordered_members
             where (
@@ -198,27 +287,28 @@ class MySqlQueryPlanTest(
         )
 
         plan.assertUsesIndexFor("memberships", "host member cursor page")
+        plan.assertUsesIndexFor("current_session", "host member current open session join")
+        plan.assertUsesIndexFor("sessions", "host member current open session lookup")
+        plan.assertUsesIndexFor("session_participants", "host member current session participation join")
     }
 
     @Test
-    fun `notification delivery claim query uses indexed access on deliveries`() {
+    fun `global notification delivery claim query uses indexed access on deliveries`() {
         val plan = jdbcTemplate.explain(
             """
             select id
             from notification_deliveries
-            where club_id = ?
-              and channel = 'EMAIL'
+            where channel = 'EMAIL'
               and status in ('PENDING', 'FAILED')
               and next_attempt_at <= utc_timestamp(6)
             order by next_attempt_at, created_at
             limit ?
             for update skip locked
             """.trimIndent(),
-            READING_SAI_CLUB_ID,
             50,
         )
 
-        plan.assertUsesIndexFor("notification_deliveries", "notification delivery claim")
+        plan.assertUsesIndexFor("notification_deliveries", "global notification delivery claim")
     }
 
     @Test

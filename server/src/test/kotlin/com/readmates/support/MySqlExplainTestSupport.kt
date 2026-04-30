@@ -37,11 +37,30 @@ fun List<MySqlExplainRow>.assertUsesIndexFor(tableName: String, reason: String) 
     assertThat(candidates)
         .describedAs("EXPLAIN plan should include table $tableName for $reason. Plan: $this")
         .isNotEmpty
-    assertThat(candidates)
-        .describedAs("EXPLAIN plan should use an index for $tableName ($reason). Plan: $this")
-        .anySatisfy { row ->
-            assertThat(row.key)
-                .describedAs("EXPLAIN key for $tableName ($reason). Row: $row")
-                .isNotBlank()
-        }
+    val allowedAccessTypes = setOf(
+        "const",
+        "eq_ref",
+        "index_merge",
+        "index_subquery",
+        "range",
+        "ref",
+        "ref_or_null",
+        "system",
+        "unique_subquery",
+    )
+    val invalidAccessRows = candidates.filter { row ->
+        row.accessType?.lowercase() !in allowedAccessTypes
+    }
+    assertThat(invalidAccessRows)
+        .describedAs(
+            "EXPLAIN plan should use targeted indexed access for $tableName ($reason), " +
+                "not full table or full index scans. Plan: $this",
+        )
+        .isEmpty()
+    val missingKeyRows = candidates.filter { row ->
+        row.accessType?.lowercase() != "system" && row.key.isNullOrBlank()
+    }
+    assertThat(missingKeyRows)
+        .describedAs("EXPLAIN key should be present for $tableName ($reason). Plan: $this")
+        .isEmpty()
 }
