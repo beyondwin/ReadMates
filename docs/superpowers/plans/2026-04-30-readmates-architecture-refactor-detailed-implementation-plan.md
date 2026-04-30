@@ -1219,7 +1219,7 @@ Acceptance criteria completed: notification delivery, host session write, and ar
 - Move host files from `front/features/host/components` to `front/features/host/ui`
 - Modify host route/data imports and unit tests.
 
-- [ ] **Step 1: Remove frontend boundary exceptions first**
+- [x] **Step 1: Remove frontend boundary exceptions first**
 
 In `frontend-boundaries.test.ts`, remove the legacy exceptions for:
 
@@ -1238,7 +1238,7 @@ pnpm --dir front test -- --run tests/unit/frontend-boundaries.test.ts
 
 Expected: fail with shared-to-app and host components import violations.
 
-- [ ] **Step 2: Inject app link behavior into shared UI**
+- [x] **Step 2: Inject app link behavior into shared UI**
 
 Change shared navigation components to accept a `LinkComponent` prop:
 
@@ -1254,7 +1254,7 @@ Use it instead of importing `Link` from `src/app/router-link`.
 
 In `front/src/app/layouts.tsx`, pass the app `Link` into shared UI components.
 
-- [ ] **Step 3: Move host presentation to ui**
+- [x] **Step 3: Move host presentation to ui**
 
 Move files:
 
@@ -1285,7 +1285,7 @@ front/tests/unit/host-members.test.tsx
 front/tests/unit/host-session-editor.test.tsx
 ```
 
-- [ ] **Step 4: Move host action types out of UI**
+- [x] **Step 4: Move host action types out of UI**
 
 For action type exports currently living beside host UI, create:
 
@@ -1298,7 +1298,7 @@ front/features/host/route/host-session-editor-actions.ts
 
 Update route data modules to import action types from these files, not UI files.
 
-- [ ] **Step 5: Run frontend boundary and host tests**
+- [x] **Step 5: Run frontend boundary and host tests**
 
 Run:
 
@@ -1315,7 +1315,7 @@ pnpm --dir front test -- --run \
 
 Expected: all pass.
 
-- [ ] **Step 6: Commit frontend boundary cleanup**
+- [x] **Step 6: Commit frontend boundary cleanup**
 
 Run:
 
@@ -1323,6 +1323,9 @@ Run:
 git add front/shared front/src/app front/features/host front/tests/unit
 git commit -m "refactor: remove frontend legacy boundaries"
 ```
+
+COMPACT CHECKPOINT Task 8 - Remove Frontend Shared-To-App And Host Components Legacy Boundaries:
+Acceptance criteria completed: frontend boundary exceptions were removed; shared UI navigation/auth/footer/header components no longer import app router/continuity and receive app link behavior by prop injection; host presentation moved from `features/host/components` to `features/host/ui`; remaining host component legacy surface was removed; route-owned host action types live under `features/host/route`; boundary tests guard shared-to-app imports, host components imports, and host UI `*Actions` exports using AST inspection; implementation committed as `2f894e5`, follow-ups as `f9c2c2f`, `e408cf5`, `d9a6875`, and `7cca1e6`. Changed files: `front/shared/ui/*` navigation components, `front/src/app/layouts.tsx`, `front/src/app/host-route-elements.tsx`, `front/src/app/router.tsx`, host route/action/ui modules, host unit tests, `front/tests/unit/frontend-boundaries.test.ts`, and this plan document. Key decisions: shared UI defaults remain anchor-based for isolated tests while app composition injects SPA `Link`; host UI uses local structural props and route-owned action contracts to preserve route-first direction; AST export inspection is used because regex-only checks missed common TypeScript re-export forms. Contracts/API/state/test expectations: visual/runtime behavior is unchanged; no `front/features/host/components` surface or imports remain; `front/shared/ui` has no app/page/feature imports; route data imports action types from route files, not UI files. Reviews: initial spec review found `HostInvitationsActions` still exported from UI; follow-up made it private and added a boundary guard; subsequent reviews found remaining host components surface and weaker export guard forms; follow-ups moved the last files to `ui` and replaced the guard with AST export detection; final closure review found no Task 8 issues. Verification: red boundary test after removing exceptions failed with 17 expected shared-to-app/host-components violations; implementer ran the Task 8 frontend command, `pnpm --dir front lint`, and `git diff --check`, passed; follow-ups ran focused boundary/host editor/invitations tests, lint, `git diff --check`, and `rg -n "features/host/components|host/components" front`, passed/no matches; final local Task 8 command `pnpm --dir front test -- --run tests/unit/frontend-boundaries.test.ts tests/unit/responsive-navigation.test.tsx tests/unit/spa-layout.test.tsx tests/unit/host-dashboard.test.tsx tests/unit/host-invitations.test.tsx tests/unit/host-members.test.tsx tests/unit/host-session-editor.test.tsx` passed with 48 files and 621 tests because the package script already includes `vitest run`; code-quality reviewer also ran `pnpm --dir front test`, `pnpm --dir front build`, and `pnpm --dir front test:e2e`, passed. Existing non-failing stderr remains React Router `HydrateFallback` and jsdom navigation noise. Remaining risks: AST guard intentionally rejects any host UI named export ending in `Actions`; plain `export * from ...` cannot expose names statically but no such exports exist. Next first action: dispatch Task 9 implementer to extract shared Cloudflare BFF/OAuth proxy helpers and add header stripping assertions. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 8 subagents closed; no session-owned ports open.
 
 ## Task 9: Extract Shared BFF Proxy Helpers
 
