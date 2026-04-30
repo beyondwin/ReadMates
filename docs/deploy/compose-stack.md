@@ -45,7 +45,7 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-instal
 ```bash
 ./server/gradlew -p server clean test
 ./server/gradlew -p server bootJar
-VM_PUBLIC_IP=VM_PUBLIC_IP CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
+VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
 ```
 
 완료 기준은 script가 끝까지 성공하고, compose `readmates-api` health, Cloudflare BFF auth smoke, production integration smoke가 모두 통과하는 것입니다. Redis/Kafka 기능 flag는 별도 rollout 전에는 켜지지 않은 상태로 둡니다.
@@ -84,7 +84,7 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'sudo test -s /opt/readmates/rea
 
 ```bash
 ./server/gradlew -p server bootJar
-VM_PUBLIC_IP=VM_PUBLIC_IP ./deploy/oci/03-deploy.sh
+VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
 ```
 
 Legacy host 서비스를 Spring, Caddy 순서로 올립니다.

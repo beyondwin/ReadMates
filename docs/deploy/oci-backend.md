@@ -4,6 +4,8 @@
 
 상위 배포 허브는 [README.md](README.md)입니다. Cloudflare Pages와 Pages Functions 설정은 [cloudflare-pages.md](cloudflare-pages.md)를 함께 확인합니다. 멀티 클럽 domain alias와 OAuth origin 운영은 [multi-club-domains.md](multi-club-domains.md)를 기준으로 맞춥니다.
 
+2026-04-30 Compose cutover와 BFF secret 처리 이슈의 사건 기록은 [OCI Compose Cutover 배포 보고서](2026-04-30-oci-compose-cutover-deployment-report.md)에 남겨 두며, 반복 가능한 현재 절차는 이 문서와 [compose-stack.md](compose-stack.md)를 기준으로 합니다.
+
 백엔드 배포는 compose stack이 새 image로 실행되고, Flyway 결과와 `/internal/health`, Cloudflare BFF smoke, OAuth start smoke가 변경 범위에 맞게 확인됐을 때 완료입니다. DB migration, notification pipeline, mail delivery, Object Storage backup을 건드린 경우에는 해당 섹션의 targeted smoke도 함께 확인합니다.
 
 VM IP, SSH key path, private DB host, SMTP credential, OCI resource identifiers, 운영 smoke 결과 전문은 Git에 남기지 않습니다. 실제 provider 설정이나 비용 관련 판단은 현재 OCI/Cloudflare/Google 콘솔을 확인한 뒤 실행합니다.
@@ -134,7 +136,7 @@ READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
 
 OCI security list나 host firewall에서 `6379`, `9092`를 public internet에 열지 않습니다. 최종 compose stack에서는 두 포트를 host에 publish하지 않습니다.
 
-첫 v1.3.0 서버 배포에서는 아래처럼 모두 끈 상태로 Flyway와 기존 앱 smoke를 먼저 통과시킵니다.
+초기 compose cutover나 새 기능 flag rollout에서는 아래처럼 모두 끈 상태로 Flyway와 기존 앱 smoke를 먼저 통과시킵니다.
 
 ```bash
 READMATES_REDIS_ENABLED=false
