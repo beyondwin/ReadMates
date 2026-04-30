@@ -28,6 +28,10 @@ require_file() {
   fi
 }
 
+shell_quote() {
+  printf "%q" "$1"
+}
+
 echo "==> [1/9] 필수 파일 확인"
 require_file "$JAR_PATH"
 require_file "$COMPOSE_FILE"
@@ -40,7 +44,7 @@ docker save "${IMAGE_TAG}" -o "${IMAGE_ARCHIVE}"
 
 echo "==> [3/9] VM Docker/Compose 확인"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-  "docker version >/dev/null && docker compose version >/dev/null"
+  "sudo docker version >/dev/null && sudo docker compose version >/dev/null"
 
 echo "==> [4/9] runtime files 전송"
 scp "${SSH_OPTIONS[@]}" "$IMAGE_ARCHIVE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-server-image.tar"
@@ -49,15 +53,21 @@ scp "${SSH_OPTIONS[@]}" "$CADDYFILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readma
 scp "${SSH_OPTIONS[@]}" "$SERVICE_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-stack.service"
 
 echo "==> [5/9] VM runtime files 설치"
-ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
+ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+  "sudo bash -s -- $(shell_quote "$REMOTE_DIR") $(shell_quote "$CADDY_SITE") $(shell_quote "$IMAGE_TAG")" <<'EOF'
 set -euo pipefail
-sudo mkdir -p ${REMOTE_DIR} /etc/readmates
-sudo mv /tmp/readmates-compose.yml ${REMOTE_DIR}/compose.yml
-sudo mv /tmp/readmates-Caddyfile ${REMOTE_DIR}/Caddyfile
+remote_dir="$1"
+caddy_site="$2"
+image_tag="$3"
+sudo mkdir -p "$remote_dir" /etc/readmates
+sudo mv /tmp/readmates-compose.yml "$remote_dir/compose.yml"
+sudo mv /tmp/readmates-Caddyfile "$remote_dir/Caddyfile"
 sudo mv /tmp/readmates-stack.service /etc/systemd/system/readmates-stack.service
-printf 'CADDY_SITE=%s\n' '${CADDY_SITE}' | sudo tee /etc/readmates/caddy.env >/dev/null
+printf 'CADDY_SITE=%s\n' "$caddy_site" | sudo tee /etc/readmates/caddy.env >/dev/null
 sudo chmod 600 /etc/readmates/caddy.env
-sudo chown -R readmates:readmates ${REMOTE_DIR}
+printf 'READMATES_SERVER_IMAGE=%s\n' "$image_tag" | sudo tee "$remote_dir/.env" >/dev/null
+sudo chmod 600 "$remote_dir/.env"
+sudo chown -R readmates:readmates "$remote_dir"
 sudo systemctl daemon-reload
 sudo docker load -i /tmp/readmates-server-image.tar
 rm -f /tmp/readmates-server-image.tar
@@ -65,11 +75,11 @@ EOF
 
 echo "==> [6/9] compose 설정 검증"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-  "cd ${REMOTE_DIR} && sudo READMATES_SERVER_IMAGE='${IMAGE_TAG}' docker compose -f compose.yml config >/dev/null"
+  "cd ${REMOTE_DIR} && sudo docker compose -f compose.yml config >/dev/null"
 
 echo "==> [7/10] DB backup 확인"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-  "test -d /var/backups/readmates/mysql && sudo find /var/backups/readmates/mysql -type f -name '*.sql.gz' -mtime -2 | grep -q ."
+  "sudo test -d /var/backups/readmates/mysql && sudo find /var/backups/readmates/mysql -type f -name '*.sql.gz' -mtime -2 | grep -q ."
 
 echo "==> [8/10] 기존 host Caddy/Spring 서비스 정지"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<'EOF'
@@ -89,7 +99,7 @@ ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
 set -euo pipefail
 sudo systemctl enable readmates-stack
 cd ${REMOTE_DIR}
-sudo READMATES_SERVER_IMAGE='${IMAGE_TAG}' docker compose -f compose.yml up -d --remove-orphans
+sudo docker compose -f compose.yml up -d --remove-orphans
 sudo docker compose -f compose.yml ps
 EOF
 
