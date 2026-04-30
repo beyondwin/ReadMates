@@ -1,6 +1,7 @@
 package com.readmates.auth.adapter.out.persistence
 
 import com.readmates.auth.application.InvitationDomainException
+import com.readmates.auth.application.InvitationDomainError
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand
 import com.readmates.auth.application.port.out.HostInvitationListRow
 import com.readmates.auth.application.port.out.HostInvitationStorePort
@@ -19,7 +20,6 @@ import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.ConnectionCallback
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -44,7 +44,7 @@ class JdbcHostInvitationStoreAdapter(
                     if (resultSet.getInt(1) != 1) {
                         throw InvitationDomainException(
                             "INVITATION_LOCK_TIMEOUT",
-                            HttpStatus.CONFLICT,
+                            InvitationDomainError.CONFLICT,
                             "Could not acquire invitation lock",
                         )
                     }
@@ -436,7 +436,7 @@ class JdbcHostInvitationStoreAdapter(
         jdbcTemplateProvider.ifAvailable
             ?: throw InvitationDomainException(
                 "INVITATION_STORAGE_UNAVAILABLE",
-                HttpStatus.SERVICE_UNAVAILABLE,
+                InvitationDomainError.STORAGE_UNAVAILABLE,
                 "Invitation storage is unavailable",
             )
 

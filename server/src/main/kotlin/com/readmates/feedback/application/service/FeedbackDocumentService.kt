@@ -1,5 +1,7 @@
 package com.readmates.feedback.application.service
 
+import com.readmates.feedback.application.FeedbackDocumentError
+import com.readmates.feedback.application.FeedbackDocumentException
 import com.readmates.feedback.application.FeedbackDocumentParser
 import com.readmates.feedback.application.ParsedFeedbackDocument
 import com.readmates.feedback.application.model.FeedbackDocumentListItemResult
@@ -25,10 +27,8 @@ import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
@@ -91,7 +91,7 @@ class FeedbackDocumentService(
     ): FeedbackDocumentStatusResult {
         requireHostFeedbackDocumentUploadAccess(currentMember)
         feedbackDocumentStorePort.findReadableSession(currentMember.clubId, sessionId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+            ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
 
         val document = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, sessionId)
         return FeedbackDocumentStatusResult(
@@ -113,7 +113,7 @@ class FeedbackDocumentService(
         return runCatching {
             val parsedDocument = parser.parse(command.sourceText)
             val session = feedbackDocumentStorePort.findSessionForUpload(currentMember.clubId, command.sessionId)
-                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+                ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
             val version = feedbackDocumentStorePort.nextDocumentVersion(currentMember.clubId, command.sessionId)
             feedbackDocumentStorePort.insertDocument(
                 currentMember = currentMember,
@@ -131,7 +131,10 @@ class FeedbackDocumentService(
             )
 
             val storedDocument = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)
-                ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR)
+                ?: throw FeedbackDocumentException(
+                    FeedbackDocumentError.STORAGE_UNAVAILABLE,
+                    "Stored feedback document not found after upload",
+                )
             storedDocument.toResponse(session, parsedDocument)
         }.onSuccess {
             operationalMetrics.feedbackUploadSucceeded()
@@ -148,7 +151,10 @@ class FeedbackDocumentService(
 
     private fun requireReadableFeedbackMember(currentMember: CurrentMember) {
         if (!currentMember.isActive) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Feedback documents require active membership")
+            throw FeedbackDocumentException(
+                FeedbackDocumentError.ACTIVE_MEMBERSHIP_REQUIRED,
+                "Feedback documents require active membership",
+            )
         }
     }
 
@@ -167,7 +173,7 @@ class FeedbackDocumentService(
                 } else {
                     "피드백 문서를 불러올 수 없습니다."
                 }
-                throw ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, reason)
+                throw FeedbackDocumentException(FeedbackDocumentError.INVALID_STORED_DOCUMENT, reason)
             }
 
     private fun StoredFeedbackDocumentListResult.toListItem(title: String): FeedbackDocumentListItemResult =

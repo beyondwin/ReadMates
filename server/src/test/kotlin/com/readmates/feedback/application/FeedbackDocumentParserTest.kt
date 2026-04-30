@@ -3,8 +3,6 @@ package com.readmates.feedback.application
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
 
 class FeedbackDocumentParserTest {
     private val parser = FeedbackDocumentParser()
@@ -85,7 +83,7 @@ class FeedbackDocumentParserTest {
 
     @Test
     fun `rejects missing marker with bad request template error`() {
-        val exception = assertThrows(ResponseStatusException::class.java) {
+        val exception = assertThrows(FeedbackDocumentException::class.java) {
             parser.parse(validFeedbackMarkdown().replace("<!-- readmates-feedback:v1 -->\n\n", ""))
         }
 
@@ -94,16 +92,16 @@ class FeedbackDocumentParserTest {
 
     @Test
     fun `rejects missing required heading with bad request template error`() {
-        val exception = assertThrows(ResponseStatusException::class.java) {
+        val exception = assertThrows(FeedbackDocumentException::class.java) {
             parser.parse(validFeedbackMarkdown().replace("## 관찰자 노트", "## 관찰 메모"))
         }
 
         assertTemplateError(exception)
     }
 
-    private fun assertTemplateError(exception: ResponseStatusException) {
-        assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
-        assertEquals("ReadMates 피드백 템플릿 형식이 아닙니다.", exception.reason)
+    private fun assertTemplateError(exception: FeedbackDocumentException) {
+        assertEquals(FeedbackDocumentError.INVALID_TEMPLATE, exception.error)
+        assertEquals("ReadMates 피드백 템플릿 형식이 아닙니다.", exception.message)
     }
 
     private fun validFeedbackMarkdown(): String =

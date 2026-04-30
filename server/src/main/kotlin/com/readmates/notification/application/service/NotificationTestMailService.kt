@@ -1,5 +1,7 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.NotificationApplicationError
+import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.model.sanitizeNotificationError
@@ -10,9 +12,7 @@ import com.readmates.notification.application.port.out.NotificationTestMailAudit
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -36,7 +36,10 @@ class NotificationTestMailService(
         val currentHost = requireHost(host)
         val recipient = command.recipientEmail.trim().lowercase()
         if (recipient.length > TEST_MAIL_MAX_EMAIL_LENGTH || !TEST_MAIL_EMAIL_PATTERN.matches(recipient)) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid email address")
+            throw NotificationApplicationException(
+                NotificationApplicationError.INVALID_TEST_MAIL_EMAIL,
+                "Invalid email address",
+            )
         }
 
         val audit = notificationTestMailAuditPort.reserveTestMailAuditAttempt(
@@ -45,7 +48,10 @@ class NotificationTestMailService(
             recipientMaskedEmail = recipient.maskEmail(),
             recipientEmailHash = sha256Hex(recipient),
             cooldownStartedAfter = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(TEST_MAIL_COOLDOWN_SECONDS),
-        ) ?: throw ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Test mail cooldown is active")
+        ) ?: throw NotificationApplicationException(
+            NotificationApplicationError.TEST_MAIL_COOLDOWN,
+            "Test mail cooldown is active",
+        )
 
         return try {
             mailDeliveryPort.send(

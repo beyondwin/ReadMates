@@ -4,9 +4,7 @@ import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
 import com.readmates.auth.application.port.out.PendingApprovalRow
 import com.readmates.auth.application.port.out.PendingApprovalStorePort
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 
 data class PendingApprovalAppResponse(
     val approvalState: String,
@@ -30,12 +28,12 @@ class PendingApprovalReadService(
 ) : GetPendingApprovalUseCase {
     override fun get(member: CurrentMember): PendingApprovalAppResponse {
         if (!member.isViewer) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Pending approval required")
+            throw AuthApplicationException(AuthApplicationError.PENDING_APPROVAL_REQUIRED, "Pending approval required")
         }
 
         return pendingApprovalStore.findPendingApproval(member.clubId)
             ?.toPendingApprovalAppResponse()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club not found")
+            ?: throw AuthApplicationException(AuthApplicationError.CLUB_NOT_FOUND, "Club not found")
     }
 
     private fun PendingApprovalRow.toPendingApprovalAppResponse(): PendingApprovalAppResponse {

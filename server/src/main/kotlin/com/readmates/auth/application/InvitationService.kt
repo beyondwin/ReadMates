@@ -15,10 +15,8 @@ import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.bind.annotation.ResponseStatus
 import java.security.MessageDigest
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -53,13 +51,6 @@ data class InvitationPreviewResponse(
     val expiresAt: String,
     val canAccept: Boolean,
 )
-
-@ResponseStatus(HttpStatus.CONFLICT)
-class InvitationDomainException(
-    val code: String,
-    val status: HttpStatus,
-    message: String,
-) : RuntimeException(message)
 
 @Service
 class InvitationService(
@@ -117,7 +108,7 @@ class InvitationService(
     override fun previewInvitation(rawToken: String, clubSlug: String?): InvitationPreviewResponse {
         val invitation = findInvitationByToken(rawToken)
         if (clubSlug != null && invitation.clubSlug != clubSlug) {
-            throw InvitationDomainException("INVITATION_CLUB_MISMATCH", HttpStatus.NOT_FOUND, "Invitation not found")
+            throw InvitationDomainException("INVITATION_CLUB_MISMATCH", InvitationDomainError.NOT_FOUND, "Invitation not found")
         }
         val effectiveStatus = effectiveStatus(invitation.status, invitation.expiresAt)
         return InvitationPreviewResponse(
@@ -144,13 +135,13 @@ class InvitationService(
     ): CurrentMember {
         val invitation = queryInvitationByToken(rawToken, forUpdate = true)
         if (expectedClubSlug != null && invitation.clubSlug != expectedClubSlug) {
-            throw InvitationDomainException("INVITATION_CLUB_MISMATCH", HttpStatus.NOT_FOUND, "Invitation not found")
+            throw InvitationDomainException("INVITATION_CLUB_MISMATCH", InvitationDomainError.NOT_FOUND, "Invitation not found")
         }
         val effectiveStatus = effectiveStatus(invitation.status, invitation.expiresAt)
         if (effectiveStatus != InvitationStatus.PENDING) {
             throw InvitationDomainException(
                 "INVITATION_${effectiveStatus.name}",
-                HttpStatus.CONFLICT,
+                InvitationDomainError.CONFLICT,
                 "Invitation is not pending",
             )
         }
@@ -159,7 +150,7 @@ class InvitationService(
         if (!invitation.email.equals(normalizedEmail, ignoreCase = true)) {
             throw InvitationDomainException(
                 "INVITATION_EMAIL_MISMATCH",
-                HttpStatus.FORBIDDEN,
+                InvitationDomainError.FORBIDDEN,
                 "Invitation email does not match authenticated Google email",
             )
         }
@@ -177,7 +168,7 @@ class InvitationService(
         if (!invitationStore.acceptInvitation(invitation.id, userId)) {
             throw InvitationDomainException(
                 "INVITATION_NOT_PENDING",
-                HttpStatus.CONFLICT,
+                InvitationDomainError.CONFLICT,
                 "Invitation is not pending",
             )
         }
@@ -187,7 +178,11 @@ class InvitationService(
         }
         memberAccountStore.recordLastLogin(userId)
         return invitationStore.findCurrentMember(membershipId)
-            ?: throw InvitationDomainException("MEMBERSHIP_NOT_FOUND", HttpStatus.CONFLICT, "Accepted membership not found")
+            ?: throw InvitationDomainException(
+                "MEMBERSHIP_NOT_FOUND",
+                InvitationDomainError.CONFLICT,
+                "Accepted membership not found",
+            )
     }
 
     @Transactional
@@ -208,14 +203,14 @@ class InvitationService(
         invitationId: UUID,
     ): HostInvitationListRow =
         invitationStore.findHostInvitation(clubId, invitationId)
-            ?: throw InvitationDomainException("INVITATION_NOT_FOUND", HttpStatus.NOT_FOUND, "Invitation not found")
+            ?: throw InvitationDomainException("INVITATION_NOT_FOUND", InvitationDomainError.NOT_FOUND, "Invitation not found")
 
     private fun findInvitationByToken(rawToken: String): InvitationTokenRow =
         queryInvitationByToken(rawToken, forUpdate = false)
 
     private fun queryInvitationByToken(rawToken: String, forUpdate: Boolean): InvitationTokenRow =
         invitationStore.findInvitationByTokenHash(tokenService.hashToken(rawToken), forUpdate)
-            ?: throw InvitationDomainException("INVITATION_NOT_FOUND", HttpStatus.NOT_FOUND, "Invitation not found")
+            ?: throw InvitationDomainException("INVITATION_NOT_FOUND", InvitationDomainError.NOT_FOUND, "Invitation not found")
 
     private fun connectOrCreateInvitedGoogleUser(
         googleSubjectId: String,
@@ -266,17 +261,17 @@ class InvitationService(
     private fun rejectActiveMember(clubId: UUID, email: String) {
         val count = invitationStore.activeMemberCountByEmail(clubId, email)
         if (count > 0) {
-            throw InvitationDomainException("MEMBER_ALREADY_ACTIVE", HttpStatus.CONFLICT, "Member is already active")
+            throw InvitationDomainException("MEMBER_ALREADY_ACTIVE", InvitationDomainError.CONFLICT, "Member is already active")
         }
     }
 
     private fun normalizeEmail(email: String): String =
         email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
-            ?: throw InvitationDomainException("INVALID_INVITATION_EMAIL", HttpStatus.BAD_REQUEST, "Email is required")
+            ?: throw InvitationDomainException("INVALID_INVITATION_EMAIL", InvitationDomainError.BAD_REQUEST, "Email is required")
 
     private fun normalizeInvitedName(name: String): String =
         name.trim().takeIf { it.isNotEmpty() }?.take(120)
-            ?: throw InvitationDomainException("INVALID_INVITATION_NAME", HttpStatus.BAD_REQUEST, "Name is required")
+            ?: throw InvitationDomainException("INVALID_INVITATION_NAME", InvitationDomainError.BAD_REQUEST, "Name is required")
 
     private fun invitationLockKey(clubId: UUID, email: String): String =
         "invitation:${sha256Short("${clubId.dbString()}:${normalizeEmail(email)}")}"
@@ -322,7 +317,7 @@ class InvitationService(
 
     private fun requireHost(member: CurrentMember) {
         if (!member.isHost) {
-            throw InvitationDomainException("HOST_REQUIRED", HttpStatus.FORBIDDEN, "Host role required")
+            throw InvitationDomainException("HOST_REQUIRED", InvitationDomainError.FORBIDDEN, "Host role required")
         }
     }
 

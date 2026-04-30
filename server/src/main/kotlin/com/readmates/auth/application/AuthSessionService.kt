@@ -7,7 +7,6 @@ import com.readmates.auth.application.port.out.AuthSessionCachePort
 import com.readmates.auth.application.port.out.AuthSessionStorePort
 import com.readmates.shared.cache.AuthSessionCacheProperties
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.http.ResponseCookie
 import org.springframework.stereotype.Service
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -105,21 +104,13 @@ class AuthSessionService(
     }
 
     fun sessionCookie(rawToken: String): String =
-        cookieBuilder(rawToken, SESSION_TTL).build().toString()
+        buildCookie(COOKIE_NAME, rawToken, SESSION_TTL, includeDomain = true)
 
     fun clearedSessionCookie(): String =
-        cookieBuilder("", Duration.ZERO).build().toString()
+        buildCookie(COOKIE_NAME, "", Duration.ZERO, includeDomain = true)
 
     override fun clearedServletSessionCookie(): String =
-        ResponseCookie
-            .from(SERVLET_SESSION_COOKIE_NAME, "")
-            .httpOnly(true)
-            .secure(secureCookie)
-            .sameSite("Lax")
-            .path("/")
-            .maxAge(Duration.ZERO)
-            .build()
-            .toString()
+        buildCookie(SERVLET_SESSION_COOKIE_NAME, "", Duration.ZERO, includeDomain = false)
 
     fun hashToken(rawToken: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(rawToken.toByteArray(Charsets.UTF_8))
@@ -175,19 +166,27 @@ class AuthSessionService(
         return minOf(cacheProperties.sessionTtl, remaining)
     }
 
-    private fun cookieBuilder(value: String, maxAge: Duration): ResponseCookie.ResponseCookieBuilder {
-        val builder = ResponseCookie
-            .from(COOKIE_NAME, value)
-            .httpOnly(true)
-            .secure(secureCookie)
-            .sameSite("Lax")
-            .path("/")
-            .maxAge(maxAge)
+    private fun buildCookie(
+        name: String,
+        value: String,
+        maxAge: Duration,
+        includeDomain: Boolean,
+    ): String {
+        val parts = mutableListOf(
+            "$name=$value",
+            "Path=/",
+            "Max-Age=${maxAge.seconds}",
+        )
         val normalizedDomain = sessionCookieDomain.trim().takeIf { it.isNotEmpty() }
-        if (normalizedDomain != null) {
-            builder.domain(normalizedDomain)
+        if (includeDomain && normalizedDomain != null) {
+            parts += "Domain=$normalizedDomain"
         }
-        return builder
+        if (secureCookie) {
+            parts += "Secure"
+        }
+        parts += "HttpOnly"
+        parts += "SameSite=Lax"
+        return parts.joinToString("; ")
     }
 
     companion object {
