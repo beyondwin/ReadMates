@@ -1338,7 +1338,7 @@ Acceptance criteria completed: frontend boundary exceptions were removed; shared
 - Modify: `front/tests/unit/cloudflare-bff.test.ts`
 - Modify: `front/tests/unit/cloudflare-oauth-proxy.test.ts`
 
-- [ ] **Step 1: Add shared proxy helper tests**
+- [x] **Step 1: Add shared proxy helper tests**
 
 Extend BFF and OAuth proxy tests to assert browser-supplied headers are stripped:
 
@@ -1358,7 +1358,7 @@ headers: {
 }
 ```
 
-- [ ] **Step 2: Create shared proxy helper**
+- [x] **Step 2: Create shared proxy helper**
 
 Create `front/functions/_shared/proxy.ts` with exported helpers:
 
@@ -1416,7 +1416,7 @@ export function safeRouteSegment(value: string | string[] | undefined) {
 
 Move existing duplicate helpers into this file and import them from all three functions.
 
-- [ ] **Step 3: Run BFF tests**
+- [x] **Step 3: Run BFF tests**
 
 Run:
 
@@ -1426,7 +1426,7 @@ pnpm --dir front test -- --run tests/unit/cloudflare-bff.test.ts tests/unit/clou
 
 Expected: all pass.
 
-- [ ] **Step 4: Commit BFF helper extraction**
+- [x] **Step 4: Commit BFF helper extraction**
 
 Run:
 
@@ -1434,6 +1434,9 @@ Run:
 git add front/functions front/tests/unit/cloudflare-bff.test.ts front/tests/unit/cloudflare-oauth-proxy.test.ts
 git commit -m "refactor: share cloudflare proxy helpers"
 ```
+
+COMPACT CHECKPOINT Task 9 - Extract Shared BFF Proxy Helpers:
+Acceptance criteria completed: shared Cloudflare proxy helper module created; BFF and OAuth functions import shared header/cookie/host/IP/route-segment helpers; tests assert malicious browser-supplied internal headers are overwritten by trusted server values; OAuth forwarded header builder duplication removed in follow-up; implementation committed as `54becf2`, follow-up as `d1a33a2`. Changed files: `front/functions/_shared/proxy.ts`, BFF function, OAuth authorization/callback functions, Cloudflare BFF/OAuth unit tests, and this plan document. Key decisions: route-specific API path validation remains local to BFF, while reusable trust-boundary helpers live in `_shared/proxy.ts`; OAuth `forwardedOAuthRequestHeaders` is shared because authorization start and callback must not drift; upstream response copies strip internal `x-readmates-*` headers including club slug while preserving single and multi `Set-Cookie`. Contracts/API/state/test expectations: BFF secret is only server-side; request forwarding uses server-derived `X-Readmates-Bff-Secret`, `X-Readmates-Client-IP`, `X-Readmates-Club-Host`, and route-selected club slug; safe OAuth registration IDs still reject path traversal, slash, backslash, and multi-segment values; Cloudflare helper bundles as shared code, not a route. Reviews: spec/security review found no issues; code-quality review found duplicated OAuth forwarded header construction; follow-up extracted it; final closure review found no issues. Verification: newly added malicious-header tests passed before implementation because existing code already constructed trusted headers from scratch; Task 9 command `pnpm --dir front test -- --run tests/unit/cloudflare-bff.test.ts tests/unit/cloudflare-oauth-proxy.test.ts tests/unit/cloudflare-spa-redirects.test.ts` passed, though package script ran the full unit suite; focused `pnpm --dir front exec vitest run tests/unit/cloudflare-oauth-proxy.test.ts tests/unit/cloudflare-bff.test.ts` passed; `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `pnpm --dir front test:e2e`, `pnpm dlx wrangler pages functions build functions ...`, and `git diff --check` passed during review/follow-up. Remaining risks: none known; helper still deliberately derives trust headers from request/runtime context rather than inbound internal headers. Next first action: dispatch Task 10 docs implementer for architecture/test-guide/agent-guide updates, then run final full verification. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 9 subagents closed; no session-owned ports open.
 
 ## Task 10: Full Verification And Documentation Updates
 
