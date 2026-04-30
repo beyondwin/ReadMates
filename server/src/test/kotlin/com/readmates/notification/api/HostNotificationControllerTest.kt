@@ -225,7 +225,7 @@ class HostNotificationControllerTest(
             jsonPath("$.status") { value("SENT") }
         }
 
-        val copy = NotificationEmailTemplates.testMailCopy()
+        val copy = NotificationEmailTemplates.testMailCopy("읽는사이")
         val command = testMailDeliveryPort.sent.single()
         assertThat(command.to).isEqualTo("external@example.com")
         assertThat(command.subject).isEqualTo(copy.emailSubject)

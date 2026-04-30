@@ -245,7 +245,8 @@ class JdbcNotificationEventOutboxAdapter(
                    notification_event_outbox.aggregate_type,
                    notification_event_outbox.aggregate_id,
                    notification_event_outbox.payload_json,
-                   notification_event_outbox.created_at
+                   notification_event_outbox.created_at,
+                   clubs.name as club_name
             from notification_event_outbox
             join clubs on clubs.id = notification_event_outbox.club_id
             where notification_event_outbox.id = ?
@@ -321,6 +322,7 @@ class JdbcNotificationEventOutboxAdapter(
             eventId = uuid("id"),
             clubId = uuid("club_id"),
             clubSlug = getString("club_slug"),
+            clubName = getString("club_name"),
             eventType = NotificationEventType.valueOf(getString("event_type")),
             aggregateType = getString("aggregate_type"),
             aggregateId = uuid("aggregate_id"),

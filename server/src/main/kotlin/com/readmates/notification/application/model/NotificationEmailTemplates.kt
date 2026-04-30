@@ -20,11 +20,13 @@ object NotificationEmailTemplates {
         sessionId: UUID,
         sessionNumber: Int,
         bookTitle: String,
+        clubName: String,
         clubSlug: String,
         displayName: String?,
         appBaseUrl: String,
     ): NotificationRenderedCopy {
         val memberName = displayName?.trim()?.takeIf { it.isNotEmpty() } ?: "멤버"
+        val brandName = clubName.requiredClubName()
         val detail = detailFor(
             eventType = eventType,
             sessionId = sessionId,
@@ -49,30 +51,33 @@ object NotificationEmailTemplates {
                 summary = detail.summary,
                 contextRows = contextRows,
                 ctaUrl = ctaUrl,
-                footer = "ReadMates 알림 설정에 따라 발송된 메일입니다.",
+                brandName = brandName,
+                footer = "$brandName 알림 설정에 따라 발송된 메일입니다.",
             ),
             emailBodyHtml = htmlEmail(
                 label = detail.label,
+                brandName = brandName,
                 title = detail.title,
                 memberName = memberName,
                 summary = detail.summary,
                 contextRows = contextRows,
                 ctaLabel = detail.ctaLabel,
                 ctaUrl = ctaUrl,
-                closing = "조용히 읽고, 필요한 준비만 놓치지 않도록 알려드립니다.",
-                footer = "이 메일은 ReadMates 알림 설정에 따라 발송되었습니다. 알림 설정은 ReadMates 내 프로필에서 변경할 수 있습니다.",
+                closing = "다음 모임과 읽기 흐름에 맞춰 소식을 전합니다.",
+                footer = "이 메일은 $brandName 알림 설정에 따라 발송되었습니다. 알림 설정은 내 프로필에서 변경할 수 있습니다.",
             ),
         )
     }
 
-    fun testMailCopy(): NotificationRenderedCopy =
-        NotificationRenderedCopy(
+    fun testMailCopy(clubName: String): NotificationRenderedCopy {
+        val brandName = clubName.requiredClubName()
+        return NotificationRenderedCopy(
             title = "알림 메일 발송이 준비되었습니다",
-            body = "ReadMates 알림 발송 설정을 확인하기 위한 테스트 메일입니다.",
+            body = "$brandName 알림 발송 설정을 확인하기 위한 테스트 메일입니다.",
             deepLinkPath = null,
-            emailSubject = "ReadMates 알림 테스트",
+            emailSubject = "$brandName 알림 테스트",
             emailBodyText = """
-                ReadMates
+                $brandName
 
                 알림 메일 발송이 준비되었습니다.
 
@@ -83,9 +88,10 @@ object NotificationEmailTemplates {
             """.trimIndent(),
             emailBodyHtml = htmlEmail(
                 label = "delivery check",
+                brandName = brandName,
                 title = "알림 메일 발송이 준비되었습니다",
                 memberName = null,
-                summary = "ReadMates 알림 발송 설정이 정상적으로 동작하는지 확인하기 위한 테스트 메일입니다.",
+                summary = "$brandName 알림 발송 설정이 정상적으로 동작하는지 확인하기 위한 테스트 메일입니다.",
                 contextRows = listOf(
                     "용도" to "SMTP 발송 점검",
                     "범위" to "테스트 메일",
@@ -96,6 +102,7 @@ object NotificationEmailTemplates {
                 footer = "SMTP 발송 점검을 위한 테스트 메일입니다.",
             ),
         )
+    }
 
     private fun detailFor(
         eventType: NotificationEventType,
@@ -112,7 +119,7 @@ object NotificationEmailTemplates {
                 summary = "다음 모임에서 함께 읽을 책이 정해졌습니다. 모임 전 회차 정보와 준비 내용을 확인해 주세요.",
                 contextLabel = "확인",
                 context = "일정과 준비 메모",
-                ctaLabel = "ReadMates에서 회차 확인하기",
+                ctaLabel = "회차 확인하기",
                 deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
                 inAppBody = "${sessionNumber}회차 $bookTitle 책이 공개되었습니다.",
             )
@@ -121,7 +128,7 @@ object NotificationEmailTemplates {
                 label = "session reminder",
                 subject = "내일 ${sessionNumber}회차 모임이 있습니다",
                 title = "내일 ${sessionNumber}회차 모임이 있습니다",
-                summary = "모임 전 질문, 읽은 분량, 참석 상태를 확인하라는 운영 알림.",
+                summary = "모임 전에 질문과 읽은 분량, 참석 여부를 한 번 더 정리해 주세요.",
                 contextLabel = "준비",
                 context = "질문, 읽은 분량, 참석 상태",
                 ctaLabel = "모임 준비 확인하기",
@@ -133,7 +140,7 @@ object NotificationEmailTemplates {
                 label = "feedback document",
                 subject = "${sessionNumber}회차 피드백 문서가 올라왔습니다",
                 title = "${sessionNumber}회차 피드백 문서가 올라왔습니다",
-                summary = "참석했던 회차의 정리와 다음 읽기를 위한 메모를 확인하라는 안내.",
+                summary = "참석한 회차의 정리와 다음 읽기에 참고할 내용을 확인해 주세요.",
                 contextLabel = "확인",
                 context = "피드백 문서와 모임 정리",
                 ctaLabel = "피드백 문서 확인하기",
@@ -145,7 +152,7 @@ object NotificationEmailTemplates {
                 label = "new review",
                 subject = "${sessionNumber}회차에 새 서평이 공개되었습니다",
                 title = "${sessionNumber}회차에 새 서평이 공개되었습니다",
-                summary = "같은 회차의 새 공개 서평이 올라왔고, ReadMates에서 서평 흐름을 확인하라는 안내.",
+                summary = "같은 회차에 새 서평이 공개되었습니다. 함께 읽은 기록을 이어서 확인해 주세요.",
                 contextLabel = "확인",
                 context = "새로 공개된 서평",
                 ctaLabel = "서평 확인하기",
@@ -159,10 +166,11 @@ object NotificationEmailTemplates {
         summary: String,
         contextRows: List<Pair<String, String>>,
         ctaUrl: String,
+        brandName: String,
         footer: String,
     ): String =
         buildString {
-            appendLine("ReadMates")
+            appendLine(brandName)
             appendLine()
             appendLine("${memberName}님,")
             appendLine()
@@ -179,6 +187,7 @@ object NotificationEmailTemplates {
 
     private fun htmlEmail(
         label: String,
+        brandName: String,
         title: String,
         memberName: String?,
         summary: String,
@@ -224,7 +233,7 @@ object NotificationEmailTemplates {
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                               <tr>
                                 <td style="padding:0 0 18px;border-bottom:1px solid #e9ded0;">
-                                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:500;letter-spacing:0;color:#17233a;"><strong>ReadMates</strong></span>
+                                  <span style="font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:500;letter-spacing:0;color:#17233a;"><strong>${escapeHtml(brandName)}</strong></span>
                                   <span style="float:right;color:#687084;font-size:11px;letter-spacing:.08em;text-transform:uppercase;">${escapeHtml(label)}</span>
                                 </td>
                               </tr>
@@ -297,6 +306,9 @@ object NotificationEmailTemplates {
 
     private fun labelForText(label: String): String =
         if (label == "확인") "확인할 일" else label
+
+    private fun String.requiredClubName(): String =
+        trim().takeIf { it.isNotEmpty() } ?: throw IllegalArgumentException("clubName is required")
 
     private fun escapeHtml(value: String): String =
         buildString(value.length) {

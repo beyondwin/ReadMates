@@ -172,6 +172,14 @@ Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함
   --tests com.readmates.support.ReadmatesMySqlSeedTest
 ```
 
+알림 이메일 템플릿 copy, subject, club name 렌더링, HTML preview를 수정했다면 아래 focused command로 순수 템플릿 테스트와 preview report 생성을 먼저 확인합니다. Report는 테스트 산출물이며 Git에 커밋하지 않습니다.
+
+```bash
+./server/gradlew -p server test \
+  --tests com.readmates.notification.application.model.NotificationEmailTemplatesTest \
+  --tests com.readmates.notification.application.model.NotificationEmailTemplatePreviewTest
+```
+
 ## 공개 릴리즈 후보 점검
 
 공개 저장소로 낼 수 있는 후보 tree를 만들고 검사합니다.

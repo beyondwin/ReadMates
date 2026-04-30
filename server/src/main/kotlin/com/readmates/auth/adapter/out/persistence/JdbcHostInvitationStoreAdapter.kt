@@ -369,6 +369,7 @@ class JdbcHostInvitationStoreAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -391,6 +392,7 @@ class JdbcHostInvitationStoreAdapter(
                     accountName = resultSet.getString("account_name"),
                     role = MembershipRole.valueOf(resultSet.getString("role")),
                     membershipStatus = MembershipStatus.valueOf(resultSet.getString("membership_status")),
+                    clubName = resultSet.getString("club_name"),
                 )
             },
             membershipId.dbString(),

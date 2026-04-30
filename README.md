@@ -2,11 +2,11 @@
 
 ReadMates는 여러 정기 독서모임의 세션 준비, 참여 관리, 기록 공개, 피드백 문서 열람을 클럽별 공개 사이트와 공유 로그인 세션으로 묶은 멤버십 풀스택 웹 서비스입니다.
 
-- Demo: [https://readmates.pages.dev](https://readmates.pages.dev)
+- Site: [https://readmates.pages.dev](https://readmates.pages.dev)
 - Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`, optional `Redis`, `Redpanda/Kafka`, `Micrometer/Prometheus`
 - Scope: 멀티 클럽 플랫폼에서 클럽별 공개 사이트, 현재·예정 회차 준비, 참여 관리, 기록 공개, 피드백 문서 열람까지 아우르는 운영형 서비스
 - Highlight: Google OAuth, 안전한 로그인 복귀 경로, 서버 측 공유 session cookie, Cloudflare BFF 보안 경계, club-scoped URL과 역할 권한, Cloudflare Pages marker 기반 domain alias 상태 확인, optional Redis rate limit/cache, 현재/예정 세션 공개 범위, 멤버 알림 설정과 알림함, 피드백 문서 접근 제어, Playwright E2E, 공개 릴리즈 후보 scan
-- 운영 파이프라인: MySQL transactional event outbox, Redpanda/Kafka relay/consumer 기반 이메일 및 in-app 알림, plain text fallback을 포함한 HTML 이메일 템플릿, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
+- 운영 파이프라인: MySQL transactional event outbox, Redpanda/Kafka relay/consumer 기반 이메일 및 in-app 알림, 클럽명 기반 HTML/plain text 이메일 템플릿, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 
 이 저장소는 외부 공개를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
 
@@ -76,7 +76,7 @@ MySQL
 - 인증은 Google OAuth와 서버 측 `readmates_session` cookie를 사용하고, raw token은 저장하지 않습니다. 로그인 세션은 platform 전체에서 공유하고 role/status는 club membership별로 판정합니다. 프런트엔드는 같은 origin의 안전한 relative `returnTo`만 로그인과 OAuth 시작 흐름에 전달합니다.
 - MySQL/Flyway가 source of truth이며 Redis는 rate limit, cache, invalidation을 위한 optional 보조 계층입니다.
 - 세션 lifecycle, 공개 범위, 역할 기반 권한, 피드백 문서 접근 제어는 서버에서 검증합니다.
-- 알림은 MySQL transactional outbox와 Kafka relay/consumer로 처리하며, 서버의 순수 템플릿 helper가 in-app/deep link/email subject/plain/HTML copy를 함께 생성합니다. SMTP는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 발송하고, 공개 릴리즈 후보는 별도 scanner로 점검합니다.
+- 알림은 MySQL transactional outbox와 Kafka relay/consumer로 처리하며, 서버의 순수 템플릿 helper가 club-scoped in-app/deep link/email subject/plain/HTML copy를 함께 생성합니다. SMTP는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 발송하고, 공개 릴리즈 후보는 별도 scanner로 점검합니다.
 
 상세한 배경과 trade-off는 [주요 기술적 의사결정](docs/development/technical-decisions.md)을 참고합니다.
 
@@ -196,7 +196,6 @@ pnpm --dir front dev
 | OCI Compose Stack | [docs/deploy/compose-stack.md](docs/deploy/compose-stack.md) |
 | OCI backend | [docs/deploy/oci-backend.md](docs/deploy/oci-backend.md) |
 | OCI MySQL HeatWave | [docs/deploy/oci-mysql-heatwave.md](docs/deploy/oci-mysql-heatwave.md) |
-| OCI Compose cutover report | [docs/deploy/2026-04-30-oci-compose-cutover-deployment-report.md](docs/deploy/2026-04-30-oci-compose-cutover-deployment-report.md) |
 | 공개 저장소 보안과 release safety | [docs/deploy/security-public-repo.md](docs/deploy/security-public-repo.md) |
 | Release helper scripts | [scripts/README.md](scripts/README.md) |
 
