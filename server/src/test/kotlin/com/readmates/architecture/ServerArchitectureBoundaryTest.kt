@@ -3,6 +3,7 @@ package com.readmates.architecture
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ServerArchitectureBoundaryTest {
@@ -111,6 +112,38 @@ class ServerArchitectureBoundaryTest {
             )
             .check(importedClasses)
     }
+
+    @Test
+    fun `application packages do not depend on spring web or http response types`() {
+        val forbiddenPrefixes = listOf(
+            "org.springframework.http.",
+            "org.springframework.web.",
+        )
+        val violations = importedClasses
+            .filter { javaClass -> javaClass.residesInAnyPackagePattern(migratedApplicationPackages) }
+            .flatMap { javaClass ->
+                javaClass.directDependenciesFromSelf
+                    .filter { dependency ->
+                        forbiddenPrefixes.any { forbiddenPrefix ->
+                            dependency.targetClass.name.startsWith(forbiddenPrefix)
+                        }
+                    }
+                    .map { dependency -> "${javaClass.name} -> ${dependency.targetClass.name}" }
+            }
+            .distinct()
+            .sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Application packages must not depend on Spring HTTP/Web types:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    private fun com.tngtech.archunit.core.domain.JavaClass.residesInAnyPackagePattern(patterns: Array<String>): Boolean =
+        patterns.any { pattern ->
+            val packagePrefix = pattern.removeSuffix("..")
+            packageName == packagePrefix || packageName.startsWith("$packagePrefix.")
+        }
 
     @Test
     fun `domain classes do not depend on adapters or web and jdbc frameworks`() {

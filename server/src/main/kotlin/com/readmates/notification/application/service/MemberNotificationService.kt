@@ -1,13 +1,13 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.NotificationApplicationError
+import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.MemberNotificationList
 import com.readmates.notification.application.port.`in`.ManageMemberNotificationsUseCase
 import com.readmates.notification.application.port.out.MemberNotificationPort
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
@@ -29,7 +29,10 @@ class MemberNotificationService(
 
     override fun markRead(member: CurrentMember, id: UUID) {
         if (!memberNotificationPort.markRead(member.clubId, member.membershipId, id)) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found")
+            throw NotificationApplicationException(
+                NotificationApplicationError.NOTIFICATION_NOT_FOUND,
+                "Notification not found",
+            )
         }
     }
 

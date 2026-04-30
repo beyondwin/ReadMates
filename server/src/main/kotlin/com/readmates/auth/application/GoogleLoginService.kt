@@ -4,11 +4,9 @@ import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.bind.annotation.ResponseStatus
 import java.util.Locale
 import java.util.UUID
 
@@ -17,7 +15,6 @@ data class GoogleLoginResult(
     val currentMember: CurrentMember?,
 )
 
-@ResponseStatus(HttpStatus.UNAUTHORIZED)
 class GoogleLoginException(
     message: String,
     val redirectError: String = "google",

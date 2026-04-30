@@ -7,10 +7,8 @@ import com.readmates.auth.application.port.out.ViewerMemberRow
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 data class ViewerMemberResponse(
@@ -79,10 +77,10 @@ class MemberApprovalService(
 
     private fun requireHost(member: CurrentMember) {
         if (!member.isHost) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "Host role required")
+            throw AuthApplicationException(AuthApplicationError.HOST_REQUIRED, "Host role required")
         }
     }
 
-    private fun viewerMemberNotFound(): ResponseStatusException =
-        ResponseStatusException(HttpStatus.NOT_FOUND, "Viewer member not found")
+    private fun viewerMemberNotFound(): AuthApplicationException =
+        AuthApplicationException(AuthApplicationError.VIEWER_MEMBER_NOT_FOUND, "Viewer member not found")
 }

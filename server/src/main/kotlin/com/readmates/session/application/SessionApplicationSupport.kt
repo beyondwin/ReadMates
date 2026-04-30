@@ -2,8 +2,6 @@ package com.readmates.session.application
 
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
-import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.ResponseStatus
 
 internal fun requireHost(member: CurrentMember) {
     if (!member.isHost) {
@@ -21,37 +19,26 @@ internal fun shortNameFor(displayName: String): String = when (displayName) {
     else -> displayName
 }
 
-@ResponseStatus(HttpStatus.CONFLICT)
 class CurrentSessionNotOpenException : RuntimeException("No open current session")
 
-@ResponseStatus(HttpStatus.CONFLICT)
 class OpenSessionAlreadyExistsException : RuntimeException("Open session already exists")
 
-@ResponseStatus(HttpStatus.NOT_FOUND)
 class HostSessionNotFoundException : RuntimeException("Host session not found")
 
-@ResponseStatus(HttpStatus.NOT_FOUND)
 class HostSessionParticipantNotFoundException : RuntimeException("Host session participant not found")
 
-@ResponseStatus(HttpStatus.CONFLICT)
 class HostSessionDeletionNotAllowedException : RuntimeException("Only open sessions can be deleted")
 
-@ResponseStatus(HttpStatus.CONFLICT)
 class HostSessionOpenNotAllowedException : RuntimeException("Only draft sessions can be opened")
 
-@ResponseStatus(HttpStatus.CONFLICT)
 class HostSessionCloseNotAllowedException : RuntimeException("Only open sessions can be closed")
 
-@ResponseStatus(HttpStatus.CONFLICT)
 class HostSessionPublishNotAllowedException : RuntimeException(
     "Only closed sessions with member-visible publication can be published",
 )
 
-@ResponseStatus(HttpStatus.BAD_REQUEST)
 class InvalidMembershipIdException : RuntimeException("Invalid membership id")
 
-@ResponseStatus(HttpStatus.BAD_REQUEST)
 class InvalidSessionScheduleException : RuntimeException("Session end time must be after start time")
 
-@ResponseStatus(HttpStatus.BAD_REQUEST)
 class InvalidQuestionSetException : RuntimeException("Questions must include up to 5 non-empty items")
