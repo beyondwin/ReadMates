@@ -12,7 +12,16 @@ ReadMates의 최종 OCI backend runtime은 Caddy, Spring Boot API, Redis, Redpan
 
 ## First Setup
 
-기존 `/etc/readmates/readmates.env` 운영 변수는 그대로 사용합니다. Docker와 Compose plugin은 VM에서 한 번 설치합니다.
+Compose stack은 deploy/config/start 전에 VM의 `/etc/readmates/readmates.env`가 먼저 있어야 합니다. 이 파일에는 Spring `prod` runtime 값이 들어가며 Git에는 실제 값을 기록하지 않습니다.
+
+준비 방법은 둘 중 하나입니다.
+
+1. Legacy host 설정 flow로 `/etc/readmates/readmates.env`를 먼저 만듭니다. `deploy/oci/02-configure.sh`는 placeholder-safe 변수 이름만 문서화하고 실제 운영 값은 실행 시 Git 밖에서 주입합니다.
+2. 운영자가 VM에서 `/etc/readmates/readmates.env`를 직접 만듭니다. 문서에는 `<db-password>`, `<google-oauth-client-id>` 같은 placeholder만 남기고 실제 DB/OAuth/BFF/SMTP 값은 VM 또는 운영 secret 채널에만 둡니다.
+
+`05-deploy-compose-stack.sh`는 `/etc/readmates/caddy.env`와 `/opt/readmates/.env`를 생성하지만 `/etc/readmates/readmates.env`는 생성하지 않습니다.
+
+Docker와 Compose plugin은 VM에서 한 번 설치합니다.
 
 ```bash
 ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-install-docker.sh
@@ -44,7 +53,32 @@ READMATES_SMOKE_BASE_URL=https://readmates.pages.dev READMATES_SMOKE_AUTH_BASE_U
 ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'cd /opt/readmates && printf "READMATES_SERVER_IMAGE=%s\n" readmates-server:previous | sudo tee .env >/dev/null && sudo docker compose -f compose.yml up -d readmates-api'
 ```
 
-Compose cutover 자체가 실패하면 `readmates-stack`을 멈추고 legacy host `readmates-server`/`caddy` 서비스를 다시 enable한 뒤 마지막으로 검증된 JAR 배포 상태로 되돌립니다. 이 경로는 전환과 장애 대응용입니다.
+Compose cutover 자체가 실패하면 compose stack을 멈춘 뒤 legacy host JAR와 host Caddy로 되돌립니다. 이 경로는 전환과 장애 대응용입니다.
+
+VM에서 compose stack을 먼저 중지합니다.
+
+```bash
+ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'sudo systemctl stop readmates-stack || true && sudo systemctl disable readmates-stack || true'
+```
+
+마지막으로 검증된 JAR가 VM에 있는지 확인합니다.
+
+```bash
+ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'sudo test -s /opt/readmates/readmates-server.jar && sudo ls -lh /opt/readmates/readmates-server.jar'
+```
+
+검증된 JAR가 없거나 교체가 필요하면 로컬에서 다시 배포합니다.
+
+```bash
+./server/gradlew -p server bootJar
+VM_PUBLIC_IP=VM_PUBLIC_IP ./deploy/oci/03-deploy.sh
+```
+
+Legacy host 서비스를 Spring, Caddy 순서로 올립니다.
+
+```bash
+ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'sudo systemctl enable --now readmates-server && sudo systemctl enable --now caddy && sudo systemctl status readmates-server --no-pager && sudo systemctl status caddy --no-pager'
+```
 
 ## Redis and Kafka Flags
 
