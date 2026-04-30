@@ -19,9 +19,54 @@ function emptyPage<T>() {
   return { items: [] as T[], nextCursor: null };
 }
 
+function requestedSessionIdOrNull(requestedSessionId: string | null) {
+  return requestedSessionId?.trim() ? requestedSessionId : null;
+}
+
+function noteSessionFromFeedItems(requestedSessionId: string, items: NoteFeedPage["items"]): NoteSessionItem | null {
+  const sessionItems = items.filter((item) => item.sessionId === requestedSessionId);
+  const firstItem = sessionItems[0];
+
+  if (!firstItem) {
+    return null;
+  }
+
+  return {
+    sessionId: requestedSessionId,
+    sessionNumber: firstItem.sessionNumber,
+    bookTitle: firstItem.bookTitle,
+    date: firstItem.date,
+    questionCount: sessionItems.filter((item) => item.kind === "QUESTION").length,
+    oneLinerCount: sessionItems.filter((item) => item.kind === "ONE_LINE_REVIEW").length,
+    longReviewCount: sessionItems.filter((item) => item.kind === "LONG_REVIEW").length,
+    highlightCount: sessionItems.filter((item) => item.kind === "HIGHLIGHT").length,
+    totalCount: sessionItems.length,
+  };
+}
+
 export async function loadNotesFeedRouteData(requestedSessionId: string | null, context?: ReadmatesApiContext): Promise<NotesFeedRouteData> {
   const noteSessions = await fetchNoteSessions(context, { limit: NOTES_SESSIONS_FIRST_PAGE_LIMIT });
-  const selectedSession = selectNoteSession(noteSessions.items, requestedSessionId);
+  const requestedSessionIdValue = requestedSessionIdOrNull(requestedSessionId);
+
+  if (requestedSessionIdValue) {
+    const selectedSession = noteSessions.items.find((session) => session.sessionId === requestedSessionIdValue) ?? null;
+
+    if (!selectedSession) {
+      const items = await fetchNotesFeed(requestedSessionIdValue, context, { limit: NOTES_FEED_FIRST_PAGE_LIMIT });
+
+      return {
+        noteSessions,
+        selectedSession: noteSessionFromFeedItems(requestedSessionIdValue, items.items),
+        items,
+      };
+    }
+
+    const items = await fetchNotesFeed(selectedSession.sessionId, context, { limit: NOTES_FEED_FIRST_PAGE_LIMIT });
+
+    return { noteSessions, selectedSession, items };
+  }
+
+  const selectedSession = selectNoteSession(noteSessions.items, requestedSessionIdValue);
   const items = selectedSession ? await fetchNotesFeed(selectedSession.sessionId, context, { limit: NOTES_FEED_FIRST_PAGE_LIMIT }) : emptyPage();
 
   return { noteSessions, selectedSession, items };

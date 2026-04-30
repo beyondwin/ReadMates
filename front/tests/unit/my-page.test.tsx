@@ -196,8 +196,8 @@ function renderMyPage(overrides: Partial<MyPageProps> = {}) {
   const props: MyPageProps = {
     data,
     reports: reportPage,
-    reviewCount: 3,
-    questionCount: 7,
+    reviewCount: "3",
+    questionCount: "7",
     LogoutButtonComponent: TestLogoutButton,
     onLeaveMembership: testLeaveMembership,
     notificationPreferences,
@@ -212,8 +212,8 @@ function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
   const props: EditableMyPageProps = {
     data,
     reports: reportPage,
-    reviewCount: 3,
-    questionCount: 7,
+    reviewCount: "3",
+    questionCount: "7",
     LogoutButtonComponent: TestLogoutButton,
     onLeaveMembership: testLeaveMembership,
     canEditProfile: true,
@@ -458,6 +458,59 @@ describe("MyPage", () => {
     expect(screen.queryAllByRole("button", { name: "알림 설정 저장" })).toHaveLength(0);
   });
 
+  it("caps my writing counts when the first archive page has more records", async () => {
+    installRouterRequestShim();
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(jsonResponse(activeAuth));
+      }
+
+      if (url === "/api/bff/api/app/me") {
+        return Promise.resolve(jsonResponse(data));
+      }
+
+      if (url === "/api/bff/api/feedback-documents/me?limit=30") {
+        return Promise.resolve(jsonResponse(reportPage));
+      }
+
+      if (url === "/api/bff/api/archive/me/questions?limit=30") {
+        return Promise.resolve(jsonResponse(pageOf(new Array(30).fill(null), "questions-next")));
+      }
+
+      if (url === "/api/bff/api/archive/me/reviews?limit=30") {
+        return Promise.resolve(jsonResponse(pageOf(new Array(3).fill(null))));
+      }
+
+      if (url === "/api/bff/api/me/notifications/preferences") {
+        return Promise.resolve(jsonResponse(notificationPreferences));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/app/me",
+          element: <MyRoutePage />,
+          loader: myPageLoader,
+          hydrateFallbackElement: <div>내 공간을 불러오는 중</div>,
+        },
+      ],
+      { initialEntries: ["/app/me"] },
+    );
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "계정과 기록" })).toBeInTheDocument();
+    expect(screen.getAllByText("30+").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "질문 30+" })).toHaveAttribute("href", "/app/archive?view=questions");
+    expect(screen.queryByRole("link", { name: "질문 30" })).not.toBeInTheDocument();
+  });
+
   it("saves a trimmed display name through the profile editor", async () => {
     const onUpdateProfile = vi.fn(async (displayName: string) => memberProfileResponse(displayName));
     const { container } = renderEditableMyPage({ onUpdateProfile });
@@ -605,8 +658,8 @@ describe("MyPage", () => {
         <MyPage
           data={data}
           reports={reportsPage}
-          reviewCount={3}
-          questionCount={7}
+          reviewCount="3"
+          questionCount="7"
           LogoutButtonComponent={TestLogoutButton}
           onLeaveMembership={testLeaveMembership}
           notificationPreferences={notificationPreferences}
@@ -739,8 +792,8 @@ describe("MyPage", () => {
               <MyPage
                 data={data}
                 reports={reportPage}
-                reviewCount={3}
-                questionCount={7}
+                reviewCount="3"
+                questionCount="7"
                 LogoutButtonComponent={TestLogoutButton}
                 onLeaveMembership={testLeaveMembership}
                 notificationPreferences={notificationPreferences}
@@ -912,7 +965,7 @@ describe("MyPage", () => {
       totalSessionCount: 6,
       recentAttendances: [],
     };
-    const { container } = renderMyPage({ data: viewerData, reports: pageOf([]), reviewCount: 0, questionCount: 0 });
+    const { container } = renderMyPage({ data: viewerData, reports: pageOf([]), reviewCount: "0", questionCount: "0" });
     const desktop = desktopScope(container);
     const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
 

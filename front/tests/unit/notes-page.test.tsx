@@ -78,6 +78,19 @@ const feedItems: NoteFeedItem[] = [
   },
 ];
 
+const olderFeedItems: NoteFeedItem[] = [
+  {
+    sessionId: "session-older",
+    sessionNumber: 2,
+    bookTitle: "오래된 세션",
+    date: "2025-12-17",
+    authorName: "이멤버5",
+    authorShortName: "수",
+    kind: "QUESTION",
+    text: "첫 페이지 밖 세션의 기록입니다.",
+  },
+];
+
 function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
   return { items, nextCursor };
 }
@@ -105,9 +118,11 @@ function installRouterRequestShim() {
 function mockNotesBff({
   sessions = noteSessions,
   feed = feedItems,
+  feedsBySession = {},
 }: {
   sessions?: NoteSessionItem[];
   feed?: NoteFeedItem[];
+  feedsBySession?: Record<string, NoteFeedItem[]>;
 } = {}) {
   vi.stubGlobal(
     "fetch",
@@ -136,7 +151,9 @@ function mockNotesBff({
       }
 
       if (url.startsWith("/api/bff/api/notes/feed?sessionId=")) {
-        return Promise.resolve(jsonResponse(pageOf(feed)));
+        const requestUrl = new URL(url, "http://readmates.test");
+        const sessionId = requestUrl.searchParams.get("sessionId") ?? "";
+        return Promise.resolve(jsonResponse(pageOf(feedsBySession[sessionId] ?? feed)));
       }
 
       return Promise.reject(new Error(`Unexpected BFF path: ${url}`));
@@ -250,22 +267,32 @@ describe("NotesPage", () => {
     expect(props.initialFilter).toBe("all");
   });
 
-  it("falls back invalid sessionId to the first session with records", async () => {
-    mockNotesBff();
+  it("keeps a requested sessionId outside the first sessions page instead of selecting a different session", async () => {
+    mockNotesBff({ feedsBySession: { "session-older": olderFeedItems } });
 
-    renderNotesPage("missing-session");
+    renderNotesPage("session-older");
     const props = await latestNotesProps();
 
     expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-6&limit=60",
+      "/api/bff/api/notes/feed?sessionId=session-older&limit=60",
       expect.any(Object),
     );
     expect(props).toEqual({
-      items: pageOf(feedItems),
+      items: pageOf(olderFeedItems),
       noteSessions: pageOf(noteSessions),
-      selectedSessionId: "session-6",
-      selectedSession: noteSessions[1],
+      selectedSessionId: "session-older",
+      selectedSession: {
+        sessionId: "session-older",
+        sessionNumber: 2,
+        bookTitle: "오래된 세션",
+        date: "2025-12-17",
+        questionCount: 1,
+        oneLinerCount: 0,
+        longReviewCount: 0,
+        highlightCount: 0,
+        totalCount: 1,
+      },
       initialFilter: "all",
       onFilterChange: expect.any(Function),
       onLoadMoreItems: expect.any(Function),

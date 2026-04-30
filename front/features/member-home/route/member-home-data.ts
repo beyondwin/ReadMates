@@ -11,6 +11,8 @@ import type {
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 
+const MEMBER_HOME_NOTE_FEED_LIMIT = 60;
+
 export type MemberHomeRouteData = {
   current: MemberHomeCurrentSessionResponse;
   noteFeedItems: MemberHomeNoteFeedItem[];
@@ -29,11 +31,11 @@ export async function memberHomeLoader(args?: LoaderFunctionArgs): Promise<Membe
     };
   }
 
-  const [current, noteFeedItems, upcomingSessions] = await Promise.all([
+  const [current, noteFeed, upcomingSessions] = await Promise.all([
     fetchMemberHomeCurrentSession(context),
-    fetchMemberHomeNoteFeed(context),
+    fetchMemberHomeNoteFeed(context, { limit: MEMBER_HOME_NOTE_FEED_LIMIT }),
     fetchMemberHomeUpcomingSessions(context),
   ]);
 
-  return { current, noteFeedItems, upcomingSessions };
+  return { current, noteFeedItems: noteFeed.items, upcomingSessions };
 }

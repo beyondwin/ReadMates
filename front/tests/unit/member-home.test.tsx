@@ -8,6 +8,7 @@ import type {
   MemberHomeNoteFeedItem as NoteFeedItem,
   MemberHomeUpcomingSession,
 } from "@/features/member-home/api/member-home-contracts";
+import type { PagedResponse } from "@/shared/model/paging";
 
 afterEach(cleanup);
 afterEach(() => {
@@ -119,12 +120,16 @@ function jsonResponse(body: unknown) {
   });
 }
 
+function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
+  return { items, nextCursor };
+}
+
 describe("MemberHome", () => {
   it("loads upcoming sessions for member home", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(jsonResponse(auth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
-      if (url === "/api/bff/api/notes/feed") return Promise.resolve(jsonResponse(noteFeedItems));
+      if (url === "/api/bff/api/notes/feed?limit=60") return Promise.resolve(jsonResponse(pageOf(noteFeedItems)));
       if (url === "/api/bff/api/sessions/upcoming") return Promise.resolve(jsonResponse([]));
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
@@ -132,7 +137,9 @@ describe("MemberHome", () => {
 
     const data = await memberHomeLoader();
 
+    expect(data.noteFeedItems).toEqual(noteFeedItems);
     expect(data.upcomingSessions).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/notes/feed?limit=60", expect.objectContaining({}));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/upcoming", expect.objectContaining({}));
   });
 
