@@ -2,10 +2,15 @@ package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.MailDeliveryCommand
+import com.readmates.notification.application.port.out.MailDeliveryPort
+import com.readmates.notification.application.service.NotificationDeliveryProcessingService
+import com.readmates.notification.application.service.ReadmatesOperationalMetrics
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.support.MySqlTestContainer
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -17,7 +22,11 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.Collections
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 private const val CLEANUP_NOTIFICATION_DELIVERY_SQL = """
     delete from member_notifications
@@ -229,6 +238,28 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(activeMarked).isTrue()
         assertThat(statusFor(emailDeliveryId)).isEqualTo("SENT")
         assertThat(deliveryAdapter.findDeliveryStatus(emailDeliveryId)).isEqualTo(NotificationDeliveryStatus.SENT)
+    }
+
+    @Test
+    fun `processing service concurrent claims do not send duplicate email delivery recipients`() {
+        insertEventOutboxRow()
+        deliveryAdapter.persistPlannedDeliveries(message())
+        val mailPort = RecordingMailPort()
+        val service = NotificationDeliveryProcessingService(
+            notificationDeliveryPort = deliveryAdapter,
+            mailDeliveryPort = mailPort,
+            metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+            maxAttempts = 5,
+            deliveryEnabled = true,
+        )
+
+        val processedCounts = runConcurrently(workerCount = 2) {
+            service.processPending(limit = 2)
+        }
+
+        assertThat(processedCounts.sum()).isEqualTo(3)
+        assertThat(mailPort.recipients()).hasSize(3).doesNotHaveDuplicates()
+        assertThat(emailDeliveryRowsByStatus(NotificationDeliveryStatus.SENT)).isEqualTo(3)
     }
 
     @Test
@@ -580,6 +611,42 @@ class JdbcNotificationDeliveryAdapterTest(
             id.toString(),
         )!!
 
+    private fun emailDeliveryRowsByStatus(status: NotificationDeliveryStatus): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_deliveries
+            where event_id = ?
+              and club_id = ?
+              and channel = 'EMAIL'
+              and status = ?
+            """.trimIndent(),
+            Int::class.java,
+            eventId.toString(),
+            clubId.toString(),
+            status.name,
+        ) ?: 0
+
+    private fun <T> runConcurrently(workerCount: Int, action: () -> T): List<T> {
+        val executor = Executors.newFixedThreadPool(workerCount)
+        val ready = CountDownLatch(workerCount)
+        val start = CountDownLatch(1)
+        return try {
+            val futures = (1..workerCount).map {
+                executor.submit<T> {
+                    ready.countDown()
+                    check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
+                    action()
+                }
+            }
+            check(ready.await(5, TimeUnit.SECONDS)) { "Timed out waiting for concurrent workers" }
+            start.countDown()
+            futures.map { it.get(10, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     companion object {
         @JvmStatic
         @DynamicPropertySource
@@ -592,4 +659,14 @@ class JdbcNotificationDeliveryAdapterTest(
         val userId: UUID,
         val membershipId: UUID,
     )
+
+    private class RecordingMailPort : MailDeliveryPort {
+        private val recipients = Collections.synchronizedList(mutableListOf<String>())
+
+        override fun send(command: MailDeliveryCommand) {
+            recipients += command.to
+        }
+
+        fun recipients(): List<String> = recipients.toList()
+    }
 }
