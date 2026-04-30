@@ -1,3 +1,5 @@
+import type { PagedResponse } from "@/shared/model/paging";
+
 export type MemberRole = "HOST" | "MEMBER";
 export type MembershipStatus = "INVITED" | "VIEWER" | "ACTIVE" | "SUSPENDED" | "LEFT" | "INACTIVE";
 export type AttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
@@ -36,6 +38,8 @@ export type ArchiveSessionItem = {
   state: SessionState;
   feedbackDocument?: MemberArchiveFeedbackDocumentStatus;
 };
+
+export type ArchiveSessionPage = PagedResponse<ArchiveSessionItem>;
 
 export type MemberArchiveHighlightItem = {
   text: string;
@@ -114,6 +118,8 @@ export type MyArchiveQuestionItem = {
   draftThought: string | null;
 };
 
+export type MyArchiveQuestionPage = PagedResponse<MyArchiveQuestionItem>;
+
 export type MyArchiveReviewItem = {
   sessionId: string;
   sessionNumber: number;
@@ -122,6 +128,8 @@ export type MyArchiveReviewItem = {
   kind: "LONG_REVIEW";
   text: string;
 };
+
+export type MyArchiveReviewPage = PagedResponse<MyArchiveReviewItem>;
 
 export type FeedbackDocumentListItem = {
   sessionId: string;
@@ -135,6 +143,8 @@ export type FeedbackDocumentListItem = {
   uploadedAt: string;
 };
 
+export type FeedbackDocumentListPage = PagedResponse<FeedbackDocumentListItem>;
+
 export type NoteFeedItem = {
   sessionId: string;
   sessionNumber: number;
@@ -145,6 +155,8 @@ export type NoteFeedItem = {
   kind: "QUESTION" | "ONE_LINE_REVIEW" | "LONG_REVIEW" | "HIGHLIGHT";
   text: string;
 };
+
+export type NoteFeedPage = PagedResponse<NoteFeedItem>;
 
 export type NoteSessionItem = {
   sessionId: string;
@@ -157,6 +169,8 @@ export type NoteSessionItem = {
   highlightCount: number;
   totalCount: number;
 };
+
+export type NoteSessionPage = PagedResponse<NoteSessionItem>;
 
 export type MyPageResponse = {
   displayName: string;

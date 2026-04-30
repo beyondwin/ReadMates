@@ -1,6 +1,16 @@
 import type { CurrentSessionResponse } from "@/features/current-session/api/current-session-contracts";
-import type { FeedbackDocumentResponse } from "@/features/feedback/api/feedback-contracts";
-import type { MemberArchiveSessionDetailResponse } from "@/features/archive/api/archive-contracts";
+import type {
+  FeedbackDocumentListPage,
+  FeedbackDocumentResponse,
+} from "@/features/feedback/api/feedback-contracts";
+import type {
+  ArchiveSessionPage,
+  MemberArchiveSessionDetailResponse,
+  MyArchiveQuestionPage,
+  MyArchiveReviewPage,
+  NoteFeedPage,
+  NoteSessionPage,
+} from "@/features/archive/api/archive-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type {
   CurrentSessionResponse as HostCurrentSessionResponse,
@@ -229,6 +239,109 @@ export const archiveSessionDetailContractFixture = {
     uploadedAt: "2026-04-20T09:00:00Z",
   },
 } satisfies MemberArchiveSessionDetailResponse;
+
+export const archiveSessionPageContractFixture = {
+  items: [
+    {
+      sessionId: "session-1",
+      sessionNumber: 1,
+      title: "1회차 모임 · 팩트풀니스",
+      bookTitle: "팩트풀니스",
+      bookAuthor: "한스 로슬링",
+      bookImageUrl: null,
+      date: "2025-11-26",
+      attendance: 6,
+      total: 6,
+      published: true,
+      state: "PUBLISHED",
+      feedbackDocument: {
+        available: true,
+        readable: true,
+        lockedReason: null,
+        title: "독서모임 1차 피드백",
+        uploadedAt: "2026-04-20T09:00:00Z",
+      },
+    },
+  ],
+  nextCursor: "session-older",
+} satisfies ArchiveSessionPage;
+
+export const myArchiveQuestionPageContractFixture = {
+  items: [
+    {
+      sessionId: "session-1",
+      sessionNumber: 1,
+      bookTitle: "팩트풀니스",
+      date: "2025-11-26",
+      priority: 1,
+      text: "데이터를 믿는 기준은 어디서 시작되나요?",
+      draftThought: null,
+    },
+  ],
+  nextCursor: null,
+} satisfies MyArchiveQuestionPage;
+
+export const myArchiveReviewPageContractFixture = {
+  items: [
+    {
+      sessionId: "session-1",
+      sessionNumber: 1,
+      bookTitle: "팩트풀니스",
+      date: "2025-11-26",
+      kind: "LONG_REVIEW",
+      text: "숫자를 읽는 습관을 다시 점검했다.",
+    },
+  ],
+  nextCursor: null,
+} satisfies MyArchiveReviewPage;
+
+export const noteSessionPageContractFixture = {
+  items: [
+    {
+      sessionId: "session-1",
+      sessionNumber: 1,
+      bookTitle: "팩트풀니스",
+      date: "2025-11-26",
+      questionCount: 1,
+      oneLinerCount: 1,
+      longReviewCount: 0,
+      highlightCount: 1,
+      totalCount: 3,
+    },
+  ],
+  nextCursor: null,
+} satisfies NoteSessionPage;
+
+export const noteFeedPageContractFixture = {
+  items: [
+    {
+      sessionId: "session-1",
+      sessionNumber: 1,
+      bookTitle: "팩트풀니스",
+      date: "2025-11-26",
+      authorName: "이멤버5",
+      authorShortName: "수",
+      kind: "QUESTION",
+      text: "데이터를 믿는 기준은 어디서 시작되나요?",
+    },
+  ],
+  nextCursor: null,
+} satisfies NoteFeedPage;
+
+export const feedbackDocumentListPageContractFixture = {
+  items: [
+    {
+      sessionId: "session-1",
+      sessionNumber: 1,
+      title: "독서모임 1차 피드백",
+      bookTitle: "팩트풀니스",
+      date: "2025-11-26",
+      fileName: "251126 1차.md",
+      uploadedAt: "2026-04-20T09:00:00Z",
+    },
+  ],
+  nextCursor: null,
+} satisfies FeedbackDocumentListPage;
 
 export const hostSessionPublicationContractFixture = {
   publicSummary: "데이터를 읽는 태도와 대화의 균형을 공개 요약으로 남겼습니다.",

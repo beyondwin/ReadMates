@@ -5,18 +5,21 @@ import type { NoteFeedItem, NoteSessionItem } from "@/features/archive/api/archi
 import type { FeedFilter } from "@/features/archive/model/notes-feed-model";
 import { notesFeedLoader } from "@/features/archive/route/notes-feed-data";
 import NotesPage from "@/src/pages/notes";
+import type { PagedResponse } from "@/shared/model/paging";
 
 const { notesFeedPageMock } = vi.hoisted(() => ({
   notesFeedPageMock: vi.fn(),
 }));
 
 type NotesFeedProps = {
-  items: NoteFeedItem[];
-  noteSessions: NoteSessionItem[];
+  items: PagedResponse<NoteFeedItem>;
+  noteSessions: PagedResponse<NoteSessionItem>;
   selectedSessionId: string | null;
   selectedSession: NoteSessionItem | null;
   initialFilter?: FeedFilter;
   onFilterChange?: (filter: FeedFilter) => void;
+  onLoadMoreItems?: () => Promise<void>;
+  onLoadMoreNoteSessions?: () => Promise<void>;
 };
 
 vi.mock("@/features/archive/ui/notes-feed-page", () => ({
@@ -75,6 +78,10 @@ const feedItems: NoteFeedItem[] = [
   },
 ];
 
+function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
+  return { items, nextCursor };
+}
+
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -124,12 +131,12 @@ function mockNotesBff({
         );
       }
 
-      if (url === "/api/bff/api/notes/sessions") {
-        return Promise.resolve(jsonResponse(sessions));
+      if (url === "/api/bff/api/notes/sessions?limit=30") {
+        return Promise.resolve(jsonResponse(pageOf(sessions)));
       }
 
       if (url.startsWith("/api/bff/api/notes/feed?sessionId=")) {
-        return Promise.resolve(jsonResponse(feed));
+        return Promise.resolve(jsonResponse(pageOf(feed)));
       }
 
       return Promise.reject(new Error(`Unexpected BFF path: ${url}`));
@@ -185,17 +192,19 @@ describe("NotesPage", () => {
     const props = await latestNotesProps();
 
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions,
+      items: pageOf(feedItems),
+      noteSessions: pageOf(noteSessions),
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
     expect(screen.getByTestId("notes-feed")).toHaveTextContent("session-6");
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-6",
+      "/api/bff/api/notes/feed?sessionId=session-6&limit=60",
       expect.any(Object),
     );
   });
@@ -206,18 +215,20 @@ describe("NotesPage", () => {
     renderNotesPage();
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-6",
+      "/api/bff/api/notes/feed?sessionId=session-6&limit=60",
       expect.any(Object),
     );
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions,
+      items: pageOf(feedItems),
+      noteSessions: pageOf(noteSessions),
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
   });
 
@@ -245,18 +256,20 @@ describe("NotesPage", () => {
     renderNotesPage("missing-session");
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-6",
+      "/api/bff/api/notes/feed?sessionId=session-6&limit=60",
       expect.any(Object),
     );
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions,
+      items: pageOf(feedItems),
+      noteSessions: pageOf(noteSessions),
       selectedSessionId: "session-6",
       selectedSession: noteSessions[1],
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
   });
 
@@ -275,18 +288,20 @@ describe("NotesPage", () => {
     renderNotesPage();
     const props = await latestNotesProps();
 
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/bff/api/notes/feed?sessionId=session-7",
+      "/api/bff/api/notes/feed?sessionId=session-7&limit=60",
       expect.any(Object),
     );
     expect(props).toEqual({
-      items: feedItems,
-      noteSessions: zeroCountSessions,
+      items: pageOf(feedItems),
+      noteSessions: pageOf(zeroCountSessions),
       selectedSessionId: "session-7",
       selectedSession: zeroCountSessions[0],
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
   });
 
@@ -297,14 +312,16 @@ describe("NotesPage", () => {
     const props = await latestNotesProps();
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
     expect(props).toEqual({
-      items: [],
-      noteSessions: [],
+      items: pageOf([]),
+      noteSessions: pageOf([]),
       selectedSessionId: null,
       selectedSession: null,
       initialFilter: "all",
       onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
     });
   });
 });
