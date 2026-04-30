@@ -211,7 +211,7 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 
 멤버 알림함은 `/api/me/notifications`, `/api/me/notifications/unread-count`, `/api/me/notifications/{id}/read`, `/api/me/notifications/read-all`을 사용합니다. `/app/notifications`는 `member_notifications`를 source of truth로 읽고, unread count, 개별 읽음 처리, 전체 읽음 처리를 제공합니다. 각 알림의 deep link를 열면 해당 알림을 읽음 처리한 뒤 대상 화면으로 이동합니다.
 
-호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, 고정 템플릿 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
+호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, redesigned template helper를 사용하는 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
 
 테스트 메일은 SMTP 호출 전 audit row를 먼저 예약해 host membership 단위 60초 cooldown을 직렬화합니다. 실패한 테스트 메일은 같은 audit row를 `FAILED`로 갱신하고, 저장/응답되는 error는 email, secret, token, credential 형태를 redaction한 뒤 길이를 제한합니다.
 
