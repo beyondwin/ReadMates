@@ -32,7 +32,7 @@ type HostMessage = {
 
 type PendingRowAction = "revoke" | "reissue";
 
-export type HostInvitationsActions = {
+type HostInvitationsActions = {
   listInvitations: (page?: PageRequest) => Promise<Response>;
   createInvitation: (request: CreateHostInvitationRequest) => Promise<Response>;
   revokeInvitation: (invitationId: string) => Promise<Response>;

@@ -497,6 +497,9 @@ describe("frontend architecture boundaries", () => {
         "@/features/host/api/host-api",
       );
       expect(source, `${relativePath} must not call fetch directly`).not.toMatch(/\bfetch\s*\(/);
+      expect(source, `${relativePath} must not export route-owned action types`).not.toMatch(
+        /export\s+type\s+\w+Actions\b/,
+      );
     }
   });
 
