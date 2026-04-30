@@ -115,6 +115,8 @@ Spring은 OAuth callback origin과 app return origin을 분리합니다.
 
 Google Cloud OAuth client에는 `READMATES_AUTH_BASE_URL`의 `/login/oauth2/code/google` callback을 등록합니다. `https://readmates.pages.dev` fallback을 계속 운영하면 fallback callback도 유지합니다.
 
+Registered club host를 새로 추가한 뒤에는 Cloudflare Pages custom domain 연결, Spring `READMATES_ALLOWED_ORIGINS` 갱신과 재시작, Platform admin 상태 확인 action을 같은 rollout로 묶습니다. 마지막에는 `scripts/smoke-production-integrations.sh`로 Pages marker와 OAuth `redirect_uri`를 확인하고, 실제 운영 결과는 공개 문서나 Git에 붙이지 않습니다.
+
 ## JAR 배포
 
 ```bash

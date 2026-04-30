@@ -40,9 +40,12 @@ Cloudflare 프로젝트 root가 `front`이므로 `front/functions`가 Functions 
 ```bash
 READMATES_API_BASE_URL=https://api.example.com
 READMATES_BFF_SECRET=<shared-secret>
+VITE_PUBLIC_PRIMARY_DOMAIN={primary-domain}
 ```
 
 `READMATES_API_BASE_URL`은 운영 HTTPS origin이어야 합니다. `READMATES_BFF_SECRET`은 Spring `READMATES_BFF_SECRET`과 같은 값이어야 하며 브라우저에 노출되는 `VITE_` 변수로 만들지 않습니다.
+
+`VITE_PUBLIC_PRIMARY_DOMAIN`은 canonical URL을 만들 때 쓰는 build-time public setting입니다. Primary domain이 없으면 비워두고 `readmates.pages.dev` fallback은 `noindex`로 운영합니다.
 
 Preview 배포에는 운영 secret을 넣지 않습니다. Preview가 API를 써야 하면 별도 preview 백엔드와 별도 BFF secret을 둡니다.
 
@@ -52,6 +55,8 @@ Preview 배포에는 운영 secret을 넣지 않습니다. Preview가 API를 써
 
 ```bash
 READMATES_APP_BASE_URL=https://readmates.pages.dev
+READMATES_AUTH_BASE_URL=https://readmates.pages.dev
+READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
 READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
 READMATES_BFF_SECRET=<same-shared-secret>
 READMATES_BFF_SECRET_REQUIRED=true
@@ -65,6 +70,8 @@ Spring property 이름으로 쓰면 아래와 같습니다.
 
 ```properties
 readmates.app-base-url=https://readmates.pages.dev
+readmates.auth.auth-base-url=https://readmates.pages.dev
+readmates.auth.return-state-secret={return-state-signing-secret}
 readmates.allowed-origins=https://readmates.pages.dev
 readmates.bff-secret=<same-shared-secret>
 readmates.bff-secret-required=true
@@ -74,17 +81,23 @@ spring.security.oauth2.client.registration.google.client-secret=<google-oauth-cl
 spring.security.oauth2.client.registration.google.scope=openid,email,profile
 ```
 
-커스텀 도메인으로 전환하면 Cloudflare, Spring, Google OAuth의 origin을 같은 HTTPS origin으로 동시에 맞춥니다.
+커스텀 도메인으로 전환하면 Cloudflare Pages custom domain, Spring `READMATES_AUTH_BASE_URL`, `READMATES_ALLOWED_ORIGINS`, Google OAuth redirect URI를 같은 HTTPS auth origin 정책에 맞춥니다. Club별 registered host는 OAuth start와 return target이 될 수 있지만, 기본 전략에서는 Google callback을 `READMATES_AUTH_BASE_URL`로 모읍니다.
 
 ## Google OAuth 흐름
 
-Google Cloud OAuth client에 승인된 redirect URI를 등록합니다.
+Google Cloud OAuth client에 승인된 redirect URI를 등록합니다. Fallback-only 운영에서는 아래 URI가 필요합니다.
 
 ```text
 https://readmates.pages.dev/login/oauth2/code/google
 ```
 
-브라우저는 `/oauth2/authorization/google`에서 로그인을 시작합니다. Pages Functions가 Spring으로 요청을 전달하고, Spring이 Google로 redirect하며, Google callback은 다시 Pages origin의 `/login/oauth2/code/google`로 돌아옵니다.
+Primary auth domain을 운영하면 같은 path를 primary origin에도 추가합니다.
+
+```text
+https://<primary-domain>/login/oauth2/code/google
+```
+
+브라우저는 `/oauth2/authorization/google`에서 로그인을 시작합니다. Pages Functions가 Spring으로 요청을 전달하고, Spring이 Google로 redirect하며, Google callback은 `READMATES_AUTH_BASE_URL`의 `/login/oauth2/code/google`로 돌아옵니다. 성공 후 signed `returnTo`가 검증되면 원래 클럽 path나 active registered host로 복귀하고, 없으면 `/app` smart entry로 이동합니다.
 
 ## 수동 검증 체크리스트
 
@@ -99,6 +112,7 @@ https://readmates.pages.dev/login/oauth2/code/google
 9. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있고, 멤버 공개 예정 세션이 있으면 홈에서 볼 수 있는지 확인합니다.
 10. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.
 11. 피드백 문서 `PDF로 저장` action이 숨겨져 있는지 확인합니다. 현재 `feedbackDocumentPdfDownloadsEnabled=false`라서 print route는 사용자-facing PDF 저장 흐름으로 쓰지 않습니다.
+12. `/.well-known/readmates-domain-check.json` marker가 fallback host와 registered host에서 ReadMates Cloudflare Pages marker를 반환하는지 확인합니다.
 
 PDF 저장 흐름을 다시 켜는 경우에는 `front/shared/config/readmates-feature-flags.ts`를 변경한 뒤 `/app/feedback/:sessionId/print`가 데이터를 불러오고 browser print를 한 번 호출하는지 별도로 검증합니다.
 
@@ -108,6 +122,9 @@ PDF 저장 흐름을 다시 켜는 경우에는 `front/shared/config/readmates-f
 curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/app
 curl -sS -o /dev/null -w '%{http_code}\n' https://readmates.pages.dev/api/bff/api/auth/me
 curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.pages.dev/oauth2/authorization/google
+READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+./scripts/smoke-production-integrations.sh
 ```
 
 ## 문제 해결
@@ -116,4 +133,4 @@ curl -sS -o /dev/null -w '%{http_code} %{redirect_url}\n' https://readmates.page
 - 변경 요청의 `/api/bff/**`가 403이면 same-origin 검증, browser origin, Spring `READMATES_ALLOWED_ORIGINS`를 확인합니다.
 - API 호출이 401이거나 세션이 유지되지 않으면 cookie 설정, `READMATES_AUTH_SESSION_COOKIE_SECURE`, BFF 우회 여부를 확인합니다.
 - `/api/bff/**`가 500이면 `READMATES_API_BASE_URL`이 없거나 Spring origin에 도달할 수 없는 상태일 수 있습니다.
-- OAuth redirect mismatch는 Google OAuth client, Spring `READMATES_APP_BASE_URL`, Cloudflare Pages public origin이 서로 다를 때 발생합니다.
+- OAuth redirect mismatch는 Google OAuth client, Spring `READMATES_AUTH_BASE_URL`, Cloudflare Pages public origin이 서로 다를 때 발생합니다.

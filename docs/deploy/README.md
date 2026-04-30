@@ -1,6 +1,6 @@
 # ReadMates 배포 문서
 
-검토일: 2026-04-25
+검토일: 2026-04-30
 
 이 디렉터리는 ReadMates의 공개 안전 배포 문서 허브입니다. 운영 환경의 목표 구조, 신뢰 경계, secret 보관 원칙, 공개 릴리즈 후보 검증 흐름을 설명하되 계정별 값과 private deployment state는 Git에 두지 않습니다.
 
@@ -81,6 +81,7 @@ ReadMates는 제품 수준에서 invite-only 흐름을 사용합니다.
 - 본인 프로필 수정은 인증된 멤버 앱 읽기 가능 상태에서만 허용하고, 같은 클럽 안의 표시 이름 중복과 예약어는 서버에서 막습니다.
 - Public API는 `sessions.state=PUBLISHED`이고 `public_session_publications.visibility=PUBLIC`인 공개 기록만 반환합니다.
 - 피드백 문서는 권한과 참석 여부를 통과한 정식 멤버 또는 호스트에게만 노출합니다.
+- Platform admin은 club 생성과 domain alias 상태 확인을 관리하는 별도 권한입니다. Platform `OPERATOR`라도 특정 클럽의 호스트 도구를 쓰려면 해당 club membership의 `HOST` 권한을 별도로 가져야 합니다.
 
 ## 환경 변수
 
@@ -113,7 +114,7 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 
 직접 API origin 예시는 공개 문서에서 `https://api.example.com` 같은 placeholder만 사용합니다. 실제 운영 secret, DB password, OAuth secret, OCI OCID, private IP, DB dump는 문서와 Git에 넣지 않습니다.
 
-배포 후 공개 연동 최소 smoke는 `./scripts/smoke-production-integrations.sh`로 실행합니다. 이 script는 Cloudflare Pages marker와 Google OAuth `redirect_uri`를 확인하지만, 실제 운영 결과나 domain 목록은 Git에 기록하지 않습니다.
+배포 후 공개 연동 최소 smoke는 `./scripts/smoke-production-integrations.sh`로 실행합니다. 이 script는 Cloudflare Pages marker와 Google OAuth `redirect_uri`를 확인하지만, 실제 운영 결과나 domain 목록은 Git에 기록하지 않습니다. Registered club host의 `ACTIVE` 전환은 Platform admin 상태 확인 action이 `/.well-known/readmates-domain-check.json` marker를 확인한 뒤에만 진행합니다.
 
 ## Redis Feature Flags
 
