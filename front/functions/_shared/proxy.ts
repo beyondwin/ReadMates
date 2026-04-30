@@ -42,6 +42,22 @@ export function clientIpFromRequest(request: Request) {
   return forwardedFor ? forwardedFor.slice(0, MAX_CLIENT_IP_LENGTH) : null;
 }
 
+export function apiBaseUrlFromEnv(env: { READMATES_API_BASE_URL: string }) {
+  const apiBaseUrl = new URL(env.READMATES_API_BASE_URL);
+  apiBaseUrl.search = "";
+  apiBaseUrl.hash = "";
+  return apiBaseUrl;
+}
+
+export function bffSecretFromEnv(env: { READMATES_BFF_SECRET?: string }) {
+  const directSecret = env.READMATES_BFF_SECRET?.trim();
+  if (directSecret) {
+    return directSecret;
+  }
+
+  return null;
+}
+
 export function forwardedOAuthRequestHeaders(
   request: Request,
   env: { READMATES_BFF_SECRET?: string },
@@ -60,7 +76,7 @@ export function forwardedOAuthRequestHeaders(
   headers.set("x-forwarded-proto", sourceUrl.protocol.replace(":", ""));
   headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(request));
 
-  const bffSecret = env.READMATES_BFF_SECRET?.trim();
+  const bffSecret = bffSecretFromEnv(env);
   if (bffSecret) {
     headers.set("X-Readmates-Bff-Secret", bffSecret);
   }

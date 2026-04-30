@@ -89,6 +89,13 @@ ${CADDY_SITE} {
     reverse_proxy 127.0.0.1:8080
     log {
         output file /var/log/caddy/readmates.log
+        format filter {
+            wrap console
+            request>uri delete
+            request>headers>Authorization delete
+            request>headers>Cookie delete
+            request>headers>X-Readmates-Bff-Secret delete
+        }
     }
 }
 EOF

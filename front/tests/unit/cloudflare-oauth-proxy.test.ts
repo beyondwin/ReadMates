@@ -76,6 +76,29 @@ describe("Cloudflare OAuth proxy functions", () => {
     expect(response.headers.get("x-readmates-club-host")).toBeNull();
   });
 
+  it("uses the dedicated bff secret and strips API base URL query parameters before proxying OAuth", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 302 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await authorizationGet({
+      request: new Request("https://readmates.pages.dev/oauth2/authorization/google?returnTo=/app"),
+      env: {
+        READMATES_API_BASE_URL: "https://api.example.com?ignored=value",
+        READMATES_BFF_SECRET: "direct-secret",
+      },
+      params: {
+        registrationId: "google",
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/oauth2/authorization/google?returnTo=/app",
+      expect.any(Object),
+    );
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("direct-secret");
+  });
+
   it("forwards club host during OAuth authorization start", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 302 }));
     vi.stubGlobal("fetch", fetchMock);

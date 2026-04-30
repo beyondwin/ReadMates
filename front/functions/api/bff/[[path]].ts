@@ -1,4 +1,6 @@
 import {
+  apiBaseUrlFromEnv,
+  bffSecretFromEnv,
   clientIpFromRequest,
   copyUpstreamHeaders,
   normalizedHostFromRequest,
@@ -97,7 +99,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return new Response(null, { status: 404 });
   }
 
-  const upstreamUrl = new URL(upstreamPath, context.env.READMATES_API_BASE_URL);
+  const upstreamUrl = new URL(upstreamPath, apiBaseUrlFromEnv(context.env));
   if (upstreamUrl.pathname !== "/api" && !upstreamUrl.pathname.startsWith("/api/")) {
     return new Response(null, { status: 404 });
   }
@@ -137,7 +139,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     headers.set("X-Readmates-Club-Slug", clubSlug);
   }
 
-  const bffSecret = context.env.READMATES_BFF_SECRET?.trim();
+  const bffSecret = bffSecretFromEnv(context.env);
   if (bffSecret) {
     headers.set("X-Readmates-Bff-Secret", bffSecret);
   }
