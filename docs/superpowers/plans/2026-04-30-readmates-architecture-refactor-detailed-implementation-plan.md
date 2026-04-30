@@ -1447,7 +1447,7 @@ Acceptance criteria completed: shared Cloudflare proxy helper module created; BF
 - Modify: `docs/agents/front.md`
 - Modify: `docs/agents/server.md`
 
-- [ ] **Step 1: Update architecture docs**
+- [x] **Step 1: Update architecture docs**
 
 In `docs/development/architecture.md`, update:
 
@@ -1458,7 +1458,7 @@ In `docs/development/architecture.md`, update:
 - application HTTP dependency is forbidden
 - BFF shared proxy helper owns trusted header forwarding policy
 
-- [ ] **Step 2: Update agent guides**
+- [x] **Step 2: Update agent guides**
 
 In `docs/agents/front.md`, remove language allowing documented legacy `shared/ui` exceptions.
 
@@ -1468,7 +1468,7 @@ In `docs/agents/server.md`, add:
 Application services must not throw Spring web/http exceptions. Use feature application errors and map them in adapter.in.web.
 ```
 
-- [ ] **Step 3: Run full verification**
+- [x] **Step 3: Run full verification**
 
 Run:
 
@@ -1483,7 +1483,7 @@ git diff --check -- docs/development/architecture.md docs/development/test-guide
 
 Expected: all pass.
 
-- [ ] **Step 4: Commit documentation**
+- [x] **Step 4: Commit documentation**
 
 Run:
 
@@ -1491,6 +1491,9 @@ Run:
 git add docs/development/architecture.md docs/development/test-guide.md docs/agents/front.md docs/agents/server.md
 git commit -m "docs: document architecture refactor"
 ```
+
+COMPACT CHECKPOINT Task 10 - Full Verification And Documentation Updates:
+Acceptance criteria completed: architecture/test/agent docs updated for paged contracts, frontend boundary cleanup, server application HTTP boundary, DB query/EXPLAIN guardrails, and Cloudflare proxy helper policy; docs implementation committed as `59fa99c`, docs accuracy follow-up as `f41c90e`; full verification passed. Changed files: `docs/development/architecture.md`, `docs/development/test-guide.md`, `docs/agents/front.md`, `docs/agents/server.md`, and this plan document. Key decisions: architecture docs describe common cursor-paged fields (`items`, `nextCursor`) while allowing endpoint-specific fields such as notification `unreadCount`; `/api/host/members/pending-approvals` is documented as a host cursor-paged list; BFF docs state route functions compose trusted headers using shared `_shared/proxy.ts` helpers rather than overstating that all request header construction lives in the helper. Contracts/API/state/test expectations: scoped archive, notes, feedback, host, and notification list endpoints no longer document legacy array contracts; `shared/ui` must not import app/page/feature code; host `ui` is the public presentation surface; application services must use feature errors mapped in `adapter.in.web`, not Spring web/http exceptions; BFF secret remains server-only. Reviews: first docs spec review found missing pending approvals documentation, incomplete notification page shape, and overstated BFF helper ownership; follow-up `f41c90e` fixed all; final docs re-review found no issues; docs quality/release review found no issues. Verification: `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed with 48 files and 621 tests; `pnpm --dir front build` passed; `pnpm --dir front test:e2e` passed with 22 tests; `git diff --check -- docs/development/architecture.md docs/development/test-guide.md docs/agents/front.md docs/agents/server.md` passed; reviewers also ran targeted docs safety/link scans and relevant architecture/BFF/frontend boundary tests. Existing non-failing output remains React Router `HydrateFallback`, jsdom navigation, and `NO_COLOR`/`FORCE_COLOR` warnings. Remaining risks: no known open issues; plain historical `docs/superpowers` records remain as historical artifacts. Next first action: final status summary only. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions left running; Playwright-managed web servers exited with `pnpm --dir front test:e2e`; completed Task 10 subagents closed; no session-owned ports open.
 
 ## Final Completion Criteria
 
