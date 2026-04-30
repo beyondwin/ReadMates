@@ -325,11 +325,11 @@ function hostSessionEditorLoaderForTest() {
   } as unknown as Parameters<typeof hostSessionEditorLoader>[0]);
 }
 
-const hostLoaderCases: Array<[string, () => Promise<unknown>]> = [
-  ["dashboard", () => hostDashboardLoader()],
-  ["members", () => hostMembersLoader()],
-  ["invitations", () => hostInvitationsLoader()],
-  ["session editor", hostSessionEditorLoaderForTest],
+const hostLoaderCases: Array<[string, () => Promise<unknown>, string]> = [
+  ["dashboard", () => hostDashboardLoader(), "/login"],
+  ["members", () => hostMembersLoader(), "/login"],
+  ["invitations", () => hostInvitationsLoader(), "/login"],
+  ["session editor", hostSessionEditorLoaderForTest, "/login?returnTo=%2Fapp%2Fhost%2Fsessions%2Fsession-7%2Fedit"],
 ];
 
 const clubScopedHostDashboardLoader = hostDashboardLoader as unknown as (
@@ -337,11 +337,11 @@ const clubScopedHostDashboardLoader = hostDashboardLoader as unknown as (
 ) => ReturnType<typeof hostDashboardLoader>;
 
 describe("HostDashboard", () => {
-  it.each(hostLoaderCases)("redirects anonymous users before calling %s host endpoints", async (_name, runLoader) => {
+  it.each(hostLoaderCases)("redirects anonymous users before calling %s host endpoints", async (_name, runLoader, location) => {
     const fetchMock = vi.fn().mockResolvedValue(authResponse(anonymousAuth));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expectLoaderRedirect(runLoader, "/login");
+    await expectLoaderRedirect(runLoader, location);
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/bff/api/host/"))).toBe(false);

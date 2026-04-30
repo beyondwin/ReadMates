@@ -45,6 +45,7 @@ class NotificationDispatchService(
             to = requiredDeliveryField(claimed.id, "recipientEmail", claimed.recipientEmail),
             subject = requiredDeliveryField(claimed.id, "subject", claimed.subject),
             text = requiredDeliveryField(claimed.id, "bodyText", claimed.bodyText),
+            html = claimed.bodyHtml?.takeIf { it.isNotBlank() },
         )
         try {
             mailDeliveryPort.send(command)

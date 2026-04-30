@@ -25,16 +25,18 @@ class NotificationDeliveryProcessingServiceTest {
     @Test
     fun `processClaimed increments sent metric after sent mark succeeds`() {
         val deliveryPort = ProcessingRecordingDeliveryPort()
+        val mailPort = ProcessingRecordingMailPort()
         val registry = SimpleMeterRegistry()
         val service = NotificationDeliveryProcessingService(
             notificationDeliveryPort = deliveryPort,
-            mailDeliveryPort = ProcessingRecordingMailPort(),
+            mailDeliveryPort = mailPort,
             metrics = ReadmatesOperationalMetrics(registry),
             maxAttempts = 5,
         )
 
         service.processClaimed(processingClaimedDelivery())
 
+        assertThat(mailPort.sent.single().html).contains("피드백 문서")
         assertThat(counter(registry, "readmates.notifications.sent")).isEqualTo(1.0)
     }
 
@@ -87,7 +89,11 @@ private class FailingMailPort(private val message: String) : com.readmates.notif
 }
 
 private class ProcessingRecordingMailPort : com.readmates.notification.application.port.out.MailDeliveryPort {
-    override fun send(command: MailDeliveryCommand) = Unit
+    val sent = mutableListOf<MailDeliveryCommand>()
+
+    override fun send(command: MailDeliveryCommand) {
+        sent += command
+    }
 }
 
 private class ProcessingRecordingDeliveryPort : NotificationDeliveryPort {
@@ -154,4 +160,5 @@ private fun processingClaimedDelivery(
         recipientEmail = "member@example.com",
         subject = "Feedback document is ready",
         bodyText = "ReadMates에서 확인해 주세요.",
+        bodyHtml = "<html><body>피드백 문서</body></html>",
     )

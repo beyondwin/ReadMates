@@ -1,5 +1,6 @@
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import { parseReadmatesResponse } from "@/shared/api/response";
+import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
 
 export type ReadmatesApiContext = {
   clubSlug?: string;
@@ -47,7 +48,7 @@ export async function readmatesFetchResponse(path: string, init?: RequestInit, c
 
   if (response.status === 401) {
     if (typeof window !== "undefined") {
-      window.location.assign("/login");
+      window.location.assign(loginPathForReturnTo(currentRelativeReturnTo()));
     }
     throw new Error("ReadMates session expired");
   }

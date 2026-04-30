@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import { LogoutButton } from "@/features/auth/route/logout-button";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
+import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { canUseHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
 import { scopedAppPath } from "@/shared/auth/member-app-loader";
 import { canUsePlatformAdmin } from "@/shared/auth/platform-admin-access";
@@ -9,18 +10,20 @@ import { useAuth, useAuthActions } from "./auth-state";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const state = useAuth();
+  const loginPath = useLoginPathForCurrentRoute();
 
   if (state.status === "loading") return <ReadmatesRouteLoading label="로그인 상태를 확인하는 중" variant="auth" />;
-  if (!state.auth.authenticated) return <Navigate to="/login" replace />;
+  if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
 
   return <>{children}</>;
 }
 
 export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
   const state = useAuth();
+  const loginPath = useLoginPathForCurrentRoute();
 
   if (state.status === "loading") return <ReadmatesRouteLoading label="플랫폼 권한을 확인하는 중" variant="auth" />;
-  if (!state.auth.authenticated) return <Navigate to="/login" replace />;
+  if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
   if (!canUsePlatformAdmin(state.auth)) return <BlockedPlatformAdmin />;
 
   return <>{children}</>;
@@ -29,9 +32,10 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
 export function RequireMemberApp({ children }: { children: ReactNode }) {
   const state = useAuth();
   const { clubSlug } = useParams();
+  const loginPath = useLoginPathForCurrentRoute();
 
   if (state.status === "loading") return <ReadmatesRouteLoading label="멤버 화면을 확인하는 중" variant="member" />;
-  if (!state.auth.authenticated) return <Navigate to="/login" replace />;
+  if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
   if (clubSlug) {
     return <>{children}</>;
   }
@@ -47,15 +51,22 @@ export const RequireActiveMember = RequireMemberApp;
 export function RequireHost({ children }: { children: ReactNode }) {
   const state = useAuth();
   const { clubSlug } = useParams();
+  const loginPath = useLoginPathForCurrentRoute();
 
   if (state.status === "loading") return <ReadmatesRouteLoading label="호스트 권한을 확인하는 중" variant="host" />;
-  if (!state.auth.authenticated) return <Navigate to="/login" replace />;
+  if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
   if (clubSlug) {
     return <>{children}</>;
   }
   if (!canUseHostApp(state.auth)) return <Navigate to={scopedAppPath(clubSlug)} replace />;
 
   return <>{children}</>;
+}
+
+function useLoginPathForCurrentRoute() {
+  const location = useLocation();
+
+  return loginPathForReturnTo(`${location.pathname}${location.search}${location.hash}`);
 }
 
 function BlockedMemberApp() {

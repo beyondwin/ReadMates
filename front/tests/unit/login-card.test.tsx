@@ -24,6 +24,25 @@ describe("LoginRoute", () => {
     expect(screen.queryByLabelText("비밀번호")).toBeNull();
   });
 
+  it("adds a safe returnTo value to the Google login action", () => {
+    window.history.pushState({}, "", "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail");
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
+      "href",
+      "/oauth2/authorization/google?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
+    );
+  });
+
+  it("ignores unsafe returnTo values on the login route", () => {
+    window.history.pushState({}, "", "/login?returnTo=https%3A%2F%2Fevil.example%2Fapp");
+
+    render(<LoginRoute />);
+
+    expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute("href", "/oauth2/authorization/google");
+  });
+
   it("hides dev login shortcuts in production builds even when the flag is true", () => {
     vi.stubEnv("PROD", true);
     vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");

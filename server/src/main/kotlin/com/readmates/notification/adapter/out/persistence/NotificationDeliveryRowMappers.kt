@@ -5,10 +5,10 @@ import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationFailure
 import com.readmates.notification.application.model.HostNotificationItem
+import com.readmates.notification.application.model.NotificationEmailTemplates
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
-import com.readmates.notification.application.model.clubScopedAppPath
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -32,6 +32,7 @@ internal data class DeliveryCopy(
     val deepLinkPath: String,
     val emailSubject: String,
     val emailBodyText: String,
+    val emailBodyHtml: String,
 )
 
 internal data class DeliveryInsertRow(
@@ -50,6 +51,7 @@ internal data class MemberNotificationDeliveryRow(
 
 internal class NotificationDeliveryRowMappers(
     private val objectMapper: ObjectMapper,
+    private val appBaseUrl: String,
 ) {
     private val payloadType = objectMapper.typeFactory.constructType(NotificationEventPayload::class.java)
 
@@ -75,6 +77,7 @@ internal class NotificationDeliveryRowMappers(
             recipientEmail = if (channel == NotificationChannel.EMAIL) getString("recipient_email") else null,
             subject = copy?.emailSubject,
             bodyText = copy?.emailBodyText,
+            bodyHtml = copy?.emailBodyHtml,
         )
     }
 
@@ -112,6 +115,7 @@ internal class NotificationDeliveryRowMappers(
             recipientEmail = getString("recipient_email"),
             subject = copy.emailSubject,
             bodyText = copy.emailBodyText,
+            bodyHtml = copy.emailBodyHtml,
         )
     }
 
@@ -209,57 +213,23 @@ internal class NotificationDeliveryRowMappers(
         clubSlug: String,
         displayName: String?,
     ): DeliveryCopy {
-        val memberName = displayName ?: "멤버"
-        return when (eventType) {
-            NotificationEventType.NEXT_BOOK_PUBLISHED -> DeliveryCopy(
-                title = "다음 책이 공개되었습니다",
-                body = "${sessionNumber}회차 책은 $bookTitle 입니다.",
-                deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
-                emailSubject = "다음 책이 공개되었습니다",
-                emailBodyText = """
-                    ${memberName}님,
-
-                    ${sessionNumber}회차 책은 $bookTitle 입니다.
-                    ReadMates에서 모임 정보를 확인해 주세요.
-                """.trimIndent(),
-            )
-            NotificationEventType.SESSION_REMINDER_DUE -> DeliveryCopy(
-                title = "내일 독서모임이 있습니다",
-                body = "내일 ${sessionNumber}회차 $bookTitle 모임이 있습니다.",
-                deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
-                emailSubject = "내일 독서모임이 있습니다",
-                emailBodyText = """
-                    ${memberName}님,
-
-                    내일 ${sessionNumber}회차 $bookTitle 모임이 있습니다.
-                    ReadMates에서 준비 내용을 확인해 주세요.
-                """.trimIndent(),
-            )
-            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> DeliveryCopy(
-                title = "피드백 문서가 올라왔습니다",
-                body = "${sessionNumber}회차 $bookTitle 피드백 문서가 올라왔습니다.",
-                deepLinkPath = clubScopedAppPath(clubSlug, "/archive?view=report"),
-                emailSubject = "피드백 문서가 올라왔습니다",
-                emailBodyText = """
-                    ${memberName}님,
-
-                    ${sessionNumber}회차 $bookTitle 피드백 문서가 올라왔습니다.
-                    ReadMates에서 확인해 주세요.
-                """.trimIndent(),
-            )
-            NotificationEventType.REVIEW_PUBLISHED -> DeliveryCopy(
-                title = "새 서평이 공개되었습니다",
-                body = "${sessionNumber}회차 $bookTitle 에 새 서평이 공개되었습니다.",
-                deepLinkPath = clubScopedAppPath(clubSlug, "/notes?sessionId=$sessionId"),
-                emailSubject = "새 서평이 공개되었습니다",
-                emailBodyText = """
-                    ${memberName}님,
-
-                    ${sessionNumber}회차 $bookTitle 에 새 서평이 공개되었습니다.
-                    ReadMates에서 확인해 주세요.
-                """.trimIndent(),
-            )
-        }
+        val rendered = NotificationEmailTemplates.eventCopy(
+            eventType = eventType,
+            sessionId = sessionId,
+            sessionNumber = sessionNumber,
+            bookTitle = bookTitle,
+            clubSlug = clubSlug,
+            displayName = displayName,
+            appBaseUrl = appBaseUrl,
+        )
+        return DeliveryCopy(
+            title = rendered.title,
+            body = rendered.body,
+            deepLinkPath = requireNotNull(rendered.deepLinkPath),
+            emailSubject = rendered.emailSubject,
+            emailBodyText = rendered.emailBodyText,
+            emailBodyHtml = rendered.emailBodyHtml,
+        )
     }
 
     fun sessionId(message: NotificationEventMessage): UUID =

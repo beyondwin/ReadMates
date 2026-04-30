@@ -49,6 +49,7 @@ class NotificationDeliveryProcessingService(
                     to = requiredDeliveryField(item.id, "recipientEmail", item.recipientEmail),
                     subject = requiredDeliveryField(item.id, "subject", item.subject),
                     text = requiredDeliveryField(item.id, "bodyText", item.bodyText),
+                    html = item.bodyHtml?.takeIf { it.isNotBlank() },
                 ),
             )
         } catch (exception: Exception) {
