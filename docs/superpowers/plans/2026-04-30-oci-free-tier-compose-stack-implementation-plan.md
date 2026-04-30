@@ -522,7 +522,7 @@ git commit -m "deploy: add compose stack deploy script"
 - Create: `docs/deploy/compose-stack.md`
 - Test: `git diff --check -- .env.example docs/deploy/oci-backend.md docs/deploy/compose-stack.md`
 
-- [ ] **Step 1: Add compose examples to `.env.example`**
+- [x] **Step 1: Add compose examples to `.env.example`**
 
 Add these public-safe lines near the deploy/runtime section:
 
@@ -535,7 +535,7 @@ READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092
 
 Keep all secret values as existing placeholders or disabled defaults.
 
-- [ ] **Step 2: Create `docs/deploy/compose-stack.md`**
+- [x] **Step 2: Create `docs/deploy/compose-stack.md`**
 
 Write a concise runbook with these sections and commands:
 
@@ -604,7 +604,7 @@ READMATES_KAFKA_ENABLED=true
 ```
 ```
 
-- [ ] **Step 3: Update `docs/deploy/oci-backend.md`**
+- [x] **Step 3: Update `docs/deploy/oci-backend.md`**
 
 Add a section linking to `compose-stack.md` and state:
 
@@ -624,7 +624,7 @@ Caddy 포함 최종 backend runtime은 [compose-stack.md](compose-stack.md)를 �
 7. Kafka/notification flag는 Redis 안정화 뒤 별도 smoke로 켠다.
 ```
 
-- [ ] **Step 4: Validate docs**
+- [x] **Step 4: Validate docs**
 
 Run:
 
@@ -634,7 +634,7 @@ git diff --check -- .env.example docs/deploy/oci-backend.md docs/deploy/compose-
 
 Expected: `git diff --check` has no output. Public release scanning runs in Task 6 after all deploy docs and scripts are in place.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .env.example docs/deploy/oci-backend.md docs/deploy/compose-stack.md
