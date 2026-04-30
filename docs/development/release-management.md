@@ -1,6 +1,6 @@
 # 릴리즈 관리
 
-ReadMates는 Git tag, GitHub Releases, `CHANGELOG.md`를 함께 사용합니다. GitHub Releases는 사용자와 공개 방문자가 보는 태그별 릴리즈 노트이고, `CHANGELOG.md`는 저장소 안에 남는 같은 내용의 장기 기록입니다.
+ReadMates는 Git tag, GitHub Releases, `CHANGELOG.md`를 함께 사용합니다. GitHub Releases는 사용자와 공개 방문자가 보는 태그별 릴리즈 노트이고, `CHANGELOG.md`는 저장소 안에 남는 같은 내용의 장기 기록입니다. 제품 버전 source of truth와 server/frontend 공통 tag 기준은 [versioning.md](versioning.md)를 우선합니다.
 
 ## 원칙
 
@@ -127,6 +127,15 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    ```
 
    `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow를 시작합니다.
+
+   서버 변경이 있는 릴리즈는 tag push 전에 OCI backend를 같은 제품 버전 image tag로 배포합니다.
+
+   ```bash
+   READMATES_SERVER_IMAGE=readmates-server:v1.2.0 \
+   VM_PUBLIC_IP='<vm-public-ip>' \
+   CADDY_SITE=api.example.com \
+   ./deploy/oci/05-deploy-compose-stack.sh
+   ```
 
 8. GitHub Release를 만듭니다.
 

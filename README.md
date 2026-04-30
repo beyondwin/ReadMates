@@ -187,6 +187,7 @@ pnpm --dir front dev
 | 아키텍처 상세 | [docs/development/architecture.md](docs/development/architecture.md) |
 | 주요 기술적 의사결정 | [docs/development/technical-decisions.md](docs/development/technical-decisions.md) |
 | 테스트 가이드 | [docs/development/test-guide.md](docs/development/test-guide.md) |
+| 버저닝 | [docs/development/versioning.md](docs/development/versioning.md) |
 | 릴리즈 관리와 CHANGELOG | [docs/development/release-management.md](docs/development/release-management.md), [CHANGELOG.md](CHANGELOG.md) |
 | 배포 문서 허브 | [docs/deploy/README.md](docs/deploy/README.md) |
 | Cloudflare Pages | [docs/deploy/cloudflare-pages.md](docs/deploy/cloudflare-pages.md) |

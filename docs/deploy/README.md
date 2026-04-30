@@ -162,7 +162,7 @@ OCI backend Compose stack:
 ```bash
 ./server/gradlew -p server clean test
 ./server/gradlew -p server bootJar
-VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
+READMATES_SERVER_IMAGE=readmates-server:vX.Y.Z VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
 ```
 
 자세한 절차와 rollback은 [compose-stack.md](compose-stack.md)를 기준으로 합니다.

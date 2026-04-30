@@ -40,12 +40,12 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-instal
 
 ## Deploy
 
-`05-deploy-compose-stack.sh`는 서버 이미지를 만들고 VM으로 전송한 뒤 `/opt/readmates/.env`에 `READMATES_SERVER_IMAGE`를 저장합니다. 재부팅 뒤에도 systemd compose stack이 같은 image tag로 올라오게 하기 위한 파일입니다.
+`05-deploy-compose-stack.sh`는 서버 이미지를 만들고 VM으로 전송한 뒤 `/opt/readmates/.env`에 `READMATES_SERVER_IMAGE`를 저장합니다. 재부팅 뒤에도 systemd compose stack이 같은 image tag로 올라오게 하기 위한 파일입니다. 릴리즈 배포에서는 제품 tag와 맞춘 `readmates-server:vMAJOR.MINOR.PATCH` image tag를 사용합니다.
 
 ```bash
 ./server/gradlew -p server clean test
 ./server/gradlew -p server bootJar
-VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
+READMATES_SERVER_IMAGE=readmates-server:vX.Y.Z VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
 ```
 
 완료 기준은 script가 끝까지 성공하고, compose `readmates-api` health, Cloudflare BFF auth smoke, production integration smoke가 모두 통과하는 것입니다. Redis/Kafka 기능 flag는 별도 rollout 전에는 켜지지 않은 상태로 둡니다.
