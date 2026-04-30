@@ -193,9 +193,23 @@ class HostSessionControllerDbTest(
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[0].sessionId") { value(sessionId) }
-            jsonPath("$[0].state") { value("DRAFT") }
-            jsonPath("$[0].visibility") { value("HOST_ONLY") }
+            jsonPath("$.items[0].sessionId") { value(sessionId) }
+            jsonPath("$.items[0].state") { value("DRAFT") }
+            jsonPath("$.items[0].visibility") { value("HOST_ONLY") }
+        }
+    }
+
+    @Test
+    fun `host sessions list returns paged contract`() {
+        createDraftSessionSeven()
+
+        mockMvc.get("/api/host/sessions") {
+            with(user("host@example.com"))
+            param("limit", "2")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(2) }
+            jsonPath("$.nextCursor") { exists() }
         }
     }
 

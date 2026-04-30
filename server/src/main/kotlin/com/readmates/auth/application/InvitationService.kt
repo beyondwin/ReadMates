@@ -11,6 +11,8 @@ import com.readmates.auth.application.port.out.InvitationTokenRow
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.shared.db.dbString
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -103,9 +105,13 @@ class InvitationService(
         return toHostInvitationResponse(created).copy(acceptUrl = acceptUrl(created.clubSlug, token, created.primaryHost))
     }
 
-    override fun listHostInvitations(host: CurrentMember): List<HostInvitationResponse> {
+    override fun listHostInvitations(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostInvitationResponse> {
         requireHost(host)
-        return invitationStore.listHostInvitations(host.clubId).map(::toHostInvitationResponse)
+        val page = invitationStore.listHostInvitations(host.clubId, pageRequest)
+        return CursorPage(
+            items = page.items.map(::toHostInvitationResponse),
+            nextCursor = page.nextCursor,
+        )
     }
 
     override fun previewInvitation(rawToken: String, clubSlug: String?): InvitationPreviewResponse {

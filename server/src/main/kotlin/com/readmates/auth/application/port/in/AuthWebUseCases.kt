@@ -7,11 +7,13 @@ import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.MemberLifecycleResponse
 import com.readmates.auth.application.PendingApprovalAppResponse
 import com.readmates.auth.application.ViewerMemberResponse
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface ManageHostInvitationsUseCase {
-    fun listHostInvitations(host: CurrentMember): List<HostInvitationResponse>
+    fun listHostInvitations(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostInvitationResponse>
 
     fun createInvitation(
         host: CurrentMember,
@@ -28,13 +30,13 @@ interface PreviewInvitationUseCase {
 }
 
 interface ManageMemberApprovalsUseCase {
-    fun listViewers(host: CurrentMember): List<ViewerMemberResponse>
+    fun listViewers(host: CurrentMember, pageRequest: PageRequest): CursorPage<ViewerMemberResponse>
     fun activateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse
     fun deactivateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse
 }
 
 interface ManageMemberLifecycleUseCase {
-    fun listMembers(host: CurrentMember): List<HostMemberListItem>
+    fun listMembers(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostMemberListItem>
     fun suspend(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse
     fun restore(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse
     fun deactivate(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse

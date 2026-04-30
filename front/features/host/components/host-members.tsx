@@ -14,12 +14,14 @@ import type {
   CurrentSessionPolicy,
   HostMemberProfileErrorCode,
   HostMemberProfileResponse,
+  HostMemberListPage,
   HostMemberListItem,
   MembershipStatus,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
   ViewerMember,
 } from "@/features/host/api/host-contracts";
+import type { PageRequest } from "@/shared/model/paging";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 type HostMemberLifecyclePath = "/suspend" | "/deactivate" | "/restore" | "/current-session/add" | "/current-session/remove";
@@ -28,7 +30,7 @@ type HostViewerAction = "activate" | "deactivate-viewer";
 type JsonResponse<T> = Response & { json(): Promise<T> };
 
 export type HostMembersActions = {
-  loadMembers: () => Promise<HostMemberListItem[]>;
+  loadMembers: (page?: PageRequest) => Promise<HostMemberListPage>;
   submitLifecycle: (
     membershipId: string,
     path: HostMemberLifecyclePath,
@@ -39,7 +41,7 @@ export type HostMembersActions = {
 };
 
 type HostMembersProps = {
-  initialMembers: HostMemberListItem[];
+  initialMembers: HostMemberListPage | HostMemberListItem[];
   actions: HostMembersActions;
 };
 
@@ -332,11 +334,15 @@ function profileFailureMessage(error: unknown) {
 }
 
 export default function HostMembers({ initialMembers, actions }: HostMembersProps) {
+  const initialPage = normalizeMemberPage(initialMembers);
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
-    source: initialMembers,
-    members: initialMembers,
+    source: initialPage.items,
+    members: initialPage.items,
   }));
-  const members = memberRowsState.source === initialMembers ? memberRowsState.members : initialMembers;
+  const initialMembersItems = initialPage.items;
+  const members = memberRowsState.source === initialMembersItems ? memberRowsState.members : initialMembersItems;
+  const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialog>(null);
@@ -349,8 +355,8 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
 
   const setMembers = (update: MemberRowsUpdate) => {
     setMemberRowsState((current) => {
-      const source = current.source === initialMembers ? current.source : initialMembers;
-      const currentMembers = current.source === initialMembers ? current.members : initialMembers;
+      const source = current.source === initialMembersItems ? current.source : initialMembersItems;
+      const currentMembers = current.source === initialMembersItems ? current.members : initialMembersItems;
       const nextMembers = typeof update === "function" ? update(currentMembers) : update;
 
       return { source, members: nextMembers };
@@ -419,14 +425,33 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
     refreshRequestIdRef.current = requestId;
 
     try {
-      const nextMembers = await actions.loadMembers();
+      const nextPage = normalizeMemberPage(await actions.loadMembers({ limit: 50 }));
       if (requestId === refreshRequestIdRef.current) {
-        setMembers(nextMembers);
+        setMembers(nextPage.items);
+        setNextCursor(nextPage.nextCursor);
       }
     } catch (error) {
       if (requestId === refreshRequestIdRef.current) {
         throw error;
       }
+    }
+  };
+
+  const loadMoreMembers = async () => {
+    if (!nextCursor || isLoadingMore) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    setMessage(null);
+    try {
+      const page = normalizeMemberPage(await actions.loadMembers({ limit: 50, cursor: nextCursor }));
+      setMembers((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch {
+      setMessage({ kind: "alert", text: "멤버 목록을 더 불러오지 못했습니다." });
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -740,6 +765,17 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
           />
         ) : null}
 
+        {activeTab !== "invitations" && nextCursor ? (
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm"
+            disabled={isLoadingMore}
+            onClick={() => void loadMoreMembers()}
+          >
+            {isLoadingMore ? "불러오는 중" : "더 보기"}
+          </button>
+        ) : null}
+
         {activeTab === "invitations" ? (
           <div className="surface" style={{ padding: 24 }}>
             <div className="row-between" style={{ gap: 16, flexWrap: "wrap" }}>
@@ -783,6 +819,10 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
       ) : null}
     </div>
   );
+}
+
+function normalizeMemberPage(value: HostMemberListPage | HostMemberListItem[]): HostMemberListPage {
+  return Array.isArray(value) ? { items: value, nextCursor: null } : value;
 }
 
 function MemberActionButton({

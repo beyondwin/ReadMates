@@ -3,6 +3,8 @@ package com.readmates.auth.application.port.out
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.session.domain.SessionParticipationStatus
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -34,7 +36,7 @@ data class HostMemberListRow(
 )
 
 interface MemberLifecycleStorePort {
-    fun listMembers(clubId: UUID): List<HostMemberListRow>
+    fun listMembers(clubId: UUID, pageRequest: PageRequest): CursorPage<HostMemberListRow>
     fun suspendActiveMember(clubId: UUID, membershipId: UUID): Boolean
     fun restoreSuspendedMember(clubId: UUID, membershipId: UUID): Boolean
     fun markMemberLeftByHost(clubId: UUID, membershipId: UUID): Boolean

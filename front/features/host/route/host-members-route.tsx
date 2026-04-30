@@ -1,10 +1,10 @@
 import { useLoaderData } from "react-router-dom";
-import type { HostMemberListItem } from "@/features/host/api/host-contracts";
+import type { HostMemberListPage } from "@/features/host/api/host-contracts";
 import HostMembers from "@/features/host/components/host-members";
 import { hostMembersActions } from "./host-members-data";
 
 export function HostMembersRoute() {
-  const members = useLoaderData() as HostMemberListItem[];
+  const members = useLoaderData() as HostMemberListPage;
 
   return (
     <main className="rm-host-members-page">

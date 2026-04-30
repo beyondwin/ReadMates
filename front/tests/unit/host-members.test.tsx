@@ -522,6 +522,34 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("updated@example.com · 정식 멤버")).toBeInTheDocument();
   });
 
+  it("loads the next member page and appends it", async () => {
+    const user = userEvent.setup();
+    const nextMember = {
+      ...members[0],
+      membershipId: "membership-next",
+      userId: "user-next",
+      email: "next-member@example.com",
+      displayName: "다음 멤버",
+    } satisfies HostMemberListItem;
+    const actions = {
+      ...noopHostMembersActions,
+      loadMembers: vi.fn(async () => ({ items: [nextMember], nextCursor: null })),
+    } satisfies HostMembersActions;
+
+    render(
+      <HostMembersForTest
+        initialMembers={{ items: [members[0]], nextCursor: "cursor-1" }}
+        actions={actions}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "더 보기" }));
+
+    expect(actions.loadMembers).toHaveBeenCalledWith({ limit: 50, cursor: "cursor-1" });
+    expect(await screen.findByText("다음 멤버")).toBeInTheDocument();
+    expect(screen.getByText("멤버1")).toBeInTheDocument();
+  });
+
   it("keeps each viewer row locked while multiple viewer actions are in flight", async () => {
     const user = userEvent.setup();
     const secondPending = {

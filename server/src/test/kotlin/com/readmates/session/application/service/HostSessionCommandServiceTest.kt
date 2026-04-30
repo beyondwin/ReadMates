@@ -24,6 +24,8 @@ import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -63,7 +65,7 @@ class HostSessionCommandServiceTest {
         val port = RecordingHostSessionWritePort()
         val service = HostSessionCommandService(port)
 
-        service.list(host)
+        service.list(host, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
 
         assertEquals(host, port.listHost)
     }
@@ -284,9 +286,9 @@ class HostSessionCommandServiceTest {
         var publishChanged = true
         var throwOnUpsertPublication = false
 
-        override fun list(host: CurrentMember): List<HostSessionListItem> {
+        override fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem> {
             listHost = host
-            return emptyList()
+            return CursorPage(emptyList(), null)
         }
 
         override fun create(command: HostSessionCommand) =

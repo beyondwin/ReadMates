@@ -3,12 +3,14 @@ package com.readmates.auth.adapter.`in`.web
 import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -19,16 +21,34 @@ class HostMemberApprovalController(
     private val memberLifecycle: ManageMemberLifecycleUseCase,
 ) {
     @GetMapping
-    fun members(currentMember: CurrentMember) =
-        memberLifecycle.listMembers(currentMember)
+    fun members(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ) = memberLifecycle.listMembers(
+        currentMember,
+        PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
+    )
 
     @GetMapping("/viewers")
-    fun viewers(currentMember: CurrentMember) =
-        memberApprovals.listViewers(currentMember)
+    fun viewers(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ) = memberApprovals.listViewers(
+        currentMember,
+        PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
+    )
 
     @GetMapping("/pending-approvals")
-    fun pending(currentMember: CurrentMember) =
-        memberApprovals.listViewers(currentMember)
+    fun pending(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ) = memberApprovals.listViewers(
+        currentMember,
+        PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
+    )
 
     @PostMapping("/{membershipId}/activate")
     fun activate(

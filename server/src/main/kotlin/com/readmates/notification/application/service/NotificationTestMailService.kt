@@ -7,6 +7,7 @@ import com.readmates.notification.application.port.`in`.SendNotificationTestMail
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationTestMailAuditPort
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
@@ -60,8 +61,8 @@ class NotificationTestMailService(
         }
     }
 
-    override fun listTestMailAudit(host: CurrentMember): List<NotificationTestMailAuditItem> =
-        notificationTestMailAuditPort.listTestMailAudit(requireHost(host).clubId)
+    override fun listTestMailAudit(host: CurrentMember, pageRequest: PageRequest) =
+        notificationTestMailAuditPort.listTestMailAudit(requireHost(host).clubId, pageRequest)
 
     private fun requireHost(host: CurrentMember): CurrentMember {
         if (!host.isHost) {

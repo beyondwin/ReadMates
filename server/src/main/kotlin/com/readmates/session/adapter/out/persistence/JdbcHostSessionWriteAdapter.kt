@@ -35,6 +35,9 @@ import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.toUtcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.BatchPreparedStatementSetter
@@ -73,22 +76,46 @@ class JdbcHostSessionWriteAdapter(
     override fun create(command: HostSessionCommand) =
         createDraftSession(command.host, command)
 
-    override fun list(host: CurrentMember): List<HostSessionListItem> {
+    override fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem> {
         requireHost(host)
-        return jdbcTemplate().query(
+        val cursor = HostSessionCursor.from(pageRequest.cursor)
+        val rows = jdbcTemplate().query(
             """
             select id, number, title, book_title, book_author, book_image_url,
                    session_date, start_time, end_time, location_label, state, visibility
-            from sessions
-            where club_id = ?
-            order by
-              case state when 'OPEN' then 0 when 'DRAFT' then 1 when 'CLOSED' then 2 else 3 end,
-              session_date,
-              number
+            from (
+              select id, number, title, book_title, book_author, book_image_url,
+                     session_date, start_time, end_time, location_label, state, visibility,
+                     case state when 'OPEN' then 0 when 'DRAFT' then 1 when 'CLOSED' then 2 else 3 end as state_rank
+              from sessions
+              where club_id = ?
+            ) ordered_sessions
+            where (
+              ? is null
+              or state_rank > ?
+              or (state_rank = ? and session_date > ?)
+              or (state_rank = ? and session_date = ? and number > ?)
+              or (state_rank = ? and session_date = ? and number = ? and id > ?)
+            )
+            order by state_rank, session_date, number, id
+            limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostSessionListItem() },
             host.clubId.dbString(),
+            cursor?.stateRank,
+            cursor?.stateRank,
+            cursor?.stateRank,
+            cursor?.date,
+            cursor?.stateRank,
+            cursor?.date,
+            cursor?.number,
+            cursor?.stateRank,
+            cursor?.date,
+            cursor?.number,
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit, ::hostSessionCursor)
     }
 
     override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> =
@@ -1017,3 +1044,45 @@ private fun ResultSet.toUpcomingSessionItem() = UpcomingSessionItem(
     locationLabel = getString("location_label"),
     visibility = SessionRecordVisibility.valueOf(getString("visibility")),
 )
+
+private fun hostSessionCursor(item: HostSessionListItem): String? =
+    CursorCodec.encode(
+        mapOf(
+            "stateRank" to hostSessionStateRank(item.state).toString(),
+            "date" to item.date,
+            "number" to item.sessionNumber.toString(),
+            "id" to item.sessionId,
+        ),
+    )
+
+private fun hostSessionStateRank(state: String): Int = when (state) {
+    "OPEN" -> 0
+    "DRAFT" -> 1
+    "CLOSED" -> 2
+    else -> 3
+}
+
+private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    val visibleRows = rows.take(limit)
+    return CursorPage(
+        items = visibleRows,
+        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+    )
+}
+
+private data class HostSessionCursor(
+    val stateRank: Int,
+    val date: LocalDate,
+    val number: Int,
+    val id: String,
+) {
+    companion object {
+        fun from(cursor: Map<String, String>): HostSessionCursor? {
+            val stateRank = cursor["stateRank"]?.toIntOrNull() ?: return null
+            val date = cursor["date"]?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: return null
+            val number = cursor["number"]?.toIntOrNull() ?: return null
+            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+            return HostSessionCursor(stateRank, date, number, id)
+        }
+    }
+}

@@ -92,6 +92,7 @@ data class MemberNotificationItem(
 data class MemberNotificationList(
     val items: List<MemberNotificationItem>,
     val unreadCount: Int,
+    val nextCursor: String? = null,
 )
 
 fun notificationDeliveryDedupeKey(
@@ -111,7 +112,6 @@ data class HostNotificationSummary(
 data class HostNotificationItemQuery(
     val status: NotificationOutboxStatus?,
     val eventType: NotificationEventType?,
-    val limit: Int,
 )
 
 data class HostNotificationItem(
@@ -121,11 +121,13 @@ data class HostNotificationItem(
     val recipientEmail: String,
     val attemptCount: Int,
     val nextAttemptAt: OffsetDateTime,
+    val createdAt: OffsetDateTime,
     val updatedAt: OffsetDateTime,
 )
 
 data class HostNotificationItemList(
     val items: List<HostNotificationItem>,
+    val nextCursor: String? = null,
 )
 
 data class HostNotificationEvent(
@@ -139,6 +141,7 @@ data class HostNotificationEvent(
 
 data class HostNotificationEventList(
     val items: List<HostNotificationEvent>,
+    val nextCursor: String? = null,
 )
 
 data class HostNotificationDelivery(
@@ -148,11 +151,13 @@ data class HostNotificationDelivery(
     val status: NotificationDeliveryStatus,
     val recipientEmail: String?,
     val attemptCount: Int,
+    val createdAt: OffsetDateTime,
     val updatedAt: OffsetDateTime,
 )
 
 data class HostNotificationDeliveryList(
     val items: List<HostNotificationDelivery>,
+    val nextCursor: String? = null,
 )
 
 enum class NotificationTestMailStatus {

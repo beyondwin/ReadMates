@@ -9,20 +9,21 @@ import {
   sendHostNotificationTestMail,
 } from "@/features/host/api/host-api";
 import type {
-  HostNotificationDeliveryItem,
-  HostNotificationEventItem,
+  HostNotificationDeliveryListResponse,
+  HostNotificationEventListResponse,
   HostNotificationSummary,
-  NotificationTestMailAuditItem,
+  NotificationTestMailAuditPage,
 } from "@/features/host/api/host-contracts";
+import type { PageRequest } from "@/shared/model/paging";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 export type HostNotificationsRouteData = {
   summary: HostNotificationSummary;
-  events: HostNotificationEventItem[];
-  deliveries: HostNotificationDeliveryItem[];
-  audit: NotificationTestMailAuditItem[];
+  events: HostNotificationEventListResponse;
+  deliveries: HostNotificationDeliveryListResponse;
+  audit: NotificationTestMailAuditPage;
 };
 
 export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promise<HostNotificationsRouteData> {
@@ -31,12 +32,12 @@ export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promis
 
   const [summary, events, deliveries, audit] = await Promise.all([
     fetchHostNotificationSummary(context),
-    fetchHostNotificationEvents(context),
-    fetchHostNotificationDeliveries(context),
-    fetchHostNotificationTestMailAudit(context),
+    fetchHostNotificationEvents(context, { limit: 50 }),
+    fetchHostNotificationDeliveries(context, { limit: 50 }),
+    fetchHostNotificationTestMailAudit(context, { limit: 50 }),
   ]);
 
-  return { summary, events: events.items, deliveries: deliveries.items, audit };
+  return { summary, events, deliveries, audit };
 }
 
 export const hostNotificationsActions = {
@@ -49,4 +50,7 @@ export const hostNotificationsActions = {
   retry: retryHostNotification,
   restore: restoreHostNotification,
   sendTestMail: sendHostNotificationTestMail,
+  loadEvents: (page?: PageRequest) => fetchHostNotificationEvents(undefined, page),
+  loadDeliveries: (page?: PageRequest) => fetchHostNotificationDeliveries(undefined, page),
+  loadAudit: (page?: PageRequest) => fetchHostNotificationTestMailAudit(undefined, page),
 };

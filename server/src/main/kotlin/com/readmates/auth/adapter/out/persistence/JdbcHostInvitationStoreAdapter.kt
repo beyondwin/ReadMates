@@ -13,6 +13,9 @@ import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.ObjectProvider
@@ -24,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.sql.Connection
 import java.sql.ResultSet
+import java.time.OffsetDateTime
 import java.util.Locale
 import java.util.UUID
 
@@ -115,8 +119,9 @@ class JdbcHostInvitationStoreAdapter(
         )
     }
 
-    override fun listHostInvitations(clubId: UUID): List<HostInvitationListRow> =
-        jdbcTemplate().query(
+    override fun listHostInvitations(clubId: UUID, pageRequest: PageRequest): CursorPage<HostInvitationListRow> {
+        val cursor = HostInvitationCreatedAtDescCursor.from(pageRequest.cursor)
+        val rows = jdbcTemplate().query(
             """
             select
               invitations.id,
@@ -148,11 +153,26 @@ class JdbcHostInvitationStoreAdapter(
               group by club_id
             ) primary_domains on primary_domains.club_id = invitations.club_id
             where invitations.club_id = ?
-            order by invitations.created_at desc
+              and (
+                ? is null
+                or invitations.created_at < ?
+                or (invitations.created_at = ? and invitations.id < ?)
+              )
+            order by invitations.created_at desc, invitations.id desc
+            limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostInvitationListRow() },
             clubId.dbString(),
+            cursor?.createdAt,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit) { row ->
+            hostInvitationCreatedAtDescCursor(row.createdAt, row.invitationId.toString())
+        }
+    }
 
     override fun findHostInvitation(clubId: UUID, invitationId: UUID): HostInvitationListRow? =
         jdbcTemplate().query(
@@ -422,5 +442,35 @@ class JdbcHostInvitationStoreAdapter(
 
     private companion object {
         private val logger = LoggerFactory.getLogger(JdbcHostInvitationStoreAdapter::class.java)
+    }
+}
+
+private fun hostInvitationCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =
+    CursorCodec.encode(
+        mapOf(
+            "createdAt" to createdAt.toString(),
+            "id" to id,
+        ),
+    )
+
+private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    val visibleRows = rows.take(limit)
+    return CursorPage(
+        items = visibleRows,
+        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+    )
+}
+
+private data class HostInvitationCreatedAtDescCursor(
+    val createdAt: OffsetDateTime,
+    val id: String,
+) {
+    companion object {
+        fun from(cursor: Map<String, String>): HostInvitationCreatedAtDescCursor? {
+            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                ?: return null
+            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+            return HostInvitationCreatedAtDescCursor(createdAt, id)
+        }
     }
 }

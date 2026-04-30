@@ -45,7 +45,12 @@ export async function hostDashboardLoader(args?: LoaderFunctionArgs): Promise<Ho
     fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
   ]);
 
-  return { current, data, hostSessions, notifications };
+  return {
+    current,
+    data,
+    hostSessions: Array.isArray(hostSessions) ? hostSessions : hostSessions.items,
+    notifications,
+  };
 }
 
 function notificationSummaryFallback(error: unknown): HostNotificationSummary {

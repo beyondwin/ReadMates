@@ -1,8 +1,9 @@
 import { readmatesFetch, type ReadmatesApiContext } from "@/shared/api/client";
+import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
 import type { MemberNotificationListResponse } from "./notifications-contracts";
 
-export function fetchMemberNotifications(context?: ReadmatesApiContext): Promise<MemberNotificationListResponse> {
-  return readmatesFetch<MemberNotificationListResponse>("/api/me/notifications", undefined, context);
+export function fetchMemberNotifications(context?: ReadmatesApiContext, page?: PageRequest): Promise<MemberNotificationListResponse> {
+  return readmatesFetch<MemberNotificationListResponse>(`/api/me/notifications${pagingSearchParams(page)}`, undefined, context);
 }
 
 export async function markMemberNotificationRead(id: string): Promise<void> {
