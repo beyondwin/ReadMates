@@ -34,7 +34,7 @@ The approved design covers one deploy subsystem: OCI backend runtime packaging a
 - Create: `server/.dockerignore`
 - Test: Docker build command
 
-- [ ] **Step 1: Build the current JAR before adding Docker files**
+- [x] **Step 1: Build the current JAR before adding Docker files**
 
 Run:
 
@@ -44,7 +44,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL` and `server/build/libs/readmates-server-0.0.1-SNAPSHOT.jar` exists.
 
-- [ ] **Step 2: Create `server/Dockerfile`**
+- [x] **Step 2: Create `server/Dockerfile`**
 
 Write exactly:
 
@@ -68,7 +68,7 @@ EXPOSE 8080 8081
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-jar", "/app/readmates-server.jar"]
 ```
 
-- [ ] **Step 3: Create `server/.dockerignore`**
+- [x] **Step 3: Create `server/.dockerignore`**
 
 Write exactly:
 
@@ -89,7 +89,7 @@ gradlew.bat
 
 Do not ignore `build/libs/readmates-server-0.0.1-SNAPSHOT.jar`; the Dockerfile copies it.
 
-- [ ] **Step 4: Build the image locally**
+- [x] **Step 4: Build the image locally**
 
 Run:
 
@@ -99,7 +99,7 @@ docker build -t readmates-server:local server
 
 Expected: image builds successfully. If Docker is not available locally, record the skip reason and continue to script validation.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/Dockerfile server/.dockerignore
