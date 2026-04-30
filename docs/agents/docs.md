@@ -6,6 +6,9 @@ Successful documentation changes make the current source of truth easier to foll
 
 Current source-of-truth order:
 
+- Current code, config, tests, migrations, and scripts: factual source of truth for behavior and commands.
+- `docs/development/architecture.md`: current product and technical boundaries when architecture or API behavior is unclear.
+
 - `README.md`: portfolio-facing overview, concise product and architecture summary, and links to detailed docs.
 - `docs/development/`: local setup, testing, architecture, and contributor-facing technical guidance.
 - `docs/deploy/`: public-safe deployment runbooks and release-safety policy.
@@ -16,6 +19,7 @@ Current source-of-truth order:
 Documentation rules:
 
 - Cross-check factual claims against current code, config, tests, and scripts before editing.
+- Treat README as the entry point, not as an override for architecture, code, tests, deploy scripts, or release helpers.
 - Keep public-facing docs free of real member data, private domains, deployment state, local absolute paths, OCIDs, secrets, and token-shaped examples.
 - Use placeholders such as `https://api.example.com`, `<db-password>`, and `host@example.com`.
 - Preserve the Korean-first documentation style in current docs.

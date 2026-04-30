@@ -35,6 +35,8 @@ SPRING_DATASOURCE_URL=jdbc:mysql://<mysql-private-host>:3306/readmates?useSSL=tr
 SPRING_DATASOURCE_USERNAME=readmates
 SPRING_DATASOURCE_PASSWORD=<secret>
 READMATES_APP_BASE_URL=https://readmates.pages.dev
+READMATES_AUTH_BASE_URL=https://readmates.pages.dev
+READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
 READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
 READMATES_BFF_SECRET=<same-pages-function-secret>
 READMATES_BFF_SECRET_REQUIRED=true
@@ -173,6 +175,8 @@ gunzip -c readmates-YYYYMMDDTHHMMSSZ.sql.gz | mysql \
 - Spring이 `SPRING_PROFILES_ACTIVE=prod`로 시작하는지 확인합니다.
 - Cloudflare Pages와 Spring의 `READMATES_BFF_SECRET`이 같은지 확인합니다.
 - `READMATES_ALLOWED_ORIGINS`가 운영 Cloudflare Pages origin으로 제한되어 있는지 확인합니다.
+- `READMATES_AUTH_BASE_URL`의 `/login/oauth2/code/google`이 Google OAuth redirect URI와 일치하는지 확인합니다.
+- `READMATES_AUTH_RETURN_STATE_SECRET`이 공개 기본값이나 짧은 샘플 문자열이 아닌 운영 secret인지 확인합니다.
 - `READMATES_AUTH_SESSION_COOKIE_SECURE=true`로 세션 cookie가 Secure로 나가는지 확인합니다.
 - Google OAuth client 변수와 redirect URI가 운영 Pages origin과 맞는지 확인합니다.
 - export script가 dump를 생성하는지 확인합니다.
