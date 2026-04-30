@@ -1,6 +1,6 @@
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -14,6 +14,7 @@ import MyPage from "@/features/archive/ui/my-page";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { AuthActionsContext, AuthContext } from "@/src/app/auth-state";
 import MyRoutePage from "@/src/pages/my-page";
+import type { PagedResponse } from "@/shared/model/paging";
 
 afterEach(() => {
   cleanup();
@@ -42,6 +43,10 @@ function createDeferred<T>(): Deferred<T> {
   });
 
   return { promise, resolve, reject };
+}
+
+function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
+  return { items, nextCursor };
 }
 
 function TestLogoutButton({
@@ -184,12 +189,13 @@ const reports: FeedbackDocumentListItem[] = [
     uploadedAt: "2026-04-20T09:00:00Z",
   },
 ];
+const reportPage = pageOf(reports);
 const reportReadLabel = "No.01 팩트풀니스 피드백 문서 읽기";
 
 function renderMyPage(overrides: Partial<MyPageProps> = {}) {
   const props: MyPageProps = {
     data,
-    reports,
+    reports: reportPage,
     reviewCount: 3,
     questionCount: 7,
     LogoutButtonComponent: TestLogoutButton,
@@ -205,7 +211,7 @@ function renderMyPage(overrides: Partial<MyPageProps> = {}) {
 function renderEditableMyPage(overrides: Partial<EditableMyPageProps> = {}) {
   const props: EditableMyPageProps = {
     data,
-    reports,
+    reports: reportPage,
     reviewCount: 3,
     questionCount: 7,
     LogoutButtonComponent: TestLogoutButton,
@@ -248,16 +254,16 @@ function renderMyRouteWithProfileFetch({
       return Promise.resolve(jsonResponse(myPageRequestCount > 1 ? nextMyPageData : initialMyPageData));
     }
 
-    if (url === "/api/bff/api/feedback-documents/me") {
-      return Promise.resolve(jsonResponse(reports));
+    if (url === "/api/bff/api/feedback-documents/me?limit=30") {
+      return Promise.resolve(jsonResponse(reportPage));
     }
 
-    if (url === "/api/bff/api/archive/me/questions") {
-      return Promise.resolve(jsonResponse(new Array(7).fill(null)));
+    if (url === "/api/bff/api/archive/me/questions?limit=30") {
+      return Promise.resolve(jsonResponse(pageOf(new Array(7).fill(null))));
     }
 
-    if (url === "/api/bff/api/archive/me/reviews") {
-      return Promise.resolve(jsonResponse(new Array(3).fill(null)));
+    if (url === "/api/bff/api/archive/me/reviews?limit=30") {
+      return Promise.resolve(jsonResponse(pageOf(new Array(3).fill(null))));
     }
 
     if (url === "/api/bff/api/me/notifications/preferences") {
@@ -410,12 +416,12 @@ describe("MyPage", () => {
         );
       }
 
-      if (url === "/api/bff/api/feedback-documents/me") {
+      if (url === "/api/bff/api/feedback-documents/me?limit=30") {
         return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
       }
 
-      if (url === "/api/bff/api/archive/me/questions" || url === "/api/bff/api/archive/me/reviews") {
-        return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/archive/me/questions?limit=30" || url === "/api/bff/api/archive/me/reviews?limit=30") {
+        return Promise.resolve(jsonResponse(pageOf([])));
       }
 
       if (url === "/api/bff/api/me/notifications/preferences") {
@@ -578,14 +584,64 @@ describe("MyPage", () => {
     expect(scoped.queryByText("feedback-13.html")).not.toBeInTheDocument();
   });
 
+  it("appends feedback documents on my page when 더 보기 is clicked", async () => {
+    const user = userEvent.setup();
+    const nextReport: FeedbackDocumentListItem = {
+      sessionId: "session-2",
+      sessionNumber: 2,
+      title: "독서모임 2차 피드백",
+      bookTitle: "냉정한 이타주의자",
+      date: "2025-12-17",
+      fileName: "251217 2차.md",
+      uploadedAt: "2026-04-21T09:00:00Z",
+    };
+
+    function MyPageLoadMoreHarness() {
+      const [reportsPage, setReportsPage] = useState<PagedResponse<FeedbackDocumentListItem>>(
+        pageOf(reports, "cursor-next"),
+      );
+
+      return (
+        <MyPage
+          data={data}
+          reports={reportsPage}
+          reviewCount={3}
+          questionCount={7}
+          LogoutButtonComponent={TestLogoutButton}
+          onLeaveMembership={testLeaveMembership}
+          notificationPreferences={notificationPreferences}
+          onSaveNotificationPreferences={async (preferences) => preferences}
+          onLoadMoreReports={async () => {
+            setReportsPage((current) => ({
+              items: [...current.items, nextReport],
+              nextCursor: null,
+            }));
+          }}
+        />
+      );
+    }
+
+    const { container } = render(<MyPageLoadMoreHarness />);
+    const scoped = desktopScope(container);
+
+    expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
+    expect(scoped.queryByText("냉정한 이타주의자")).not.toBeInTheDocument();
+
+    await user.click(scoped.getByRole("button", { name: "더 보기" }));
+
+    expect(scoped.getByText("팩트풀니스")).toBeInTheDocument();
+    expect(scoped.getByText("냉정한 이타주의자")).toBeInTheDocument();
+    expect(scoped.queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
+  });
+
   it("encodes feedback document links from my page reports", () => {
     const { container } = renderMyPage({
-      reports: [
+      reports: pageOf([
         {
           ...reports[0],
           sessionId: "session 1/slash",
         },
-      ],
+      ]),
     });
     const scoped = desktopScope(container);
 
@@ -646,28 +702,27 @@ describe("MyPage", () => {
     expect(mobile?.querySelectorAll(".m-list")).toHaveLength(1);
   });
 
-  it("shows only the three latest feedback documents on my page summaries", () => {
+  it("shows feedback documents from the current page on my page summaries", () => {
     const manyReports: FeedbackDocumentListItem[] = [
       { ...reports[0], sessionId: "session-4", sessionNumber: 4, bookTitle: "모순", date: "2026-02-26" },
       { ...reports[0], sessionId: "session-3", sessionNumber: 3, bookTitle: "작별하지 않는다", date: "2026-01-26" },
       { ...reports[0], sessionId: "session-2", sessionNumber: 2, bookTitle: "냉정한 이타주의자", date: "2025-12-26" },
       reports[0],
     ];
-    const { container } = renderMyPage({ reports: manyReports });
+    const { container } = renderMyPage({ reports: pageOf(manyReports) });
     const desktop = desktopScope(container);
     const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
 
-    for (const title of ["모순", "작별하지 않는다", "냉정한 이타주의자"]) {
+    for (const title of ["모순", "작별하지 않는다", "냉정한 이타주의자", "팩트풀니스"]) {
       expect(desktop.getByText(title)).toBeInTheDocument();
     }
-    expect(desktop.queryByText("팩트풀니스")).not.toBeInTheDocument();
     expect(desktop.getByText("· 전체 4개")).toBeInTheDocument();
 
     expect(mobile.getByText("· 전체 4개")).toBeInTheDocument();
     expect(mobile.getByText("모순")).toBeInTheDocument();
     expect(mobile.getByText("작별하지 않는다")).toBeInTheDocument();
     expect(mobile.getByText("냉정한 이타주의자")).toBeInTheDocument();
-    expect(mobile.queryByText("팩트풀니스")).not.toBeInTheDocument();
+    expect(mobile.getByText("팩트풀니스")).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/archive?view=report");
     expect(mobile.getByRole("link", { name: "전체 보기" })).toHaveClass("btn", "btn-quiet", "btn-sm");
     expect(mobile.getByRole("link", { name: "전체 보기" })).not.toHaveClass("m-chip");
@@ -683,7 +738,7 @@ describe("MyPage", () => {
             element={
               <MyPage
                 data={data}
-                reports={reports}
+                reports={reportPage}
                 reviewCount={3}
                 questionCount={7}
                 LogoutButtonComponent={TestLogoutButton}
@@ -857,7 +912,7 @@ describe("MyPage", () => {
       totalSessionCount: 6,
       recentAttendances: [],
     };
-    const { container } = renderMyPage({ data: viewerData, reports: [], reviewCount: 0, questionCount: 0 });
+    const { container } = renderMyPage({ data: viewerData, reports: pageOf([]), reviewCount: 0, questionCount: 0 });
     const desktop = desktopScope(container);
     const mobile = within(container.querySelector(".rm-my-mobile") as HTMLElement);
 
@@ -956,7 +1011,7 @@ describe("MyPage", () => {
   });
 
   it("renders real rhythm stats and an empty feedback document state when there are no reports", () => {
-    const { container } = renderMyPage({ reports: [] });
+    const { container } = renderMyPage({ reports: pageOf([]) });
     const scoped = desktopScope(container);
     const rhythmSection = scoped.getByRole("heading", { level: 2, name: "나의 리듬" }).closest("section");
     const rhythm = within(rhythmSection as HTMLElement);
@@ -1005,12 +1060,12 @@ describe("MyPage", () => {
         return Promise.resolve(jsonResponse(data));
       }
 
-      if (url === "/api/bff/api/feedback-documents/me") {
+      if (url === "/api/bff/api/feedback-documents/me?limit=30") {
         return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
       }
 
-      if (url === "/api/bff/api/archive/me/questions" || url === "/api/bff/api/archive/me/reviews") {
-        return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/archive/me/questions?limit=30" || url === "/api/bff/api/archive/me/reviews?limit=30") {
+        return Promise.resolve(jsonResponse(pageOf([])));
       }
 
       if (url === "/api/bff/api/me/notifications/preferences") {

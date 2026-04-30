@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   anonymousAuthMeContractFixture,
+  archiveSessionPageContractFixture,
   archiveSessionDetailContractFixture,
   authMeContractFixture,
   currentSessionContractFixture,
+  feedbackDocumentListPageContractFixture,
   feedbackDocumentContractFixture,
   hostCurrentSessionContractFixture,
   hostInvitationContractFixture,
@@ -12,6 +14,10 @@ import {
   hostNotificationEventListContractFixture,
   hostSessionDetailContractFixture,
   hostSessionPublicationContractFixture,
+  myArchiveQuestionPageContractFixture,
+  myArchiveReviewPageContractFixture,
+  noteFeedPageContractFixture,
+  noteSessionPageContractFixture,
 } from "./api-contract-fixtures";
 
 describe("API contract fixtures", () => {
@@ -30,6 +36,16 @@ describe("API contract fixtures", () => {
     expect(hostNotificationEventListContractFixture.items[0]?.status).toBe("PENDING");
     expect(hostNotificationDeliveryListContractFixture.items[0]?.channel).toBe("EMAIL");
     expect(feedbackDocumentContractFixture.participants[0]?.revealingQuote.quote).toBeTruthy();
+  });
+
+  it("represents paged archive, note, and feedback list contracts", () => {
+    expect(archiveSessionPageContractFixture.items[0]?.sessionId).toBe("session-1");
+    expect(archiveSessionPageContractFixture.nextCursor).toBe("session-older");
+    expect(myArchiveQuestionPageContractFixture.nextCursor).toBeNull();
+    expect(myArchiveReviewPageContractFixture.items[0]?.kind).toBe("LONG_REVIEW");
+    expect(noteSessionPageContractFixture.items[0]?.totalCount).toBe(3);
+    expect(noteFeedPageContractFixture.items[0]?.kind).toBe("QUESTION");
+    expect(feedbackDocumentListPageContractFixture.items[0]?.fileName).toBe("251126 1차.md");
   });
 
   it("represents notification event and delivery ledgers separately", () => {

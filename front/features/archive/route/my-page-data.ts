@@ -6,7 +6,9 @@ import {
   fetchMyPage,
 } from "@/features/archive/api/archive-api";
 import type {
-  FeedbackDocumentListItem,
+  FeedbackDocumentListPage,
+  MyArchiveQuestionPage,
+  MyArchiveReviewPage,
   MyPageResponse,
   NotificationPreferencesResponse,
 } from "@/features/archive/api/archive-contracts";
@@ -18,12 +20,20 @@ import type { LoaderFunctionArgs } from "react-router-dom";
 
 export type MyPageRouteData = {
   data: MyPageResponse;
-  reports: FeedbackDocumentListItem[];
+  reports: FeedbackDocumentListPage;
+  questions: MyArchiveQuestionPage;
+  reviews: MyArchiveReviewPage;
   questionCount: number;
   reviewCount: number;
   notificationPreferences: NotificationPreferencesResponse;
   canManageNotificationPreferences: boolean;
 };
+
+const MY_PAGE_FIRST_PAGE_LIMIT = 30;
+
+function emptyPage<T>() {
+  return { items: [] as T[], nextCursor: null };
+}
 
 function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
   return {
@@ -52,7 +62,9 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
   if (!access.allowed) {
     return {
       data: inactiveMyPageData(access.auth),
-      reports: [],
+      reports: emptyPage(),
+      questions: emptyPage(),
+      reviews: emptyPage(),
       questionCount: 0,
       reviewCount: 0,
       notificationPreferences: defaultNotificationPreferences,
@@ -62,17 +74,19 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
 
   const [data, reports, questions, reviews, notificationPreferences] = await Promise.all([
     fetchMyPage(context),
-    fetchMyFeedbackDocuments(context),
-    fetchMyArchiveQuestions(context),
-    fetchMyArchiveReviews(context),
+    fetchMyFeedbackDocuments(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
+    fetchMyArchiveQuestions(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
+    fetchMyArchiveReviews(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
     notificationPreferencesAvailable ? fetchNotificationPreferences(context) : Promise.resolve(defaultNotificationPreferences),
   ]);
 
   return {
     data,
     reports,
-    questionCount: questions.length,
-    reviewCount: reviews.length,
+    questions,
+    reviews,
+    questionCount: questions.items.length,
+    reviewCount: reviews.items.length,
     notificationPreferences,
     canManageNotificationPreferences: notificationPreferencesAvailable,
   };

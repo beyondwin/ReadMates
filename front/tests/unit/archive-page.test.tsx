@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ArchivePage from "@/features/archive/ui/archive-page";
@@ -9,8 +10,13 @@ import type {
   MyArchiveQuestionItem,
   MyArchiveReviewItem,
 } from "@/features/archive/api/archive-contracts";
+import type { PagedResponse } from "@/shared/model/paging";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
+
+function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<T> {
+  return { items, nextCursor };
+}
 
 afterEach(() => {
   cleanup();
@@ -135,6 +141,10 @@ const seededReports: FeedbackDocumentListItem[] = [
     uploadedAt: "2026-04-20T09:00:00Z",
   },
 ];
+const seededSessionPage = pageOf(seededSessions);
+const seededQuestionPage = pageOf(seededQuestions);
+const seededReviewPage = pageOf(seededReviews);
+const seededReportPage = pageOf(seededReports);
 const seededReportReadLabel = "No.01 팩트풀니스 피드백 문서 읽기";
 const seededReportPdfLabel = "No.01 팩트풀니스 피드백 문서 PDF로 저장";
 
@@ -177,10 +187,10 @@ function ArchiveSearchParamHarness() {
         search report
       </button>
       <ArchivePage
-        sessions={seededSessions}
-        questions={seededQuestions}
-        reviews={seededReviews}
-        reports={seededReports}
+        sessions={seededSessionPage}
+        questions={seededQuestionPage}
+        reviews={seededReviewPage}
+        reports={seededReportPage}
         initialView={initialView}
         onViewChange={(nextView) => setSearchParams({ view: nextView })}
         routePathname={location.pathname}
@@ -205,7 +215,7 @@ function LocationStateEcho() {
 describe("ArchivePage", () => {
   it("shows the record storage title and session archive controls", () => {
     const { container } = render(
-      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,
     );
     const desktop = getDesktop(container);
     const mobile = container.querySelector(".rm-archive-mobile");
@@ -248,10 +258,60 @@ describe("ArchivePage", () => {
     expect(desktop.getAllByText("피드백 X").length).toBe(seededSessions.length - 1);
   });
 
+  it("appends archive sessions when 더 보기 is clicked", async () => {
+    const user = userEvent.setup();
+    const nextSession: ArchiveSessionItem = {
+      sessionId: "session-0",
+      sessionNumber: 0,
+      title: "0회차 모임 · 오래된 책",
+      bookTitle: "오래된 책",
+      bookAuthor: "기록 작가",
+      bookImageUrl: null,
+      date: "2025-10-01",
+      attendance: 4,
+      total: 6,
+      published: true,
+      state: "CLOSED",
+    };
+
+    function ArchiveLoadMoreHarness() {
+      const [sessions, setSessions] = useState<PagedResponse<ArchiveSessionItem>>(
+        pageOf([seededSessions[0]], "cursor-next"),
+      );
+
+      return (
+        <ArchivePage
+          sessions={sessions}
+          questions={pageOf([])}
+          reviews={pageOf([])}
+          reports={pageOf([])}
+          onLoadMoreSessions={async () => {
+            setSessions((current) => ({
+              items: [...current.items, nextSession],
+              nextCursor: null,
+            }));
+          }}
+        />
+      );
+    }
+
+    const { container } = render(<ArchiveLoadMoreHarness />);
+    const desktop = getDesktop(container);
+
+    expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
+    expect(desktop.queryByText("오래된 책")).not.toBeInTheDocument();
+
+    await user.click(desktop.getByRole("button", { name: "더 보기" }));
+
+    expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
+    expect(desktop.getAllByText("오래된 책").length).toBeGreaterThan(0);
+    expect(desktop.queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
+  });
+
   it("keeps archive item links inside the scoped app route", () => {
     const sessionRender = render(
       <MemoryRouter initialEntries={["/clubs/reading-sai/app/archive"]}>
-        <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+        <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />
       </MemoryRouter>,
     );
 
@@ -264,10 +324,10 @@ describe("ArchivePage", () => {
     render(
       <MemoryRouter initialEntries={["/clubs/reading-sai/app/archive?view=report"]}>
         <ArchivePage
-          sessions={seededSessions}
-          questions={seededQuestions}
-          reviews={seededReviews}
-          reports={seededReports}
+          sessions={seededSessionPage}
+          questions={seededQuestionPage}
+          reviews={seededReviewPage}
+          reports={seededReportPage}
           initialView="report"
         />
       </MemoryRouter>,
@@ -292,7 +352,7 @@ describe("ArchivePage", () => {
     };
 
     const { container } = render(
-      <ArchivePage sessions={[lockedSession]} questions={[]} reviews={[]} reports={[]} />,
+      <ArchivePage sessions={pageOf([lockedSession])} questions={pageOf([])} reviews={pageOf([])} reports={pageOf([])} />,
     );
     const desktop = getDesktop(container);
     const mobile = within(container.querySelector(".rm-archive-mobile") as HTMLElement);
@@ -319,7 +379,7 @@ describe("ArchivePage", () => {
       state: "CLOSED",
     };
     const validRender = render(
-      <ArchivePage sessions={[seededSessions[0]]} questions={[]} reviews={[]} reports={[]} />,
+      <ArchivePage sessions={pageOf([seededSessions[0]])} questions={pageOf([])} reviews={pageOf([])} reports={pageOf([])} />,
     );
 
     expect(getDesktop(validRender.container).getByText("04.15")).toBeInTheDocument();
@@ -328,10 +388,10 @@ describe("ArchivePage", () => {
 
     const fallbackRender = render(
       <ArchivePage
-        sessions={[sessionWithMissingDate]}
-        questions={[]}
-        reviews={[]}
-        reports={[]}
+        sessions={pageOf([sessionWithMissingDate])}
+        questions={pageOf([])}
+        reviews={pageOf([])}
+        reports={pageOf([])}
       />,
     );
 
@@ -355,10 +415,10 @@ describe("ArchivePage", () => {
 
     const { container } = render(
       <ArchivePage
-        sessions={[seededSessions[0], sessionWithMissingDate]}
-        questions={[]}
-        reviews={[]}
-        reports={[]}
+        sessions={pageOf([seededSessions[0], sessionWithMissingDate])}
+        questions={pageOf([])}
+        reviews={pageOf([])}
+        reports={pageOf([])}
       />,
     );
     const desktopElement = container.querySelector(".desktop-only") as HTMLElement;
@@ -374,7 +434,7 @@ describe("ArchivePage", () => {
 
   it("renders the standalone-aligned mobile archive shell", () => {
     const { container } = render(
-      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,
     );
 
     const mobile = container.querySelector(".rm-archive-mobile");
@@ -441,7 +501,7 @@ describe("ArchivePage", () => {
   it("switches mobile archive tabs using Korean chip labels", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,
     );
 
     const mobile = container.querySelector(".rm-archive-mobile") as HTMLElement;
@@ -503,10 +563,10 @@ describe("ArchivePage", () => {
             path="/app/archive"
             element={
               <ArchivePage
-                sessions={seededSessions}
-                questions={seededQuestions}
-                reviews={seededReviews}
-                reports={seededReports}
+                sessions={seededSessionPage}
+                questions={seededQuestionPage}
+                reviews={seededReviewPage}
+                reports={seededReportPage}
                 initialView="report"
               />
             }
@@ -537,10 +597,10 @@ describe("ArchivePage", () => {
             path="/app/archive"
             element={
               <ArchivePage
-                sessions={seededSessions}
-                questions={seededQuestions}
-                reviews={seededReviews}
-                reports={seededReports}
+                sessions={seededSessionPage}
+                questions={seededQuestionPage}
+                reviews={seededReviewPage}
+                reports={seededReportPage}
                 initialView="report"
               />
             }
@@ -564,7 +624,7 @@ describe("ArchivePage", () => {
   it("moves archive tab selection with keyboard arrow keys", async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,
     );
     const desktop = getDesktop(container);
 
@@ -585,7 +645,7 @@ describe("ArchivePage", () => {
 
   it("uses contextual session actions only for available app session routes", () => {
     const { container } = render(
-      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,
     );
     const desktop = getDesktop(container);
 
@@ -612,10 +672,10 @@ describe("ArchivePage", () => {
             path="/app/archive"
             element={
               <ArchivePage
-                sessions={seededSessions}
-                questions={seededQuestions}
-                reviews={seededReviews}
-                reports={seededReports}
+                sessions={seededSessionPage}
+                questions={seededQuestionPage}
+                reviews={seededReviewPage}
+                reports={seededReportPage}
               />
             }
           />
@@ -639,7 +699,7 @@ describe("ArchivePage", () => {
     window.sessionStorage.setItem(ARCHIVE_SCROLL_KEY, "stale");
     const desktopRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
-        <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+        <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />
       </MemoryRouter>,
     );
 
@@ -654,7 +714,7 @@ describe("ArchivePage", () => {
 
     const mobileRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=sessions"]}>
-        <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />
+        <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />
       </MemoryRouter>,
     );
     const mobile = within(mobileRender.container.querySelector(".rm-archive-mobile") as HTMLElement);
@@ -671,10 +731,10 @@ describe("ArchivePage", () => {
     const feedbackRender = render(
       <MemoryRouter initialEntries={["/app/archive?view=report"]}>
         <ArchivePage
-          sessions={seededSessions}
-          questions={seededQuestions}
-          reviews={seededReviews}
-          reports={seededReports}
+          sessions={seededSessionPage}
+          questions={seededQuestionPage}
+          reviews={seededReviewPage}
+          reports={seededReportPage}
           initialView="report"
         />
       </MemoryRouter>,
@@ -704,7 +764,7 @@ describe("ArchivePage", () => {
     };
 
     const { container } = render(
-      <ArchivePage sessions={[unpublishedArchiveSession]} questions={[]} reviews={[]} reports={[]} />,
+      <ArchivePage sessions={pageOf([unpublishedArchiveSession])} questions={pageOf([])} reviews={pageOf([])} reports={pageOf([])} />,
     );
     const desktop = getDesktop(container);
     const mobile = within(container.querySelector(".rm-archive-mobile") as HTMLElement);
@@ -729,7 +789,7 @@ describe("ArchivePage", () => {
     const user = userEvent.setup();
 
     const { container } = render(
-      <ArchivePage sessions={seededSessions} questions={seededQuestions} reviews={seededReviews} reports={seededReports} />,
+      <ArchivePage sessions={seededSessionPage} questions={seededQuestionPage} reviews={seededReviewPage} reports={seededReportPage} />,
     );
     const desktop = getDesktop(container);
 
@@ -782,10 +842,10 @@ describe("ArchivePage", () => {
   it("uses contextual icon-only labels when multiple feedback reports are listed", () => {
     const { container } = render(
       <ArchivePage
-        sessions={[]}
-        questions={[]}
-        reviews={[]}
-        reports={[
+        sessions={pageOf([])}
+        questions={pageOf([])}
+        reviews={pageOf([])}
+        reports={pageOf([
           ...seededReports,
           {
             sessionId: "session-2",
@@ -796,7 +856,7 @@ describe("ArchivePage", () => {
             fileName: "251217 2차.md",
             uploadedAt: "2026-04-21T09:00:00Z",
           },
-        ]}
+        ])}
         initialView="report"
       />,
     );
@@ -825,10 +885,10 @@ describe("ArchivePage", () => {
             path="/app/archive"
             element={
               <ArchivePage
-                sessions={seededSessions}
-                questions={seededQuestions}
-                reviews={seededReviews}
-                reports={seededReports}
+                sessions={seededSessionPage}
+                questions={seededQuestionPage}
+                reviews={seededReviewPage}
+                reports={seededReportPage}
                 initialView="reviews"
               />
             }
@@ -847,10 +907,10 @@ describe("ArchivePage", () => {
   it("can open directly with the feedback document tab selected", () => {
     const { container } = render(
       <ArchivePage
-        sessions={seededSessions}
-        questions={seededQuestions}
-        reviews={seededReviews}
-        reports={seededReports}
+        sessions={seededSessionPage}
+        questions={seededQuestionPage}
+        reviews={seededReviewPage}
+        reports={seededReportPage}
         initialView="report"
       />,
     );
@@ -894,10 +954,10 @@ describe("ArchivePage", () => {
 
     render(
       <ArchivePage
-        sessions={seededSessions}
-        questions={seededQuestions}
-        reviews={seededReviews}
-        reports={seededReports}
+        sessions={seededSessionPage}
+        questions={seededQuestionPage}
+        reviews={seededReviewPage}
+        reports={seededReportPage}
         routePathname="/app/archive"
         routeSearch="?view=sessions"
       />,
@@ -962,10 +1022,10 @@ describe("ArchivePage", () => {
 
     const { container } = render(
       <ArchivePage
-        sessions={sessionsWithEncodedId}
-        questions={questionsWithEncodedId}
-        reviews={reviewsWithEncodedId}
-        reports={reportsWithEncodedId}
+        sessions={pageOf(sessionsWithEncodedId)}
+        questions={pageOf(questionsWithEncodedId)}
+        reviews={pageOf(reviewsWithEncodedId)}
+        reports={pageOf(reportsWithEncodedId)}
       />,
     );
     const desktop = getDesktop(container);
@@ -989,7 +1049,7 @@ describe("ArchivePage", () => {
   it("renders empty states instead of fallback samples", async () => {
     const user = userEvent.setup();
 
-    const { container } = render(<ArchivePage sessions={[]} questions={[]} reviews={[]} reports={[]} />);
+    const { container } = render(<ArchivePage sessions={pageOf([])} questions={pageOf([])} reviews={pageOf([])} reports={pageOf([])} />);
     const desktop = getDesktop(container);
 
     expect(desktop.getByText("아직 저장된 모임 기록이 없습니다.")).toBeInTheDocument();
@@ -1009,7 +1069,7 @@ describe("ArchivePage", () => {
 
   it("renders mobile empty states with mobile card/list primitives", async () => {
     const user = userEvent.setup();
-    const { container } = render(<ArchivePage sessions={[]} questions={[]} reviews={[]} reports={[]} />);
+    const { container } = render(<ArchivePage sessions={pageOf([])} questions={pageOf([])} reviews={pageOf([])} reports={pageOf([])} />);
 
     const mobile = container.querySelector(".rm-archive-mobile") as HTMLElement;
     expect(mobile).not.toBeNull();
