@@ -141,9 +141,15 @@ describe("public navigation auth state", () => {
       JSON.stringify({ pathname: "/records", search: "", scrollY: 720 }),
     );
 
-    renderAt("/sessions/session-1", <PublicFooter showGuestMemberActions={false} LinkComponent={Link} />);
+    renderAt("/sessions/session-1", <PublicFooter showGuestMemberActions={false} />);
 
-    fireEvent.click(screen.getByRole("link", { name: "공개 기록" }));
+    const cancelDefaultNavigation = (event: MouseEvent) => event.preventDefault();
+    document.addEventListener("click", cancelDefaultNavigation);
+    try {
+      fireEvent.click(screen.getByRole("link", { name: "공개 기록" }));
+    } finally {
+      document.removeEventListener("click", cancelDefaultNavigation);
+    }
 
     expect(window.sessionStorage.getItem("readmates:public-records-scroll")).toBeNull();
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
