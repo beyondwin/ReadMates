@@ -144,6 +144,30 @@ function routePathSet(routeObjects: RouteObject[], parent = ""): Set<string> {
   return paths;
 }
 
+function loaderRoutesWithoutHydrateFallback(routeObjects: RouteObject[], parent = ""): string[] {
+  const missing: string[] = [];
+
+  for (const route of routeObjects) {
+    const ownPath =
+      route.path === undefined
+        ? parent
+        : route.path.startsWith("/")
+          ? route.path
+          : `${parent.replace(/\/$/, "")}/${route.path}`;
+    const routeLabel = route.index ? `${parent || "/"}/(index)` : ownPath || "/";
+
+    if (route.loader && route.hydrateFallbackElement === undefined) {
+      missing.push(routeLabel);
+    }
+
+    if (route.children) {
+      missing.push(...loaderRoutesWithoutHydrateFallback(route.children, ownPath));
+    }
+  }
+
+  return missing;
+}
+
 describe("SPA router", () => {
   it("defines club-scoped member and host app routes", () => {
     const paths = routePathSet(routes);
@@ -151,6 +175,10 @@ describe("SPA router", () => {
     expect(paths).toContain("/clubs/:clubSlug/app");
     expect(paths).toContain("/clubs/:clubSlug/app/host");
     expect(paths).toContain("/clubs/:clubSlug/app/archive");
+  });
+
+  it("defines hydration fallbacks for every loader route", () => {
+    expect(loaderRoutesWithoutHydrateFallback(routes)).toEqual([]);
   });
 
   it("renders the login route", () => {

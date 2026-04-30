@@ -321,6 +321,7 @@ export const routes: RouteObject[] = [
       </RequireMemberApp>
     ),
     loader: loadMemberAppAuth,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 공간을 불러오는 중" variant="member" />,
     children: memberAppRoutes(),
   },
   {
@@ -332,6 +333,7 @@ export const routes: RouteObject[] = [
       </RequireHost>
     ),
     loader: requireHostLoaderAuth,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
     children: hostAppRoutes(),
   },
   {
@@ -343,6 +345,7 @@ export const routes: RouteObject[] = [
       </RequireHost>
     ),
     loader: requireHostLoaderAuth,
+    hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
     children: hostAppRoutes(),
   },
 ];
