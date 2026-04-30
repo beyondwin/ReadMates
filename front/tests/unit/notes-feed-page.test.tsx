@@ -287,7 +287,8 @@ describe("NotesFeedPage", () => {
   it("resolves selected sessions without changing fallback order", () => {
     expect(resolveSelectedSession({ noteSessions, selectedSessionId: "session-1", selectedSession: noteSessions[8] })).toBe(noteSessions[8]);
     expect(resolveSelectedSession({ noteSessions, selectedSessionId: "session-8", selectedSession: null })).toBe(noteSessions[1]);
-    expect(resolveSelectedSession({ noteSessions, selectedSessionId: "missing-session", selectedSession: null })).toBe(noteSessions[0]);
+    expect(resolveSelectedSession({ noteSessions, selectedSessionId: "missing-session", selectedSession: null })).toBeNull();
+    expect(resolveSelectedSession({ noteSessions, selectedSessionId: null, selectedSession: null })).toBe(noteSessions[0]);
     expect(resolveSelectedSession({ noteSessions: [], selectedSessionId: null, selectedSession: null })).toBeNull();
   });
 
@@ -706,10 +707,10 @@ describe("NotesFeedPage", () => {
     expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
   });
 
-  it("falls back to the first note session with records when no selected session is supplied", () => {
+  it("falls back to the first note session with records when no selected session id is supplied", () => {
     renderNotesFeedPage({
       renderItems: [],
-      selectedSessionId: "missing-session",
+      selectedSessionId: null,
       renderSelectedSession: null,
     });
 
@@ -719,5 +720,22 @@ describe("NotesFeedPage", () => {
     const selectedLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" });
 
     expect(selectedLink).toHaveAttribute("aria-current", "page");
+  });
+
+  it("does not select a different session when an explicit selected session id is missing", () => {
+    renderNotesFeedPage({
+      renderItems: [],
+      selectedSessionId: "missing-session",
+      renderSelectedSession: null,
+    });
+
+    expect(screen.queryByRole("heading", { name: "다정한 것이 살아남는다" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "읽고 돌아오는 자리" })).toBeInTheDocument();
+    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
+
+    const rail = desktopRail();
+    const firstLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" });
+
+    expect(firstLink).not.toHaveAttribute("aria-current", "page");
   });
 });

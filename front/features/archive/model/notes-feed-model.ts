@@ -73,6 +73,10 @@ export function resolveSelectedSession({
     return selectedSession;
   }
 
+  if (selectedSessionId) {
+    return noteSessions.find((session) => session.sessionId === selectedSessionId) ?? null;
+  }
+
   return selectNoteSession(noteSessions, selectedSessionId);
 }
 

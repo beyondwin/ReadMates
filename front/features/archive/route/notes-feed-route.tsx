@@ -60,7 +60,7 @@ export function NotesFeedRoute() {
   }, [clubSlug, data, pages.noteSessions.nextCursor]);
   const loadMoreItems = useCallback(async () => {
     const cursor = pages.items.nextCursor;
-    const sessionId = pages.selectedSession?.sessionId;
+    const sessionId = pages.selectedSessionId;
 
     if (!cursor || !sessionId) {
       return;
@@ -81,13 +81,13 @@ export function NotesFeedRoute() {
         },
       };
     });
-  }, [clubSlug, data, pages.items.nextCursor, pages.selectedSession?.sessionId]);
+  }, [clubSlug, data, pages.items.nextCursor, pages.selectedSessionId]);
 
   return (
     <NotesFeedPage
       items={pages.items}
       noteSessions={pages.noteSessions}
-      selectedSessionId={pages.selectedSession?.sessionId ?? null}
+      selectedSessionId={pages.selectedSessionId}
       selectedSession={pages.selectedSession}
       initialFilter={initialFilter}
       onFilterChange={handleFilterChange}
