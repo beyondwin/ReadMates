@@ -48,7 +48,7 @@ port: 3306
 
 이미 별도 MySQL 8 compatible database를 사용한다면 같은 database를 만들고, backend 실행 시 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 해당 값으로 바꿉니다.
 
-이 Compose database는 로컬 backend 실행과 E2E 준비용입니다. Backend Gradle test는 Testcontainers가 테스트용 MySQL을 직접 띄우므로, 일반 backend test를 위해 이 컨테이너를 먼저 실행할 필요는 없습니다.
+이 Compose database는 로컬 backend 실행과 E2E 준비용입니다. Backend Gradle test는 Testcontainers가 테스트용 MySQL을 직접 띄우므로, 일반 backend test를 위해 이 컨테이너를 먼저 실행할 필요는 없습니다. Playwright E2E schema 준비, `CREATE DATABASE` 권한, Flyway checksum mismatch 대응은 [test-guide.md](test-guide.md#playwright-e2e)를 기준으로 합니다.
 
 ## Optional Redis
 
@@ -87,7 +87,7 @@ docker compose up -d mysql kafka
 ./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
 ```
 
-로컬 backend에서 Kafka relay/consumer와 실제 이메일 delivery까지 함께 켜서 실행할 때는 backend env에 현재 코드의 Kafka property와 Spring mail property를 모두 넣습니다. `READMATES_NOTIFICATIONS_ENABLED=true`는 `SmtpMailDeliveryAdapter`를 선택하므로 `JavaMailSender`가 생성될 수 있게 `SPRING_MAIL_HOST` 같은 mail 설정이 필요합니다.
+로컬 backend에서 Kafka relay/consumer와 실제 이메일 delivery까지 함께 켜서 실행할 때는 backend env에 현재 코드의 Kafka property와 Spring mail property를 모두 넣습니다. `READMATES_NOTIFICATIONS_ENABLED=true`는 `SmtpMailDeliveryAdapter`를 선택하므로 `JavaMailSender`가 생성될 수 있게 `SPRING_MAIL_HOST` 같은 mail 설정이 필요합니다. 알림 이메일은 plain text fallback과 HTML body를 함께 담은 MIME 메시지로 발송되며, host detail API와 audit row에는 raw 이메일 본문을 노출하지 않습니다.
 
 ```bash
 READMATES_NOTIFICATIONS_ENABLED=true \
@@ -194,7 +194,7 @@ Dev-login은 로컬 개발과 E2E fixture를 위한 흐름입니다. production 
 - Dev seed는 기존 account alias인 `users.short_name`과 현재 표시 이름 저장소인 `memberships.short_name`을 모두 채웁니다. 화면 표시와 프로필 수정 API는 `displayName` 필드를 주고받고 membership 단위 `memberships.short_name`을 갱신하므로, `/app/me`와 `/app/host/members`에서 표시 이름 변경 흐름을 로컬로 확인할 수 있습니다.
 - Dev seed와 E2E fixture는 현재 `OPEN` 세션, `CLOSED`/`PUBLISHED` 기록, 호스트가 새로 만드는 `DRAFT` 예정 세션 흐름을 검증할 수 있게 구성되어 있습니다. 호스트는 `/app/host`에서 예정 세션 공개 범위를 `HOST_ONLY`, `MEMBER`, `PUBLIC`으로 바꾸고, `DRAFT`를 현재 `OPEN` 세션으로 시작한 뒤 `/app/host/sessions/:sessionId/edit`에서 세션 닫기와 기록 발행 흐름을 확인할 수 있습니다.
 
-운영 로그인은 Google OAuth 흐름입니다. 브라우저는 `/oauth2/authorization/google`로 시작하고, callback은 `/login/oauth2/code/google`로 돌아오며, Spring은 성공 시 `readmates_session` cookie를 발급합니다.
+운영 로그인은 Google OAuth 흐름입니다. 브라우저는 `/oauth2/authorization/google`로 시작하고, callback은 `/login/oauth2/code/google`로 돌아오며, Spring은 성공 시 `readmates_session` cookie를 발급합니다. 로컬 route guard, loader, API 401 흐름도 같은 origin의 안전한 relative `returnTo`만 `/login?returnTo=...`와 OAuth start에 전달하므로, 복귀 경로를 확인할 때 absolute URL이나 login/reset/invite/OAuth path를 fixture로 쓰지 않습니다.
 
 ## 종료와 초기화
 
