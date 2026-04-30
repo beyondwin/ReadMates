@@ -14,6 +14,8 @@ import java.util.UUID
 @Service
 class NotesFeedService(
     private val loadNotesFeedPort: LoadNotesFeedPort,
+    // Keyset-paged reads bypass the legacy unpaged cache because it cannot
+    // produce reliable nextCursor values for every feed/session row.
     private val cache: NotesReadCachePort = NotesReadCachePort.Noop(),
 ) : GetNotesFeedUseCase,
     ListNoteSessionsUseCase {

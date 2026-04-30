@@ -29,39 +29,50 @@ class NotesFeedServiceCacheTest {
     )
 
     @Test
-    fun `loads club feed through paged port`() {
-        val cache = NotesReadCachePort.InMemoryForTest(feed = listOf(feedItem()))
+    fun `paged club feed bypasses legacy unpaged cache`() {
+        val cache = RecordingNotesCache(feed = listOf(feedItem(text = "cached feed item")))
         val loader = RecordingNotesLoader()
         val service = NotesFeedService(loader, cache)
 
         val result = service.getNotesFeed(member, null, firstPage)
 
         assertEquals(1, result.items.size)
+        assertEquals("Question", result.items.single().text)
+        assertEquals(0, cache.getCalls)
+        assertEquals(0, cache.putCalls)
         assertEquals(1, loader.feedLoads)
     }
 
     @Test
-    fun `loads session feed through paged port`() {
-        val cache = NotesReadCachePort.InMemoryForTest()
+    fun `paged session feed bypasses legacy unpaged cache`() {
+        val cache = RecordingNotesCache(sessionFeed = listOf(feedItem(text = "cached session item")))
         val loader = RecordingNotesLoader()
         val service = NotesFeedService(loader, cache)
         val sessionId = SESSION_ID.toString()
 
-        service.getNotesFeed(member, sessionId, firstPage)
-        service.getNotesFeed(member, sessionId, firstPage)
+        val firstResult = service.getNotesFeed(member, sessionId, firstPage)
+        val secondResult = service.getNotesFeed(member, sessionId, firstPage)
 
+        assertEquals("Question", firstResult.items.single().text)
+        assertEquals("Question", secondResult.items.single().text)
+        assertEquals(0, cache.getCalls)
+        assertEquals(0, cache.putCalls)
         assertEquals(2, loader.sessionFeedLoads)
     }
 
     @Test
-    fun `loads sessions list through paged port`() {
-        val cache = NotesReadCachePort.InMemoryForTest()
+    fun `paged sessions list bypasses legacy unpaged cache`() {
+        val cache = RecordingNotesCache(sessions = listOf(noteSession(bookTitle = "Cached Book")))
         val loader = RecordingNotesLoader()
         val service = NotesFeedService(loader, cache)
 
-        service.listNoteSessions(member, sessionPage)
-        service.listNoteSessions(member, sessionPage)
+        val firstResult = service.listNoteSessions(member, sessionPage)
+        val secondResult = service.listNoteSessions(member, sessionPage)
 
+        assertEquals("Book", firstResult.items.single().bookTitle)
+        assertEquals("Book", secondResult.items.single().bookTitle)
+        assertEquals(0, cache.getCalls)
+        assertEquals(0, cache.putCalls)
         assertEquals(2, loader.sessionsLoads)
     }
 
@@ -100,13 +111,17 @@ class NotesFeedServiceCacheTest {
             CursorPage(listOf(feedItem()), null).also { sessionFeedLoads += 1 }
     }
 
-    private class RecordingNotesCache : NotesReadCachePort {
+    private class RecordingNotesCache(
+        private val feed: List<NoteFeedResult>? = null,
+        private val sessionFeed: List<NoteFeedResult>? = null,
+        private val sessions: List<NoteSessionResult>? = null,
+    ) : NotesReadCachePort {
         var getCalls = 0
         var putCalls = 0
 
         override fun getFeed(clubId: UUID): List<NoteFeedResult>? {
             getCalls += 1
-            return null
+            return feed
         }
 
         override fun putFeed(clubId: UUID, result: List<NoteFeedResult>) {
@@ -115,7 +130,7 @@ class NotesFeedServiceCacheTest {
 
         override fun getSessionFeed(clubId: UUID, sessionId: UUID): List<NoteFeedResult>? {
             getCalls += 1
-            return null
+            return sessionFeed
         }
 
         override fun putSessionFeed(clubId: UUID, sessionId: UUID, result: List<NoteFeedResult>) {
@@ -124,7 +139,7 @@ class NotesFeedServiceCacheTest {
 
         override fun getSessions(clubId: UUID): List<NoteSessionResult>? {
             getCalls += 1
-            return null
+            return sessions
         }
 
         override fun putSessions(clubId: UUID, result: List<NoteSessionResult>) {
@@ -136,7 +151,7 @@ class NotesFeedServiceCacheTest {
         private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         private val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000301")
 
-        fun feedItem() = NoteFeedResult(
+        fun feedItem(text: String = "Question") = NoteFeedResult(
             sessionId = SESSION_ID.toString(),
             sessionNumber = 1,
             bookTitle = "Book",
@@ -144,13 +159,13 @@ class NotesFeedServiceCacheTest {
             authorName = "Member",
             authorShortName = "Member",
             kind = "QUESTION",
-            text = "Question",
+            text = text,
         )
 
-        fun noteSession() = NoteSessionResult(
+        fun noteSession(bookTitle: String = "Book") = NoteSessionResult(
             sessionId = SESSION_ID.toString(),
             sessionNumber = 1,
-            bookTitle = "Book",
+            bookTitle = bookTitle,
             date = "2026-04-28",
             questionCount = 1,
             oneLinerCount = 0,
