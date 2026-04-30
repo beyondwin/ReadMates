@@ -4,6 +4,10 @@ ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Grad
 
 GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint/test/build를 실행하고, backend job에서 JDK 21로 `./server/gradlew -p server clean test`를 실행합니다.
 
+검증은 변경 surface와 위험도에 맞춰 고릅니다. 완료 보고에는 실행한 명령, 실패 또는 스킵한 명령과 이유, 남은 리스크를 함께 남깁니다. 실패한 검증을 무시하고 완료로 표시하지 않습니다.
+
+외부 배포 smoke는 실제 운영 상태를 볼 수 있으므로 결과 전문, 운영 domain 목록, provider 응답 본문을 공개 문서나 Git에 붙이지 않습니다.
+
 ## Frontend
 
 의존성 설치:

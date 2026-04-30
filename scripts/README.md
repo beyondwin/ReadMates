@@ -4,6 +4,10 @@
 
 공개 저장소 전환과 secret 관리 기준은 [공개 저장소 보안](../docs/deploy/security-public-repo.md)을 함께 확인합니다.
 
+스크립트 작업은 후보 생성 또는 검사 결과가 명확히 출력되고, 발견된 finding을 공개 가능/수정 필요/active secret 가능성으로 분류했을 때 완료입니다. 실패한 scanner 결과를 단순 경고처럼 취급하지 않습니다.
+
+`gitleaks` 미설치 fallback이나 current-tree historical finding처럼 검증 강도가 낮거나 해석이 필요한 경우에는 그 한계를 결과에 남깁니다. 이 스크립트 통과만으로 secret rotation, GitHub 공개 전환, branch protection 설정, production 배포가 끝났다고 판단하지 않습니다.
+
 ## `build-public-release-candidate.sh`
 
 아래 명령은 저장소 루트에서 실행하는 것을 기준으로 합니다. 스크립트 자체는 저장소 내부 어디에서든 실행할 수 있지만, 이 문서의 `./scripts/...` 경로는 저장소 루트에서 그대로 복사해 실행할 수 있습니다.

@@ -2,6 +2,10 @@
 
 ReadMates 저장소는 공개 GitHub 저장소로 전환하거나 공개 릴리즈 후보를 별도 저장소에 옮겨도 안전해야 합니다. 운영 secret, 실제 멤버 신원, provider 상태 파일은 Git이 추적하는 파일에 들어가면 안 됩니다.
 
+공개 안전 작업은 clean 후보 생성, 후보 scan, 필요한 current-tree scan, scanner finding triage, 공개 대상 파일 검토가 끝났을 때 완료입니다. Scanner 통과는 active secret 부재를 보조 확인하는 guardrail이며, 운영 secret rotation이나 GitHub 공개 전환을 대신하지 않습니다.
+
+Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지 않습니다. 먼저 공개 중단, 영향 범위 확인, boundary별 secret rotation, smoke check 순서로 처리하고, history rewrite나 force-push는 별도 승인 전에는 실행하지 않습니다.
+
 ## 공개 방식
 
 기본 전략은 기존 private 저장소를 그대로 public으로 전환하는 것이 아니라, 검토된 파일만 복사한 clean 공개 릴리즈 후보를 만드는 것입니다. 공개 릴리즈 후보에는 제품 소스, 공개 배포/개발 문서, placeholder 기반 예시만 포함하고 private 작업 이력, 로컬 산출물, provider 상태, 실제 secret은 포함하지 않습니다.

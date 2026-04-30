@@ -2,6 +2,10 @@
 
 ReadMates는 모든 클럽에 path fallback URL을 보장하고, 운영자가 연결한 Cloudflare Pages custom domain 또는 subdomain alias를 선택적으로 붙입니다. 이 문서는 공개 저장소에 둘 수 있는 placeholder 기준만 설명합니다. 실제 domain 목록, Cloudflare account id, zone id, API token, OAuth secret, DB password, 운영 smoke 결과는 Git에 기록하지 않습니다.
 
+Domain alias 작업은 fallback path가 계속 살아 있고, Spring allowed origins, OAuth return policy, Cloudflare marker, platform admin `ACTIVE` 상태가 같은 host를 가리킬 때 완료입니다. 어느 하나라도 확인되지 않으면 사용자 안내는 fallback URL을 유지합니다.
+
+Cloudflare custom domain 설정이나 Google OAuth redirect URI를 실제로 바꾸기 전에는 현재 provider 콘솔에서 상태와 한도를 확인합니다. 확인 결과에는 운영 domain이나 provider state가 포함될 수 있으므로 공개 문서에 붙이지 않습니다.
+
 ## URL Strategy
 
 항상 동작해야 하는 기본 URL은 아래 형태입니다.

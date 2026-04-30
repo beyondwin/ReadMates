@@ -6,6 +6,14 @@
 
 승인된 포트폴리오 데모 URL: [https://readmates.pages.dev](https://readmates.pages.dev)
 
+## 배포 문서 사용 기준
+
+배포 문서는 운영자가 안전하게 재현할 수 있는 공개 runbook이어야 합니다. 실제 배포를 완료했다고 보려면 frontend Pages 배포, Spring API health, BFF/OAuth smoke, public release safety check가 변경 범위에 맞게 확인되어야 합니다.
+
+Cloudflare, OCI, Google Cloud, GitHub의 UI, 가격, 한도, 권한 모델은 바뀔 수 있습니다. 계정 설정이나 비용 결정을 실행하기 전에는 현재 provider 콘솔 또는 공식 문서로 재확인하고, 재확인하지 않은 내용을 현재 사실처럼 단정하지 않습니다.
+
+실제 운영 domain 목록, IP, OCID, provider token, OAuth secret, DB password, smoke 결과 전문은 이 디렉터리에 기록하지 않습니다. 그런 값이 필요한 작업은 Git 밖의 운영 채널에서 처리합니다.
+
 관련 상위 문서:
 
 - [루트 README](../../README.md)

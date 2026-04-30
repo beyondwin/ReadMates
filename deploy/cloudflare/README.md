@@ -2,6 +2,10 @@
 
 Cloudflare Pages production 자동 배포를 끄거나, GitHub Actions에서 명시적으로 프론트 배포를 실행할 때 참고하는 보조 절차입니다.
 
+이 절차는 production frontend 배포를 실제로 트리거할 수 있습니다. 사용자가 배포 실행을 명시적으로 요청하지 않았으면 문서 확인이나 설정 준비에서 멈춥니다.
+
+배포 완료 기준은 workflow 또는 deploy hook 실행 성공, Cloudflare Pages production deployment 확인, SPA/BFF/OAuth smoke 통과입니다. `CLOUDFLARE_API_TOKEN`, account id, deploy hook URL은 공개 문서나 Git에 남기지 않습니다.
+
 ## GitHub Actions로 배포
 
 `.github/workflows/deploy-front.yml`은 `front`를 빌드한 뒤 Wrangler로 Cloudflare Pages에 직접 업로드합니다.

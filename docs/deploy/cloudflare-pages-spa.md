@@ -2,6 +2,10 @@
 
 현재 기준 문서는 [cloudflare-pages.md](cloudflare-pages.md)입니다. 이 문서는 SPA route, Pages Functions, OAuth proxy 문제를 확인할 때 보는 하위 참고 문서입니다.
 
+이 문서는 troubleshooting 참고입니다. 기준 문서와 충돌하면 [cloudflare-pages.md](cloudflare-pages.md), 현재 `front/public/_redirects`, `front/functions`, Spring auth 설정을 먼저 확인하고 이 문서를 맞춥니다.
+
+SPA/OAuth 점검은 deep route가 Cloudflare 404가 아니라 SPA로 들어오고, BFF route가 Spring에 도달하며, Google OAuth `redirect_uri`가 `READMATES_AUTH_BASE_URL`과 일치할 때 완료입니다. 실제 운영 응답 본문이나 domain 목록은 Git에 남기지 않습니다.
+
 ## 배포 형태
 
 ReadMates 운영 프론트엔드는 Cloudflare Pages가 `front/dist`의 Vite React SPA를 서빙하고, `front/functions`의 Pages Functions가 같은 origin BFF와 OAuth proxy를 제공합니다. 인증, 멤버십, 현재/예정 세션, 공개 기록, 피드백 문서의 진실은 OCI Spring Boot API와 MySQL에 있습니다.

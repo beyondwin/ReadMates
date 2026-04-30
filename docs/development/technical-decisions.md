@@ -8,6 +8,8 @@
 - 과거 계획 문서의 맥락은 참고할 수 있지만 현재 동작의 기준으로 삼지 않습니다.
 - 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 절대 경로, OCI OCID는 예시에 넣지 않습니다.
 - 각 결정은 "무엇을 선택했는가", "왜 선택했는가", "어떤 trade-off를 감수했는가"를 함께 남깁니다.
+- 새 결정을 추가하거나 기존 결정을 바꾸면 관련 문서와 검증 명령도 함께 갱신합니다.
+- Cloudflare, OCI, Google, GitHub처럼 외부 서비스의 한도, 가격, UI, API 동작은 바뀔 수 있으므로 운영 판단 전에 현재 공식 문서나 콘솔에서 재확인합니다. 재확인하지 않았다면 문서에 현재 기준으로 단정하지 않습니다.
 
 ## Cloudflare Pages Functions를 BFF로 둔다
 
