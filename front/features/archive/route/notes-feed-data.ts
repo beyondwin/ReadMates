@@ -8,6 +8,7 @@ import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
 export type NotesFeedRouteData = {
   noteSessions: NoteSessionPage;
+  selectedSessionId: string | null;
   selectedSession: NoteSessionItem | null;
   items: NoteFeedPage;
 };
@@ -56,6 +57,7 @@ export async function loadNotesFeedRouteData(requestedSessionId: string | null, 
 
       return {
         noteSessions,
+        selectedSessionId: requestedSessionIdValue,
         selectedSession: noteSessionFromFeedItems(requestedSessionIdValue, items.items),
         items,
       };
@@ -63,20 +65,20 @@ export async function loadNotesFeedRouteData(requestedSessionId: string | null, 
 
     const items = await fetchNotesFeed(selectedSession.sessionId, context, { limit: NOTES_FEED_FIRST_PAGE_LIMIT });
 
-    return { noteSessions, selectedSession, items };
+    return { noteSessions, selectedSessionId: requestedSessionIdValue, selectedSession, items };
   }
 
   const selectedSession = selectNoteSession(noteSessions.items, requestedSessionIdValue);
   const items = selectedSession ? await fetchNotesFeed(selectedSession.sessionId, context, { limit: NOTES_FEED_FIRST_PAGE_LIMIT }) : emptyPage();
 
-  return { noteSessions, selectedSession, items };
+  return { noteSessions, selectedSessionId: selectedSession?.sessionId ?? null, selectedSession, items };
 }
 
 export async function notesFeedLoader({ params, request }: LoaderFunctionArgs): Promise<NotesFeedRouteData> {
   const access = await loadArchiveMemberAuth({ params });
 
   if (!access.allowed) {
-    return { noteSessions: emptyPage(), selectedSession: null, items: emptyPage() };
+    return { noteSessions: emptyPage(), selectedSessionId: null, selectedSession: null, items: emptyPage() };
   }
 
   const url = new URL(request.url);

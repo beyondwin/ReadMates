@@ -300,6 +300,30 @@ describe("NotesPage", () => {
     });
   });
 
+  it("keeps an empty requested sessionId outside the first sessions page instead of selecting a different session", async () => {
+    mockNotesBff({ feedsBySession: { "session-empty": [] } });
+
+    renderNotesPage("session-empty");
+    const props = await latestNotesProps();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/bff/api/notes/sessions?limit=30", expect.any(Object));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/bff/api/notes/feed?sessionId=session-empty&limit=60",
+      expect.any(Object),
+    );
+    expect(props).toEqual({
+      items: pageOf([]),
+      noteSessions: pageOf(noteSessions),
+      selectedSessionId: "session-empty",
+      selectedSession: null,
+      initialFilter: "all",
+      onFilterChange: expect.any(Function),
+      onLoadMoreItems: expect.any(Function),
+      onLoadMoreNoteSessions: expect.any(Function),
+    });
+    expect(screen.getByTestId("notes-feed")).toHaveTextContent("session-empty");
+  });
+
   it("falls back to the first session when every session has zero records", async () => {
     const zeroCountSessions = noteSessions.map((session) => ({
       ...session,
