@@ -78,12 +78,32 @@ class HostMemberLifecycleControllerTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.membershipId == '$activeMembershipId')].status") { value("ACTIVE") }
-                jsonPath("$[?(@.membershipId == '$activeMembershipId')].currentSessionParticipationStatus") {
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].status") { value("ACTIVE") }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].currentSessionParticipationStatus") {
                     value("ACTIVE")
                 }
-                jsonPath("$[?(@.membershipId == '$activeMembershipId')].canSuspend") { value(true) }
-                jsonPath("$[?(@.membershipId == '$activeMembershipId')].canRemoveFromCurrentSession") { value(true) }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].canSuspend") { value(true) }
+                jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].canRemoveFromCurrentSession") { value(true) }
+            }
+    }
+
+    @Test
+    fun `host members list returns paged contract`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        repeat(3) { index ->
+            insertLifecycleMember("paged.members.$index", "ACTIVE")
+        }
+
+        mockMvc.get("/api/host/members") {
+            cookie(hostCookie)
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+            param("limit", "2")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(2) }
+                jsonPath("$.nextCursor") { exists() }
             }
     }
 

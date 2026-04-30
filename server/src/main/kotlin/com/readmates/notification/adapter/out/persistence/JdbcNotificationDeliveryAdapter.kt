@@ -25,6 +25,9 @@ import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.BatchPreparedStatementSetter
 import org.springframework.jdbc.core.JdbcTemplate
@@ -433,7 +436,12 @@ class JdbcNotificationDeliveryAdapter(
             latestFailures = latestFailures(clubId),
         )
 
-    override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList {
+    override fun listHostEmailItems(
+        clubId: UUID,
+        query: HostNotificationItemQuery,
+        pageRequest: PageRequest,
+    ): HostNotificationItemList {
+        val cursor = NotificationDeliveryUpdatedAtDescCursor.from(pageRequest.cursor)
         val predicates = mutableListOf(
             "notification_deliveries.club_id = ?",
             "notification_deliveries.channel = 'EMAIL'",
@@ -447,7 +455,22 @@ class JdbcNotificationDeliveryAdapter(
             predicates += "notification_event_outbox.event_type = ?"
             args += it.name
         }
-        args += query.limit.coerceIn(1, 100)
+        if (cursor != null) {
+            predicates += """
+                (
+                  notification_deliveries.updated_at < ?
+                  or (notification_deliveries.updated_at = ? and notification_deliveries.created_at < ?)
+                  or (notification_deliveries.updated_at = ? and notification_deliveries.created_at = ? and notification_deliveries.id < ?)
+                )
+            """.trimIndent()
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.id
+        }
+        args += pageRequest.limit + 1
 
         val items = jdbcTemplate().query(
             """
@@ -458,6 +481,7 @@ class JdbcNotificationDeliveryAdapter(
               users.email as recipient_email,
               notification_deliveries.attempt_count,
               notification_deliveries.next_attempt_at,
+              notification_deliveries.created_at,
               notification_deliveries.updated_at
             from notification_deliveries
             join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
@@ -466,14 +490,21 @@ class JdbcNotificationDeliveryAdapter(
               and memberships.club_id = notification_deliveries.club_id
             join users on users.id = memberships.user_id
             where ${predicates.joinToString(" and ")}
-            order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc
+            order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc
             limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostNotificationItem() },
             *args.toTypedArray(),
         )
 
-        return HostNotificationItemList(items)
+        return HostNotificationItemList(
+            items = items.take(pageRequest.limit),
+            nextCursor = if (items.size > pageRequest.limit) {
+                items.take(pageRequest.limit).lastOrNull()?.let { notificationDeliveryUpdatedAtDescCursor(it.updatedAt, it.createdAt, it.id.toString()) }
+            } else {
+                null
+            },
+        )
     }
 
     override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
@@ -513,15 +544,35 @@ class JdbcNotificationDeliveryAdapter(
         clubId: UUID,
         status: NotificationDeliveryStatus?,
         channel: NotificationChannel?,
-        limit: Int,
-    ): List<HostNotificationDelivery> {
+        pageRequest: PageRequest,
+    ): CursorPage<HostNotificationDelivery> {
+        val cursor = NotificationDeliveryUpdatedAtDescCursor.from(pageRequest.cursor)
         val statusPredicate = if (status == null) "" else "and notification_deliveries.status = ?"
         val channelPredicate = if (channel == null) "" else "and notification_deliveries.channel = ?"
+        val cursorPredicate = if (cursor == null) {
+            ""
+        } else {
+            """
+            and (
+              notification_deliveries.updated_at < ?
+              or (notification_deliveries.updated_at = ? and notification_deliveries.created_at < ?)
+              or (notification_deliveries.updated_at = ? and notification_deliveries.created_at = ? and notification_deliveries.id < ?)
+            )
+            """.trimIndent()
+        }
         val args = mutableListOf<Any>(clubId.dbString())
         status?.let { args += it.name }
         channel?.let { args += it.name }
-        args += limit
-        return jdbcTemplate().query(
+        if (cursor != null) {
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.updatedAt.toUtcLocalDateTime()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.id
+        }
+        args += pageRequest.limit + 1
+        val rows = jdbcTemplate().query(
             """
             select
               notification_deliveries.id,
@@ -530,6 +581,7 @@ class JdbcNotificationDeliveryAdapter(
               notification_deliveries.status,
               case when notification_deliveries.channel = 'EMAIL' then users.email else null end as recipient_email,
               notification_deliveries.attempt_count,
+              notification_deliveries.created_at,
               notification_deliveries.updated_at
             from notification_deliveries
             join memberships on memberships.id = notification_deliveries.recipient_membership_id
@@ -538,12 +590,16 @@ class JdbcNotificationDeliveryAdapter(
             where notification_deliveries.club_id = ?
               $statusPredicate
               $channelPredicate
+              $cursorPredicate
             order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc
             limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostNotificationDelivery() },
             *args.toTypedArray(),
         )
+        return pageFromRows(rows, pageRequest.limit) { row ->
+            notificationDeliveryUpdatedAtDescCursor(row.updatedAt, row.createdAt, row.id.toString())
+        }
     }
 
     private fun recipientsFor(jdbcTemplate: JdbcTemplate, message: NotificationEventMessage): List<DeliveryRecipient> =
@@ -989,6 +1045,7 @@ class JdbcNotificationDeliveryAdapter(
             status = NotificationDeliveryStatus.valueOf(getString("status")),
             recipientEmail = getString("recipient_email"),
             attemptCount = getInt("attempt_count"),
+            createdAt = utcOffsetDateTime("created_at"),
             updatedAt = utcOffsetDateTime("updated_at"),
         )
 
@@ -1009,6 +1066,7 @@ class JdbcNotificationDeliveryAdapter(
             recipientEmail = getString("recipient_email"),
             attemptCount = getInt("attempt_count"),
             nextAttemptAt = utcOffsetDateTime("next_attempt_at"),
+            createdAt = utcOffsetDateTime("created_at"),
             updatedAt = utcOffsetDateTime("updated_at"),
         )
 
@@ -1156,3 +1214,37 @@ class JdbcNotificationDeliveryAdapter(
 class MissingNotificationEventOutboxException(
     message: String,
 ) : RuntimeException(message)
+
+private fun notificationDeliveryUpdatedAtDescCursor(updatedAt: OffsetDateTime, createdAt: OffsetDateTime, id: String): String? =
+    CursorCodec.encode(
+        mapOf(
+            "updatedAt" to updatedAt.toString(),
+            "createdAt" to createdAt.toString(),
+            "id" to id,
+        ),
+    )
+
+private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    val visibleRows = rows.take(limit)
+    return CursorPage(
+        items = visibleRows,
+        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+    )
+}
+
+private data class NotificationDeliveryUpdatedAtDescCursor(
+    val updatedAt: OffsetDateTime,
+    val createdAt: OffsetDateTime,
+    val id: String,
+) {
+    companion object {
+        fun from(cursor: Map<String, String>): NotificationDeliveryUpdatedAtDescCursor? {
+            val updatedAt = cursor["updatedAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                ?: return null
+            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                ?: return null
+            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+            return NotificationDeliveryUpdatedAtDescCursor(updatedAt, createdAt, id)
+        }
+    }
+}

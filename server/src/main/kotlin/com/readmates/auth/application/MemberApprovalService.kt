@@ -4,6 +4,8 @@ import com.readmates.auth.domain.MembershipStatus
 import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
 import com.readmates.auth.application.port.out.MemberApprovalStorePort
 import com.readmates.auth.application.port.out.ViewerMemberRow
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -26,9 +28,13 @@ data class ViewerMemberResponse(
 class MemberApprovalService(
     private val memberApprovalStore: MemberApprovalStorePort,
 ) : ManageMemberApprovalsUseCase {
-    override fun listViewers(host: CurrentMember): List<ViewerMemberResponse> {
+    override fun listViewers(host: CurrentMember, pageRequest: PageRequest): CursorPage<ViewerMemberResponse> {
         requireHost(host)
-        return memberApprovalStore.listPendingViewers(host.clubId).map(::mapViewerMember)
+        val page = memberApprovalStore.listPendingViewers(host.clubId, pageRequest)
+        return CursorPage(
+            items = page.items.map(::mapViewerMember),
+            nextCursor = page.nextCursor,
+        )
     }
 
     @Transactional

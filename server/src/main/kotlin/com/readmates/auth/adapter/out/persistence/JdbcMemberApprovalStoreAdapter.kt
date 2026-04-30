@@ -4,22 +4,28 @@ import com.readmates.auth.application.port.out.MemberApprovalStorePort
 import com.readmates.auth.application.port.out.ViewerMemberRow
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
 class JdbcMemberApprovalStoreAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : MemberApprovalStorePort {
-    override fun listPendingViewers(clubId: UUID): List<ViewerMemberRow> =
-        jdbcTemplate().query(
+    override fun listPendingViewers(clubId: UUID, pageRequest: PageRequest): CursorPage<ViewerMemberRow> {
+        val cursor = MemberApprovalCreatedAtDescCursor.from(pageRequest.cursor)
+        val rows = jdbcTemplate().query(
             """
             select
               memberships.id as membership_id,
@@ -35,11 +41,26 @@ class JdbcMemberApprovalStoreAdapter(
             where memberships.club_id = ?
               and memberships.role = 'MEMBER'
               and memberships.status = 'VIEWER'
+              and (
+                ? is null
+                or memberships.created_at < ?
+                or (memberships.created_at = ? and memberships.id < ?)
+              )
             order by memberships.created_at desc, memberships.id desc
+            limit ?
             """.trimIndent(),
             ::mapViewerMember,
             clubId.dbString(),
+            cursor?.createdAt,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit) { row ->
+            memberApprovalCreatedAtDescCursor(row.createdAt, row.membershipId.toString())
+        }
+    }
 
     override fun activateViewer(clubId: UUID, membershipId: UUID): Boolean =
         jdbcTemplate().update(
@@ -143,4 +164,34 @@ class JdbcMemberApprovalStoreAdapter(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "Member approval storage is unavailable",
             )
+}
+
+private fun memberApprovalCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =
+    CursorCodec.encode(
+        mapOf(
+            "createdAt" to createdAt.toString(),
+            "id" to id,
+        ),
+    )
+
+private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    val visibleRows = rows.take(limit)
+    return CursorPage(
+        items = visibleRows,
+        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+    )
+}
+
+private data class MemberApprovalCreatedAtDescCursor(
+    val createdAt: OffsetDateTime,
+    val id: String,
+) {
+    companion object {
+        fun from(cursor: Map<String, String>): MemberApprovalCreatedAtDescCursor? {
+            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                ?: return null
+            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+            return MemberApprovalCreatedAtDescCursor(createdAt, id)
+        }
+    }
 }

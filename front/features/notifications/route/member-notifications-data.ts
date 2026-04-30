@@ -13,7 +13,7 @@ export async function memberNotificationsLoader(args?: LoaderFunctionArgs): Prom
   const access = await loadMemberAppAuth(args);
 
   if (!access.allowed) {
-    return { items: [], unreadCount: 0 };
+    return { items: [], unreadCount: 0, nextCursor: null };
   }
 
   return fetchMemberNotifications({ clubSlug: clubSlugFromLoaderArgs(args) });
@@ -22,4 +22,5 @@ export async function memberNotificationsLoader(args?: LoaderFunctionArgs): Prom
 export const memberNotificationsActions = {
   markRead: markMemberNotificationRead,
   markAllRead: markAllMemberNotificationsRead,
+  loadMore: fetchMemberNotifications,
 };

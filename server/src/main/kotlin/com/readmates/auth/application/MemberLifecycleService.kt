@@ -7,6 +7,8 @@ import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -19,10 +21,13 @@ class MemberLifecycleService(
     private val memberLifecycleStore: MemberLifecycleStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : ManageMemberLifecycleUseCase, LeaveMembershipUseCase {
-    override fun listMembers(host: CurrentMember): List<HostMemberListItem> {
+    override fun listMembers(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostMemberListItem> {
         requireHost(host)
-        return memberLifecycleStore.listMembers(host.clubId)
-            .map { row -> row.toHostMemberListItem(host.membershipId) }
+        val page = memberLifecycleStore.listMembers(host.clubId, pageRequest)
+        return CursorPage(
+            items = page.items.map { row -> row.toHostMemberListItem(host.membershipId) },
+            nextCursor = page.nextCursor,
+        )
     }
 
     @Transactional

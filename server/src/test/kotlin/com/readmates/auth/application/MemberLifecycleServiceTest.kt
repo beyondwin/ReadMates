@@ -7,6 +7,8 @@ import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -44,8 +46,8 @@ class MemberLifecycleServiceTest {
     private inner class RecordingMemberLifecycleStorePort : MemberLifecycleStorePort {
         private var targetStatus = MembershipStatus.ACTIVE
 
-        override fun listMembers(clubId: UUID): List<HostMemberListRow> =
-            listOf(hostMemberListRow())
+        override fun listMembers(clubId: UUID, pageRequest: PageRequest): CursorPage<HostMemberListRow> =
+            CursorPage(listOf(hostMemberListRow()), null)
 
         override fun suspendActiveMember(clubId: UUID, membershipId: UUID): Boolean {
             targetStatus = MembershipStatus.SUSPENDED

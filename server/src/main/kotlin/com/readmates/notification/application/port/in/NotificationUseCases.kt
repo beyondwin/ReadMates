@@ -14,6 +14,8 @@ import com.readmates.notification.application.model.SendNotificationTestMailComm
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import java.time.LocalDate
 import java.util.UUID
@@ -55,17 +57,17 @@ interface GetHostNotificationSummaryUseCase {
 }
 
 interface ManageHostNotificationsUseCase {
-    fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList
+    fun listItems(host: CurrentMember, query: HostNotificationItemQuery, pageRequest: PageRequest): HostNotificationItemList
     fun listEvents(
         host: CurrentMember,
         status: NotificationEventOutboxStatus?,
-        limit: Int,
+        pageRequest: PageRequest,
     ): HostNotificationEventList
     fun listDeliveries(
         host: CurrentMember,
         status: NotificationDeliveryStatus?,
         channel: NotificationChannel?,
-        limit: Int,
+        pageRequest: PageRequest,
     ): HostNotificationDeliveryList
     fun detail(host: CurrentMember, id: UUID): HostNotificationDetail
     fun retry(host: CurrentMember, id: UUID): HostNotificationDetail
@@ -74,7 +76,7 @@ interface ManageHostNotificationsUseCase {
 
 interface SendNotificationTestMailUseCase {
     fun sendTestMail(host: CurrentMember, command: SendNotificationTestMailCommand): NotificationTestMailAuditItem
-    fun listTestMailAudit(host: CurrentMember): List<NotificationTestMailAuditItem>
+    fun listTestMailAudit(host: CurrentMember, pageRequest: PageRequest): CursorPage<NotificationTestMailAuditItem>
 }
 
 interface ManageNotificationPreferencesUseCase {
@@ -83,7 +85,7 @@ interface ManageNotificationPreferencesUseCase {
 }
 
 interface ManageMemberNotificationsUseCase {
-    fun list(member: CurrentMember, limit: Int): MemberNotificationList
+    fun list(member: CurrentMember, pageRequest: PageRequest): MemberNotificationList
     fun unreadCount(member: CurrentMember): Int
     fun markRead(member: CurrentMember, id: UUID)
     fun markAllRead(member: CurrentMember): Int

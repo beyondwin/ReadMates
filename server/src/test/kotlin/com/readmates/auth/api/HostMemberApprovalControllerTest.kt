@@ -68,8 +68,25 @@ class HostMemberApprovalControllerTest(
             cookie(hostCookie)
         }.andExpect {
             status { isOk() }
-            jsonPath("$[0].email") { value(viewerEmail) }
-            jsonPath("$[0].status") { value("VIEWER") }
+            jsonPath("$.items[0].email") { value(viewerEmail) }
+            jsonPath("$.items[0].status") { value("VIEWER") }
+        }
+    }
+
+    @Test
+    fun `host pending approvals list returns paged contract`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        repeat(3) { index ->
+            insertViewerMember(uniqueEmail("viewer.paged.$index"), "Viewer Paged $index")
+        }
+
+        mockMvc.get("/api/host/members/pending-approvals") {
+            cookie(hostCookie)
+            param("limit", "2")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(2) }
+            jsonPath("$.nextCursor") { exists() }
         }
     }
 

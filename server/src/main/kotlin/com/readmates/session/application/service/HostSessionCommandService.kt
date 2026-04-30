@@ -16,6 +16,7 @@ import com.readmates.session.application.port.`in`.ManageHostSessionUseCase
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
 import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -32,7 +33,7 @@ class HostSessionCommandService(
     UpsertPublicationUseCase,
     ListUpcomingSessionsUseCase,
     GetHostDashboardUseCase {
-    override fun list(host: CurrentMember) = port.list(host)
+    override fun list(host: CurrentMember, pageRequest: PageRequest) = port.list(host, pageRequest)
 
     @Transactional
     override fun create(command: HostSessionCommand) =

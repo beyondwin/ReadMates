@@ -11,6 +11,8 @@ import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -36,12 +38,23 @@ interface NotificationDeliveryPort {
     fun deliveryBacklog(): NotificationDeliveryBacklog
     fun countByStatus(clubId: UUID, channel: NotificationChannel?, status: NotificationDeliveryStatus): Int
     fun hostSummary(clubId: UUID): HostNotificationSummary
-    fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList
+    fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery, pageRequest: PageRequest): HostNotificationItemList =
+        listHostEmailItems(clubId, query)
+    fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
+        error("Host notification item listing is unavailable")
     fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail?
     fun listHostDeliveries(
         clubId: UUID,
         status: NotificationDeliveryStatus?,
         channel: NotificationChannel?,
+        pageRequest: PageRequest,
+    ): CursorPage<HostNotificationDelivery> =
+        CursorPage(listHostDeliveries(clubId, status, channel, pageRequest.limit), null)
+    fun listHostDeliveries(
+        clubId: UUID,
+        status: NotificationDeliveryStatus?,
+        channel: NotificationChannel?,
         limit: Int,
-    ): List<HostNotificationDelivery>
+    ): List<HostNotificationDelivery> =
+        error("Host notification delivery listing is unavailable")
 }

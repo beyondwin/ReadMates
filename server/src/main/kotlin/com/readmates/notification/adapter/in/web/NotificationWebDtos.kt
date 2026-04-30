@@ -20,6 +20,7 @@ import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
+import com.readmates.shared.paging.CursorPage
 import java.util.UUID
 
 private const val MAX_HOST_LAST_ERROR_LENGTH = 200
@@ -47,10 +48,12 @@ data class HostNotificationFailureResponse(
 
 data class HostNotificationItemListResponse(
     val items: List<HostNotificationItemResponse>,
+    val nextCursor: String?,
 )
 
 data class HostNotificationEventListResponse(
     val items: List<HostNotificationEventResponse>,
+    val nextCursor: String?,
 )
 
 data class HostNotificationEventResponse(
@@ -64,6 +67,7 @@ data class HostNotificationEventResponse(
 
 data class HostNotificationDeliveryListResponse(
     val items: List<HostNotificationDeliveryResponse>,
+    val nextCursor: String?,
 )
 
 data class HostNotificationDeliveryResponse(
@@ -133,6 +137,7 @@ data class NotificationPreferencesResponse(
 data class MemberNotificationListResponse(
     val items: List<MemberNotificationResponse>,
     val unreadCount: Int,
+    val nextCursor: String?,
 )
 
 data class MemberNotificationResponse(
@@ -155,6 +160,7 @@ fun MemberNotificationList.toResponse(): MemberNotificationListResponse =
     MemberNotificationListResponse(
         items = items.map { it.toResponse() },
         unreadCount = unreadCount,
+        nextCursor = nextCursor,
     )
 
 fun MemberNotificationItem.toResponse(): MemberNotificationResponse =
@@ -189,11 +195,13 @@ private fun HostNotificationFailure.toResponse(): HostNotificationFailureRespons
 fun HostNotificationItemList.toResponse(): HostNotificationItemListResponse =
     HostNotificationItemListResponse(
         items = items.map { it.toResponse() },
+        nextCursor = nextCursor,
     )
 
 fun HostNotificationEventList.toResponse(): HostNotificationEventListResponse =
     HostNotificationEventListResponse(
         items = items.map { it.toResponse() },
+        nextCursor = nextCursor,
     )
 
 private fun HostNotificationEvent.toResponse(): HostNotificationEventResponse =
@@ -209,6 +217,7 @@ private fun HostNotificationEvent.toResponse(): HostNotificationEventResponse =
 fun HostNotificationDeliveryList.toResponse(): HostNotificationDeliveryListResponse =
     HostNotificationDeliveryListResponse(
         items = items.map { it.toResponse() },
+        nextCursor = nextCursor,
     )
 
 private fun HostNotificationDelivery.toResponse(): HostNotificationDeliveryResponse =
@@ -256,6 +265,14 @@ fun NotificationTestMailAuditItem.toResponse(): NotificationTestMailAuditRespons
         lastError = lastError.toHostSafeLastError(),
         createdAt = createdAt.toString(),
     )
+
+data class CursorPageResponse<T>(
+    val items: List<T>,
+    val nextCursor: String?,
+)
+
+fun <T, R> CursorPage<T>.mapItems(mapper: (T) -> R): CursorPageResponse<R> =
+    CursorPageResponse(items = items.map(mapper), nextCursor = nextCursor)
 
 private fun maskEmail(email: String): String {
     val trimmed = email.trim()

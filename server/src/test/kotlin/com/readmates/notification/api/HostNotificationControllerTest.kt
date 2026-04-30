@@ -146,25 +146,63 @@ class HostNotificationControllerTest(
 
         mockMvc.get("/api/host/notifications/events") {
             with(user("host@example.com"))
+            param("limit", "2")
         }.andExpect {
             status { isOk() }
             jsonPath("$.items.length()") { value(1) }
             jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009501") }
             jsonPath("$.items[0].eventType") { value("NEXT_BOOK_PUBLISHED") }
             jsonPath("$.items[0].status") { value("PUBLISHED") }
+            jsonPath("$.nextCursor") { value(null) }
         }
 
         val response = mockMvc.get("/api/host/notifications/deliveries") {
             with(user("host@example.com"))
+            param("limit", "2")
         }.andExpect {
             status { isOk() }
             jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009601") }
             jsonPath("$.items[0].channel") { value("EMAIL") }
             jsonPath("$.items[0].status") { value("SENT") }
             jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
+            jsonPath("$.nextCursor") { value(null) }
         }.andReturn().response.contentAsString
 
         assertThat(response).doesNotContain("member1@example.com")
+    }
+
+    @Test
+    fun `host notification items return paged contract with masked recipients`() {
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009621",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.PENDING,
+            dedupeKey = "host-notification-controller-test-paged-item-1",
+        )
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009622",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.PENDING,
+            dedupeKey = "host-notification-controller-test-paged-item-2",
+        )
+        insertNotification(
+            id = "00000000-0000-0000-0000-000000009623",
+            clubId = "00000000-0000-0000-0000-000000000001",
+            status = NotificationOutboxStatus.PENDING,
+            dedupeKey = "host-notification-controller-test-paged-item-3",
+        )
+
+        val response = mockMvc.get("/api/host/notifications/items") {
+            with(user("host@example.com"))
+            param("limit", "2")
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.items.length()") { value(2) }
+            jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
+            jsonPath("$.nextCursor") { exists() }
+        }.andReturn().response.contentAsString
+
+        assertThat(response).doesNotContain("member@example.com")
     }
 
     @Test
@@ -245,7 +283,8 @@ class HostNotificationControllerTest(
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[0].status") { value("FAILED") }
+            jsonPath("$.items[0].status") { value("FAILED") }
+            jsonPath("$.nextCursor") { value(null) }
         }.andReturn().response.contentAsString
 
         assertThat(auditResponse).contains("[redacted-email]")
@@ -282,7 +321,8 @@ class HostNotificationControllerTest(
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[0].status") { value("FAILED") }
+            jsonPath("$.items[0].status") { value("FAILED") }
+            jsonPath("$.nextCursor") { value(null) }
         }.andReturn().response.contentAsString
 
         assertThat(response).contains("[redacted-email]")

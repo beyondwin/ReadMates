@@ -1,4 +1,5 @@
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
+import type { PagedResponse } from "@/shared/model/paging";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 
 export type MemberRole = "HOST" | "MEMBER";
@@ -132,6 +133,8 @@ export type HostInvitationListItem = {
   canReissue: boolean;
 };
 
+export type HostInvitationListPage = PagedResponse<HostInvitationListItem>;
+
 export type HostInvitationResponse = HostInvitationListItem & {
   acceptUrl: string | null;
 };
@@ -151,6 +154,8 @@ export type ViewerMember = {
   createdAt: string;
 };
 
+export type ViewerMemberPage = PagedResponse<ViewerMember>;
+
 export type HostMemberListItem = {
   membershipId: string;
   userId: string;
@@ -169,6 +174,8 @@ export type HostMemberListItem = {
   canAddToCurrentSession: boolean;
   canRemoveFromCurrentSession: boolean;
 };
+
+export type HostMemberListPage = PagedResponse<HostMemberListItem>;
 
 export type UpdateHostMemberProfileRequest = {
   displayName: string;
@@ -244,6 +251,7 @@ export type HostNotificationItem = {
 
 export type HostNotificationItemListResponse = {
   items: HostNotificationItem[];
+  nextCursor: string | null;
 };
 
 export type HostNotificationEventItem = {
@@ -257,6 +265,7 @@ export type HostNotificationEventItem = {
 
 export type HostNotificationEventListResponse = {
   items: HostNotificationEventItem[];
+  nextCursor: string | null;
 };
 
 export type HostNotificationDeliveryItem = {
@@ -271,6 +280,7 @@ export type HostNotificationDeliveryItem = {
 
 export type HostNotificationDeliveryListResponse = {
   items: HostNotificationDeliveryItem[];
+  nextCursor: string | null;
 };
 
 export type HostNotificationMetadata = {
@@ -304,6 +314,8 @@ export type NotificationTestMailAuditItem = {
   createdAt: string;
 };
 
+export type NotificationTestMailAuditPage = PagedResponse<NotificationTestMailAuditItem>;
+
 export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
 
 export type HostSessionListItem = {
@@ -320,6 +332,8 @@ export type HostSessionListItem = {
   state: SessionState;
   visibility: SessionRecordVisibility;
 };
+
+export type HostSessionListPage = PagedResponse<HostSessionListItem>;
 
 export type HostSessionVisibilityRequest = {
   visibility: SessionRecordVisibility;

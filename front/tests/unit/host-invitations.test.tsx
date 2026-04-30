@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import HostInvitations, { type HostInvitationsActions } from "@/features/host/components/host-invitations";
@@ -96,6 +96,32 @@ describe("HostInvitations", () => {
     expect(screen.getByRole("button", { name: "pending@example.com 새 링크 발급" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "pending@example.com 새 링크 발급" })).toHaveTextContent(/^새 링크 발급$/);
     expect(screen.queryByRole("button", { name: "accepted@example.com 새 링크 발급" })).not.toBeInTheDocument();
+  });
+
+  it("loads the next invitation page and appends it", async () => {
+    const nextInvitation = {
+      ...invitations[1],
+      invitationId: "invite-3",
+      email: "next@example.com",
+      name: "다음 멤버",
+    } satisfies HostInvitationListItem;
+    const actions = {
+      ...hostInvitationsTestActions,
+      listInvitations: vi.fn(async () => new Response(JSON.stringify({ items: [nextInvitation], nextCursor: null }))),
+    } satisfies HostInvitationsActions;
+
+    render(
+      <HostInvitationsForTest
+        initialInvitations={{ items: [invitations[0]], nextCursor: "cursor-1" }}
+        actions={actions}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+
+    expect(actions.listInvitations).toHaveBeenCalledWith({ limit: 50, cursor: "cursor-1" });
+    expect(await screen.findByText("다음 멤버")).toBeInTheDocument();
+    expect(screen.getByText("대기 멤버")).toBeInTheDocument();
   });
 
   it("creates an invitation and copies the returned link", async () => {
