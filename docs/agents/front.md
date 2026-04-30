@@ -4,6 +4,8 @@ Read this for work under `front/`.
 
 The frontend is a Vite React SPA with React Router 7 and Cloudflare Pages Functions for BFF/OAuth proxy routes.
 
+Successful frontend changes keep route modules in charge of data flow, keep UI components prop/callback driven, and avoid leaking server-only configuration into the browser bundle.
+
 Physical source roots under `front/`:
 
 ```text
@@ -35,6 +37,14 @@ Do not add new imports from removed `shared/api/readmates`. Use feature-owned AP
 
 When touching a migrated feature, prefer `api`, `model`, `route`, `ui` placement over adding to legacy `components`.
 
+Read another guide when the frontend task crosses surfaces:
+
+- UI, layout, copy, or visual polish: `docs/agents/design.md`.
+- Backend API contract, authorization, persistence, or migration changes: `docs/agents/server.md`.
+- README, deploy docs, scripts docs, or agent instructions: `docs/agents/docs.md`.
+
+Ask before editing if the route, API contract, or auth boundary cannot be inferred from current code and docs. Stop and report if a proposed change would require browser-exposed secrets or real member/deployment data.
+
 Checks:
 
 ```bash
@@ -48,3 +58,5 @@ For route/auth/BFF/user-flow changes, also run:
 ```bash
 pnpm --dir front test:e2e
 ```
+
+Done when the touched route or component follows the dependency direction, relevant unit/build/E2E checks are run or explicitly reported as skipped, and any user-visible flow changed by the patch has been exercised by test or manual inspection.
