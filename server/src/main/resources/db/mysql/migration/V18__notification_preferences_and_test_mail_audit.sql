@@ -11,7 +11,7 @@ create table notification_preferences (
   primary key (membership_id, club_id),
   constraint notification_preferences_membership_fk
     foreign key (membership_id, club_id) references memberships(id, club_id)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
 create table notification_test_mail_audit (
   id char(36) not null,
@@ -33,4 +33,4 @@ create table notification_test_mail_audit (
   constraint notification_test_mail_audit_status_check check (status in ('SENT', 'FAILED')),
   constraint notification_test_mail_audit_mask_check check (length(trim(recipient_masked_email)) > 0),
   constraint notification_test_mail_audit_hash_check check (regexp_like(recipient_email_hash, '^[0-9a-f]{64}$', 'c'))
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;

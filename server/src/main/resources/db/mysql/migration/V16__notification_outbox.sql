@@ -32,4 +32,4 @@ create table notification_outbox (
   constraint notification_outbox_body_check check (length(trim(body_text)) > 0),
   constraint notification_outbox_deep_link_path_check check (deep_link_path like '/%'),
   constraint notification_outbox_dedupe_key_check check (length(trim(dedupe_key)) > 0)
-);
+) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
