@@ -4,11 +4,16 @@ import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
 import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
 import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface FeedbackDocumentStorePort {
-    fun listLatestReadableDocuments(currentMember: CurrentMember): List<StoredFeedbackDocumentListResult>
+    fun listLatestReadableDocuments(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<StoredFeedbackDocumentListResult>
 
     fun findReadableSession(
         clubId: UUID,

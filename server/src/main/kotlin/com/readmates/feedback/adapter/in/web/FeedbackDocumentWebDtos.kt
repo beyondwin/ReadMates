@@ -1,5 +1,10 @@
 package com.readmates.feedback.adapter.`in`.web
 
+data class FeedbackDocumentListPage(
+    val items: List<FeedbackDocumentListItem>,
+    val nextCursor: String?,
+)
+
 data class FeedbackDocumentListItem(
     val sessionId: String,
     val sessionNumber: Int,

@@ -13,6 +13,10 @@ import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
 import com.readmates.archive.application.model.MyPageResult
 import com.readmates.archive.application.model.MyRecentAttendanceResult
+import com.readmates.shared.paging.CursorPage
+
+fun <T, R> CursorPage<T>.mapItems(mapper: (T) -> R): CursorPageResponse<R> =
+    CursorPageResponse(items = items.map(mapper), nextCursor = nextCursor)
 
 fun ArchiveSessionResult.toWebDto() =
     ArchiveSessionItem(

@@ -16,25 +16,34 @@ import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.archive.application.port.out.LoadArchiveDataPort
 import com.readmates.archive.application.shortNameFor
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
 class JdbcArchiveQueryAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : LoadArchiveDataPort {
-    override fun loadArchiveSessions(currentMember: CurrentMember): List<ArchiveSessionResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
+    override fun loadArchiveSessions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<ArchiveSessionResult> {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return CursorPage(emptyList(), null)
+        val cursor = ArchiveSessionCursor.from(pageRequest.cursor)
 
-        return jdbcTemplate.query(
+        val rows = jdbcTemplate.query(
             """
             select
               sessions.id,
@@ -80,6 +89,11 @@ class JdbcArchiveQueryAdapter(
             where sessions.club_id = ?
               and sessions.state in ('CLOSED', 'PUBLISHED')
               and sessions.visibility in ('MEMBER', 'PUBLIC')
+              and (
+                ? is null
+                or sessions.number < ?
+                or (sessions.number = ? and sessions.id < ?)
+              )
             group by
               sessions.id,
               sessions.number,
@@ -92,13 +106,20 @@ class JdbcArchiveQueryAdapter(
               current_participant.attendance_status,
               public_session_publications.visibility,
               latest_feedback_document.created_at
-            order by sessions.number desc
+            order by sessions.number desc, sessions.id desc
+            limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toArchiveSessionItem(currentMember) },
             currentMember.membershipId.dbString(),
             currentMember.clubId.dbString(),
             currentMember.clubId.dbString(),
+            cursor?.number,
+            cursor?.number,
+            cursor?.number,
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit, ::archiveSessionCursor)
     }
 
     override fun loadArchiveSessionDetail(
@@ -195,10 +216,14 @@ class JdbcArchiveQueryAdapter(
         ).firstOrNull()
     }
 
-    override fun loadMyQuestions(currentMember: CurrentMember): List<MyArchiveQuestionResult> =
-        jdbcTemplateProvider.ifAvailable?.query(
+    override fun loadMyQuestions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<MyArchiveQuestionResult> {
+        val cursor = MyQuestionCursor.from(pageRequest.cursor)
+        val rows = jdbcTemplateProvider.ifAvailable?.query(
             """
-            select sessions.id, sessions.number, sessions.book_title, sessions.session_date,
+            select questions.id as question_id, sessions.id, sessions.number, sessions.book_title, sessions.session_date,
                    questions.priority, questions.text, questions.draft_thought
             from questions
             join sessions on sessions.id = questions.session_id
@@ -206,10 +231,18 @@ class JdbcArchiveQueryAdapter(
             where questions.club_id = ?
               and questions.membership_id = ?
               and sessions.state = 'PUBLISHED'
-            order by sessions.number desc, questions.priority
+              and (
+                ? is null
+                or sessions.number < ?
+                or (sessions.number = ? and questions.priority > ?)
+                or (sessions.number = ? and questions.priority = ? and questions.id < ?)
+              )
+            order by sessions.number desc, questions.priority asc, questions.id desc
+            limit ?
             """.trimIndent(),
             { resultSet, _ ->
                 MyArchiveQuestionResult(
+                    questionId = resultSet.uuid("question_id").toString(),
                     sessionId = resultSet.uuid("id").toString(),
                     sessionNumber = resultSet.getInt("number"),
                     bookTitle = resultSet.getString("book_title"),
@@ -221,12 +254,28 @@ class JdbcArchiveQueryAdapter(
             },
             currentMember.clubId.dbString(),
             currentMember.membershipId.dbString(),
+            cursor?.sessionNumber,
+            cursor?.sessionNumber,
+            cursor?.sessionNumber,
+            cursor?.priority,
+            cursor?.sessionNumber,
+            cursor?.priority,
+            cursor?.id,
+            pageRequest.limit + 1,
         ) ?: emptyList()
+        return pageFromRows(rows, pageRequest.limit, ::myQuestionCursor)
+    }
 
-    override fun loadMyReviews(currentMember: CurrentMember): List<MyArchiveReviewResult> =
-        jdbcTemplateProvider.ifAvailable?.query(
+    override fun loadMyReviews(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<MyArchiveReviewResult> {
+        val cursor = MyReviewCursor.from(pageRequest.cursor)
+        val rows = jdbcTemplateProvider.ifAvailable?.query(
             """
             select
+              long_reviews.id as review_id,
+              long_reviews.created_at as review_created_at,
               sessions.id as session_id,
               sessions.number as session_number,
               sessions.book_title as book_title,
@@ -239,10 +288,19 @@ class JdbcArchiveQueryAdapter(
             where long_reviews.club_id = ?
               and long_reviews.membership_id = ?
               and sessions.state = 'PUBLISHED'
-            order by sessions.number desc, long_reviews.created_at desc
+              and (
+                ? is null
+                or sessions.number < ?
+                or (sessions.number = ? and long_reviews.created_at < ?)
+                or (sessions.number = ? and long_reviews.created_at = ? and long_reviews.id < ?)
+              )
+            order by sessions.number desc, long_reviews.created_at desc, long_reviews.id desc
+            limit ?
             """.trimIndent(),
             { resultSet, _ ->
                 MyArchiveReviewResult(
+                    reviewId = resultSet.uuid("review_id").toString(),
+                    createdAt = resultSet.utcOffsetDateTime("review_created_at").toString(),
                     sessionId = resultSet.uuid("session_id").toString(),
                     sessionNumber = resultSet.getInt("session_number"),
                     bookTitle = resultSet.getString("book_title"),
@@ -253,7 +311,17 @@ class JdbcArchiveQueryAdapter(
             },
             currentMember.clubId.dbString(),
             currentMember.membershipId.dbString(),
+            cursor?.sessionNumber,
+            cursor?.sessionNumber,
+            cursor?.sessionNumber,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sessionNumber,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.id,
+            pageRequest.limit + 1,
         ) ?: emptyList()
+        return pageFromRows(rows, pageRequest.limit, ::myReviewCursor)
+    }
 
     override fun loadMyPage(currentMember: CurrentMember): MyPageResult {
         val jdbcTemplate = jdbcTemplateProvider.ifAvailable
@@ -697,6 +765,84 @@ class JdbcArchiveQueryAdapter(
                 uploadedAt = feedbackDocumentUploadedAt,
             ),
         )
+    }
+
+    private fun archiveSessionCursor(item: ArchiveSessionResult): String? =
+        CursorCodec.encode(
+            mapOf(
+                "number" to item.sessionNumber.toString(),
+                "id" to item.sessionId,
+            ),
+        )
+
+    private fun myQuestionCursor(item: MyArchiveQuestionResult): String? =
+        CursorCodec.encode(
+            mapOf(
+                "sessionNumber" to item.sessionNumber.toString(),
+                "priority" to item.priority.toString(),
+                "id" to item.questionId,
+            ),
+        )
+
+    private fun myReviewCursor(item: MyArchiveReviewResult): String? =
+        CursorCodec.encode(
+            mapOf(
+                "sessionNumber" to item.sessionNumber.toString(),
+                "createdAt" to item.createdAt,
+                "id" to item.reviewId,
+            ),
+        )
+
+    private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+        val visibleRows = rows.take(limit)
+        return CursorPage(
+            items = visibleRows,
+            nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+        )
+    }
+
+    private data class ArchiveSessionCursor(
+        val number: Int,
+        val id: String,
+    ) {
+        companion object {
+            fun from(cursor: Map<String, String>): ArchiveSessionCursor? {
+                val number = cursor["number"]?.toIntOrNull() ?: return null
+                val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+                return ArchiveSessionCursor(number, id)
+            }
+        }
+    }
+
+    private data class MyQuestionCursor(
+        val sessionNumber: Int,
+        val priority: Int,
+        val id: String,
+    ) {
+        companion object {
+            fun from(cursor: Map<String, String>): MyQuestionCursor? {
+                val sessionNumber = cursor["sessionNumber"]?.toIntOrNull() ?: return null
+                val priority = cursor["priority"]?.toIntOrNull() ?: return null
+                val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+                return MyQuestionCursor(sessionNumber, priority, id)
+            }
+        }
+    }
+
+    private data class MyReviewCursor(
+        val sessionNumber: Int,
+        val createdAt: OffsetDateTime,
+        val id: String,
+    ) {
+        companion object {
+            fun from(cursor: Map<String, String>): MyReviewCursor? {
+                val sessionNumber = cursor["sessionNumber"]?.toIntOrNull() ?: return null
+                val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
+                val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+                return MyReviewCursor(sessionNumber, createdAt, id)
+            }
+        }
     }
 
 }

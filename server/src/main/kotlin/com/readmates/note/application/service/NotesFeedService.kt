@@ -5,6 +5,8 @@ import com.readmates.note.application.port.`in`.GetNotesFeedUseCase
 import com.readmates.note.application.port.`in`.ListNoteSessionsUseCase
 import com.readmates.note.application.port.out.LoadNotesFeedPort
 import com.readmates.note.application.port.out.NotesReadCachePort
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import java.util.UUID
@@ -15,27 +17,22 @@ class NotesFeedService(
     private val cache: NotesReadCachePort = NotesReadCachePort.Noop(),
 ) : GetNotesFeedUseCase,
     ListNoteSessionsUseCase {
-    override fun getNotesFeed(member: CurrentMember, sessionId: String?): List<NoteFeedResult> {
+    override fun getNotesFeed(
+        member: CurrentMember,
+        sessionId: String?,
+        pageRequest: PageRequest,
+    ): CursorPage<NoteFeedResult> {
         if (sessionId != null) {
-            val parsedSessionId = parseSessionIdOrNull(sessionId) ?: return emptyList()
-            return cache.getSessionFeed(member.clubId, parsedSessionId)
-                ?: loadNotesFeedPort.loadNotesFeedForSession(member.clubId, parsedSessionId).also {
-                    cache.putSessionFeed(member.clubId, parsedSessionId, it)
-                }
+            val parsedSessionId = parseSessionIdOrNull(sessionId) ?: return CursorPage(emptyList(), null)
+            return loadNotesFeedPort.loadNotesFeedForSession(member.clubId, parsedSessionId, pageRequest)
         }
-
-        return cache.getFeed(member.clubId)
-            ?: loadNotesFeedPort.loadNotesFeed(member.clubId).also {
-                cache.putFeed(member.clubId, it)
-            }
+        return loadNotesFeedPort.loadNotesFeed(member.clubId, pageRequest)
     }
 
-    override fun listNoteSessions(member: CurrentMember) =
-        cache.getSessions(member.clubId)
-            ?: loadNotesFeedPort.loadNoteSessions(member.clubId).also {
-                cache.putSessions(member.clubId, it)
-            }
+    override fun listNoteSessions(member: CurrentMember, pageRequest: PageRequest) =
+        loadNotesFeedPort.loadNoteSessions(member.clubId, pageRequest)
 
     private fun parseSessionIdOrNull(sessionId: String): UUID? =
         runCatching { UUID.fromString(sessionId) }.getOrNull()
+
 }

@@ -123,9 +123,9 @@ class FeedbackDocumentControllerTest(
             with(user("member5@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[?(@.sessionNumber == 1)].sessionNumber") { value(hasItem(1)) }
-            jsonPath("$[?(@.sessionNumber == 1)].bookTitle") { value(hasItem("팩트풀니스")) }
-            jsonPath("$[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
+            jsonPath("$.items[?(@.sessionNumber == 1)].sessionNumber") { value(hasItem(1)) }
+            jsonPath("$.items[?(@.sessionNumber == 1)].bookTitle") { value(hasItem("팩트풀니스")) }
+            jsonPath("$.items[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
         }
     }
 
@@ -135,7 +135,7 @@ class FeedbackDocumentControllerTest(
             with(user("member2@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
         }
     }
 
@@ -157,14 +157,14 @@ class FeedbackDocumentControllerTest(
             with(user("member5@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
         }
 
         mockMvc.get("/api/feedback-documents/me") {
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
         }
 
         mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
@@ -198,7 +198,7 @@ class FeedbackDocumentControllerTest(
             with(user("member5@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
+            jsonPath("$.items[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
         }
 
         mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
@@ -228,7 +228,7 @@ class FeedbackDocumentControllerTest(
             with(user("member5@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(1))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
         }
 
         mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
@@ -355,7 +355,7 @@ class FeedbackDocumentControllerTest(
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[?(@.sessionNumber == 6)].title") { value(hasItem("독서모임 6차 피드백")) }
+            jsonPath("$.items[?(@.sessionNumber == 6)].title") { value(hasItem("독서모임 6차 피드백")) }
         }
 
         assertThat(
@@ -435,7 +435,7 @@ class FeedbackDocumentControllerTest(
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[?(@.sessionNumber == 6)].fileName") { value(hasItem("feedback-6-test.md")) }
+            jsonPath("$.items[?(@.sessionNumber == 6)].fileName") { value(hasItem("feedback-6-test.md")) }
         }
 
         mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
@@ -637,7 +637,7 @@ class FeedbackDocumentControllerTest(
             with(user("host@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[?(@.sessionNumber == 6)].title") { value(hasItem("문서 형식 확인 필요")) }
+            jsonPath("$.items[?(@.sessionNumber == 6)].title") { value(hasItem("문서 형식 확인 필요")) }
         }
     }
 
@@ -649,7 +649,7 @@ class FeedbackDocumentControllerTest(
             with(user("member5@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(6))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(6))) }
         }
     }
 

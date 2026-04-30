@@ -4,11 +4,13 @@ import com.readmates.archive.application.port.`in`.GetArchiveSessionDetailUseCas
 import com.readmates.archive.application.port.`in`.ListArchiveSessionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveQuestionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveReviewsUseCase
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
@@ -22,9 +24,14 @@ class ArchiveController(
     private val listMyArchiveReviewsUseCase: ListMyArchiveReviewsUseCase,
 ) {
     @GetMapping("/sessions")
-    fun sessions(currentMember: CurrentMember): List<ArchiveSessionItem> =
-        listArchiveSessionsUseCase.listArchiveSessions(currentMember)
-            .map { it.toWebDto() }
+    fun sessions(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): CursorPageResponse<ArchiveSessionItem> =
+        listArchiveSessionsUseCase
+            .listArchiveSessions(currentMember, PageRequest.cursor(limit, cursor, defaultLimit = 30, maxLimit = 100))
+            .mapItems { it.toWebDto() }
 
     @GetMapping("/sessions/{sessionId}")
     fun sessionDetail(
@@ -36,14 +43,24 @@ class ArchiveController(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
     @GetMapping("/me/questions")
-    fun myQuestions(currentMember: CurrentMember): List<MyArchiveQuestionItem> =
-        listMyArchiveQuestionsUseCase.listMyQuestions(currentMember)
-            .map { it.toWebDto() }
+    fun myQuestions(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): CursorPageResponse<MyArchiveQuestionItem> =
+        listMyArchiveQuestionsUseCase
+            .listMyQuestions(currentMember, PageRequest.cursor(limit, cursor, defaultLimit = 30, maxLimit = 100))
+            .mapItems { it.toWebDto() }
 
     @GetMapping("/me/reviews")
-    fun myReviews(currentMember: CurrentMember): List<MyArchiveReviewItem> =
-        listMyArchiveReviewsUseCase.listMyReviews(currentMember)
-            .map { it.toWebDto() }
+    fun myReviews(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): CursorPageResponse<MyArchiveReviewItem> =
+        listMyArchiveReviewsUseCase
+            .listMyReviews(currentMember, PageRequest.cursor(limit, cursor, defaultLimit = 30, maxLimit = 100))
+            .mapItems { it.toWebDto() }
 
     private fun parseSessionId(sessionId: String): UUID =
         runCatching { UUID.fromString(sessionId) }

@@ -6,6 +6,7 @@ import com.readmates.archive.application.port.`in`.ListArchiveSessionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveQuestionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveReviewsUseCase
 import com.readmates.archive.application.port.out.LoadArchiveDataPort
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -20,8 +21,8 @@ class ArchiveQueryService(
     ListMyArchiveQuestionsUseCase,
     ListMyArchiveReviewsUseCase,
     GetMyPageSummaryUseCase {
-    override fun listArchiveSessions(currentMember: CurrentMember) =
-        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadArchiveSessions(currentMember) }
+    override fun listArchiveSessions(currentMember: CurrentMember, pageRequest: PageRequest) =
+        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadArchiveSessions(currentMember, pageRequest) }
 
     override fun getArchiveSessionDetail(
         currentMember: CurrentMember,
@@ -30,11 +31,11 @@ class ArchiveQueryService(
         loadArchiveDataPort.loadArchiveSessionDetail(currentMember, sessionId)
     }
 
-    override fun listMyQuestions(currentMember: CurrentMember) =
-        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyQuestions(currentMember) }
+    override fun listMyQuestions(currentMember: CurrentMember, pageRequest: PageRequest) =
+        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyQuestions(currentMember, pageRequest) }
 
-    override fun listMyReviews(currentMember: CurrentMember) =
-        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyReviews(currentMember) }
+    override fun listMyReviews(currentMember: CurrentMember, pageRequest: PageRequest) =
+        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyReviews(currentMember, pageRequest) }
 
     override fun getMyPageSummary(currentMember: CurrentMember) =
         loadArchiveDataPort.loadMyPage(currentMember)

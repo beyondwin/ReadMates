@@ -128,9 +128,9 @@ class ArchiveControllerDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.sessionNumber == 998)].published") { value(hasItem(false)) }
-                jsonPath("$[?(@.sessionNumber == 997)].published") { value(hasItem(false)) }
-                jsonPath("$[?(@.sessionNumber == 996)].published") { value(hasItem(true)) }
+                jsonPath("$.items[?(@.sessionNumber == 998)].published") { value(hasItem(false)) }
+                jsonPath("$.items[?(@.sessionNumber == 997)].published") { value(hasItem(false)) }
+                jsonPath("$.items[?(@.sessionNumber == 996)].published") { value(hasItem(true)) }
             }
 
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000998") {
@@ -181,11 +181,11 @@ class ArchiveControllerDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.title") { value(hasItem("독서모임 6차 피드백")) }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.uploadedAt") { exists() }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.title") { value(hasItem("독서모임 6차 피드백")) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.uploadedAt") { exists() }
             }
     }
 
@@ -198,8 +198,8 @@ class ArchiveControllerDbTest(
             with(user("member1@example.com"))
         }.andExpect {
             status { isOk() }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(88))) }
-            jsonPath("$[*].sessionNumber") { value(not(hasItem(89))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(88))) }
+            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(89))) }
         }
 
         mockMvc.get("/api/archive/sessions/$hostOnlySessionId") {
@@ -292,9 +292,9 @@ class ArchiveControllerDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
-                jsonPath("$[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
             }
     }
 
@@ -364,7 +364,7 @@ class ArchiveControllerDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[*].sessionNumber") { value(not(hasItem(906))) }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(906))) }
             }
 
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000906") {
@@ -394,9 +394,9 @@ class ArchiveControllerDbTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
-                jsonPath("$[0].attendance") { value(2) }
-                jsonPath("$[0].total") { value(5) }
+                jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
+                jsonPath("$.items[0].attendance") { value(2) }
+                jsonPath("$.items[0].total") { value(5) }
             }
 
         mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
