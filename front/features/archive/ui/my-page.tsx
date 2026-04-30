@@ -75,8 +75,8 @@ function LoadMoreButton({
 type MyPageProps = {
   data: MyPageProfile;
   reports: PagedResponse<FeedbackDocumentListItem>;
-  reviewCount: number;
-  questionCount: number;
+  reviewCount: string;
+  questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile?: boolean;
@@ -188,8 +188,8 @@ function MyDesktop({
 }: {
   data: MyPageProfile;
   reports: PagedResponse<FeedbackDocumentListItem>;
-  reviewCount: number;
-  questionCount: number;
+  reviewCount: string;
+  questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile: boolean;
@@ -253,8 +253,8 @@ function MyMobile({
 }: {
   data: MyPageProfile;
   reports: PagedResponse<FeedbackDocumentListItem>;
-  reviewCount: number;
-  questionCount: number;
+  reviewCount: string;
+  questionCount: string;
   LogoutButtonComponent: LogoutControlComponent;
   onLeaveMembership: () => Promise<void>;
   canEditProfile: boolean;
@@ -641,8 +641,8 @@ function RhythmSection({
   questionCount,
 }: {
   data: MyPageProfile;
-  reviewCount: number;
-  questionCount: number;
+  reviewCount: string;
+  questionCount: string;
 }) {
   const summary = attendanceSummary(data);
   const recentAttendances = data.recentAttendances ?? [];
@@ -799,7 +799,7 @@ function FeedbackReports({
   );
 }
 
-function WritingSection({ reviewCount, questionCount }: { reviewCount: number; questionCount: number }) {
+function WritingSection({ reviewCount, questionCount }: { reviewCount: string; questionCount: string }) {
   return (
     <section>
       <SectionHeader eyebrow="내 글" title="내가 남긴 문장" />
@@ -813,7 +813,7 @@ function WritingSection({ reviewCount, questionCount }: { reviewCount: number; q
   );
 }
 
-function WritingCountCard({ label, value, body, href }: { label: string; value: number; body: string; href: string }) {
+function WritingCountCard({ label, value, body, href }: { label: string; value: string; body: string; href: string }) {
   return (
     <Link to={href} style={{ display: "block", padding: "18px 20px", background: "var(--bg-sub)", borderRadius: "var(--r-2)" }}>
       <div className="tiny mono" style={{ color: "var(--text-3)" }}>

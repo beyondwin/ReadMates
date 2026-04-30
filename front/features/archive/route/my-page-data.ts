@@ -23,8 +23,8 @@ export type MyPageRouteData = {
   reports: FeedbackDocumentListPage;
   questions: MyArchiveQuestionPage;
   reviews: MyArchiveReviewPage;
-  questionCount: number;
-  reviewCount: number;
+  questionCount: string;
+  reviewCount: string;
   notificationPreferences: NotificationPreferencesResponse;
   canManageNotificationPreferences: boolean;
 };
@@ -54,6 +54,10 @@ function canManageNotificationPreferences(auth: AuthMeResponse) {
   return auth.membershipStatus !== "VIEWER";
 }
 
+function countLabel<T>(page: { items: T[]; nextCursor: string | null }) {
+  return `${page.items.length}${page.nextCursor ? "+" : ""}`;
+}
+
 export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRouteData> {
   const access = await loadArchiveMemberAuth(args);
   const context = { clubSlug: clubSlugFromLoaderArgs(args) };
@@ -65,8 +69,8 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
       reports: emptyPage(),
       questions: emptyPage(),
       reviews: emptyPage(),
-      questionCount: 0,
-      reviewCount: 0,
+      questionCount: "0",
+      reviewCount: "0",
       notificationPreferences: defaultNotificationPreferences,
       canManageNotificationPreferences: false,
     };
@@ -85,8 +89,8 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
     reports,
     questions,
     reviews,
-    questionCount: questions.items.length,
-    reviewCount: reviews.items.length,
+    questionCount: countLabel(questions),
+    reviewCount: countLabel(reviews),
     notificationPreferences,
     canManageNotificationPreferences: notificationPreferencesAvailable,
   };
