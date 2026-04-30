@@ -16,7 +16,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 
 프런트엔드는 React Router route를 중심으로 `front/src/app -> front/src/pages -> front/features -> front/shared` 방향을 목표 경계로 유지합니다. `front/tsconfig.json`과 Vite 설정에서 `@/*` alias는 `front/*`를 가리키므로, feature와 shared source는 `front/src` 안이 아니라 `front/features`, `front/shared` 아래에 있습니다. `src/app`은 router, layout, guard, provider wiring을 담당하고, `src/pages`는 route compatibility shell로서 feature route module을 re-export하거나 얇게 위임합니다.
 
-현재 `shared/ui`에는 명시적인 legacy 예외가 남아 있습니다. `mobile-header`는 `src/app/router-link`와 `src/app/route-continuity`를 import하고, `mobile-tab-bar`, `public-auth-action`, `public-footer`, `top-nav`는 `src/app/router-link`를 import합니다. 이 예외는 router-link와 route-continuity primitive를 `src/app` 밖으로 이동하거나 app/page composition에서 주입하도록 바꾼 뒤에만 boundary test 예외에서 제거합니다.
+`shared/ui`는 재사용 가능한 presentation primitive만 소유하며 `src/app`, `src/pages`, `features`를 import하지 않습니다. Router, route continuity, provider context처럼 app이 소유한 의존성은 app/page/feature route composition에서 주입하거나 shared boundary 밖의 primitive로 옮긴 뒤 사용합니다.
 
 Feature는 가능한 범위에서 `api`, `model`, `route`, `ui`로 나눕니다.
 
@@ -25,7 +25,7 @@ Feature는 가능한 범위에서 `api`, `model`, `route`, `ui`로 나눕니다.
 - `features/<name>/route`는 loader/action, route error/loading state, API/model 호출, UI props 조립을 담당합니다.
 - `features/<name>/ui`는 props와 callback으로만 렌더링하며 `fetch`, `shared/api`, feature API, route module을 직접 import하지 않습니다.
 
-`shared/api/readmates` compatibility module은 제거되었고, feature route/page는 feature-owned API contract 또는 `shared/api` primitive를 사용해야 합니다. `features/*/components`는 `ui`로 이동하지 않은 legacy presentation surface에만 남길 수 있습니다. `ui` directory가 있는 feature에서는 외부 source가 `features/<name>/components`를 public surface처럼 import하지 않습니다.
+`shared/api/readmates` compatibility module은 제거되었고, feature route/page는 feature-owned API contract 또는 `shared/api` primitive를 사용해야 합니다. `features/*/components`는 `ui`로 이동하지 않은 legacy presentation surface에만 남길 수 있습니다. `ui` directory가 있는 feature에서는 외부 source가 `features/<name>/components`를 public surface처럼 import하지 않습니다. Host feature는 `features/host/ui`가 공개 presentation surface이며, host components legacy public surface는 없습니다.
 
 이 경계는 `front/tests/unit/frontend-boundaries.test.ts`에서 일부 강제합니다. 테스트는 shared-to-app/page/feature import, feature 간 직접 import, feature `model/route/ui` layer import, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import를 확인합니다.
 
@@ -56,7 +56,7 @@ Spring Boot API
 MySQL
 ```
 
-Production에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 직접 Spring API origin을 신뢰하지 않고, 같은 origin의 `/api/bff/**`로 요청합니다. Pages Functions는 upstream Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙이고 cookie를 전달합니다. 또한 path fallback의 `clubSlug` query와 요청 host에서 클럽 context를 계산해 Spring으로 신뢰 가능한 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host` header를 전달합니다.
+Production에서 browser-facing origin은 Cloudflare Pages입니다. 브라우저는 직접 Spring API origin을 신뢰하지 않고, 같은 origin의 `/api/bff/**`로 요청합니다. Pages Functions는 upstream Spring `/api/**`로 전달하면서 `X-Readmates-Bff-Secret`을 붙이고 cookie를 전달합니다. 또한 path fallback의 `clubSlug` query와 요청 host에서 클럽 context를 계산해 Spring으로 신뢰 가능한 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host` header를 전달합니다. Cloudflare Functions의 `front/functions/_shared/proxy.ts`는 upstream response header 복사, 내부 `x-readmates-*` response header 제거, host 정규화, client IP 계산, OAuth forwarded header 생성처럼 재사용되는 trusted header forwarding policy를 소유합니다. BFF route별 API path와 `clubSlug` 검증은 각 route가 맡되, browser가 보낸 내부 header를 신뢰값으로 전달하지 않는 정책은 shared helper와 route tests가 함께 지킵니다.
 
 로컬 Vite dev server는 `front/vite.config.ts`의 proxy로 같은 구조를 흉내 냅니다. Cloudflare Pages Functions 코드는 production/preview 배포에서 실행되고, 로컬 개발에서는 Vite proxy가 `/api/bff/**`, `/oauth2/authorization/**`, `/login/oauth2/code/**`를 backend로 넘깁니다. 로컬 proxy도 browser-supplied club context header를 제거하고 `clubSlug` query에서 검증한 slug만 trusted header로 다시 붙입니다.
 
@@ -113,7 +113,9 @@ notification
 
 새 기능이나 전환된 slice에서는 기존 repository를 controller에 다시 주입하지 않고, 필요한 경우 inbound port, application service, outbound port와 adapter를 먼저 둡니다.
 
-아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다. 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth`/`notification` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
+Application package는 Spring Web/HTTP type, HTTP client, adapter 구현체에 의존하지 않습니다. Application service는 feature application error를 던지고, HTTP status와 response mapping은 `adapter.in.web`의 controller 또는 error handler가 맡습니다. 외부 HTTP가 필요한 기능은 application outbound port를 정의하고 `adapter.out.http` 구현으로 분리합니다.
+
+아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다. 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth`/`notification`/`club` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
 
 ## 인증과 세션
 
@@ -208,6 +210,14 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 호스트 알림 운영 페이지는 `/app/host/notifications`입니다. 이 페이지는 현재 host club의 event outbox row와 channel delivery row 목록, 이메일 pending/failed 처리, 개별 retry, `DEAD` delivery 복구, 고정 템플릿 테스트 메일, 최근 테스트 메일 audit을 다룹니다. 호스트 API 응답은 recipient email을 masked 값으로만 반환하고, detail metadata는 `sessionNumber`, `bookTitle`처럼 allowlist된 제품 metadata만 노출합니다.
 
 테스트 메일은 SMTP 호출 전 audit row를 먼저 예약해 host membership 단위 60초 cooldown을 직렬화합니다. 실패한 테스트 메일은 같은 audit row를 `FAILED`로 갱신하고, 저장/응답되는 error는 email, secret, token, credential 형태를 redaction한 뒤 길이를 제한합니다.
+
+## 페이지된 목록 API contract
+
+범위가 있는 목록 endpoint는 cursor 기반 page object를 반환합니다. 응답 형태는 항상 `{ "items": [...], "nextCursor": string | null }`이고, 다음 page가 없으면 `nextCursor`는 `null`입니다. Request query는 endpoint별 기본값과 최대값을 둔 `limit`, `cursor`를 사용합니다.
+
+이 contract를 따르는 목록은 archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/test-mail/audit`입니다.
+
+위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 page object를 사용합니다.
 
 ## 멤버 프로필과 표시 이름
 
