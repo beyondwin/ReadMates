@@ -154,7 +154,7 @@ The spec covers several related subsystems. Execute this plan in order and stop 
 
 **Files:** none.
 
-- [ ] **Step 1: Confirm worktree state**
+- [x] **Step 1: Confirm worktree state**
 
 Run:
 
@@ -164,7 +164,7 @@ git status --short --branch
 
 Expected: Git prints the current branch. If tracked files are modified, inspect them and do not revert unrelated work.
 
-- [ ] **Step 2: Run current targeted architecture baselines**
+- [x] **Step 2: Run current targeted architecture baselines**
 
 Run:
 
@@ -175,7 +175,7 @@ pnpm --dir front test -- --run tests/unit/frontend-boundaries.test.ts tests/unit
 
 Expected: all selected tests pass.
 
-- [ ] **Step 3: Run current full smoke baselines if time allows**
+- [x] **Step 3: Run current full smoke baselines if time allows**
 
 Run:
 
@@ -187,6 +187,9 @@ pnpm --dir front build
 ```
 
 Expected: all pass. If a baseline fails before edits, record the failing command and stop for triage.
+
+COMPACT CHECKPOINT Task 0 - Baseline And Branch State:
+Acceptance criteria completed: worktree branch/status confirmed on `codex/readmates-architecture-refactor`; server architecture boundary baseline passed; frontend boundary/BFF/OAuth targeted baseline passed with the corrected Vitest invocation; full server/frontend smoke passed. Changed files: this plan document only. Key decision: the plan's `pnpm --dir front test -- --run ...` form runs broader Vitest selection because the package script already includes `vitest run`; recorded and used `pnpm --dir front test --run ...` for the intended targeted files, then verified full `pnpm --dir front test` passed. Contracts/API/state/test expectations: no code contracts changed. Reviews: Task 0 spec review approved; Task 0 process/code-quality review approved; no issues left open. Verification: `git status --short --branch` -> `## codex/readmates-architecture-refactor`; `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest` passed; `pnpm --dir front test --run tests/unit/frontend-boundaries.test.ts tests/unit/cloudflare-bff.test.ts tests/unit/cloudflare-oauth-proxy.test.ts` passed 36 tests; `./server/gradlew -p server clean test` passed; `pnpm --dir front lint` passed; `pnpm --dir front test` passed 607 tests; `pnpm --dir front build` passed. Remaining risks: one transient all-suite run failure was observed before full suite passed; monitor if it recurs. Next first action: dispatch Task 1 implementer for shared cursor pagination primitives. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed subagents closed; no session-owned ports open.
 
 ## Task 1: Add Shared Cursor Pagination Foundation
 
