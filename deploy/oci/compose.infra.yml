@@ -1,3 +1,5 @@
+# Transition-only helper for running Redis and Redpanda beside the legacy host JAR deployment.
+# The final OCI runtime uses deploy/oci/compose.yml, which also includes Caddy and readmates-api.
 services:
   redis:
     image: redis:7.4-alpine

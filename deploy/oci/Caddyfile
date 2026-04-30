@@ -1,0 +1,8 @@
+{$CADDY_SITE} {
+    reverse_proxy readmates-api:8080
+
+    log {
+        output stdout
+        format console
+    }
+}
