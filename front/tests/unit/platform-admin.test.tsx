@@ -24,6 +24,19 @@ const baseAuth: AuthMeResponse = {
   joinedClubs: [],
 };
 
+const anonymousAuth: AuthMeResponse = {
+  authenticated: false,
+  userId: null,
+  membershipId: null,
+  clubId: null,
+  email: null,
+  displayName: null,
+  accountName: null,
+  role: null,
+  membershipStatus: null,
+  approvalState: "ANONYMOUS",
+};
+
 function renderWithAuth(auth: AuthMeResponse) {
   const state: AuthState = { status: "ready", auth };
 
@@ -157,6 +170,34 @@ describe("platform admin frontend shell", () => {
       "/api/bff/api/auth/me",
       expect.objectContaining({ cache: "no-store" }),
     );
+  });
+
+  it("redirects anonymous admin loader requests to login with returnTo", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me") {
+        return Promise.resolve(new Response(JSON.stringify(anonymousAuth), { status: 200 }));
+      }
+
+      if (input.toString() === "/api/bff/api/admin/summary") {
+        return Promise.reject(new Error("summary should not be requested"));
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${input.toString()}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await platformAdminLoader({
+        params: {},
+        request: new Request("https://app.readmates.example/admin?tab=domains"),
+      } as Parameters<typeof platformAdminLoader>[0]);
+      throw new Error("Expected redirect");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Response);
+      expect((error as Response).status).toBe(302);
+      expect((error as Response).headers.get("Location")).toBe("/login?returnTo=%2Fadmin%3Ftab%3Ddomains");
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("renders summary metrics without club-role wording", () => {

@@ -59,6 +59,7 @@ data class NotificationDeliveryItem(
     val recipientEmail: String?,
     val subject: String?,
     val bodyText: String?,
+    val bodyHtml: String?,
 )
 
 data class ClaimedNotificationDeliveryItem(
@@ -74,6 +75,7 @@ data class ClaimedNotificationDeliveryItem(
     val recipientEmail: String?,
     val subject: String?,
     val bodyText: String?,
+    val bodyHtml: String?,
 )
 
 data class MemberNotificationItem(

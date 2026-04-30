@@ -102,6 +102,19 @@ function jsonResponse(body: unknown) {
   });
 }
 
+const anonymousAuth = {
+  authenticated: false,
+  userId: null,
+  membershipId: null,
+  clubId: null,
+  email: null,
+  displayName: null,
+  accountName: null,
+  role: null,
+  membershipStatus: null,
+  approvalState: "ANONYMOUS",
+};
+
 function installRouterRequestShim() {
   const NativeRequest = globalThis.Request;
 
@@ -202,6 +215,32 @@ afterEach(() => {
 });
 
 describe("NotesPage", () => {
+  it("redirects anonymous direct notes navigation to login with returnTo", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(anonymousAuth));
+      }
+
+      return Promise.reject(new Error(`Unexpected BFF path: ${input.toString()}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await notesFeedLoader({
+        params: { clubSlug: "reading-sai" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/notes?sessionId=session-6&from=email"),
+      } as Parameters<typeof notesFeedLoader>[0]);
+      throw new Error("Expected redirect");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Response);
+      expect((error as Response).status).toBe(302);
+      expect((error as Response).headers.get("Location")).toBe(
+        "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Fnotes%3FsessionId%3Dsession-6%26from%3Demail",
+      );
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("uses a matching URL sessionId to fetch the feed and pass selected props", async () => {
     mockNotesBff();
 

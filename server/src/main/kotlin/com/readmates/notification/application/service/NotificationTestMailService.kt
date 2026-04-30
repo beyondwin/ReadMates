@@ -2,6 +2,7 @@ package com.readmates.notification.application.service
 
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
+import com.readmates.notification.application.model.NotificationEmailTemplates
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.model.sanitizeNotificationError
@@ -20,8 +21,6 @@ import java.time.ZoneOffset
 private const val TEST_MAIL_COOLDOWN_SECONDS = 60L
 private const val TEST_MAIL_MAX_EMAIL_LENGTH = 320
 private const val TEST_MAIL_MAX_ERROR_LENGTH = 500
-private const val TEST_MAIL_SUBJECT = "ReadMates 알림 테스트"
-private const val TEST_MAIL_BODY = "ReadMates 알림 발송 설정을 확인하기 위한 테스트 메일입니다."
 private val TEST_MAIL_EMAIL_PATTERN = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
 @Service
@@ -54,11 +53,13 @@ class NotificationTestMailService(
         )
 
         return try {
+            val copy = NotificationEmailTemplates.testMailCopy()
             mailDeliveryPort.send(
                 MailDeliveryCommand(
                     to = recipient,
-                    subject = TEST_MAIL_SUBJECT,
-                    text = TEST_MAIL_BODY,
+                    subject = copy.emailSubject,
+                    text = copy.emailBodyText,
+                    html = copy.emailBodyHtml,
                 ),
             )
             audit

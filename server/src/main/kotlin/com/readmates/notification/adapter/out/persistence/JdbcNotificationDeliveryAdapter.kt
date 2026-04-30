@@ -15,6 +15,7 @@ import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.ObjectProvider
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -26,8 +27,9 @@ import java.util.UUID
 class JdbcNotificationDeliveryAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
     objectMapper: ObjectMapper,
+    @Value("\${readmates.app-base-url:http://localhost:3000}") appBaseUrl: String,
 ) : NotificationDeliveryPort {
-    private val rowMappers = NotificationDeliveryRowMappers(objectMapper)
+    private val rowMappers = NotificationDeliveryRowMappers(objectMapper, appBaseUrl)
     private val queries = NotificationDeliveryQueries(rowMappers)
     private val writeOperations = NotificationDeliveryWriteOperations(queries, rowMappers)
 

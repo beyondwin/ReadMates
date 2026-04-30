@@ -74,8 +74,9 @@ export async function loadNotesFeedRouteData(requestedSessionId: string | null, 
   return { noteSessions, selectedSessionId: selectedSession?.sessionId ?? null, selectedSession, items };
 }
 
-export async function notesFeedLoader({ params, request }: LoaderFunctionArgs): Promise<NotesFeedRouteData> {
-  const access = await loadArchiveMemberAuth({ params });
+export async function notesFeedLoader(args: LoaderFunctionArgs): Promise<NotesFeedRouteData> {
+  const { params, request } = args;
+  const access = await loadArchiveMemberAuth(args);
 
   if (!access.allowed) {
     return { noteSessions: emptyPage(), selectedSessionId: null, selectedSession: null, items: emptyPage() };

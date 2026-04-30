@@ -9,11 +9,13 @@ export type DevAccount = {
 
 export function LoginCard({
   devAccounts = [],
+  googleLoginHref = "/oauth2/authorization/google",
   initialError = null,
   showDevLogin = false,
   onDevLogin,
 }: {
   devAccounts?: DevAccount[];
+  googleLoginHref?: string;
   initialError?: string | null;
   showDevLogin?: boolean;
   onDevLogin?: (email: string) => Promise<void>;
@@ -42,7 +44,7 @@ export function LoginCard({
         승인 뒤 참여 권한이 열립니다.
       </p>
       <div className="auth-card__actions auth-card__actions--primary">
-        <a className="btn btn-primary btn-lg" href="/oauth2/authorization/google">
+        <a className="btn btn-primary btn-lg" href={googleLoginHref}>
           시작하기
         </a>
       </div>

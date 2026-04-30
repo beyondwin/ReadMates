@@ -21,7 +21,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 ## 주요 구조 문서
 
 - 프런트엔드 route-first 경계, feature `api/model/route/ui` 책임, legacy 예외 제거 기준은 [architecture.md](architecture.md)의 "프런트엔드 route-first 경계" 섹션을 기준으로 합니다.
-- 서버 current member 해석, optional Redis 계층, 멀티 클럽 context/domain model, 현재/예정 세션 조회, `DRAFT -> OPEN -> CLOSED -> PUBLISHED` lifecycle, 멤버 세션 쓰기, 호스트 세션 쓰기, 세션/기록 공개 범위, 멤버 알림 설정과 알림함, 호스트 알림 운영, 멤버 프로필/표시 이름 경계는 [architecture.md](architecture.md)의 "멀티 클럽 context와 도메인 모델", "서버 내부 구조", "Optional Redis 계층", "세션 lifecycle과 공개 범위", "이메일 알림, 멤버 알림함, 호스트 운영", "멤버 프로필과 표시 이름" 섹션을 기준으로 합니다.
+- 서버 current member 해석, OAuth/login return 경계, optional Redis 계층, 멀티 클럽 context/domain model, 현재/예정 세션 조회, `DRAFT -> OPEN -> CLOSED -> PUBLISHED` lifecycle, 멤버 세션 쓰기, 호스트 세션 쓰기, 세션/기록 공개 범위, 이메일 템플릿과 멤버 알림 설정/알림함, 호스트 알림 운영, 멤버 프로필/표시 이름 경계는 [architecture.md](architecture.md)의 "멀티 클럽 context와 도메인 모델", "서버 내부 구조", "Optional Redis 계층", "세션 lifecycle과 공개 범위", "이메일 알림, 멤버 알림함, 호스트 운영", "멤버 프로필과 표시 이름" 섹션을 기준으로 합니다.
 - 핵심 기술 선택의 배경, trade-off, 관련 검증 명령은 [technical-decisions.md](technical-decisions.md)를 기준으로 합니다.
 - v1.3.0 이후 OCI Docker Compose cutover와 BFF secret handling incident는 [2026-04-30 배포 보고서](../deploy/2026-04-30-oci-compose-cutover-deployment-report.md)를 참고하되, 현재 운영 절차는 [compose-stack.md](../deploy/compose-stack.md)와 [oci-backend.md](../deploy/oci-backend.md)를 우선합니다.
 - 작업자는 루트 [../../AGENTS.md](../../AGENTS.md)에서 task별 agent guide를 먼저 고르고, 프런트엔드 패키지 안에서는 [../../front/AGENTS.md](../../front/AGENTS.md)의 패키지 지침도 함께 확인합니다.

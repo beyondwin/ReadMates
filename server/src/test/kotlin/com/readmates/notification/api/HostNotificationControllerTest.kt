@@ -2,6 +2,7 @@ package com.readmates.notification.api
 
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
+import com.readmates.notification.application.model.NotificationEmailTemplates
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
@@ -11,6 +12,7 @@ import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import jakarta.mail.Session
 import jakarta.mail.internet.MimeMessage
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.TestConfiguration
@@ -77,7 +79,13 @@ private const val SENSITIVE_TEST_MAIL_ERROR =
 class HostNotificationControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val testMailDeliveryPort: RecordingTestMailDeliveryPort,
 ) {
+    @BeforeEach
+    fun resetTestMailDeliveryPort() {
+        testMailDeliveryPort.sent.clear()
+    }
+
     @Test
     fun `host can read notification status summary`() {
         insertNotification(
@@ -217,6 +225,14 @@ class HostNotificationControllerTest(
             jsonPath("$.status") { value("SENT") }
         }
 
+        val copy = NotificationEmailTemplates.testMailCopy()
+        val command = testMailDeliveryPort.sent.single()
+        assertThat(command.to).isEqualTo("external@example.com")
+        assertThat(command.subject).isEqualTo(copy.emailSubject)
+        assertThat(command.text).isEqualTo(copy.emailBodyText)
+        assertThat(command.html).isEqualTo(copy.emailBodyHtml)
+        assertThat(command.html).doesNotContain("<a ")
+
         val rows = jdbcTemplate.queryForList(
             """
             select recipient_masked_email, recipient_email_hash
@@ -346,7 +362,7 @@ class HostNotificationControllerTest(
             status { isOk() }
             jsonPath("$.id") { value("00000000-0000-0000-0000-000000009402") }
             jsonPath("$.recipientEmail") { value("m***@example.com") }
-            jsonPath("$.subject") { value("피드백 문서가 올라왔습니다") }
+            jsonPath("$.subject") { value("3회차 피드백 문서가 올라왔습니다") }
             jsonPath("$.status") { value("PENDING") }
             jsonPath("$.metadata.sessionNumber") { value(3) }
             jsonPath("$.metadata.bookTitle") { value("메타데이터 테스트 책") }
@@ -354,6 +370,8 @@ class HostNotificationControllerTest(
         }.andReturn().response.contentAsString
 
         assertThat(response).doesNotContain("bodyText")
+        assertThat(response).doesNotContain("bodyHtml")
+        assertThat(response).doesNotContain("<html")
         assertThat(response).doesNotContain("member@example.com")
         assertThat(response).doesNotContain("ReadMates에서 확인해 주세요.")
         assertThat(response).doesNotContain("inviteToken")
@@ -689,14 +707,8 @@ class HostNotificationControllerTest(
     class TestMailDeliveryConfig {
         @Bean
         @Primary
-        fun testMailDeliveryPort(): MailDeliveryPort =
-            object : MailDeliveryPort {
-                override fun send(command: MailDeliveryCommand) {
-                    if (command.to == FAILING_TEST_MAIL_RECIPIENT) {
-                        error(SENSITIVE_TEST_MAIL_ERROR)
-                    }
-                }
-            }
+        fun testMailDeliveryPort(): RecordingTestMailDeliveryPort =
+            RecordingTestMailDeliveryPort()
 
         @Bean
         fun testJavaMailSender(): JavaMailSender =
@@ -719,6 +731,17 @@ class HostNotificationControllerTest(
 
                 override fun send(vararg simpleMessages: SimpleMailMessage) = Unit
             }
+    }
+
+    class RecordingTestMailDeliveryPort : MailDeliveryPort {
+        val sent = mutableListOf<MailDeliveryCommand>()
+
+        override fun send(command: MailDeliveryCommand) {
+            if (command.to == FAILING_TEST_MAIL_RECIPIENT) {
+                error(SENSITIVE_TEST_MAIL_ERROR)
+            }
+            sent += command
+        }
     }
 
     companion object {
