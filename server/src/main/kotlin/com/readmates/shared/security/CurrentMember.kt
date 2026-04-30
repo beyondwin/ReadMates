@@ -19,6 +19,7 @@ data class CurrentMember(
     val accountName: String,
     val role: MembershipRole,
     val membershipStatus: MembershipStatus = MembershipStatus.ACTIVE,
+    val clubName: String = clubSlug,
 ) {
     val isHost: Boolean
         get() = role == MembershipRole.HOST && membershipStatus == MembershipStatus.ACTIVE

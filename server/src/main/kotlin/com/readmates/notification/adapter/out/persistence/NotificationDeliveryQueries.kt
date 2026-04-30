@@ -189,6 +189,7 @@ internal class NotificationDeliveryQueries(
               notification_event_outbox.aggregate_id,
               notification_event_outbox.payload_json,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email as recipient_email,
               coalesce(memberships.short_name, users.name) as display_name
             from notification_deliveries
@@ -292,7 +293,8 @@ internal class NotificationDeliveryQueries(
                    notification_event_outbox.aggregate_type,
                    notification_event_outbox.aggregate_id,
                    notification_event_outbox.payload_json,
-                   notification_event_outbox.created_at
+                   notification_event_outbox.created_at,
+                   clubs.name as club_name
             from notification_event_outbox
             join clubs on clubs.id = notification_event_outbox.club_id
             where notification_event_outbox.id = ?
@@ -493,6 +495,7 @@ internal class NotificationDeliveryQueries(
               notification_event_outbox.aggregate_id,
               notification_event_outbox.payload_json,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email as recipient_email,
               coalesce(memberships.short_name, users.name) as display_name
             from notification_deliveries

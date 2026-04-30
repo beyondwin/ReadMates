@@ -57,6 +57,7 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -84,6 +85,7 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -113,6 +115,7 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -204,6 +207,7 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -413,6 +417,7 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -545,6 +550,7 @@ class JdbcMemberAccountAdapter(
               memberships.id as membership_id,
               clubs.id as club_id,
               clubs.slug as club_slug,
+              clubs.name as club_name,
               users.email,
               users.name as account_name,
               coalesce(memberships.short_name, users.name) as display_name,
@@ -607,8 +613,12 @@ class JdbcMemberAccountAdapter(
             accountName = getString("account_name"),
             role = MembershipRole.valueOf(getString("role")),
             membershipStatus = MembershipStatus.valueOf(getString("membership_status")),
+            clubName = getStringOrNull("club_name") ?: getString("club_slug"),
         )
     }
+
+    private fun java.sql.ResultSet.getStringOrNull(columnLabel: String): String? =
+        runCatching { getString(columnLabel) }.getOrNull()
 
     private fun defaultDisplayNameFor(accountName: String): String = when (accountName) {
         "김호스트" -> "호스트"

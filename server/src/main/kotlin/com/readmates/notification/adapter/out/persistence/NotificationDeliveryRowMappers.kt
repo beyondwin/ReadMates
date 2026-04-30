@@ -90,6 +90,7 @@ internal class NotificationDeliveryRowMappers(
             aggregateId = uuid("aggregate_id"),
             occurredAt = utcOffsetDateTime("created_at"),
             clubSlug = getString("club_slug"),
+            clubName = getString("club_name"),
             payload = parsePayload(getString("payload_json")),
         )
 
@@ -100,6 +101,7 @@ internal class NotificationDeliveryRowMappers(
             aggregateId = uuid("aggregate_id"),
             payload = parsePayload(getString("payload_json")),
             clubSlug = getString("club_slug"),
+            clubName = getString("club_name"),
             displayName = getString("display_name"),
         )
         return ClaimedNotificationDeliveryItem(
@@ -160,6 +162,7 @@ internal class NotificationDeliveryRowMappers(
             aggregateId = uuid("aggregate_id"),
             payload = payload,
             clubSlug = getString("club_slug"),
+            clubName = getString("club_name"),
             displayName = getString("display_name"),
         )
         return HostNotificationDetail(
@@ -186,6 +189,7 @@ internal class NotificationDeliveryRowMappers(
             aggregateId = message.aggregateId,
             payload = message.payload,
             clubSlug = requireNotNull(message.clubSlug) { "Notification event ${message.eventId} missing clubSlug" },
+            clubName = requireNotNull(message.clubName) { "Notification event ${message.eventId} missing clubName" },
             displayName = displayName,
         )
 
@@ -194,6 +198,7 @@ internal class NotificationDeliveryRowMappers(
         aggregateId: UUID,
         payload: NotificationEventPayload,
         clubSlug: String,
+        clubName: String,
         displayName: String?,
     ): DeliveryCopy =
         copyFor(
@@ -201,6 +206,7 @@ internal class NotificationDeliveryRowMappers(
             sessionId = payload.sessionId ?: aggregateId,
             sessionNumber = payload.sessionNumber ?: 0,
             bookTitle = payload.bookTitle ?: "선정 도서",
+            clubName = clubName,
             clubSlug = clubSlug,
             displayName = displayName,
         )
@@ -210,6 +216,7 @@ internal class NotificationDeliveryRowMappers(
         sessionId: UUID,
         sessionNumber: Int,
         bookTitle: String,
+        clubName: String,
         clubSlug: String,
         displayName: String?,
     ): DeliveryCopy {
@@ -218,6 +225,7 @@ internal class NotificationDeliveryRowMappers(
             sessionId = sessionId,
             sessionNumber = sessionNumber,
             bookTitle = bookTitle,
+            clubName = clubName,
             clubSlug = clubSlug,
             displayName = displayName,
             appBaseUrl = appBaseUrl,

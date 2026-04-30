@@ -37,6 +37,7 @@ data class NotificationEventMessage(
     val eventId: UUID,
     val clubId: UUID,
     val clubSlug: String? = null,
+    val clubName: String? = null,
     val eventType: NotificationEventType,
     val aggregateType: String,
     val aggregateId: UUID,

@@ -53,7 +53,7 @@ class NotificationTestMailService(
         )
 
         return try {
-            val copy = NotificationEmailTemplates.testMailCopy()
+            val copy = NotificationEmailTemplates.testMailCopy(currentHost.clubName)
             mailDeliveryPort.send(
                 MailDeliveryCommand(
                     to = recipient,
