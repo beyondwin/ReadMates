@@ -412,7 +412,7 @@ Acceptance criteria completed: server cursor codec test was written first and fa
 - Test: `server/src/test/kotlin/com/readmates/note/api/QuestionControllerTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/note/api/MemberActionControllerDbTest.kt`
 
-- [ ] **Step 1: Write archive sessions paged response test**
+- [x] **Step 1: Write archive sessions paged response test**
 
 In `server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerTest.kt`, add a test that asserts `GET /api/archive/sessions` returns an object with `items` and `nextCursor`:
 
@@ -432,7 +432,7 @@ fun `archive sessions returns cursor page`() {
 
 Use the existing auth helper name from the same test file. If the helper has a different name, use that helper instead of creating a new auth mechanism.
 
-- [ ] **Step 2: Change archive inbound port signatures**
+- [x] **Step 2: Change archive inbound port signatures**
 
 In `server/src/main/kotlin/com/readmates/archive/application/port/in/ArchiveUseCases.kt`, change list use cases to accept `PageRequest` and return `CursorPage`:
 
@@ -453,7 +453,7 @@ interface ListMyArchiveReviewsUseCase {
 }
 ```
 
-- [ ] **Step 3: Change archive controller to parse pagination**
+- [x] **Step 3: Change archive controller to parse pagination**
 
 In `server/src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveController.kt`, update list endpoints:
 
@@ -505,7 +505,7 @@ fun <T, R> CursorPage<T>.mapItems(mapper: (T) -> R): CursorPageResponse<R> =
     CursorPageResponse(items = items.map(mapper), nextCursor = nextCursor)
 ```
 
-- [ ] **Step 4: Add archive outbound pagination**
+- [x] **Step 4: Add archive outbound pagination**
 
 In `LoadArchiveDataPort.kt`, mirror the inbound signatures:
 
@@ -517,7 +517,7 @@ fun loadMyReviews(currentMember: CurrentMember, pageRequest: PageRequest): Curso
 
 In `ArchiveQueryService.kt`, pass through the `PageRequest` after membership checks.
 
-- [ ] **Step 5: Implement keyset pagination in `JdbcArchiveQueryAdapter`**
+- [x] **Step 5: Implement keyset pagination in `JdbcArchiveQueryAdapter`**
 
 For `loadArchiveSessions`, select `limit + 1` rows and add cursor predicate:
 
@@ -595,7 +595,7 @@ notes feed:
              or (created_at = :createdAt and source_order = :sourceOrder and session_number = :sessionNumber and item_order = :itemOrder and id < :id)
 ```
 
-- [ ] **Step 6: Convert feedback document list**
+- [x] **Step 6: Convert feedback document list**
 
 Change `FeedbackDocumentUseCases.kt`, `FeedbackDocumentStorePort.kt`, `FeedbackDocumentService.kt`, `FeedbackDocumentController.kt`, and `FeedbackDocumentWebDtos.kt` so `/api/feedback-documents/me` returns:
 
@@ -614,7 +614,7 @@ order by session_number desc, session_feedback_documents.created_at desc, sessio
 
 The cursor payload must include `sessionNumber`, `createdAt`, and `id`.
 
-- [ ] **Step 7: Convert notes list and feed**
+- [x] **Step 7: Convert notes list and feed**
 
 Change `NotesFeedUseCases.kt`, `LoadNotesFeedPort.kt`, `NotesFeedService.kt`, `NotesFeedController.kt`, and `NotesFeedWebDtos.kt`.
 
@@ -622,7 +622,7 @@ Change `NotesFeedUseCases.kt`, `LoadNotesFeedPort.kt`, `NotesFeedService.kt`, `N
 
 `GET /api/notes/feed` returns `CursorPageResponse<NoteFeedItem>` for both whole-feed and `sessionId` modes. Remove the unpaged session-specific branch. Apply `limit + 1` to both.
 
-- [ ] **Step 8: Run targeted server tests**
+- [x] **Step 8: Run targeted server tests**
 
 Run:
 
@@ -636,7 +636,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 9: Commit member-facing pagination server changes**
+- [x] **Step 9: Commit member-facing pagination server changes**
 
 Run:
 
@@ -644,6 +644,9 @@ Run:
 git add server/src/main/kotlin/com/readmates/archive server/src/main/kotlin/com/readmates/feedback server/src/main/kotlin/com/readmates/note server/src/test/kotlin/com/readmates/archive server/src/test/kotlin/com/readmates/feedback server/src/test/kotlin/com/readmates/note
 git commit -m "feat: paginate member archive notes and feedback APIs"
 ```
+
+COMPACT CHECKPOINT Task 2 - Convert Archive, Feedback, And Notes Server APIs To Paged Contracts:
+Acceptance criteria completed: archive sessions/questions/reviews, feedback documents, notes sessions, and notes feed server contracts now return `{ items, nextCursor }`; controllers parse `limit`/`cursor`; use cases and ports use `CursorPage`/`PageRequest`; JDBC adapters use keyset predicates with `limit + 1`; related server tests updated; implementation committed as `f0e5a87`; cache-bypass clarification follow-up committed as `13d122f`. Changed files: server archive/feedback/note API, service, port, model, persistence, and related server tests plus this plan document. Key decisions: invalid/undecodable cursors intentionally fall back to first page per shared cursor decode contract; notes reads intentionally bypass the legacy unpaged notes cache because it cannot produce correct keyset `nextCursor`, and tests now lock zero cache reads/writes for paged paths. Contracts/API/state/test expectations: scoped endpoints no longer preserve raw-array responses; archive/feedback/notes sort orders and cursor payloads match the Task 2 table; notes feed uses `60/120`, notes sessions and member-facing lists use `30/100`. Reviews: Task 2 spec review approved; initial quality review raised malformed-cursor and notes-cache concerns; malformed-cursor behavior was adjudicated as accepted contract, notes-cache clarity was fixed and quality re-review approved. Verification: red `./server/gradlew -p server test --tests com.readmates.archive.api.ArchiveControllerTest` failed on missing `$.items`; `./server/gradlew -p server test --rerun-tasks --tests com.readmates.archive.api.ArchiveControllerTest --tests com.readmates.feedback.api.FeedbackDocumentControllerTest --tests com.readmates.note.api.QuestionControllerTest --tests com.readmates.note.api.MemberActionControllerDbTest --tests com.readmates.archive.api.MemberArchiveReviewControllerTest` passed; `./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest` passed; `./server/gradlew -p server test --tests com.readmates.archive.api.ArchiveControllerDbTest --tests com.readmates.archive.api.ArchiveAndNotesDbTest --tests com.readmates.note.application.service.NotesFeedServiceCacheTest` passed; after follow-up, `./server/gradlew -p server test --tests com.readmates.note.application.service.NotesFeedServiceCacheTest` passed and targeted Task 2 server command passed again. Remaining risks: frontend still consumes old array contracts until Task 3; do not run mixed server/frontend manually expecting compatibility before Task 3 lands. Next first action: dispatch Task 3 implementer for frontend archive, feedback, and notes paged contracts. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 2 subagents closed; no session-owned ports open.
 
 ## Task 3: Convert Frontend Archive, Feedback, And Notes To Paged Contracts
 
