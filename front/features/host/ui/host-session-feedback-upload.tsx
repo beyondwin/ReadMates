@@ -1,12 +1,23 @@
 "use client";
 
-import { Link } from "@/src/app/router-link";
-import { appFeedbackHref, type ReadmatesReturnState } from "@/src/app/route-continuity";
-import type { ChangeEventHandler, RefObject } from "react";
+import type { ChangeEventHandler, ComponentType, ReactNode, RefObject } from "react";
 
 type FeedbackDocumentUploadStatus = {
   uploaded: boolean;
   fileName: string | null;
+};
+
+type ReadmatesReturnState = {
+  readmatesReturnTo: string;
+  readmatesReturnLabel: string;
+  readmatesReturnState?: ReadmatesReturnState;
+};
+
+type FeedbackUploadLinkProps = {
+  to: string;
+  state?: unknown;
+  className?: string;
+  children: ReactNode;
 };
 
 type HostSessionFeedbackUploadProps = {
@@ -15,6 +26,7 @@ type HostSessionFeedbackUploadProps = {
   inputRef: RefObject<HTMLInputElement | null>;
   emptyMessage: string;
   previewState?: ReadmatesReturnState;
+  LinkComponent: ComponentType<FeedbackUploadLinkProps>;
   onUploadFeedbackDocument: ChangeEventHandler<HTMLInputElement>;
 };
 
@@ -24,6 +36,7 @@ export function HostSessionFeedbackUpload({
   inputRef,
   emptyMessage,
   previewState,
+  LinkComponent,
   onUploadFeedbackDocument,
 }: HostSessionFeedbackUploadProps) {
   if (!sessionId) {
@@ -60,9 +73,9 @@ export function HostSessionFeedbackUpload({
           </div>
           <div className="rm-feedback-upload__actions">
             {feedbackDocument.uploaded ? (
-              <Link className="btn btn-quiet btn-sm" to={appFeedbackHref(sessionId)} state={previewState}>
+              <LinkComponent className="btn btn-quiet btn-sm" to={`/app/feedback/${encodeURIComponent(sessionId)}`} state={previewState}>
                 미리보기
-              </Link>
+              </LinkComponent>
             ) : null}
             <button className="btn btn-ghost btn-sm" type="button" onClick={() => inputRef.current?.click()}>
               {feedbackDocument.uploaded ? "교체" : "등록"}

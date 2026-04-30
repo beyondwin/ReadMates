@@ -11,7 +11,7 @@ import {
   updateHostSession,
   uploadHostSessionFeedbackDocument,
 } from "@/features/host/api/host-api";
-import type { HostSessionEditorActions } from "@/features/host/components/host-session-editor";
+import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 

@@ -6,7 +6,7 @@ import {
   parseHostInvitationResponse,
   revokeHostInvitation,
 } from "@/features/host/api/host-api";
-import type { HostInvitationsActions } from "@/features/host/components/host-invitations";
+import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";

@@ -2,7 +2,8 @@ import userEvent from "@testing-library/user-event";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, type LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostDashboard, { type HostDashboardActions } from "@/features/host/components/host-dashboard";
+import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
+import HostDashboard from "@/features/host/ui/host-dashboard";
 import {
   hostDashboardLoader,
   hostInvitationsLoader,

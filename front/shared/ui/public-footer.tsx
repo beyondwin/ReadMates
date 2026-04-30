@@ -1,16 +1,41 @@
-import { Link } from "@/src/app/router-link";
-import { PublicGuestOnlyActions, PublicInviteGuidance } from "@/shared/ui/public-auth-action";
+import {
+  PublicGuestOnlyActions,
+  PublicInviteGuidance,
+  type AppLinkComponent,
+  type AppLinkProps,
+} from "@/shared/ui/public-auth-action";
 
 type PublicFooterProps = {
   showGuestMemberActions?: boolean;
   publicBasePath?: string;
+  LinkComponent?: AppLinkComponent;
 };
+
+function DefaultLink({ to, resetScroll = false, children, ...props }: AppLinkProps) {
+  return (
+    <a
+      {...props}
+      href={to}
+      onClick={(event) => {
+        if (!resetScroll || event.defaultPrevented || event.metaKey || event.altKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+          return;
+        }
+
+        window.sessionStorage.removeItem("readmates:archive-scroll");
+        window.sessionStorage.removeItem("readmates:public-records-scroll");
+        window.scrollTo({ top: 0, behavior: "auto" });
+      }}
+    >
+      {children}
+    </a>
+  );
+}
 
 function prefixedPath(publicBasePath: string, path: string) {
   return publicBasePath ? `${publicBasePath}${path === "/" ? "" : path}` : path;
 }
 
-export function PublicFooter({ publicBasePath = "", showGuestMemberActions = true }: PublicFooterProps) {
+export function PublicFooter({ publicBasePath = "", showGuestMemberActions = true, LinkComponent = DefaultLink }: PublicFooterProps) {
   return (
     <footer className="public-footer">
       <div className="container public-footer__inner">
@@ -26,15 +51,15 @@ export function PublicFooter({ publicBasePath = "", showGuestMemberActions = tru
               클럽
             </div>
             <div className="small public-footer__links">
-              <Link to={prefixedPath(publicBasePath, "/")} resetScroll>
+              <LinkComponent to={prefixedPath(publicBasePath, "/")} resetScroll>
                 공개 홈
-              </Link>
-              <Link to={prefixedPath(publicBasePath, "/about")} resetScroll>
+              </LinkComponent>
+              <LinkComponent to={prefixedPath(publicBasePath, "/about")} resetScroll>
                 클럽 소개
-              </Link>
-              <Link to={prefixedPath(publicBasePath, "/records")} resetScroll>
+              </LinkComponent>
+              <LinkComponent to={prefixedPath(publicBasePath, "/records")} resetScroll>
                 공개 기록
-              </Link>
+              </LinkComponent>
             </div>
           </div>
           {showGuestMemberActions ? (
@@ -44,7 +69,7 @@ export function PublicFooter({ publicBasePath = "", showGuestMemberActions = tru
               </div>
               <div className="small public-footer__links">
                 <PublicGuestOnlyActions>
-                  <Link to="/login">기존 멤버 로그인</Link>
+                  <LinkComponent to="/login">기존 멤버 로그인</LinkComponent>
                   <PublicInviteGuidance className="public-footer__invite-guidance" />
                 </PublicGuestOnlyActions>
               </div>

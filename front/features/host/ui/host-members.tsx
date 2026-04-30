@@ -1,5 +1,5 @@
-import { Link } from "@/src/app/router-link";
 import {
+  type ComponentType,
   type CSSProperties,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   CurrentSessionPolicy,
   HostMemberProfileErrorCode,
@@ -20,8 +21,9 @@ import type {
   MemberLifecycleRequest,
   MemberLifecycleResponse,
   ViewerMember,
-} from "@/features/host/api/host-contracts";
+} from "@/features/host/ui/host-ui-types";
 import type { PageRequest } from "@/shared/model/paging";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 type HostMemberLifecyclePath = "/suspend" | "/deactivate" | "/restore" | "/current-session/add" | "/current-session/remove";
@@ -29,7 +31,7 @@ type HostViewerAction = "activate" | "deactivate-viewer";
 
 type JsonResponse<T> = Response & { json(): Promise<T> };
 
-export type HostMembersActions = {
+type HostMembersActions = {
   loadMembers: (page?: PageRequest) => Promise<HostMemberListPage>;
   submitLifecycle: (
     membershipId: string,
@@ -40,10 +42,44 @@ export type HostMembersActions = {
   submitViewerAction: (membershipId: string, action: HostViewerAction) => Promise<ViewerMember>;
 };
 
+type HostMembersLinkProps = {
+  to: string;
+  className?: string;
+  children: ReactNode;
+};
+export type HostMembersLinkComponent = ComponentType<HostMembersLinkProps>;
+
 type HostMembersProps = {
   initialMembers: HostMemberListPage | HostMemberListItem[];
   actions: HostMembersActions;
+  LinkComponent?: HostMembersLinkComponent;
 };
+
+function RouterScopedDefaultLink({ to, children, ...props }: HostMembersLinkProps) {
+  const location = useLocation();
+
+  return (
+    <a {...props} href={scopedAppLinkTarget(location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
+
+function DefaultLinkComponent(props: HostMembersLinkProps) {
+  const inRouter = useInRouterContext();
+
+  if (inRouter) {
+    return <RouterScopedDefaultLink {...props} />;
+  }
+
+  const { to, children, ...anchorProps } = props;
+
+  return (
+    <a {...anchorProps} href={scopedAppLinkTarget(globalThis.location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
 
 type MemberRowsState = {
   source: HostMemberListItem[];
@@ -333,7 +369,7 @@ function profileFailureMessage(error: unknown) {
   return hostProfileUnknownErrorMessage;
 }
 
-export default function HostMembers({ initialMembers, actions }: HostMembersProps) {
+export default function HostMembers({ initialMembers, actions, LinkComponent = DefaultLinkComponent }: HostMembersProps) {
   const initialPage = normalizeMemberPage(initialMembers);
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
     source: initialPage.items,
@@ -790,9 +826,9 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
                   새 멤버 초대와 링크 상태는 초대 화면에서 관리합니다.
                 </p>
               </div>
-              <Link to="/app/host/invitations" className="btn btn-primary">
+              <LinkComponent to="/app/host/invitations" className="btn btn-primary">
                 초대 관리
-              </Link>
+              </LinkComponent>
             </div>
           </div>
         ) : null}

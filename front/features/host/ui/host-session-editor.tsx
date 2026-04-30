@@ -1,6 +1,7 @@
 "use client";
 import {
   type ChangeEvent,
+  type ComponentType,
   type CSSProperties,
   type FormEvent,
   type KeyboardEvent,
@@ -8,12 +9,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   AttendanceStatus,
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
-} from "@/features/host/api/host-contracts";
+} from "@/features/host/ui/host-ui-types";
 import {
   buildHostSessionRequest,
   buildPublicationRequest,
@@ -33,13 +35,7 @@ import {
 } from "@/features/host/model/host-session-editor-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { SessionIdentity } from "@/shared/ui/session-identity";
-import {
-  hostDashboardReturnTarget,
-  readmatesReturnState,
-  type ReadmatesReturnTarget,
-} from "@/src/app/route-continuity";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
-import { Link } from "@/src/app/router-link";
 import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { HostSessionFeedbackUpload } from "./host-session-feedback-upload";
@@ -139,7 +135,28 @@ type AttendanceWriteState = {
 
 type JsonResponse<T> = Response & { json(): Promise<T> };
 
-export type HostSessionEditorActions = {
+type ReadmatesReturnState = {
+  readmatesReturnTo: string;
+  readmatesReturnLabel: string;
+  readmatesReturnState?: ReadmatesReturnState;
+};
+
+type ReadmatesReturnTarget = {
+  href: string;
+  label: string;
+  state?: ReadmatesReturnState;
+};
+
+type HostSessionEditorLinkProps = {
+  to: string;
+  state?: unknown;
+  className?: string;
+  children: ReactNode;
+  style?: CSSProperties;
+};
+export type HostSessionEditorLinkComponent = ComponentType<HostSessionEditorLinkProps>;
+
+type HostSessionEditorActions = {
   loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
   deleteSession: (sessionId: string) => Promise<Response>;
   closeSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
@@ -153,14 +170,66 @@ export type HostSessionEditorActions = {
   uploadFeedbackDocument: (sessionId: string, formData: FormData) => Promise<JsonResponse<FeedbackDocumentResponse>>;
 };
 
+const defaultHostDashboardReturnTarget: ReadmatesReturnTarget = {
+  href: "/app/host",
+  label: "운영으로",
+};
+
+function RouterScopedDefaultLink({ to, state: _state, children, ...props }: HostSessionEditorLinkProps) {
+  void _state;
+  const location = useLocation();
+
+  return (
+    <a {...props} href={scopedAppLinkTarget(location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
+
+function DefaultLinkComponent(props: HostSessionEditorLinkProps) {
+  const inRouter = useInRouterContext();
+
+  if (inRouter) {
+    return <RouterScopedDefaultLink {...props} />;
+  }
+
+  const { to, state: _state, children, ...anchorProps } = props;
+  void _state;
+
+  return (
+    <a {...anchorProps} href={scopedAppLinkTarget(globalThis.location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
+
+function defaultReadmatesReturnState(target: ReadmatesReturnTarget) {
+  const state: ReadmatesReturnState = {
+    readmatesReturnTo: target.href,
+    readmatesReturnLabel: target.label,
+  };
+
+  if (target.state) {
+    state.readmatesReturnState = target.state;
+  }
+
+  return state;
+}
+
 export default function HostSessionEditor({
   session,
-  returnTarget = hostDashboardReturnTarget,
+  returnTarget = defaultHostDashboardReturnTarget,
   actions,
+  LinkComponent = DefaultLinkComponent,
+  hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
+  readmatesReturnState = defaultReadmatesReturnState,
 }: {
   session?: HostSessionDetailResponse | null;
   returnTarget?: ReadmatesReturnTarget;
   actions: HostSessionEditorActions;
+  LinkComponent?: HostSessionEditorLinkComponent;
+  hostDashboardReturnTarget?: ReadmatesReturnTarget;
+  readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 }) {
   const [formDefaults] = useState(() => hydrateHostSessionFormValues(session));
   const [title, setTitle] = useState(formDefaults.title);
@@ -614,9 +683,9 @@ export default function HostSessionEditor({
           <div className="row-between" style={{ alignItems: "flex-start", flexWrap: "wrap" }}>
             <div>
               {showReturnLink ? (
-                <Link to={returnTarget.href} state={returnTarget.state} className="btn btn-quiet btn-sm" style={{ marginBottom: 14 }}>
+                <LinkComponent to={returnTarget.href} state={returnTarget.state} className="btn btn-quiet btn-sm" style={{ marginBottom: 14 }}>
                   {returnTarget.label}
-                </Link>
+                </LinkComponent>
               ) : null}
               <div className="eyebrow">세션 운영 문서</div>
               <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
@@ -1059,6 +1128,7 @@ export default function HostSessionEditor({
                   inputRef={feedbackDocumentInputRef}
                   emptyMessage={emptyManagementMessage}
                   previewState={feedbackPreviewState}
+                  LinkComponent={LinkComponent}
                   onUploadFeedbackDocument={uploadFeedbackDocument}
                 />
               </Panel>

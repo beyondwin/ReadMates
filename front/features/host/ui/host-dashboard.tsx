@@ -1,6 +1,5 @@
-import { Link } from "@/src/app/router-link";
-import { useState, type CSSProperties, type ReactNode } from "react";
-import { hostDashboardReturnTarget, readmatesReturnState } from "@/src/app/route-continuity";
+import { useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
+import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
@@ -8,7 +7,7 @@ import type {
   HostSessionListPage,
   HostSessionListItem,
   SessionRecordVisibility,
-} from "@/features/host/api/host-contracts";
+} from "@/features/host/ui/host-ui-types";
 import type { PageRequest } from "@/shared/model/paging";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
@@ -30,6 +29,7 @@ import {
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { READMATES_NAV_LABELS } from "@/shared/ui/readmates-copy";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import {
   formatDateOnlyLabel,
   formatMobileTodayLabel,
@@ -95,7 +95,26 @@ const quickActions = [
 type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 type QuickActionIcon = (typeof quickActions)[number]["icon"];
 type MissingCurrentSessionMember = NonNullable<HostDashboardResponse["currentSessionMissingMembers"]>[number];
-export type HostDashboardMissingMemberAction = "add" | "remove";
+type HostDashboardMissingMemberAction = "add" | "remove";
+type ReadmatesReturnState = {
+  readmatesReturnTo: string;
+  readmatesReturnLabel: string;
+  readmatesReturnState?: ReadmatesReturnState;
+};
+type ReadmatesReturnTarget = {
+  href: string;
+  label: string;
+  state?: ReadmatesReturnState;
+};
+type HostDashboardLinkProps = {
+  to: string;
+  state?: unknown;
+  className?: string;
+  children: ReactNode;
+  "aria-label"?: string;
+  style?: CSSProperties;
+};
+export type HostDashboardLinkComponent = ComponentType<HostDashboardLinkProps>;
 type UpcomingActionKind = "visibility" | "open";
 type UpcomingActionHandlers = {
   updateVisibility: (sessionId: string, visibility: SessionRecordVisibility) => Promise<void>;
@@ -105,7 +124,7 @@ type UpcomingActionHandlers = {
   canOpenSession: boolean;
 };
 
-export type HostDashboardActions = {
+type HostDashboardActions = {
   updateCurrentSessionParticipation: (
     membershipId: string,
     action: HostDashboardMissingMemberAction,
@@ -116,6 +135,10 @@ export type HostDashboardActions = {
 };
 
 const newSessionHref = "/app/host/sessions/new";
+const defaultHostDashboardReturnTarget: ReadmatesReturnTarget = {
+  href: "/app/host",
+  label: "운영으로",
+};
 const EMPTY_NOTIFICATION_SUMMARY: HostNotificationSummary = {
   pending: 0,
   failed: 0,
@@ -123,6 +146,47 @@ const EMPTY_NOTIFICATION_SUMMARY: HostNotificationSummary = {
   sentLast24h: 0,
   latestFailures: [],
 };
+
+function RouterScopedDefaultLink({ to, state: _state, children, ...props }: HostDashboardLinkProps) {
+  void _state;
+  const location = useLocation();
+
+  return (
+    <a {...props} href={scopedAppLinkTarget(location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
+
+function DefaultLinkComponent(props: HostDashboardLinkProps) {
+  const inRouter = useInRouterContext();
+
+  if (inRouter) {
+    return <RouterScopedDefaultLink {...props} />;
+  }
+
+  const { to, state: _state, children, ...anchorProps } = props;
+  void _state;
+
+  return (
+    <a {...anchorProps} href={scopedAppLinkTarget(globalThis.location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
+
+function defaultReadmatesReturnState(target: ReadmatesReturnTarget) {
+  const state: ReadmatesReturnState = {
+    readmatesReturnTo: target.href,
+    readmatesReturnLabel: target.label,
+  };
+
+  if (target.state) {
+    state.readmatesReturnState = target.state;
+  }
+
+  return state;
+}
 
 function memberSessionState(
   session: CurrentSession,
@@ -198,6 +262,9 @@ export default function HostDashboard({
   hostSessions,
   notifications = EMPTY_NOTIFICATION_SUMMARY,
   actions,
+  LinkComponent = DefaultLinkComponent,
+  hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
+  readmatesReturnState = defaultReadmatesReturnState,
 }: {
   auth?: AuthMeResponse;
   current?: CurrentSessionResponse;
@@ -205,6 +272,9 @@ export default function HostDashboard({
   hostSessions: HostSessionListPage;
   notifications?: HostNotificationSummary;
   actions: HostDashboardActions;
+  LinkComponent?: HostDashboardLinkComponent;
+  hostDashboardReturnTarget?: ReadmatesReturnTarget;
+  readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 }) {
   const hostName = auth?.displayName ?? "호스트";
   const session = current?.currentSession ?? null;
@@ -353,11 +423,12 @@ export default function HostDashboard({
           <div className="container">
             <SectionHeader eyebrow={HOST_DASHBOARD_LABELS.attention} title="운영 상태 요약" />
             {missingMembers ? (
-              <MissingCurrentSessionMembersAlert
-                alert={missingMembers}
-                actions={actions}
-                onResolved={resolveMissingMember}
-              />
+                    <MissingCurrentSessionMembersAlert
+                      alert={missingMembers}
+                      actions={actions}
+                      onResolved={resolveMissingMember}
+                      LinkComponent={LinkComponent}
+                    />
             ) : null}
             <div className="rm-document-panel" style={{ padding: "8px 22px" }}>
               {hostAlertMetrics(data).map((alert) => (
@@ -398,9 +469,9 @@ export default function HostDashboard({
                   eyebrow={HOST_DASHBOARD_LABELS.upcoming}
                   title={phase.title}
                   action={
-                    <Link to={sessionEditHref} state={sessionEditState} className="btn btn-ghost btn-sm">
+                    <LinkComponent to={sessionEditHref} state={sessionEditState} className="btn btn-ghost btn-sm">
                       {session ? "세션 문서 편집" : "세션 문서 만들기"}
-                    </Link>
+                    </LinkComponent>
                   }
                 />
                 <article className="rm-document-panel" style={{ padding: "28px" }}>
@@ -464,9 +535,9 @@ export default function HostDashboard({
                     eyebrow="예정 세션"
                     title="앞으로 읽을 세션"
                     action={
-                      <Link to={newSessionHref} className="btn btn-ghost btn-sm">
+                      <LinkComponent to={newSessionHref} className="btn btn-ghost btn-sm">
                         세션 문서 만들기
-                      </Link>
+                      </LinkComponent>
                     }
                   />
                   {upcomingSessions.length > 0 ? (
@@ -479,6 +550,7 @@ export default function HostDashboard({
                             session={item}
                             actions={upcomingActions}
                             showSeparator={index > 0}
+                            LinkComponent={LinkComponent}
                           />
                         ))}
                       </div>
@@ -548,7 +620,12 @@ export default function HostDashboard({
               </div>
 
               <aside className="stack" style={{ "--stack": "24px" } as CSSProperties}>
-                <NextActionCard action={nextAction} />
+                <NextActionCard
+                  action={nextAction}
+                  LinkComponent={LinkComponent}
+                  hostDashboardReturnTarget={hostDashboardReturnTarget}
+                  readmatesReturnState={readmatesReturnState}
+                />
 
                 <section>
                   <div className="eyebrow" style={{ marginBottom: "10px" }}>
@@ -594,8 +671,8 @@ export default function HostDashboard({
                 </section>
 
                 <PublicationFeedbackSection data={data} />
-                <HostNotificationLedger notifications={notifications} />
-                <InvitePipelineSection />
+                <HostNotificationLedger notifications={notifications} LinkComponent={LinkComponent} />
+                <InvitePipelineSection LinkComponent={LinkComponent} />
 
                 <section>
                   <div className="eyebrow" style={{ marginBottom: "10px" }}>
@@ -611,6 +688,9 @@ export default function HostDashboard({
                         unavailableReason={action.target === "session-edit" ? SESSION_REQUIRED_REASON : action.unavailableReason}
                         disabledStatusLabel={action.target === "session-edit" ? "세션 필요" : action.statusLabel}
                         index={index}
+                        LinkComponent={LinkComponent}
+                        hostDashboardReturnTarget={hostDashboardReturnTarget}
+                        readmatesReturnState={readmatesReturnState}
                       />
                     ))}
                   </div>
@@ -642,6 +722,9 @@ export default function HostDashboard({
         hasMoreUpcomingSessions={Boolean(nextHostSessionsCursor)}
         isLoadingMoreHostSessions={isLoadingMoreHostSessions}
         onLoadMoreHostSessions={handleLoadMoreHostSessions}
+        LinkComponent={LinkComponent}
+        hostDashboardReturnTarget={hostDashboardReturnTarget}
+        readmatesReturnState={readmatesReturnState}
       />
     </>
   );
@@ -651,10 +734,12 @@ function UpcomingSessionRow({
   session,
   actions,
   showSeparator = true,
+  LinkComponent,
 }: {
   session: HostSessionListItem;
   actions: UpcomingActionHandlers;
   showSeparator?: boolean;
+  LinkComponent: HostDashboardLinkComponent;
 }) {
   const isMemberVisible = session.visibility !== "HOST_ONLY";
   const visibilityPending = actions.isPending(session.sessionId, "visibility");
@@ -710,9 +795,9 @@ function UpcomingSessionRow({
         >
           {visibilityActionLabel}
         </button>
-        <Link className="btn btn-ghost btn-sm" to={hostSessionEditHref(session.sessionId)} aria-label={`편집 · ${session.bookTitle}`}>
+        <LinkComponent className="btn btn-ghost btn-sm" to={hostSessionEditHref(session.sessionId)} aria-label={`편집 · ${session.bookTitle}`}>
           편집
-        </Link>
+        </LinkComponent>
       </div>
     </div>
   );
@@ -740,13 +825,16 @@ function MobileHostDashboard({
   hasMoreUpcomingSessions,
   isLoadingMoreHostSessions,
   onLoadMoreHostSessions,
+  LinkComponent,
+  hostDashboardReturnTarget,
+  readmatesReturnState,
 }: {
   hostName: string;
   session: CurrentSession | null;
   data: HostDashboardResponse;
   notifications: HostNotificationSummary;
   sessionEditHref: string;
-  sessionEditState: ReturnType<typeof readmatesReturnState>;
+  sessionEditState: ReadmatesReturnState;
   sessionSpecificEditHref: string | null;
   checklist: HostChecklistItem[];
   missingMembers: MissingCurrentSessionMembers | null;
@@ -762,6 +850,9 @@ function MobileHostDashboard({
   hasMoreUpcomingSessions: boolean;
   isLoadingMoreHostSessions: boolean;
   onLoadMoreHostSessions: () => void;
+  LinkComponent: HostDashboardLinkComponent;
+  hostDashboardReturnTarget: ReadmatesReturnTarget;
+  readmatesReturnState: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 }) {
   const mobileAlerts = hostAlertMetrics(data);
 
@@ -789,6 +880,7 @@ function MobileHostDashboard({
             mobile
             actions={actions}
             onResolved={onMissingMemberResolved}
+            LinkComponent={LinkComponent}
           />
         ) : null}
         <div className="m-list">
@@ -828,7 +920,13 @@ function MobileHostDashboard({
         <div className="eyebrow" style={{ marginBottom: 10 }}>
           {HOST_DASHBOARD_LABELS.nextActionSection}
         </div>
-        <NextActionCard action={nextAction} mobile />
+        <NextActionCard
+          action={nextAction}
+          mobile
+          LinkComponent={LinkComponent}
+          hostDashboardReturnTarget={hostDashboardReturnTarget}
+          readmatesReturnState={readmatesReturnState}
+        />
       </section>
 
       <section className="m-sec">
@@ -875,19 +973,19 @@ function MobileHostDashboard({
               </div>
             )}
           </div>
-          <Link to={sessionEditHref} state={sessionEditState} className="btn btn-primary rm-host-dashboard-mobile__session-cta">
+          <LinkComponent to={sessionEditHref} state={sessionEditState} className="btn btn-primary rm-host-dashboard-mobile__session-cta">
             <span>{session ? "세션 문서 편집" : "세션 문서 만들기"}</span>
             <Icon name="arrow-right" size={14} />
-          </Link>
+          </LinkComponent>
         </article>
       </section>
 
       <section className="m-sec">
         <div className="m-eyebrow-row">
           <span className="eyebrow">예정 세션</span>
-          <Link to={newSessionHref} className="tiny">
+          <LinkComponent to={newSessionHref} className="tiny">
             문서 만들기
-          </Link>
+          </LinkComponent>
         </div>
         {upcomingSessions.length > 0 ? (
           <>
@@ -897,7 +995,12 @@ function MobileHostDashboard({
               style={{ display: "grid", gridAutoFlow: "column", gridAutoColumns: "minmax(220px, 82%)", gap: 10, overflowX: "auto" }}
             >
               {upcomingSessions.map((item) => (
-                <UpcomingSessionMobileCard key={item.sessionId} session={item} actions={upcomingActions} />
+                <UpcomingSessionMobileCard
+                  key={item.sessionId}
+                  session={item}
+                  actions={upcomingActions}
+                  LinkComponent={LinkComponent}
+                />
               ))}
             </div>
           </>
@@ -1000,14 +1103,14 @@ function MobileHostDashboard({
       </section>
 
       <section className="m-sec">
-        <HostNotificationLedger notifications={notifications} mobile />
+        <HostNotificationLedger notifications={notifications} mobile LinkComponent={LinkComponent} />
       </section>
 
       <section className="m-sec">
         <div className="eyebrow" style={{ marginBottom: 10 }}>
           {HOST_DASHBOARD_LABELS.invitePipeline}
         </div>
-        <InvitePipelineSection mobile />
+        <InvitePipelineSection mobile LinkComponent={LinkComponent} />
       </section>
 
       <section className="m-sec">
@@ -1024,6 +1127,9 @@ function MobileHostDashboard({
               unavailableReason={action.target === "session-edit" ? SESSION_REQUIRED_REASON : action.unavailableReason}
               disabledStatusLabel={action.target === "session-edit" ? "세션 필요" : action.statusLabel}
               index={index}
+              LinkComponent={LinkComponent}
+              hostDashboardReturnTarget={hostDashboardReturnTarget}
+              readmatesReturnState={readmatesReturnState}
             />
           ))}
         </div>
@@ -1035,9 +1141,11 @@ function MobileHostDashboard({
 function UpcomingSessionMobileCard({
   session,
   actions,
+  LinkComponent,
 }: {
   session: HostSessionListItem;
   actions: UpcomingActionHandlers;
+  LinkComponent: HostDashboardLinkComponent;
 }) {
   const isMemberVisible = session.visibility !== "HOST_ONLY";
   const visibilityPending = actions.isPending(session.sessionId, "visibility");
@@ -1090,14 +1198,14 @@ function UpcomingSessionMobileCard({
         >
           {visibilityActionLabel}
         </button>
-        <Link
+        <LinkComponent
           className="btn btn-ghost btn-sm"
           to={hostSessionEditHref(session.sessionId)}
           style={UPCOMING_MOBILE_ACTION_STYLE}
           aria-label={`편집 · ${session.bookTitle}`}
         >
           편집
-        </Link>
+        </LinkComponent>
       </div>
     </div>
   );
@@ -1156,11 +1264,13 @@ function MissingCurrentSessionMembersAlert({
   mobile = false,
   actions,
   onResolved,
+  LinkComponent,
 }: {
   alert: MissingCurrentSessionMembers;
   mobile?: boolean;
   actions: HostDashboardActions;
   onResolved: (membershipId: string) => void;
+  LinkComponent: HostDashboardLinkComponent;
 }) {
   const [pendingActions, setPendingActions] = useState<Set<string>>(() => new Set());
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
@@ -1275,16 +1385,28 @@ function MissingCurrentSessionMembersAlert({
             })}
           </div>
         ) : (
-          <Link to="/app/host/members" className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }}>
+          <LinkComponent to="/app/host/members" className="btn btn-primary btn-sm" style={{ alignSelf: "flex-start" }}>
             멤버 관리
-          </Link>
+          </LinkComponent>
         )}
       </div>
     </article>
   );
 }
 
-function NextActionCard({ action, mobile = false }: { action: NextOperationAction; mobile?: boolean }) {
+function NextActionCard({
+  action,
+  mobile = false,
+  LinkComponent,
+  hostDashboardReturnTarget,
+  readmatesReturnState,
+}: {
+  action: NextOperationAction;
+  mobile?: boolean;
+  LinkComponent: HostDashboardLinkComponent;
+  hostDashboardReturnTarget: ReadmatesReturnTarget;
+  readmatesReturnState: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
+}) {
   const body = (
     <>
       <div className="eyebrow" style={{ marginBottom: 8 }}>
@@ -1299,9 +1421,9 @@ function NextActionCard({ action, mobile = false }: { action: NextOperationActio
       {action.label ? (
         <div style={{ marginTop: 14 }}>
           {action.href ? (
-            <Link to={action.href} state={readmatesReturnState(hostDashboardReturnTarget)} className="btn btn-primary btn-sm">
+            <LinkComponent to={action.href} state={readmatesReturnState(hostDashboardReturnTarget)} className="btn btn-primary btn-sm">
               {action.label}
-            </Link>
+            </LinkComponent>
           ) : (
             <button
               className="btn btn-ghost btn-sm"
@@ -1367,9 +1489,11 @@ function PublicationFeedbackSection({ data, mobile = false }: { data: HostDashbo
 function HostNotificationLedger({
   notifications,
   mobile = false,
+  LinkComponent,
 }: {
   notifications: HostNotificationSummary;
   mobile?: boolean;
+  LinkComponent: HostDashboardLinkComponent;
 }) {
   const failures = notifications.latestFailures.slice(0, 3);
   const body = (
@@ -1401,14 +1525,14 @@ function HostNotificationLedger({
             </span>
           ))}
         </div>
-        <Link
+        <LinkComponent
           to="/app/host/notifications"
           className="btn btn-quiet btn-sm"
           style={{ marginTop: 12 }}
           aria-label={mobile ? "알림 발송 장부 열기" : undefined}
         >
           알림 발송 장부
-        </Link>
+        </LinkComponent>
         {failures.length > 0 ? (
           <ul style={{ margin: mobile ? "10px 0 0" : "4px 0 0", padding: 0, listStyle: "none" }}>
             {failures.map((failure, index) => (
@@ -1460,7 +1584,13 @@ function maskEmail(email: string) {
   return `${localPart[0]}***@${domain}`;
 }
 
-function InvitePipelineSection({ mobile = false }: { mobile?: boolean }) {
+function InvitePipelineSection({
+  mobile = false,
+  LinkComponent,
+}: {
+  mobile?: boolean;
+  LinkComponent: HostDashboardLinkComponent;
+}) {
   return (
     <section className={mobile ? "m-card-quiet" : "surface-quiet"} style={{ padding: mobile ? undefined : "18px" }}>
       {!mobile ? (
@@ -1474,9 +1604,9 @@ function InvitePipelineSection({ mobile = false }: { mobile?: boolean }) {
       <p className="tiny" style={{ margin: "6px 0 12px", color: "var(--text-3)" }}>
         보안상 초대 URL은 생성 직후에만 복사합니다. 기존 대기 초대는 취소하거나 새 링크를 발급하세요.
       </p>
-      <Link to="/app/host/invitations" className="btn btn-ghost btn-sm">
+      <LinkComponent to="/app/host/invitations" className="btn btn-ghost btn-sm">
         초대 관리 열기
-      </Link>
+      </LinkComponent>
     </section>
   );
 }
@@ -1488,6 +1618,9 @@ function QuickAction({
   unavailableReason,
   disabledStatusLabel,
   index,
+  LinkComponent,
+  hostDashboardReturnTarget,
+  readmatesReturnState,
 }: {
   icon: QuickActionIcon;
   label: string;
@@ -1495,6 +1628,9 @@ function QuickAction({
   unavailableReason: string;
   disabledStatusLabel: string;
   index: number;
+  LinkComponent: HostDashboardLinkComponent;
+  hostDashboardReturnTarget: ReadmatesReturnTarget;
+  readmatesReturnState: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 }) {
   const style = {
     display: "flex",
@@ -1509,13 +1645,13 @@ function QuickAction({
 
   if (href) {
     return (
-      <Link to={href} state={readmatesReturnState(hostDashboardReturnTarget)} style={style}>
+      <LinkComponent to={href} state={readmatesReturnState(hostDashboardReturnTarget)} style={style}>
         <Icon name={icon} size={14} style={{ color: "var(--text-3)" }} />
         <span className="body" style={{ fontSize: "13.5px", flex: 1 }}>
           {label}
         </span>
         <Icon name="arrow-right" size={13} style={{ color: "var(--text-4)" }} />
-      </Link>
+      </LinkComponent>
     );
   }
 
