@@ -72,7 +72,7 @@
 - Create: `server/src/test/kotlin/com/readmates/notification/application/model/NotificationEmailTemplatesTest.kt`
 - Later implementation target: `server/src/main/kotlin/com/readmates/notification/application/model/NotificationEmailTemplates.kt`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `server/src/test/kotlin/com/readmates/notification/application/model/NotificationEmailTemplatesTest.kt`:
 
@@ -210,7 +210,7 @@ class NotificationEmailTemplatesTest {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run:
 
@@ -228,7 +228,7 @@ Expected: compilation fails because `NotificationEmailTemplates` and its return 
 - Create: `server/src/main/kotlin/com/readmates/notification/application/model/NotificationEmailTemplates.kt`
 - Test: `server/src/test/kotlin/com/readmates/notification/application/model/NotificationEmailTemplatesTest.kt`
 
-- [ ] **Step 1: Add the pure renderer**
+- [x] **Step 1: Add the pure renderer**
 
 Create `server/src/main/kotlin/com/readmates/notification/application/model/NotificationEmailTemplates.kt`:
 
@@ -521,7 +521,7 @@ object NotificationEmailTemplates {
 }
 ```
 
-- [ ] **Step 2: Run the renderer test**
+- [x] **Step 2: Run the renderer test**
 
 Run:
 
@@ -531,13 +531,15 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit (skipped)**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/model/NotificationEmailTemplates.kt \
   server/src/test/kotlin/com/readmates/notification/application/model/NotificationEmailTemplatesTest.kt
 git commit -m "feat: add notification email templates"
 ```
+
+Skipped (2026-04-30): no task-level commit was created in this session; changes remain uncommitted for user review.
 
 ---
 
@@ -549,7 +551,7 @@ git commit -m "feat: add notification email templates"
 - Modify: `server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationDeliveryAdapterTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt`
 
-- [ ] **Step 1: Write/update failing persistence assertions**
+- [x] **Step 1: Write/update failing persistence assertions**
 
 In `JdbcNotificationDeliveryAdapterTest`, update the assertions in `persistPlannedDeliveries plans from persisted outbox event when Kafka message fields are stale`:
 
@@ -588,7 +590,7 @@ assertThat(response).doesNotContain("bodyHtml")
 assertThat(response).doesNotContain("<html")
 ```
 
-- [ ] **Step 2: Run the persistence/controller tests to verify failure**
+- [x] **Step 2: Run the persistence/controller tests to verify failure**
 
 Run:
 
@@ -598,7 +600,7 @@ Run:
 
 Expected: compilation fails because `bodyHtml` does not exist, and old subject expectations still come from old copy.
 
-- [ ] **Step 3: Add `bodyHtml` to delivery models**
+- [x] **Step 3: Add `bodyHtml` to delivery models**
 
 In `NotificationModels.kt`, add `bodyHtml: String?` to both delivery models:
 
@@ -635,7 +637,7 @@ data class ClaimedNotificationDeliveryItem(
 )
 ```
 
-- [ ] **Step 4: Replace row mapper copy generation**
+- [x] **Step 4: Replace row mapper copy generation**
 
 In `NotificationDeliveryRowMappers.kt`:
 
@@ -676,7 +678,7 @@ private fun copyFor(
 
 If `NotificationDeliveryRowMappers` is not currently injected by Spring, modify its owning adapter constructor to accept `@Value("\${readmates.app-base-url:http://localhost:3000}") appBaseUrl: String` and instantiate `NotificationDeliveryRowMappers(objectMapper, appBaseUrl)`.
 
-- [ ] **Step 5: Update fake model construction in tests**
+- [x] **Step 5: Update fake model construction in tests**
 
 Every `NotificationDeliveryItem(...)` and `ClaimedNotificationDeliveryItem(...)` test constructor must pass `bodyHtml`.
 
@@ -692,7 +694,7 @@ Use this pattern for in-app-only delivery helpers:
 bodyHtml = null,
 ```
 
-- [ ] **Step 6: Run targeted tests**
+- [x] **Step 6: Run targeted tests**
 
 Run:
 
@@ -702,7 +704,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit (skipped)**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/model/NotificationModels.kt \
@@ -711,6 +713,8 @@ git add server/src/main/kotlin/com/readmates/notification/application/model/Noti
   server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt
 git commit -m "feat: render notification email copy"
 ```
+
+Skipped (2026-04-30): no task-level commit was created in this session; changes remain uncommitted for user review.
 
 ---
 
@@ -723,7 +727,7 @@ git commit -m "feat: render notification email copy"
 - Modify: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationDispatchServiceTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationDeliveryProcessingServiceTest.kt`
 
-- [ ] **Step 1: Write failing dispatch assertions**
+- [x] **Step 1: Write failing dispatch assertions**
 
 In `NotificationDispatchServiceTest`, update `dispatch persists planned deliveries sends claimed email and marks sent` to expect `html`:
 
@@ -752,7 +756,7 @@ assertThat(mailPort.sent.single().html).contains("피드백 문서")
 
 Set `processingClaimedDelivery().bodyHtml` to `"<html><body>피드백 문서</body></html>"`.
 
-- [ ] **Step 2: Run service tests to verify failure**
+- [x] **Step 2: Run service tests to verify failure**
 
 Run:
 
@@ -762,7 +766,7 @@ Run:
 
 Expected: compilation fails because `MailDeliveryCommand.html` is missing.
 
-- [ ] **Step 3: Add `html` to mail command**
+- [x] **Step 3: Add `html` to mail command**
 
 Modify `MailDeliveryPort.kt`:
 
@@ -775,7 +779,7 @@ data class MailDeliveryCommand(
 )
 ```
 
-- [ ] **Step 4: Forward HTML from dispatch services**
+- [x] **Step 4: Forward HTML from dispatch services**
 
 In `NotificationDispatchService.dispatchEmail`, change command construction to:
 
@@ -799,7 +803,7 @@ MailDeliveryCommand(
 )
 ```
 
-- [ ] **Step 5: Run service tests**
+- [x] **Step 5: Run service tests**
 
 Run:
 
@@ -809,7 +813,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit (skipped)**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/port/out/MailDeliveryPort.kt \
@@ -820,6 +824,8 @@ git add server/src/main/kotlin/com/readmates/notification/application/port/out/M
 git commit -m "feat: pass html email bodies to mail delivery"
 ```
 
+Skipped (2026-04-30): no task-level commit was created in this session; changes remain uncommitted for user review.
+
 ---
 
 ### Task 5: Convert SMTP Adapter To Multipart MIME
@@ -829,7 +835,7 @@ git commit -m "feat: pass html email bodies to mail delivery"
 - Modify: `server/src/main/kotlin/com/readmates/notification/adapter/out/mail/SmtpMailDeliveryAdapter.kt`
 - Modify if needed: `server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt`
 
-- [ ] **Step 1: Write the failing SMTP tests**
+- [x] **Step 1: Write the failing SMTP tests**
 
 Create `server/src/test/kotlin/com/readmates/notification/adapter/out/mail/SmtpMailDeliveryAdapterTest.kt`:
 
@@ -939,7 +945,7 @@ private fun collectTextParts(content: Any?): List<String> =
     }
 ```
 
-- [ ] **Step 2: Run SMTP test to verify failure**
+- [x] **Step 2: Run SMTP test to verify failure**
 
 Run:
 
@@ -949,7 +955,7 @@ Run:
 
 Expected: FAIL because adapter still sends `SimpleMailMessage`.
 
-- [ ] **Step 3: Implement MIME sending**
+- [x] **Step 3: Implement MIME sending**
 
 Replace `SmtpMailDeliveryAdapter.send` with:
 
@@ -979,7 +985,7 @@ import org.springframework.mail.javamail.MimeMessageHelper
 
 Remove the `SimpleMailMessage` import.
 
-- [ ] **Step 4: Run SMTP test**
+- [x] **Step 4: Run SMTP test**
 
 Run:
 
@@ -989,7 +995,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Run host notification controller test**
+- [x] **Step 5: Run host notification controller test**
 
 Run:
 
@@ -999,7 +1005,7 @@ Run:
 
 Expected: PASS. If the test JavaMailSender fake still imports `SimpleMailMessage`, keep those override methods because `JavaMailSender` requires them, but production code must not call them.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit (skipped)**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/out/mail/SmtpMailDeliveryAdapter.kt \
@@ -1007,6 +1013,8 @@ git add server/src/main/kotlin/com/readmates/notification/adapter/out/mail/SmtpM
   server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt
 git commit -m "feat: send html notification emails"
 ```
+
+Skipped (2026-04-30): no task-level commit was created in this session; changes remain uncommitted for user review.
 
 ---
 
@@ -1016,7 +1024,7 @@ git commit -m "feat: send html notification emails"
 - Modify: `server/src/main/kotlin/com/readmates/notification/application/service/NotificationTestMailService.kt`
 - Modify: `server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt`
 
-- [ ] **Step 1: Add test-mail command assertions**
+- [x] **Step 1: Add test-mail command assertions**
 
 In `HostNotificationControllerTest.TestMailDeliveryConfig`, replace the anonymous `MailDeliveryPort` with a bean that records the last command:
 
@@ -1060,7 +1068,7 @@ assertThat(testMailDeliveryPort.sent.single()).satisfies { command ->
 }
 ```
 
-- [ ] **Step 2: Run controller test to verify failure**
+- [x] **Step 2: Run controller test to verify failure**
 
 Run:
 
@@ -1070,7 +1078,7 @@ Run:
 
 Expected: FAIL because test mail still sends the old short plain text and no HTML.
 
-- [ ] **Step 3: Use shared test mail template**
+- [x] **Step 3: Use shared test mail template**
 
 In `NotificationTestMailService.kt`, remove `TEST_MAIL_SUBJECT` and `TEST_MAIL_BODY`. In `sendTestMail`, replace the command with:
 
@@ -1092,7 +1100,7 @@ Add import:
 import com.readmates.notification.application.model.NotificationEmailTemplates
 ```
 
-- [ ] **Step 4: Run controller test**
+- [x] **Step 4: Run controller test**
 
 Run:
 
@@ -1102,13 +1110,15 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit (skipped)**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationTestMailService.kt \
   server/src/test/kotlin/com/readmates/notification/api/HostNotificationControllerTest.kt
 git commit -m "feat: format notification test mail"
 ```
+
+Skipped (2026-04-30): no task-level commit was created in this session; changes remain uncommitted for user review.
 
 ---
 
@@ -1118,7 +1128,7 @@ git commit -m "feat: format notification test mail"
 - Create: `front/shared/auth/login-return.ts`
 - Create: `front/tests/unit/login-return.test.ts`
 
-- [ ] **Step 1: Write pure helper tests**
+- [x] **Step 1: Write pure helper tests**
 
 Create `front/tests/unit/login-return.test.ts`:
 
@@ -1161,7 +1171,7 @@ describe("login return helpers", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify failure**
+- [x] **Step 2: Run test to verify failure**
 
 Run:
 
@@ -1171,7 +1181,7 @@ pnpm --dir front test -- login-return.test.ts
 
 Expected: FAIL because `front/shared/auth/login-return.ts` does not exist.
 
-- [ ] **Step 3: Implement helper**
+- [x] **Step 3: Implement helper**
 
 Create `front/shared/auth/login-return.ts`:
 
@@ -1218,7 +1228,7 @@ function hasControlCharacter(value: string) {
 }
 ```
 
-- [ ] **Step 4: Run helper test**
+- [x] **Step 4: Run helper test**
 
 Run:
 
@@ -1228,12 +1238,14 @@ pnpm --dir front test -- login-return.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit (skipped)**
 
 ```bash
 git add front/shared/auth/login-return.ts front/tests/unit/login-return.test.ts
 git commit -m "feat: add safe login return helpers"
 ```
+
+Skipped (2026-04-30): no task-level commit was created in this session; changes remain uncommitted for user review.
 
 ---
 
@@ -1252,7 +1264,7 @@ git commit -m "feat: add safe login return helpers"
   - `front/tests/unit/readmates-fetch.test.ts`
   - `front/tests/unit/spa-router.test.tsx`
 
-- [ ] **Step 1: Write failing tests for login route href**
+- [x] **Step 1: Write failing tests for login route href**
 
 In `front/tests/unit/login-card.test.tsx`, add:
 
@@ -1279,7 +1291,7 @@ it("ignores unsafe returnTo values on the login route", () => {
 
 Update existing href expectations in this file to use the same default href.
 
-- [ ] **Step 2: Write failing tests for guarded route redirects**
+- [x] **Step 2: Write failing tests for guarded route redirects**
 
 In `front/tests/unit/auth-context.test.tsx`, update `renderGuard` so it can accept an initial entry:
 
@@ -1340,7 +1352,7 @@ Then assert:
 expect(await screen.findByText(/returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail/)).toBeInTheDocument();
 ```
 
-- [ ] **Step 3: Write failing loader and fetch tests**
+- [x] **Step 3: Write failing loader and fetch tests**
 
 In `front/tests/unit/member-app-access.test.ts`, add:
 
@@ -1388,7 +1400,7 @@ expect(assignMock).toHaveBeenCalledWith(
 );
 ```
 
-- [ ] **Step 4: Run frontend tests to verify failure**
+- [x] **Step 4: Run frontend tests to verify failure**
 
 Run:
 
@@ -1398,7 +1410,7 @@ pnpm --dir front test -- login-card.test.tsx auth-context.test.tsx member-app-ac
 
 Expected: FAIL because code still drops returnTo.
 
-- [ ] **Step 5: Implement route guard redirects**
+- [x] **Step 5: Implement route guard redirects**
 
 In `front/src/app/route-guards.tsx`, import `useLocation` and helper:
 
@@ -1434,7 +1446,7 @@ with:
 <Navigate to={loginPath} replace />
 ```
 
-- [ ] **Step 6: Implement loader redirects**
+- [x] **Step 6: Implement loader redirects**
 
 In `front/shared/auth/member-app-loader.ts`, extend the args type:
 
@@ -1474,7 +1486,7 @@ throw redirect(loginPathForReturnTo(returnToFromRequest(args?.request)));
 
 Update `front/shared/auth/platform-admin-loader.ts` and `front/features/host/route/host-loader-auth.ts` if they independently redirect anonymous users to `/login`; use the same `loginPathForReturnTo(returnToFromRequest(args.request))` pattern there.
 
-- [ ] **Step 7: Implement API 401 redirect**
+- [x] **Step 7: Implement API 401 redirect**
 
 In `front/shared/api/client.ts`, import:
 
@@ -1494,7 +1506,7 @@ with:
 window.location.assign(loginPathForReturnTo(currentRelativeReturnTo()));
 ```
 
-- [ ] **Step 8: Implement login OAuth href**
+- [x] **Step 8: Implement login OAuth href**
 
 In `front/features/auth/ui/login-card.tsx`, add prop:
 
@@ -1548,7 +1560,7 @@ with:
 globalThis.location.assign(returnTo ?? "/app");
 ```
 
-- [ ] **Step 9: Run frontend targeted tests**
+- [x] **Step 9: Run frontend targeted tests**
 
 Run:
 
@@ -1558,7 +1570,7 @@ pnpm --dir front test -- login-return.test.ts login-card.test.tsx auth-context.t
 
 Expected: PASS.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit (skipped)**
 
 ```bash
 git add front/shared/auth/login-return.ts \
@@ -1576,6 +1588,8 @@ git add front/shared/auth/login-return.ts \
 git commit -m "feat: preserve login return targets"
 ```
 
+Skipped (2026-04-30): no task-level commit was created in this session; changes remain uncommitted for user review.
+
 ---
 
 ### Task 9: Run Notification Slice And Frontend Verification
@@ -1583,7 +1597,7 @@ git commit -m "feat: preserve login return targets"
 **Files:**
 - No planned code changes unless a verification failure identifies a root cause.
 
-- [ ] **Step 1: Run notification tests**
+- [x] **Step 1: Run notification tests**
 
 Run:
 
@@ -1593,7 +1607,9 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 2: Run frontend tests**
+Result (2026-04-30): PASS, exit 0.
+
+- [x] **Step 2: Run frontend tests**
 
 Run:
 
@@ -1603,7 +1619,9 @@ pnpm --dir front test
 
 Expected: PASS.
 
-- [ ] **Step 3: Run frontend build**
+Result (2026-04-30): PASS, exit 0.
+
+- [x] **Step 3: Run frontend build**
 
 Run:
 
@@ -1613,7 +1631,9 @@ pnpm --dir front build
 
 Expected: PASS.
 
-- [ ] **Step 4: Run frontend e2e if the local environment is ready**
+Result (2026-04-30): PASS, exit 0.
+
+- [x] **Step 4: Run frontend e2e if the local environment is ready**
 
 Run:
 
@@ -1623,7 +1643,15 @@ pnpm --dir front test:e2e
 
 Expected: PASS. If the command cannot run because local browsers, dev server, or backend prerequisites are unavailable, record the skipped command and exact reason in the final response.
 
-- [ ] **Step 5: Run full server tests if targeted tests exposed broad auth or model risk**
+Result (2026-04-30): initial `pnpm --dir front test:e2e` failed before browser tests because the local MySQL `readmates_e2e` schema has Flyway checksum mismatches for migrations 16/18/20/21. A fresh local schema attempt with `READMATES_E2E_DB_NAME=readmates_e2e_email_template_redesign` also failed because the configured `readmates` DB user cannot create that database. Follow-up risk resolution used an existing `readmates`-granted codex E2E schema without dropping or repairing the stale default schema:
+
+```bash
+READMATES_E2E_DB_NAME=readmates_e2e_codex_shortname5 pnpm --dir front test:e2e
+```
+
+Result: PASS, 22 tests passed.
+
+- [x] **Step 5: Run full server tests if targeted tests exposed broad auth or model risk**
 
 Run:
 
@@ -1633,7 +1661,9 @@ Run:
 
 Expected: PASS. If this is skipped because the change stayed within notification plus frontend auth continuity and targeted tests already passed, state that explicitly.
 
-- [ ] **Step 6: Inspect public safety diff**
+Result (2026-04-30): first `./server/gradlew -p server clean test` run failed with a transient `JdbcNotificationDeliveryAdapterTest` NPE while claiming a pending email delivery. Root-cause review found no link to the email-template changes; the exact test and full adapter class passed on focused reruns. A final no-concurrent `./server/gradlew -p server clean test` rerun passed with exit 0.
+
+- [x] **Step 6: Inspect public safety diff**
 
 Run:
 
@@ -1645,7 +1675,9 @@ git grep -n -E 'gmail[.]com|READMATES_BFF_SECRET=|SPRING_DATASOURCE_PASSWORD=|BE
 
 Expected: no newly introduced real secrets, private hosts, real member data, or token-shaped examples. Known public-safe fixture domains such as `example.com`, `example.test`, and `app.readmates.example` are acceptable.
 
-- [ ] **Step 7: Final commit if verification fixes were needed**
+Result (2026-04-30): `git diff --check` and `git diff --cached --check` passed with exit 0. The planned grep produced only existing placeholder/test-token matches; narrowed scans of changed additions and untracked files, excluding this plan and `.server-config`, produced no matches.
+
+- [x] **Step 7: Final commit if verification fixes were needed**
 
 If verification required fixes, commit those fixes:
 
@@ -1655,6 +1687,8 @@ git commit -m "test: verify email notification redesign"
 ```
 
 If no fixes were needed after previous task commits, do not create an empty commit.
+
+Skipped (2026-04-30): no verification fixes were made, and no commit was created.
 
 ---
 
@@ -1678,3 +1712,57 @@ Type consistency:
 
 - `NotificationRenderedCopy.emailBodyHtml` maps to `DeliveryCopy.emailBodyHtml`, `NotificationDeliveryItem.bodyHtml`, `ClaimedNotificationDeliveryItem.bodyHtml`, and `MailDeliveryCommand.html`.
 - Frontend return helpers consistently use `safeRelativeReturnTo`, `loginPathForReturnTo`, `oauthHrefForReturnTo`, and `currentRelativeReturnTo`.
+
+## COMPACT CHECKPOINT - Risk Resolution
+
+Task/Phase: Final risk resolution for E2E validation and unclosed setup guidance.
+
+Acceptance criteria completed:
+
+- Default `readmates_e2e` Flyway checksum mismatch was not repaired or dropped.
+- E2E was rerun against an existing schema already granted to the local E2E user.
+- E2E passed with 22 Chromium tests.
+- Test guide now documents the safe admin pre-create/grant path for E2E users without `CREATE DATABASE` privilege and recommends a fresh schema instead of `repair`/drop for checksum mismatch.
+
+Changed files:
+
+- `docs/development/test-guide.md`
+- `docs/superpowers/plans/2026-04-30-readmates-email-template-redesign-implementation-plan.md`
+
+Key decisions and reasons:
+
+- Used a non-destructive schema override because the stale default schema is local state unrelated to the email-template change.
+- Did not run Flyway repair or drop any schema because those would mutate/delete existing local DB state.
+
+Confirmed contract/API/state/test expectation:
+
+- Official E2E command can still use defaults when the local default schema is valid.
+- When the default schema is stale, a caller can provide `READMATES_E2E_DB_NAME` pointing at a current, granted E2E schema.
+
+Reviews:
+
+- Fresh `gpt-5.5` high explorer reviewed the E2E DB setup and found no email-template code change was warranted; it recommended docs setup guidance.
+
+Verification:
+
+- `READMATES_E2E_DB_NAME=readmates_e2e_codex_shortname5 pnpm --dir front test:e2e` passed: 22 tests.
+- `git diff --check` passed after doc update.
+- Targeted changed-doc safety scan passed with no matches.
+
+Remaining risks:
+
+- None known for validation. The default local `readmates_e2e` schema remains stale by design and was not modified.
+
+Next first action:
+
+- Optionally commit the finished branch if a permanent checkpoint is desired.
+
+Worktree/branch:
+
+- `/Users/kws/.config/superpowers/worktrees/ReadMates/codex-email-template-redesign`
+- `codex/email-template-redesign`
+
+Session-owned process/port state:
+
+- Playwright web servers exited after the E2E run.
+- No session-owned dev server, bootRun, browser, or port remains open.

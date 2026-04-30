@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { submitDevLogin } from "@/features/auth/api/auth-api";
 import { LoginCard, type DevAccount } from "@/features/auth/ui/login-card";
+import { oauthHrefForReturnTo, safeRelativeReturnTo } from "@/shared/auth/login-return";
 
 const devAccounts: DevAccount[] = [
   { label: "김호스트 · 호스트", email: "host@example.com" },
@@ -35,7 +36,12 @@ function loginErrorMessage(search: string) {
   return null;
 }
 
+function loginReturnTo(search: string) {
+  return safeRelativeReturnTo(new URLSearchParams(search).get("returnTo"));
+}
+
 export function LoginRouteContent() {
+  const returnTo = loginReturnTo(globalThis.location.search);
   const loginAsDevAccount = useCallback(async (email: string) => {
     const response = await submitDevLogin(email);
 
@@ -43,12 +49,13 @@ export function LoginRouteContent() {
       throw new Error(`Dev login failed: ${response.status}`);
     }
 
-    globalThis.location.assign("/app");
-  }, []);
+    globalThis.location.assign(returnTo ?? "/app");
+  }, [returnTo]);
 
   return (
     <LoginCard
       devAccounts={devAccounts}
+      googleLoginHref={oauthHrefForReturnTo(returnTo)}
       initialError={loginErrorMessage(globalThis.location.search)}
       showDevLogin={isDevLoginEnabled()}
       onDevLogin={loginAsDevAccount}

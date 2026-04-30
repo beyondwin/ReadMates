@@ -1,6 +1,7 @@
 import { redirect } from "react-router-dom";
 import { readmatesFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { canUseMemberApp } from "@/shared/auth/member-app-access";
 
 type ClubScopedLoaderArgs = {
@@ -8,6 +9,7 @@ type ClubScopedLoaderArgs = {
   params?: {
     clubSlug?: string;
   };
+  request?: Request;
 };
 
 export type MemberAppAccess = {
@@ -27,12 +29,21 @@ export function clubSlugFromLoaderArgs(args?: ClubScopedLoaderArgs) {
   return args?.clubSlug ?? args?.params?.clubSlug;
 }
 
+export function returnToFromRequest(request?: Request) {
+  if (!request) {
+    return null;
+  }
+
+  const url = new URL(request.url);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 export async function loadMemberAppAuth(args?: ClubScopedLoaderArgs): Promise<MemberAppAccess> {
   const clubSlug = clubSlugFromLoaderArgs(args);
   const auth = await readmatesFetch<AuthMeResponse>(authMePath(clubSlug), undefined, { clubSlug });
 
   if (!auth.authenticated) {
-    throw redirect("/login");
+    throw redirect(loginPathForReturnTo(returnToFromRequest(args?.request)));
   }
 
   return { auth, allowed: canUseMemberApp(auth) };

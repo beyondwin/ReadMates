@@ -15,8 +15,9 @@ import type { HostSessionEditorActions } from "@/features/host/route/host-sessio
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 
-export async function hostSessionEditorLoader({ params }: LoaderFunctionArgs) {
-  await requireHostLoaderAuth({ params });
+export async function hostSessionEditorLoader(args: LoaderFunctionArgs) {
+  const { params } = args;
+  await requireHostLoaderAuth(args);
   const context = { clubSlug: clubSlugFromLoaderArgs({ params }) };
 
   if (!params.sessionId) {

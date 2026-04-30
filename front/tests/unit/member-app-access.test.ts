@@ -132,4 +132,22 @@ describe("member app access helpers", () => {
       expect.objectContaining({ cache: "no-store" }),
     );
   });
+
+  it("redirects anonymous loader auth to login with returnTo from request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(anonymousAuth));
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await loadMemberAppAuth({
+        params: { clubSlug: "reading-sai" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/feedback/session-1?from=email"),
+      } as Parameters<typeof loadMemberAppAuth>[0] & { request: Request });
+      throw new Error("Expected redirect");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Response);
+      expect((error as Response).headers.get("Location")).toBe(
+        "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Ffeedback%2Fsession-1%3Ffrom%3Demail",
+      );
+    }
+  });
 });

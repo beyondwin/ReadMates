@@ -27,7 +27,7 @@
 
 **이유:** invite-only 멤버십 서비스에서 자체 비밀번호 운영 부담을 줄이고, 세션 revoke와 membership 상태 반영은 서버에서 통제합니다. Cookie는 `HttpOnly`, `SameSite=Lax`, production `Secure` posture를 사용해 브라우저 JavaScript가 session token을 직접 다루지 않게 합니다.
 
-**Trade-off:** OAuth provider 설정과 callback proxy가 서비스 가용성에 포함됩니다. 비밀번호 로그인과 비밀번호 재설정 경로는 운영 경로에서 제외되어 `410 Gone` stub으로 남기므로, 문서와 UI는 Google OAuth 중심으로 유지해야 합니다.
+**Trade-off:** OAuth provider 설정과 callback proxy가 서비스 가용성에 포함됩니다. 로그인 복귀 경로는 같은 origin의 안전한 relative `returnTo`만 프런트엔드에서 OAuth start로 넘기고, 서버는 signed return state와 허용 origin/host 정책을 다시 검증합니다. 비밀번호 로그인과 비밀번호 재설정 경로는 운영 경로에서 제외되어 `410 Gone` stub으로 남기므로, 문서와 UI는 Google OAuth 중심으로 유지해야 합니다.
 
 **관련 문서와 검증:** [architecture.md](architecture.md#인증과-세션), [local-setup.md](local-setup.md#dev-login-흐름), `./server/gradlew -p server clean test`
 
@@ -83,9 +83,9 @@
 
 ## 알림은 transactional outbox와 Kafka relay/consumer로 처리한다
 
-**결정:** 알림 이벤트는 먼저 MySQL `notification_event_outbox`에 저장하고, relay scheduler가 Kafka topic으로 발행합니다. Kafka consumer는 수신자와 선호도를 계산해 `notification_deliveries`와 `member_notifications`를 만듭니다.
+**결정:** 알림 이벤트는 먼저 MySQL `notification_event_outbox`에 저장하고, relay scheduler가 Kafka topic으로 발행합니다. Kafka consumer는 수신자와 선호도를 계산해 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 copy는 application model의 순수 템플릿 helper가 subject/plain/HTML을 함께 렌더링하고, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 보냅니다.
 
-**이유:** 세션 발행, 피드백 문서 공개, 서평 공개 같은 domain mutation과 알림 생성 시점을 분리하되, 이벤트 발생 사실은 MySQL transaction 안에 남기기 위해서입니다. 이메일 발송은 retryable side effect로 `notification_deliveries`에 남기고, in-app 알림은 `member_notifications`를 source of truth로 사용합니다.
+**이유:** 세션 발행, 피드백 문서 공개, 서평 공개 같은 domain mutation과 알림 생성 시점을 분리하되, 이벤트 발생 사실은 MySQL transaction 안에 남기기 위해서입니다. 이메일 발송은 retryable side effect로 `notification_deliveries`에 남기고, in-app 알림은 `member_notifications`를 source of truth로 사용합니다. Plain/HTML copy를 같은 helper에서 만들면 in-app deep link, 이메일 CTA, 테스트 메일, host ledger privacy 경계가 서로 드리프트하지 않습니다.
 
 **Trade-off:** 운영해야 할 상태가 `PENDING`, `PUBLISHING`, `PUBLISHED`, `FAILED`, `DEAD`처럼 늘어납니다. 대신 호스트 알림 운영 화면, retry/restore API, Prometheus metrics로 실패를 추적하고 복구할 수 있습니다.
 

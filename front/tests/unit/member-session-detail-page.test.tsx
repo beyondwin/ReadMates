@@ -18,6 +18,19 @@ afterEach(() => {
 
 const readableSession: MemberArchiveSessionDetailResponse = archiveSessionDetailContractFixture;
 
+const anonymousAuth = {
+  authenticated: false,
+  userId: null,
+  membershipId: null,
+  clubId: null,
+  email: null,
+  displayName: null,
+  accountName: null,
+  role: null,
+  membershipStatus: null,
+  approvalState: "ANONYMOUS",
+};
+
 function installRouterRequestShim() {
   const NativeRequest = globalThis.Request;
 
@@ -73,6 +86,37 @@ function LocationStateEcho() {
 }
 
 describe("MemberSessionDetailPage", () => {
+  it("redirects anonymous direct session-detail navigation to login with returnTo", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(
+          new Response(JSON.stringify(anonymousAuth), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected BFF path: ${input.toString()}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await memberSessionDetailLoader({
+        params: { clubSlug: "reading-sai", sessionId: "session-6" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/session-6?from=email"),
+      } as Parameters<typeof memberSessionDetailLoader>[0]);
+      throw new Error("Expected redirect");
+    } catch (error) {
+      expect(error).toBeInstanceOf(Response);
+      expect((error as Response).status).toBe(302);
+      expect((error as Response).headers.get("Location")).toBe(
+        "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp%2Fsessions%2Fsession-6%3Ffrom%3Demail",
+      );
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("enriches legacy session detail highlights from the notes feed authors", () => {
     const enriched = enrichSessionDetailHighlightAuthors(
       {

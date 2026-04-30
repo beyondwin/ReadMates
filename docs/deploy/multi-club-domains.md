@@ -40,7 +40,7 @@ Registered host를 `ACTIVE`로 전환하기 전에는 해당 host가 ReadMates C
 
 ## OAuth and Shared Session
 
-로그인 세션은 platform 전체에서 공유합니다. Google OAuth start endpoint는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google에 전달하는 callback `redirect_uri`는 primary auth origin으로 모읍니다. 초대 수락처럼 `returnTo`를 함께 보낸 흐름만 성공 후 signed return state에 저장된 클럽 URL로 돌아가고, 일반 로그인은 `/app` smart entry로 이동합니다.
+로그인 세션은 platform 전체에서 공유합니다. Google OAuth start endpoint는 현재 Pages 또는 registered host에서 시작될 수 있지만, Google에 전달하는 callback `redirect_uri`는 primary auth origin으로 모읍니다. 초대 수락처럼 같은 origin의 안전한 relative `returnTo`를 함께 보낸 흐름만 성공 후 signed return state에 저장된 클럽 URL로 돌아가고, 일반 로그인은 `/app` smart entry로 이동합니다. Absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 return target은 프런트엔드에서 먼저 버리고 서버의 signed return state와 host/origin 정책으로 다시 제한합니다.
 
 Spring 설정:
 
