@@ -14,6 +14,7 @@ import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationOutboxStatus
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.annotation.Value
@@ -31,21 +32,31 @@ class HostNotificationOperationsService(
     override fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary =
         notificationDeliveryPort.hostSummary(requireHost(host).clubId)
 
-    override fun listItems(host: CurrentMember, query: HostNotificationItemQuery): HostNotificationItemList =
-        notificationDeliveryPort.listHostEmailItems(requireHost(host).clubId, query.copy(limit = query.limit.coerceIn(1, 100)))
+    override fun listItems(
+        host: CurrentMember,
+        query: HostNotificationItemQuery,
+        pageRequest: PageRequest,
+    ): HostNotificationItemList =
+        notificationDeliveryPort.listHostEmailItems(
+            requireHost(host).clubId,
+            query,
+            pageRequest.copy(limit = pageRequest.limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT)),
+        )
 
     override fun listEvents(
         host: CurrentMember,
         status: NotificationEventOutboxStatus?,
-        limit: Int,
+        pageRequest: PageRequest,
     ): HostNotificationEventList {
         val currentHost = requireHost(host)
+        val page = notificationEventOutboxPort.listHostEvents(
+            clubId = currentHost.clubId,
+            status = status,
+            pageRequest = pageRequest.copy(limit = pageRequest.limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT)),
+        )
         return HostNotificationEventList(
-            notificationEventOutboxPort.listHostEvents(
-                clubId = currentHost.clubId,
-                status = status,
-                limit = limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT),
-            ),
+            items = page.items,
+            nextCursor = page.nextCursor,
         )
     }
 
@@ -53,16 +64,18 @@ class HostNotificationOperationsService(
         host: CurrentMember,
         status: NotificationDeliveryStatus?,
         channel: NotificationChannel?,
-        limit: Int,
+        pageRequest: PageRequest,
     ): HostNotificationDeliveryList {
         val currentHost = requireHost(host)
+        val page = notificationDeliveryPort.listHostDeliveries(
+            clubId = currentHost.clubId,
+            status = status,
+            channel = channel,
+            pageRequest = pageRequest.copy(limit = pageRequest.limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT)),
+        )
         return HostNotificationDeliveryList(
-            notificationDeliveryPort.listHostDeliveries(
-                clubId = currentHost.clubId,
-                status = status,
-                channel = channel,
-                limit = limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT),
-            ),
+            items = page.items,
+            nextCursor = page.nextCursor,
         )
     }
 

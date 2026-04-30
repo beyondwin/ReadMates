@@ -1,7 +1,7 @@
 "use client";
 
+import type { ComponentType, CSSProperties, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { Link } from "@/src/app/router-link";
 import { AvatarChip } from "./avatar-chip";
 import { usePublicAuthAction, type PublicAuthAction } from "./public-auth-action-state";
 import { ReadmatesBrandMark } from "./readmates-brand-mark";
@@ -9,6 +9,18 @@ import { READMATES_NAV_LABELS, READMATES_WORKSPACE_LABELS } from "./readmates-co
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
 export type TopNavVariant = "guest" | "member" | "host";
+
+type AppLinkProps = {
+  to: string;
+  className?: string;
+  children: ReactNode;
+  "aria-label"?: string;
+  "aria-current"?: "page";
+  title?: string;
+  style?: CSSProperties;
+};
+
+export type AppLinkComponent = ComponentType<AppLinkProps>;
 
 type NavLink = {
   key: string;
@@ -24,6 +36,7 @@ type TopNavProps = {
   authenticated?: boolean;
   publicBasePath?: string;
   appBasePath?: string;
+  LinkComponent?: AppLinkComponent;
 };
 
 const memberLinks: NavLink[] = [
@@ -103,6 +116,14 @@ const memberReturnLink: NavLink = {
   current: (pathname) => pathname === "/app",
 };
 
+function DefaultLink({ to, children, ...props }: AppLinkProps) {
+  return (
+    <a {...props} href={to}>
+      {children}
+    </a>
+  );
+}
+
 function prefixedPath(publicBasePath: string, path: string) {
   return publicBasePath ? `${publicBasePath}${path === "/" ? "" : path}` : path;
 }
@@ -148,9 +169,9 @@ function guestLinks(publicBasePath: string): NavLink[] {
   ];
 }
 
-function Brand({ href }: { href: string }) {
+function Brand({ href, LinkComponent }: { href: string; LinkComponent: AppLinkComponent }) {
   return (
-    <Link to={href} className="row" style={{ gap: "10px" }}>
+    <LinkComponent to={href} className="row" style={{ gap: "10px" }}>
       <ReadmatesBrandMark />
       <span>
         <span
@@ -169,7 +190,7 @@ function Brand({ href }: { href: string }) {
           독서 모임
         </span>
       </span>
-    </Link>
+    </LinkComponent>
   );
 }
 
@@ -180,6 +201,7 @@ function TopNavFrame({
   pathname,
   memberName,
   workspaceAction,
+  LinkComponent,
 }: {
   brandHref: string;
   navLabel: string;
@@ -187,34 +209,35 @@ function TopNavFrame({
   pathname: string;
   memberName?: string | null;
   workspaceAction?: NavLink | null;
+  LinkComponent: AppLinkComponent;
 }) {
   return (
     <header className="topnav">
       <div className="container topnav-inner">
-        <Brand href={brandHref} />
+        <Brand href={brandHref} LinkComponent={LinkComponent} />
 
         <div className="row" style={{ gap: "12px" }}>
           <nav className="nav-links" aria-label={navLabel}>
             {links.map((link) => (
-              <Link
+              <LinkComponent
                 key={link.key}
                 to={link.href}
                 className="nav-link"
                 aria-current={link.current(pathname) ? "page" : undefined}
               >
                 {link.label}
-              </Link>
+              </LinkComponent>
             ))}
           </nav>
           {workspaceAction ? (
-            <Link
+            <LinkComponent
               to={workspaceAction.href}
               className="rm-workspace-switch"
               aria-label={workspaceAction.label}
               title={workspaceAction.label}
             >
               <WorkspaceSwitchIcon size={17} />
-            </Link>
+            </LinkComponent>
           ) : null}
           {memberName ? (
             <AvatarChip name={memberName} label={memberName} size={28} />
@@ -238,7 +261,15 @@ function guestLinksWithAction(links: NavLink[], authAction: PublicAuthAction): N
   );
 }
 
-function GuestTopNav({ authenticated, publicBasePath = "" }: { authenticated?: boolean; publicBasePath?: string }) {
+function GuestTopNav({
+  authenticated,
+  publicBasePath = "",
+  LinkComponent,
+}: {
+  authenticated?: boolean;
+  publicBasePath?: string;
+  LinkComponent: AppLinkComponent;
+}) {
   const pathname = useLocation().pathname;
   const authAction = usePublicAuthAction({ href: "/login", label: READMATES_NAV_LABELS.public.login }, authenticated);
   const links = guestLinks(publicBasePath);
@@ -249,6 +280,7 @@ function GuestTopNav({ authenticated, publicBasePath = "" }: { authenticated?: b
       navLabel="공개 내비게이션"
       links={guestLinksWithAction(links, authAction)}
       pathname={pathname}
+      LinkComponent={LinkComponent}
     />
   );
 }
@@ -258,11 +290,13 @@ function AppTopNav({
   memberName,
   showHostEntry,
   appBasePath = "",
+  LinkComponent,
 }: {
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
   showHostEntry?: boolean;
   appBasePath?: string;
+  LinkComponent: AppLinkComponent;
 }) {
   const pathname = useLocation().pathname;
   const appPath = appPathname(pathname);
@@ -278,14 +312,31 @@ function AppTopNav({
       pathname={appPath}
       memberName={memberName}
       workspaceAction={scopedWorkspaceAction}
+      LinkComponent={LinkComponent}
     />
   );
 }
 
-export function TopNav({ variant = "guest", memberName, showHostEntry, authenticated, publicBasePath, appBasePath }: TopNavProps) {
+export function TopNav({
+  variant = "guest",
+  memberName,
+  showHostEntry,
+  authenticated,
+  publicBasePath,
+  appBasePath,
+  LinkComponent = DefaultLink,
+}: TopNavProps) {
   if (variant === "guest") {
-    return <GuestTopNav authenticated={authenticated} publicBasePath={publicBasePath} />;
+    return <GuestTopNav authenticated={authenticated} publicBasePath={publicBasePath} LinkComponent={LinkComponent} />;
   }
 
-  return <AppTopNav variant={variant} memberName={memberName} showHostEntry={showHostEntry} appBasePath={appBasePath} />;
+  return (
+    <AppTopNav
+      variant={variant}
+      memberName={memberName}
+      showHostEntry={showHostEntry}
+      appBasePath={appBasePath}
+      LinkComponent={LinkComponent}
+    />
+  );
 }

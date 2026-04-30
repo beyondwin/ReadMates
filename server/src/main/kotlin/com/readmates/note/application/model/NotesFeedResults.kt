@@ -1,6 +1,10 @@
 package com.readmates.note.application.model
 
 data class NoteFeedResult(
+    val itemId: String = "",
+    val createdAt: String = "",
+    val sourceOrder: Int = 0,
+    val itemOrder: Int = 0,
     val sessionId: String,
     val sessionNumber: Int,
     val bookTitle: String,

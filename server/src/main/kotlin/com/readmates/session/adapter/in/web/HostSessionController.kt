@@ -5,6 +5,7 @@ import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.port.`in`.ManageHostSessionUseCase
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
@@ -40,7 +42,11 @@ class HostSessionController(
     ) = manageHostSessionUseCase.create(request.toCommand(member))
 
     @GetMapping
-    fun list(member: CurrentMember) = manageHostSessionUseCase.list(member)
+    fun list(
+        member: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ) = manageHostSessionUseCase.list(member, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
 
     @GetMapping("/{sessionId}")
     fun detail(

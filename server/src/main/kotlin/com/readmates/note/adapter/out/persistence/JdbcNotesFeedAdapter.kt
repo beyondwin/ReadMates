@@ -4,22 +4,29 @@ import com.readmates.note.application.model.NoteFeedResult
 import com.readmates.note.application.model.NoteSessionResult
 import com.readmates.note.application.port.out.LoadNotesFeedPort
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.toUtcLocalDateTime
+import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @Repository
 class JdbcNotesFeedAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : LoadNotesFeedPort {
-    override fun loadNoteSessions(clubId: UUID): List<NoteSessionResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
+    override fun loadNoteSessions(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteSessionResult> {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList<NoteSessionResult>().toCursorPage()
+        val cursor = NoteSessionCursor.from(pageRequest.cursor)
 
-        return jdbcTemplate.query(
+        val rows = jdbcTemplate.query(
             """
             select
               sessions.id,
@@ -91,7 +98,13 @@ class JdbcNotesFeedAdapter(
             where sessions.club_id = ?
               and sessions.state = 'PUBLISHED'
               and sessions.visibility in ('MEMBER', 'PUBLIC')
-            order by sessions.number desc
+              and (
+                ? is null
+                or sessions.number < ?
+                or (sessions.number = ? and sessions.id < ?)
+              )
+            order by sessions.number desc, sessions.id desc
+            limit ?
             """.trimIndent(),
             { resultSet, _ ->
                 val questionCount = resultSet.getInt("question_count")
@@ -112,17 +125,26 @@ class JdbcNotesFeedAdapter(
                 )
             },
             clubId.dbString(),
+            cursor?.number,
+            cursor?.number,
+            cursor?.number,
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit, ::noteSessionCursor)
     }
 
-    override fun loadNotesFeed(clubId: UUID): List<NoteFeedResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
+    override fun loadNotesFeed(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteFeedResult> {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList<NoteFeedResult>().toCursorPage()
+        val cursor = NoteFeedCursor.from(pageRequest.cursor)
 
-        return jdbcTemplate.query(
+        val rows = jdbcTemplate.query(
             """
-            select session_id, session_number, book_title, session_date, author_name, author_short_name_source, kind, text
+            select id, session_id, session_number, book_title, session_date, author_name, author_short_name_source,
+                   kind, text, created_at, source_order, item_order
             from (
               select
+                questions.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -151,6 +173,7 @@ class JdbcNotesFeedAdapter(
               union all
 
               select
+                long_reviews.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -180,6 +203,7 @@ class JdbcNotesFeedAdapter(
               union all
 
               select
+                one_line_reviews.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -209,6 +233,7 @@ class JdbcNotesFeedAdapter(
               union all
 
               select
+                highlights.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -237,31 +262,63 @@ class JdbcNotesFeedAdapter(
                   or session_participants.participation_status = 'ACTIVE'
                 )
             ) feed_items
+            where (
+              ? is null
+              or created_at < ?
+              or (created_at = ? and source_order > ?)
+              or (created_at = ? and source_order = ? and session_number < ?)
+              or (created_at = ? and source_order = ? and session_number = ? and item_order > ?)
+              or (created_at = ? and source_order = ? and session_number = ? and item_order = ? and id < ?)
+            )
             order by
               created_at desc,
-              source_order,
+              source_order asc,
               session_number desc,
-              item_order,
-              author_name,
-              text
-            limit 120
+              item_order asc,
+              id desc
+            limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNoteFeedResult() },
             clubId.dbString(),
             clubId.dbString(),
             clubId.dbString(),
             clubId.dbString(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.sessionNumber,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.sessionNumber,
+            cursor?.itemOrder,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.sessionNumber,
+            cursor?.itemOrder,
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit, ::noteFeedCursor)
     }
 
-    override fun loadNotesFeedForSession(clubId: UUID, sessionId: UUID): List<NoteFeedResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
+    override fun loadNotesFeedForSession(
+        clubId: UUID,
+        sessionId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<NoteFeedResult> {
+        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList<NoteFeedResult>().toCursorPage()
+        val cursor = NoteFeedCursor.from(pageRequest.cursor)
 
-        return jdbcTemplate.query(
+        val rows = jdbcTemplate.query(
             """
-            select session_id, session_number, book_title, session_date, author_name, author_short_name_source, kind, text
+            select id, session_id, session_number, book_title, session_date, author_name, author_short_name_source,
+                   kind, text, created_at, source_order, item_order
             from (
               select
+                questions.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -291,6 +348,7 @@ class JdbcNotesFeedAdapter(
               union all
 
               select
+                long_reviews.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -321,6 +379,7 @@ class JdbcNotesFeedAdapter(
               union all
 
               select
+                one_line_reviews.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -351,6 +410,7 @@ class JdbcNotesFeedAdapter(
               union all
 
               select
+                highlights.id as id,
                 sessions.id as session_id,
                 sessions.number as session_number,
                 sessions.book_title as book_title,
@@ -380,13 +440,21 @@ class JdbcNotesFeedAdapter(
                   or session_participants.participation_status = 'ACTIVE'
                 )
             ) feed_items
+            where (
+              ? is null
+              or created_at < ?
+              or (created_at = ? and source_order > ?)
+              or (created_at = ? and source_order = ? and session_number < ?)
+              or (created_at = ? and source_order = ? and session_number = ? and item_order > ?)
+              or (created_at = ? and source_order = ? and session_number = ? and item_order = ? and id < ?)
+            )
             order by
               created_at desc,
-              source_order,
+              source_order asc,
               session_number desc,
-              item_order,
-              author_name,
-              text
+              item_order asc,
+              id desc
+            limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toNoteFeedResult() },
             clubId.dbString(),
@@ -397,7 +465,25 @@ class JdbcNotesFeedAdapter(
             sessionId.dbString(),
             clubId.dbString(),
             sessionId.dbString(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.sessionNumber,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.sessionNumber,
+            cursor?.itemOrder,
+            cursor?.createdAt?.toUtcLocalDateTime(),
+            cursor?.sourceOrder,
+            cursor?.sessionNumber,
+            cursor?.itemOrder,
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit, ::noteFeedCursor)
     }
 
     private fun ResultSet.toNoteFeedResult(): NoteFeedResult {
@@ -405,6 +491,10 @@ class JdbcNotesFeedAdapter(
         val authorShortNameSource = getString("author_short_name_source")
 
         return NoteFeedResult(
+            itemId = uuid("id").toString(),
+            createdAt = utcOffsetDateTime("created_at").toString(),
+            sourceOrder = getInt("source_order"),
+            itemOrder = getInt("item_order"),
             sessionId = uuid("session_id").toString(),
             sessionNumber = getInt("session_number"),
             bookTitle = getString("book_title"),
@@ -424,5 +514,67 @@ class JdbcNotesFeedAdapter(
         "송멤버4" -> "멤버4"
         "이멤버5" -> "멤버5"
         else -> displayName
+    }
+
+    private fun noteSessionCursor(item: NoteSessionResult): String? =
+        CursorCodec.encode(
+            mapOf(
+                "number" to item.sessionNumber.toString(),
+                "id" to item.sessionId,
+            ),
+        )
+
+    private fun noteFeedCursor(item: NoteFeedResult): String? =
+        CursorCodec.encode(
+            mapOf(
+                "createdAt" to item.createdAt,
+                "sourceOrder" to item.sourceOrder.toString(),
+                "sessionNumber" to item.sessionNumber.toString(),
+                "itemOrder" to item.itemOrder.toString(),
+                "id" to item.itemId,
+            ),
+        )
+
+    private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+        val visibleRows = rows.take(limit)
+        return CursorPage(
+            items = visibleRows,
+            nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+        )
+    }
+
+    private fun <T> List<T>.toCursorPage(): CursorPage<T> = CursorPage(items = this, nextCursor = null)
+
+    private data class NoteSessionCursor(
+        val number: Int,
+        val id: String,
+    ) {
+        companion object {
+            fun from(cursor: Map<String, String>): NoteSessionCursor? {
+                val number = cursor["number"]?.toIntOrNull() ?: return null
+                val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+                return NoteSessionCursor(number, id)
+            }
+        }
+    }
+
+    private data class NoteFeedCursor(
+        val createdAt: OffsetDateTime,
+        val sourceOrder: Int,
+        val sessionNumber: Int,
+        val itemOrder: Int,
+        val id: String,
+    ) {
+        companion object {
+            fun from(cursor: Map<String, String>): NoteFeedCursor? {
+                val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
+                val sourceOrder = cursor["sourceOrder"]?.toIntOrNull() ?: return null
+                val sessionNumber = cursor["sessionNumber"]?.toIntOrNull() ?: return null
+                val itemOrder = cursor["itemOrder"]?.toIntOrNull() ?: return null
+                val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+                return NoteFeedCursor(createdAt, sourceOrder, sessionNumber, itemOrder, id)
+            }
+        }
     }
 }

@@ -6,7 +6,7 @@ import {
   parseHostInvitationResponse,
   revokeHostInvitation,
 } from "@/features/host/api/host-api";
-import type { HostInvitationsActions } from "@/features/host/components/host-invitations";
+import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
@@ -18,7 +18,7 @@ export async function hostInvitationsLoader(args?: LoaderFunctionArgs) {
 }
 
 export const hostInvitationsActions = {
-  listInvitations: listHostInvitationsResponse,
+  listInvitations: (page) => listHostInvitationsResponse(undefined, page),
   createInvitation: createHostInvitation,
   revokeInvitation: revokeHostInvitation,
   parseInvitation: parseHostInvitationResponse,

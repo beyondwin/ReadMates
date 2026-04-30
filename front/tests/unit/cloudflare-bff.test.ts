@@ -37,10 +37,17 @@ describe("Cloudflare BFF function", () => {
           headers: {
             "CF-Connecting-IP": "203.0.113.10",
             "X-Forwarded-For": "198.51.100.10, 198.51.100.11",
+            "X-Readmates-Bff-Secret": "attacker",
+            "X-Readmates-Client-IP": "attacker",
+            "X-Readmates-Club-Host": "attacker.example.test",
           },
         }),
         {
           path: ["api", "auth", "me"],
+        },
+        {
+          READMATES_API_BASE_URL: "https://api.example.com",
+          READMATES_BFF_SECRET: "test-bff-secret",
         },
       ),
     );
@@ -55,8 +62,9 @@ describe("Cloudflare BFF function", () => {
       }),
     );
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("secret");
+    expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("test-bff-secret");
     expect((init.headers as Headers).get("X-Readmates-Client-IP")).toBe("203.0.113.10");
+    expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe("readmates.pages.dev");
   });
 
   it("forwards normalized club host from request host and overwrites browser header", async () => {

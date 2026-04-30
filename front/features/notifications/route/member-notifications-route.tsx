@@ -14,6 +14,14 @@ export function MemberNotificationsRoute() {
   const [pendingReadIds, setPendingReadIds] = useState<ReadonlySet<string>>(() => new Set());
   const [markAllReadPending, setMarkAllReadPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pageState, setPageState] = useState(() => ({ source: data, page: data }));
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  if (pageState.source !== data) {
+    setPageState({ source: data, page: data });
+  }
+
+  const page = pageState.source === data ? pageState.page : data;
 
   const setReadPending = (id: string, pending: boolean) => {
     const next = new Set(pendingReadIdsRef.current);
@@ -49,7 +57,7 @@ export function MemberNotificationsRoute() {
   };
 
   const markAllRead = async () => {
-    if (markAllReadPendingRef.current || pendingReadIdsRef.current.size > 0 || data.unreadCount === 0) {
+    if (markAllReadPendingRef.current || pendingReadIdsRef.current.size > 0 || page.unreadCount === 0) {
       return;
     }
 
@@ -76,10 +84,36 @@ export function MemberNotificationsRoute() {
     })();
   };
 
+  const loadMore = async () => {
+    if (!page.nextCursor || isLoadingMore) {
+      return;
+    }
+
+    setActionError(null);
+    setIsLoadingMore(true);
+    try {
+      const nextPage = await memberNotificationsActions.loadMore(undefined, { limit: 50, cursor: page.nextCursor });
+      setPageState((current) => ({
+        source: current.source,
+        page: {
+          unreadCount: nextPage.unreadCount,
+          items: [...current.page.items, ...nextPage.items],
+          nextCursor: nextPage.nextCursor,
+        },
+      }));
+    } catch {
+      setActionError("알림을 더 불러오지 못했습니다.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   return (
     <MemberNotificationsPage
-      unreadCount={data.unreadCount}
-      items={data.items}
+      unreadCount={page.unreadCount}
+      items={page.items}
+      hasMore={Boolean(page.nextCursor)}
+      isLoadingMore={isLoadingMore}
       pendingReadIds={pendingReadIds}
       markAllReadPending={markAllReadPending}
       actionError={actionError}
@@ -90,6 +124,9 @@ export function MemberNotificationsRoute() {
         void markAllRead();
       }}
       onOpenNotification={openNotification}
+      onLoadMore={() => {
+        void loadMore();
+      }}
     />
   );
 }

@@ -11,6 +11,7 @@ import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.web.bind.annotation.GetMapping
@@ -39,33 +40,40 @@ class HostNotificationController(
         host: CurrentMember,
         @RequestParam(required = false) status: NotificationOutboxStatus?,
         @RequestParam(required = false) eventType: NotificationEventType?,
-        @RequestParam(defaultValue = "50") limit: Int,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
     ): HostNotificationItemListResponse =
         manageHostNotificationsUseCase.listItems(
             host,
             HostNotificationItemQuery(
                 status = status,
                 eventType = eventType,
-                limit = limit,
             ),
+            PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
         ).toResponse()
 
     @GetMapping("/events")
     fun events(
         host: CurrentMember,
         @RequestParam(required = false) status: NotificationEventOutboxStatus?,
-        @RequestParam(defaultValue = "50") limit: Int,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
     ): HostNotificationEventListResponse =
-        manageHostNotificationsUseCase.listEvents(host, status, limit).toResponse()
+        manageHostNotificationsUseCase
+            .listEvents(host, status, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+            .toResponse()
 
     @GetMapping("/deliveries")
     fun deliveries(
         host: CurrentMember,
         @RequestParam(required = false) status: NotificationDeliveryStatus?,
         @RequestParam(required = false) channel: NotificationChannel?,
-        @RequestParam(defaultValue = "50") limit: Int,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
     ): HostNotificationDeliveryListResponse =
-        manageHostNotificationsUseCase.listDeliveries(host, status, channel, limit).toResponse()
+        manageHostNotificationsUseCase
+            .listDeliveries(host, status, channel, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+            .toResponse()
 
     @PostMapping("/test-mail")
     fun sendTestMail(
@@ -78,8 +86,14 @@ class HostNotificationController(
         ).toResponse()
 
     @GetMapping("/test-mail/audit")
-    fun testMailAudit(host: CurrentMember): List<NotificationTestMailAuditResponse> =
-        sendNotificationTestMailUseCase.listTestMailAudit(host).map { it.toResponse() }
+    fun testMailAudit(
+        host: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): CursorPageResponse<NotificationTestMailAuditResponse> =
+        sendNotificationTestMailUseCase
+            .listTestMailAudit(host, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+            .mapItems { it.toResponse() }
 
     @GetMapping("/items/{id}")
     fun detail(

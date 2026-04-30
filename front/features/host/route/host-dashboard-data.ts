@@ -7,13 +7,13 @@ import {
   saveHostSessionVisibility,
   submitHostMemberLifecycle,
 } from "@/features/host/api/host-api";
-import type { HostDashboardActions } from "@/features/host/components/host-dashboard";
+import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
   HostNotificationSummary,
-  HostSessionListItem,
+  HostSessionListPage,
 } from "@/features/host/api/host-contracts";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
@@ -30,7 +30,7 @@ const EMPTY_HOST_NOTIFICATION_SUMMARY: HostNotificationSummary = {
 export type HostDashboardRouteData = {
   current: CurrentSessionResponse;
   data: HostDashboardResponse;
-  hostSessions: HostSessionListItem[];
+  hostSessions: HostSessionListPage;
   notifications: HostNotificationSummary;
 };
 
@@ -45,7 +45,12 @@ export async function hostDashboardLoader(args?: LoaderFunctionArgs): Promise<Ho
     fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
   ]);
 
-  return { current, data, hostSessions, notifications };
+  return {
+    current,
+    data,
+    hostSessions,
+    notifications,
+  };
 }
 
 function notificationSummaryFallback(error: unknown): HostNotificationSummary {
@@ -84,4 +89,5 @@ export const hostDashboardActions = {
       throw new Error("Host session open failed");
     }
   },
+  loadHostSessions: (page) => fetchHostSessions(undefined, page),
 } satisfies HostDashboardActions;

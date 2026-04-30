@@ -2,8 +2,9 @@ import userEvent from "@testing-library/user-event";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostMembers, { type HostMembersActions } from "@/features/host/components/host-members";
-import { hostMembersLoader } from "@/features/host";
+import type { HostMembersActions } from "@/features/host/route/host-members-actions";
+import HostMembers from "@/features/host/ui/host-members";
+import { hostMembersActions, hostMembersLoader } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
@@ -522,6 +523,46 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("updated@example.com · 정식 멤버")).toBeInTheDocument();
   });
 
+  it("loads the next member page and appends it", async () => {
+    const user = userEvent.setup();
+    const nextMember = {
+      ...members[0],
+      membershipId: "membership-next",
+      userId: "user-next",
+      email: "next-member@example.com",
+      displayName: "다음 멤버",
+    } satisfies HostMemberListItem;
+    const actions = {
+      ...noopHostMembersActions,
+      loadMembers: vi.fn(async () => ({ items: [nextMember], nextCursor: null })),
+    } satisfies HostMembersActions;
+
+    render(
+      <HostMembersForTest
+        initialMembers={{ items: [members[0]], nextCursor: "cursor-1" }}
+        actions={actions}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "더 보기" }));
+
+    expect(actions.loadMembers).toHaveBeenCalledWith({ limit: 50, cursor: "cursor-1" });
+    expect(await screen.findByText("다음 멤버")).toBeInTheDocument();
+    expect(screen.getByText("멤버1")).toBeInTheDocument();
+  });
+
+  it("keeps load-more pagination on the route action URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(memberListResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await hostMembersActions.loadMembers({ limit: 50, cursor: "cursor-1" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/members?limit=50&cursor=cursor-1",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
   it("keeps each viewer row locked while multiple viewer actions are in flight", async () => {
     const user = userEvent.setup();
     const secondPending = {
@@ -649,7 +690,7 @@ describe("HostMembersPage", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members",
+      "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
 
@@ -733,7 +774,7 @@ describe("HostMembersPage", () => {
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members",
+      "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
 
@@ -760,7 +801,7 @@ describe("HostMembersPage", () => {
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members",
+      "/api/bff/api/host/members?limit=50",
       expect.objectContaining({ cache: "no-store" }),
     );
   });

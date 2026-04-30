@@ -6,7 +6,9 @@ import {
   fetchMyPage,
 } from "@/features/archive/api/archive-api";
 import type {
-  FeedbackDocumentListItem,
+  FeedbackDocumentListPage,
+  MyArchiveQuestionPage,
+  MyArchiveReviewPage,
   MyPageResponse,
   NotificationPreferencesResponse,
 } from "@/features/archive/api/archive-contracts";
@@ -18,12 +20,20 @@ import type { LoaderFunctionArgs } from "react-router-dom";
 
 export type MyPageRouteData = {
   data: MyPageResponse;
-  reports: FeedbackDocumentListItem[];
-  questionCount: number;
-  reviewCount: number;
+  reports: FeedbackDocumentListPage;
+  questions: MyArchiveQuestionPage;
+  reviews: MyArchiveReviewPage;
+  questionCount: string;
+  reviewCount: string;
   notificationPreferences: NotificationPreferencesResponse;
   canManageNotificationPreferences: boolean;
 };
+
+const MY_PAGE_FIRST_PAGE_LIMIT = 30;
+
+function emptyPage<T>() {
+  return { items: [] as T[], nextCursor: null };
+}
 
 function inactiveMyPageData(auth: AuthMeResponse): MyPageResponse {
   return {
@@ -44,6 +54,10 @@ function canManageNotificationPreferences(auth: AuthMeResponse) {
   return auth.membershipStatus !== "VIEWER";
 }
 
+function countLabel<T>(page: { items: T[]; nextCursor: string | null }) {
+  return `${page.items.length}${page.nextCursor ? "+" : ""}`;
+}
+
 export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRouteData> {
   const access = await loadArchiveMemberAuth(args);
   const context = { clubSlug: clubSlugFromLoaderArgs(args) };
@@ -52,9 +66,11 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
   if (!access.allowed) {
     return {
       data: inactiveMyPageData(access.auth),
-      reports: [],
-      questionCount: 0,
-      reviewCount: 0,
+      reports: emptyPage(),
+      questions: emptyPage(),
+      reviews: emptyPage(),
+      questionCount: "0",
+      reviewCount: "0",
       notificationPreferences: defaultNotificationPreferences,
       canManageNotificationPreferences: false,
     };
@@ -62,17 +78,19 @@ export async function myPageLoader(args?: LoaderFunctionArgs): Promise<MyPageRou
 
   const [data, reports, questions, reviews, notificationPreferences] = await Promise.all([
     fetchMyPage(context),
-    fetchMyFeedbackDocuments(context),
-    fetchMyArchiveQuestions(context),
-    fetchMyArchiveReviews(context),
+    fetchMyFeedbackDocuments(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
+    fetchMyArchiveQuestions(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
+    fetchMyArchiveReviews(context, { limit: MY_PAGE_FIRST_PAGE_LIMIT }),
     notificationPreferencesAvailable ? fetchNotificationPreferences(context) : Promise.resolve(defaultNotificationPreferences),
   ]);
 
   return {
     data,
     reports,
-    questionCount: questions.length,
-    reviewCount: reviews.length,
+    questions,
+    reviews,
+    questionCount: countLabel(questions),
+    reviewCount: countLabel(reviews),
     notificationPreferences,
     canManageNotificationPreferences: notificationPreferencesAvailable,
   };

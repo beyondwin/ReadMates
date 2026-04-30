@@ -2,6 +2,8 @@ package com.readmates.auth.api
 
 import com.readmates.auth.application.AuthSessionService
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
+import com.readmates.feedback.application.FeedbackDocumentError
+import com.readmates.feedback.application.FeedbackDocumentException
 import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
 import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
@@ -21,7 +23,6 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @SpringBootTest(
@@ -171,15 +172,15 @@ class ViewerSecurityTest(
         val currentMember = resolveCurrentMemberUseCase.resolveByEmail(email)
             ?: error("Expected viewer member to resolve")
 
-        val exception = assertThrows<ResponseStatusException> {
+        val exception = assertThrows<FeedbackDocumentException> {
             getReadableFeedbackDocumentUseCase.getReadableFeedbackDocument(
                 currentMember,
                 UUID.fromString("00000000-0000-0000-0000-000000000301"),
             )
         }
 
-        assertEquals(HttpStatus.FORBIDDEN, exception.statusCode)
-        assertEquals("Feedback documents require active membership", exception.reason)
+        assertEquals(FeedbackDocumentError.ACTIVE_MEMBERSHIP_REQUIRED, exception.error)
+        assertEquals("Feedback documents require active membership", exception.message)
     }
 
     private fun viewerSessionCookie(emailPrefixOrAddress: String, membershipDisplayName: String? = null): Cookie {

@@ -6,6 +6,7 @@ import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentStatu
 import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
 import com.readmates.feedback.application.port.`in`.ListMyReadableFeedbackDocumentsUseCase
 import com.readmates.feedback.application.port.`in`.UploadHostFeedbackDocumentUseCase
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -29,9 +30,17 @@ class FeedbackDocumentController(
     private val feedbackDocumentUploadValidator: FeedbackDocumentUploadValidator,
 ) {
     @GetMapping("/api/feedback-documents/me")
-    fun myFeedbackDocuments(currentMember: CurrentMember): List<FeedbackDocumentListItem> =
-        listMyReadableFeedbackDocumentsUseCase.listMyReadableFeedbackDocuments(currentMember)
-            .map { it.toWebDto() }
+    fun myFeedbackDocuments(
+        currentMember: CurrentMember,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): FeedbackDocumentListPage =
+        listMyReadableFeedbackDocumentsUseCase
+            .listMyReadableFeedbackDocuments(
+                currentMember,
+                PageRequest.cursor(limit, cursor, defaultLimit = 30, maxLimit = 100),
+            )
+            .toWebDto()
 
     @GetMapping("/api/sessions/{sessionId}/feedback-document")
     fun feedbackDocument(

@@ -6,10 +6,10 @@ import type {
   FeedbackDocumentResponse,
   HostAttendanceUpdate,
   HostDashboardResponse,
-  HostInvitationListItem,
+  HostInvitationListPage,
   HostInvitationResponse,
   HostNotificationDeliveryListResponse,
-  HostMemberListItem,
+  HostMemberListPage,
   HostNotificationEventListResponse,
   HostMemberProfileResponse,
   HostNotificationDetailResponse,
@@ -19,17 +19,19 @@ import type {
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
   HostSessionDetailResponse,
-  HostSessionListItem,
+  HostSessionListPage,
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionVisibilityRequest,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
   NotificationTestMailAuditItem,
+  NotificationTestMailAuditPage,
   SendNotificationTestMailRequest,
   UpdateHostMemberProfileRequest,
   ViewerMember,
 } from "./host-contracts";
+import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
 
 export function fetchHostCurrentSession(context?: ReadmatesApiContext) {
   return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
@@ -47,17 +49,32 @@ export function processHostNotifications() {
   return readmatesFetchResponse("/api/host/notifications/process", { method: "POST" });
 }
 
-export function fetchHostNotificationItems(status?: HostNotificationStatus, context?: ReadmatesApiContext) {
-  const search = status ? `?status=${encodeURIComponent(status)}` : "";
+function hostNotificationItemSearch(status?: HostNotificationStatus, page?: PageRequest) {
+  const params = new URLSearchParams();
+  if (status) {
+    params.set("status", status);
+  }
+  if (page?.limit !== undefined) {
+    params.set("limit", String(page.limit));
+  }
+  if (page?.cursor) {
+    params.set("cursor", page.cursor);
+  }
+  const search = params.toString();
+  return search ? `?${search}` : "";
+}
+
+export function fetchHostNotificationItems(status?: HostNotificationStatus, context?: ReadmatesApiContext, page?: PageRequest) {
+  const search = hostNotificationItemSearch(status, page);
   return readmatesFetch<HostNotificationItemListResponse>(`/api/host/notifications/items${search}`, undefined, context);
 }
 
-export function fetchHostNotificationEvents(context?: ReadmatesApiContext) {
-  return readmatesFetch<HostNotificationEventListResponse>("/api/host/notifications/events", undefined, context);
+export function fetchHostNotificationEvents(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<HostNotificationEventListResponse>(`/api/host/notifications/events${pagingSearchParams(page)}`, undefined, context);
 }
 
-export function fetchHostNotificationDeliveries(context?: ReadmatesApiContext) {
-  return readmatesFetch<HostNotificationDeliveryListResponse>("/api/host/notifications/deliveries", undefined, context);
+export function fetchHostNotificationDeliveries(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<HostNotificationDeliveryListResponse>(`/api/host/notifications/deliveries${pagingSearchParams(page)}`, undefined, context);
 }
 
 export function fetchHostNotificationDetail(id: string, context?: ReadmatesApiContext) {
@@ -90,12 +107,12 @@ export function sendHostNotificationTestMail(request: SendNotificationTestMailRe
   });
 }
 
-export function fetchHostNotificationTestMailAudit(context?: ReadmatesApiContext) {
-  return readmatesFetch<NotificationTestMailAuditItem[]>("/api/host/notifications/test-mail/audit", undefined, context);
+export function fetchHostNotificationTestMailAudit(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<NotificationTestMailAuditPage>(`/api/host/notifications/test-mail/audit${pagingSearchParams(page)}`, undefined, context);
 }
 
-export function fetchHostSessions(context?: ReadmatesApiContext) {
-  return readmatesFetch<HostSessionListItem[]>("/api/host/sessions", undefined, context);
+export function fetchHostSessions(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<HostSessionListPage>(`/api/host/sessions${pagingSearchParams(page)}`, undefined, context);
 }
 
 export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApiContext) {
@@ -179,8 +196,8 @@ export function uploadHostSessionFeedbackDocument(sessionId: string, formData: F
   }) as Promise<Response & { json(): Promise<FeedbackDocumentResponse> }>;
 }
 
-export function fetchHostMembers(context?: ReadmatesApiContext) {
-  return readmatesFetch<HostMemberListItem[]>("/api/host/members", undefined, context);
+export function fetchHostMembers(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<HostMemberListPage>(`/api/host/members${pagingSearchParams(page)}`, undefined, context);
 }
 
 export function submitHostMemberLifecycle(
@@ -210,13 +227,13 @@ export function submitHostMemberProfile(membershipId: string, displayName: strin
   }) as Promise<Response & { json(): Promise<HostMemberProfileResponse> }>;
 }
 
-export function fetchHostInvitations(context?: ReadmatesApiContext) {
-  return readmatesFetch<HostInvitationListItem[]>("/api/host/invitations", undefined, context);
+export function fetchHostInvitations(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<HostInvitationListPage>(`/api/host/invitations${pagingSearchParams(page)}`, undefined, context);
 }
 
-export function listHostInvitationsResponse(context?: ReadmatesApiContext) {
-  return readmatesFetchResponse("/api/host/invitations", undefined, context) as Promise<Response & {
-    json(): Promise<HostInvitationListItem[]>;
+export function listHostInvitationsResponse(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetchResponse(`/api/host/invitations${pagingSearchParams(page)}`, undefined, context) as Promise<Response & {
+    json(): Promise<HostInvitationListPage>;
   }>;
 }
 
@@ -238,6 +255,6 @@ export async function parseHostInvitationResponse(response: Response): Promise<H
   return (await response.json()) as HostInvitationResponse;
 }
 
-export async function parseHostInvitationListResponse(response: Response): Promise<HostInvitationListItem[]> {
-  return (await response.json()) as HostInvitationListItem[];
+export async function parseHostInvitationListResponse(response: Response): Promise<HostInvitationListPage> {
+  return (await response.json()) as HostInvitationListPage;
 }

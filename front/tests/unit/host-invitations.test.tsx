@@ -1,7 +1,9 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import HostInvitations, { type HostInvitationsActions } from "@/features/host/components/host-invitations";
+import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
+import HostInvitations from "@/features/host/ui/host-invitations";
+import { hostInvitationsActions } from "@/features/host";
 import type { HostInvitationListItem } from "@/features/host/api/host-contracts";
 
 const invitations: HostInvitationListItem[] = [
@@ -96,6 +98,44 @@ describe("HostInvitations", () => {
     expect(screen.getByRole("button", { name: "pending@example.com 새 링크 발급" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "pending@example.com 새 링크 발급" })).toHaveTextContent(/^새 링크 발급$/);
     expect(screen.queryByRole("button", { name: "accepted@example.com 새 링크 발급" })).not.toBeInTheDocument();
+  });
+
+  it("loads the next invitation page and appends it", async () => {
+    const nextInvitation = {
+      ...invitations[1],
+      invitationId: "invite-3",
+      email: "next@example.com",
+      name: "다음 멤버",
+    } satisfies HostInvitationListItem;
+    const actions = {
+      ...hostInvitationsTestActions,
+      listInvitations: vi.fn(async () => new Response(JSON.stringify({ items: [nextInvitation], nextCursor: null }))),
+    } satisfies HostInvitationsActions;
+
+    render(
+      <HostInvitationsForTest
+        initialInvitations={{ items: [invitations[0]], nextCursor: "cursor-1" }}
+        actions={actions}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+
+    expect(actions.listInvitations).toHaveBeenCalledWith({ limit: 50, cursor: "cursor-1" });
+    expect(await screen.findByText("다음 멤버")).toBeInTheDocument();
+    expect(screen.getByText("대기 멤버")).toBeInTheDocument();
+  });
+
+  it("keeps load-more pagination on the route action URL", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [], nextCursor: null })));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await hostInvitationsActions.listInvitations({ limit: 50, cursor: "cursor-1" });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/invitations?limit=50&cursor=cursor-1",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 
   it("creates an invitation and copies the returned link", async () => {

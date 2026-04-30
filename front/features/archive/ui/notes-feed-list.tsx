@@ -79,7 +79,7 @@ export function FeedSections({
   hasNoteSessions: boolean;
 }) {
   if (!hasNoteSessions || !selectedSession) {
-    return <NotesEmptyState message="아직 발행된 세션 기록이 없습니다." />;
+    return <NotesEmptyState message={hasNoteSessions ? "이 세션에는 해당 기록이 없습니다." : "아직 발행된 세션 기록이 없습니다."} />;
   }
 
   const visibleItems = items.filter((item) => item.kind !== "LONG_REVIEW");

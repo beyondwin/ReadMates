@@ -62,7 +62,8 @@ export async function memberSessionDetailLoader({
   }
 
   try {
-    return enrichSessionDetailHighlightAuthors(session, await fetchNotesFeed(session.sessionId, context));
+    const notesFeed = await fetchNotesFeed(session.sessionId, context, { limit: 60 });
+    return enrichSessionDetailHighlightAuthors(session, notesFeed.items);
   } catch {
     return session;
   }

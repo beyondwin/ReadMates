@@ -2,6 +2,7 @@ package com.readmates.notification.adapter.`in`.web
 
 import com.readmates.notification.application.port.`in`.ManageMemberNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ManageNotificationPreferencesUseCase
+import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -23,9 +24,12 @@ class MemberNotificationController(
     @GetMapping
     fun list(
         member: CurrentMember,
-        @RequestParam(defaultValue = "50") limit: Int,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
     ): MemberNotificationListResponse =
-        manageMemberNotificationsUseCase.list(member, limit).toResponse()
+        manageMemberNotificationsUseCase
+            .list(member, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+            .toResponse()
 
     @GetMapping("/unread-count")
     fun unreadCount(member: CurrentMember): Map<String, Int> =

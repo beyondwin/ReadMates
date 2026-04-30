@@ -1,5 +1,5 @@
-import { Link } from "@/src/app/router-link";
 import {
+  type ComponentType,
   type CSSProperties,
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -10,16 +10,20 @@ import {
   useRef,
   useState,
 } from "react";
+import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   CurrentSessionPolicy,
   HostMemberProfileErrorCode,
   HostMemberProfileResponse,
+  HostMemberListPage,
   HostMemberListItem,
   MembershipStatus,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
   ViewerMember,
-} from "@/features/host/api/host-contracts";
+} from "@/features/host/ui/host-ui-types";
+import type { PageRequest } from "@/shared/model/paging";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 type HostMemberLifecyclePath = "/suspend" | "/deactivate" | "/restore" | "/current-session/add" | "/current-session/remove";
@@ -27,8 +31,8 @@ type HostViewerAction = "activate" | "deactivate-viewer";
 
 type JsonResponse<T> = Response & { json(): Promise<T> };
 
-export type HostMembersActions = {
-  loadMembers: () => Promise<HostMemberListItem[]>;
+type HostMembersActions = {
+  loadMembers: (page?: PageRequest) => Promise<HostMemberListPage>;
   submitLifecycle: (
     membershipId: string,
     path: HostMemberLifecyclePath,
@@ -38,10 +42,44 @@ export type HostMembersActions = {
   submitViewerAction: (membershipId: string, action: HostViewerAction) => Promise<ViewerMember>;
 };
 
-type HostMembersProps = {
-  initialMembers: HostMemberListItem[];
-  actions: HostMembersActions;
+type HostMembersLinkProps = {
+  to: string;
+  className?: string;
+  children: ReactNode;
 };
+export type HostMembersLinkComponent = ComponentType<HostMembersLinkProps>;
+
+type HostMembersProps = {
+  initialMembers: HostMemberListPage | HostMemberListItem[];
+  actions: HostMembersActions;
+  LinkComponent?: HostMembersLinkComponent;
+};
+
+function RouterScopedDefaultLink({ to, children, ...props }: HostMembersLinkProps) {
+  const location = useLocation();
+
+  return (
+    <a {...props} href={scopedAppLinkTarget(location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
+
+function DefaultLinkComponent(props: HostMembersLinkProps) {
+  const inRouter = useInRouterContext();
+
+  if (inRouter) {
+    return <RouterScopedDefaultLink {...props} />;
+  }
+
+  const { to, children, ...anchorProps } = props;
+
+  return (
+    <a {...anchorProps} href={scopedAppLinkTarget(globalThis.location.pathname, to)}>
+      {children}
+    </a>
+  );
+}
 
 type MemberRowsState = {
   source: HostMemberListItem[];
@@ -331,12 +369,16 @@ function profileFailureMessage(error: unknown) {
   return hostProfileUnknownErrorMessage;
 }
 
-export default function HostMembers({ initialMembers, actions }: HostMembersProps) {
+export default function HostMembers({ initialMembers, actions, LinkComponent = DefaultLinkComponent }: HostMembersProps) {
+  const initialPage = normalizeMemberPage(initialMembers);
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
-    source: initialMembers,
-    members: initialMembers,
+    source: initialPage.items,
+    members: initialPage.items,
   }));
-  const members = memberRowsState.source === initialMembers ? memberRowsState.members : initialMembers;
+  const initialMembersItems = initialPage.items;
+  const members = memberRowsState.source === initialMembersItems ? memberRowsState.members : initialMembersItems;
+  const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<MemberTab>("active");
   const [dialog, setDialog] = useState<LifecycleDialog>(null);
   const [profileDialog, setProfileDialog] = useState<ProfileDialog>(null);
@@ -349,8 +391,8 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
 
   const setMembers = (update: MemberRowsUpdate) => {
     setMemberRowsState((current) => {
-      const source = current.source === initialMembers ? current.source : initialMembers;
-      const currentMembers = current.source === initialMembers ? current.members : initialMembers;
+      const source = current.source === initialMembersItems ? current.source : initialMembersItems;
+      const currentMembers = current.source === initialMembersItems ? current.members : initialMembersItems;
       const nextMembers = typeof update === "function" ? update(currentMembers) : update;
 
       return { source, members: nextMembers };
@@ -419,14 +461,33 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
     refreshRequestIdRef.current = requestId;
 
     try {
-      const nextMembers = await actions.loadMembers();
+      const nextPage = normalizeMemberPage(await actions.loadMembers({ limit: 50 }));
       if (requestId === refreshRequestIdRef.current) {
-        setMembers(nextMembers);
+        setMembers(nextPage.items);
+        setNextCursor(nextPage.nextCursor);
       }
     } catch (error) {
       if (requestId === refreshRequestIdRef.current) {
         throw error;
       }
+    }
+  };
+
+  const loadMoreMembers = async () => {
+    if (!nextCursor || isLoadingMore) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    setMessage(null);
+    try {
+      const page = normalizeMemberPage(await actions.loadMembers({ limit: 50, cursor: nextCursor }));
+      setMembers((current) => [...current, ...page.items]);
+      setNextCursor(page.nextCursor);
+    } catch {
+      setMessage({ kind: "alert", text: "멤버 목록을 더 불러오지 못했습니다." });
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -740,6 +801,17 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
           />
         ) : null}
 
+        {activeTab !== "invitations" && nextCursor ? (
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm"
+            disabled={isLoadingMore}
+            onClick={() => void loadMoreMembers()}
+          >
+            {isLoadingMore ? "불러오는 중" : "더 보기"}
+          </button>
+        ) : null}
+
         {activeTab === "invitations" ? (
           <div className="surface" style={{ padding: 24 }}>
             <div className="row-between" style={{ gap: 16, flexWrap: "wrap" }}>
@@ -754,9 +826,9 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
                   새 멤버 초대와 링크 상태는 초대 화면에서 관리합니다.
                 </p>
               </div>
-              <Link to="/app/host/invitations" className="btn btn-primary">
+              <LinkComponent to="/app/host/invitations" className="btn btn-primary">
                 초대 관리
-              </Link>
+              </LinkComponent>
             </div>
           </div>
         ) : null}
@@ -783,6 +855,10 @@ export default function HostMembers({ initialMembers, actions }: HostMembersProp
       ) : null}
     </div>
   );
+}
+
+function normalizeMemberPage(value: HostMemberListPage | HostMemberListItem[]): HostMemberListPage {
+  return Array.isArray(value) ? { items: value, nextCursor: null } : value;
 }
 
 function MemberActionButton({

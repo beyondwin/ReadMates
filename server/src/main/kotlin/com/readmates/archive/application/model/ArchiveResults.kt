@@ -16,6 +16,7 @@ data class ArchiveSessionResult(
 )
 
 data class MyArchiveQuestionResult(
+    val questionId: String = "",
     val sessionId: String,
     val sessionNumber: Int,
     val bookTitle: String,
@@ -26,6 +27,8 @@ data class MyArchiveQuestionResult(
 )
 
 data class MyArchiveReviewResult(
+    val reviewId: String = "",
+    val createdAt: String = "",
     val sessionId: String,
     val sessionNumber: Int,
     val bookTitle: String,

@@ -10,6 +10,9 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
+import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -22,54 +25,101 @@ import java.util.UUID
 class JdbcMemberLifecycleStoreAdapter(
     private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
 ) : MemberLifecycleStorePort {
-    override fun listMembers(clubId: UUID): List<HostMemberListRow> =
-        jdbcTemplate().query(
+    override fun listMembers(clubId: UUID, pageRequest: PageRequest): CursorPage<HostMemberListRow> {
+        val cursor = HostMemberCursor.from(pageRequest.cursor)
+        val rows = jdbcTemplate().query(
             """
             select
-              memberships.id as membership_id,
-              users.id as user_id,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              users.profile_image_url,
-              memberships.role,
-              memberships.status,
-              memberships.joined_at,
-              memberships.created_at,
-              current_session.id as current_session_id,
-              session_participants.participation_status
-            from memberships
-            join users on users.id = memberships.user_id
-            left join sessions current_session on current_session.club_id = memberships.club_id
-              and current_session.state = 'OPEN'
-              and current_session.id = (
-                select sessions.id
-                from sessions
-                where sessions.club_id = memberships.club_id
-                  and sessions.state = 'OPEN'
-                order by sessions.number desc
-                limit 1
-              )
-            left join session_participants on session_participants.session_id = current_session.id
-              and session_participants.club_id = memberships.club_id
-              and session_participants.membership_id = memberships.id
-            where memberships.club_id = ?
+              membership_id,
+              user_id,
+              email,
+              account_name,
+              display_name,
+              profile_image_url,
+              role,
+              status,
+              joined_at,
+              created_at,
+              current_session_id,
+              participation_status
+            from (
+              select
+                memberships.id as membership_id,
+                users.id as user_id,
+                users.email,
+                users.name as account_name,
+                coalesce(memberships.short_name, users.name) as display_name,
+                users.profile_image_url,
+                memberships.role,
+                memberships.status,
+                memberships.joined_at,
+                memberships.created_at,
+                current_session.id as current_session_id,
+                session_participants.participation_status,
+                case memberships.role when 'HOST' then 0 else 1 end as role_rank,
+                case memberships.status
+                  when 'ACTIVE' then 0
+                  when 'VIEWER' then 1
+                  when 'SUSPENDED' then 2
+                  when 'LEFT' then 3
+                  when 'INACTIVE' then 4
+                  else 5
+                end as status_rank
+              from memberships
+              join users on users.id = memberships.user_id
+              left join sessions current_session on current_session.club_id = memberships.club_id
+                and current_session.state = 'OPEN'
+                and current_session.id = (
+                  select sessions.id
+                  from sessions
+                  where sessions.club_id = memberships.club_id
+                    and sessions.state = 'OPEN'
+                  order by sessions.number desc
+                  limit 1
+                )
+              left join session_participants on session_participants.session_id = current_session.id
+                and session_participants.club_id = memberships.club_id
+                and session_participants.membership_id = memberships.id
+              where memberships.club_id = ?
+            ) ordered_members
+            where (
+              ? is null
+              or role_rank > ?
+              or (role_rank = ? and status_rank > ?)
+              or (role_rank = ? and status_rank = ? and display_name > ?)
+              or (role_rank = ? and status_rank = ? and display_name = ? and email > ?)
+              or (role_rank = ? and status_rank = ? and display_name = ? and email = ? and membership_id > ?)
+            )
             order by
-              case memberships.role when 'HOST' then 0 else 1 end,
-              case memberships.status
-                when 'ACTIVE' then 0
-                when 'VIEWER' then 1
-                when 'SUSPENDED' then 2
-                when 'LEFT' then 3
-                when 'INACTIVE' then 4
-                else 5
-              end,
-              users.name,
-              users.email
+              role_rank,
+              status_rank,
+              display_name,
+              email,
+              membership_id
+            limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostMemberListRow() },
             clubId.dbString(),
+            cursor?.roleRank,
+            cursor?.roleRank,
+            cursor?.roleRank,
+            cursor?.statusRank,
+            cursor?.roleRank,
+            cursor?.statusRank,
+            cursor?.displayName,
+            cursor?.roleRank,
+            cursor?.statusRank,
+            cursor?.displayName,
+            cursor?.email,
+            cursor?.roleRank,
+            cursor?.statusRank,
+            cursor?.displayName,
+            cursor?.email,
+            cursor?.id,
+            pageRequest.limit + 1,
         )
+        return pageFromRows(rows, pageRequest.limit, ::hostMemberCursor)
+    }
 
     override fun suspendActiveMember(clubId: UUID, membershipId: UUID): Boolean =
         jdbcTemplate().update(
@@ -324,4 +374,56 @@ class JdbcMemberLifecycleStoreAdapter(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "Member lifecycle storage is unavailable",
             )
+}
+
+private fun hostMemberCursor(row: HostMemberListRow): String? =
+    CursorCodec.encode(
+        mapOf(
+            "roleRank" to hostMemberRoleRank(row.role).toString(),
+            "statusRank" to hostMemberStatusRank(row.status).toString(),
+            "displayName" to row.displayName,
+            "email" to row.email,
+            "id" to row.membershipId.toString(),
+        ),
+    )
+
+private fun hostMemberRoleRank(role: MembershipRole): Int = when (role) {
+    MembershipRole.HOST -> 0
+    else -> 1
+}
+
+private fun hostMemberStatusRank(status: MembershipStatus): Int = when (status) {
+    MembershipStatus.ACTIVE -> 0
+    MembershipStatus.VIEWER -> 1
+    MembershipStatus.SUSPENDED -> 2
+    MembershipStatus.LEFT -> 3
+    MembershipStatus.INACTIVE -> 4
+    else -> 5
+}
+
+private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    val visibleRows = rows.take(limit)
+    return CursorPage(
+        items = visibleRows,
+        nextCursor = if (rows.size > limit) visibleRows.lastOrNull()?.let(cursorFor) else null,
+    )
+}
+
+private data class HostMemberCursor(
+    val roleRank: Int,
+    val statusRank: Int,
+    val displayName: String,
+    val email: String,
+    val id: String,
+) {
+    companion object {
+        fun from(cursor: Map<String, String>): HostMemberCursor? {
+            val roleRank = cursor["roleRank"]?.toIntOrNull() ?: return null
+            val statusRank = cursor["statusRank"]?.toIntOrNull() ?: return null
+            val displayName = cursor["displayName"] ?: return null
+            val email = cursor["email"] ?: return null
+            val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+            return HostMemberCursor(roleRank, statusRank, displayName, email, id)
+        }
+    }
 }

@@ -1,10 +1,10 @@
 import { useLoaderData } from "react-router-dom";
-import type { HostMemberListItem } from "@/features/host/api/host-contracts";
-import HostMembers from "@/features/host/components/host-members";
+import type { HostMemberListPage } from "@/features/host/api/host-contracts";
+import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
 import { hostMembersActions } from "./host-members-data";
 
-export function HostMembersRoute() {
-  const members = useLoaderData() as HostMemberListItem[];
+export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMembersLinkComponent }) {
+  const members = useLoaderData() as HostMemberListPage;
 
   return (
     <main className="rm-host-members-page">
@@ -20,7 +20,7 @@ export function HostMembersRoute() {
         </div>
       </section>
       <section className="container rm-host-members-page__body">
-        <HostMembers initialMembers={members} actions={hostMembersActions} />
+        <HostMembers initialMembers={members} actions={hostMembersActions} LinkComponent={LinkComponent} />
       </section>
     </main>
   );

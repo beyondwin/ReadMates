@@ -1,3 +1,5 @@
+import type { PagedResponse } from "@/shared/model/paging";
+
 export type NotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
@@ -14,7 +16,6 @@ export interface MemberNotification {
   createdAt: string;
 }
 
-export interface MemberNotificationListResponse {
+export interface MemberNotificationListResponse extends PagedResponse<MemberNotification> {
   unreadCount: number;
-  items: MemberNotification[];
 }

@@ -18,6 +18,10 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function pageOf<T>(items: T[], nextCursor: string | null = null) {
+  return { items, nextCursor };
+}
+
 function installRouterRequestShim() {
   const NativeRequest = globalThis.Request;
 
@@ -83,13 +87,13 @@ const publicClubResponse = {
 
 function isArchiveChildDataEndpoint(url: string) {
   return (
-    url === "/api/bff/api/archive/sessions" ||
+    url.startsWith("/api/bff/api/archive/sessions?") ||
     url.startsWith("/api/bff/api/archive/sessions/") ||
     (url.startsWith("/api/bff/api/sessions/") && url.endsWith("/feedback-document")) ||
-    url === "/api/bff/api/archive/me/questions" ||
-    url === "/api/bff/api/archive/me/reviews" ||
-    url === "/api/bff/api/feedback-documents/me" ||
-    url === "/api/bff/api/notes/sessions" ||
+    url.startsWith("/api/bff/api/archive/me/questions?") ||
+    url.startsWith("/api/bff/api/archive/me/reviews?") ||
+    url.startsWith("/api/bff/api/feedback-documents/me?") ||
+    url.startsWith("/api/bff/api/notes/sessions?") ||
     url.startsWith("/api/bff/api/notes/feed") ||
     url === "/api/bff/api/app/me"
   );
@@ -140,6 +144,30 @@ function routePathSet(routeObjects: RouteObject[], parent = ""): Set<string> {
   return paths;
 }
 
+function loaderRoutesWithoutHydrateFallback(routeObjects: RouteObject[], parent = ""): string[] {
+  const missing: string[] = [];
+
+  for (const route of routeObjects) {
+    const ownPath =
+      route.path === undefined
+        ? parent
+        : route.path.startsWith("/")
+          ? route.path
+          : `${parent.replace(/\/$/, "")}/${route.path}`;
+    const routeLabel = route.index ? `${parent || "/"}/(index)` : ownPath || "/";
+
+    if (route.loader && route.hydrateFallbackElement === undefined) {
+      missing.push(routeLabel);
+    }
+
+    if (route.children) {
+      missing.push(...loaderRoutesWithoutHydrateFallback(route.children, ownPath));
+    }
+  }
+
+  return missing;
+}
+
 describe("SPA router", () => {
   it("defines club-scoped member and host app routes", () => {
     const paths = routePathSet(routes);
@@ -147,6 +175,10 @@ describe("SPA router", () => {
     expect(paths).toContain("/clubs/:clubSlug/app");
     expect(paths).toContain("/clubs/:clubSlug/app/host");
     expect(paths).toContain("/clubs/:clubSlug/app/archive");
+  });
+
+  it("defines hydration fallbacks for every loader route", () => {
+    expect(loaderRoutesWithoutHydrateFallback(routes)).toEqual([]);
   });
 
   it("renders the login route", () => {
@@ -568,9 +600,9 @@ describe("SPA router", () => {
         );
       }
 
-      if (url === "/api/bff/api/archive/sessions") {
+      if (url === "/api/bff/api/archive/sessions?limit=30") {
         return Promise.resolve(
-          jsonResponse([
+          jsonResponse(pageOf([
             {
               sessionId: "session-6",
               sessionNumber: 6,
@@ -584,15 +616,15 @@ describe("SPA router", () => {
               published: true,
               state: "CLOSED",
             },
-          ]),
+          ])),
         );
       }
 
-      if (url === "/api/bff/api/archive/me/questions" || url === "/api/bff/api/archive/me/reviews") {
-        return Promise.resolve(jsonResponse([]));
+      if (url === "/api/bff/api/archive/me/questions?limit=30" || url === "/api/bff/api/archive/me/reviews?limit=30") {
+        return Promise.resolve(jsonResponse(pageOf([])));
       }
 
-      if (url === "/api/bff/api/feedback-documents/me") {
+      if (url === "/api/bff/api/feedback-documents/me?limit=30") {
         return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
       }
 
@@ -633,9 +665,9 @@ describe("SPA router", () => {
         );
       }
 
-      if (url === "/api/bff/api/archive/sessions?clubSlug=reading-sai") {
+      if (url === "/api/bff/api/archive/sessions?limit=30&clubSlug=reading-sai") {
         return Promise.resolve(
-          jsonResponse([
+          jsonResponse(pageOf([
             {
               sessionId: "session-6",
               sessionNumber: 6,
@@ -649,18 +681,18 @@ describe("SPA router", () => {
               published: true,
               state: "CLOSED",
             },
-          ]),
+          ])),
         );
       }
 
       if (
-        url === "/api/bff/api/archive/me/questions?clubSlug=reading-sai" ||
-        url === "/api/bff/api/archive/me/reviews?clubSlug=reading-sai"
+        url === "/api/bff/api/archive/me/questions?limit=30&clubSlug=reading-sai" ||
+        url === "/api/bff/api/archive/me/reviews?limit=30&clubSlug=reading-sai"
       ) {
-        return Promise.resolve(jsonResponse([]));
+        return Promise.resolve(jsonResponse(pageOf([])));
       }
 
-      if (url === "/api/bff/api/feedback-documents/me?clubSlug=reading-sai") {
+      if (url === "/api/bff/api/feedback-documents/me?limit=30&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ message: "forbidden" }, 403));
       }
 
@@ -682,7 +714,7 @@ describe("SPA router", () => {
       expect.objectContaining({ cache: "no-store" }),
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/archive/sessions?clubSlug=reading-sai",
+      "/api/bff/api/archive/sessions?limit=30&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
   });

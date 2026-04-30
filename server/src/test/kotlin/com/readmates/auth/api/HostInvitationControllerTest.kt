@@ -115,8 +115,26 @@ class HostInvitationControllerTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].email") { value("invite.apply@example.com") }
-                jsonPath("$[0].applyToCurrentSession") { value(false) }
+                jsonPath("$.items[0].email") { value("invite.apply@example.com") }
+                jsonPath("$.items[0].applyToCurrentSession") { value(false) }
+            }
+    }
+
+    @Test
+    fun `host invitation list returns paged contract`() {
+        createInvitation("paged.invite.1@example.com")
+        createInvitation("paged.invite.2@example.com")
+        createInvitation("paged.invite.3@example.com")
+
+        mockMvc.get("/api/host/invitations") {
+            with(user("host@example.com"))
+            param("limit", "2")
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(2) }
+                jsonPath("$.items[0].email") { value("paged.invite.3@example.com") }
+                jsonPath("$.nextCursor") { exists() }
             }
     }
 
@@ -203,10 +221,10 @@ class HostInvitationControllerTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].email") { value("list.member@example.com") }
-                jsonPath("$[0].effectiveStatus") { value("PENDING") }
-                jsonPath("$[0].canRevoke") { value(true) }
-                jsonPath("$[0].canReissue") { value(true) }
+                jsonPath("$.items[0].email") { value("list.member@example.com") }
+                jsonPath("$.items[0].effectiveStatus") { value("PENDING") }
+                jsonPath("$.items[0].canRevoke") { value(true) }
+                jsonPath("$.items[0].canReissue") { value(true) }
             }
             .andReturn()
             .response
@@ -234,10 +252,10 @@ class HostInvitationControllerTest(
         }
             .andExpect {
                 status { isOk() }
-                jsonPath("$[0].email") { value("accepted.list.member@example.com") }
-                jsonPath("$[0].effectiveStatus") { value("ACCEPTED") }
-                jsonPath("$[0].canRevoke") { value(false) }
-                jsonPath("$[0].canReissue") { value(false) }
+                jsonPath("$.items[0].email") { value("accepted.list.member@example.com") }
+                jsonPath("$.items[0].effectiveStatus") { value("ACCEPTED") }
+                jsonPath("$.items[0].canRevoke") { value(false) }
+                jsonPath("$.items[0].canReissue") { value(false) }
             }
     }
 

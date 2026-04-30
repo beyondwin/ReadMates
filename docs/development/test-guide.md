@@ -28,12 +28,18 @@ Unit test:
 pnpm --dir front test
 ```
 
-Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, 제거된 `shared/api/readmates` compatibility import, legacy boundary exception 사용 여부를 확인합니다.
+Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, `shared/ui`의 `src/app` import 금지, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import 금지, route-owned action type 노출 여부를 확인합니다. Legacy boundary exception 목록은 비어 있어야 합니다.
 
 Frontend 경계만 빠르게 확인하려면 Vitest를 직접 실행합니다.
 
 ```bash
 pnpm --dir front exec vitest run tests/unit/frontend-boundaries.test.ts
+```
+
+BFF/OAuth proxy header forwarding을 바꿨다면 Cloudflare Functions unit test를 먼저 실행합니다. 이 테스트는 browser-supplied internal header를 trusted BFF/server-derived 값으로 덮어쓰는지, `_shared/proxy.ts` helper가 upstream response의 internal `x-readmates-*` header를 제거하는지, OAuth proxy의 forwarded header policy가 authorization start와 callback에서 드리프트하지 않는지 확인합니다.
+
+```bash
+pnpm --dir front exec vitest run tests/unit/cloudflare-bff.test.ts tests/unit/cloudflare-oauth-proxy.test.ts
 ```
 
 Production build:
@@ -121,7 +127,7 @@ pnpm --dir front test:e2e
 
 Targeted Redis adapter test는 Testcontainers Redis를 직접 띄우므로 수동 Redis server가 필요하지 않습니다. Rate limit, auth session cache, public cache, notes cache, read-cache invalidation을 바꾸면 관련 `Redis*AdapterTest`, application cache test, `ServerArchitectureBoundaryTest`를 함께 확인합니다.
 
-Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인하고, 전환된 application package가 adapter, Spring JDBC, Spring DAO 세부사항에 의존하지 않는지 확인합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
+Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인하고, 전환된 application package가 adapter, Spring JDBC, Spring DAO, Spring Web/HTTP 세부사항에 의존하지 않는지 확인합니다. Application service에서 `ResponseStatusException`, `HttpStatus`, Spring Web type을 쓰지 말고 feature application error를 `adapter.in.web`에서 HTTP response로 매핑합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
 
 ```bash
 ./server/gradlew -p server test \
@@ -132,6 +138,14 @@ Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함
   --tests com.readmates.session.api.HostSessionControllerDbTest \
   --tests com.readmates.session.api.HostDashboardControllerTest \
   --tests com.readmates.note.api.MemberActionControllerDbTest
+```
+
+목록 조회, archive/notes/host/public detail query, 또는 cursor pagination SQL을 수정했다면 query budget과 EXPLAIN guardrail을 먼저 확인합니다. `ServerQueryBudgetTest`는 주요 HTTP flow의 query 수가 관찰된 budget을 넘지 않는지 확인하고, `MySqlQueryPlanTest`는 핵심 목록/detail SQL이 의도한 index plan을 유지하는지 확인합니다.
+
+```bash
+./server/gradlew -p server test \
+  --tests com.readmates.performance.ServerQueryBudgetTest \
+  --tests com.readmates.performance.MySqlQueryPlanTest
 ```
 
 멤버 프로필이나 표시 이름 검증을 수정했다면 아래 focused command로 controller, application, migration 경계를 먼저 확인할 수 있습니다.
