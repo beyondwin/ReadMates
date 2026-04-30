@@ -27,6 +27,17 @@ Docker와 Compose plugin은 VM에서 한 번 설치합니다.
 ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-install-docker.sh
 ```
 
+## Preflight Stop Rules
+
+아래 조건이 맞지 않으면 `05-deploy-compose-stack.sh`를 실행하지 않습니다.
+
+- VM의 `/etc/readmates/readmates.env`가 있고 권한이 `600`입니다.
+- Docker와 Compose plugin이 VM에서 동작합니다.
+- DB backup이 Git 밖의 운영 backup 위치에 있고 최근 48시간 이내 파일입니다. 배포 script는 `/var/backups/readmates/mysql/*.sql.gz`의 최근 파일을 확인합니다.
+- legacy host `readmates-server`와 host `caddy`를 중지/disable해도 되는 cutover window와 권한이 있습니다.
+
+`05-deploy-compose-stack.sh`는 compose stack 시작 전에 legacy host 서비스를 중지하고 disable합니다. 이 권한이나 rollback 기준이 없으면 먼저 [Rollback](#rollback) 경로를 준비합니다.
+
 ## Deploy
 
 `05-deploy-compose-stack.sh`는 서버 이미지를 만들고 VM으로 전송한 뒤 `/opt/readmates/.env`에 `READMATES_SERVER_IMAGE`를 저장합니다. 재부팅 뒤에도 systemd compose stack이 같은 image tag로 올라오게 하기 위한 파일입니다.
@@ -36,6 +47,8 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-instal
 ./server/gradlew -p server bootJar
 VM_PUBLIC_IP=VM_PUBLIC_IP CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
 ```
+
+완료 기준은 script가 끝까지 성공하고, compose `readmates-api` health, Cloudflare BFF auth smoke, production integration smoke가 모두 통과하는 것입니다. Redis/Kafka 기능 flag는 별도 rollout 전에는 켜지지 않은 상태로 둡니다.
 
 ## Smoke
 

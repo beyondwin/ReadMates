@@ -127,10 +127,10 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 
 ## Redis Feature Flags
 
-Redis는 선택 계층입니다. 런타임 환경에 관리형 Redis URL을 placeholder-safe 값으로 설정한 뒤, 기능 flag를 단계적으로 켭니다.
+Redis는 선택 계층입니다. 최종 OCI Compose stack에서는 compose가 `READMATES_REDIS_URL=redis://redis:6379`를 container 환경으로 주입합니다. Compose가 아닌 runtime에서만 관리형 Redis URL을 placeholder-safe 값으로 설정합니다.
 
 ```text
-READMATES_REDIS_URL=<managed-redis-url>
+READMATES_REDIS_URL=redis://redis:6379
 ```
 
 권장 순서:
