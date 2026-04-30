@@ -86,11 +86,27 @@ Domain provisioning은 DB에 저장된 desired workflow와 실제 Cloudflare 연
 | `REQUESTED` | 사용자가 domain alias를 요청했지만 운영 연결이 아직 시작되지 않았습니다. |
 | `ACTION_REQUIRED` | 운영자가 Cloudflare dashboard 또는 Wrangler에서 Pages custom domain 연결을 수행해야 합니다. |
 | `PROVISIONING` | 연결 또는 인증서 준비가 진행 중입니다. 현재 구현은 Cloudflare API poller가 아니라 admin-triggered marker check로 실제 연결을 확인합니다. |
-| `ACTIVE` | 상태 확인 action이 ReadMates Pages marker를 확인했거나 운영 절차상 서비스 가능한 host로 인정한 상태입니다. |
+| `ACTIVE` | 상태 확인 action이 ReadMates Pages marker를 확인한 상태입니다. |
 | `FAILED` | 연결, 인증서, DNS, smoke test 중 하나가 실패했습니다. |
 | `DISABLED` | 더 이상 traffic을 받지 않는 domain alias입니다. |
 
 현재 platform admin create flow는 domain row를 `ACTION_REQUIRED`로 만듭니다. Admin UI와 API는 `status`, `desiredState`, `manualAction`, `errorCode`를 보여주며, `ACTION_REQUIRED`의 manual action은 `CLOUDFLARE_PAGES_CUSTOM_DOMAIN`입니다. 상태 확인 action이 marker를 찾지 못하면 `FAILED`와 `DOMAIN_CHECK_*` error code를 남깁니다. 실제 Cloudflare API provisioning, account id/zone id/token 저장, live status poller는 1차 구현 범위가 아닙니다.
+
+Domain marker checker는 HTTPS `GET`만 사용하고 secret header를 보내지 않습니다. Redirect는 따르지 않으며, DNS가 private/link-local/loopback/multicast/IPv6 ULA address로 resolve되거나 marker body가 4KB를 넘으면 fail-closed로 처리합니다.
+
+대표 error code:
+
+| Error code | 의미 |
+| --- | --- |
+| `DOMAIN_CHECK_INVALID_HOSTNAME` | hostname으로 HTTPS marker URL을 만들 수 없습니다. |
+| `DOMAIN_CHECK_DNS_FAILED` | DNS resolve에 실패했습니다. |
+| `DOMAIN_CHECK_PRIVATE_ADDRESS` | DNS가 private, loopback, link-local, multicast, IPv6 ULA address로 resolve되었습니다. |
+| `DOMAIN_CHECK_UNREACHABLE` | HTTPS marker 요청이 timeout, TLS, network 오류 등으로 실패했습니다. |
+| `DOMAIN_CHECK_REDIRECT` | Marker endpoint가 3xx redirect를 반환했습니다. |
+| `DOMAIN_CHECK_RESPONSE_TOO_LARGE` | Marker 응답이 허용 크기를 넘었습니다. |
+| `DOMAIN_CHECK_HTTP_<status>` | Marker endpoint가 `200`이 아닌 HTTP status를 반환했습니다. |
+| `DOMAIN_CHECK_MARKER_MISMATCH` | Marker JSON이 ReadMates Cloudflare Pages marker가 아닙니다. |
+| `DOMAIN_CHECK_UNCONFIGURED` | 테스트 또는 fallback checker가 실제 확인 없이 실패 상태를 반환했습니다. 운영에서는 HTTP checker 설정을 확인합니다. |
 
 운영 절차:
 

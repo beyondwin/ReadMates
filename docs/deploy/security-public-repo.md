@@ -153,6 +153,14 @@ Git history까지 검사하는 `gitleaks detect --source .`는 이미 공개된 
 
 모든 secret을 한 번에 바꾸지 않습니다. 한 boundary를 바꾸고 smoke test한 뒤 다음 boundary로 넘어갑니다.
 
+BFF, OAuth, domain boundary를 함께 바꾼 배포에서는 기본 auth smoke에 더해 Cloudflare Pages marker와 Google OAuth `redirect_uri`도 확인합니다. Smoke 결과에는 운영 domain 상태가 들어갈 수 있으므로 공개 문서와 Git에는 결과를 붙이지 않습니다.
+
+```bash
+READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+./scripts/smoke-production-integrations.sh
+```
+
 ## 로컬 파일 관리
 
 Git ignore 대상 파일이라도 실제 secret을 담고 있으면 위험합니다. 가능하면 운영 secret은 repository 폴더 밖에 두고, 이슈나 지원 요청에 첨부하지 않습니다.
