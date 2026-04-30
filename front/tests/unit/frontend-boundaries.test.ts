@@ -9,8 +9,6 @@ const sourceRoots = ["src", "features", "shared"];
 const sourceExtensions = new Set([".js", ".jsx", ".ts", ".tsx"]);
 const featuresWithUiPublicSurface = collectFeaturesWithUiPublicSurface();
 const removedReadmatesApiCompatibilityPath = ["shared", "api", "readmates"].join("/");
-const routeOwnedActionTypeExportPattern =
-  /(?:export\s+(?:type|interface)\s+\w+Actions\b|export\s+(?:type\s+\{[^}]*\w+Actions\b|\{[^}]*\btype\s+\w+Actions\b))/;
 
 type BoundaryRuleId =
   | "shared-boundary"
@@ -123,6 +121,70 @@ function parseStaticImportSpecifiers(source: string) {
   visit(sourceFile);
 
   return specifiers;
+}
+
+function isRouteOwnedActionsName(name: string) {
+  return name.endsWith("Actions") && name.length > "Actions".length;
+}
+
+function hasRouteOwnedActionTypeExport(source: string) {
+  const sourceFile = ts.createSourceFile(
+    "host-ui-action-export-source.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TSX,
+  );
+  let hasRouteOwnedActionExport = false;
+
+  function hasExportModifier(node: ts.Node) {
+    return (
+      ts.canHaveModifiers(node) &&
+      ts.getModifiers(node)?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    );
+  }
+
+  function visit(node: ts.Node) {
+    if (
+      (ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) &&
+      hasExportModifier(node) &&
+      isRouteOwnedActionsName(node.name.text)
+    ) {
+      hasRouteOwnedActionExport = true;
+      return;
+    }
+
+    if (ts.isExportDeclaration(node) && node.exportClause !== undefined) {
+      if (ts.isNamedExports(node.exportClause)) {
+        for (const element of node.exportClause.elements) {
+          const localName = element.propertyName?.text;
+          const exportedName = element.name.text;
+
+          if (
+            (localName !== undefined && isRouteOwnedActionsName(localName)) ||
+            isRouteOwnedActionsName(exportedName)
+          ) {
+            hasRouteOwnedActionExport = true;
+            return;
+          }
+        }
+      }
+
+      if (
+        ts.isNamespaceExport(node.exportClause) &&
+        isRouteOwnedActionsName(node.exportClause.name.text)
+      ) {
+        hasRouteOwnedActionExport = true;
+        return;
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  return hasRouteOwnedActionExport;
 }
 
 function normalizeImportSpecifier(sourceFile: SourceFile, specifier: string): ImportSpecifier {
@@ -393,10 +455,12 @@ describe("frontend architecture boundaries", () => {
       "export interface HostDashboardActions {}",
       "export type { HostDashboardActions } from './host-dashboard-actions';",
       "export { type HostDashboardActions } from './host-dashboard-actions';",
+      "export { HostDashboardActions } from './host-dashboard-actions';",
+      "export { HostDashboardActions };",
     ];
 
     for (const invalidExport of invalidExports) {
-      expect(invalidExport, `${invalidExport} must be rejected`).toMatch(routeOwnedActionTypeExportPattern);
+      expect(hasRouteOwnedActionTypeExport(invalidExport), `${invalidExport} must be rejected`).toBe(true);
     }
   });
 
@@ -512,7 +576,9 @@ describe("frontend architecture boundaries", () => {
         "@/features/host/api/host-api",
       );
       expect(source, `${relativePath} must not call fetch directly`).not.toMatch(/\bfetch\s*\(/);
-      expect(source, `${relativePath} must not export route-owned action types`).not.toMatch(routeOwnedActionTypeExportPattern);
+      expect(hasRouteOwnedActionTypeExport(source), `${relativePath} must not export route-owned action types`).toBe(
+        false,
+      );
     }
   });
 
