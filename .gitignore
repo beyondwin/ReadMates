@@ -23,3 +23,4 @@ deploy/cloudflare/.deploy-hook.env
 .idea
 .playwright-mcp
 docs/private/
+.server-config/

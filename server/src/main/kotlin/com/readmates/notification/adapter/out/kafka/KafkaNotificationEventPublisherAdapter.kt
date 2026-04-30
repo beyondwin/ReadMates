@@ -2,6 +2,7 @@ package com.readmates.notification.adapter.out.kafka
 
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.kafka.core.KafkaTemplate
@@ -16,7 +17,7 @@ import java.util.concurrent.TimeoutException
 @Component
 @ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
-class KafkaNotificationEventPublisherAdapter(
+class KafkaNotificationEventPublisherAdapter @Autowired constructor(
     @param:Qualifier("notificationEventKafkaTemplate")
     private val kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,
     private val kafkaProperties: NotificationKafkaProperties,

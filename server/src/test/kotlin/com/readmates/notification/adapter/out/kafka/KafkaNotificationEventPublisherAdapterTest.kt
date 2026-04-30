@@ -85,6 +85,21 @@ class KafkaNotificationEventPublisherAdapterTest {
     }
 
     @Test
+    fun `publisher adapter component autowires notification kafka dependencies`() {
+        ApplicationContextRunner()
+            .withUserConfiguration(
+                NotificationKafkaConfiguration::class.java,
+                KafkaNotificationEventPublisherAdapter::class.java,
+            ).withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                assertThat(context).hasSingleBean(NotificationEventPublisherPort::class.java)
+            }
+    }
+
+    @Test
     fun `consumer factory uses notification bootstrap servers and consumer group`() {
         contextRunner
             .withPropertyValues(
