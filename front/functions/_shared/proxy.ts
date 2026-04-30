@@ -42,6 +42,37 @@ export function clientIpFromRequest(request: Request) {
   return forwardedFor ? forwardedFor.slice(0, MAX_CLIENT_IP_LENGTH) : null;
 }
 
+export function forwardedOAuthRequestHeaders(
+  request: Request,
+  env: { READMATES_BFF_SECRET?: string },
+) {
+  const sourceUrl = new URL(request.url);
+  const headers = new Headers();
+
+  for (const name of ["accept", "accept-language", "cookie", "user-agent"]) {
+    const value = request.headers.get(name);
+    if (value) {
+      headers.set(name, value);
+    }
+  }
+
+  headers.set("x-forwarded-host", sourceUrl.host);
+  headers.set("x-forwarded-proto", sourceUrl.protocol.replace(":", ""));
+  headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(request));
+
+  const bffSecret = env.READMATES_BFF_SECRET?.trim();
+  if (bffSecret) {
+    headers.set("X-Readmates-Bff-Secret", bffSecret);
+  }
+
+  const clientIp = clientIpFromRequest(request);
+  if (clientIp) {
+    headers.set("X-Readmates-Client-IP", clientIp);
+  }
+
+  return headers;
+}
+
 export function safeRouteSegment(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
     return value.length === 1 ? safeRouteSegment(value[0]) : null;
