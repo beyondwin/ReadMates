@@ -657,7 +657,7 @@ git commit -m "docs: clarify compose stack prerequisites and rollback"
 - No source changes expected
 - Test: server, docs, compose, public release safety
 
-- [ ] **Step 1: Run server tests**
+- [x] **Step 1: Run server tests**
 
 Run:
 
@@ -667,7 +667,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL`.
 
-- [ ] **Step 2: Build boot JAR**
+- [x] **Step 2: Build boot JAR**
 
 Run:
 
@@ -677,7 +677,7 @@ Run:
 
 Expected: `BUILD SUCCESSFUL` and JAR exists.
 
-- [ ] **Step 3: Build Docker image**
+- [x] **Step 3: Build Docker image**
 
 Run:
 
@@ -697,7 +697,9 @@ READMATES_SERVER_IMAGE=readmates-server:local docker compose -f deploy/oci/compo
 
 Expected: command exits 0 and `/tmp/readmates-compose-config.yml` contains services `caddy`, `readmates-api`, `redis`, `redpanda`.
 
-- [ ] **Step 5: Run public release safety checks**
+Task 6 local result: exact command failed locally because `/etc/readmates/caddy.env` was not present. The approved local substitute with `--no-env-resolution` exited 0, and `/tmp/readmates-compose-config.yml` contained services `caddy`, `readmates-api`, `redis`, `redpanda`.
+
+- [x] **Step 5: Run public release safety checks**
 
 Run:
 
@@ -708,7 +710,7 @@ Run:
 
 Expected: release candidate builds and public release scanner passes.
 
-- [ ] **Step 6: Commit verification-only changes if any**
+- [x] **Step 6: Commit verification-only changes if any**
 
 If verification produced tracked doc or config changes, commit them. If no files changed, do not create an empty commit.
 
