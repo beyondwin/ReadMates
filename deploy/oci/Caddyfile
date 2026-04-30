@@ -1,8 +1,14 @@
 {$CADDY_SITE} {
-    reverse_proxy readmates-api:8080
+	reverse_proxy readmates-api:8080
 
-    log {
-        output stdout
-        format console
-    }
+	log {
+		output stdout
+		format filter {
+			wrap console
+			request>uri delete
+			request>headers>Authorization delete
+			request>headers>Cookie delete
+			request>headers>X-Readmates-Bff-Secret delete
+		}
+	}
 }

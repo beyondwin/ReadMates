@@ -67,6 +67,31 @@ describe("Cloudflare BFF function", () => {
     expect((init.headers as Headers).get("X-Readmates-Club-Host")).toBe("readmates.pages.dev");
   });
 
+  it("uses the dedicated bff secret and strips API base URL query parameters", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/me"),
+        {
+          path: ["api", "auth", "me"],
+        },
+        {
+          READMATES_API_BASE_URL: "https://api.example.com?ignored=value",
+          READMATES_BFF_SECRET: "direct-secret",
+        },
+      ),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/auth/me",
+      expect.any(Object),
+    );
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Bff-Secret")).toBe("direct-secret");
+  });
+
   it("forwards normalized club host from request host and overwrites browser header", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

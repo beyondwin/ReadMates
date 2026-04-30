@@ -1,4 +1,5 @@
 import {
+  apiBaseUrlFromEnv,
   copyUpstreamHeaders,
   forwardedOAuthRequestHeaders,
   safeRouteSegment,
@@ -22,7 +23,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   }
 
   const sourceUrl = new URL(request.url);
-  const upstreamUrl = new URL(`/login/oauth2/code/${registrationId}`, env.READMATES_API_BASE_URL);
+  const upstreamUrl = new URL(`/login/oauth2/code/${registrationId}`, apiBaseUrlFromEnv(env));
   upstreamUrl.search = sourceUrl.search;
 
   const upstream = await fetch(upstreamUrl.toString(), {
