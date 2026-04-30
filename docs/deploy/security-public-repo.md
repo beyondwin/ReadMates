@@ -18,6 +18,7 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `.github/workflows/deploy-front.yml`
 - `.github/CODEOWNERS`, 파일이 있을 때만 포함
 - `.gitignore`
+- `.gitleaks.toml`, 파일이 있을 때만 포함
 - `.env.example`
 - `README.md`
 - `compose.yml`
@@ -27,7 +28,7 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `docs/deploy/`
 - `docs/development/`
 - `docs/superpowers/`의 sanitized historical design and implementation records
-- 공개 릴리즈 검증용 `scripts/`
+- 공개 릴리즈 후보 생성, 검사, fixture 검증, 배포 후 공개 연동 smoke용 `scripts/`
 
 공개 릴리즈 후보에서 제외하는 주요 경로:
 
@@ -81,6 +82,7 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 ## 커밋 가능
 
 - placeholder만 있는 `.env.example`
+- public release scanner 설정인 `.gitleaks.toml`
 - `host@example.com`, `member1@example.com` 같은 예약된 sample email
 - 공개해도 되는 sample 이름
 - `local-dev-secret`, `e2e-secret`, `test-secret` 같은 테스트 전용 secret

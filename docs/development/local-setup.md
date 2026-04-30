@@ -120,6 +120,8 @@ SPRING_DATASOURCE_URL='jdbc:mysql://localhost:3306/<local-db-name>?serverTimezon
 SPRING_DATASOURCE_USERNAME='<local-db-user>' \
 SPRING_DATASOURCE_PASSWORD='<local-db-password>' \
 READMATES_APP_BASE_URL=http://localhost:5173 \
+READMATES_AUTH_BASE_URL=http://localhost:5173 \
+READMATES_AUTH_RETURN_STATE_SECRET='<local-return-state-signing-secret>' \
 READMATES_ALLOWED_ORIGINS=http://localhost:5173 \
 READMATES_BFF_SECRET='<local-bff-secret>' \
 READMATES_AUTH_SESSION_COOKIE_SECURE=false \
@@ -135,6 +137,8 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `SPRING_DATASOURCE_USERNAME` | MySQL 사용자입니다. |
 | `SPRING_DATASOURCE_PASSWORD` | MySQL 비밀번호입니다. |
 | `READMATES_APP_BASE_URL` | 로그인 성공 후 돌아갈 frontend origin입니다. |
+| `READMATES_AUTH_BASE_URL` | Google OAuth callback `redirect_uri`에 쓰는 auth origin입니다. 로컬에서는 보통 `READMATES_APP_BASE_URL`과 같은 값을 둡니다. |
+| `READMATES_AUTH_RETURN_STATE_SECRET` | OAuth `returnTo` target 서명 secret입니다. 로컬에서도 placeholder-safe 값을 명시하면 production return-state 경계를 더 가깝게 확인할 수 있습니다. |
 | `READMATES_ALLOWED_ORIGINS` | mutating API 요청의 `Origin` 또는 `Referer` 허용 origin입니다. 쉼표로 여러 값을 줄 수 있습니다. |
 | `READMATES_BFF_SECRET` | BFF가 Spring API로 전달하는 공유 secret입니다. 로컬에서도 frontend proxy와 같은 값을 쓰면 production boundary를 비슷하게 테스트할 수 있습니다. |
 | `READMATES_BFF_SECRET_REQUIRED` | 기본 `true`입니다. `application-dev.yml`에서는 `false`로 완화되어 있지만, `READMATES_BFF_SECRET`을 설정하면 `/api/**` 요청은 `X-Readmates-Bff-Secret`이 필요합니다. |
