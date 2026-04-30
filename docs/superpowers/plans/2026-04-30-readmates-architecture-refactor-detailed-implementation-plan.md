@@ -1059,7 +1059,7 @@ Acceptance criteria completed: `ServerArchitectureBoundaryTest` now rejects Spri
 - Create: `server/src/test/kotlin/com/readmates/performance/MySqlQueryPlanTest.kt`
 - Modify: notification/session tests for transaction-required paths.
 
-- [ ] **Step 1: Add query counting datasource support**
+- [x] **Step 1: Add query counting datasource support**
 
 Create a test support wrapper that counts `prepareStatement` calls per test thread. Keep it test-only and opt-in so production wiring is unchanged.
 
@@ -1074,7 +1074,7 @@ object QueryCounter {
 
 Wrap `DataSource.getConnection()` and increment on `prepareStatement(sql)`.
 
-- [ ] **Step 2: Add query budget tests**
+- [x] **Step 2: Add query budget tests**
 
 Create `ServerQueryBudgetTest.kt` with MockMvc calls:
 
@@ -1100,15 +1100,15 @@ Add similar tests for:
 /api/host/sessions/{sessionId}/deletion-preview
 ```
 
-- [ ] **Step 3: Add MySQL EXPLAIN tests**
+- [x] **Step 3: Add MySQL EXPLAIN tests**
 
 Create `MySqlQueryPlanTest.kt` using existing MySQL Testcontainer support. Test the paged query shapes for archive, notes, host members, notification delivery claim, and public session detail. Assert no full table scan on the largest tables by checking the `key` column is non-null for the table under test.
 
-- [ ] **Step 4: Add transaction-required tests for lock paths**
+- [x] **Step 4: Add transaction-required tests for lock paths**
 
 For methods using `for update` or `for update skip locked`, add tests that call them through their application service or scheduler entrypoint, not directly without transaction. Assert claim methods do not produce duplicate ids when invoked twice inside concurrent transactions.
 
-- [ ] **Step 5: Run performance guard tests**
+- [x] **Step 5: Run performance guard tests**
 
 Run:
 
@@ -1123,7 +1123,7 @@ Run:
 
 Expected: all pass. If a budget is too strict for current behavior, adjust the budget in the test and record the reason in the test name or assertion message.
 
-- [ ] **Step 6: Commit DB guardrails**
+- [x] **Step 6: Commit DB guardrails**
 
 Run:
 
@@ -1131,6 +1131,9 @@ Run:
 git add server/src/test/kotlin/com/readmates/support server/src/test/kotlin/com/readmates/performance server/src/test/kotlin/com/readmates/notification server/src/test/kotlin/com/readmates/session
 git commit -m "test: add db query and transaction guardrails"
 ```
+
+COMPACT CHECKPOINT Task 6 - Add DB Query Budget, EXPLAIN, And Transaction Guard Tests:
+Acceptance criteria completed: test-only query counting datasource and query budgets added; MySQL EXPLAIN support and production-shaped query plan tests added; notification claim/outbox and host session transaction guard coverage added; EXPLAIN assertion tightened; narrow note-count indexes added where tightened guard exposed a real full scan; implementation committed as `963afc6`, follow-up as `252d988`. Changed files: `QueryCountingDataSource.kt`, `MySqlExplainTestSupport.kt`, `MySqlExplainTestSupportTest.kt`, `ServerQueryBudgetTest.kt`, `MySqlQueryPlanTest.kt`, notification/session tests, `server/src/main/resources/db/mysql/migration/V22__note_count_query_indexes.sql`, and this plan document. Key decisions: query budgets use observed baselines with assertion reasons instead of forcing optimizations in this test task; V22 indexes are additive and tied to existing notes count query shapes (`one_line_reviews`/`long_reviews` by club/session/visibility/member), not speculative; `assertUsesIndexFor` rejects `ALL` and full `index` scans. Contracts/API/state/test expectations: current query budgets are current-session 5, archive detail 14, public club 5, public session detail 3, deletion preview 15; EXPLAIN tests cover archive page, notes production session count query, host member production query, global notification delivery claim, and public session detail. Reviews: initial Task 6 reviews found reduced EXPLAIN query shapes and weak index assertions; follow-up fixed them; final DB/migration and Task 6 re-reviews approved. Verification: initial red budget run failed with observed query counts before baselines were set; Task 6 suite `./server/gradlew -p server test --tests com.readmates.performance.ServerQueryBudgetTest --tests com.readmates.performance.MySqlQueryPlanTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapterTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapterTest --tests com.readmates.session.api.HostSessionControllerDbTest` passed; after follow-up, `./server/gradlew -p server test --tests com.readmates.performance.ServerQueryBudgetTest --tests com.readmates.performance.MySqlQueryPlanTest --tests com.readmates.support.MySqlExplainTestSupportTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapterTest --tests com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapterTest --tests com.readmates.session.api.HostSessionControllerDbTest` passed; migration reviewer also ran `MySqlFlywayMigrationTest`, passed; `git diff --check` passed. Remaining risks: EXPLAIN tests are intentionally sensitive to MySQL planner changes; keep future failures as performance review signals, not automatic weakening candidates. Next first action: dispatch Task 7 implementer to split notification delivery, host session write, and archive JDBC adapters without behavior changes. Worktree/branch: `/Users/kws/.config/superpowers/worktrees/ReadMates/readmates-architecture-refactor`, `codex/readmates-architecture-refactor`. Session-owned process/port state: no dev servers or browser sessions started; completed Task 6 subagents closed; no session-owned ports open.
 
 ## Task 7: Split High-Risk JDBC Adapters Without Behavior Changes
 
