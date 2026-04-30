@@ -1,7 +1,10 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.NotificationEventOutboxItem
+import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.NotificationEventPublisherPort
+import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.support.MySqlTestContainer
@@ -17,7 +20,11 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.Collections
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
     delete from notification_event_outbox
@@ -131,6 +138,28 @@ class JdbcNotificationEventOutboxAdapterTest(
                 claimed.single().id.toString(),
             ),
         ).isEqualTo("PUBLISHING")
+    }
+
+    @Test
+    fun `relay service concurrent claims do not publish duplicate event ids`() {
+        insertClub()
+        repeat(3) { index ->
+            enqueueTestEvent("event-outbox-adapter-test-concurrent-claim-$index")
+        }
+        val publisher = RecordingNotificationEventPublisher()
+        val service = NotificationRelayService(
+            notificationEventOutboxPort = adapter,
+            notificationEventPublisherPort = publisher,
+            maxAttempts = 5,
+        )
+
+        val publishedCounts = runConcurrently(workerCount = 2) {
+            service.publishPending(limit = 2)
+        }
+
+        assertThat(publishedCounts.sum()).isEqualTo(3)
+        assertThat(publisher.eventIds()).hasSize(3).doesNotHaveDuplicates()
+        assertThat(publishedEventRows()).isEqualTo(3)
     }
 
     @Test
@@ -408,6 +437,18 @@ class JdbcNotificationEventOutboxAdapterTest(
             clubId.toString(),
         ) ?: 0
 
+    private fun publishedEventRows(): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from notification_event_outbox
+            where club_id = ?
+              and status = 'PUBLISHED'
+            """.trimIndent(),
+            Int::class.java,
+            clubId.toString(),
+        ) ?: 0
+
     private fun claimSingleEvent(
         dedupeKey: String,
     ): NotificationEventOutboxItem {
@@ -527,11 +568,41 @@ class JdbcNotificationEventOutboxAdapterTest(
         )
     }
 
+    private fun <T> runConcurrently(workerCount: Int, action: () -> T): List<T> {
+        val executor = Executors.newFixedThreadPool(workerCount)
+        val ready = CountDownLatch(workerCount)
+        val start = CountDownLatch(1)
+        return try {
+            val futures = (1..workerCount).map {
+                executor.submit<T> {
+                    ready.countDown()
+                    check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
+                    action()
+                }
+            }
+            check(ready.await(5, TimeUnit.SECONDS)) { "Timed out waiting for concurrent workers" }
+            start.countDown()
+            futures.map { it.get(10, TimeUnit.SECONDS) }
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
     companion object {
         @JvmStatic
         @DynamicPropertySource
         fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
             MySqlTestContainer.registerDatasourceProperties(registry)
         }
+    }
+
+    private class RecordingNotificationEventPublisher : NotificationEventPublisherPort {
+        private val eventIds = Collections.synchronizedList(mutableListOf<UUID>())
+
+        override fun publish(message: NotificationEventMessage, topic: String, key: String) {
+            eventIds += message.eventId
+        }
+
+        fun eventIds(): List<UUID> = eventIds.toList()
     }
 }
