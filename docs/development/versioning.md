@@ -9,7 +9,7 @@ ReadMates의 제품 릴리즈 버전은 Git tag와 `CHANGELOG.md`, GitHub Releas
 | Git tag `vMAJOR.MINOR.PATCH` | 배포 가능한 제품 버전과 Cloudflare Pages frontend deployment trigger |
 | `CHANGELOG.md` | 저장소에 남는 버전별 릴리즈 노트 |
 | GitHub Release | 공개 사용자와 운영자가 보는 tag별 릴리즈 노트 |
-| OCI compose image tag | 서버 배포 시 운영 VM에 올리는 container image 식별자. 제품 tag와 맞춰 `readmates-server:vMAJOR.MINOR.PATCH`를 권장 |
+| OCI compose image tag | 서버 배포 시 운영 VM에서 pull하는 container image 식별자. 제품 tag와 맞춰 `ghcr.io/<owner>/<repo>/readmates-server:vMAJOR.MINOR.PATCH`를 사용 |
 
 제품 버전은 하나만 올립니다. Server와 frontend를 각각 다른 semantic version으로 관리하지 않고, 같은 Git tag가 backend code, frontend code, Pages Functions, deployment scripts, docs를 함께 가리킵니다.
 
@@ -31,10 +31,11 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 2. `docs/development/release-management.md`와 이 문서가 현재 절차와 맞는지 확인합니다.
 3. 변경 범위에 맞는 검증을 실행합니다.
 4. 릴리즈 문서 변경을 `main`에 커밋하고 push합니다.
-5. 서버 변경이 있으면 먼저 OCI backend를 같은 버전 image tag로 배포합니다.
+5. 서버 변경이 있으면 같은 release tag로 GHCR image와 OCI compose 배포를 진행할 계획을 deployment notes에 확정합니다.
 6. `git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"`를 만들고 push합니다.
-7. Tag push가 `.github/workflows/deploy-front.yml`을 통해 Cloudflare Pages frontend와 Pages Functions를 배포합니다.
-8. GitHub Release body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
+7. Tag push가 `.github/workflows/deploy-front.yml`을 통해 Cloudflare Pages frontend와 Pages Functions를 배포하고, `.github/workflows/deploy-server.yml`을 통해 같은 tag의 GHCR server image를 게시합니다.
+8. 서버 변경이 있으면 `Deploy Server Image` workflow 성공 뒤 OCI backend를 같은 GHCR image tag로 배포합니다.
+9. GitHub Release body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
 
 `main` push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend 배포 기준은 `v*` tag push입니다.
 

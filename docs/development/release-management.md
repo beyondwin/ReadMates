@@ -126,9 +126,9 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    git push origin v1.2.0
    ```
 
-   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow를 시작합니다.
+   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow와 GHCR server image publish workflow를 시작합니다.
 
-   서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 같은 tag의 GHCR 이미지를 게시했는지 확인합니다. 수동 실행할 때는 workflow input `image_tag`에도 같은 release tag를 넣습니다. OCI backend는 그 release artifact를 같은 제품 버전 image tag로 배포합니다.
+   서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 같은 tag의 GHCR 이미지를 게시했는지 확인합니다. 수동 실행할 때는 release tag/ref에서 실행하고 workflow input `image_tag`에도 같은 release tag를 넣습니다. OCI backend는 그 release artifact를 같은 제품 버전 image tag로 배포합니다.
 
    ```bash
    READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:v1.2.0' \
@@ -151,7 +151,7 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
 서버 API 또는 DB migration이 있는 릴리즈는 아래 내용을 `Deployment Notes`에 반드시 적습니다.
 
-- 서버 JAR 배포가 필요한지
+- 서버 image/OCI compose 배포가 필요한지
 - Flyway가 몇 버전까지 올라가야 하는지
 - Cloudflare Pages 배포만으로 충분하지 않은지
 - 비로그인 smoke에서 기대되는 HTTP status
