@@ -407,6 +407,20 @@ describe("route guards", () => {
     expect(screen.queryByText("protected app")).not.toBeInTheDocument();
   });
 
+  it("redirects anonymous guarded routes to login with search and hash returnTo", async () => {
+    mockAuthFetch(anonymousAuth);
+
+    renderGuard(
+      <RequireAuth>
+        <main>protected app</main>
+      </RequireAuth>,
+      "/guard?tab=notes#question-1",
+    );
+
+    expect(await screen.findByText("login page ?returnTo=%2Fguard%3Ftab%3Dnotes%23question-1")).toBeInTheDocument();
+    expect(screen.queryByText("protected app")).not.toBeInTheDocument();
+  });
+
   it("redirects anonymous member app routes to login", async () => {
     mockAuthFetch(anonymousAuth);
 

@@ -404,7 +404,7 @@ git commit -m "fix: verify notification DLT partitions"
 
 **배경:** `front/tests/unit/route-continuity.test.ts`와 `front/tests/unit/auth-context.test.tsx`가 이미 존재합니다. 새 빈 껍데기 test file을 만들지 말고 실제 누락 case를 기존 suite에 추가합니다.
 
-- [ ] **Step 1: route-continuity test에 실제 state parsing case 추가**
+- [x] **Step 1: route-continuity test에 실제 state parsing case 추가**
 
 `front/tests/unit/route-continuity.test.ts` import에 아래 함수들을 추가합니다.
 
@@ -445,7 +445,7 @@ it("rejects external return targets", () => {
 });
 ```
 
-- [ ] **Step 2: auth guard test는 기존 `auth-context.test.tsx`에 추가**
+- [x] **Step 2: auth guard test는 기존 `auth-context.test.tsx`에 추가**
 
 `RequireAuth`, `RequireMemberApp`, `RequireHost`의 loading/anonymous/member/host case는 이미 있으므로, 추가 test는 현재 누락된 returnTo hash/search 보존 또는 club-scoped path 중 하나로 제한합니다.
 
@@ -464,7 +464,7 @@ it("redirects anonymous guarded routes to login with search and hash returnTo", 
 });
 ```
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 pnpm --dir front test front/tests/unit/route-continuity.test.ts front/tests/unit/auth-context.test.tsx
@@ -474,7 +474,9 @@ pnpm --dir front build
 pnpm --dir front test:e2e
 ```
 
-- [ ] **Step 4: Commit**
+Actual: planned `front/tests/...` filter fails under `pnpm --dir front` because paths are resolved from `front/`; equivalent `tests/unit/...` targeted test, `lint`, full `test`, `build`, and `git diff --check` passed. `test:e2e` was attempted but blocked by the existing local `readmates_e2e` Flyway checksum state.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add front/tests/unit/route-continuity.test.ts front/tests/unit/auth-context.test.tsx
