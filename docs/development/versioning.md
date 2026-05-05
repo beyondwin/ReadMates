@@ -40,10 +40,10 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 
 ## Server Image Tags
 
-OCI compose 배포 script는 `READMATES_SERVER_IMAGE`가 없으면 `readmates-server:local`을 사용합니다. 릴리즈 배포에서는 아래처럼 제품 tag와 같은 image tag를 명시합니다.
+OCI compose 배포 script는 `READMATES_SERVER_IMAGE`가 없으면 `readmates-server:local`을 사용해 로컬 빌드 이미지를 VM으로 전송합니다. 릴리즈 배포에서는 먼저 `Deploy Server Image` workflow가 같은 tag의 GHCR 이미지를 게시했는지 확인하고, 아래처럼 제품 tag와 같은 image tag를 명시합니다.
 
 ```bash
-READMATES_SERVER_IMAGE=readmates-server:vX.Y.Z \
+READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
 VM_PUBLIC_IP='<vm-public-ip>' \
 CADDY_SITE=api.example.com \
 ./deploy/oci/05-deploy-compose-stack.sh

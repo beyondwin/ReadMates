@@ -168,12 +168,16 @@ Current `server/Dockerfile` copies `build/libs/readmates-server-0.0.1-SNAPSHOT.j
 - Modify: `server/Dockerfile`
 - Modify: `server/.dockerignore`
 - Create: `.github/workflows/deploy-server.yml`
+- Modify: `deploy/oci/05-deploy-compose-stack.sh`
 - Modify: `docs/deploy/oci-backend.md`
+- Modify: `docs/deploy/compose-stack.md`
+- Modify: `docs/deploy/README.md`
 - Modify: `docs/development/release-management.md`
+- Modify: `docs/development/versioning.md`
 
 ### Steps
 
-- [ ] **Step 1: `.dockerignore`를 builder-friendly로 변경**
+- [x] **Step 1: `.dockerignore`를 builder-friendly로 변경**
 
 Replace `server/.dockerignore` with:
 
@@ -190,7 +194,7 @@ build/tmp
 
 Keep `src`, `gradle`, `gradlew`, `gradlew.bat`, `settings.gradle.kts`, and `build.gradle.kts` available to the build context.
 
-- [ ] **Step 2: multi-stage Dockerfile 작성**
+- [x] **Step 2: multi-stage Dockerfile 작성**
 
 Replace `server/Dockerfile` with:
 
@@ -221,7 +225,7 @@ EXPOSE 8080 8081
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-jar", "/app/readmates-server.jar"]
 ```
 
-- [ ] **Step 3: local build 확인**
+- [x] **Step 3: local build 확인**
 
 ```bash
 docker build -t readmates-server:local server
@@ -230,7 +234,7 @@ docker run --rm readmates-server:local --version
 
 Expected: the image builds. If `java -jar` does not support `--version`, the container may exit non-zero after printing Spring Boot usage or startup failure because env is missing; the build itself is the gate. Do not add runtime secrets to test this image.
 
-- [ ] **Step 4: GHCR workflow 추가**
+- [x] **Step 4: GHCR workflow 추가**
 
 Create `.github/workflows/deploy-server.yml`:
 
@@ -278,7 +282,7 @@ jobs:
           tags: ghcr.io/${{ github.repository }}/readmates-server:${{ github.ref_name }}
 ```
 
-- [ ] **Step 5: docs에 배포 artifact 규칙 추가**
+- [x] **Step 5: docs에 배포 artifact 규칙 추가**
 
 In `docs/deploy/oci-backend.md`, document:
 
@@ -292,19 +296,24 @@ In `docs/development/release-management.md`, add release checklist item:
 서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 같은 tag의 GHCR 이미지를 게시했는지 확인합니다.
 ```
 
-- [ ] **Step 6: verify**
+Review fix: update `deploy/oci/05-deploy-compose-stack.sh` and live deploy docs so release deploys pull `ghcr.io/<owner>/<repo>/readmates-server:<git-tag>` on the VM instead of rebuilding a local image under the GHCR tag. Keep local non-GHCR image tags as a build-and-transfer path for transition checks.
+
+- [x] **Step 6: verify**
 
 ```bash
 docker build -t readmates-server:local server
 ./server/gradlew -p server clean test
-git diff --check -- server/Dockerfile server/.dockerignore .github/workflows/deploy-server.yml docs/deploy/oci-backend.md docs/development/release-management.md
+bash -n deploy/oci/05-deploy-compose-stack.sh
+git diff --check -- server/Dockerfile server/.dockerignore .github/workflows/deploy-server.yml deploy/oci/05-deploy-compose-stack.sh docs/deploy/oci-backend.md docs/deploy/compose-stack.md docs/deploy/README.md docs/development/release-management.md docs/development/versioning.md
 ```
 
-- [ ] **Step 7: commit**
+- [x] **Step 7: commit**
 
 ```bash
 git add server/Dockerfile server/.dockerignore .github/workflows/deploy-server.yml \
-        docs/deploy/oci-backend.md docs/development/release-management.md
+        deploy/oci/05-deploy-compose-stack.sh \
+        docs/deploy/oci-backend.md docs/deploy/compose-stack.md docs/deploy/README.md \
+        docs/development/release-management.md docs/development/versioning.md
 git commit -m "ci: publish reproducible server images"
 ```
 

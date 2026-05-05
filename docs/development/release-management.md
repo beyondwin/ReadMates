@@ -128,10 +128,10 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow를 시작합니다.
 
-   서버 변경이 있는 릴리즈는 tag push 전에 OCI backend를 같은 제품 버전 image tag로 배포합니다.
+   서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 같은 tag의 GHCR 이미지를 게시했는지 확인합니다. 수동 실행할 때는 workflow input `image_tag`에도 같은 release tag를 넣습니다. OCI backend는 그 release artifact를 같은 제품 버전 image tag로 배포합니다.
 
    ```bash
-   READMATES_SERVER_IMAGE=readmates-server:v1.2.0 \
+   READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:v1.2.0' \
    VM_PUBLIC_IP='<vm-public-ip>' \
    CADDY_SITE=api.example.com \
    ./deploy/oci/05-deploy-compose-stack.sh

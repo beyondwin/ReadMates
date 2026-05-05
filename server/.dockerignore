@@ -5,8 +5,4 @@ build/kotlin
 build/reports
 build/test-results
 build/tmp
-src
-gradle
-gradlew
-gradlew.bat
 *.iml

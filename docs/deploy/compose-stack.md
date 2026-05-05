@@ -5,7 +5,7 @@ ReadMates의 최종 OCI backend runtime은 Caddy, Spring Boot API, Redis, Redpan
 ## Files
 
 - `deploy/oci/04-install-docker.sh`: VM Docker bootstrap
-- `deploy/oci/05-deploy-compose-stack.sh`: local compose deployment
+- `deploy/oci/05-deploy-compose-stack.sh`: compose deployment
 - `deploy/oci/compose.yml`: runtime stack
 - `deploy/oci/Caddyfile`: Caddy reverse proxy
 - `deploy/oci/readmates-stack.service`: systemd wrapper
@@ -33,6 +33,7 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-instal
 
 - VM의 `/etc/readmates/readmates.env`가 있고 권한이 `600`입니다.
 - Docker와 Compose plugin이 VM에서 동작합니다.
+- 릴리즈 배포에서 GHCR package가 private이면 VM에서 registry login이 Git 밖의 credential로 미리 완료되어 있습니다.
 - DB backup이 Git 밖의 운영 backup 위치에 있고 최근 48시간 이내 파일입니다. 배포 script는 `/var/backups/readmates/mysql/*.sql.gz`의 최근 파일을 확인합니다.
 - legacy host `readmates-server`와 host `caddy`를 중지/disable해도 되는 cutover window와 권한이 있습니다.
 
@@ -40,12 +41,11 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-instal
 
 ## Deploy
 
-`05-deploy-compose-stack.sh`는 서버 이미지를 만들고 VM으로 전송한 뒤 `/opt/readmates/.env`에 `READMATES_SERVER_IMAGE`를 저장합니다. 재부팅 뒤에도 systemd compose stack이 같은 image tag로 올라오게 하기 위한 파일입니다. 릴리즈 배포에서는 제품 tag와 맞춘 `readmates-server:vMAJOR.MINOR.PATCH` image tag를 사용합니다.
+`05-deploy-compose-stack.sh`는 `/opt/readmates/.env`에 `READMATES_SERVER_IMAGE`를 저장합니다. 릴리즈 배포에서는 `ghcr.io/<owner>/<repo>/readmates-server:vMAJOR.MINOR.PATCH` 이미지를 VM에서 pull하며, script를 실행하기 전에 같은 tag의 `Deploy Server Image` workflow가 성공했는지 확인합니다. `READMATES_SERVER_IMAGE`가 `ghcr.io/`로 시작하지 않는 로컬 전환 검증에서는 script가 서버 이미지를 로컬에서 빌드해 VM으로 전송합니다.
 
 ```bash
 ./server/gradlew -p server clean test
-./server/gradlew -p server bootJar
-READMATES_SERVER_IMAGE=readmates-server:vX.Y.Z VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
+READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
 ```
 
 완료 기준은 script가 끝까지 성공하고, compose `readmates-api` health, Cloudflare BFF auth smoke, production integration smoke가 모두 통과하는 것입니다. Redis/Kafka 기능 flag는 별도 rollout 전에는 켜지지 않은 상태로 둡니다.
@@ -63,7 +63,7 @@ READMATES_SMOKE_BASE_URL=https://readmates.pages.dev READMATES_SMOKE_AUTH_BASE_U
 서버 image만 되돌릴 때는 `/opt/readmates/.env`의 `READMATES_SERVER_IMAGE`를 이전 tag로 바꾸고 `readmates-api`를 다시 올립니다.
 
 ```bash
-ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'cd /opt/readmates && printf "READMATES_SERVER_IMAGE=%s\n" readmates-server:previous | sudo tee .env >/dev/null && sudo docker compose -f compose.yml up -d readmates-api'
+ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'cd /opt/readmates && printf "READMATES_SERVER_IMAGE=%s\n" "ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z-previous" | sudo tee .env >/dev/null && sudo docker compose -f compose.yml up -d readmates-api'
 ```
 
 Compose cutover 자체가 실패하면 compose stack을 멈춘 뒤 legacy host JAR와 host Caddy로 되돌립니다. 이 경로는 전환과 장애 대응용입니다.

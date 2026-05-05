@@ -28,12 +28,14 @@ VM IP, SSH key path, private DB host, SMTP credential, OCI resource identifiers,
 
 Caddy 포함 최종 backend runtime은 [compose-stack.md](compose-stack.md)를 기준으로 운영합니다. 기존 JAR + host Caddy 방식은 compose cutover 전 단계와 rollback 경로로 유지합니다.
 
+서버 이미지는 release tag와 같은 tag로 GHCR에 게시합니다. 운영 compose는 `ghcr.io/<owner>/<repo>/readmates-server:<git-tag>` 형태의 이미지를 pull해야 하며, 임의의 로컬 빌드 산출물을 운영 서버에서 다시 빌드하지 않습니다.
+
 운영 전환 순서:
 
 1. `04-install-docker.sh`로 VM Docker runtime을 준비합니다.
-2. `bootJar`와 server test를 통과시킵니다.
+2. server test를 통과시키고, 릴리즈 배포라면 같은 release tag의 `Deploy Server Image` workflow가 GHCR 이미지를 게시했는지 확인합니다.
 3. DB backup을 만들고 최근 48시간 이내 파일이 Git 밖의 운영 backup 위치에 있음을 확인합니다.
-4. `05-deploy-compose-stack.sh`로 image, compose file, Caddyfile, systemd unit을 배포합니다. 이 script는 compose 시작 전에 legacy host `readmates-server`와 host `caddy`를 중지하고 disable합니다.
+4. `05-deploy-compose-stack.sh`로 image, compose file, Caddyfile, systemd unit을 배포합니다. `READMATES_SERVER_IMAGE`가 `ghcr.io/`로 시작하면 VM에서 해당 이미지를 pull하고, 그 외 로컬 검증 tag는 script가 이미지를 빌드해 전송합니다. 이 script는 compose 시작 전에 legacy host `readmates-server`와 host `caddy`를 중지하고 disable합니다.
 5. `/internal/health`, BFF auth smoke, OAuth redirect smoke를 확인합니다.
 6. Redis feature flag를 단계적으로 켭니다.
 7. Kafka/notification flag는 Redis 안정화 뒤 별도 smoke로 켭니다.
