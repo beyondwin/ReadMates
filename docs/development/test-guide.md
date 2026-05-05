@@ -102,7 +102,7 @@ Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관
 
 ## Notification Operations
 
-알림 event outbox, Kafka relay/consumer, OCI Email Delivery adapter 설정, 운영 metrics, host dashboard/notification operations UI, 멤버 알림 설정과 알림함을 바꿨다면 아래 targeted command를 먼저 실행합니다. Kafka notification integration test는 Testcontainers Kafka를 사용하므로 Docker 또는 Colima가 실행 중이어야 합니다.
+알림 event outbox, Kafka relay/consumer, OCI Email Delivery adapter 설정, retry delay 설정, 운영 metrics, host dashboard/notification operations UI, 멤버 알림 설정과 알림함을 바꿨다면 아래 targeted command를 먼저 실행합니다. Kafka notification integration test는 Testcontainers Kafka를 사용하므로 Docker 또는 Colima가 실행 중이어야 합니다.
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.notification.kafka.*'
