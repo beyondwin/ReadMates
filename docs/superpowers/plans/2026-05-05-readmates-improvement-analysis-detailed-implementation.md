@@ -708,7 +708,7 @@ raw email, raw invite token, raw session token, OAuth code, BFF secret, SMTP cre
 
 ### Steps
 
-- [ ] **Step 1: BFF rejection logs**
+- [x] **Step 1: BFF rejection logs**
 
 In `BffSecretFilter`, add:
 
@@ -720,7 +720,7 @@ Add companion logger:
 
 ```kotlin
 private companion object {
-    private val logger = LoggerFactory.getLogger(BffSecretFilter::class.java)
+    private val operationalLogger = LoggerFactory.getLogger(BffSecretFilter::class.java)
     const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
     val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
 }
@@ -748,19 +748,19 @@ logger.warn(
 )
 ```
 
-- [ ] **Step 2: notification relay logs**
+- [x] **Step 2: notification relay logs**
 
 In `NotificationRelayService`, log:
 
 ```kotlin
 logger.info("Notification event published eventId={} topic={} key={}", item.id, item.kafkaTopic, item.kafkaKey)
-logger.warn("Notification event publish failed eventId={} attempt={} error={}", item.id, item.attemptCount + 1, error)
-logger.warn("Notification event publish dead eventId={} attempt={} error={}", item.id, item.attemptCount + 1, error)
+logger.warn("Notification event publish failed eventId={} attemptCount={} error={}", item.id, item.attemptCount + 1, error)
+logger.warn("Notification event publish dead eventId={} attemptCount={} error={}", item.id, item.attemptCount + 1, error)
 ```
 
 Do not log payload body.
 
-- [ ] **Step 3: notification delivery logs**
+- [x] **Step 3: notification delivery logs**
 
 For send success:
 
@@ -771,23 +771,23 @@ logger.info("Notification email delivery sent deliveryId={} eventType={}", claim
 For retry/dead:
 
 ```kotlin
-logger.warn("Notification email delivery failed deliveryId={} eventType={} attempt={} error={}", claimed.id, claimed.eventType, claimed.attemptCount + 1, error)
-logger.warn("Notification email delivery dead deliveryId={} eventType={} attempt={} error={}", claimed.id, claimed.eventType, claimed.attemptCount + 1, error)
+logger.warn("Notification email delivery failed deliveryId={} eventType={} attemptCount={} error={}", claimed.id, claimed.eventType, claimed.attemptCount + 1, error)
+logger.warn("Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}", claimed.id, claimed.eventType, claimed.attemptCount + 1, error)
 ```
 
-- [ ] **Step 4: session lifecycle logs**
+- [x] **Step 4: session lifecycle logs**
 
 In the service method that performs open/close/publish, log after a successful state update:
 
 ```kotlin
-logger.info("Session state changed clubId={} sessionId={} from={} to={}", clubId, sessionId, "DRAFT", "OPEN")
-logger.info("Session state changed clubId={} sessionId={} from={} to={}", clubId, sessionId, "OPEN", "CLOSED")
-logger.info("Session state changed clubId={} sessionId={} from={} to={}", clubId, sessionId, "CLOSED", "PUBLISHED")
+logger.info("Session state changed clubId={} sessionId={} oldState={} newState={}", clubId, sessionId, "DRAFT", "OPEN")
+logger.info("Session state changed clubId={} sessionId={} oldState={} newState={}", clubId, sessionId, "OPEN", "CLOSED")
+logger.info("Session state changed clubId={} sessionId={} oldState={} newState={}", clubId, sessionId, "CLOSED", "PUBLISHED")
 ```
 
 Use actual local variable names from `HostSessionCommandService.kt`.
 
-- [ ] **Step 5: verify**
+- [x] **Step 5: verify**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.auth.infrastructure.security.BffSecretFilter*'
@@ -795,6 +795,15 @@ Use actual local variable names from `HostSessionCommandService.kt`.
 ./server/gradlew -p server test --tests 'com.readmates.session.application.service.*'
 ./server/gradlew -p server clean test
 ```
+
+Verification recorded 2026-05-06:
+
+- PASS `./server/gradlew -p server test --tests 'com.readmates.auth.infrastructure.security.BffSecretFilter*'`
+- PASS `./server/gradlew -p server test --tests 'com.readmates.notification.application.service.*'`
+- PASS `./server/gradlew -p server test --tests 'com.readmates.session.application.service.*'`
+- PASS `./server/gradlew -p server clean test`
+- PASS `git diff --check`
+- BLOCKED `pnpm --dir front test:e2e`: Playwright webServer `bootRun` failed before browser tests because the existing local `readmates_e2e` schema has Flyway checksum mismatches for migrations 16, 18, 20, and 21. No destructive repair, drop, or reset was performed.
 
 ---
 

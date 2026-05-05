@@ -1,5 +1,9 @@
 package com.readmates.notification.application.service
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDetail
@@ -17,6 +21,7 @@ import com.readmates.notification.domain.NotificationEventType
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -35,7 +40,20 @@ class NotificationDeliveryProcessingServiceTest {
             retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
-        service.processClaimed(processingClaimedDelivery())
+        captureDeliveryProcessingLogs().use { logs ->
+            service.processClaimed(processingClaimedDelivery())
+
+            val event = logs.events.single()
+            assertThat(event.level).isEqualTo(Level.INFO)
+            assertThat(event.message).isEqualTo("Notification email delivery sent deliveryId={} eventType={}")
+            assertThat(event.argumentArray.toList()).containsExactly(
+                UUID.fromString("00000000-0000-0000-0000-000000000401"),
+                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+            )
+            assertThat(event.formattedMessage)
+                .doesNotContain("member@example.com")
+                .doesNotContain("ReadMates에서 확인해 주세요.")
+        }
 
         assertThat(mailPort.sent.single().html).contains("피드백 문서")
         assertThat(counter(registry, "readmates.notifications.sent")).isEqualTo(1.0)
@@ -53,7 +71,20 @@ class NotificationDeliveryProcessingServiceTest {
             retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
-        service.processClaimed(processingClaimedDelivery(attemptCount = 1))
+        captureDeliveryProcessingLogs().use { logs ->
+            service.processClaimed(processingClaimedDelivery(attemptCount = 1))
+
+            val event = logs.events.single()
+            assertThat(event.level).isEqualTo(Level.WARN)
+            assertThat(event.message).isEqualTo("Notification email delivery failed deliveryId={} eventType={} attemptCount={} error={}")
+            assertThat(event.argumentArray.toList()).containsExactly(
+                UUID.fromString("00000000-0000-0000-0000-000000000401"),
+                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                2,
+                "smtp rejected",
+            )
+            assertThat(event.formattedMessage).doesNotContain("member@example.com")
+        }
 
         assertThat(counter(registry, "readmates.notifications.failed")).isEqualTo(1.0)
         assertThat(counter(registry, "readmates.notifications.dead")).isZero()
@@ -87,7 +118,20 @@ class NotificationDeliveryProcessingServiceTest {
             retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
-        service.processClaimed(processingClaimedDelivery(attemptCount = 4))
+        captureDeliveryProcessingLogs().use { logs ->
+            service.processClaimed(processingClaimedDelivery(attemptCount = 4))
+
+            val event = logs.events.single()
+            assertThat(event.level).isEqualTo(Level.WARN)
+            assertThat(event.message).isEqualTo("Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}")
+            assertThat(event.argumentArray.toList()).containsExactly(
+                UUID.fromString("00000000-0000-0000-0000-000000000401"),
+                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                5,
+                "smtp rejected",
+            )
+            assertThat(event.formattedMessage).doesNotContain("member@example.com")
+        }
 
         assertThat(counter(registry, "readmates.notifications.dead")).isEqualTo(1.0)
         assertThat(counter(registry, "readmates.notifications.failed")).isZero()
@@ -193,3 +237,23 @@ private fun processingClaimedDelivery(
         bodyText = "ReadMates에서 확인해 주세요.",
         bodyHtml = "<html><body>피드백 문서</body></html>",
     )
+
+private class DeliveryProcessingLogCapture(
+    private val logger: Logger,
+    private val appender: ListAppender<ILoggingEvent>,
+) : AutoCloseable {
+    val events: List<ILoggingEvent>
+        get() = appender.list
+
+    override fun close() {
+        logger.detachAppender(appender)
+        appender.stop()
+    }
+}
+
+private fun captureDeliveryProcessingLogs(): DeliveryProcessingLogCapture {
+    val logger = LoggerFactory.getLogger(NotificationDeliveryProcessingService::class.java) as Logger
+    val appender = ListAppender<ILoggingEvent>().apply { start() }
+    logger.addAppender(appender)
+    return DeliveryProcessingLogCapture(logger, appender)
+}
