@@ -355,7 +355,7 @@ git commit -m "feat: configure notification email retry delays"
 
 **배경:** `setVerifyPartition(false)`를 제거하는 것만으로는 부족합니다. 현재 destination resolver가 `TopicPartition(dlqTopic, -1)`을 반환하므로 Spring Kafka는 partition 검증을 건너뜁니다.
 
-- [ ] **Step 1: DLT destination을 원본 partition으로 변경**
+- [x] **Step 1: DLT destination을 원본 partition으로 변경**
 
 ```kotlin
 DeadLetterPublishingRecoverer(kafkaOperations) { record, _ ->
@@ -369,7 +369,7 @@ DeadLetterPublishingRecoverer(kafkaOperations) { record, _ ->
 it.setVerifyPartition(false)
 ```
 
-- [ ] **Step 2: 기존 test 기대값 수정**
+- [x] **Step 2: 기존 test 기대값 수정**
 
 `KafkaNotificationEventPublisherAdapterTest`의 `dead letter recoverer publishes to configured notification dlq topic`는 partition이 `null`이 아니라 원본 record partition인 `2`임을 검증해야 합니다.
 
@@ -380,7 +380,7 @@ assertThat(captor.value.key()).isEqualTo("club-key")
 assertThat(captor.value.value()).isEqualTo(record.value())
 ```
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 ./server/gradlew -p server test --tests "com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapterTest"
@@ -388,7 +388,9 @@ assertThat(captor.value.value()).isEqualTo(record.value())
 ./server/gradlew -p server clean test
 ```
 
-- [ ] **Step 4: Commit**
+Actual: Kafka adapter test, notification Kafka tests, `clean test`, and `git diff --check` passed.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/adapter/out/kafka/NotificationKafkaConfiguration.kt \

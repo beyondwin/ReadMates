@@ -72,10 +72,8 @@ class NotificationKafkaConfiguration {
         kafkaOperations: KafkaOperations<String, NotificationEventMessage>,
         properties: NotificationKafkaProperties,
     ): DeadLetterPublishingRecoverer =
-        DeadLetterPublishingRecoverer(kafkaOperations) { _, _ ->
-            TopicPartition(properties.dlqTopic, NO_PARTITION)
-        }.also {
-            it.setVerifyPartition(false)
+        DeadLetterPublishingRecoverer(kafkaOperations) { record, _ ->
+            TopicPartition(properties.dlqTopic, record.partition())
         }
 
     @Bean
@@ -147,9 +145,6 @@ class NotificationKafkaConfiguration {
     private fun notificationEventJsonMapper(): JsonMapper =
         JacksonMapperUtils.enhancedJsonMapper()
 
-    private companion object {
-        private const val NO_PARTITION = -1
-    }
 }
 
 @ConfigurationProperties(prefix = "readmates.notifications.kafka")

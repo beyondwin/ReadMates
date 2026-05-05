@@ -8,10 +8,12 @@ import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.application.service.NotificationDeliveryRetryableException
 import com.readmates.notification.domain.NotificationEventType
+import org.apache.kafka.clients.consumer.Consumer
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
+import org.apache.kafka.common.PartitionInfo
 import org.apache.kafka.common.header.internals.RecordHeaders
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -263,17 +265,38 @@ class KafkaNotificationEventPublisherAdapterTest {
             "club-key",
             notificationEventMessage(),
         )
+        val consumer = Mockito.mock(Consumer::class.java) as Consumer<String, NotificationEventMessage>
+        Mockito.`when`(
+            consumer.partitionsFor(
+                Mockito.eq("custom.notification.dlq.v1"),
+                Mockito.any(Duration::class.java),
+            ),
+        ).thenReturn(
+            listOf(
+                PartitionInfo(
+                    "custom.notification.dlq.v1",
+                    2,
+                    null,
+                    emptyArray(),
+                    emptyArray(),
+                ),
+            ),
+        )
 
-        recoverer.accept(record, null, IllegalArgumentException("unsupported schema"))
+        recoverer.accept(record, consumer, IllegalArgumentException("unsupported schema"))
 
         val captor = ArgumentCaptor.forClass(ProducerRecord::class.java)
             as ArgumentCaptor<ProducerRecord<String, NotificationEventMessage>>
         Mockito.verify(kafkaOperations).send(captor.capture())
         val partition: Int? = captor.value.partition()
         assertThat(captor.value.topic()).isEqualTo("custom.notification.dlq.v1")
-        assertThat(partition).isNull()
+        assertThat(partition).isEqualTo(2)
         assertThat(captor.value.key()).isEqualTo("club-key")
         assertThat(captor.value.value()).isEqualTo(record.value())
+        Mockito.verify(consumer).partitionsFor(
+            Mockito.eq("custom.notification.dlq.v1"),
+            Mockito.any(Duration::class.java),
+        )
     }
 
     @Test
