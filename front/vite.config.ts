@@ -1,16 +1,13 @@
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-
-const clubSlugPattern = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
+import { normalizedClubSlug } from "./shared/security/club-slug";
 
 function normalizedClubSlugFromProxyPath(proxyPath: string | undefined) {
   if (!proxyPath) {
     return "";
   }
-  const value = new URL(proxyPath, "http://readmates.local").searchParams.get("clubSlug") ?? "";
-  const normalized = value.trim().toLowerCase();
-  return clubSlugPattern.test(normalized) && !normalized.includes("--") ? normalized : "";
+  return normalizedClubSlug(new URL(proxyPath, "http://readmates.local").searchParams.get("clubSlug"));
 }
 
 export default defineConfig({

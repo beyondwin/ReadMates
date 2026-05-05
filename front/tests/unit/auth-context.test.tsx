@@ -243,7 +243,46 @@ describe("AuthProvider", () => {
 
     expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
     expect(location.href).toBe("/login");
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/bff/api/auth/logout", { method: "POST" });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/bff/api/auth/logout",
+      expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+      }),
+    );
+  });
+
+  it("marks the current app shell anonymous when logout finds an expired session", async () => {
+    const user = userEvent.setup();
+    const location = { href: "" };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(authResponse(activeMemberAuth))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+        <AuthAwareLogoutButton />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ACTIVE");
+
+    await user.click(screen.getByRole("button", { name: "로그아웃" }));
+
+    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    expect(location.href).toBe("/login");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/bff/api/auth/logout",
+      expect.objectContaining({
+        cache: "no-store",
+        method: "POST",
+      }),
+    );
   });
 
   it("refreshes the auth payload and updates the current display name", async () => {

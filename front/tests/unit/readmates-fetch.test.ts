@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readmatesApiPath, readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { normalizedClubSlug } from "@/shared/security/club-slug";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -9,6 +10,13 @@ afterEach(() => {
 });
 
 describe("readmatesFetchResponse", () => {
+  it("normalizes club slugs through the shared BFF helper contract", () => {
+    expect(normalizedClubSlug(" Reading-Sai ")).toBe("reading-sai");
+    expect(normalizedClubSlug("bad--slug")).toBe("");
+    expect(normalizedClubSlug("bad_slug")).toBe("");
+    expect(normalizedClubSlug(null)).toBe("");
+  });
+
   it("redirects to login and rejects when the BFF returns 401", async () => {
     const assignMock = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
@@ -86,6 +94,14 @@ describe("readmatesFetchResponse", () => {
       "/api/bff/api/auth/me?clubSlug=sample-book-club",
       expect.objectContaining({ cache: "no-store" }),
     );
+  });
+
+  it("adds an explicit club context to club-scoped auth preview requests", () => {
+    expect(
+      readmatesApiPath("/api/clubs/reading-sai/invitations/raw-token", {
+        clubSlug: "reading-sai",
+      }),
+    ).toBe("/api/clubs/reading-sai/invitations/raw-token?clubSlug=reading-sai");
   });
 
   it("does not use browser location fallback when an explicit empty API context is provided", () => {

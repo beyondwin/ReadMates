@@ -791,7 +791,7 @@ Result:
 - Modify: `front/tests/unit/invite-acceptance-card.test.tsx`
 - Modify: `front/tests/unit/readmates-fetch.test.ts`
 
-- [ ] **Step 1: response-preserving wrapper로 교체**
+- [x] **Step 1: response-preserving wrapper로 교체**
 
 Use `readmatesFetchResponse` where callers still need raw `Response`:
 
@@ -810,11 +810,11 @@ return readmatesFetchResponse(`/api/clubs/${encodeURIComponent(clubSlug)}/invita
 
 Use explicit context only if tests show current URL scope is ambiguous.
 
-- [ ] **Step 2: 401 redirect behavior 확인**
+- [x] **Step 2: 401 redirect behavior 확인**
 
 If an auth flow intentionally handles 401 without redirect, keep a small direct helper or add an option to `readmatesFetchResponse`. Do not silently change login/invite user flow.
 
-- [ ] **Step 3: verification**
+- [x] **Step 3: verification**
 
 Run:
 
@@ -824,6 +824,14 @@ pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
+
+Verification 2026-05-06:
+
+- RED: `pnpm --dir front test tests/unit/login-card.test.tsx tests/unit/invite-acceptance-card.test.tsx` failed while auth API still used direct `fetch` for dev login and invite preview.
+- GREEN: the focused login/invite command passed after dev login moved to `readmatesFetchResponse`; invitation preview and logout use a raw-response shared-path wrapper so their intentional `401` in-flow handling is preserved.
+- RED/GREEN follow-up: `pnpm --dir front test tests/unit/auth-context.test.tsx` first failed with logout `401` leaving auth `ACTIVE`, then passed after logout was kept on the raw-response helper.
+- Final pass: `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build`.
+- E2E attempted: `pnpm --dir front test:e2e` was blocked by local `readmates_e2e` Flyway checksum mismatches for migrations 16, 18, 20, and 21. No repair/drop/reset was run.
 
 ## P2 Task 12: `clubSlug` validation helper 공유
 
@@ -837,7 +845,7 @@ pnpm --dir front build
 - Modify: `front/tests/unit/cloudflare-bff.test.ts`
 - Modify: `front/tests/unit/readmates-fetch.test.ts`
 
-- [ ] **Step 1: shared helper 생성**
+- [x] **Step 1: shared helper 생성**
 
 ```ts
 export const CLUB_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
@@ -848,7 +856,7 @@ export function normalizedClubSlug(value: string | null | undefined) {
 }
 ```
 
-- [ ] **Step 2: BFF와 Vite에서 import**
+- [x] **Step 2: BFF와 Vite에서 import**
 
 Both call sites should use the same helper and keep existing status behavior:
 
@@ -858,7 +866,7 @@ invalid clubSlug query => 400 in Pages Function
 invalid clubSlug query => no trusted slug header in local Vite proxy
 ```
 
-- [ ] **Step 3: verification**
+- [x] **Step 3: verification**
 
 Run:
 
@@ -867,6 +875,12 @@ pnpm --dir front test tests/unit/cloudflare-bff.test.ts tests/unit/readmates-fet
 pnpm --dir front lint
 pnpm --dir front build
 ```
+
+Verification 2026-05-06:
+
+- RED: `pnpm --dir front test tests/unit/cloudflare-bff.test.ts tests/unit/readmates-fetch.test.ts` failed on missing shared helper import and Pages Function uppercase slug normalization.
+- GREEN: the focused BFF/fetch command passed after Vite and Pages Function imported `front/shared/security/club-slug.ts`.
+- Final pass: `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build`.
 
 ## P2 Task 13: 대형 UI split 계획 실행
 

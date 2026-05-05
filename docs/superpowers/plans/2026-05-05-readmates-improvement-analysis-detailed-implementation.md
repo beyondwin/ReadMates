@@ -954,7 +954,7 @@ Unify auth API calls through `readmatesFetchResponse` where behavior matches, an
 
 ### Steps
 
-- [ ] **Step 1: shared slug helper**
+- [x] **Step 1: shared slug helper**
 
 Create:
 
@@ -967,7 +967,7 @@ export function normalizedClubSlug(value: string | null | undefined) {
 }
 ```
 
-- [ ] **Step 2: Vite proxy uses helper**
+- [x] **Step 2: Vite proxy uses helper**
 
 In `front/vite.config.ts`, remove local regex and call:
 
@@ -982,7 +982,7 @@ function normalizedClubSlugFromProxyPath(proxyPath: string | undefined) {
 }
 ```
 
-- [ ] **Step 3: Pages Function uses helper**
+- [x] **Step 3: Pages Function uses helper**
 
 In `front/functions/api/bff/[[path]].ts`, remove local regex and call the shared helper:
 
@@ -992,7 +992,7 @@ import { normalizedClubSlug } from "../../../shared/security/club-slug";
 
 The relative import must be verified from `front/functions/api/bff/[[path]].ts` to `front/shared/security/club-slug.ts`.
 
-- [ ] **Step 4: auth API direct fetch replacement**
+- [x] **Step 4: auth API direct fetch replacement**
 
 In `front/features/auth/api/auth-api.ts`:
 
@@ -1009,27 +1009,19 @@ return readmatesFetchResponse("/api/dev/login", {
 });
 ```
 
-Change logout:
+Keep logout on the raw-response helper because the logout UI intentionally treats `401` as a successful local logout when the server session is already gone:
 
 ```ts
-return readmatesFetchResponse("/api/auth/logout", { method: "POST" });
+return readmatesFetchRawResponse("/api/auth/logout", { method: "POST" });
 ```
 
 For invitation preview, keep raw `Response` behavior:
 
 ```ts
-if (clubSlug) {
-  return readmatesFetchResponse(
-    `/api/clubs/${encodeURIComponent(clubSlug)}/invitations/${encodeURIComponent(token)}`,
-    undefined,
-    { clubSlug },
-  );
-}
-
-return readmatesFetchResponse(`/api/invitations/${encodeURIComponent(token)}`);
+return readmatesFetchRawResponse(`/api/clubs/${encodeURIComponent(clubSlug)}/invitations/${encodeURIComponent(token)}`);
 ```
 
-- [ ] **Step 5: verify**
+- [x] **Step 5: verify**
 
 ```bash
 pnpm --dir front test tests/unit/cloudflare-bff.test.ts tests/unit/readmates-fetch.test.ts
@@ -1044,6 +1036,15 @@ For BFF behavior changes, run or report why skipped:
 ```bash
 pnpm --dir front test:e2e
 ```
+
+Verification 2026-05-06:
+
+- RED: `pnpm --dir front test tests/unit/cloudflare-bff.test.ts tests/unit/readmates-fetch.test.ts` failed on missing `front/shared/security/club-slug.ts` and uppercase `clubSlug` normalization returning 400.
+- RED: `pnpm --dir front test tests/unit/login-card.test.tsx tests/unit/invite-acceptance-card.test.tsx` failed because dev login and club-scoped invite preview still used direct `fetch` without shared-client options.
+- GREEN: the same two focused commands passed after implementation.
+- RED/GREEN follow-up: `pnpm --dir front test tests/unit/auth-context.test.tsx` first failed with logout `401` leaving auth `ACTIVE`, then passed after logout was kept on the raw-response helper.
+- Final pass: `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build`.
+- E2E attempted: `pnpm --dir front test:e2e` was blocked by local `readmates_e2e` Flyway checksum mismatches for migrations 16, 18, 20, and 21. No repair/drop/reset was run.
 
 ---
 

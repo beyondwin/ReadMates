@@ -140,6 +140,45 @@ describe("Cloudflare BFF function", () => {
     expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
   });
 
+  it("normalizes a route-selected club slug before trusting it as server context", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/me?clubSlug=%20Reading-Sai%20"),
+        {
+          path: ["api", "auth", "me"],
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBe("reading-sai");
+  });
+
+  it("does not send a trusted slug header when the route does not select one", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/me", {
+          headers: {
+            "X-Readmates-Club-Slug": "attacker-club",
+          },
+        }),
+        {
+          path: ["api", "auth", "me"],
+        },
+      ),
+    );
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Headers).get("X-Readmates-Club-Slug")).toBeNull();
+  });
+
   it("rejects invalid route-selected club slugs before calling upstream", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

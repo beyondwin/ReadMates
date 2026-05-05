@@ -113,11 +113,31 @@ describe("InviteAcceptanceRouteContent", () => {
     render(<InviteAcceptanceRouteContent clubSlug="reading-sai" token="raw-token" />);
 
     expect(await screen.findByText("member@example.com")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/clubs/reading-sai/invitations/raw-token");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/clubs/reading-sai/invitations/raw-token",
+      expect.objectContaining({ cache: "no-store" }),
+    );
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",
       `/oauth2/authorization/google?inviteToken=raw-token&returnTo=${encodeURIComponent("/clubs/reading-sai/invite/raw-token")}`,
     );
+  });
+
+  it("keeps invitation preview 401 responses in the invite flow instead of redirecting", async () => {
+    const assignMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValueOnce(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", {
+      assign: assignMock,
+      hash: "",
+      pathname: "/clubs/reading-sai/invite/raw-token",
+      search: "",
+    });
+
+    render(<InviteAcceptanceRouteContent clubSlug="reading-sai" token="raw-token" />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("초대 링크를 찾을 수 없습니다.");
+    expect(assignMock).not.toHaveBeenCalled();
   });
 
   it("renders expired invitation state", async () => {
@@ -288,7 +308,10 @@ describe("InviteAcceptanceRouteContent", () => {
     );
 
     expect(await screen.findByText("sample-member@example.com")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenLastCalledWith("/api/bff/api/clubs/sample-book-club/invitations/shared-token");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/bff/api/clubs/sample-book-club/invitations/shared-token",
+      expect.objectContaining({ cache: "no-store" }),
+    );
   });
 });
 
