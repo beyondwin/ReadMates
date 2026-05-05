@@ -14,7 +14,7 @@ import javax.crypto.spec.SecretKeySpec
 
 @Component
 class OAuthReturnState(
-    @Value("\${readmates.auth.return-state-secret:dev-return-state-secret}")
+    @Value("\${readmates.auth.return-state-secret}")
     secret: String,
     @Value("\${readmates.app-base-url:http://localhost:3000}")
     appBaseUrl: String,
@@ -24,7 +24,11 @@ class OAuthReturnState(
     sessionCookieDomain: String,
     private val trustedReturnHostPort: TrustedReturnHostPort,
 ) {
-    private val normalizedSecret = secret.trim().ifEmpty { "dev-return-state-secret" }
+    private val normalizedSecret = secret.trim().also {
+        require(it.isNotEmpty()) {
+            "readmates.auth.return-state-secret must be set via READMATES_AUTH_RETURN_STATE_SECRET"
+        }
+    }
     private val appOrigin = readmatesAppOrigin(appBaseUrl)
     private val primaryAppHost = URI.create(appOrigin).host.lowercase(Locale.ROOT)
     private val sharedSessionCookieDomain = sessionCookieDomain

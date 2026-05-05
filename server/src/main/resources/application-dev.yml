@@ -3,6 +3,8 @@ spring:
     locations: classpath:db/mysql/migration,classpath:db/mysql/dev
 
 readmates:
+  auth:
+    return-state-secret: "dev-return-state-secret-for-local-only"
   bff-secret-required: false
   redis:
     enabled: false

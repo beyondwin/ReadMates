@@ -38,7 +38,6 @@ import java.time.Instant
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
         "readmates.app-base-url=https://readmates.pages.dev",
         "readmates.auth.auth-base-url=https://auth.readmates.example",
-        "readmates.auth.return-state-secret=oauth-return-state-test-secret",
         "readmates.auth.session-cookie-domain=.readmates.example",
         "spring.security.oauth2.client.registration.google.client-id=test-client",
         "spring.security.oauth2.client.registration.google.client-secret=test-secret",

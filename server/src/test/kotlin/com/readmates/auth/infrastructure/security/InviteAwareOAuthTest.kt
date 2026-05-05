@@ -24,7 +24,6 @@ import java.util.UUID
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
         "readmates.app-base-url=https://app.readmates.example",
         "readmates.auth.auth-base-url=https://auth.readmates.example",
-        "readmates.auth.return-state-secret=oauth-return-state-test-secret",
         "readmates.auth.session-cookie-domain=.readmates.example",
     ],
 )
