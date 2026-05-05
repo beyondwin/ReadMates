@@ -83,6 +83,8 @@ Kafka 알림 relay/consumer를 로컬에서 확인할 때는 Compose의 `kafka` 
 docker compose up -d mysql kafka
 ```
 
+Redpanda healthcheck가 통과했는지는 `docker compose ps kafka`의 `healthy` 상태로 확인합니다.
+
 로컬 기본 bootstrap server는 `localhost:9092`입니다. Kafka/Testcontainers integration test만 실행하려면 backend를 `bootRun`으로 띄우거나 `READMATES_NOTIFICATIONS_ENABLED=true`를 설정하지 않습니다. Testcontainers가 테스트용 Kafka를 직접 띄우고 test configuration이 mail sender를 대체하므로 SMTP 환경 변수도 필요하지 않습니다.
 
 ```bash

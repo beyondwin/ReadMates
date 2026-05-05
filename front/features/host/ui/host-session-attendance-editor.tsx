@@ -1,4 +1,3 @@
-"use client";
 
 import { useState, type CSSProperties } from "react";
 import type { AttendanceStatus, RsvpStatus, SessionParticipationStatus } from "@/features/host/ui/host-ui-types";

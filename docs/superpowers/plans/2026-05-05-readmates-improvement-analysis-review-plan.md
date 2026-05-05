@@ -1021,11 +1021,11 @@ pnpm --dir front build
 rg -l '^"use client";' front/{features,shared,src}
 ```
 
-- [ ] **Step 1: remove only first-line directives**
+- [x] **Step 1: remove only first-line directives**
 
 Use editor/apply_patch or a safe formatter-assisted mechanical edit. Do not remove string literals elsewhere.
 
-- [ ] **Step 2: verification**
+- [x] **Step 2: verification**
 
 Run:
 
@@ -1038,6 +1038,13 @@ pnpm --dir front build
 
 Expected: `rg` returns no output.
 
+Verification result:
+
+- PASS `rg -n '^"use client";' front/{features,shared,src}` returned no output.
+- PASS `pnpm --dir front lint`.
+- PASS `pnpm --dir front test` (49 files, 647 tests).
+- PASS `pnpm --dir front build`.
+
 ## P3 Task 17: Redpanda healthcheck
 
 **Why:** local MySQL and Redis have healthchecks, but Kafka/Redpanda does not. This is DX only.
@@ -1047,7 +1054,7 @@ Expected: `rg` returns no output.
 - Modify: `compose.yml`
 - Modify: `docs/development/local-setup.md` if startup instructions change
 
-- [ ] **Step 1: add healthcheck**
+- [x] **Step 1: add healthcheck**
 
 ```yaml
 kafka:
@@ -1059,7 +1066,7 @@ kafka:
     start_period: 10s
 ```
 
-- [ ] **Step 2: verify compose service health**
+- [x] **Step 2: verify compose service health**
 
 Run:
 
@@ -1069,6 +1076,14 @@ docker compose ps kafka
 ```
 
 Expected: service reaches healthy state.
+
+Verification result:
+
+- PASS `docker compose up -d kafka`; session-owned container `readmates-improvement-analysis-stack-kafka-1` started.
+- PASS `docker compose ps kafka`; service reached `healthy`.
+- Cleanup: stopped the session-owned Kafka container after verification; follow-up `docker compose ps kafka` showed no running Kafka service row.
+- PASS `git diff --check -- compose.yml docs/development/local-setup.md docs/superpowers/plans/2026-05-05-readmates-improvement-analysis-detailed-implementation.md docs/superpowers/plans/2026-05-05-readmates-improvement-analysis-review-plan.md`.
+- PASS `git diff --check`.
 
 ---
 

@@ -1,4 +1,3 @@
-"use client";
 
 import type { ComponentType, ReactNode } from "react";
 import { useLocation } from "react-router-dom";

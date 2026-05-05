@@ -1,4 +1,3 @@
-"use client";
 
 import type { ComponentType, ReactNode } from "react";
 import { usePublicAuthenticated, type PublicAuthAction } from "@/shared/ui/public-auth-action-state";
