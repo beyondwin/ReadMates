@@ -70,6 +70,42 @@ class HostInvitationControllerTest(
     }
 
     @Test
+    fun `host invitation rejects email longer than database email limit before persistence`() {
+        val longEmail = "${"a".repeat(309)}@example.com"
+
+        mockMvc.post("/api/host/invitations") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"$longEmail","name":"긴 이메일"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_INVITATION_EMAIL") }
+            }
+
+        val count = jdbcTemplate.queryForObject(
+            "select count(*) from invitations where invited_email = ?",
+            Long::class.java,
+            longEmail,
+        ) ?: 0L
+        assertEquals(0L, count)
+    }
+
+    @Test
+    fun `host invitation malformed short email does not return length validation message`() {
+        mockMvc.post("/api/host/invitations") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"email":"not-an-email","name":"잘못된 이메일"}"""
+        }
+            .andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_INVITATION_EMAIL") }
+                jsonPath("$.message") { value("Invalid invitation email") }
+            }
+    }
+
+    @Test
     fun `host invitation accept url uses primary active club domain when present`() {
         jdbcTemplate.update(
             """
@@ -370,7 +406,8 @@ class HostInvitationControllerTest(
               'accepted.list.member@example.com',
               'race@example.com',
               'primary.domain.invite@example.com'
-            );
+            )
+               or invited_email = concat(repeat('a', 309), '@example.com');
             delete from club_domains
             where hostname = 'reading.example.test';
             delete memberships

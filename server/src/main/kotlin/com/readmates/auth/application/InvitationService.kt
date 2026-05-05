@@ -24,6 +24,8 @@ import java.util.HexFormat
 import java.util.Locale
 import java.util.UUID
 
+private const val MAX_EMAIL_LENGTH = 320
+
 data class HostInvitationResponse(
     val invitationId: String,
     val email: String,
@@ -265,9 +267,20 @@ class InvitationService(
         }
     }
 
-    private fun normalizeEmail(email: String): String =
-        email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
-            ?: throw InvitationDomainException("INVALID_INVITATION_EMAIL", InvitationDomainError.BAD_REQUEST, "Email is required")
+    private fun normalizeEmail(email: String): String {
+        val normalized = email.trim().lowercase(Locale.ROOT)
+        if (normalized.isEmpty()) {
+            throw InvitationDomainException("INVALID_INVITATION_EMAIL", InvitationDomainError.BAD_REQUEST, "Email is required")
+        }
+        if (normalized.length > MAX_EMAIL_LENGTH) {
+            throw InvitationDomainException(
+                "INVALID_INVITATION_EMAIL",
+                InvitationDomainError.BAD_REQUEST,
+                "Email must be 320 characters or less",
+            )
+        }
+        return normalized
+    }
 
     private fun normalizeInvitedName(name: String): String =
         name.trim().takeIf { it.isNotEmpty() }?.take(120)

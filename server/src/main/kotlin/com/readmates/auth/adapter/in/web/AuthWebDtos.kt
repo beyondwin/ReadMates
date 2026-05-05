@@ -8,6 +8,7 @@ import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import java.util.UUID
 
 enum class ApprovalState {
@@ -170,6 +171,7 @@ private fun MembershipStatus.toApprovalState(): ApprovalState =
 class CreateInvitationRequest(email: String, name: String, applyToCurrentSession: Boolean? = null) {
     @field:NotBlank
     @field:Email
+    @field:Size(max = 320)
     val email: String = email.trim()
 
     @field:NotBlank
