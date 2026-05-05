@@ -311,5 +311,6 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 - Spring `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기본 운영 기준입니다. secret이 비면 시작 실패가 맞습니다.
 - OCI Email Delivery SMTP credential과 sender 값은 `/etc/readmates/readmates.env`에만 둡니다. Git에는 `<oci-region>`, `<oci-smtp-username>`, `<oci-smtp-password>`, `no-reply@example.com` 같은 placeholder만 기록합니다.
 - DB migration은 Spring 시작 시 Flyway가 `db/mysql/migration`을 적용합니다.
+- 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
 - 백엔드 프로덕션 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
 - Compose Caddy 로그는 container stdout으로 확인합니다. Legacy host Caddy rollback에서는 `/var/log/caddy/readmates.log`를 확인합니다. Caddy access log 설정은 request URI와 `Authorization`, `Cookie`, `X-Readmates-Bff-Secret` request header를 기록하지 않아야 합니다.

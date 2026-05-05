@@ -158,6 +158,8 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET` | Google OAuth를 로컬에서 직접 시험할 때 필요한 client secret입니다. dev-login만 쓰면 필요하지 않습니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE` | Google OAuth scope입니다. 기본 운영 예시는 `openid,email,profile`입니다. |
 
+운영 migration은 `server/src/main/resources/db/mysql/migration`에만 추가합니다. `server/src/main/resources/db/migration`은 사용하지 않으며, 새 파일을 그 위치에 만들면 운영 Flyway가 읽지 않습니다.
+
 Backend health check:
 
 ```bash
