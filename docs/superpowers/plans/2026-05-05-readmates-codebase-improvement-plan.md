@@ -279,7 +279,7 @@ git commit -m "fix: fail fast when OAuth return-state secret is missing"
 
 **배경:** email delivery retry delay가 `NotificationDispatchService`와 `NotificationDeliveryProcessingService`에 각각 하드코딩되어 있습니다. Kafka consumer path와 worker path가 같은 운영 정책을 사용해야 합니다.
 
-- [ ] **Step 1: application.yml에 설정 추가**
+- [x] **Step 1: application.yml에 설정 추가**
 
 `readmates.notifications` 아래에 추가합니다.
 
@@ -289,7 +289,7 @@ readmates:
     retry-delay-minutes: ${READMATES_NOTIFICATION_RETRY_DELAY_MINUTES:5,15,60,240}
 ```
 
-- [ ] **Step 2: 두 service constructor에 같은 설정 주입**
+- [x] **Step 2: 두 service constructor에 같은 설정 주입**
 
 `NotificationDispatchService`와 `NotificationDeliveryProcessingService` 모두 아래 parameter를 추가합니다.
 
@@ -307,11 +307,11 @@ private fun retryDelayMinutes(attemptCount: Int): Long {
 }
 ```
 
-- [ ] **Step 3: 테스트 생성자 호출 업데이트**
+- [x] **Step 3: 테스트 생성자 호출 업데이트**
 
 `NotificationDispatchServiceTest`, `NotificationDeliveryProcessingServiceTest`, `HostNotificationOperationsServiceTest`, `JdbcNotificationDeliveryAdapterTest`에서 직접 생성하는 service에 `retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L)`를 명시합니다. 가능하면 test helper factory를 만들어 반복을 줄입니다.
 
-- [ ] **Step 4: custom delay 테스트 추가**
+- [x] **Step 4: custom delay 테스트 추가**
 
 `NotificationDispatchServiceTest`와 `NotificationDeliveryProcessingServiceTest`에 각각 custom delay가 적용되는 테스트를 추가합니다.
 
@@ -327,7 +327,7 @@ val service = NotificationDispatchService(
 
 Expected: `attemptCount = 1` 실패 시 `delayMinutes`가 `4L`입니다.
 
-- [ ] **Step 5: 검증**
+- [x] **Step 5: 검증**
 
 ```bash
 ./server/gradlew -p server test --tests "com.readmates.notification.application.service.NotificationDispatchServiceTest"
@@ -336,7 +336,9 @@ Expected: `attemptCount = 1` 실패 시 `delayMinutes`가 `4L`입니다.
 ./server/gradlew -p server clean test
 ```
 
-- [ ] **Step 6: Commit**
+Actual: targeted dispatch/processing tests, `com.readmates.notification.*`, `clean test`, and `git diff --check` passed.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/notification/application/service/NotificationDispatchService.kt \

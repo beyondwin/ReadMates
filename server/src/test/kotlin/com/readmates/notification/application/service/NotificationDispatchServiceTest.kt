@@ -37,7 +37,7 @@ class NotificationDispatchServiceTest {
     fun `dispatch persists planned deliveries sends claimed email and marks sent`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery()))
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         service.dispatch(message())
 
@@ -59,11 +59,10 @@ class NotificationDispatchServiceTest {
         val registry = SimpleMeterRegistry()
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery()))
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(
+        val service = notificationDispatchService(
             deliveryPort,
             mailPort,
-            ReadmatesOperationalMetrics(registry),
-            maxAttempts = 5,
+            metrics = ReadmatesOperationalMetrics(registry),
         )
 
         service.dispatch(message())
@@ -75,7 +74,7 @@ class NotificationDispatchServiceTest {
     fun `dispatch does not send in app deliveries`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(inAppDelivery()))
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         service.dispatch(message())
 
@@ -89,7 +88,7 @@ class NotificationDispatchServiceTest {
     fun `dispatch marks failed and throws retryable exception before max attempts`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 1)))
         val mailPort = FailingMailPort("smtp rejected")
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(NotificationDeliveryRetryableException::class.java)
@@ -103,15 +102,30 @@ class NotificationDispatchServiceTest {
     }
 
     @Test
+    fun `dispatch uses configured retry delay when marking retryable failure`() {
+        val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 1)))
+        val mailPort = FailingMailPort("smtp rejected")
+        val service = notificationDispatchService(
+            deliveryPort,
+            mailPort,
+            retryDelayMinutesConfig = listOf(2L, 4L, 8L),
+        )
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
+
+        assertThat(deliveryPort.failed.map { it.delayMinutes }).containsExactly(4L)
+    }
+
+    @Test
     fun `dispatch increments failed metric after retryable failure mark succeeds`() {
         val registry = SimpleMeterRegistry()
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 1)))
         val mailPort = FailingMailPort("smtp rejected")
-        val service = NotificationDispatchService(
+        val service = notificationDispatchService(
             deliveryPort,
             mailPort,
-            ReadmatesOperationalMetrics(registry),
-            maxAttempts = 5,
+            metrics = ReadmatesOperationalMetrics(registry),
         )
 
         assertThatThrownBy { service.dispatch(message()) }
@@ -134,7 +148,7 @@ class NotificationDispatchServiceTest {
         )
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(failedDelivery, laterDelivery))
         val mailPort = SelectiveFailingMailPort(failures = mapOf("first@example.com" to "smtp rejected"))
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(NotificationDeliveryRetryableException::class.java)
@@ -152,7 +166,7 @@ class NotificationDispatchServiceTest {
     fun `dispatch retryable exception from mail failure does not retain raw provider exception`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 1)))
         val mailPort = FailingMailPort("provider token=raw-secret failed for member@example.com")
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(NotificationDeliveryRetryableException::class.java)
@@ -181,7 +195,7 @@ class NotificationDispatchServiceTest {
             unclaimableIds = setOf(parkedDelivery.id),
         )
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(NotificationDeliveryRetryableException::class.java)
@@ -199,7 +213,7 @@ class NotificationDispatchServiceTest {
     fun `dispatch marks dead and completes when attempts are exhausted`() {
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 4)))
         val mailPort = FailingMailPort("token=secret member@example.com " + "x".repeat(600))
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatCode { service.dispatch(message()) }
             .doesNotThrowAnyException()
@@ -215,11 +229,10 @@ class NotificationDispatchServiceTest {
         val registry = SimpleMeterRegistry()
         val deliveryPort = FakeDeliveryPort(deliveries = listOf(emailDelivery(attemptCount = 4)))
         val mailPort = FailingMailPort("smtp rejected")
-        val service = NotificationDispatchService(
+        val service = notificationDispatchService(
             deliveryPort,
             mailPort,
-            ReadmatesOperationalMetrics(registry),
-            maxAttempts = 5,
+            metrics = ReadmatesOperationalMetrics(registry),
         )
 
         service.dispatch(message())
@@ -235,7 +248,7 @@ class NotificationDispatchServiceTest {
             markSentResult = false,
         )
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(IllegalStateException::class.java)
@@ -253,7 +266,7 @@ class NotificationDispatchServiceTest {
             markFailedResult = false,
         )
         val mailPort = FailingMailPort("smtp rejected")
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(IllegalStateException::class.java)
@@ -271,7 +284,7 @@ class NotificationDispatchServiceTest {
             markDeadResult = false,
         )
         val mailPort = FailingMailPort("smtp rejected")
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(IllegalStateException::class.java)
@@ -289,7 +302,7 @@ class NotificationDispatchServiceTest {
             claimable = false,
         )
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         assertThatThrownBy { service.dispatch(message()) }
             .isInstanceOf(NotificationDeliveryRetryableException::class.java)
@@ -309,7 +322,7 @@ class NotificationDispatchServiceTest {
             claimable = false,
         )
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         service.dispatch(message())
 
@@ -327,7 +340,7 @@ class NotificationDispatchServiceTest {
             claimable = false,
         )
         val mailPort = RecordingMailPort()
-        val service = NotificationDispatchService(deliveryPort, mailPort, dispatchTestMetrics(), maxAttempts = 5)
+        val service = notificationDispatchService(deliveryPort, mailPort)
 
         service.dispatch(message())
 
@@ -337,6 +350,21 @@ class NotificationDispatchServiceTest {
         assertThat(deliveryPort.failed).isEmpty()
         assertThat(deliveryPort.dead).isEmpty()
     }
+
+    private fun notificationDispatchService(
+        deliveryPort: NotificationDeliveryPort,
+        mailPort: MailDeliveryPort,
+        metrics: ReadmatesOperationalMetrics = dispatchTestMetrics(),
+        maxAttempts: Int = 5,
+        retryDelayMinutesConfig: List<Long> = listOf(5L, 15L, 60L, 240L),
+    ): NotificationDispatchService =
+        NotificationDispatchService(
+            deliveryPort = deliveryPort,
+            mailDeliveryPort = mailPort,
+            metrics = metrics,
+            maxAttempts = maxAttempts,
+            retryDelayMinutesConfig = retryDelayMinutesConfig,
+        )
 
     private fun message(): NotificationEventMessage =
         NotificationEventMessage(

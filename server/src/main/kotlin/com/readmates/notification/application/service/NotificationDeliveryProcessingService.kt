@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 private const val MAX_PROCESSING_ERROR_LENGTH = 500
-private val PROCESSING_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
+private val DEFAULT_PROCESSING_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 
 @Service
 class NotificationDeliveryProcessingService(
@@ -20,6 +20,8 @@ class NotificationDeliveryProcessingService(
     private val mailDeliveryPort: MailDeliveryPort,
     private val metrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.kafka.max-delivery-attempts:5}") private val maxAttempts: Int,
+    @param:Value("\${readmates.notifications.retry-delay-minutes:5,15,60,240}")
+    private val retryDelayMinutesConfig: List<Long>,
     @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
 ) : ProcessNotificationDeliveriesUseCase {
     override fun processPending(limit: Int): Int {
@@ -90,8 +92,10 @@ class NotificationDeliveryProcessingService(
         value?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Claimed email delivery $deliveryId missing $name")
 
-    private fun retryDelayMinutes(attemptCount: Int): Long =
-        PROCESSING_RETRY_DELAYS_MINUTES[attemptCount.coerceIn(0, PROCESSING_RETRY_DELAYS_MINUTES.lastIndex)]
+    private fun retryDelayMinutes(attemptCount: Int): Long {
+        val delays = retryDelayMinutesConfig.ifEmpty { DEFAULT_PROCESSING_RETRY_DELAYS_MINUTES }
+        return delays[attemptCount.coerceIn(0, delays.lastIndex)]
+    }
 
     private fun staleDeliveryLeaseMessage(id: UUID, status: NotificationDeliveryStatus): String =
         "Could not mark email delivery $id $status; delivery lease changed"
