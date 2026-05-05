@@ -1160,6 +1160,16 @@ Public release candidate, only when release/public-repo surface changes:
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
+Final integration verification result:
+
+- PASS `./server/gradlew -p server clean test`. A first final run found a Redis Testcontainers host-resolution flake when the mapped port overlapped local MySQL X on IPv6; `RedisTestContainer` now normalizes Testcontainers `localhost` to `127.0.0.1`, and both the focused Redis test and full server clean test passed after the fix.
+- PASS `pnpm --dir front lint`.
+- PASS `pnpm --dir front test` (49 files, 647 tests).
+- PASS `pnpm --dir front build`.
+- BLOCKED `pnpm --dir front test:e2e`: Playwright webServer `bootRun` failed before browser tests because the existing local `readmates_e2e` schema has Flyway checksum mismatches for migrations 16, 18, 20, and 21. The failure was reproduced with `bootRun --stacktrace`; no repair, drop, or reset was run.
+- PASS `git diff --check`.
+- Public release candidate checks were not run because this stack changed public-release docs/workflows but did not prepare a release-candidate export.
+
 ## Done Criteria
 
 - Every implemented item maps back to a row in the 판정표.

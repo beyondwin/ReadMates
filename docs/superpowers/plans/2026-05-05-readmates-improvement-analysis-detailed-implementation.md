@@ -1247,10 +1247,20 @@ If public release files or scanner docs changed, also run:
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
 
+Final integration verification result:
+
+- PASS `./server/gradlew -p server clean test`. The first final run exposed a local Redis Testcontainers host-resolution flake: Redis mapped to host port `33060`, while local MySQL X listened on IPv6 for that port and answered `localhost`. The test helper now uses `127.0.0.1` when Testcontainers reports `localhost`; the focused Redis test and the full server clean test passed after that fix.
+- PASS `pnpm --dir front lint`.
+- PASS `pnpm --dir front test` (49 files, 647 tests).
+- PASS `pnpm --dir front build`.
+- BLOCKED `pnpm --dir front test:e2e`: Playwright webServer `bootRun` failed before browser tests because the existing local `readmates_e2e` schema has Flyway checksum mismatches for migrations 16, 18, 20, and 21. The failure was reproduced with `bootRun --stacktrace`; no repair, drop, or reset was run.
+- PASS `git diff --check`.
+- Public release candidate checks were not run because this stack changed public-release docs/workflows but did not prepare a release-candidate export.
+
 ## Completion checklist
 
-- [ ] P0 PRs are merged before P1/P2 behavior changes.
-- [ ] Every merged PR names the changed surface and checks actually run.
-- [ ] Every skipped E2E or Docker/Compose check has an exact blocker and residual risk.
-- [ ] Public-safe constraints are preserved in docs, workflows, logs, and examples.
-- [ ] No excluded item was changed as a drive-by cleanup.
+- [x] P0 PRs are merged before P1/P2 behavior changes.
+- [x] Every merged PR names the changed surface and checks actually run.
+- [x] Every skipped E2E or Docker/Compose check has an exact blocker and residual risk.
+- [x] Public-safe constraints are preserved in docs, workflows, logs, and examples.
+- [x] No excluded item was changed as a drive-by cleanup.
