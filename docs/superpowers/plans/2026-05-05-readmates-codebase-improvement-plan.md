@@ -467,14 +467,14 @@ it("redirects anonymous guarded routes to login with search and hash returnTo", 
 - [x] **Step 3: 검증**
 
 ```bash
-pnpm --dir front test front/tests/unit/route-continuity.test.ts front/tests/unit/auth-context.test.tsx
+pnpm --dir front test tests/unit/route-continuity.test.ts tests/unit/auth-context.test.tsx
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 pnpm --dir front test:e2e
 ```
 
-Actual: planned `front/tests/...` filter fails under `pnpm --dir front` because paths are resolved from `front/`; equivalent `tests/unit/...` targeted test, `lint`, full `test`, `build`, and `git diff --check` passed. `test:e2e` was attempted but blocked by the existing local `readmates_e2e` Flyway checksum state.
+Actual: targeted `tests/unit/...` test, `lint`, full `test`, `build`, and `git diff --check` passed. The initially drafted `front/tests/...` filter was corrected because paths are resolved from `front/` under `pnpm --dir front`. `test:e2e` was attempted but blocked by the existing local `readmates_e2e` Flyway checksum state.
 
 - [x] **Step 4: Commit**
 
