@@ -32,12 +32,10 @@ class NotificationDeliveryProcessingServiceTest {
         val deliveryPort = ProcessingRecordingDeliveryPort()
         val mailPort = ProcessingRecordingMailPort()
         val registry = SimpleMeterRegistry()
-        val service = NotificationDeliveryProcessingService(
-            notificationDeliveryPort = deliveryPort,
-            mailDeliveryPort = mailPort,
+        val service = notificationDeliveryProcessingService(
+            deliveryPort = deliveryPort,
+            mailPort = mailPort,
             metrics = ReadmatesOperationalMetrics(registry),
-            maxAttempts = 5,
-            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
         captureDeliveryProcessingLogs().use { logs ->
@@ -63,12 +61,10 @@ class NotificationDeliveryProcessingServiceTest {
     fun `processClaimed increments failed metric after retryable failure mark succeeds`() {
         val deliveryPort = ProcessingRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
-        val service = NotificationDeliveryProcessingService(
-            notificationDeliveryPort = deliveryPort,
-            mailDeliveryPort = FailingMailPort("smtp rejected"),
+        val service = notificationDeliveryProcessingService(
+            deliveryPort = deliveryPort,
+            mailPort = FailingMailPort("smtp rejected"),
             metrics = ReadmatesOperationalMetrics(registry),
-            maxAttempts = 5,
-            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
         captureDeliveryProcessingLogs().use { logs ->
@@ -93,11 +89,9 @@ class NotificationDeliveryProcessingServiceTest {
     @Test
     fun `processClaimed uses configured retry delay when marking retryable failure`() {
         val deliveryPort = ProcessingRecordingDeliveryPort()
-        val service = NotificationDeliveryProcessingService(
-            notificationDeliveryPort = deliveryPort,
-            mailDeliveryPort = FailingMailPort("smtp rejected"),
-            metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-            maxAttempts = 5,
+        val service = notificationDeliveryProcessingService(
+            deliveryPort = deliveryPort,
+            mailPort = FailingMailPort("smtp rejected"),
             retryDelayMinutesConfig = listOf(2L, 4L, 8L),
         )
 
@@ -110,12 +104,10 @@ class NotificationDeliveryProcessingServiceTest {
     fun `processClaimed increments dead metric after exhausted failure mark succeeds`() {
         val deliveryPort = ProcessingRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
-        val service = NotificationDeliveryProcessingService(
-            notificationDeliveryPort = deliveryPort,
-            mailDeliveryPort = FailingMailPort("smtp rejected"),
+        val service = notificationDeliveryProcessingService(
+            deliveryPort = deliveryPort,
+            mailPort = FailingMailPort("smtp rejected"),
             metrics = ReadmatesOperationalMetrics(registry),
-            maxAttempts = 5,
-            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
         captureDeliveryProcessingLogs().use { logs ->
@@ -143,6 +135,24 @@ class NotificationDeliveryProcessingServiceTest {
             .counter()
             ?.count()
             ?: 0.0
+
+    private fun notificationDeliveryProcessingService(
+        deliveryPort: NotificationDeliveryPort,
+        mailPort: com.readmates.notification.application.port.out.MailDeliveryPort,
+        metrics: ReadmatesOperationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+        maxAttempts: Int = 5,
+        retryDelayMinutesConfig: List<Long> = listOf(5L, 15L, 60L, 240L),
+    ): NotificationDeliveryProcessingService =
+        NotificationDeliveryProcessingService(
+            notificationDeliveryPort = deliveryPort,
+            deliveryEngine = NotificationDeliveryEngine(
+                deliveryPort = deliveryPort,
+                mailDeliveryPort = mailPort,
+                metrics = metrics,
+                maxAttempts = maxAttempts,
+                retryDelayMinutesConfig = retryDelayMinutesConfig,
+            ),
+        )
 }
 
 private class FailingMailPort(private val message: String) : com.readmates.notification.application.port.out.MailDeliveryPort {
@@ -252,7 +262,7 @@ private class DeliveryProcessingLogCapture(
 }
 
 private fun captureDeliveryProcessingLogs(): DeliveryProcessingLogCapture {
-    val logger = LoggerFactory.getLogger(NotificationDeliveryProcessingService::class.java) as Logger
+    val logger = LoggerFactory.getLogger(NotificationDeliveryEngine::class.java) as Logger
     val appender = ListAppender<ILoggingEvent>().apply { start() }
     logger.addAppender(appender)
     return DeliveryProcessingLogCapture(logger, appender)

@@ -823,7 +823,7 @@ Extract shared email delivery state transition logic, then make Kafka config exp
 
 ### Steps
 
-- [ ] **Step 1: engine result type**
+- [x] **Step 1: engine result type**
 
 Create:
 
@@ -835,7 +835,7 @@ sealed interface DeliveryEngineResult {
 }
 ```
 
-- [ ] **Step 2: engine service**
+- [x] **Step 2: engine service**
 
 Create `NotificationDeliveryEngine` with:
 
@@ -872,7 +872,7 @@ class NotificationDeliveryEngine(
 
 Move existing private helpers into the engine and keep their behavior unchanged.
 
-- [ ] **Step 3: worker delegates**
+- [x] **Step 3: worker delegates**
 
 `NotificationDeliveryProcessingService.processClaimed` becomes:
 
@@ -884,7 +884,7 @@ fun processClaimed(item: ClaimedNotificationDeliveryItem) {
 
 If the engine returns `RetryableFailure`, worker processing still continues to the next claimed item.
 
-- [ ] **Step 4: Kafka dispatch delegates and rethrows retryable**
+- [x] **Step 4: Kafka dispatch delegates and rethrows retryable**
 
 `NotificationDispatchService.dispatchEmail` should convert engine result:
 
@@ -897,7 +897,7 @@ return when (val result = deliveryEngine.sendClaimed(claimed)) {
 }
 ```
 
-- [ ] **Step 5: Kafka config explicit keys**
+- [x] **Step 5: Kafka config explicit keys**
 
 In producer configs add:
 
@@ -915,14 +915,23 @@ ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to false,
 ConsumerConfig.ISOLATION_LEVEL_CONFIG to "read_committed",
 ```
 
-- [ ] **Step 6: verify**
+- [x] **Step 6: verify**
 
 ```bash
 ./server/gradlew -p server test --tests 'com.readmates.notification.application.service.*'
 ./server/gradlew -p server test --tests com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapterTest
+./server/gradlew -p server test --tests com.readmates.notification.adapter.in.kafka.NotificationEventKafkaListenerTest
 ./server/gradlew -p server test --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest
 ./server/gradlew -p server clean test
 ```
+
+Result:
+
+- PASS `./server/gradlew -p server test --tests 'com.readmates.notification.application.service.*'`
+- PASS `./server/gradlew -p server test --tests com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapterTest`
+- PASS `./server/gradlew -p server test --tests com.readmates.notification.adapter.in.kafka.NotificationEventKafkaListenerTest`
+- PASS `./server/gradlew -p server test --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest`
+- PASS `./server/gradlew -p server clean test`
 
 ---
 

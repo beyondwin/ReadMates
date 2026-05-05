@@ -406,10 +406,13 @@ class NotificationDispatchServiceTest {
     ): NotificationDispatchService =
         NotificationDispatchService(
             deliveryPort = deliveryPort,
-            mailDeliveryPort = mailPort,
-            metrics = metrics,
-            maxAttempts = maxAttempts,
-            retryDelayMinutesConfig = retryDelayMinutesConfig,
+            deliveryEngine = NotificationDeliveryEngine(
+                deliveryPort = deliveryPort,
+                mailDeliveryPort = mailPort,
+                metrics = metrics,
+                maxAttempts = maxAttempts,
+                retryDelayMinutesConfig = retryDelayMinutesConfig,
+            ),
         )
 
     private fun message(): NotificationEventMessage =
@@ -648,7 +651,7 @@ private class DispatchLogCapture(
 }
 
 private fun captureDispatchLogs(): DispatchLogCapture {
-    val logger = LoggerFactory.getLogger(NotificationDispatchService::class.java) as Logger
+    val logger = LoggerFactory.getLogger(NotificationDeliveryEngine::class.java) as Logger
     val appender = ListAppender<ILoggingEvent>().apply { start() }
     logger.addAppender(appender)
     return DispatchLogCapture(logger, appender)

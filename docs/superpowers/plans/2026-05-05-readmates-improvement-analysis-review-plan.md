@@ -655,7 +655,7 @@ Run:
 - Modify: `server/src/main/kotlin/com/readmates/notification/application/service/NotificationDispatchService.kt`
 - Modify tests under `server/src/test/kotlin/com/readmates/notification/application/service/`
 
-- [ ] **Step 1: characterization tests**
+- [x] **Step 1: characterization tests**
 
 Before extracting, confirm tests cover:
 
@@ -668,7 +668,9 @@ stale lease throws
 configured retry delays are used
 ```
 
-- [ ] **Step 2: engine API**
+Confirmed with existing service tests and added `NotificationDeliveryEngineTest` before extraction.
+
+- [x] **Step 2: engine API**
 
 Create an engine with no scheduler/Kafka knowledge:
 
@@ -686,11 +688,11 @@ class NotificationDeliveryEngine(
 
 Return a small sealed result so the Kafka dispatch path can rethrow retryable failures while the worker path can continue processing.
 
-- [ ] **Step 3: services delegate only orchestration**
+- [x] **Step 3: services delegate only orchestration**
 
 `NotificationDeliveryProcessingService` keeps claim-loop behavior. `NotificationDispatchService` keeps `persistPlannedDeliveries` and per-event retry aggregation. Both delegate actual email send and status transitions to the engine.
 
-- [ ] **Step 4: verification**
+- [x] **Step 4: verification**
 
 Run:
 
@@ -699,6 +701,12 @@ Run:
 ./server/gradlew -p server test --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest
 ./server/gradlew -p server clean test
 ```
+
+Result:
+
+- PASS `./server/gradlew -p server test --tests 'com.readmates.notification.application.service.*'`
+- PASS `./server/gradlew -p server test --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest`
+- PASS `./server/gradlew -p server clean test`
 
 ## P2 Task 10: Kafka config 명시와 condition style 정리
 
@@ -710,7 +718,7 @@ Run:
 - Modify: `server/src/test/kotlin/com/readmates/notification/adapter/out/kafka/KafkaNotificationEventPublisherAdapterTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListenerTest.kt`
 
-- [ ] **Step 1: config tests**
+- [x] **Step 1: config tests**
 
 Assert producer map contains:
 
@@ -729,11 +737,11 @@ isolation.level=read_committed
 auto.offset.reset=earliest
 ```
 
-- [ ] **Step 2: config implementation**
+- [x] **Step 2: config implementation**
 
 Add explicit config keys in `notificationProducerConfigs` and `notificationConsumerConfigs`.
 
-- [ ] **Step 3: optional condition style**
+- [x] **Step 3: optional condition style**
 
 Only if reviewers want one annotation, replace pairs like:
 
@@ -754,7 +762,9 @@ with:
 
 This is style-only, not a bug fix.
 
-- [ ] **Step 4: verification**
+Decision: not changed for PR7; tests continue to cover the existing repeatable property conditions.
+
+- [x] **Step 4: verification**
 
 Run:
 
@@ -763,6 +773,12 @@ Run:
 ./server/gradlew -p server test --tests com.readmates.notification.adapter.in.kafka.NotificationEventKafkaListenerTest
 ./server/gradlew -p server test --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest
 ```
+
+Result:
+
+- PASS `./server/gradlew -p server test --tests com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapterTest`
+- PASS `./server/gradlew -p server test --tests com.readmates.notification.adapter.in.kafka.NotificationEventKafkaListenerTest`
+- PASS `./server/gradlew -p server test --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest`
 
 ## P2 Task 11: auth API 공통 client 통일
 

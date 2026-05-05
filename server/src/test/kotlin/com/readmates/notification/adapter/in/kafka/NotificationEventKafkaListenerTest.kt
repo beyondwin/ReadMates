@@ -4,13 +4,17 @@ import com.readmates.notification.adapter.`in`.scheduler.NotificationEventRelayS
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.`in`.DispatchNotificationEventUseCase
-import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
+import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
+import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.domain.NotificationEventType
+import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.annotation.KafkaListener
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -47,6 +51,30 @@ class NotificationEventKafkaListenerTest {
             "readmates.notifications.enabled",
             "readmates.notifications.kafka.enabled",
         )
+    }
+
+    @Test
+    fun `listener consumer factory uses manual commits read committed isolation and earliest reset`() {
+        ApplicationContextRunner()
+            .withUserConfiguration(NotificationKafkaConfiguration::class.java)
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+                "readmates.notifications.kafka.consumer-group=notification-workers",
+            ).run { context ->
+                val consumerFactory = context.getBean(
+                    "notificationEventConsumerFactory",
+                    DefaultKafkaConsumerFactory::class.java,
+                )
+
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG])
+                    .isEqualTo(false)
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.ISOLATION_LEVEL_CONFIG])
+                    .isEqualTo("read_committed")
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG])
+                    .isEqualTo("earliest")
+            }
     }
 
     @Test
