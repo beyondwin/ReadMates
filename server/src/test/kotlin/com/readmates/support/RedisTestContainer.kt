@@ -13,8 +13,11 @@ object RedisTestContainer {
     fun registerRedisProperties(registry: DynamicPropertyRegistry) {
         registry.add("readmates.redis.enabled") { "true" }
         registry.add("spring.data.redis.url") {
-            "redis://${container.host}:${container.getMappedPort(6379)}"
+            "redis://${redisHost()}:${container.getMappedPort(6379)}"
         }
         registry.add("management.health.redis.enabled") { "true" }
     }
+
+    private fun redisHost(): String =
+        if (container.host == "localhost") "127.0.0.1" else container.host
 }
