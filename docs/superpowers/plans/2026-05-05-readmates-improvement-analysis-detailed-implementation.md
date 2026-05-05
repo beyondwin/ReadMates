@@ -1086,7 +1086,7 @@ front/features/host/ui/members/member-mobile-card.tsx
 
 ### Steps
 
-- [ ] **Step 1: characterization baseline**
+- [x] **Step 1: characterization baseline**
 
 ```bash
 pnpm --dir front test tests/unit/host-members.test.tsx
@@ -1095,7 +1095,7 @@ pnpm --dir front test tests/unit/my-page.test.tsx
 pnpm --dir front test tests/unit/host-session-editor.test.tsx tests/unit/host-session-editor-model.test.ts
 ```
 
-- [ ] **Step 2: extract leaf components first**
+- [x] **Step 2: extract leaf components first**
 
 For each file, extract components that:
 
@@ -1107,11 +1107,11 @@ do not call fetch or shared/api
 do not read React Router state directly
 ```
 
-- [ ] **Step 3: preserve route state injection**
+- [x] **Step 3: preserve route state injection**
 
 Keep return-state and scoped link construction in route/app boundary modules or pass the already-derived values into UI props.
 
-- [ ] **Step 4: verify after each extraction**
+- [x] **Step 4: verify after each extraction**
 
 ```bash
 pnpm --dir front test tests/unit/host-members.test.tsx
@@ -1119,6 +1119,8 @@ pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
+
+2026-05-06 PR9 completion: targeted host dashboard, my-page, host session editor, and host members suites passed after extraction. Final `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `git diff --check`, and extracted-UI import-boundary scan passed.
 
 - [ ] **Step 5: visual/manual check**
 
@@ -1129,6 +1131,8 @@ pnpm --dir front dev
 ```
 
 Inspect desktop and mobile host member/dashboard screens. Confirm no text overlap, disabled controls remain clear, and privacy-sensitive notification/email values remain masked.
+
+2026-05-06 PR9 completion: no dev server was started and no browser/manual visual pass was run. Residual visual risk is limited to extracted shell/panel composition because behavior was verified by targeted unit suites plus lint/test/build.
 
 ---
 

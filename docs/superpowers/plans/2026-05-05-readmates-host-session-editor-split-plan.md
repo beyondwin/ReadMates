@@ -55,17 +55,17 @@ Extract in this order so static panels move before stateful lifecycle sections.
 
 Before moving code, extend `front/tests/unit/host-session-editor.test.tsx` only for gaps. Existing coverage already includes default dates, new/edit labels, mobile tabs, payloads, publication lifecycle, attendance coalescing, feedback upload, delete modal focus, and scoped redirects.
 
-- [ ] Confirm existing baseline:
+- [x] Confirm existing baseline:
 
 ```bash
 pnpm --dir front test tests/unit/host-session-editor.test.tsx tests/unit/host-session-editor-model.test.ts
 ```
 
-- [ ] Add or verify a test that the mobile tablist supports click, ArrowLeft/ArrowRight, Home, and End while preserving `aria-selected` and panel visibility.
-- [ ] Add or verify a test that the basic session panel submits book, image, meeting URL, passcode, date, time, and location without changing deadline semantics.
-- [ ] Add or verify a test that publication save and publish controls disable while pending and block host-only visibility publication before sending a request.
-- [ ] Add or verify a test that attendance writes remain serialized/coalesced and rollback to the last committed status on failure.
-- [ ] Add or verify a test that the delete modal keeps focus trapped, restores focus on Escape, and keeps scoped delete redirects.
+- [x] Add or verify a test that the mobile tablist supports click, ArrowLeft/ArrowRight, Home, and End while preserving `aria-selected` and panel visibility.
+- [x] Add or verify a test that the basic session panel submits book, image, meeting URL, passcode, date, time, and location without changing deadline semantics.
+- [x] Add or verify a test that publication save and publish controls disable while pending and block host-only visibility publication before sending a request.
+- [x] Add or verify a test that attendance writes remain serialized/coalesced and rollback to the last committed status on failure.
+- [x] Add or verify a test that the delete modal keeps focus trapped, restores focus on Escape, and keeps scoped delete redirects.
 
 Run the targeted suite after each characterization addition:
 
@@ -75,42 +75,46 @@ pnpm --dir front test tests/unit/host-session-editor.test.tsx
 
 ## Implementation Checklist
 
-- [ ] **Phase 1: Baseline and dependency map**
+- [x] **Phase 1: Baseline and dependency map**
   - Run `git status --short --untracked-files=all`.
   - Inspect `host-session-editor.tsx` imports and local helper ownership.
   - Confirm no unrelated dirty frontend edits will be overwritten.
 
-- [ ] **Phase 2: Characterization tests first**
+- [x] **Phase 2: Characterization tests first**
   - Add only missing tests from the section above.
   - Run the targeted host session editor test command.
 
-- [ ] **Phase 3: Extract mobile tabs and shared panel shell**
+- [x] **Phase 3: Extract mobile tabs and shared panel shell**
   - Create `mobile-editor-tabs.tsx`.
   - Optionally create `session-editor-panel.tsx` for `Panel`.
   - Keep active-section state owned by `HostSessionEditor`.
   - Run the targeted host session editor test suite.
 
-- [ ] **Phase 4: Extract basic and document-state panels**
+- [x] **Phase 4: Extract basic and document-state panels**
   - Create `basic-session-panel.tsx` and `document-state-panel.tsx`.
   - Keep all controlled input values and setters explicit in props.
   - Run the targeted host session editor test suite.
+  - 2026-05-06 PR9 completion: `basic-session-panel.tsx` now owns controlled book/schedule/location/meeting/cover fields, and `document-state-panel.tsx` remains the extracted state summary.
 
-- [ ] **Phase 5: Extract publication panel**
+- [x] **Phase 5: Extract publication panel**
   - Create `publication-panel.tsx`.
   - Pass save/close/publish callbacks and status values from `HostSessionEditor`.
   - Keep validation feedback and disabled states unchanged.
   - Run the targeted host session editor test suite.
+  - 2026-05-06 PR9 completion: publication visibility, save/close/publish controls, status copy, and disabled/pending state rendering moved to `publication-panel.tsx`; callbacks and lifecycle orchestration remain injected.
 
-- [ ] **Phase 6: Extract attendance panel**
+- [x] **Phase 6: Extract attendance panel**
   - Create `attendance-panel.tsx`.
   - Keep write queue refs and mutation orchestration in `HostSessionEditor` unless a separate model refactor is planned.
   - Run the targeted host session editor test suite.
+  - 2026-05-06 PR9 completion: attendance list rendering moved to `attendance-panel.tsx`; optimistic write queues and mutation orchestration remain in `HostSessionEditor`.
 
-- [ ] **Phase 7: Review link and redirect helpers**
+- [x] **Phase 7: Review link and redirect helpers**
   - Extract `session-editor-links.tsx` only if it keeps route concerns injected and does not make leaf panels router-aware.
   - Verify new-session save, existing-session save, and delete redirects stay scoped.
+  - 2026-05-06 PR9 completion: no `session-editor-links.tsx` extraction was made. Keeping `DefaultLinkComponent`, router/default-link fallback, scoped redirect target creation, and create/update/delete redirect side effects in `HostSessionEditor` keeps route concerns parent-owned while extracted panels stay prop/callback driven. Scoped redirects remain covered by the targeted host session editor tests.
 
-- [ ] **Phase 8: Full verification**
+- [x] **Phase 8: Full verification**
   - Run all commands in the verification section.
   - Inspect the final diff for accidental route/API/model changes.
 

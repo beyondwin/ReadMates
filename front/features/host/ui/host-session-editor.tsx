@@ -4,7 +4,6 @@ import {
   type ComponentType,
   type CSSProperties,
   type FormEvent,
-  type KeyboardEvent,
   type ReactNode,
   useRef,
   useState,
@@ -21,26 +20,31 @@ import {
   buildPublicationRequest,
   getDestructiveActionAvailability,
   hydrateHostSessionFormValues,
-  hostSessionStateLabel,
   initialAttendanceStatuses,
   initialFeedbackDocumentStatus,
   initialPublicationSummary,
   initialRecordVisibility,
   questionDeadlineLabelForForm,
-  recordVisibilityDescription,
-  recordVisibilityLabel,
   type HostSessionPublicationRequest,
   type HostSessionRequest,
   type SessionRecordVisibility,
 } from "@/features/host/model/host-session-editor-model";
-import { BookCover } from "@/shared/ui/book-cover";
 import { SessionIdentity } from "@/shared/ui/session-identity";
 import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
-import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { HostSessionFeedbackUpload } from "./host-session-feedback-upload";
+import { AttendancePanel } from "./session-editor/attendance-panel";
+import { BasicSessionPanel } from "./session-editor/basic-session-panel";
+import { DocumentStatePanel } from "./session-editor/document-state-panel";
+import {
+  handleMobileEditorSectionKeyDown,
+  mobileEditorSections,
+  type MobileEditorSection,
+} from "./session-editor/mobile-editor-tabs";
+import { PublicationPanel } from "./session-editor/publication-panel";
+import { Panel } from "./session-editor/session-editor-panel";
 
 const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
 
@@ -51,7 +55,6 @@ const operationOrder = [
   "회차 피드백 문서 등록",
 ];
 
-type MobileEditorSection = "basic" | "publish" | "attendance" | "report";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 type PublicationFeedback = {
@@ -59,74 +62,8 @@ type PublicationFeedback = {
   message: string;
 };
 
-const mobileEditorSections: { key: MobileEditorSection; label: string; tabId: string; panelIds: string[] }[] = [
-  {
-    key: "basic",
-    label: "기본",
-    tabId: "host-editor-tab-basic",
-    panelIds: ["host-editor-panel-basic-info", "host-editor-panel-basic-schedule"],
-  },
-  {
-    key: "publish",
-    label: "공개",
-    tabId: "host-editor-tab-publish",
-    panelIds: ["host-editor-panel-publish"],
-  },
-  {
-    key: "attendance",
-    label: "출석",
-    tabId: "host-editor-tab-attendance",
-    panelIds: ["host-editor-panel-attendance"],
-  },
-  {
-    key: "report",
-    label: "문서",
-    tabId: "host-editor-tab-report",
-    panelIds: ["host-editor-panel-report"],
-  },
-];
-
-function mobileEditorSectionConfig(section: MobileEditorSection) {
-  return mobileEditorSections.find((item) => item.key === section) ?? mobileEditorSections[0];
-}
-
-function focusMobileEditorSection(section: MobileEditorSection) {
-  globalThis.setTimeout(() => {
-    document.getElementById(mobileEditorSectionConfig(section).tabId)?.focus();
-  }, 0);
-}
-
 function scopedHostRedirectHref(href: string) {
   return scopedAppLinkTarget(globalThis.location.pathname, href);
-}
-
-function handleMobileEditorSectionKeyDown(
-  event: KeyboardEvent<HTMLDivElement>,
-  activeSection: MobileEditorSection,
-  onSectionChange: (section: MobileEditorSection) => void,
-) {
-  const keys = mobileEditorSections.map((section) => section.key);
-  const currentIndex = keys.indexOf(activeSection);
-  const lastIndex = keys.length - 1;
-  const nextIndex =
-    event.key === "ArrowRight"
-      ? (currentIndex + 1) % keys.length
-      : event.key === "ArrowLeft"
-        ? (currentIndex - 1 + keys.length) % keys.length
-        : event.key === "Home"
-          ? 0
-          : event.key === "End"
-            ? lastIndex
-            : -1;
-
-  if (nextIndex < 0) {
-    return;
-  }
-
-  event.preventDefault();
-  const nextSection = keys[nextIndex];
-  onSectionChange(nextSection);
-  focusMobileEditorSection(nextSection);
 }
 
 type AttendanceWriteState = {
@@ -772,324 +709,56 @@ export default function HostSessionEditor({
               className="stack"
               style={{ "--stack": "28px" } as CSSProperties}
             >
-              <Panel
-                eyebrow="도서 정보"
-                title="읽을 책"
-                mobileSection="basic"
-                panelId="host-editor-panel-basic-info"
+              <BasicSessionPanel
                 activeMobileSection={activeMobileSection}
-              >
-                <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
-                  <div>
-                    <label className="label" htmlFor="session-title">
-                      세션 제목
-                    </label>
-                    <input
-                      id="session-title"
-                      className="input"
-                      value={title}
-                      onChange={(event) => setTitle(event.target.value)}
-                      placeholder="예: 8회차 모임 · 물고기는 존재하지 않는다"
-                    />
-                  </div>
-                  <div className="grid-2">
-                    <div>
-                      <label className="label" htmlFor="book-title">
-                        책 제목
-                      </label>
-                      <input
-                        id="book-title"
-                        className="input"
-                        value={bookTitle}
-                        onChange={(event) => setBookTitle(event.target.value)}
-                        placeholder="예: 물고기는 존재하지 않는다"
-                      />
-                    </div>
-                    <div>
-                      <label className="label" htmlFor="book-author">
-                        저자
-                      </label>
-                      <input
-                        id="book-author"
-                        className="input"
-                        value={bookAuthor}
-                        onChange={(event) => setBookAuthor(event.target.value)}
-                        placeholder="예: 룰루 밀러"
-                      />
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "18px", alignItems: "end" }}>
-                    <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
-                      <div>
-                        <label className="label" htmlFor="book-link">
-                          책 링크
-                        </label>
-                        <input
-                          id="book-link"
-                          className="input"
-                          value={bookLink}
-                          onChange={(event) => setBookLink(event.target.value)}
-                          placeholder="https://product.kyobobook.co.kr/..."
-                        />
-                        <div className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
-                          교보·알라딘·예스24·출판사 페이지 등 어디든 괜찮아요. 공개/멤버 페이지에 “책 정보 보기”로
-                          노출돼요.
-                        </div>
-                      </div>
-                      <div>
-                        <label className="label" htmlFor="book-image-url">
-                          책 이미지 URL
-                        </label>
-                        <input
-                          id="book-image-url"
-                          className="input"
-                          value={bookImageUrl}
-                          onChange={(event) => setBookImageUrl(event.target.value)}
-                          placeholder="https://image.example.com/book-cover.jpg"
-                        />
-                      </div>
-                    </div>
-                    <BookCover title={bookTitle} author={bookAuthor} imageUrl={bookImageUrl} width={96} />
-                  </div>
-                </div>
-              </Panel>
+                title={title}
+                bookTitle={bookTitle}
+                bookAuthor={bookAuthor}
+                bookLink={bookLink}
+                bookImageUrl={bookImageUrl}
+                date={date}
+                time={time}
+                deadline={deadline}
+                locationLabel={locationLabel}
+                meetingUrl={meetingUrl}
+                meetingPasscode={meetingPasscode}
+                onTitleChange={setTitle}
+                onBookTitleChange={setBookTitle}
+                onBookAuthorChange={setBookAuthor}
+                onBookLinkChange={setBookLink}
+                onBookImageUrlChange={setBookImageUrl}
+                onDateChange={setDate}
+                onTimeChange={setTime}
+                onLocationLabelChange={setLocationLabel}
+                onMeetingUrlChange={setMeetingUrl}
+                onMeetingPasscodeChange={setMeetingPasscode}
+              />
 
-              <Panel
-                eyebrow="일정 정보"
-                title="모임 일정과 접속 정보"
-                mobileSection="basic"
-                panelId="host-editor-panel-basic-schedule"
+              <PublicationPanel
                 activeMobileSection={activeMobileSection}
-              >
-                <div className="grid-3">
-                  <div>
-                    <label className="label" htmlFor="session-date">
-                      모임 날짜
-                    </label>
-                    <input
-                      id="session-date"
-                      className="input"
-                      type="date"
-                      value={date}
-                      onChange={(event) => setDate(event.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="label" htmlFor="session-time">
-                      시작 시간
-                    </label>
-                    <input
-                      id="session-time"
-                      className="input"
-                      type="time"
-                      value={time}
-                      onChange={(event) => setTime(event.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="label" htmlFor="question-deadline">
-                      질문 제출 마감
-                    </label>
-                    <input
-                      id="question-deadline"
-                      className="input"
-                      value={deadline}
-                      readOnly
-                    />
-                  </div>
-                </div>
-                <div style={{ marginTop: "14px" }}>
-                  <label className="label" htmlFor="session-location">
-                    장소
-                  </label>
-                  <input
-                    id="session-location"
-                    className="input"
-                    value={locationLabel}
-                    onChange={(event) => setLocationLabel(event.target.value)}
-                  />
-                </div>
-                <div className="grid-2" style={{ marginTop: "14px" }}>
-                  <div>
-                    <label className="label" htmlFor="meeting-url">
-                      미팅 URL
-                    </label>
-                    <input
-                      id="meeting-url"
-                      className="input"
-                      value={meetingUrl}
-                      onChange={(event) => setMeetingUrl(event.target.value)}
-                      placeholder="https://meet.google.com/..."
-                    />
-                    <div className="tiny" style={{ marginTop: "6px" }}>
-                      저장 즉시 멤버의 홈과 세션 화면에 링크가 노출됩니다.
-                    </div>
-                  </div>
-                  <div>
-                    <label className="label" htmlFor="meeting-passcode">
-                      Passcode · 선택
-                    </label>
-                    <input
-                      id="meeting-passcode"
-                      className="input"
-                      value={meetingPasscode}
-                      onChange={(event) => setMeetingPasscode(event.target.value)}
-                      placeholder="선택 사항"
-                    />
-                  </div>
-                </div>
-                <div className="marginalia" style={{ marginTop: "12px" }}>
-                  일정과 링크는 저장 즉시 멤버 홈과 현재 세션 화면에 반영됩니다. 자동 안내 발송은 아직 연결되지 않았습니다.
-                </div>
-              </Panel>
+                session={session}
+                sessionState={sessionState}
+                recordVisibility={recordVisibility}
+                recordSaveInFlight={recordSaveInFlight}
+                lifecycleSaveState={lifecycleSaveState}
+                summary={summary}
+                publicationFeedback={publicationFeedback}
+                publicationLifecycleHelp={publicationLifecycleHelp}
+                onRecordVisibilityChange={setRecordVisibility}
+                onSummaryChange={setSummary}
+                onPublicationFeedbackChange={setPublicationFeedback}
+                onSavePublication={savePublication}
+                onCloseSession={closeSession}
+                onPublishRecord={publishRecord}
+              />
 
-              <Panel
-                eyebrow="기록 · 공개 범위"
-                title="기록 공개 범위"
-                tone="warn"
-                mobileSection="publish"
-                panelId="host-editor-panel-publish"
+              <AttendancePanel
                 activeMobileSection={activeMobileSection}
-              >
-                <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
-                  <fieldset className="stack" style={{ "--stack": "10px", border: 0, padding: 0, margin: 0 } as CSSProperties}>
-                    <legend className="label">공개 범위</legend>
-                    {(["HOST_ONLY", "MEMBER", "PUBLIC"] as const).map((visibility) => {
-                      const selected = recordVisibility === visibility;
-
-                      return (
-                        <label
-                          key={visibility}
-                          className="row"
-                          style={{
-                            alignItems: "flex-start",
-                            gap: "10px",
-                            padding: "10px 14px",
-                            borderRadius: "8px",
-                            border: `1px solid ${selected ? "var(--accent)" : "var(--line)"}`,
-                            background: selected ? "var(--accent-soft)" : "var(--bg)",
-                            cursor: !session || recordSaveInFlight ? "not-allowed" : "pointer",
-                            opacity: !session || recordSaveInFlight ? 0.72 : 1,
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="record-visibility"
-                            value={visibility}
-                            checked={selected}
-                            disabled={!session || recordSaveInFlight}
-                            onChange={() => {
-                              setRecordVisibility(visibility);
-                              if (publicationFeedback?.tone === "error") {
-                                setPublicationFeedback(null);
-                              }
-                            }}
-                            style={{ marginTop: "3px" }}
-                          />
-                          <span>
-                            <span className="body">{recordVisibilityLabel(visibility)}</span>
-                            <span className="tiny" style={{ display: "block", color: "var(--text-3)" }}>
-                              {recordVisibilityDescription(visibility)}
-                            </span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </fieldset>
-                </div>
-                <hr className="divider-soft" style={{ margin: "20px 0" }} />
-                <div>
-                  <label className="label" htmlFor="public-summary">
-                    기록 요약
-                  </label>
-                  <textarea
-                    id="public-summary"
-                    className="textarea"
-                    rows={3}
-                    value={summary}
-                    disabled={recordSaveInFlight}
-                    onChange={(event) => {
-                      setSummary(event.target.value);
-                      if (publicationFeedback?.tone === "error") {
-                        setPublicationFeedback(null);
-                      }
-                    }}
-                    placeholder="모임의 분위기와 대화의 결을 2~3문장으로 짧게."
-                    aria-describedby="publication-summary-help publication-lifecycle-help publication-feedback"
-                  />
-                  <div id="publication-summary-help" className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
-                    선택한 공개 범위에 맞춰 기록 화면에 반영됩니다.
-                  </div>
-                  <div id="publication-lifecycle-help" className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
-                    {publicationLifecycleHelp}
-                  </div>
-                </div>
-                <div className="row" style={{ gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", marginTop: "16px" }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={!session || recordSaveInFlight}
-                    aria-describedby={!session ? "publication-lifecycle-help" : undefined}
-                    onClick={() => void savePublication()}
-                  >
-                    {recordSaveInFlight ? "저장하는 중" : "저장"}
-                  </button>
-                  {session && sessionState === "OPEN" ? (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={lifecycleSaveState === "saving"}
-                      onClick={() => void closeSession()}
-                    >
-                      {lifecycleSaveState === "saving" ? "마감하는 중" : "세션 마감"}
-                    </button>
-                  ) : null}
-                  {session && sessionState === "CLOSED" ? (
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      disabled={recordSaveInFlight || lifecycleSaveState === "saving"}
-                      onClick={() => void publishRecord()}
-                    >
-                      {lifecycleSaveState === "saving" ? "공개하는 중" : "기록 공개"}
-                    </button>
-                  ) : null}
-                  {session && sessionState === "PUBLISHED" ? (
-                    <span className="badge badge-ok">공개 완료</span>
-                  ) : null}
-                </div>
-                {publicationFeedback ? (
-                  <div
-                    id="publication-feedback"
-                    role={publicationFeedback.tone === "error" ? "alert" : "status"}
-                    className={publicationFeedback.tone === "error" ? "marginalia" : "small"}
-                    style={{
-                      marginTop: "12px",
-                      color: publicationFeedback.tone === "error" ? "var(--danger)" : "var(--accent)",
-                    }}
-                  >
-                    {publicationFeedback.message}
-                  </div>
-                ) : (
-                  <div id="publication-feedback" />
-                )}
-              </Panel>
-
-              <Panel
-                eyebrow="참석 명단"
-                title="출석 확정 명단"
-                mobileSection="attendance"
-                panelId="host-editor-panel-attendance"
-                activeMobileSection={activeMobileSection}
-              >
-                <HostSessionAttendanceEditor
-                  hasSession={Boolean(session)}
-                  attendees={session?.attendees}
-                  attendanceStatuses={attendanceStatuses}
-                  emptyMessage={emptyManagementMessage}
-                  onUpdateAttendance={updateAttendance}
-                />
-              </Panel>
+                session={session}
+                attendanceStatuses={attendanceStatuses}
+                emptyMessage={emptyManagementMessage}
+                onUpdateAttendance={updateAttendance}
+              />
 
               <Panel
                 eyebrow="피드백 문서 · 민감"
@@ -1186,140 +855,4 @@ export default function HostSessionEditor({
       ) : null}
     </main>
   );
-}
-
-function Panel({
-  eyebrow,
-  title,
-  children,
-  tone,
-  mobileSection,
-  panelId,
-  activeMobileSection,
-}: {
-  eyebrow: string;
-  title: string;
-  children: ReactNode;
-  tone?: "warn";
-  mobileSection: MobileEditorSection;
-  panelId: string;
-  activeMobileSection: MobileEditorSection;
-}) {
-  const warn = tone === "warn";
-  const isMobileActive = mobileSection === activeMobileSection;
-  const sectionConfig = mobileEditorSectionConfig(mobileSection);
-
-  return (
-    <section
-      id={panelId}
-      role="tabpanel"
-      aria-labelledby={sectionConfig.tabId}
-      className={`surface rm-host-session-editor__section${isMobileActive ? " is-mobile-active" : ""}`}
-      data-mobile-editor-section={mobileSection}
-      style={{
-        padding: "28px",
-        borderColor: warn ? "color-mix(in oklch, var(--warn), var(--line) 70%)" : "var(--line)",
-      }}
-    >
-      <div className="row-between" style={{ marginBottom: "18px" }}>
-        <div>
-          <div className="eyebrow" style={{ color: warn ? "var(--warn)" : "var(--text-3)" }}>
-            {eyebrow}
-          </div>
-          <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>
-            {title}
-          </h2>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function DocumentStatePanel({
-  session,
-  saveState,
-  recordVisibility,
-  hasPublicationRecord,
-  feedbackDocumentUploaded,
-}: {
-  session?: HostSessionDetailResponse | null;
-  saveState: SaveState;
-  recordVisibility: SessionRecordVisibility;
-  hasPublicationRecord: boolean;
-  feedbackDocumentUploaded: boolean;
-}) {
-  const rows = [
-    {
-      label: "문서 상태",
-      value: session ? hostSessionStateLabel(session.state) : "새 예정 세션",
-      className: sessionStateBadgeClass(session?.state),
-    },
-    {
-      label: "기본 정보",
-      value: saveState === "saving" ? "기본 정보 저장 중" : saveState === "error" ? "저장 실패" : session ? "저장됨" : "저장 전",
-      className: saveState === "error" ? "badge badge-warn badge-dot" : saveState === "saving" ? "badge badge-accent badge-dot" : "badge",
-    },
-    {
-      label: "공개 기록",
-      value: hasPublicationRecord ? recordVisibilityLabel(recordVisibility) : "기록 없음",
-      className: recordVisibilityBadgeClass(recordVisibility),
-    },
-    {
-      label: "피드백",
-      value: feedbackDocumentUploaded ? "문서 등록" : "미등록",
-      className: feedbackDocumentUploaded ? "badge badge-ok badge-dot" : "badge",
-    },
-    {
-      label: "참석 명단",
-      value: session ? `${session.attendees.length}명` : "세션 저장 후",
-      className: session?.attendees.length ? "badge badge-ok badge-dot" : "badge",
-    },
-  ];
-
-  return (
-    <div className="rm-document-panel" style={{ padding: "22px" }}>
-      <div className="eyebrow" style={{ marginBottom: "10px" }}>
-        문서 상태
-      </div>
-      <div className="stack" style={{ "--stack": "9px" } as CSSProperties}>
-        {rows.map((row) => (
-          <div key={row.label} className="row-between" style={{ gap: 12 }}>
-            <span className="small" style={{ color: "var(--text-2)" }}>
-              {row.label}
-            </span>
-            <span className={row.className}>{row.value}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function sessionStateBadgeClass(state?: HostSessionDetailResponse["state"]) {
-  if (state === "OPEN") {
-    return "badge badge-accent badge-dot";
-  }
-
-  if (state === "PUBLISHED") {
-    return "badge badge-ok badge-dot";
-  }
-
-  if (state === "CLOSED") {
-    return "badge badge-warn badge-dot";
-  }
-
-  return "badge";
-}
-
-function recordVisibilityBadgeClass(visibility: SessionRecordVisibility) {
-  if (visibility === "PUBLIC") {
-    return "badge badge-ok badge-dot";
-  }
-
-  if (visibility === "MEMBER") {
-    return "badge badge-accent badge-dot";
-  }
-
-  return "badge";
 }

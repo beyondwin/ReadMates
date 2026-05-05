@@ -896,11 +896,11 @@ Verification 2026-05-06:
 
 - Create: `docs/superpowers/plans/2026-05-05-readmates-host-members-split-plan.md`
 
-- [ ] **Step 1: do not duplicate existing plans**
+- [x] **Step 1: do not duplicate existing plans**
 
 Execute the existing plans as-is unless code has drifted. If drift exists, patch the plan first rather than improvising.
 
-- [ ] **Step 2: HostMembers split plan 작성**
+- [x] **Step 2: HostMembers split plan 작성**
 
 Use these current sources:
 
@@ -920,7 +920,7 @@ member-approval-actions
 member-mobile-card
 ```
 
-- [ ] **Step 3: verification per UI split**
+- [x] **Step 3: verification per UI split**
 
 Run the targeted suite after each extraction:
 
@@ -930,6 +930,8 @@ pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
+
+2026-05-06 PR9 completion: executed the remaining split phases from the host dashboard, my-page, host session editor, and host members split plans. Targeted suites, full frontend lint/test/build, `git diff --check`, and the extracted-UI import-boundary scan passed. No visual/manual browser check was run for PR9.
 
 ## P2 Task 14: short-name fallback 정리
 
