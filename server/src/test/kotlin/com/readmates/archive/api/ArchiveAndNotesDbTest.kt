@@ -76,6 +76,48 @@ class ArchiveAndNotesDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_SAMPLE_CLUB_ARCHIVE_ISOLATION_SQL,
+            INSERT_SAMPLE_CLUB_MEMBER5_MEMBERSHIP_SQL,
+            INSERT_SAMPLE_CLUB_ARCHIVE_SESSION_SQL,
+            INSERT_SAMPLE_CLUB_ARCHIVE_PARTICIPANT_SQL,
+            INSERT_SAMPLE_CLUB_ARCHIVE_PUBLICATION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_SAMPLE_CLUB_ARCHIVE_ISOLATION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `archive sessions are scoped by requested club slug for the same member`() {
+        mockMvc.get("/api/archive/sessions") {
+            header("X-Readmates-Club-Slug", "reading-sai")
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(6) }
+                jsonPath("$.items[*].bookTitle") { value(hasItem("가난한 찰리의 연감")) }
+                jsonPath("$.items[*].bookTitle") { value(not(hasItem("샘플 클럽 아카이브 테스트 책"))) }
+            }
+
+        mockMvc.get("/api/archive/sessions") {
+            header("X-Readmates-Club-Slug", "sample-book-club")
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000009181") }
+                jsonPath("$.items[0].bookTitle") { value("샘플 클럽 아카이브 테스트 책") }
+                jsonPath("$.items[*].bookTitle") { value(not(hasItem("가난한 찰리의 연감"))) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL,
             INSERT_VIEWER_DRAFT_SESSION_SQL,
             INSERT_VIEWER_OPEN_SESSION_SQL,
@@ -815,6 +857,118 @@ class ArchiveAndNotesDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val CLEANUP_SAMPLE_CLUB_ARCHIVE_ISOLATION_SQL = """
+            delete from public_session_publications
+            where session_id = '00000000-0000-0000-0000-000000009181';
+            delete from session_participants
+            where session_id = '00000000-0000-0000-0000-000000009181'
+               or membership_id = '00000000-0000-0000-0000-000000009182';
+            delete from sessions
+            where id = '00000000-0000-0000-0000-000000009181';
+            delete from memberships
+            where id = '00000000-0000-0000-0000-000000009182';
+        """
+
+        private const val INSERT_SAMPLE_CLUB_MEMBER5_MEMBERSHIP_SQL = """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select
+              '00000000-0000-0000-0000-000000009182',
+              clubs.id,
+              users.id,
+              'MEMBER',
+              'ACTIVE',
+              '2026-01-01 00:00:00.000000',
+              '샘플멤버5'
+            from clubs
+            join users on users.email = 'member5@example.com'
+            where clubs.slug = 'sample-book-club';
+        """
+
+        private const val INSERT_SAMPLE_CLUB_ARCHIVE_SESSION_SQL = """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              book_translator,
+              book_link,
+              book_image_url,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              meeting_url,
+              meeting_passcode,
+              question_deadline_at,
+              state,
+              visibility
+            )
+            values (
+              '00000000-0000-0000-0000-000000009181',
+              '00000000-0000-0000-0000-000000000002',
+              1,
+              '1회차 · 샘플 클럽 아카이브 테스트 책',
+              '샘플 클럽 아카이브 테스트 책',
+              '샘플 클럽 테스트 저자',
+              null,
+              null,
+              null,
+              '2026-10-10',
+              '20:00:00',
+              '22:00:00',
+              '온라인',
+              null,
+              null,
+              '2026-10-09 14:59:00.000000',
+              'PUBLISHED',
+              'PUBLIC'
+            );
+        """
+
+        private const val INSERT_SAMPLE_CLUB_ARCHIVE_PARTICIPANT_SQL = """
+            insert into session_participants (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              rsvp_status,
+              attendance_status,
+              participation_status
+            )
+            values (
+              '00000000-0000-0000-0000-000000009183',
+              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000009181',
+              '00000000-0000-0000-0000-000000009182',
+              'GOING',
+              'ATTENDED',
+              'ACTIVE'
+            );
+        """
+
+        private const val INSERT_SAMPLE_CLUB_ARCHIVE_PUBLICATION_SQL = """
+            insert into public_session_publications (
+              id,
+              club_id,
+              session_id,
+              public_summary,
+              is_public,
+              visibility,
+              published_at
+            )
+            values (
+              '00000000-0000-0000-0000-000000009184',
+              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000009181',
+              '샘플 클럽 공개 기록은 샘플 클럽 멤버 아카이브에만 노출됩니다.',
+              true,
+              'PUBLIC',
+              '2026-10-11 00:00:00.000000'
+            );
+        """
 
         private const val CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL = """
             delete from sessions

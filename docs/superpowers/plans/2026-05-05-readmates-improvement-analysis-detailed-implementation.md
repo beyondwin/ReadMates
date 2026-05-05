@@ -636,7 +636,7 @@ Add explicit tests for public exposure and multi-club isolation. This PR should 
 
 ### Tests to add
 
-- [ ] **Step 1: public publication matrix**
+- [x] **Step 1: public publication matrix**
 
 Add tests with fixture sessions for:
 
@@ -650,7 +650,7 @@ OPEN + PUBLIC returns 404 on public detail and is absent from public record list
 
 Use UUIDs in the existing test fixture style. Use placeholder book titles like `공개 범위 테스트 책`.
 
-- [ ] **Step 2: archive club isolation**
+- [x] **Step 2: archive club isolation**
 
 Add tests proving:
 
@@ -662,7 +662,7 @@ public records from one club do not appear in another club member archive respon
 
 Use existing dev seed clubs if available. Do not add real club/member data.
 
-- [ ] **Step 3: verify**
+- [x] **Step 3: verify**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.publication.api.PublicControllerDbTest
@@ -673,6 +673,8 @@ pnpm --dir front test:e2e
 ```
 
 If E2E cannot run because local MySQL cannot create the E2E schema, record that exact reason in the final response and PR notes.
+
+Status: focused server tests and full `./server/gradlew -p server clean test` passed. `pnpm --dir front test:e2e` was attempted after installing frontend dependencies with a frozen lockfile, but the configured Spring `bootRun` web server failed Flyway validation against the existing local `readmates_e2e` schema because migration checksums for versions 16, 18, 20, and 21 differ from the resolved local migrations.
 
 ---
 
