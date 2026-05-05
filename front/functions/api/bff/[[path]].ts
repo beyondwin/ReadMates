@@ -5,6 +5,7 @@ import {
   copyUpstreamHeaders,
   normalizedHostFromRequest,
 } from "../../_shared/proxy";
+import { normalizedClubSlug } from "../../../shared/security/club-slug";
 
 type Env = {
   READMATES_API_BASE_URL: string;
@@ -18,7 +19,6 @@ type PagesFunction<Env> = (context: {
 }) => Response | Promise<Response>;
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const CLUB_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
 
 function pathSegments(path: string | string[] | undefined) {
   if (Array.isArray(path)) {
@@ -88,9 +88,7 @@ function normalizedClubSlugFromRequest(request: Request) {
     return null;
   }
 
-  const value = params.get("clubSlug") ?? "";
-  const normalized = value.trim();
-  return CLUB_SLUG_PATTERN.test(normalized) && !normalized.includes("--") ? normalized : "";
+  return normalizedClubSlug(params.get("clubSlug"));
 }
 
 export const onRequest: PagesFunction<Env> = async (context) => {

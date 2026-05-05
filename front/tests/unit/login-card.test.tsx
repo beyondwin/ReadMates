@@ -1,10 +1,12 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { LoginRoute } from "@/features/auth/route/login-route";
 
 afterEach(() => {
   cleanup();
   window.history.pushState({}, "", "/");
+  vi.unstubAllGlobals();
   vi.unstubAllEnvs();
 });
 
@@ -70,6 +72,37 @@ describe("LoginRoute", () => {
     expect(screen.getByRole("button", { name: "김멤버3" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "송멤버4" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이멤버5" })).toBeInTheDocument();
+  });
+
+  it("submits dev login through the shared BFF client and preserves the user redirect", async () => {
+    const user = userEvent.setup();
+    const assignMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubEnv("VITE_ENABLE_DEV_LOGIN", "true");
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", {
+      assign: assignMock,
+      hash: "",
+      pathname: "/login",
+      search: "?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    });
+
+    render(<LoginRoute />);
+
+    await user.click(screen.getByRole("button", { name: "김호스트 · 호스트" }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/dev/login",
+      expect.objectContaining({
+        body: JSON.stringify({ email: "host@example.com" }),
+        cache: "no-store",
+        method: "POST",
+      }),
+    );
+    const headers = fetchMock.mock.calls[0]?.[1]?.headers;
+    expect(headers).toBeInstanceOf(Headers);
+    expect((headers as Headers).get("Content-Type")).toBe("application/json");
+    expect(assignMock).toHaveBeenCalledWith("/clubs/reading-sai/app");
   });
 
   it("shows a specific message when a left member returns from Google login", () => {
