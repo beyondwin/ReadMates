@@ -676,7 +676,7 @@ git commit -m "fix: validate invitation email length before persistence"
 
 **배경:** root `compose.yml`의 `readmates`/`readmates-root` 값은 로컬 개발용 public-safe sample이라 운영 secret 유출은 아닙니다. 그래도 `.env` override를 지원하면 로컬 환경 충돌을 줄이고 public repo safety policy와 일관성이 좋아집니다.
 
-- [ ] **Step 1: compose.yml 환경변수화**
+- [x] **Step 1: compose.yml 환경변수화**
 
 ```yaml
 services:
@@ -700,7 +700,7 @@ services:
       start_period: 30s
 ```
 
-- [ ] **Step 2: .env.example에 local Compose section 추가**
+- [x] **Step 2: .env.example에 local Compose section 추가**
 
 ```dotenv
 # Local Docker Compose MySQL defaults. Copy the variables you need into .env.
@@ -711,7 +711,7 @@ READMATES_LOCAL_MYSQL_PASSWORD=readmates
 READMATES_LOCAL_MYSQL_PORT=3306
 ```
 
-- [ ] **Step 3: local setup 문서 업데이트**
+- [x] **Step 3: local setup 문서 업데이트**
 
 `docs/development/local-setup.md`의 MySQL 준비 섹션에 `.env` override를 설명합니다. 예시는 local public-safe sample만 사용하고 실제 개인 비밀번호를 문서에 남기지 않습니다.
 
@@ -719,14 +719,16 @@ READMATES_LOCAL_MYSQL_PORT=3306
 Root `.env`는 Git에서 무시됩니다. 기본값을 바꾸려면 `.env.example`의 Local Docker Compose MySQL section 중 필요한 변수만 `.env`에 복사해 수정합니다.
 ```
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 ```bash
 docker compose config --quiet
 git diff --check -- compose.yml .env.example docs/development/local-setup.md
 ```
 
-- [ ] **Step 5: Commit**
+Actual: `docker compose config --quiet`, targeted `git diff --check`, and public-safety review over touched config/docs passed.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add compose.yml .env.example docs/development/local-setup.md
