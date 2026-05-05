@@ -7,6 +7,7 @@ import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationDeliveryStatus
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.util.UUID
@@ -64,6 +65,11 @@ class NotificationDeliveryProcessingService(
             staleDeliveryLeaseMessage(item.id, NotificationDeliveryStatus.SENT)
         }
         metrics.sent(item.eventType)
+        logger.info(
+            "Notification email delivery sent deliveryId={} eventType={}",
+            item.id,
+            item.eventType,
+        )
     }
 
     private fun markFailure(item: ClaimedNotificationDeliveryItem, exception: Exception) {
@@ -74,6 +80,13 @@ class NotificationDeliveryProcessingService(
                 staleDeliveryLeaseMessage(item.id, NotificationDeliveryStatus.DEAD)
             }
             metrics.dead(item.eventType)
+            logger.warn(
+                "Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}",
+                item.id,
+                item.eventType,
+                item.attemptCount + 1,
+                error,
+            )
         } else {
             val marked = notificationDeliveryPort.markDeliveryFailed(
                 id = item.id,
@@ -85,6 +98,13 @@ class NotificationDeliveryProcessingService(
                 staleDeliveryLeaseMessage(item.id, NotificationDeliveryStatus.FAILED)
             }
             metrics.failed(item.eventType)
+            logger.warn(
+                "Notification email delivery failed deliveryId={} eventType={} attemptCount={} error={}",
+                item.id,
+                item.eventType,
+                item.attemptCount + 1,
+                error,
+            )
         }
     }
 
@@ -103,4 +123,8 @@ class NotificationDeliveryProcessingService(
     private fun Exception.toStorageError(): String =
         sanitizeNotificationError(message ?: javaClass.simpleName, MAX_PROCESSING_ERROR_LENGTH)
             ?: javaClass.simpleName.take(MAX_PROCESSING_ERROR_LENGTH)
+
+    private companion object {
+        private val logger = LoggerFactory.getLogger(NotificationDeliveryProcessingService::class.java)
+    }
 }

@@ -18,6 +18,7 @@ import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -64,6 +65,13 @@ class HostSessionCommandService(
     override fun open(command: HostSessionIdCommand) =
         port.open(command).also { result ->
             if (result.changed) {
+                logger.info(
+                    "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                    command.host.clubId,
+                    command.sessionId,
+                    "DRAFT",
+                    "OPEN",
+                )
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
             }
         }.detail
@@ -72,6 +80,13 @@ class HostSessionCommandService(
     override fun close(command: HostSessionIdCommand) =
         port.close(command).also { result ->
             if (result.changed) {
+                logger.info(
+                    "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                    command.host.clubId,
+                    command.sessionId,
+                    "OPEN",
+                    "CLOSED",
+                )
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
             }
         }.detail
@@ -80,6 +95,13 @@ class HostSessionCommandService(
     override fun publish(command: HostSessionIdCommand) =
         port.publish(command).also { result ->
             if (result.changed) {
+                logger.info(
+                    "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                    command.host.clubId,
+                    command.sessionId,
+                    "CLOSED",
+                    "PUBLISHED",
+                )
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
             }
         }.detail
@@ -101,6 +123,10 @@ class HostSessionCommandService(
     override fun dashboard(host: CurrentMember) = port.dashboard(host)
 
     override fun upcoming(member: CurrentMember) = port.upcoming(member)
+
+    private companion object {
+        private val logger = LoggerFactory.getLogger(HostSessionCommandService::class.java)
+    }
 }
 
 private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCase {

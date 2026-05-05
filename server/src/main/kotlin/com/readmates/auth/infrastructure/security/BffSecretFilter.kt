@@ -3,6 +3,7 @@ package com.readmates.auth.infrastructure.security
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.env.Environment
 import org.springframework.core.env.StandardEnvironment
@@ -41,11 +42,23 @@ class BffSecretFilter(
         if (isApiRequest(request) && expected.isNotBlank()) {
             val provided = request.getHeader(BFF_SECRET_HEADER)
             if (provided == null || !secretMatches(provided, expected)) {
+                operationalLogger.warn(
+                    "BFF secret rejected method={} path={} clientIp={}",
+                    request.method,
+                    request.requestURI,
+                    request.remoteAddr,
+                )
                 response.status = HttpServletResponse.SC_UNAUTHORIZED
                 return
             }
 
             if (isMutatingRequest(request) && !hasAllowedOrigin(request)) {
+                operationalLogger.warn(
+                    "BFF mutating origin rejected method={} path={} clientIp={}",
+                    request.method,
+                    request.requestURI,
+                    request.remoteAddr,
+                )
                 response.status = HttpServletResponse.SC_FORBIDDEN
                 return
             }
@@ -79,6 +92,7 @@ class BffSecretFilter(
     }
 
     private companion object {
+        private val operationalLogger = LoggerFactory.getLogger(BffSecretFilter::class.java)
         const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
 

@@ -10,6 +10,7 @@ import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.time.OffsetDateTime
@@ -58,6 +59,11 @@ class NotificationDispatchService(
             throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.SENT)
         }
         metrics.sent(claimed.eventType)
+        logger.info(
+            "Notification email delivery sent deliveryId={} eventType={}",
+            claimed.id,
+            claimed.eventType,
+        )
         return null
     }
 
@@ -91,6 +97,13 @@ class NotificationDispatchService(
                 throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.DEAD)
             }
             metrics.dead(claimed.eventType)
+            logger.warn(
+                "Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}",
+                claimed.id,
+                claimed.eventType,
+                claimed.attemptCount + 1,
+                error,
+            )
             return null
         } else {
             val marked = deliveryPort.markDeliveryFailed(
@@ -103,6 +116,13 @@ class NotificationDispatchService(
                 throw staleDeliveryLeaseException(claimed.id, NotificationDeliveryStatus.FAILED)
             }
             metrics.failed(claimed.eventType)
+            logger.warn(
+                "Notification email delivery failed deliveryId={} eventType={} attemptCount={} error={}",
+                claimed.id,
+                claimed.eventType,
+                claimed.attemptCount + 1,
+                error,
+            )
             return NotificationDeliveryRetryableException(
                 "Email delivery ${claimed.id} failed and is scheduled for retry: $error",
             )
@@ -133,6 +153,10 @@ class NotificationDispatchService(
     private fun Exception.toStorageError(): String =
         sanitizeNotificationError(message ?: javaClass.simpleName, MAX_DISPATCH_ERROR_LENGTH)
             ?: javaClass.simpleName.take(MAX_DISPATCH_ERROR_LENGTH)
+
+    private companion object {
+        private val logger = LoggerFactory.getLogger(NotificationDispatchService::class.java)
+    }
 }
 
 class NotificationDeliveryRetryableException(

@@ -1,5 +1,9 @@
 package com.readmates.session.application.service
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.session.application.CreatedSessionResponse
@@ -27,10 +31,12 @@ import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.UUID
 
@@ -257,6 +263,53 @@ class HostSessionCommandServiceTest {
         assertEquals(emptyList<UUID>(), invalidation.clubs)
     }
 
+    @Test
+    fun `changed lifecycle transitions log club session and states only`() {
+        val port = RecordingHostSessionWritePort()
+        val service = HostSessionCommandService(port)
+        val command = HostSessionIdCommand(host, sessionId)
+
+        captureHostSessionLogs().use { logs ->
+            service.open(command)
+            service.close(command)
+            service.publish(command)
+
+            assertThat(logs.events.map { it.level }).containsExactly(Level.INFO, Level.INFO, Level.INFO)
+            assertThat(logs.events.map { it.message }).containsExactly(
+                "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                "Session state changed clubId={} sessionId={} oldState={} newState={}",
+            )
+            assertThat(logs.events.map { it.argumentArray.toList() }).containsExactly(
+                listOf(host.clubId, sessionId, "DRAFT", "OPEN"),
+                listOf(host.clubId, sessionId, "OPEN", "CLOSED"),
+                listOf(host.clubId, sessionId, "CLOSED", "PUBLISHED"),
+            )
+            assertThat(logs.events.map { it.formattedMessage }.joinToString("\n"))
+                .doesNotContain(host.email)
+                .doesNotContain(host.displayName)
+        }
+    }
+
+    @Test
+    fun `no-op lifecycle transitions do not log state changes`() {
+        val port = RecordingHostSessionWritePort().apply {
+            openChanged = false
+            closeChanged = false
+            publishChanged = false
+        }
+        val service = HostSessionCommandService(port)
+        val command = HostSessionIdCommand(host, sessionId)
+
+        captureHostSessionLogs().use { logs ->
+            service.open(command)
+            service.close(command)
+            service.publish(command)
+
+            assertThat(logs.events).isEmpty()
+        }
+    }
+
     private fun hostSessionCommand() = HostSessionCommand(
         host = host,
         title = "7회차",
@@ -450,4 +503,24 @@ class HostSessionCommandServiceTest {
             throw IllegalStateException("invalidation failed")
         }
     }
+}
+
+private class HostSessionLogCapture(
+    private val logger: Logger,
+    private val appender: ListAppender<ILoggingEvent>,
+) : AutoCloseable {
+    val events: List<ILoggingEvent>
+        get() = appender.list
+
+    override fun close() {
+        logger.detachAppender(appender)
+        appender.stop()
+    }
+}
+
+private fun captureHostSessionLogs(): HostSessionLogCapture {
+    val logger = LoggerFactory.getLogger(HostSessionCommandService::class.java) as Logger
+    val appender = ListAppender<ILoggingEvent>().apply { start() }
+    logger.addAppender(appender)
+    return HostSessionLogCapture(logger, appender)
 }

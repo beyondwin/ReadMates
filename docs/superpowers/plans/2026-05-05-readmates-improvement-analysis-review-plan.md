@@ -548,7 +548,7 @@ Status: focused server tests and full `./server/gradlew -p server clean test` pa
 - Modify: relevant session application service or adapter owning state transition, such as `server/src/main/kotlin/com/readmates/session/application/service/HostSessionCommandService.kt`
 - Test: notification service tests and BFF filter tests
 
-- [ ] **Step 1: log policy**
+- [x] **Step 1: log policy**
 
 Use `LoggerFactory` and structured placeholders. Allowed values:
 
@@ -562,19 +562,19 @@ Never log:
 raw token, BFF secret, OAuth code, email address, feedback document body, SMTP credential, invite token
 ```
 
-- [ ] **Step 2: BFF rejection warnings**
+- [x] **Step 2: BFF rejection warnings**
 
 Add WARN logs for missing/mismatched BFF secret and forbidden mutating origin. Include request method, path, and client IP only.
 
-- [ ] **Step 3: notification relay/delivery logs**
+- [x] **Step 3: notification relay/delivery logs**
 
 Add INFO on publish success and WARN on publish/delivery failure/dead. Reuse sanitized error strings already used for storage.
 
-- [ ] **Step 4: session lifecycle logs**
+- [x] **Step 4: session lifecycle logs**
 
 Add INFO on `DRAFT -> OPEN`, `OPEN -> CLOSED`, `CLOSED -> PUBLISHED` transitions with session/club IDs only.
 
-- [ ] **Step 5: verification**
+- [x] **Step 5: verification**
 
 Run:
 
@@ -584,6 +584,15 @@ Run:
 ./server/gradlew -p server test --tests 'com.readmates.session.application.service.*'
 ./server/gradlew -p server clean test
 ```
+
+Verification recorded 2026-05-06:
+
+- PASS `./server/gradlew -p server test --tests 'com.readmates.auth.infrastructure.security.BffSecretFilter*'`
+- PASS `./server/gradlew -p server test --tests 'com.readmates.notification.application.service.*'`
+- PASS `./server/gradlew -p server test --tests 'com.readmates.session.application.service.*'`
+- PASS `./server/gradlew -p server clean test`
+- PASS `git diff --check`
+- BLOCKED `pnpm --dir front test:e2e`: Playwright webServer `bootRun` failed before browser tests because the existing local `readmates_e2e` schema has Flyway checksum mismatches for migrations 16, 18, 20, and 21. No destructive repair, drop, or reset was performed.
 
 ---
 

@@ -1,5 +1,9 @@
 package com.readmates.notification.application.service
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDetail
@@ -22,6 +26,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -39,7 +44,20 @@ class NotificationDispatchServiceTest {
         val mailPort = RecordingMailPort()
         val service = notificationDispatchService(deliveryPort, mailPort)
 
-        service.dispatch(message())
+        captureDispatchLogs().use { logs ->
+            service.dispatch(message())
+
+            val event = logs.events.single()
+            assertThat(event.level).isEqualTo(Level.INFO)
+            assertThat(event.message).isEqualTo("Notification email delivery sent deliveryId={} eventType={}")
+            assertThat(event.argumentArray.toList()).containsExactly(
+                emailDelivery().id,
+                NotificationEventType.NEXT_BOOK_PUBLISHED,
+            )
+            assertThat(event.formattedMessage)
+                .doesNotContain("member@example.com")
+                .doesNotContain("다음 책을 확인해 주세요.")
+        }
 
         assertThat(deliveryPort.persistedMessages).containsExactly(message())
         assertThat(deliveryPort.claimedIds).containsExactly(emailDelivery().id)
@@ -90,10 +108,23 @@ class NotificationDispatchServiceTest {
         val mailPort = FailingMailPort("smtp rejected")
         val service = notificationDispatchService(deliveryPort, mailPort)
 
-        assertThatThrownBy { service.dispatch(message()) }
-            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
-            .hasMessageContaining("smtp rejected")
-            .hasNoCause()
+        captureDispatchLogs().use { logs ->
+            assertThatThrownBy { service.dispatch(message()) }
+                .isInstanceOf(NotificationDeliveryRetryableException::class.java)
+                .hasMessageContaining("smtp rejected")
+                .hasNoCause()
+
+            val event = logs.events.single()
+            assertThat(event.level).isEqualTo(Level.WARN)
+            assertThat(event.message).isEqualTo("Notification email delivery failed deliveryId={} eventType={} attemptCount={} error={}")
+            assertThat(event.argumentArray.toList()).containsExactly(
+                emailDelivery().id,
+                NotificationEventType.NEXT_BOOK_PUBLISHED,
+                2,
+                "smtp rejected",
+            )
+            assertThat(event.formattedMessage).doesNotContain("member@example.com")
+        }
 
         assertThat(deliveryPort.failed.map { it.id }).containsExactly(emailDelivery().id)
         assertThat(deliveryPort.failed.map { it.delayMinutes }).containsExactly(15L)
@@ -215,8 +246,23 @@ class NotificationDispatchServiceTest {
         val mailPort = FailingMailPort("token=secret member@example.com " + "x".repeat(600))
         val service = notificationDispatchService(deliveryPort, mailPort)
 
-        assertThatCode { service.dispatch(message()) }
-            .doesNotThrowAnyException()
+        captureDispatchLogs().use { logs ->
+            assertThatCode { service.dispatch(message()) }
+                .doesNotThrowAnyException()
+
+            val event = logs.events.single()
+            assertThat(event.level).isEqualTo(Level.WARN)
+            assertThat(event.message).isEqualTo("Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}")
+            assertThat(event.argumentArray.toList()).hasSize(4)
+            assertThat(event.argumentArray[0]).isEqualTo(emailDelivery().id)
+            assertThat(event.argumentArray[1]).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+            assertThat(event.argumentArray[2]).isEqualTo(5)
+            assertThat(event.argumentArray[3].toString())
+                .contains("[redacted-secret]", "[redacted-email]")
+                .doesNotContain("token=secret")
+                .doesNotContain("member@example.com")
+            assertThat(event.formattedMessage).doesNotContain("member@example.com")
+        }
 
         assertThat(deliveryPort.dead.map { it.id }).containsExactly(emailDelivery().id)
         assertThat(deliveryPort.dead.single().error).hasSize(500)
@@ -587,3 +633,23 @@ private fun dispatchCounter(registry: SimpleMeterRegistry, name: String): Double
         .counter()
         ?.count()
         ?: 0.0
+
+private class DispatchLogCapture(
+    private val logger: Logger,
+    private val appender: ListAppender<ILoggingEvent>,
+) : AutoCloseable {
+    val events: List<ILoggingEvent>
+        get() = appender.list
+
+    override fun close() {
+        logger.detachAppender(appender)
+        appender.stop()
+    }
+}
+
+private fun captureDispatchLogs(): DispatchLogCapture {
+    val logger = LoggerFactory.getLogger(NotificationDispatchService::class.java) as Logger
+    val appender = ListAppender<ILoggingEvent>().apply { start() }
+    logger.addAppender(appender)
+    return DispatchLogCapture(logger, appender)
+}
