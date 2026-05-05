@@ -12,7 +12,6 @@ SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-accept-new}"
 APP_BASE_URL="${READMATES_APP_BASE_URL:-https://readmates.pages.dev}"
 IMAGE_TAG="${READMATES_SERVER_IMAGE:-readmates-server:local}"
 IMAGE_ARCHIVE="${TMPDIR:-/tmp}/readmates-server-image.tar"
-JAR_PATH="server/build/libs/readmates-server-0.0.1-SNAPSHOT.jar"
 COMPOSE_FILE="deploy/oci/compose.yml"
 CADDYFILE="deploy/oci/Caddyfile"
 SERVICE_FILE="deploy/oci/readmates-stack.service"
@@ -32,33 +31,45 @@ shell_quote() {
   printf "%q" "$1"
 }
 
-echo "==> [1/9] 필수 파일 확인"
-require_file "$JAR_PATH"
+uses_registry_image() {
+  [[ "$IMAGE_TAG" == ghcr.io/* ]]
+}
+
+echo "==> [1/10] 필수 파일 확인"
 require_file "$COMPOSE_FILE"
 require_file "$CADDYFILE"
 require_file "$SERVICE_FILE"
 
-echo "==> [2/9] Docker image build: ${IMAGE_TAG}"
-docker build -t "${IMAGE_TAG}" server
-docker save "${IMAGE_TAG}" -o "${IMAGE_ARCHIVE}"
+if uses_registry_image; then
+  IMAGE_SOURCE="registry"
+  echo "==> [2/10] Docker image pull on VM: ${IMAGE_TAG}"
+else
+  IMAGE_SOURCE="local"
+  echo "==> [2/10] Docker image build: ${IMAGE_TAG}"
+  docker build -t "${IMAGE_TAG}" server
+  docker save "${IMAGE_TAG}" -o "${IMAGE_ARCHIVE}"
+fi
 
-echo "==> [3/9] VM Docker/Compose 확인"
+echo "==> [3/10] VM Docker/Compose 확인"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "sudo docker version >/dev/null && sudo docker compose version >/dev/null"
 
-echo "==> [4/9] runtime files 전송"
-scp "${SSH_OPTIONS[@]}" "$IMAGE_ARCHIVE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-server-image.tar"
+echo "==> [4/10] runtime files 전송"
+if ! uses_registry_image; then
+  scp "${SSH_OPTIONS[@]}" "$IMAGE_ARCHIVE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-server-image.tar"
+fi
 scp "${SSH_OPTIONS[@]}" "$COMPOSE_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-compose.yml"
 scp "${SSH_OPTIONS[@]}" "$CADDYFILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-Caddyfile"
 scp "${SSH_OPTIONS[@]}" "$SERVICE_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-stack.service"
 
-echo "==> [5/9] VM runtime files 설치"
+echo "==> [5/10] VM runtime files 설치"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-  "sudo bash -s -- $(shell_quote "$REMOTE_DIR") $(shell_quote "$CADDY_SITE") $(shell_quote "$IMAGE_TAG")" <<'EOF'
+  "sudo bash -s -- $(shell_quote "$REMOTE_DIR") $(shell_quote "$CADDY_SITE") $(shell_quote "$IMAGE_TAG") $(shell_quote "$IMAGE_SOURCE")" <<'EOF'
 set -euo pipefail
 remote_dir="$1"
 caddy_site="$2"
 image_tag="$3"
+image_source="$4"
 sudo mkdir -p "$remote_dir" /etc/readmates
 sudo mv /tmp/readmates-compose.yml "$remote_dir/compose.yml"
 sudo mv /tmp/readmates-Caddyfile "$remote_dir/Caddyfile"
@@ -69,11 +80,15 @@ printf 'READMATES_SERVER_IMAGE=%s\n' "$image_tag" | sudo tee "$remote_dir/.env" 
 sudo chmod 600 "$remote_dir/.env"
 sudo chown -R readmates:readmates "$remote_dir"
 sudo systemctl daemon-reload
-sudo docker load -i /tmp/readmates-server-image.tar
-rm -f /tmp/readmates-server-image.tar
+if [ "$image_source" = "registry" ]; then
+  sudo docker pull "$image_tag"
+else
+  sudo docker load -i /tmp/readmates-server-image.tar
+  rm -f /tmp/readmates-server-image.tar
+fi
 EOF
 
-echo "==> [6/9] compose 설정 검증"
+echo "==> [6/10] compose 설정 검증"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "cd ${REMOTE_DIR} && sudo docker compose -f compose.yml config >/dev/null"
 

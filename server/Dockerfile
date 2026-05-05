@@ -1,3 +1,11 @@
+FROM eclipse-temurin:21-jdk-jammy AS builder
+
+WORKDIR /build
+COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts ./
+COPY gradle ./gradle
+COPY src ./src
+RUN ./gradlew bootJar --no-daemon
+
 FROM eclipse-temurin:21-jre-jammy
 
 RUN apt-get update \
@@ -7,8 +15,7 @@ RUN apt-get update \
     && useradd --system --gid readmates --home-dir /app --shell /usr/sbin/nologin readmates
 
 WORKDIR /app
-COPY build/libs/readmates-server-0.0.1-SNAPSHOT.jar /app/readmates-server.jar
-
+COPY --from=builder /build/build/libs/*.jar /app/readmates-server.jar
 RUN chown -R readmates:readmates /app
 
 USER readmates

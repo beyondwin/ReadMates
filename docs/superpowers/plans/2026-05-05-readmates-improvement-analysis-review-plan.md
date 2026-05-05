@@ -132,10 +132,14 @@ git commit -m "chore: remove unused Flyway migration path"
 - Modify: `server/Dockerfile`
 - Modify: `server/.dockerignore`
 - Create: `.github/workflows/deploy-server.yml`
+- Modify: `deploy/oci/05-deploy-compose-stack.sh`
 - Modify: `docs/deploy/oci-backend.md`
+- Modify: `docs/deploy/compose-stack.md`
+- Modify: `docs/deploy/README.md`
 - Modify: `docs/development/release-management.md`
+- Modify: `docs/development/versioning.md`
 
-- [ ] **Step 1: Dockerfile을 multi-stage로 전환**
+- [x] **Step 1: Dockerfile을 multi-stage로 전환**
 
 Use this shape, preserving the existing non-root runtime user and exposed ports:
 
@@ -180,7 +184,7 @@ Build with `server/` as the Docker context:
 docker build -t readmates-server:local server
 ```
 
-- [ ] **Step 2: server image workflow 추가**
+- [x] **Step 2: server image workflow 추가**
 
 Create `.github/workflows/deploy-server.yml`:
 
@@ -228,7 +232,7 @@ jobs:
           tags: ghcr.io/${{ github.repository }}/readmates-server:${{ github.ref_name }}
 ```
 
-- [ ] **Step 3: release/deploy docs에 tag-image 연결 추가**
+- [x] **Step 3: release/deploy docs에 tag-image 연결 추가**
 
 Document that server deploy pulls:
 
@@ -238,23 +242,28 @@ ghcr.io/<owner>/<repo>/readmates-server:<git-tag>
 
 Use placeholder owner/repo only. Do not add private registry URLs or deployment hostnames.
 
-- [ ] **Step 4: verification**
+Update `deploy/oci/05-deploy-compose-stack.sh` so `ghcr.io/` image tags are pulled on the VM. Keep non-GHCR tags as the local build/save/load path for transition checks.
+
+- [x] **Step 4: verification**
 
 Run:
 
 ```bash
 docker build -t readmates-server:local server
 ./server/gradlew -p server clean test
-git diff --check -- server/Dockerfile server/.dockerignore .github/workflows/deploy-server.yml docs/deploy/oci-backend.md docs/development/release-management.md
+bash -n deploy/oci/05-deploy-compose-stack.sh
+git diff --check -- server/Dockerfile server/.dockerignore .github/workflows/deploy-server.yml deploy/oci/05-deploy-compose-stack.sh docs/deploy/oci-backend.md docs/deploy/compose-stack.md docs/deploy/README.md docs/development/release-management.md docs/development/versioning.md
 ```
 
 Expected: local image builds from a clean repo root context, server tests pass, diff check passes.
 
-- [ ] **Step 5: commit**
+- [x] **Step 5: commit**
 
 ```bash
 git add server/Dockerfile server/.dockerignore .github/workflows/deploy-server.yml \
-        docs/deploy/oci-backend.md docs/development/release-management.md
+        deploy/oci/05-deploy-compose-stack.sh \
+        docs/deploy/oci-backend.md docs/deploy/compose-stack.md docs/deploy/README.md \
+        docs/development/release-management.md docs/development/versioning.md
 git commit -m "ci: publish tagged server images"
 ```
 
