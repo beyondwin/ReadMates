@@ -739,9 +739,9 @@ git commit -m "chore: make local compose mysql credentials configurable"
 
 ## Task 9: 대형 컴포넌트 분리 계획서 작성
 
-**배경:** 현재 line count는 `host-dashboard.tsx` 1,826줄, `my-page.tsx` 1,369줄, `host-session-editor.tsx` 1,348줄입니다. 세 파일을 한 PR에서 분리하면 regression surface가 크므로 각각 별도 계획서와 characterization test를 먼저 둡니다.
+**배경:** 현재 대형 구현 파일은 `front/features/host/ui/host-dashboard.tsx` 약 1,805줄, `front/features/archive/ui/my-page.tsx` 약 1,369줄, `front/features/host/ui/host-session-editor.tsx` 약 1,325줄입니다. 세 파일을 한 PR에서 분리하면 regression surface가 크므로 각각 별도 계획서와 characterization test를 먼저 둡니다.
 
-- [ ] **Step 1: HostDashboard split plan 작성**
+- [x] **Step 1: HostDashboard split plan 작성**
 
 계획서 이름:
 
@@ -759,13 +759,13 @@ docs/superpowers/plans/2026-05-05-readmates-host-dashboard-split-plan.md
 검증:
 
 ```bash
-pnpm --dir front test front/tests/unit/host-dashboard*.test.tsx
+pnpm --dir front test tests/unit/host-dashboard.test.tsx tests/unit/host-dashboard-model.test.ts
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
 
-- [ ] **Step 2: MyPage split plan 작성**
+- [x] **Step 2: MyPage split plan 작성**
 
 계획서 이름:
 
@@ -784,13 +784,13 @@ docs/superpowers/plans/2026-05-05-readmates-my-page-split-plan.md
 검증:
 
 ```bash
-pnpm --dir front test front/tests/unit/my-page.test.tsx
+pnpm --dir front test tests/unit/my-page.test.tsx
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
 
-- [ ] **Step 3: HostSessionEditor split plan 작성**
+- [x] **Step 3: HostSessionEditor split plan 작성**
 
 계획서 이름:
 
@@ -809,19 +809,22 @@ docs/superpowers/plans/2026-05-05-readmates-host-session-editor-split-plan.md
 검증:
 
 ```bash
-pnpm --dir front test front/tests/unit/host-session-editor*.test.tsx
+pnpm --dir front test tests/unit/host-session-editor.test.tsx tests/unit/host-session-editor-model.test.ts
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
 
-- [ ] **Step 4: 세 계획서 자체 검증**
+- [x] **Step 4: 세 계획서 자체 검증**
 
 ```bash
 git diff --check -- docs/superpowers/plans/2026-05-05-readmates-host-dashboard-split-plan.md \
   docs/superpowers/plans/2026-05-05-readmates-my-page-split-plan.md \
-  docs/superpowers/plans/2026-05-05-readmates-host-session-editor-split-plan.md
+  docs/superpowers/plans/2026-05-05-readmates-host-session-editor-split-plan.md \
+  docs/superpowers/plans/2026-05-05-readmates-codebase-improvement-plan.md
 ```
+
+Actual: 세 split plan 문서가 생성되었고, `pnpm --dir front` 기준 테스트 경로는 shell wildcard 없이 `tests/unit/...` 명시 경로 형식으로 정정했습니다. Docs-only `git diff --check`, touched-doc public-safety scan, split plan에 기록된 exact targeted frontend command가 통과했습니다.
 
 ---
 
