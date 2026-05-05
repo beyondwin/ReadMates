@@ -32,7 +32,7 @@ class MemberAuthoritiesFilter(
             val member = if (requestedClubContext.supplied && requestedClubContext.context == null) {
                 null
             } else {
-                authenticatedMemberResolver.resolve(authentication, requestedClubContext.context)
+                authenticatedMemberResolver.resolveByEmail(email, requestedClubContext.context)
             }
             val authorities = authentication.authorities
                 .filterNot { it.authority in MEMBER_ROLE_AUTHORITIES }

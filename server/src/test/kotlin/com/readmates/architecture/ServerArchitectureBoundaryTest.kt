@@ -5,6 +5,11 @@ import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
+import java.nio.file.Path
+import kotlin.io.path.name
+import kotlin.io.path.relativeTo
+import kotlin.io.path.readLines
 
 class ServerArchitectureBoundaryTest {
     private val importedClasses = ClassFileImporter()
@@ -114,12 +119,13 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
-    fun `application packages do not depend on spring web or http response types`() {
+    fun `application packages do not depend on spring web http or security types`() {
         val forbiddenPrefixes = listOf(
             "org.springframework.http.",
+            "org.springframework.security.",
             "org.springframework.web.",
         )
-        val violations = importedClasses
+        val bytecodeViolations = importedClasses
             .filter { javaClass -> javaClass.residesInAnyPackagePattern(migratedApplicationPackages) }
             .flatMap { javaClass ->
                 javaClass.directDependenciesFromSelf
@@ -132,10 +138,24 @@ class ServerArchitectureBoundaryTest {
             }
             .distinct()
             .sorted()
+        val sourceViolations = applicationSourceFiles()
+            .flatMap { sourceFile ->
+                sourceFile.readLines()
+                    .filter { line ->
+                        val importName = line.trim().removePrefix("import ").trim()
+                        forbiddenPrefixes.any { forbiddenPrefix -> importName.startsWith(forbiddenPrefix) }
+                    }
+                    .map { line ->
+                        "${sourceFile.relativeTo(sourceRoot())}: ${line.trim()}"
+                    }
+            }
+            .distinct()
+            .sorted()
+        val violations = (bytecodeViolations + sourceViolations).distinct().sorted()
 
         assertTrue(
             violations.isEmpty(),
-            "Application packages must not depend on Spring HTTP/Web types:\n${violations.joinToString("\n")}",
+            "Application packages must not depend on Spring HTTP/Web/Security types:\n${violations.joinToString("\n")}",
         )
     }
 
@@ -144,6 +164,19 @@ class ServerArchitectureBoundaryTest {
             val packagePrefix = pattern.removeSuffix("..")
             packageName == packagePrefix || packageName.startsWith("$packagePrefix.")
         }
+
+    private fun applicationSourceFiles(): List<Path> =
+        migratedApplicationPackages
+            .map { pattern -> sourceRoot().resolve(pattern.removeSuffix("..").replace('.', '/')) }
+            .filter(Files::exists)
+            .flatMap { packageRoot ->
+                Files.walk(packageRoot)
+                    .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
+            }
+
+    private fun sourceRoot(): Path =
+        listOf(Path.of("src/main/kotlin"), Path.of("server/src/main/kotlin"))
+            .first(Files::exists)
 
     @Test
     fun `domain classes do not depend on adapters or web and jdbc frameworks`() {

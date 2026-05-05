@@ -11,10 +11,6 @@ spring:
     redis:
       url: ${READMATES_REDIS_URL:redis://localhost:6379}
       timeout: ${READMATES_REDIS_COMMAND_TIMEOUT:250ms}
-  jpa:
-    open-in-view: false
-    hibernate:
-      ddl-auto: validate
   flyway:
     enabled: true
     locations: ${READMATES_FLYWAY_LOCATIONS:classpath:db/mysql/migration}

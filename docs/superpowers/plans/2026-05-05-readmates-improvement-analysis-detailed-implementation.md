@@ -340,7 +340,7 @@ Remove unused JPA dependencies and block Spring Security from application packag
 
 ### Steps
 
-- [ ] **Step 1: JPA 사용처가 없는지 확인**
+- [x] **Step 1: JPA 사용처가 없는지 확인**
 
 ```bash
 rg -n '@Entity|JpaRepository|EntityManager|jakarta\.persistence|javax\.persistence' \
@@ -349,7 +349,7 @@ rg -n '@Entity|JpaRepository|EntityManager|jakarta\.persistence|javax\.persisten
 
 Expected: no output.
 
-- [ ] **Step 2: Gradle dependency 변경**
+- [x] **Step 2: Gradle dependency 변경**
 
 In `server/build.gradle.kts`, remove:
 
@@ -364,7 +364,7 @@ Add under dependencies:
 implementation("org.springframework.boot:spring-boot-starter-jdbc")
 ```
 
-- [ ] **Step 3: JPA config 제거**
+- [x] **Step 3: JPA config 제거**
 
 Remove from `server/src/main/resources/application.yml`:
 
@@ -375,7 +375,7 @@ Remove from `server/src/main/resources/application.yml`:
       ddl-auto: validate
 ```
 
-- [ ] **Step 4: ArchUnit failure 만들기**
+- [x] **Step 4: ArchUnit failure 만들기**
 
 In `ServerArchitectureBoundaryTest`, change the forbidden prefixes:
 
@@ -395,7 +395,7 @@ Run:
 
 Expected: the test fails because `AuthenticatedMemberResolver` imports `Authentication`.
 
-- [ ] **Step 5: `AuthenticatedMemberResolver`에서 Security type 제거**
+- [x] **Step 5: `AuthenticatedMemberResolver`에서 Security type 제거**
 
 Change the resolver to accept application-level inputs:
 
@@ -438,7 +438,7 @@ class AuthenticatedMemberResolver(
 
 Keep the existing `MemberProfileRow.toCurrentMember()` helper.
 
-- [ ] **Step 6: infrastructure filters extract email**
+- [x] **Step 6: infrastructure filters extract email**
 
 In `MemberAuthoritiesFilter`, replace:
 
@@ -454,7 +454,7 @@ authenticatedMemberResolver.resolveByEmail(email, requestedClubContext.context)
 
 In `SessionCookieAuthenticationFilter`, keep the existing `resolveByUserId`, `resolveProfileByUserId`, and `resolveUserById` calls. Only update names if the resolver method names changed.
 
-- [ ] **Step 7: verify**
+- [x] **Step 7: verify**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.architecture.ServerArchitectureBoundaryTest
@@ -463,7 +463,7 @@ In `SessionCookieAuthenticationFilter`, keep the existing `resolveByUserId`, `re
 ./server/gradlew -p server clean test
 ```
 
-- [ ] **Step 8: commit**
+- [x] **Step 8: commit**
 
 ```bash
 git add server/build.gradle.kts server/src/main/resources/application.yml \
