@@ -100,6 +100,7 @@ READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC=readmates.notification.events.dlq.v1 \
 READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher \
 READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50 \
 READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5 \
+READMATES_NOTIFICATION_RETRY_DELAY_MINUTES=5,15,60,240 \
 READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5 \
 SPRING_MAIL_HOST='<smtp-host>' \
 SPRING_MAIL_PORT='<smtp-port>' \
@@ -152,6 +153,7 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC` | notification event topic입니다. 기본은 `readmates.notification.events.v1`입니다. |
 | `READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC` | consumer error handler가 사용하는 DLQ topic입니다. 기본은 `readmates.notification.events.dlq.v1`입니다. |
 | `READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP` | notification consumer group입니다. 기본은 `readmates-notification-dispatcher`입니다. |
+| `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES` | email delivery dispatch/worker retry delay 목록입니다. 기본은 `5,15,60,240`분입니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID` | Google OAuth를 로컬에서 직접 시험할 때 필요한 client id입니다. dev-login만 쓰면 필요하지 않습니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET` | Google OAuth를 로컬에서 직접 시험할 때 필요한 client secret입니다. dev-login만 쓰면 필요하지 않습니다. |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE` | Google OAuth scope입니다. 기본 운영 예시는 `openid,email,profile`입니다. |

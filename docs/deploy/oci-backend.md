@@ -67,6 +67,7 @@ READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC=readmates.notification.events.dlq.v1
 READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher
 READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50
 READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5
+READMATES_NOTIFICATION_RETRY_DELAY_MINUTES=5,15,60,240
 READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5
 SPRING_MAIL_HOST=smtp.email.<oci-region>.oci.oraclecloud.com
 SPRING_MAIL_PORT=587
@@ -121,7 +122,7 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-conf
 - `readmates-server` 서비스 enable
 - Caddy reverse proxy 설정, `${CADDY_SITE} -> 127.0.0.1:8080`
 
-`02-configure.sh`는 baseline OAuth, DB, BFF 값으로 `/etc/readmates/readmates.env`를 다시 생성합니다. Compose stack도 이 Spring env 파일을 읽습니다. 알림 발송을 켜는 배포에서는 실행 뒤 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*` 값을 같은 env 파일에 운영 값으로 추가하고 compose stack의 `readmates-api`를 재시작합니다.
+`02-configure.sh`는 baseline OAuth, DB, BFF 값으로 `/etc/readmates/readmates.env`를 다시 생성합니다. Compose stack도 이 Spring env 파일을 읽습니다. 알림 발송을 켜는 배포에서는 실행 뒤 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*` 값을 같은 env 파일에 운영 값으로 추가하고 compose stack의 `readmates-api`를 재시작합니다.
 
 ## Redis and Kafka Rollout
 
@@ -245,7 +246,7 @@ Relay/consumer 처리 기준:
 - consumer가 만드는 email delivery는 `PENDING`, `SENDING`, `SENT`, `FAILED`, `DEAD`, `SKIPPED` 상태를 사용하고, 기본 최대 `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5`회까지 재시도합니다.
 - in-app delivery는 `member_notifications` row 생성 뒤 `SENT`로 기록됩니다.
 
-event publish와 email delivery 재시도 간격은 순서대로 5분, 15분, 60분, 240분입니다. Kafka publish 오류, SMTP credential 오류, provider reject가 지속되면 host dashboard의 pending/failed/dead count와 `readmates_notifications_*` metrics를 함께 확인합니다.
+Email delivery dispatch/worker retry 간격은 `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`로 조정하며 기본값은 순서대로 5분, 15분, 60분, 240분입니다. Kafka event publish retry도 같은 기본 간격을 사용하지만 현재 runtime env override 대상은 email delivery retry입니다. Kafka publish 오류, SMTP credential 오류, provider reject가 지속되면 host dashboard의 pending/failed/dead count와 `readmates_notifications_*` metrics를 함께 확인합니다.
 
 수동 처리:
 

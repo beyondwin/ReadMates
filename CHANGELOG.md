@@ -6,7 +6,32 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-No changes yet.
+### Added
+
+- 대형 HostDashboard, MyPage, HostSessionEditor 컴포넌트 분리를 위한 후속 계획서 3개를 추가했습니다. 각 계획서는 characterization test, 명시적 검증 명령, rollback 기준을 포함합니다.
+- 프런트엔드 route continuity/auth guard unit coverage를 확장해 route state parsing, storage, `returnTo` 보존 흐름을 더 구체적으로 검증합니다.
+
+### Changed
+
+- Notification email delivery retry delay를 `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`로 설정할 수 있게 했습니다.
+- 로컬 `compose.yml`의 MySQL database/user/password/port 기본값을 root `.env`로 override할 수 있게 했고, `.env.example`과 local setup 문서에 public-safe sample을 추가했습니다.
+- Host route state 타입을 shared helper로 정리해 host dashboard/session editor link state 중복을 줄였습니다.
+
+### Fixed
+
+- Profile PATCH API가 무세션 요청을 Spring Security 단계에서 빈 `401`로 차단하면서, 인증된 사용자의 membership/status/role 판단은 기존 service boundary에서 유지되도록 했습니다.
+- OAuth return-state signing secret이 비어 있으면 production runtime이 fallback 없이 실패하도록 보강했습니다.
+- Notification DLT recoverer가 원본 Kafka partition을 명시해 partition 검증을 건너뛰지 않도록 했습니다.
+- 초대 email 길이를 persistence 전에 검증해 DB 길이 제한 초과가 structured invitation error로 반환되도록 했습니다.
+
+### Verification
+
+- `./server/gradlew -p server clean test`
+- `pnpm --dir front lint`
+- `pnpm --dir front test`
+- `pnpm --dir front build`
+- `git diff --check`
+- `pnpm --dir front test:e2e`는 local `readmates_e2e` MySQL schema의 Flyway checksum mismatch로 browser test 전에 실패했습니다. DB repair/drop/reset 없이 root-cause를 확인했고, safe next step은 fresh E2E schema 또는 owner-approved DB maintenance입니다.
 
 ## v1.4.1 - 2026-04-30
 
