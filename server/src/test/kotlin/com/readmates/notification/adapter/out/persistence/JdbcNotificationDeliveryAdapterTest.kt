@@ -4,6 +4,7 @@ import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
+import com.readmates.notification.application.service.NotificationDeliveryEngine
 import com.readmates.notification.application.service.NotificationDeliveryProcessingService
 import com.readmates.notification.application.service.ReadmatesOperationalMetrics
 import com.readmates.notification.domain.NotificationChannel
@@ -248,10 +249,13 @@ class JdbcNotificationDeliveryAdapterTest(
         val mailPort = RecordingMailPort()
         val service = NotificationDeliveryProcessingService(
             notificationDeliveryPort = deliveryAdapter,
-            mailDeliveryPort = mailPort,
-            metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-            maxAttempts = 5,
-            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+            deliveryEngine = NotificationDeliveryEngine(
+                deliveryPort = deliveryAdapter,
+                mailDeliveryPort = mailPort,
+                metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                maxAttempts = 5,
+                retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+            ),
             deliveryEnabled = true,
         )
 

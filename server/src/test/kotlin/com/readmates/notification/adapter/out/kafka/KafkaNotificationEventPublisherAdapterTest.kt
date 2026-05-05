@@ -83,6 +83,11 @@ class KafkaNotificationEventPublisherAdapterTest {
 
                 assertThat(factory.configurationProperties[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG])
                     .isEqualTo(listOf("kafka-a:9092", "kafka-b:9092"))
+                assertThat(factory.configurationProperties[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG]).isEqualTo(true)
+                assertThat(factory.configurationProperties[ProducerConfig.ACKS_CONFIG]).isEqualTo("all")
+                assertThat(factory.configurationProperties[ProducerConfig.RETRIES_CONFIG]).isEqualTo(Int.MAX_VALUE)
+                assertThat(factory.configurationProperties[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION])
+                    .isEqualTo(5)
             }
     }
 
@@ -127,6 +132,10 @@ class KafkaNotificationEventPublisherAdapterTest {
                     .isEqualTo("notification-workers")
                 assertThat(consumerFactory.configurationProperties[ConsumerConfig.AUTO_OFFSET_RESET_CONFIG])
                     .isEqualTo("earliest")
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG])
+                    .isEqualTo(false)
+                assertThat(consumerFactory.configurationProperties[ConsumerConfig.ISOLATION_LEVEL_CONFIG])
+                    .isEqualTo("read_committed")
             }
     }
 
