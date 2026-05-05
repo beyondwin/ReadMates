@@ -5,7 +5,6 @@ import com.readmates.archive.application.port.`in`.SaveMemberArchiveLongReviewRe
 import com.readmates.archive.application.port.out.MemberArchiveReviewWritePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -22,10 +21,9 @@ private data class ArchiveReviewWriteTarget(
 
 @Repository
 class JdbcMemberArchiveReviewWriteAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : MemberArchiveReviewWritePort {
     override fun saveLongReview(command: SaveMemberArchiveLongReviewCommand): SaveMemberArchiveLongReviewResult? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         val target = jdbcTemplate.query(
             """
             select

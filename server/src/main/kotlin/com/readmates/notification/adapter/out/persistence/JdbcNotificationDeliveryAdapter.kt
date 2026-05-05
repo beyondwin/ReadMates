@@ -14,7 +14,6 @@ import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -25,7 +24,7 @@ import java.util.UUID
 
 @Repository
 class JdbcNotificationDeliveryAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
     objectMapper: ObjectMapper,
     @Value("\${readmates.app-base-url:http://localhost:3000}") appBaseUrl: String,
 ) : NotificationDeliveryPort {
@@ -35,29 +34,29 @@ class JdbcNotificationDeliveryAdapter(
 
     @Transactional
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
-        writeOperations.persistPlannedDeliveries(jdbcTemplate(), message)
+        writeOperations.persistPlannedDeliveries(jdbcTemplate, message)
 
     @Transactional
     override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? =
-        writeOperations.claimEmailDelivery(jdbcTemplate(), id)
+        writeOperations.claimEmailDelivery(jdbcTemplate, id)
 
     @Transactional
     override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> =
-        writeOperations.claimEmailDeliveries(jdbcTemplate(), limit)
+        writeOperations.claimEmailDeliveries(jdbcTemplate, limit)
 
     @Transactional
     override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
-        writeOperations.claimEmailDeliveriesForClub(jdbcTemplate(), clubId, limit)
+        writeOperations.claimEmailDeliveriesForClub(jdbcTemplate, clubId, limit)
 
     @Transactional
     override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? =
-        writeOperations.claimHostEmailDelivery(jdbcTemplate(), clubId, id)
+        writeOperations.claimHostEmailDelivery(jdbcTemplate, clubId, id)
 
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
-        queries.findDeliveryStatus(jdbcTemplate(), id)
+        queries.findDeliveryStatus(jdbcTemplate, id)
 
     override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean =
-        writeOperations.markDeliverySent(jdbcTemplate(), id, lockedAt)
+        writeOperations.markDeliverySent(jdbcTemplate, id, lockedAt)
 
     override fun markDeliveryFailed(
         id: UUID,
@@ -65,36 +64,36 @@ class JdbcNotificationDeliveryAdapter(
         error: String,
         nextAttemptDelayMinutes: Long,
     ): Boolean =
-        writeOperations.markDeliveryFailed(jdbcTemplate(), id, lockedAt, error, nextAttemptDelayMinutes)
+        writeOperations.markDeliveryFailed(jdbcTemplate, id, lockedAt, error, nextAttemptDelayMinutes)
 
     override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean =
-        writeOperations.markDeliveryDead(jdbcTemplate(), id, lockedAt, error)
+        writeOperations.markDeliveryDead(jdbcTemplate, id, lockedAt, error)
 
     override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean =
-        writeOperations.restoreDeadEmailDeliveryForClub(jdbcTemplate(), clubId, id)
+        writeOperations.restoreDeadEmailDeliveryForClub(jdbcTemplate, clubId, id)
 
     override fun deliveryBacklog(): NotificationDeliveryBacklog =
-        queries.deliveryBacklog(jdbcTemplate())
+        queries.deliveryBacklog(jdbcTemplate)
 
     override fun countByStatus(
         clubId: UUID,
         channel: NotificationChannel?,
         status: NotificationDeliveryStatus,
     ): Int =
-        queries.countByStatus(jdbcTemplate(), clubId, channel, status)
+        queries.countByStatus(jdbcTemplate, clubId, channel, status)
 
     override fun hostSummary(clubId: UUID): HostNotificationSummary =
-        queries.hostSummary(jdbcTemplate(), clubId)
+        queries.hostSummary(jdbcTemplate, clubId)
 
     override fun listHostEmailItems(
         clubId: UUID,
         query: HostNotificationItemQuery,
         pageRequest: PageRequest,
     ): HostNotificationItemList =
-        queries.listHostEmailItems(jdbcTemplate(), clubId, query, pageRequest)
+        queries.listHostEmailItems(jdbcTemplate, clubId, query, pageRequest)
 
     override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
-        queries.hostEmailDetail(jdbcTemplate(), clubId, id)
+        queries.hostEmailDetail(jdbcTemplate, clubId, id)
 
     override fun listHostDeliveries(
         clubId: UUID,
@@ -102,11 +101,8 @@ class JdbcNotificationDeliveryAdapter(
         channel: NotificationChannel?,
         pageRequest: PageRequest,
     ): CursorPage<HostNotificationDelivery> =
-        queries.listHostDeliveries(jdbcTemplate(), clubId, status, channel, pageRequest)
+        queries.listHostDeliveries(jdbcTemplate, clubId, status, channel, pageRequest)
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw IllegalStateException("Notification delivery storage is unavailable")
 }
 
 class MissingNotificationEventOutboxException(

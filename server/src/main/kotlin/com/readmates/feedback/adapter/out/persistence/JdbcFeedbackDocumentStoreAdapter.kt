@@ -13,7 +13,6 @@ import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -25,13 +24,12 @@ import java.util.UUID
 
 @Repository
 class JdbcFeedbackDocumentStoreAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : FeedbackDocumentStorePort {
     override fun listLatestReadableDocuments(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ): CursorPage<StoredFeedbackDocumentListResult> {
-        val jdbcTemplate = jdbcTemplate()
         val cursor = FeedbackDocumentCursor.from(pageRequest.cursor)
         val sql = if (currentMember.isHost) {
             """
@@ -150,7 +148,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
     ): FeedbackDocumentSessionResult? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select id, number, book_title, session_date
             from sessions
@@ -167,7 +165,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         currentMember: CurrentMember,
         sessionId: UUID,
     ): Boolean =
-        jdbcTemplate().queryForObject(
+        jdbcTemplate.queryForObject(
             """
             select count(*)
             from session_participants
@@ -187,7 +185,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
     ): StoredFeedbackDocumentResult? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               session_feedback_documents.session_id,
@@ -214,7 +212,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
     ): FeedbackDocumentSessionResult? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select id, number, book_title, session_date
             from sessions
@@ -231,7 +229,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
     ): Int =
-        jdbcTemplate().queryForObject(
+        jdbcTemplate.queryForObject(
             """
             select coalesce(max(version), 0) + 1
             from session_feedback_documents
@@ -250,7 +248,7 @@ class JdbcFeedbackDocumentStoreAdapter(
         documentId: UUID,
         title: String,
     ) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into session_feedback_documents (
               id,
@@ -308,10 +306,6 @@ class JdbcFeedbackDocumentStoreAdapter(
             bookTitle = getString("book_title"),
             date = getObject("session_date", LocalDate::class.java),
         )
-
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Feedback document storage is unavailable")
 
     private fun feedbackDocumentCursor(item: StoredFeedbackDocumentListResult): String? =
         CursorCodec.encode(

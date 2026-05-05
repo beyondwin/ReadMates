@@ -10,7 +10,6 @@ import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
@@ -24,25 +23,25 @@ import java.util.UUID
 
 @Repository
 class JdbcPlatformAdminAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : LoadPlatformAdminSummaryPort,
     CreateClubDomainPort,
     LoadClubDomainProvisioningPort,
     UpdateClubDomainProvisioningPort {
     override fun countActiveClubs(): Long =
-        jdbcTemplateProvider.ifAvailable?.queryForObject(
+        jdbcTemplate.queryForObject(
             "select count(*) from clubs where status = 'ACTIVE'",
             Long::class.java,
         ) ?: 0
 
     override fun countDomainsRequiringAction(): Long =
-        jdbcTemplateProvider.ifAvailable?.queryForObject(
+        jdbcTemplate.queryForObject(
             "select count(*) from club_domains where status = 'ACTION_REQUIRED'",
             Long::class.java,
         ) ?: 0
 
     override fun listDomains(limit: Int): List<PlatformAdminClubDomain> =
-        jdbcTemplateProvider.ifAvailable?.query(
+        jdbcTemplate.query(
             """
             select id, club_id, hostname, kind, status, is_primary, verified_at, last_checked_at, provisioning_error_code
             from club_domains
@@ -54,7 +53,7 @@ class JdbcPlatformAdminAdapter(
         ) ?: emptyList()
 
     override fun listDomainsRequiringAction(limit: Int): List<PlatformAdminClubDomain> =
-        jdbcTemplateProvider.ifAvailable?.query(
+        jdbcTemplate.query(
             """
             select id, club_id, hostname, kind, status, is_primary, verified_at, last_checked_at, provisioning_error_code
             from club_domains
@@ -73,8 +72,6 @@ class JdbcPlatformAdminAdapter(
         kind: ClubDomainKind,
         @Suppress("UNUSED_PARAMETER") isPrimary: Boolean,
     ): PlatformAdminClubDomain {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable
-            ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Platform admin storage is unavailable")
 
         val clubExists = jdbcTemplate.queryForObject(
             "select count(*) from clubs where id = ?",
@@ -118,7 +115,7 @@ class JdbcPlatformAdminAdapter(
     }
 
     override fun loadClubDomain(domainId: UUID): PlatformAdminClubDomain? =
-        jdbcTemplateProvider.ifAvailable?.query(
+        jdbcTemplate.query(
             """
             select id, club_id, hostname, kind, status, is_primary, verified_at, last_checked_at, provisioning_error_code
             from club_domains
@@ -137,8 +134,6 @@ class JdbcPlatformAdminAdapter(
         lastCheckedAt: OffsetDateTime,
         errorCode: String?,
     ): PlatformAdminClubDomain {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable
-            ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Platform admin storage is unavailable")
 
         val updatedRows = jdbcTemplate.update(
             """

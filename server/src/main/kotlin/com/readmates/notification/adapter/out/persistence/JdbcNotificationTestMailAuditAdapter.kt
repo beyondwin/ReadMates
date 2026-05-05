@@ -10,7 +10,6 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -23,7 +22,7 @@ private const val MAX_TEST_MAIL_STORAGE_ERROR_LENGTH = 500
 
 @Repository
 class JdbcNotificationTestMailAuditAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : NotificationTestMailAuditPort {
     @Transactional
     override fun reserveTestMailAuditAttempt(
@@ -33,7 +32,6 @@ class JdbcNotificationTestMailAuditAdapter(
         recipientEmailHash: String,
         cooldownStartedAfter: OffsetDateTime,
     ): NotificationTestMailAuditItem? {
-        val jdbcTemplate = jdbcTemplate()
         val lockedHostMembershipId = jdbcTemplate.query(
             """
             select id
@@ -100,7 +98,7 @@ class JdbcNotificationTestMailAuditAdapter(
     }
 
     override fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem {
-        val updated = jdbcTemplate().update(
+        val updated = jdbcTemplate.update(
             """
             update notification_test_mail_audit
             set status = 'FAILED',
@@ -115,7 +113,7 @@ class JdbcNotificationTestMailAuditAdapter(
             throw IllegalStateException("Notification test mail audit row not found")
         }
 
-        return jdbcTemplate().query(
+        return jdbcTemplate.query(
             """
             select id, recipient_masked_email, status, last_error, created_at
             from notification_test_mail_audit
@@ -128,7 +126,7 @@ class JdbcNotificationTestMailAuditAdapter(
 
     override fun listTestMailAudit(clubId: UUID, pageRequest: PageRequest): CursorPage<NotificationTestMailAuditItem> {
         val cursor = TestMailAuditCreatedAtDescCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate().query(
+        val rows = jdbcTemplate.query(
             """
             select id, recipient_masked_email, status, last_error, created_at
             from notification_test_mail_audit
@@ -164,9 +162,6 @@ class JdbcNotificationTestMailAuditAdapter(
             createdAt = utcOffsetDateTime("created_at"),
         )
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw IllegalStateException("Notification test mail audit storage is unavailable")
 }
 
 private fun testMailAuditCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =

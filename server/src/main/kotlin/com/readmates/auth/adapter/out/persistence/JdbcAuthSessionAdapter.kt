@@ -6,18 +6,15 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @Repository
 class JdbcAuthSessionAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : AuthSessionStorePort {
     override fun create(session: StoredAuthSession) {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable
-            ?: error("Cannot create auth session without a configured database")
         jdbcTemplate.update(
             """
             insert into auth_sessions (
@@ -44,7 +41,6 @@ class JdbcAuthSessionAdapter(
     }
 
     override fun findValidByTokenHash(tokenHash: String): StoredAuthSession? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select id, user_id, session_token_hash, created_at, last_seen_at, expires_at, revoked_at, user_agent, ip_hash
@@ -71,7 +67,6 @@ class JdbcAuthSessionAdapter(
     }
 
     override fun touchByTokenHash(tokenHash: String) {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return
         jdbcTemplate.update(
             """
             update auth_sessions
@@ -85,7 +80,6 @@ class JdbcAuthSessionAdapter(
     }
 
     override fun revokeByTokenHash(tokenHash: String) {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return
         jdbcTemplate.update(
             """
             update auth_sessions
@@ -98,7 +92,6 @@ class JdbcAuthSessionAdapter(
     }
 
     override fun revokeAllForUser(userId: String) {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return
         jdbcTemplate.update(
             """
             update auth_sessions

@@ -5,17 +5,16 @@ import com.readmates.notification.application.port.out.NotificationPreferencesPo
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.db.dbString
 import com.readmates.shared.security.CurrentMember
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 
 @Repository
 class JdbcNotificationPreferencesAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : NotificationPreferencesPort {
     override fun getPreferences(member: CurrentMember): NotificationPreferences =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               email_enabled,
@@ -36,7 +35,7 @@ class JdbcNotificationPreferencesAdapter(
         member: CurrentMember,
         preferences: NotificationPreferences,
     ): NotificationPreferences {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into notification_preferences (
               membership_id,
@@ -79,7 +78,4 @@ class JdbcNotificationPreferencesAdapter(
             ),
         )
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw IllegalStateException("Notification preference storage is unavailable")
 }

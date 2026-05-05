@@ -4,7 +4,6 @@ import com.readmates.auth.application.port.out.PendingApprovalRow
 import com.readmates.auth.application.port.out.PendingApprovalStorePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -14,10 +13,10 @@ import java.util.UUID
 
 @Repository
 class JdbcPendingApprovalStoreAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : PendingApprovalStorePort {
     override fun findPendingApproval(clubId: UUID): PendingApprovalRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               clubs.name as club_name,
@@ -51,7 +50,4 @@ class JdbcPendingApprovalStoreAdapter(
             clubId.dbString(),
         ).firstOrNull()
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Pending approval storage is unavailable")
 }

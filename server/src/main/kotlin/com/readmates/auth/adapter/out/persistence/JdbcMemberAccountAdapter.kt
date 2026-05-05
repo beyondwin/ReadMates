@@ -11,7 +11,6 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.CurrentUser
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -20,7 +19,7 @@ import java.util.UUID
 
 @Repository
 class JdbcMemberAccountAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : MemberAccountStorePort {
     private val devSeedEmails = setOf(
         "host@example.com",
@@ -49,7 +48,6 @@ class JdbcMemberAccountAdapter(
 
     override fun findActiveMemberByUserId(userId: String): CurrentMember? {
         val normalizedUserId = userId.trim().takeIf { it.isNotEmpty() } ?: return null
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select
@@ -77,7 +75,6 @@ class JdbcMemberAccountAdapter(
     }
 
     override fun findMemberByUserIdAndClubId(userId: UUID, clubId: UUID): CurrentMember? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select
@@ -107,7 +104,6 @@ class JdbcMemberAccountAdapter(
 
     override fun findMemberByEmailAndClubId(email: String, clubId: UUID): CurrentMember? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select
@@ -136,7 +132,6 @@ class JdbcMemberAccountAdapter(
     }
 
     override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList()
         return jdbcTemplate.query(
             """
             select
@@ -176,7 +171,6 @@ class JdbcMemberAccountAdapter(
     }
 
     override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select platform_admins.user_id, users.email, platform_admins.role
@@ -199,7 +193,6 @@ class JdbcMemberAccountAdapter(
 
     override fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember? {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return null
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select
@@ -228,7 +221,6 @@ class JdbcMemberAccountAdapter(
 
     override fun findAnyUserIdByEmail(email: String): UUID? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select id
@@ -242,7 +234,6 @@ class JdbcMemberAccountAdapter(
     }
 
     override fun findUserById(userId: UUID): CurrentUser? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select id, email
@@ -261,7 +252,6 @@ class JdbcMemberAccountAdapter(
     }
 
     override fun findMembershipStatusByUserId(userId: UUID): MembershipStatus? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select memberships.status
@@ -278,7 +268,6 @@ class JdbcMemberAccountAdapter(
     override fun connectGoogleSubject(userId: UUID, googleSubjectId: String, profileImageUrl: String?): Boolean {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return false
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return false
         return try {
             jdbcTemplate.update(
                 """
@@ -323,8 +312,6 @@ class JdbcMemberAccountAdapter(
             ?: "Google User"
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
         val userId = UUID.randomUUID()
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable
-            ?: throw IllegalStateException("JdbcTemplate is unavailable")
 
         try {
             jdbcTemplate.update(
@@ -365,8 +352,6 @@ class JdbcMemberAccountAdapter(
         val memberDisplayName = defaultDisplayNameFor(normalizedName)
         val userId = UUID.randomUUID()
         val membershipId = UUID.randomUUID()
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable
-            ?: throw IllegalStateException("JdbcTemplate is unavailable")
 
         try {
             jdbcTemplate.update(
@@ -409,7 +394,6 @@ class JdbcMemberAccountAdapter(
     }
 
     override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select
@@ -438,7 +422,6 @@ class JdbcMemberAccountAdapter(
 
     override fun googleSubjectOwnerEmail(googleSubjectId: String): String? {
         val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return null
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select email
@@ -452,7 +435,6 @@ class JdbcMemberAccountAdapter(
     }
 
     override fun recordLastLogin(userId: UUID) {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return
         jdbcTemplate.update(
             """
             update users
@@ -479,7 +461,6 @@ class JdbcMemberAccountAdapter(
             ?: "Google User"
         val memberDisplayName = defaultDisplayNameFor(normalizedName)
         val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         if (googleSubjectBelongsToDifferentEmail(jdbcTemplate, normalizedSubject, normalizedEmail)) {
             return null
         }
@@ -541,7 +522,6 @@ class JdbcMemberAccountAdapter(
         if (normalizedEmail.isEmpty()) {
             return null
         }
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
 
         return jdbcTemplate.query(
             """

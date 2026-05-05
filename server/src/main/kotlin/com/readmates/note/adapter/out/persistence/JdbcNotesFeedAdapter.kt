@@ -10,7 +10,6 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -20,10 +19,9 @@ import java.util.UUID
 
 @Repository
 class JdbcNotesFeedAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : LoadNotesFeedPort {
     override fun loadNoteSessions(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteSessionResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList<NoteSessionResult>().toCursorPage()
         val cursor = NoteSessionCursor.from(pageRequest.cursor)
 
         val rows = jdbcTemplate.query(
@@ -135,7 +133,6 @@ class JdbcNotesFeedAdapter(
     }
 
     override fun loadNotesFeed(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteFeedResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList<NoteFeedResult>().toCursorPage()
         val cursor = NoteFeedCursor.from(pageRequest.cursor)
 
         val rows = jdbcTemplate.query(
@@ -309,7 +306,6 @@ class JdbcNotesFeedAdapter(
         sessionId: UUID,
         pageRequest: PageRequest,
     ): CursorPage<NoteFeedResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return emptyList<NoteFeedResult>().toCursorPage()
         val cursor = NoteFeedCursor.from(pageRequest.cursor)
 
         val rows = jdbcTemplate.query(

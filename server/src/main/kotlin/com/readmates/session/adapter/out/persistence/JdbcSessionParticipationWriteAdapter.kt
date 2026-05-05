@@ -19,7 +19,6 @@ import com.readmates.session.application.port.out.SessionParticipationWritePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -33,7 +32,7 @@ private data class CurrentQuestionTarget(
 
 @Repository
 class JdbcSessionParticipationWriteAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : SessionParticipationWritePort {
     override fun updateRsvp(command: UpdateRsvpCommand): RsvpResult {
         val result = updateMemberRsvp(command.member, command.status)
@@ -82,7 +81,6 @@ class JdbcSessionParticipationWriteAdapter(
 
     private fun updateMemberRsvp(member: CurrentMember, status: String): Map<String, String> {
         requireWritableMember(member)
-        val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
             """
             update session_participants
@@ -114,7 +112,6 @@ class JdbcSessionParticipationWriteAdapter(
 
     private fun saveMemberCheckin(member: CurrentMember, readingProgress: Int): Map<String, Any> {
         requireWritableMember(member)
-        val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
             """
             insert into reading_checkins (
@@ -160,7 +157,6 @@ class JdbcSessionParticipationWriteAdapter(
 
     private fun saveMemberQuestion(member: CurrentMember, priority: Int, text: String, draftThought: String?): Map<String, Any?> {
         requireWritableMember(member)
-        val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
             """
             insert into questions (
@@ -223,7 +219,6 @@ class JdbcSessionParticipationWriteAdapter(
             throw InvalidQuestionSetException()
         }
 
-        val jdbcTemplate = jdbcTemplate()
         val target = jdbcTemplate.query(
             """
             select
@@ -302,7 +297,6 @@ class JdbcSessionParticipationWriteAdapter(
 
     private fun saveMemberOneLineReview(member: CurrentMember, text: String): Map<String, String> {
         requireWritableMember(member)
-        val jdbcTemplate = jdbcTemplate()
         val updated = jdbcTemplate.update(
             """
             insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
@@ -338,7 +332,6 @@ class JdbcSessionParticipationWriteAdapter(
 
     private fun saveMemberLongReview(member: CurrentMember, body: String): Map<String, String> {
         requireWritableMember(member)
-        val jdbcTemplate = jdbcTemplate()
         val target = jdbcTemplate.query(
             """
             select
@@ -405,9 +398,6 @@ class JdbcSessionParticipationWriteAdapter(
 
         return mapOf("body" to body)
     }
-
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateOrThrow(jdbcTemplateProvider)
 
     private fun requireWritableMember(member: CurrentMember) {
         if (!member.isActive) {

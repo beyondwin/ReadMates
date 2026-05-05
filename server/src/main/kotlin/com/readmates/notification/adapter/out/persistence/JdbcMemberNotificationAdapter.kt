@@ -10,7 +10,6 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -19,7 +18,7 @@ import java.util.UUID
 
 @Repository
 class JdbcMemberNotificationAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : MemberNotificationPort {
     override fun listForMembership(
         clubId: UUID,
@@ -27,7 +26,7 @@ class JdbcMemberNotificationAdapter(
         pageRequest: PageRequest,
     ): CursorPage<MemberNotificationItem> {
         val cursor = MemberNotificationCreatedAtDescCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate().query(
+        val rows = jdbcTemplate.query(
             """
             select id, event_id, event_type, title, body, deep_link_path, read_at, created_at
             from member_notifications
@@ -56,7 +55,7 @@ class JdbcMemberNotificationAdapter(
     }
 
     override fun unreadCount(clubId: UUID, membershipId: UUID): Int =
-        jdbcTemplate().queryForObject(
+        jdbcTemplate.queryForObject(
             """
             select count(*)
             from member_notifications
@@ -70,7 +69,7 @@ class JdbcMemberNotificationAdapter(
         ) ?: 0
 
     override fun markRead(clubId: UUID, membershipId: UUID, notificationId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update member_notifications
             set read_at = coalesce(read_at, utc_timestamp(6))
@@ -84,7 +83,7 @@ class JdbcMemberNotificationAdapter(
         ) > 0
 
     override fun markAllRead(clubId: UUID, membershipId: UUID): Int =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update member_notifications
             set read_at = utc_timestamp(6)
@@ -108,9 +107,6 @@ class JdbcMemberNotificationAdapter(
             createdAt = utcOffsetDateTime("created_at"),
         )
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw IllegalStateException("Member notification storage is unavailable")
 }
 
 private fun memberNotificationCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =

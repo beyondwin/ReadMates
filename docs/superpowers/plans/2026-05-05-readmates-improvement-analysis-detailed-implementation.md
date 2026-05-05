@@ -499,7 +499,7 @@ Convert DB persistence adapters from optional `ObjectProvider<JdbcTemplate>` to 
 
 ### Steps
 
-- [ ] **Step 1: inventory**
+- [x] **Step 1: inventory**
 
 ```bash
 rg -n 'ObjectProvider<JdbcTemplate>|jdbcTemplateProvider|ifAvailable \?: return' server/src/main/kotlin/com/readmates
@@ -507,7 +507,7 @@ rg -n 'ObjectProvider<JdbcTemplate>|jdbcTemplateProvider|ifAvailable \?: return'
 
 Save the output in the PR description, not in repository docs.
 
-- [ ] **Step 2: add guard test**
+- [x] **Step 2: add guard test**
 
 Add this test to `ServerArchitectureBoundaryTest`:
 
@@ -540,7 +540,7 @@ Run:
 
 Expected: fails and lists persistence adapters still using optional providers.
 
-- [ ] **Step 3: convert one file at a time**
+- [x] **Step 3: convert one file at a time**
 
 Pattern:
 
@@ -573,11 +573,11 @@ Remove unused imports:
 import org.springframework.beans.factory.ObjectProvider
 ```
 
-- [ ] **Step 4: remove helper only when unused**
+- [x] **Step 4: remove helper only when unused**
 
 If `SessionPersistenceSupport.kt` becomes unused after session adapters are converted, delete it in the same batch and run session tests. Do not delete it before all call sites are converted.
 
-- [ ] **Step 5: verify per batch**
+- [x] **Step 5: verify per batch**
 
 Batch 1:
 

@@ -105,6 +105,21 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `persistence adapters require jdbc template directly`() {
+        val violations = persistenceAdapterSourceFiles()
+            .filter { sourceFile ->
+                sourceFile.readLines().any { line -> "ObjectProvider<JdbcTemplate>" in line }
+            }
+            .map { sourceFile -> sourceFile.relativeTo(sourceRoot()).toString() }
+            .sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Persistence adapters must inject JdbcTemplate directly:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    @Test
     fun `member profile application service does not depend on web status types`() {
         noClasses()
             .that()
@@ -172,6 +187,17 @@ class ServerArchitectureBoundaryTest {
             .flatMap { packageRoot ->
                 Files.walk(packageRoot)
                     .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
+            }
+
+    private fun persistenceAdapterSourceFiles(): List<Path> =
+        Files.walk(sourceRoot())
+            .use { paths ->
+                paths
+                    .filter { path ->
+                        path.name.endsWith(".kt") &&
+                            path.toString().contains(Path.of("adapter", "out", "persistence").toString())
+                    }
+                    .toList()
             }
 
     private fun sourceRoot(): Path =

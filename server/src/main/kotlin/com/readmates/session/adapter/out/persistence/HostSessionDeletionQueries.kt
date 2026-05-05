@@ -9,7 +9,6 @@ import com.readmates.session.application.requireHost
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
@@ -24,11 +23,10 @@ private data class HostSessionDeletionTarget(
 
 @Repository
 class HostSessionDeletionQueries(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) {
     fun previewOpenSessionDeletion(member: CurrentMember, sessionId: UUID): HostSessionDeletionPreviewResponse {
         requireHost(member)
-        val jdbcTemplate = jdbcTemplate()
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = false)
         requireOpenDeletionTarget(target)
 
@@ -45,7 +43,6 @@ class HostSessionDeletionQueries(
     @Transactional
     fun deleteOpenHostSession(member: CurrentMember, sessionId: UUID): HostSessionDeletionResponse {
         requireHost(member)
-        val jdbcTemplate = jdbcTemplate()
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = true)
         requireOpenDeletionTarget(target)
         val counts = countSessionDeletionRows(jdbcTemplate, member.clubId, sessionId)
@@ -211,6 +208,4 @@ class HostSessionDeletionQueries(
         jdbcTemplate.update("delete from session_participants where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
     }
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateOrThrow(jdbcTemplateProvider)
 }

@@ -19,7 +19,6 @@ import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.ConnectionCallback
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -33,10 +32,10 @@ import java.util.UUID
 
 @Repository
 class JdbcHostInvitationStoreAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : HostInvitationStorePort {
     override fun acquireInvitationCreateLock(lockKey: String) {
-        jdbcTemplate().execute(ConnectionCallback<Unit> { connection ->
+        jdbcTemplate.execute(ConnectionCallback<Unit> { connection ->
             connection.prepareStatement("select get_lock(?, 5)").use { statement ->
                 statement.setString(1, lockKey)
                 statement.executeQuery().use { resultSet ->
@@ -61,7 +60,7 @@ class JdbcHostInvitationStoreAdapter(
     }
 
     override fun activeMemberCountByEmail(clubId: UUID, email: String): Int =
-        jdbcTemplate().queryForObject(
+        jdbcTemplate.queryForObject(
             """
             select count(*)
             from users
@@ -76,7 +75,7 @@ class JdbcHostInvitationStoreAdapter(
         ) ?: 0
 
     override fun revokeLivePendingInvitation(clubId: UUID, email: String) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update invitations
             set status = 'REVOKED',
@@ -92,7 +91,7 @@ class JdbcHostInvitationStoreAdapter(
     }
 
     override fun createInvitation(command: CreateHostInvitationCommand) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into invitations (
               id,
@@ -121,7 +120,7 @@ class JdbcHostInvitationStoreAdapter(
 
     override fun listHostInvitations(clubId: UUID, pageRequest: PageRequest): CursorPage<HostInvitationListRow> {
         val cursor = HostInvitationCreatedAtDescCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate().query(
+        val rows = jdbcTemplate.query(
             """
             select
               invitations.id,
@@ -175,7 +174,7 @@ class JdbcHostInvitationStoreAdapter(
     }
 
     override fun findHostInvitation(clubId: UUID, invitationId: UUID): HostInvitationListRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               invitations.id,
@@ -215,7 +214,7 @@ class JdbcHostInvitationStoreAdapter(
         ).firstOrNull()
 
     override fun revokePendingInvitation(clubId: UUID, invitationId: UUID) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update invitations
             set status = 'REVOKED',
@@ -232,7 +231,7 @@ class JdbcHostInvitationStoreAdapter(
 
     override fun findInvitationByTokenHash(tokenHash: String, forUpdate: Boolean): InvitationTokenRow? {
         val lockClause = if (forUpdate) "for update" else ""
-        return jdbcTemplate().query(
+        return jdbcTemplate.query(
             """
             select
               invitations.id,
@@ -269,7 +268,6 @@ class JdbcHostInvitationStoreAdapter(
     }
 
     override fun upsertActiveMembership(clubId: UUID, userId: UUID, role: MembershipRole): UUID {
-        val jdbcTemplate = jdbcTemplate()
         val existingMembershipId = jdbcTemplate.query(
             """
             select id
@@ -316,7 +314,7 @@ class JdbcHostInvitationStoreAdapter(
     }
 
     override fun acceptInvitation(invitationId: UUID, acceptedUserId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update invitations
             set status = 'ACCEPTED',
@@ -332,7 +330,7 @@ class JdbcHostInvitationStoreAdapter(
         ) == 1
 
     override fun addToCurrentOpenSessionIfSafe(clubId: UUID, membershipId: UUID) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into session_participants (
               id,
@@ -362,7 +360,7 @@ class JdbcHostInvitationStoreAdapter(
     }
 
     override fun findCurrentMember(membershipId: UUID): CurrentMember? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               users.id as user_id,
@@ -433,14 +431,6 @@ class JdbcHostInvitationStoreAdapter(
             logger.warn("Failed to release MySQL invitation lock {}", lockKey, error)
         }
     }
-
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw InvitationDomainException(
-                "INVITATION_STORAGE_UNAVAILABLE",
-                InvitationDomainError.STORAGE_UNAVAILABLE,
-                "Invitation storage is unavailable",
-            )
 
     private companion object {
         private val logger = LoggerFactory.getLogger(JdbcHostInvitationStoreAdapter::class.java)
