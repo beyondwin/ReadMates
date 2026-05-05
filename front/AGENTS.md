@@ -8,6 +8,8 @@ This package is the Vite React SPA plus Cloudflare Pages Functions BFF/OAuth pro
 
 Successful frontend work preserves route-first boundaries, keeps BFF secrets out of browser-exposed configuration, and leaves the touched route usable across desktop and mobile.
 
+Do not add Next/React Server Component directives such as `"use client"` to Vite source files.
+
 Default checks:
 
 ```bash

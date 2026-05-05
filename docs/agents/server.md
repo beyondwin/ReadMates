@@ -31,7 +31,9 @@ Application services own orchestration, membership/role/session authorization, d
 
 Application services must not throw Spring web/http exceptions. Use feature application errors and map them in `adapter.in.web`.
 
-Persistence adapters own SQL/JPA details, DB rows, and column mapping.
+Persistence adapters own JDBC SQL, DB rows, and column mapping. New persistence work should inject the required `JdbcTemplate` directly and fail fast if database wiring is missing.
+
+Operational Flyway migrations live under `server/src/main/resources/db/mysql/migration`. Do not add new production migrations under `server/src/main/resources/db/migration`.
 
 Security boundaries:
 

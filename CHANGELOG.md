@@ -6,7 +6,43 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-No changes yet.
+### Added
+
+- 서버 이미지를 GitHub Container Registry에 게시하는 `Deploy Server Image` workflow를 추가했습니다. Release tag push와 수동 `image_tag` 입력 모두 같은 Docker tag 검증 경로를 사용합니다.
+- 공개 archive/public visibility regression coverage와 BFF header/club slug regression coverage를 추가했습니다.
+- 알림 이메일 delivery를 dispatch path와 pending worker path가 공유하는 `NotificationDeliveryEngine`으로 분리하고 retry/dead 전환, redacted error 저장, metrics/logging을 한 곳에서 처리합니다.
+- HostDashboard, MyPage, HostSessionEditor, HostMembers UI를 route/API 호출 없는 작은 presentation module로 분리했습니다.
+
+### Changed
+
+- 운영 Flyway source of truth를 `server/src/main/resources/db/mysql/migration`으로 고정하고, 사용하지 않는 `server/src/main/resources/db/migration` tree를 제거했습니다.
+- 서버 application layer가 Spring Security/Web/JDBC 세부사항에 직접 의존하지 않도록 경계를 강화하고, persistence adapter는 필요한 `JdbcTemplate`을 직접 주입받아 wiring 오류를 빠르게 드러내도록 정리했습니다.
+- Cloudflare Pages Functions와 Vite proxy가 같은 club slug validation helper를 사용하게 했고, auth API helper는 raw `401`을 유지해야 하는 preview/logout 흐름과 일반 BFF fetch 흐름을 분리했습니다.
+- OCI compose release deploy는 GHCR image tag를 VM에서 pull하고, 로컬 non-GHCR tag는 build/save/load 전환 검증 경로로 남깁니다.
+- Vite frontend source에서 불필요한 `"use client"` directive를 제거하고 agent guide에 재도입 금지 기준을 추가했습니다.
+- 공개 릴리즈 후보 builder가 server image workflow도 후보 tree에 포함하도록 manifest를 갱신했습니다.
+
+### Fixed
+
+- Redis Testcontainers가 `localhost`를 반환할 때 Redis URL host를 `127.0.0.1`로 정규화해, 로컬 IPv6 `localhost`의 다른 서비스와 mapped port가 겹치는 테스트 flake를 줄였습니다.
+- 로그는 BFF secret rejection, notification relay/delivery, session lifecycle의 운영 이벤트를 남기되 raw secret, token, recipient 원문 같은 민감 값을 기록하지 않도록 보강했습니다.
+
+### Deployment Notes
+
+이 변경 묶음은 DB schema migration을 추가하지 않습니다. 서버 변경이 포함된 release는 먼저 `Deploy Server Image` workflow로 같은 release tag의 `ghcr.io/<owner>/<repo>/readmates-server:<tag>` 이미지를 게시하고, OCI compose backend는 그 image tag를 pull해 배포합니다.
+
+기본 `pnpm --dir front test:e2e`는 로컬 기본 E2E schema의 Flyway checksum 상태에 의존합니다. 기존 schema가 오래된 checksum을 갖고 있으면 destructive repair/drop 대신 새 E2E schema를 지정해 재검증합니다.
+
+### Verification
+
+- `./server/gradlew -p server clean test`
+- `pnpm --dir front lint`
+- `pnpm --dir front test` - 49 files, 647 tests passed
+- `pnpm --dir front build`
+- `./scripts/build-public-release-candidate.sh`
+- `./scripts/public-release-check.sh .tmp/public-release-candidate`
+- `git diff --check`
+- `pnpm --dir front test:e2e` - blocked before browser tests by existing local E2E schema Flyway checksum mismatches for migrations 16, 18, 20, and 21; no repair/drop/reset was run.
 
 ## v1.4.2 - 2026-05-05
 
