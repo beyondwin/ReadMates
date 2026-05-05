@@ -90,7 +90,7 @@
 
 **배경:** 현재 `SecurityConfig.kt`는 두 profile PATCH endpoint를 `permitAll()`로 먼저 매칭합니다. service layer가 null 인증을 막고 있어 실제 무단 수정은 막히지만, Spring Security authorization boundary를 우회합니다.
 
-- [ ] **Step 1: 기존 테스트 기대값 조정**
+- [x] **Step 1: 기존 테스트 기대값 조정**
 
 `MemberProfileControllerTest.kt`의 기존 테스트 두 개를 Spring Security entrypoint 기준으로 바꿉니다.
 
@@ -128,7 +128,7 @@ fun `host profile update requires Spring Security authentication`() {
 }
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 ```bash
 ./server/gradlew -p server test --tests "com.readmates.auth.api.MemberProfileControllerTest"
@@ -136,16 +136,16 @@ fun `host profile update requires Spring Security authentication`() {
 
 Expected: 위 두 테스트가 현재 `permitAll()` 때문에 structured JSON 401을 받아 실패합니다.
 
-- [ ] **Step 3: `permitAll()` 두 줄 제거**
+- [x] **Step 3: `permitAll()` 두 줄을 `authenticated()`로 교체**
 
-`SecurityConfig.kt`에서 아래 두 줄만 삭제합니다. CSRF ignore matcher는 기존 프론트/BFF 호출 방식 때문에 그대로 둡니다.
+`SecurityConfig.kt`에서 아래 두 `permitAll()` matcher는 원 계획의 삭제 의도와 달리 repo architecture에 맞춰 `authenticated()`로 교체합니다. `/api/me/profile`은 authenticated `VIEWER`/`ACTIVE`/`SUSPENDED` 사용자가 `MemberProfileService`의 profile-specific authorization까지 도달해야 하고, `/api/host/members/{id}/profile`은 authenticated non-host가 service의 structured `HOST_ROLE_REQUIRED` 응답을 받을 수 있어야 합니다. CSRF ignore matcher는 기존 프론트/BFF 호출 방식 때문에 그대로 둡니다.
 
 ```kotlin
-.requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$"))).permitAll()
-.requestMatchers(methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$"))).permitAll()
+.requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$"))).authenticated()
+.requestMatchers(methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$"))).authenticated()
 ```
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 ```bash
 ./server/gradlew -p server test --tests "com.readmates.auth.api.MemberProfileControllerTest"
@@ -155,7 +155,9 @@ pnpm --dir front test:e2e
 
 If `pnpm --dir front test:e2e` cannot run because the local browser or server fixture is unavailable, report that explicitly.
 
-- [ ] **Step 5: Commit**
+Actual: `MemberProfileControllerTest`, `clean test`, and `git diff --check` passed. `pnpm --dir front test:e2e` was attempted but blocked by the local `readmates_e2e` Flyway checksum state; a non-destructive retry with a fresh DB name was blocked because the local MySQL user cannot create that database.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt \
