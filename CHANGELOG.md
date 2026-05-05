@@ -6,6 +6,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+No changes yet.
+
+## v1.4.2 - 2026-05-05
+
 ### Added
 
 - 대형 HostDashboard, MyPage, HostSessionEditor 컴포넌트 분리를 위한 후속 계획서 3개를 추가했습니다. 각 계획서는 characterization test, 명시적 검증 명령, rollback 기준을 포함합니다.
@@ -24,14 +28,24 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Notification DLT recoverer가 원본 Kafka partition을 명시해 partition 검증을 건너뛰지 않도록 했습니다.
 - 초대 email 길이를 persistence 전에 검증해 DB 길이 제한 초과가 structured invitation error로 반환되도록 했습니다.
 
+### Deployment Notes
+
+이 릴리즈는 서버 인증/알림 코드, 프론트엔드 route state helper, 로컬 Compose 설정, 문서와 테스트 계획을 함께 포함합니다. DB migration은 없고, 운영 DB가 `v1.4.1` 기준 Flyway 상태라면 추가 schema migration 없이 앱을 시작할 수 있습니다.
+
+운영 서버에는 `readmates-server:v1.4.2` image를 배포해야 합니다. `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`는 email delivery retry 간격을 조정하는 선택 설정이며, 값을 지정하지 않으면 기본 `5,15,60,240`분을 사용합니다.
+
+권장 순서는 서버 backend image를 `v1.4.2`로 먼저 배포하고 `/internal/health`, BFF auth smoke, OAuth start smoke를 확인한 뒤, `v1.4.2` tag push로 Cloudflare Pages frontend와 Pages Functions 배포를 시작하는 방식입니다. Profile PATCH 무세션 요청은 빈 `401`로 차단되는 것이 정상 기대값입니다.
+
 ### Verification
 
 - `./server/gradlew -p server clean test`
 - `pnpm --dir front lint`
 - `pnpm --dir front test`
 - `pnpm --dir front build`
-- `git diff --check`
-- `pnpm --dir front test:e2e`는 local `readmates_e2e` MySQL schema의 Flyway checksum mismatch로 browser test 전에 실패했습니다. DB repair/drop/reset 없이 root-cause를 확인했고, safe next step은 fresh E2E schema 또는 owner-approved DB maintenance입니다.
+- `READMATES_E2E_DB_NAME=readmates_e2e_v142_permission_check pnpm --dir front test:e2e` - 로컬 MySQL 3306에서 22 tests passed
+- `./scripts/build-public-release-candidate.sh`
+- `./scripts/public-release-check.sh .tmp/public-release-candidate`
+- `git diff --check -- CHANGELOG.md docs/deploy/oci-backend.md docs/development/local-setup.md docs/development/test-guide.md .env.example compose.yml`
 
 ## v1.4.1 - 2026-04-30
 
