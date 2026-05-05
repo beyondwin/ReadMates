@@ -493,7 +493,7 @@ Expected: no endpoint silently changes from data to empty state.
 - Modify: `server/src/test/kotlin/com/readmates/publication/api/PublicControllerDbTest.kt`
 - Optional Modify: `server/src/test/kotlin/com/readmates/performance/ServerQueryBudgetTest.kt`
 
-- [ ] **Step 1: publication visibility matrix 추가**
+- [x] **Step 1: publication visibility matrix 추가**
 
 In `PublicControllerDbTest`, add tests for:
 
@@ -506,7 +506,7 @@ DRAFT/OPEN + PUBLIC => public API 404 or not listed
 
 Use placeholder-safe fixture book/member data only.
 
-- [ ] **Step 2: archive multi-club isolation 추가**
+- [x] **Step 2: archive multi-club isolation 추가**
 
 In archive DB tests, prove:
 
@@ -516,7 +516,7 @@ host from club A cannot expose club B archive detail
 same user with membership in two clubs gets data scoped by X-Readmates-Club-Slug
 ```
 
-- [ ] **Step 3: focused verification**
+- [x] **Step 3: focused verification**
 
 Run:
 
@@ -532,6 +532,8 @@ For API/auth exposure changes, also run or report why skipped:
 ```bash
 pnpm --dir front test:e2e
 ```
+
+Status: focused server tests and full `./server/gradlew -p server clean test` passed. `pnpm --dir front test:e2e` was attempted after installing frontend dependencies with a frozen lockfile, but the configured Spring `bootRun` web server failed Flyway validation against the existing local `readmates_e2e` schema because migration checksums for versions 16, 18, 20, and 21 differ from the resolved local migrations.
 
 ## P1 Task 7: 운영 로그 최소 세트 추가
 

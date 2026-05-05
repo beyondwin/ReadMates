@@ -110,6 +110,52 @@ class ArchiveControllerDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_SAMPLE_CLUB_ARCHIVE_DETAIL_ISOLATION_SQL,
+            INSERT_SAMPLE_CLUB_MEMBER5_DETAIL_MEMBERSHIP_SQL,
+            INSERT_SAMPLE_CLUB_ARCHIVE_DETAIL_SESSION_SQL,
+            INSERT_SAMPLE_CLUB_ARCHIVE_DETAIL_PARTICIPANT_SQL,
+            INSERT_SAMPLE_CLUB_ARCHIVE_DETAIL_PUBLICATION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_SAMPLE_CLUB_ARCHIVE_DETAIL_ISOLATION_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `archive session detail is scoped by requested club slug`() {
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
+            header("X-Readmates-Club-Slug", "reading-sai")
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isNotFound() }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
+            header("X-Readmates-Club-Slug", "reading-sai")
+            with(user("host@example.com"))
+        }
+            .andExpect {
+                status { isNotFound() }
+            }
+
+        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
+            header("X-Readmates-Club-Slug", "sample-book-club")
+            with(user("member5@example.com"))
+        }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009281") }
+                jsonPath("$.bookTitle") { value("샘플 클럽 상세 테스트 책") }
+                jsonPath("$.publicSummary") { value("샘플 클럽 상세 공개 요약입니다.") }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             CLEANUP_ARCHIVE_PUBLICATION_VISIBILITY_SESSIONS_SQL,
             INSERT_ARCHIVE_PUBLICATION_VISIBILITY_SESSIONS_SQL,
             INSERT_ARCHIVE_PUBLICATION_VISIBILITY_PUBLICATIONS_SQL,
@@ -421,6 +467,118 @@ class ArchiveControllerDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val CLEANUP_SAMPLE_CLUB_ARCHIVE_DETAIL_ISOLATION_SQL = """
+            delete from public_session_publications
+            where session_id = '00000000-0000-0000-0000-000000009281';
+            delete from session_participants
+            where session_id = '00000000-0000-0000-0000-000000009281'
+               or membership_id = '00000000-0000-0000-0000-000000009282';
+            delete from sessions
+            where id = '00000000-0000-0000-0000-000000009281';
+            delete from memberships
+            where id = '00000000-0000-0000-0000-000000009282';
+        """
+
+        private const val INSERT_SAMPLE_CLUB_MEMBER5_DETAIL_MEMBERSHIP_SQL = """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            select
+              '00000000-0000-0000-0000-000000009282',
+              clubs.id,
+              users.id,
+              'MEMBER',
+              'ACTIVE',
+              '2026-01-01 00:00:00.000000',
+              '샘플멤버5'
+            from clubs
+            join users on users.email = 'member5@example.com'
+            where clubs.slug = 'sample-book-club';
+        """
+
+        private const val INSERT_SAMPLE_CLUB_ARCHIVE_DETAIL_SESSION_SQL = """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              book_translator,
+              book_link,
+              book_image_url,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              meeting_url,
+              meeting_passcode,
+              question_deadline_at,
+              state,
+              visibility
+            )
+            values (
+              '00000000-0000-0000-0000-000000009281',
+              '00000000-0000-0000-0000-000000000002',
+              2,
+              '2회차 · 샘플 클럽 상세 테스트 책',
+              '샘플 클럽 상세 테스트 책',
+              '샘플 클럽 테스트 저자',
+              null,
+              null,
+              null,
+              '2026-10-12',
+              '20:00:00',
+              '22:00:00',
+              '온라인',
+              null,
+              null,
+              '2026-10-11 14:59:00.000000',
+              'PUBLISHED',
+              'PUBLIC'
+            );
+        """
+
+        private const val INSERT_SAMPLE_CLUB_ARCHIVE_DETAIL_PARTICIPANT_SQL = """
+            insert into session_participants (
+              id,
+              club_id,
+              session_id,
+              membership_id,
+              rsvp_status,
+              attendance_status,
+              participation_status
+            )
+            values (
+              '00000000-0000-0000-0000-000000009283',
+              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000009281',
+              '00000000-0000-0000-0000-000000009282',
+              'GOING',
+              'ATTENDED',
+              'ACTIVE'
+            );
+        """
+
+        private const val INSERT_SAMPLE_CLUB_ARCHIVE_DETAIL_PUBLICATION_SQL = """
+            insert into public_session_publications (
+              id,
+              club_id,
+              session_id,
+              public_summary,
+              is_public,
+              visibility,
+              published_at
+            )
+            values (
+              '00000000-0000-0000-0000-000000009284',
+              '00000000-0000-0000-0000-000000000002',
+              '00000000-0000-0000-0000-000000009281',
+              '샘플 클럽 상세 공개 요약입니다.',
+              true,
+              'PUBLIC',
+              '2026-10-13 00:00:00.000000'
+            );
+        """
 
         private const val MARK_SESSION6_MEMBER5_ONE_LINER_SESSION_SQL = """
             update one_line_reviews

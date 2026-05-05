@@ -236,6 +236,53 @@ class PublicControllerDbTest(
     @Test
     @Sql(
         statements = [
+            CLEANUP_PUBLIC_PUBLICATION_MATRIX_SQL,
+            INSERT_PUBLIC_PUBLICATION_MATRIX_SESSIONS_SQL,
+            INSERT_PUBLIC_PUBLICATION_MATRIX_PUBLICATIONS_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [
+            CLEANUP_PUBLIC_PUBLICATION_MATRIX_SQL,
+        ],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `club scoped public records expose only published public sessions`() {
+        mockMvc.get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000991")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.bookTitle") { value("공개 범위 테스트 책 - 발행 공개") }
+                jsonPath("$.summary") { value("발행 공개 세션만 공개 상세에 노출됩니다.") }
+            }
+
+        listOf(
+            "00000000-0000-0000-0000-000000000992",
+            "00000000-0000-0000-0000-000000000993",
+            "00000000-0000-0000-0000-000000000994",
+            "00000000-0000-0000-0000-000000000995",
+        ).forEach { sessionId ->
+            mockMvc.get("/api/public/clubs/reading-sai/sessions/$sessionId")
+                .andExpect {
+                    status { isNotFound() }
+                }
+        }
+
+        mockMvc.get("/api/public/clubs/reading-sai")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.stats.sessions") { value(7) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(hasItem("공개 범위 테스트 책 - 발행 공개")) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 발행 멤버"))) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 종료 공개"))) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 예정 공개"))) }
+                jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 진행 공개"))) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [
             CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
             INSERT_MEMBER_PUBLISHED_SESSION_SQL,
             INSERT_MEMBER_PUBLISHED_PUBLICATION_SQL,
@@ -446,6 +493,120 @@ class PublicControllerDbTest(
             where session_id = '00000000-0000-0000-0000-000000009777';
             delete from sessions
             where id = '00000000-0000-0000-0000-000000009777';
+        """
+
+        private const val CLEANUP_PUBLIC_PUBLICATION_MATRIX_SQL = """
+            delete from public_session_publications
+            where session_id in (
+              '00000000-0000-0000-0000-000000000991',
+              '00000000-0000-0000-0000-000000000992',
+              '00000000-0000-0000-0000-000000000993',
+              '00000000-0000-0000-0000-000000000994',
+              '00000000-0000-0000-0000-000000000995'
+            );
+            delete from sessions
+            where id in (
+              '00000000-0000-0000-0000-000000000991',
+              '00000000-0000-0000-0000-000000000992',
+              '00000000-0000-0000-0000-000000000993',
+              '00000000-0000-0000-0000-000000000994',
+              '00000000-0000-0000-0000-000000000995'
+            );
+        """
+
+        private const val INSERT_PUBLIC_PUBLICATION_MATRIX_SESSIONS_SQL = """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
+            )
+            values
+            (
+              '00000000-0000-0000-0000-000000000991',
+              '00000000-0000-0000-0000-000000000001',
+              991, '991회차 · 공개 범위 테스트 책 - 발행 공개', '공개 범위 테스트 책 - 발행 공개',
+              '공개 범위 테스트 저자', null, null, null, '2026-11-01', '20:00', '22:00', '온라인',
+              '2026-10-31 14:59:00.000000', 'PUBLISHED', 'PUBLIC'
+            ),
+            (
+              '00000000-0000-0000-0000-000000000992',
+              '00000000-0000-0000-0000-000000000001',
+              992, '992회차 · 공개 범위 테스트 책 - 발행 멤버', '공개 범위 테스트 책 - 발행 멤버',
+              '공개 범위 테스트 저자', null, null, null, '2026-11-02', '20:00', '22:00', '온라인',
+              '2026-11-01 14:59:00.000000', 'PUBLISHED', 'MEMBER'
+            ),
+            (
+              '00000000-0000-0000-0000-000000000993',
+              '00000000-0000-0000-0000-000000000001',
+              993, '993회차 · 공개 범위 테스트 책 - 종료 공개', '공개 범위 테스트 책 - 종료 공개',
+              '공개 범위 테스트 저자', null, null, null, '2026-11-03', '20:00', '22:00', '온라인',
+              '2026-11-02 14:59:00.000000', 'CLOSED', 'PUBLIC'
+            ),
+            (
+              '00000000-0000-0000-0000-000000000994',
+              '00000000-0000-0000-0000-000000000001',
+              994, '994회차 · 공개 범위 테스트 책 - 예정 공개', '공개 범위 테스트 책 - 예정 공개',
+              '공개 범위 테스트 저자', null, null, null, '2026-11-04', '20:00', '22:00', '온라인',
+              '2026-11-03 14:59:00.000000', 'DRAFT', 'PUBLIC'
+            ),
+            (
+              '00000000-0000-0000-0000-000000000995',
+              '00000000-0000-0000-0000-000000000001',
+              995, '995회차 · 공개 범위 테스트 책 - 진행 공개', '공개 범위 테스트 책 - 진행 공개',
+              '공개 범위 테스트 저자', null, null, null, '2026-11-05', '20:00', '22:00', '온라인',
+              '2026-11-04 14:59:00.000000', 'OPEN', 'PUBLIC'
+            );
+        """
+
+        private const val INSERT_PUBLIC_PUBLICATION_MATRIX_PUBLICATIONS_SQL = """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, published_at
+            )
+            values
+            (
+              '00000000-0000-0000-0000-000000001991',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000991',
+              '발행 공개 세션만 공개 상세에 노출됩니다.',
+              true,
+              'PUBLIC',
+              '2026-11-06 00:00:00.000000'
+            ),
+            (
+              '00000000-0000-0000-0000-000000001992',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000992',
+              '멤버 공개 세션은 공개 상세에 노출되지 않습니다.',
+              false,
+              'MEMBER',
+              null
+            ),
+            (
+              '00000000-0000-0000-0000-000000001993',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000993',
+              '종료 공개 세션은 발행 전 공개 상세에 노출되지 않습니다.',
+              false,
+              'PUBLIC',
+              null
+            ),
+            (
+              '00000000-0000-0000-0000-000000001994',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000994',
+              '예정 공개 세션은 공개 상세에 노출되지 않습니다.',
+              false,
+              'PUBLIC',
+              null
+            ),
+            (
+              '00000000-0000-0000-0000-000000001995',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000995',
+              '진행 공개 세션은 공개 상세에 노출되지 않습니다.',
+              false,
+              'PUBLIC',
+              null
+            );
         """
 
         private const val INSERT_PUBLIC_OPEN_SESSION_SQL = """
