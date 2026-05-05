@@ -1,4 +1,3 @@
-"use client";
 
 import { type CSSProperties, type KeyboardEvent, useState } from "react";
 import { MobileCurrentSessionBoard, type MobileSessionTab } from "@/features/current-session/ui/current-session-mobile";

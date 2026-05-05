@@ -1,4 +1,3 @@
-"use client";
 
 import { type ButtonHTMLAttributes, useState } from "react";
 

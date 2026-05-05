@@ -1,4 +1,3 @@
-"use client";
 
 import type { ChangeEventHandler, ComponentType, ReactNode, RefObject } from "react";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";

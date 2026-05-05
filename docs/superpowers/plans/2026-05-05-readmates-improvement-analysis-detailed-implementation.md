@@ -1150,7 +1150,7 @@ Remove Vite-noop `"use client"` directives and add Redpanda healthcheck.
 
 ### Steps
 
-- [ ] **Step 1: remove only first-line directives**
+- [x] **Step 1: remove only first-line directives**
 
 Use a mechanical edit that removes exactly:
 
@@ -1160,7 +1160,7 @@ Use a mechanical edit that removes exactly:
 
 when it is the first line. Do not remove other string literals.
 
-- [ ] **Step 2: Redpanda healthcheck**
+- [x] **Step 2: Redpanda healthcheck**
 
 In `compose.yml` under `kafka`, add:
 
@@ -1173,7 +1173,7 @@ In `compose.yml` under `kafka`, add:
       start_period: 10s
 ```
 
-- [ ] **Step 3: verify**
+- [x] **Step 3: verify**
 
 ```bash
 rg -n '^"use client";' front/{features,shared,src}
@@ -1186,6 +1186,18 @@ git diff --check -- compose.yml docs/development/local-setup.md
 ```
 
 Expected: the `rg` command returns no output and Kafka reaches healthy state.
+
+Verification result for PR 10:
+
+- PASS `rg -n '^"use client";' front/{features,shared,src}` returned no output.
+- PASS `pnpm --dir front lint`.
+- PASS `pnpm --dir front test` (49 files, 647 tests).
+- PASS `pnpm --dir front build`.
+- PASS `docker compose up -d kafka`; session-owned container `readmates-improvement-analysis-stack-kafka-1` started.
+- PASS `docker compose ps kafka`; service reached `healthy`.
+- Cleanup: stopped the session-owned Kafka container after verification; follow-up `docker compose ps kafka` showed no running Kafka service row.
+- PASS `git diff --check -- compose.yml docs/development/local-setup.md docs/superpowers/plans/2026-05-05-readmates-improvement-analysis-detailed-implementation.md docs/superpowers/plans/2026-05-05-readmates-improvement-analysis-review-plan.md`.
+- PASS `git diff --check`.
 
 ---
 

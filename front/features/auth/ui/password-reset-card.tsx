@@ -1,4 +1,3 @@
-"use client";
 
 import { Link } from "@/features/auth/ui/auth-link";
 

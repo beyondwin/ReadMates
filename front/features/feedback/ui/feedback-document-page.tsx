@@ -1,4 +1,3 @@
-"use client";
 
 import { useEffect, useRef, type CSSProperties } from "react";
 import type { FeedbackDocumentView, FeedbackUnavailableReason } from "@/features/feedback/model/feedback-document-model";

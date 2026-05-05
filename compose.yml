@@ -45,6 +45,12 @@ services:
       - --advertise-kafka-addr=PLAINTEXT://localhost:9092
     ports:
       - "9092:9092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "info"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   readmates-mysql-data:

@@ -1,4 +1,3 @@
-"use client";
 
 import { type CSSProperties, type FormEvent, type InvalidEvent, useRef, useState } from "react";
 import type {

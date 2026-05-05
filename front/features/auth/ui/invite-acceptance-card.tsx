@@ -1,4 +1,3 @@
-"use client";
 
 import { Link } from "@/features/auth/ui/auth-link";
 import type { InvitationPreviewView, InvitationStatus } from "@/features/auth/model/auth-model";

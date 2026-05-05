@@ -1,4 +1,3 @@
-"use client";
 
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type RefObject, useEffect, useRef } from "react";
 import type { FeedFilter, NoteSessionItem } from "@/features/archive/model/notes-feed-model";

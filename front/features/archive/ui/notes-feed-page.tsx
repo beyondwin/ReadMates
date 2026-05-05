@@ -1,4 +1,3 @@
-"use client";
 
 import { type CSSProperties, useRef, useState } from "react";
 import type { FeedFilter, NoteFeedItem, NoteSessionItem } from "@/features/archive/model/notes-feed-model";
