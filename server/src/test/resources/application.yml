@@ -1,2 +1,4 @@
 readmates:
+  auth:
+    return-state-secret: "test-return-state-secret-for-local-tests"
   bff-secret-required: false

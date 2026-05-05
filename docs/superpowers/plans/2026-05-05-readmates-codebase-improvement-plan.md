@@ -171,7 +171,7 @@ git commit -m "fix: require Spring Security auth for profile PATCH endpoints"
 
 **배경:** OAuth return state는 `returnTo`를 서명하는 보안 경계입니다. production에서 env가 빠져도 공개 dev fallback으로 시작되면 silent 취약점이 됩니다.
 
-- [ ] **Step 1: failing unit test 추가**
+- [x] **Step 1: failing unit test 추가**
 
 `OAuthReturnStateTest.kt`를 추가합니다.
 
@@ -205,7 +205,7 @@ class OAuthReturnStateTest {
 }
 ```
 
-- [ ] **Step 2: config fallback 제거**
+- [x] **Step 2: config fallback 제거**
 
 ```yaml
 readmates:
@@ -228,7 +228,7 @@ private val normalizedSecret = secret.trim().also {
 }
 ```
 
-- [ ] **Step 3: dev/test profile에 public-safe test secret 추가**
+- [x] **Step 3: dev/test profile에 public-safe test secret 추가**
 
 `application-dev.yml`:
 
@@ -247,11 +247,11 @@ readmates:
     return-state-secret: "test-return-state-secret-for-local-tests"
 ```
 
-- [ ] **Step 4: OAuth 관련 테스트 property 정리**
+- [x] **Step 4: OAuth 관련 테스트 property 정리**
 
 기존 `GoogleOAuthLoginSessionTest`와 `InviteAwareOAuthTest`에 있는 explicit test property는 유지해도 되고, `server/src/test/resources/application.yml`의 공통 test secret으로 대체해도 됩니다. 한 가지 방식으로 통일합니다.
 
-- [ ] **Step 5: 검증**
+- [x] **Step 5: 검증**
 
 ```bash
 ./server/gradlew -p server test --tests "com.readmates.auth.infrastructure.security.OAuthReturnStateTest"
@@ -260,7 +260,9 @@ readmates:
 ./server/gradlew -p server clean test
 ```
 
-- [ ] **Step 6: Commit**
+Actual: targeted OAuth tests, `clean test`, and `git diff --check` passed. `pnpm --dir front test:e2e` was attempted for the auth-flow surface but blocked by the existing local `readmates_e2e` Flyway checksum state.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth/infrastructure/security/OAuthReturnState.kt \
