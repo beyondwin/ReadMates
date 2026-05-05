@@ -72,7 +72,7 @@
 - Modify: `docs/deploy/oci-backend.md`
 - Test: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
-- [ ] **Step 1: dead migration path 참조 확인**
+- [x] **Step 1: dead migration path 참조 확인**
 
 Run:
 
@@ -83,7 +83,7 @@ rg -n 'db/migration|db/mysql/migration|READMATES_FLYWAY_LOCATIONS' \
 
 Expected: runtime/test/deploy docs are already anchored on `db/mysql/migration`; only deleted source files remain under `db/migration`.
 
-- [ ] **Step 2: unused migration directory 삭제**
+- [x] **Step 2: unused migration directory 삭제**
 
 Delete all files under:
 
@@ -93,7 +93,7 @@ server/src/main/resources/db/migration/
 
 Do not renumber or edit `server/src/main/resources/db/mysql/migration/*.sql`.
 
-- [ ] **Step 3: docs에 새 migration 추가 위치 명시**
+- [x] **Step 3: docs에 새 migration 추가 위치 명시**
 
 Add a short note near existing Flyway/local setup guidance:
 
@@ -102,7 +102,7 @@ Add a short note near existing Flyway/local setup guidance:
 `server/src/main/resources/db/migration`은 사용하지 않으며, 새 파일을 만들면 운영 Flyway가 읽지 않습니다.
 ```
 
-- [ ] **Step 4: Flyway test로 migration source 확인**
+- [x] **Step 4: Flyway test로 migration source 확인**
 
 Run:
 
@@ -113,7 +113,7 @@ git diff --check -- docs/development/local-setup.md docs/development/test-guide.
 
 Expected: Flyway migration test passes and doc whitespace check passes.
 
-- [ ] **Step 5: commit**
+- [x] **Step 5: commit**
 
 ```bash
 git add server/src/main/resources/db/migration \

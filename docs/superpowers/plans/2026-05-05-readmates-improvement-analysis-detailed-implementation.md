@@ -85,7 +85,7 @@ server/src/main/resources/db/mysql/dev/
 
 ### Steps
 
-- [ ] **Step 1: baseline 확인**
+- [x] **Step 1: baseline 확인**
 
 ```bash
 rg -n 'spring.flyway.locations|READMATES_FLYWAY_LOCATIONS|db/mysql/migration|db/migration' \
@@ -102,7 +102,7 @@ application-dev.yml adds classpath:db/mysql/dev
 db/migration has only unused historical SQL files
 ```
 
-- [ ] **Step 2: dead path 삭제**
+- [x] **Step 2: dead path 삭제**
 
 Use `git rm` for the dead files only:
 
@@ -112,7 +112,7 @@ git rm server/src/main/resources/db/migration/*.sql
 
 If the empty directory remains locally, leave it untracked or remove it from the filesystem. Do not add a replacement placeholder file.
 
-- [ ] **Step 3: docs에 migration 위치 명시**
+- [x] **Step 3: docs에 migration 위치 명시**
 
 Add this paragraph to `docs/development/local-setup.md` near the `READMATES_FLYWAY_LOCATIONS` table row:
 
@@ -132,7 +132,7 @@ Add this paragraph to `docs/deploy/oci-backend.md` near backend migration notes:
 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
 ```
 
-- [ ] **Step 4: verify**
+- [x] **Step 4: verify**
 
 ```bash
 ./server/gradlew -p server test --tests com.readmates.support.MySqlFlywayMigrationTest
@@ -141,7 +141,7 @@ git diff --check -- docs/development/local-setup.md docs/development/test-guide.
 
 Expected: Flyway test passes and diff check has no output. Review the changed docs for public-safe placeholder use before committing.
 
-- [ ] **Step 5: commit**
+- [x] **Step 5: commit**
 
 ```bash
 git add server/src/main/resources/db/migration \
