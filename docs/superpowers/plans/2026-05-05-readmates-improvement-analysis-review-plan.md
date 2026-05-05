@@ -193,6 +193,11 @@ name: Deploy Server Image
 
 on:
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "GHCR image tag to publish, for example v1.2.0"
+        required: true
+        type: string
   push:
     tags:
       - "v*"
@@ -223,13 +228,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set image name
+        id: image
+        env:
+          DISPATCH_IMAGE_TAG: ${{ inputs.image_tag || '' }}
+        run: |
+          image_name="ghcr.io/${GITHUB_REPOSITORY,,}/readmates-server"
+          image_tag="${DISPATCH_IMAGE_TAG:-${GITHUB_REF_NAME}}"
+          if [[ ! "$image_tag" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "Invalid Docker image tag: $image_tag" >&2
+            exit 1
+          fi
+          echo "name=$image_name" >> "$GITHUB_OUTPUT"
+          echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: server
           file: server/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}/readmates-server:${{ github.ref_name }}
+          tags: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
 ```
 
 - [x] **Step 3: release/deploy docs에 tag-image 연결 추가**
@@ -1168,7 +1187,8 @@ Final integration verification result:
 - PASS `pnpm --dir front build`.
 - BLOCKED `pnpm --dir front test:e2e`: Playwright webServer `bootRun` failed before browser tests because the existing local `readmates_e2e` schema has Flyway checksum mismatches for migrations 16, 18, 20, and 21. The failure was reproduced with `bootRun --stacktrace`; no repair, drop, or reset was run.
 - PASS `git diff --check`.
-- Public release candidate checks were not run because this stack changed public-release docs/workflows but did not prepare a release-candidate export.
+- PASS `./scripts/build-public-release-candidate.sh`.
+- PASS `./scripts/public-release-check.sh .tmp/public-release-candidate`.
 
 ## Done Criteria
 
