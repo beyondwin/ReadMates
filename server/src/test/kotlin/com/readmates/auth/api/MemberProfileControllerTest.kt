@@ -115,7 +115,7 @@ class MemberProfileControllerTest(
     }
 
     @Test
-    fun `own profile update requires authentication with structured error`() {
+    fun `own profile update requires Spring Security authentication`() {
         mockMvc.patch("/api/me/profile") {
             header("X-Readmates-Bff-Secret", "test-bff-secret")
             header("Origin", "http://localhost:3000")
@@ -124,8 +124,7 @@ class MemberProfileControllerTest(
             content = """{"displayName":"NoSession"}"""
         }.andExpect {
             status { isUnauthorized() }
-            jsonPath("$.code") { value("AUTHENTICATION_REQUIRED") }
-            jsonPath("$.message") { value("Authentication required") }
+            content { string("") }
         }
     }
 
@@ -393,7 +392,7 @@ class MemberProfileControllerTest(
     }
 
     @Test
-    fun `host profile update requires authentication with structured error`() {
+    fun `host profile update requires Spring Security authentication`() {
         val targetMembershipId = membershipIdForEmail(insertProfileMember("host.anonymous", "ACTIVE", shortName = "Blocked"))
 
         mockMvc.patch("/api/host/members/$targetMembershipId/profile") {
@@ -404,8 +403,7 @@ class MemberProfileControllerTest(
             content = """{"displayName":"NoSession"}"""
         }.andExpect {
             status { isUnauthorized() }
-            jsonPath("$.code") { value("AUTHENTICATION_REQUIRED") }
-            jsonPath("$.message") { value("Authentication required") }
+            content { string("") }
         }
 
         assertEquals("Blocked", shortNameForMembership(targetMembershipId))
