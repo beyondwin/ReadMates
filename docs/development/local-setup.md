@@ -46,6 +46,8 @@ password: readmates
 port: 3306
 ```
 
+Root `.env`는 Git에서 무시됩니다. 기본값을 바꾸려면 `.env.example`의 Local Docker Compose MySQL section 중 필요한 변수만 `.env`에 복사해 수정합니다.
+
 이미 별도 MySQL 8 compatible database를 사용한다면 같은 database를 만들고, backend 실행 시 `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`를 해당 값으로 바꿉니다.
 
 이 Compose database는 로컬 backend 실행과 E2E 준비용입니다. Backend Gradle test는 Testcontainers가 테스트용 MySQL을 직접 띄우므로, 일반 backend test를 위해 이 컨테이너를 먼저 실행할 필요는 없습니다. Playwright E2E schema 준비, `CREATE DATABASE` 권한, Flyway checksum mismatch 대응은 [test-guide.md](test-guide.md#playwright-e2e)를 기준으로 합니다.
