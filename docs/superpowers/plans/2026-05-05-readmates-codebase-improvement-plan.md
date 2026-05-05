@@ -597,7 +597,7 @@ git commit -m "refactor: share typed ReadMates route state"
 
 **배경:** `users.email`, `invitations.invited_email`, `notification_deliveries.recipient_email`는 DB schema에서 `varchar(320)`입니다. `InvitationService.normalizeEmail()`은 empty만 검증하므로 321자 이상 email이 persistence exception으로 떨어질 수 있습니다.
 
-- [ ] **Step 1: failing controller test 추가**
+- [x] **Step 1: failing controller test 추가**
 
 `HostInvitationControllerTest.kt`에 추가합니다.
 
@@ -625,7 +625,7 @@ fun `host invitation rejects email longer than database email limit before persi
 }
 ```
 
-- [ ] **Step 2: normalizeEmail 구현 수정**
+- [x] **Step 2: normalizeEmail 구현 수정**
 
 `InvitationService.kt` 상단 근처에 상수를 추가합니다.
 
@@ -652,7 +652,7 @@ private fun normalizeEmail(email: String): String {
 }
 ```
 
-- [ ] **Step 3: 검증**
+- [x] **Step 3: 검증**
 
 ```bash
 ./server/gradlew -p server test --tests "com.readmates.auth.api.HostInvitationControllerTest"
@@ -660,7 +660,9 @@ private fun normalizeEmail(email: String): String {
 ./server/gradlew -p server clean test
 ```
 
-- [ ] **Step 4: Commit**
+Actual: host invitation controller test, Google OAuth login session test, `clean test`, and `git diff --check` passed. The web adapter also maps over-length request validation to the same invitation error while keeping malformed short emails on a generic invalid-email message.
+
+- [x] **Step 4: Commit**
 
 ```bash
 git add server/src/main/kotlin/com/readmates/auth/application/InvitationService.kt \
