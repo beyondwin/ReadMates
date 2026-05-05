@@ -1,18 +1,15 @@
+import {
+  readmatesReturnState,
+  type ReadmatesReturnState,
+  type ReadmatesReturnTarget,
+} from "@/shared/routing/readmates-route-state";
+
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
 const MOBILE_WORKSPACE_KEY = "readmates:mobile-workspace";
 
-export type ReadmatesReturnTarget = {
-  href: string;
-  label: string;
-  state?: ReadmatesReturnState;
-};
-
-export type ReadmatesReturnState = {
-  readmatesReturnTo: string;
-  readmatesReturnLabel: string;
-  readmatesReturnState?: ReadmatesReturnState;
-};
+export { readmatesReturnState };
+export type { ReadmatesReturnState, ReadmatesReturnTarget };
 
 type ReadmatesRouteState = {
   readmatesReturnTo?: unknown;
@@ -78,19 +75,6 @@ export function appSessionHref(sessionId: string, hash?: string) {
 
 export function appFeedbackHref(sessionId: string, printMode = false) {
   return `/app/feedback/${encodeURIComponent(sessionId)}${printMode ? "/print" : ""}`;
-}
-
-export function readmatesReturnState(target: ReadmatesReturnTarget) {
-  const state: ReadmatesReturnState = {
-    readmatesReturnTo: target.href,
-    readmatesReturnLabel: target.label,
-  };
-
-  if (target.state) {
-    state.readmatesReturnState = target.state;
-  }
-
-  return state;
 }
 
 export function readReadmatesWorkspaceState(state: unknown): ReadmatesMobileWorkspace | null {

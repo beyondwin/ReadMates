@@ -489,7 +489,7 @@ git commit -m "test: extend route continuity and auth guard coverage"
 
 **배경:** host route/ui 파일이 route state 타입을 중복 정의하고 `state?: unknown`을 노출합니다. 하지만 feature가 `src/app/route-continuity`를 import하면 route-first dependency boundary를 어기므로 공통 타입은 `shared/routing` 아래에 둡니다.
 
-- [ ] **Step 1: shared route-state type 파일 생성**
+- [x] **Step 1: shared route-state type 파일 생성**
 
 `front/shared/routing/readmates-route-state.ts`:
 
@@ -520,7 +520,7 @@ export function readmatesReturnState(target: ReadmatesReturnTarget): ReadmatesRe
 }
 ```
 
-- [ ] **Step 2: app route-continuity가 shared type을 재사용하도록 수정**
+- [x] **Step 2: app route-continuity가 shared type을 재사용하도록 수정**
 
 `front/src/app/route-continuity.ts`에서 local `ReadmatesReturnState`, `ReadmatesReturnTarget`, `readmatesReturnState` 중복 정의를 제거하고 shared에서 import/export합니다.
 
@@ -535,7 +535,7 @@ export { readmatesReturnState };
 export type { ReadmatesReturnState, ReadmatesReturnTarget };
 ```
 
-- [ ] **Step 3: host route/ui type 중복 제거**
+- [x] **Step 3: host route/ui type 중복 제거**
 
 다음 파일의 local `ReadmatesReturnState`, `ReadmatesReturnTarget` 정의를 shared import로 대체합니다.
 
@@ -550,7 +550,7 @@ import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routi
 - `front/features/host/ui/host-session-editor.tsx`
 - `front/features/host/ui/host-session-feedback-upload.tsx`
 
-- [ ] **Step 4: Link prop state 타입 좁히기**
+- [x] **Step 4: Link prop state 타입 좁히기**
 
 Host UI의 link prop은 `state?: unknown` 대신 route state 타입을 받도록 바꿉니다.
 
@@ -567,16 +567,18 @@ type HostDashboardLinkProps = {
 
 `HostSessionEditorLinkProps`와 `FeedbackUploadLinkProps`에도 같은 원칙을 적용합니다.
 
-- [ ] **Step 5: boundary test와 build 검증**
+- [x] **Step 5: boundary test와 build 검증**
 
 ```bash
-pnpm --dir front test front/tests/unit/frontend-boundaries.test.ts
+pnpm --dir front test tests/unit/frontend-boundaries.test.ts
 pnpm --dir front lint
 pnpm --dir front test
 pnpm --dir front build
 ```
 
-- [ ] **Step 6: Commit**
+Actual: boundary test, lint, full test, build, and `git diff --check` passed. The original `front/tests/unit/frontend-boundaries.test.ts` path was adapted to `tests/unit/frontend-boundaries.test.ts` because paths resolve from `front/` when using `pnpm --dir front`.
+
+- [x] **Step 6: Commit**
 
 ```bash
 git add front/shared/routing/readmates-route-state.ts \

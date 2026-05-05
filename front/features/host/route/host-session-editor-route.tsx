@@ -1,20 +1,14 @@
 import { useLoaderData } from "react-router-dom";
 import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
 import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
+import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { hostSessionEditorActions } from "./host-session-editor-data";
 
-type HostSessionEditorReturnTarget = NonNullable<Parameters<typeof HostSessionEditor>[0]>["returnTarget"];
-type ReadmatesReturnState = {
-  readmatesReturnTo: string;
-  readmatesReturnLabel: string;
-  readmatesReturnState?: ReadmatesReturnState;
-};
-type ReadmatesReturnTarget = NonNullable<Parameters<typeof HostSessionEditor>[0]>["hostDashboardReturnTarget"];
 type HostSessionEditorRouteProps = {
-  returnTarget?: HostSessionEditorReturnTarget;
+  returnTarget?: ReadmatesReturnTarget;
   LinkComponent?: HostSessionEditorLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
-  readmatesReturnState?: (target: NonNullable<ReadmatesReturnTarget>) => ReadmatesReturnState;
+  readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 };
 
 export function NewHostSessionRoute({

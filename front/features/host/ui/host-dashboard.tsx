@@ -29,6 +29,8 @@ import {
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { BookCover } from "@/shared/ui/book-cover";
 import { READMATES_NAV_LABELS } from "@/shared/ui/readmates-copy";
+import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/routing/readmates-route-state";
+import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import {
   formatDateOnlyLabel,
@@ -96,19 +98,9 @@ type CurrentSession = NonNullable<CurrentSessionResponse["currentSession"]>;
 type QuickActionIcon = (typeof quickActions)[number]["icon"];
 type MissingCurrentSessionMember = NonNullable<HostDashboardResponse["currentSessionMissingMembers"]>[number];
 type HostDashboardMissingMemberAction = "add" | "remove";
-type ReadmatesReturnState = {
-  readmatesReturnTo: string;
-  readmatesReturnLabel: string;
-  readmatesReturnState?: ReadmatesReturnState;
-};
-type ReadmatesReturnTarget = {
-  href: string;
-  label: string;
-  state?: ReadmatesReturnState;
-};
 type HostDashboardLinkProps = {
   to: string;
-  state?: unknown;
+  state?: ReadmatesReturnState;
   className?: string;
   children: ReactNode;
   "aria-label"?: string;
@@ -173,19 +165,6 @@ function DefaultLinkComponent(props: HostDashboardLinkProps) {
       {children}
     </a>
   );
-}
-
-function defaultReadmatesReturnState(target: ReadmatesReturnTarget) {
-  const state: ReadmatesReturnState = {
-    readmatesReturnTo: target.href,
-    readmatesReturnLabel: target.label,
-  };
-
-  if (target.state) {
-    state.readmatesReturnState = target.state;
-  }
-
-  return state;
 }
 
 function memberSessionState(
