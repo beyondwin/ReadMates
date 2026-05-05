@@ -856,3 +856,5 @@ git diff --check
 ```
 
 `pnpm --dir front test:e2e`처럼 환경 의존성이 큰 검증이 실패하거나 실행 불가하면, 실패 원인과 미검증 user flow를 PR 설명과 최종 보고에 명시합니다.
+
+Final actual: `./server/gradlew -p server clean test`, `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, and `git diff --check` passed. `pnpm --dir front test:e2e` was attempted but failed before browser tests because the existing local `readmates_e2e` MySQL schema has Flyway checksum mismatches for migrations 16, 18, 20, and 21. Root-cause analysis confirmed this branch does not change those migration files versus `main`; no destructive DB repair, drop, or reset was performed.
