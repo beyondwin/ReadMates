@@ -52,20 +52,20 @@ If a helper is also used by desktop markup, prefer a small sibling helper module
 
 Before moving code, extend existing tests in `front/tests/unit/host-dashboard.test.tsx` only when the behavior is not already covered. Existing coverage already includes loader behavior, notification privacy, upcoming session actions, mobile ordering, scoped CTAs, and aggregate-action routing.
 
-- [ ] Confirm existing baseline:
+- [x] Confirm existing baseline:
 
 ```bash
 pnpm --dir front test tests/unit/host-dashboard.test.tsx tests/unit/host-dashboard-model.test.ts
 ```
 
-- [ ] Add or verify a test that desktop and mobile upcoming-session controls both:
+- [x] Add or verify a test that desktop and mobile upcoming-session controls both:
   - render encoded edit links,
   - disable visibility/open controls while an upcoming action is pending,
   - show a single blocked-start message when a current session exists.
-- [ ] Add or verify a test that `HostNotificationLedger` never renders a full email address and still links to `/app/host/notifications`.
-- [ ] Add or verify a test that the mobile dashboard order remains:
-  current operation summary, quick actions, upcoming sessions, missing-member alert, publication/feedback status, notification ledger, invite pipeline.
-- [ ] Add or verify a test that disabled `QuickAction` controls keep explanatory status text and do not create a link.
+- [x] Add or verify a test that `HostNotificationLedger` never renders a full email address and still links to `/app/host/notifications`.
+- [x] Add or verify a test that the mobile dashboard order remains:
+  current operation summary, RSVP/progress/publication/feedback status, priority work, upcoming action, preparation docs, operations schedule, member participation, publication/feedback, invite pipeline, then quick actions.
+- [x] Add or verify a test that disabled `QuickAction` controls keep explanatory status text and do not create a link.
 
 Run the targeted suite after each characterization addition:
 
@@ -75,38 +75,39 @@ pnpm --dir front test tests/unit/host-dashboard.test.tsx
 
 ## Implementation Checklist
 
-- [ ] **Phase 1: Baseline and dependency map**
+- [x] **Phase 1: Baseline and dependency map**
   - Run `git status --short --untracked-files=all`.
   - Inspect imports from `host-dashboard.tsx` and note which types/helpers each extraction candidate needs.
   - Confirm no unrelated dirty frontend edits will be overwritten.
 
-- [ ] **Phase 2: Characterization tests first**
+- [x] **Phase 2: Characterization tests first**
   - Add only missing tests from the section above.
   - Watch the new tests fail only if they expose a missing characterization gap; otherwise document that existing tests already cover the behavior.
   - Run the targeted test command.
 
-- [ ] **Phase 3: Extract upcoming-session components**
+- [x] **Phase 3: Extract upcoming-session components**
   - Create `features/host/ui/dashboard/upcoming-session-row.tsx`.
   - Move desktop/mobile upcoming-session rows and local helpers.
   - Keep props explicit: `session`, `actions`, `LinkComponent`, and layout flags.
   - Run `pnpm --dir front test tests/unit/host-dashboard.test.tsx`.
 
-- [ ] **Phase 4: Extract notification and invite sections**
+- [x] **Phase 4: Extract notification and invite sections**
   - Create `host-notification-ledger.tsx` and `invite-pipeline-section.tsx`.
   - Keep `maskEmail` private to the notification module unless another module needs it.
   - Run the targeted host dashboard test suite.
 
-- [ ] **Phase 5: Extract quick actions**
+- [x] **Phase 5: Extract quick actions**
   - Create `quick-action.tsx`.
   - Keep return-state construction injected from `HostDashboard`; extracted UI should not read router state directly.
   - Run the targeted host dashboard test suite.
 
-- [ ] **Phase 6: Extract mobile dashboard shell**
+- [x] **Phase 6: Extract mobile dashboard shell**
   - Create `mobile-host-dashboard.tsx`.
   - Move only the mobile shell and pass already-derived props from `HostDashboard`.
   - Confirm the desktop markup still stays in `host-dashboard.tsx` or is intentionally extracted in a later plan.
+  - 2026-05-06 PR9 completion: `mobile-host-dashboard.tsx` now owns the mobile shell; shared dashboard sections/helpers were moved into sibling dashboard modules and `HostDashboard` keeps route-derived state and desktop composition.
 
-- [ ] **Phase 7: Full verification**
+- [x] **Phase 7: Full verification**
   - Run all commands in the verification section.
   - Inspect the final diff for accidental route/API/model changes.
 

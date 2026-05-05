@@ -56,17 +56,17 @@ Keep shared presentational helpers such as `SectionHeader`, `Icon`, and `KeyValu
 
 Before moving code, extend `front/tests/unit/my-page.test.tsx` only for gaps. Existing coverage already includes editable identity, host/member permission differences, notification preferences, feedback reports, logout, self-leave, empty states, and mobile shell alignment.
 
-- [ ] Confirm existing baseline:
+- [x] Confirm existing baseline:
 
 ```bash
 pnpm --dir front test tests/unit/my-page.test.tsx
 ```
 
-- [ ] Add or verify a test that desktop and mobile profile editors both respect `canEditProfile=false` and do not call the profile update callback.
-- [ ] Add or verify a test that a profile save trims the value, blocks duplicate submits while pending, and preserves the generic local alert for unknown failures.
-- [ ] Add or verify a test that feedback document links are encoded and preserve my-page return state on mobile and desktop.
-- [ ] Add or verify a test that notification preference controls remain visible after save failure and preserve event choices when email delivery is off.
-- [ ] Add or verify a test that self-leave confirmation works from desktop and mobile, including pending/failed states if not already covered.
+- [x] Add or verify a test that desktop and mobile profile editors both respect `canEditProfile=false` and do not call the profile update callback.
+- [x] Add or verify a test that a profile save trims the value, blocks duplicate submits while pending, and preserves the generic local alert for unknown failures.
+- [x] Add or verify a test that feedback document links are encoded and preserve my-page return state on mobile and desktop.
+- [x] Add or verify a test that notification preference controls remain visible after save failure and preserve event choices when email delivery is off.
+- [x] Add or verify a test that self-leave confirmation works from desktop and mobile, including pending/failed states if not already covered.
 
 Run the targeted suite after each characterization addition:
 
@@ -76,38 +76,39 @@ pnpm --dir front test tests/unit/my-page.test.tsx
 
 ## Implementation Checklist
 
-- [ ] **Phase 1: Baseline and dependency map**
+- [x] **Phase 1: Baseline and dependency map**
   - Run `git status --short --untracked-files=all`.
   - Inspect `my-page.tsx` imports and local helper functions.
   - Confirm no unrelated dirty frontend edits will be overwritten.
 
-- [ ] **Phase 2: Characterization tests first**
+- [x] **Phase 2: Characterization tests first**
   - Add only missing tests from the section above.
   - Run `pnpm --dir front test tests/unit/my-page.test.tsx`.
 
-- [ ] **Phase 3: Extract profile editor**
+- [x] **Phase 3: Extract profile editor**
   - Create `features/archive/ui/my-page/profile-name-editor.tsx`.
   - Export a narrow `ProfileNameEditor` component and any required result type from the new module.
   - Keep all save/validation state local to the editor.
   - Run the targeted my-page test suite.
 
-- [ ] **Phase 4: Extract feedback reports**
+- [x] **Phase 4: Extract feedback reports**
   - Create `feedback-reports.tsx`.
   - Move desktop and mobile report lists together so pagination and return-state behavior remain aligned.
   - Run the targeted my-page test suite.
 
-- [ ] **Phase 5: Extract preferences and danger zone**
+- [x] **Phase 5: Extract preferences and danger zone**
   - Create `preferences-section.tsx` and `danger-zone.tsx`.
   - Keep notification preference save callbacks injected from `MyPage`.
   - Keep self-leave behavior injected through `onLeaveMembership`.
   - Run the targeted my-page test suite.
 
-- [ ] **Phase 6: Extract desktop and mobile shells**
+- [x] **Phase 6: Extract desktop and mobile shells**
   - Create `my-desktop.tsx` and `my-mobile.tsx`.
   - Pass derived counts, permissions, report data, and callbacks from `MyPage`.
   - Keep `MyPage` responsible for route-level mutation callbacks and browser redirect side effects that already exist in the component.
+  - 2026-05-06 PR9 completion: `my-desktop.tsx` and `my-mobile.tsx` now own the shell markup; `MyPage` still owns mutation callbacks, redirect side effects, and derived counts. Feedback report links remain inside `feedback-reports.tsx` and construct the existing my-page return state there for both desktop and mobile rows.
 
-- [ ] **Phase 7: Full verification**
+- [x] **Phase 7: Full verification**
   - Run all commands in the verification section.
   - Inspect the final diff for accidental route/API/model changes.
 
