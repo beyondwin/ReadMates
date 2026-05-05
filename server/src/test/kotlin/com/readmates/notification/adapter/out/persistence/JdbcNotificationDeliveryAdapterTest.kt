@@ -251,6 +251,7 @@ class JdbcNotificationDeliveryAdapterTest(
             mailDeliveryPort = mailPort,
             metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
             maxAttempts = 5,
+            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
             deliveryEnabled = true,
         )
 

@@ -52,6 +52,7 @@ readmates:
     sender-email: ${READMATES_NOTIFICATION_SENDER_EMAIL:no-reply@example.com}
     reminder-cron: ${READMATES_NOTIFICATION_REMINDER_CRON:0 0 0 * * *}
     reminder-zone: ${READMATES_NOTIFICATION_REMINDER_ZONE:Asia/Seoul}
+    retry-delay-minutes: ${READMATES_NOTIFICATION_RETRY_DELAY_MINUTES:5,15,60,240}
     worker:
       enabled: ${READMATES_NOTIFICATION_WORKER_ENABLED:false}
       fixed-delay-ms: ${READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS:30000}

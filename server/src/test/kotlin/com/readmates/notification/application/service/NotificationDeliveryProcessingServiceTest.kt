@@ -32,6 +32,7 @@ class NotificationDeliveryProcessingServiceTest {
             mailDeliveryPort = mailPort,
             metrics = ReadmatesOperationalMetrics(registry),
             maxAttempts = 5,
+            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
         service.processClaimed(processingClaimedDelivery())
@@ -49,12 +50,29 @@ class NotificationDeliveryProcessingServiceTest {
             mailDeliveryPort = FailingMailPort("smtp rejected"),
             metrics = ReadmatesOperationalMetrics(registry),
             maxAttempts = 5,
+            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
         service.processClaimed(processingClaimedDelivery(attemptCount = 1))
 
         assertThat(counter(registry, "readmates.notifications.failed")).isEqualTo(1.0)
         assertThat(counter(registry, "readmates.notifications.dead")).isZero()
+    }
+
+    @Test
+    fun `processClaimed uses configured retry delay when marking retryable failure`() {
+        val deliveryPort = ProcessingRecordingDeliveryPort()
+        val service = NotificationDeliveryProcessingService(
+            notificationDeliveryPort = deliveryPort,
+            mailDeliveryPort = FailingMailPort("smtp rejected"),
+            metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+            maxAttempts = 5,
+            retryDelayMinutesConfig = listOf(2L, 4L, 8L),
+        )
+
+        service.processClaimed(processingClaimedDelivery(attemptCount = 1))
+
+        assertThat(deliveryPort.failed.map { it.delayMinutes }).containsExactly(4L)
     }
 
     @Test
@@ -66,6 +84,7 @@ class NotificationDeliveryProcessingServiceTest {
             mailDeliveryPort = FailingMailPort("smtp rejected"),
             metrics = ReadmatesOperationalMetrics(registry),
             maxAttempts = 5,
+            retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
         )
 
         service.processClaimed(processingClaimedDelivery(attemptCount = 4))
@@ -96,7 +115,16 @@ private class ProcessingRecordingMailPort : com.readmates.notification.applicati
     }
 }
 
+private data class ProcessingFailedMark(
+    val id: UUID,
+    val lockedAt: OffsetDateTime,
+    val error: String,
+    val delayMinutes: Long,
+)
+
 private class ProcessingRecordingDeliveryPort : NotificationDeliveryPort {
+    val failed = mutableListOf<ProcessingFailedMark>()
+
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> = error("unused")
 
     override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
@@ -117,7 +145,10 @@ private class ProcessingRecordingDeliveryPort : NotificationDeliveryPort {
         lockedAt: OffsetDateTime,
         error: String,
         nextAttemptDelayMinutes: Long,
-    ): Boolean = true
+    ): Boolean {
+        failed += ProcessingFailedMark(id, lockedAt, error, nextAttemptDelayMinutes)
+        return true
+    }
 
     override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = true
 

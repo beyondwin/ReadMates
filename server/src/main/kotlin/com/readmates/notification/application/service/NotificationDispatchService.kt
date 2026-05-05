@@ -16,7 +16,7 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 private const val MAX_DISPATCH_ERROR_LENGTH = 500
-private val DISPATCH_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
+private val DEFAULT_DISPATCH_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
 
 @Service
 class NotificationDispatchService(
@@ -24,6 +24,8 @@ class NotificationDispatchService(
     private val mailDeliveryPort: MailDeliveryPort,
     private val metrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.kafka.max-delivery-attempts:5}") private val maxAttempts: Int,
+    @param:Value("\${readmates.notifications.retry-delay-minutes:5,15,60,240}")
+    private val retryDelayMinutesConfig: List<Long>,
 ) : DispatchNotificationEventUseCase {
     override fun dispatch(message: NotificationEventMessage) {
         val deliveries = deliveryPort.persistPlannedDeliveries(message)
@@ -116,8 +118,10 @@ class NotificationDispatchService(
         )
     }
 
-    private fun retryDelayMinutes(attemptCount: Int): Long =
-        DISPATCH_RETRY_DELAYS_MINUTES[attemptCount.coerceIn(0, DISPATCH_RETRY_DELAYS_MINUTES.lastIndex)]
+    private fun retryDelayMinutes(attemptCount: Int): Long {
+        val delays = retryDelayMinutesConfig.ifEmpty { DEFAULT_DISPATCH_RETRY_DELAYS_MINUTES }
+        return delays[attemptCount.coerceIn(0, delays.lastIndex)]
+    }
 
     private fun requiredDeliveryField(deliveryId: UUID, name: String, value: String?): String =
         value?.takeIf { it.isNotBlank() }
