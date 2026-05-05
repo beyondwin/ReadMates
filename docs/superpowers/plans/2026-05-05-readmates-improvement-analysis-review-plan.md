@@ -280,7 +280,7 @@ git commit -m "ci: publish tagged server images"
 - Test: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 
-- [ ] **Step 1: 사용처 재확인**
+- [x] **Step 1: 사용처 재확인**
 
 Run:
 
@@ -290,7 +290,7 @@ rg -n '@Entity|JpaRepository|EntityManager|jakarta\.persistence|javax\.persisten
 
 Expected: no output.
 
-- [ ] **Step 2: Gradle dependency 교체**
+- [x] **Step 2: Gradle dependency 교체**
 
 In `server/build.gradle.kts`:
 
@@ -303,7 +303,7 @@ implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 implementation("org.springframework.boot:spring-boot-starter-jdbc")
 ```
 
-- [ ] **Step 3: JPA config 제거**
+- [x] **Step 3: JPA config 제거**
 
 Remove this block from `server/src/main/resources/application.yml`:
 
@@ -314,7 +314,7 @@ jpa:
     ddl-auto: validate
 ```
 
-- [ ] **Step 4: verification**
+- [x] **Step 4: verification**
 
 Run:
 
@@ -338,7 +338,7 @@ Expected: tests pass and no missing `JdbcTemplate` bean failures occur.
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Test: `server/src/test/kotlin/com/readmates/auth/infrastructure/security/*Test.kt`
 
-- [ ] **Step 1: failing ArchUnit rule 추가**
+- [x] **Step 1: failing ArchUnit rule 추가**
 
 Add `org.springframework.security.` to the manual forbidden prefix check:
 
@@ -358,7 +358,7 @@ Run:
 
 Expected: fails on `AuthenticatedMemberResolver -> org.springframework.security.core.Authentication`.
 
-- [ ] **Step 2: resolver API를 email/userId 기반으로 변경**
+- [x] **Step 2: resolver API를 email/userId 기반으로 변경**
 
 Keep the class in application if useful, but remove every Spring Security import. The class should expose domain/application inputs only:
 
@@ -371,7 +371,7 @@ fun resolveProfileByUserId(userId: String): CurrentMember?
 
 The `email` null/blank handling stays in this service or in the caller, but no method accepts `Authentication`.
 
-- [ ] **Step 3: security filters extract email in infrastructure**
+- [x] **Step 3: security filters extract email in infrastructure**
 
 In `MemberAuthoritiesFilter`, keep this logic in infrastructure:
 
@@ -388,7 +388,7 @@ authenticatedMemberResolver.resolveByEmail(email, requestedClubContext.context)
 
 `SessionCookieAuthenticationFilter` already has `userId`; call `resolveByUserId` directly.
 
-- [ ] **Step 4: verification**
+- [x] **Step 4: verification**
 
 Run:
 

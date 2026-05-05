@@ -6,8 +6,6 @@ import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
-import com.readmates.shared.security.emailOrNull
-import org.springframework.security.core.Authentication
 import org.springframework.stereotype.Component
 import java.util.Locale
 import java.util.UUID
@@ -17,22 +15,18 @@ class AuthenticatedMemberResolver(
     private val memberAccountStore: MemberAccountStorePort,
     private val memberProfileStore: MemberProfileStorePort,
 ) {
-    fun resolve(authentication: Authentication?): CurrentMember? {
-        val email = authentication.emailOrNull() ?: return null
-        return memberAccountStore.findActiveMemberByEmail(email)
-    }
-
-    fun resolve(authentication: Authentication?, clubContext: ResolvedClubContext?): CurrentMember? {
-        val email = authentication.emailOrNull() ?: return null
+    fun resolveByEmail(email: String?, clubContext: ResolvedClubContext?): CurrentMember? {
+        val normalizedEmail = email
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.lowercase(Locale.ROOT)
+            ?: return null
         return if (clubContext != null) {
-            memberAccountStore.findMemberByEmailAndClubId(email, clubContext.clubId)
+            memberAccountStore.findMemberByEmailAndClubId(normalizedEmail, clubContext.clubId)
         } else {
-            memberAccountStore.findActiveMemberByEmail(email)
+            memberAccountStore.findActiveMemberByEmail(normalizedEmail)
         }
     }
-
-    fun resolveByUserId(userId: String): CurrentMember? =
-        memberAccountStore.findActiveMemberByUserId(userId)
 
     fun resolveByUserId(userId: String, clubContext: ResolvedClubContext?): CurrentMember? =
         if (clubContext != null) {
