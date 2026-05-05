@@ -294,13 +294,20 @@ class DevLoginControllerTest(
     properties = [
         "readmates.dev.login-enabled=false",
         "spring.flyway.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
     ],
 )
 @AutoConfigureMockMvc
 class DevLoginDisabledControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) {
+    companion object {
+        @JvmStatic
+        @DynamicPropertySource
+        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
+            MySqlTestContainer.registerDatasourceProperties(registry)
+        }
+    }
+
     @Test
     fun `dev login endpoint is unavailable when disabled`() {
         mockMvc.post("/api/dev/login") {
@@ -317,7 +324,6 @@ class DevLoginDisabledControllerTest(
     properties = [
         "readmates.dev.login-enabled=true",
         "spring.flyway.enabled=false",
-        "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
     ],
 )
 @AutoConfigureMockMvc
@@ -325,6 +331,14 @@ class DevLoginDisabledControllerTest(
 class DevLoginProductionProfileControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) {
+    companion object {
+        @JvmStatic
+        @DynamicPropertySource
+        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
+            MySqlTestContainer.registerDatasourceProperties(registry)
+        }
+    }
+
     @Test
     fun `dev login endpoint is unavailable under prod profile`() {
         mockMvc.post("/api/dev/login") {

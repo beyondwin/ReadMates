@@ -15,7 +15,6 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
@@ -33,7 +32,7 @@ private const val PUBLISHING_LEASE_TIMEOUT_MINUTES = 15
 
 @Repository
 class JdbcNotificationEventOutboxAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
     private val objectMapper: ObjectMapper,
     @param:Value("\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}") private val eventsTopic: String,
 ) : NotificationEventOutboxPort {
@@ -48,7 +47,7 @@ class JdbcNotificationEventOutboxAdapter(
         dedupeKey: String,
     ): Boolean =
         try {
-            jdbcTemplate().update(
+            jdbcTemplate.update(
                 """
                 insert into notification_event_outbox (
                   id,
@@ -80,7 +79,7 @@ class JdbcNotificationEventOutboxAdapter(
 
     @Transactional
     override fun enqueueSessionReminderDue(targetDate: LocalDate): Int =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert ignore into notification_event_outbox (
               id,
@@ -127,7 +126,6 @@ class JdbcNotificationEventOutboxAdapter(
             return emptyList()
         }
 
-        val jdbcTemplate = jdbcTemplate()
         resetStalePublishingRows(jdbcTemplate)
         val ids = jdbcTemplate.query(
             """
@@ -175,7 +173,7 @@ class JdbcNotificationEventOutboxAdapter(
     }
 
     override fun markPublished(id: UUID, lockedAt: OffsetDateTime): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update notification_event_outbox
             set status = 'PUBLISHED',
@@ -197,7 +195,7 @@ class JdbcNotificationEventOutboxAdapter(
         error: String,
         nextAttemptDelayMinutes: Long,
     ): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update notification_event_outbox
             set status = 'FAILED',
@@ -217,7 +215,7 @@ class JdbcNotificationEventOutboxAdapter(
         ) > 0
 
     override fun markPublishDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update notification_event_outbox
             set status = 'DEAD',
@@ -236,7 +234,7 @@ class JdbcNotificationEventOutboxAdapter(
         ) > 0
 
     override fun loadMessage(eventId: UUID): NotificationEventMessage? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select notification_event_outbox.id,
                    notification_event_outbox.club_id,
@@ -284,7 +282,7 @@ class JdbcNotificationEventOutboxAdapter(
             args += cursor.id
         }
         args += pageRequest.limit + 1
-        val rows = jdbcTemplate().query(
+        val rows = jdbcTemplate.query(
             """
             select id, event_type, status, attempt_count, created_at, updated_at
             from notification_event_outbox
@@ -358,9 +356,6 @@ class JdbcNotificationEventOutboxAdapter(
         )
     }
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw IllegalStateException("Notification event outbox storage is unavailable")
 }
 
 private fun notificationEventUpdatedAtDescCursor(updatedAt: OffsetDateTime, createdAt: OffsetDateTime, id: String): String? =

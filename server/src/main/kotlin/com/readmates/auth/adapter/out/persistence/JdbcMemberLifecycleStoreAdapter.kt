@@ -13,7 +13,6 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -23,11 +22,11 @@ import java.util.UUID
 
 @Repository
 class JdbcMemberLifecycleStoreAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : MemberLifecycleStorePort {
     override fun listMembers(clubId: UUID, pageRequest: PageRequest): CursorPage<HostMemberListRow> {
         val cursor = HostMemberCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate().query(
+        val rows = jdbcTemplate.query(
             """
             select
               membership_id,
@@ -122,7 +121,7 @@ class JdbcMemberLifecycleStoreAdapter(
     }
 
     override fun suspendActiveMember(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set status = 'SUSPENDED',
@@ -137,7 +136,7 @@ class JdbcMemberLifecycleStoreAdapter(
         ) == 1
 
     override fun restoreSuspendedMember(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set status = 'ACTIVE',
@@ -153,7 +152,7 @@ class JdbcMemberLifecycleStoreAdapter(
         ) == 1
 
     override fun markMemberLeftByHost(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set status = 'LEFT',
@@ -168,7 +167,7 @@ class JdbcMemberLifecycleStoreAdapter(
         ) == 1
 
     override fun markMembershipLeft(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set status = 'LEFT',
@@ -182,7 +181,7 @@ class JdbcMemberLifecycleStoreAdapter(
         ) == 1
 
     override fun findCurrentOpenSessionId(clubId: UUID): UUID? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select id
             from sessions
@@ -196,7 +195,7 @@ class JdbcMemberLifecycleStoreAdapter(
         ).firstOrNull()
 
     override fun addToCurrentSession(clubId: UUID, sessionId: UUID, membershipId: UUID) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into session_participants (
               id,
@@ -220,7 +219,7 @@ class JdbcMemberLifecycleStoreAdapter(
     }
 
     override fun markRemovedFromCurrentSession(clubId: UUID, sessionId: UUID, membershipId: UUID) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into session_participants (
               id,
@@ -244,7 +243,7 @@ class JdbcMemberLifecycleStoreAdapter(
     }
 
     override fun findMembershipInClubForUpdate(clubId: UUID, membershipId: UUID): LifecycleMembershipRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -268,7 +267,7 @@ class JdbcMemberLifecycleStoreAdapter(
         ).firstOrNull()
 
     override fun lockActiveHostRows(clubId: UUID) {
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select id
             from memberships
@@ -284,7 +283,7 @@ class JdbcMemberLifecycleStoreAdapter(
     }
 
     override fun activeHostCount(clubId: UUID): Int =
-        jdbcTemplate().queryForObject(
+        jdbcTemplate.queryForObject(
             """
             select count(*)
             from memberships
@@ -297,7 +296,7 @@ class JdbcMemberLifecycleStoreAdapter(
         ) ?: 0
 
     override fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -368,12 +367,6 @@ class JdbcMemberLifecycleStoreAdapter(
         )
     }
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw ResponseStatusException(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "Member lifecycle storage is unavailable",
-            )
 }
 
 private fun hostMemberCursor(row: HostMemberListRow): String? =

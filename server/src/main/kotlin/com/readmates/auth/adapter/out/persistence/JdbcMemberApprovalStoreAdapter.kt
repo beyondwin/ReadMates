@@ -10,7 +10,6 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -21,11 +20,11 @@ import java.util.UUID
 
 @Repository
 class JdbcMemberApprovalStoreAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : MemberApprovalStorePort {
     override fun listPendingViewers(clubId: UUID, pageRequest: PageRequest): CursorPage<ViewerMemberRow> {
         val cursor = MemberApprovalCreatedAtDescCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate().query(
+        val rows = jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -63,7 +62,7 @@ class JdbcMemberApprovalStoreAdapter(
     }
 
     override fun activateViewer(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set status = 'ACTIVE',
@@ -79,7 +78,7 @@ class JdbcMemberApprovalStoreAdapter(
         ) == 1
 
     override fun deactivateViewer(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set status = 'INACTIVE',
@@ -94,7 +93,7 @@ class JdbcMemberApprovalStoreAdapter(
         ) == 1
 
     override fun addToCurrentOpenSession(clubId: UUID, membershipId: UUID) {
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             insert into session_participants (
               id,
@@ -124,7 +123,7 @@ class JdbcMemberApprovalStoreAdapter(
     }
 
     override fun findMemberForHost(clubId: UUID, membershipId: UUID): ViewerMemberRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -158,12 +157,6 @@ class JdbcMemberApprovalStoreAdapter(
             createdAt = resultSet.utcOffsetDateTime("created_at"),
         )
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw ResponseStatusException(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "Member approval storage is unavailable",
-            )
 }
 
 private fun memberApprovalCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =

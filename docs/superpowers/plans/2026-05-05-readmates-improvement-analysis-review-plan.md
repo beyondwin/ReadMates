@@ -414,7 +414,7 @@ Expected: ArchUnit passes and auth/session filter behavior remains unchanged.
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcClubContextAdapter.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 
-- [ ] **Step 1: inventory 작성**
+- [x] **Step 1: inventory 작성**
 
 Run:
 
@@ -424,7 +424,7 @@ rg -n 'ObjectProvider<JdbcTemplate>|jdbcTemplateProvider|ifAvailable \?: return'
 
 Expected: list all DB adapters that still need conversion. Split work into 3-5 file batches.
 
-- [ ] **Step 2: first batch failing guard 추가**
+- [x] **Step 2: first batch failing guard 추가**
 
 Add an ArchUnit or focused source scan test that forbids `ObjectProvider<JdbcTemplate>` under `..adapter.out.persistence..`:
 
@@ -439,7 +439,7 @@ noClasses()
 
 If this is too broad because non-JDBC providers exist in persistence adapters, use a source-level test that scans Kotlin source for `ObjectProvider<JdbcTemplate>`.
 
-- [ ] **Step 3: direct injection conversion pattern**
+- [x] **Step 3: direct injection conversion pattern**
 
 Change:
 
@@ -463,7 +463,7 @@ class JdbcNotesFeedAdapter(
 
 Do not change SQL semantics in this task.
 
-- [ ] **Step 4: focused verification per batch**
+- [x] **Step 4: focused verification per batch**
 
 Run at minimum:
 

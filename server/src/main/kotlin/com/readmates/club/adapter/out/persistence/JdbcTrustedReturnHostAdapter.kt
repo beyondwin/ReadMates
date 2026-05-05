@@ -1,16 +1,14 @@
 package com.readmates.club.adapter.out.persistence
 
 import com.readmates.auth.application.port.out.TrustedReturnHostPort
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 
 @Repository
 class JdbcTrustedReturnHostAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : TrustedReturnHostPort {
     override fun activeClubSlugForHost(host: String): String? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select clubs.slug

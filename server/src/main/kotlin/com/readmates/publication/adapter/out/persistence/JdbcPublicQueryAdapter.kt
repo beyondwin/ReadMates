@@ -10,7 +10,6 @@ import com.readmates.publication.application.model.PublicSessionSummaryResult
 import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import java.time.LocalDate
@@ -18,13 +17,12 @@ import java.util.UUID
 
 @Component
 class JdbcPublicQueryAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : LoadPublishedPublicDataPort {
     override fun loadClub(): PublicClubResult? =
         loadClub(LEGACY_PUBLIC_CLUB_SLUG)
 
     override fun loadClub(clubSlug: String): PublicClubResult? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
 
         return jdbcTemplate.query(
             """
@@ -51,7 +49,6 @@ class JdbcPublicQueryAdapter(
         loadSession(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
 
     override fun loadSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
 
         return jdbcTemplate.query(
             """

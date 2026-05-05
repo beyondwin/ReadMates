@@ -10,7 +10,6 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -21,11 +20,11 @@ import java.util.UUID
 
 @Repository
 class JdbcMemberProfileStoreAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : MemberProfileStorePort {
     override fun findProfileMemberByEmail(email: String): MemberProfileRow? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
-        return jdbcTemplate().query(
+        return jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -52,7 +51,7 @@ class JdbcMemberProfileStoreAdapter(
     }
 
     override fun findProfileMemberByUserId(userId: UUID): MemberProfileRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -78,7 +77,7 @@ class JdbcMemberProfileStoreAdapter(
         ).firstOrNull()
 
     override fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID): MemberProfileRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -105,7 +104,7 @@ class JdbcMemberProfileStoreAdapter(
         ).firstOrNull()
 
     override fun lockClubProfileNames(clubId: UUID): Boolean =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select clubs.id
             from clubs
@@ -117,7 +116,7 @@ class JdbcMemberProfileStoreAdapter(
         ).firstOrNull() == true
 
     override fun displayNameExistsInClub(clubId: UUID, displayName: String, excludingMembershipId: UUID): Boolean =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select memberships.id
             from memberships
@@ -135,7 +134,7 @@ class JdbcMemberProfileStoreAdapter(
         ).firstOrNull() == true
 
     override fun updateOwnDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set memberships.short_name = ?,
@@ -150,7 +149,7 @@ class JdbcMemberProfileStoreAdapter(
         ) == 1
 
     override fun updateDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean =
-        jdbcTemplate().update(
+        jdbcTemplate.update(
             """
             update memberships
             set memberships.short_name = ?,
@@ -165,7 +164,7 @@ class JdbcMemberProfileStoreAdapter(
         ) == 1
 
     override fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow? =
-        jdbcTemplate().query(
+        jdbcTemplate.query(
             """
             select
               memberships.id as membership_id,
@@ -237,10 +236,4 @@ class JdbcMemberProfileStoreAdapter(
         )
     }
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateProvider.ifAvailable
-            ?: throw ResponseStatusException(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "Member profile storage is unavailable",
-            )
 }

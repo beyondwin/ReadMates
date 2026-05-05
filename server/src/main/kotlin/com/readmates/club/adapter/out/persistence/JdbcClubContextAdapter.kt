@@ -4,17 +4,15 @@ import com.readmates.club.application.model.ClubSlug
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.out.LoadClubContextPort
 import com.readmates.shared.db.uuid
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
 
 @Repository
 class JdbcClubContextAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : LoadClubContextPort {
     override fun loadBySlug(slug: ClubSlug): ResolvedClubContext? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select
@@ -34,7 +32,6 @@ class JdbcClubContextAdapter(
     }
 
     override fun loadByHostname(hostname: String): ResolvedClubContext? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return jdbcTemplate.query(
             """
             select

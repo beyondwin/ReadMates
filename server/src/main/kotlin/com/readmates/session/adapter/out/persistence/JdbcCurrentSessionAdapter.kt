@@ -17,7 +17,6 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.sql.ResultSet
@@ -27,10 +26,9 @@ import java.util.UUID
 
 @Repository
 class JdbcCurrentSessionAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : LoadCurrentSessionPort {
     override fun loadCurrentSession(member: CurrentMember): CurrentSessionPayload {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return CurrentSessionPayload(null)
         val session = jdbcTemplate.query(
             """
             select
@@ -65,7 +63,6 @@ class JdbcCurrentSessionAdapter(
     }
 
     fun findOpenSessionId(clubId: UUID): UUID {
-        val jdbcTemplate = jdbcTemplate()
         return jdbcTemplate.query(
             """
             select id
@@ -403,6 +400,4 @@ class JdbcCurrentSessionAdapter(
         )
     }
 
-    private fun jdbcTemplate(): JdbcTemplate =
-        jdbcTemplateOrThrow(jdbcTemplateProvider)
 }

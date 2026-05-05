@@ -9,14 +9,13 @@ import com.readmates.archive.application.port.out.LoadArchiveDataPort
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
-import org.springframework.beans.factory.ObjectProvider
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @Repository
 class JdbcArchiveQueryAdapter(
-    private val jdbcTemplateProvider: ObjectProvider<JdbcTemplate>,
+    private val jdbcTemplate: JdbcTemplate,
 ) : LoadArchiveDataPort {
     private val detailQueries = ArchiveDetailQueries()
     private val listQueries = ArchiveListQueries()
@@ -25,7 +24,6 @@ class JdbcArchiveQueryAdapter(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ): CursorPage<ArchiveSessionResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return CursorPage(emptyList(), null)
         return listQueries.loadArchiveSessions(jdbcTemplate, currentMember, pageRequest)
     }
 
@@ -33,7 +31,6 @@ class JdbcArchiveQueryAdapter(
         currentMember: CurrentMember,
         sessionId: UUID,
     ): MemberArchiveSessionDetailResult? {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return null
         return detailQueries.loadArchiveSessionDetail(jdbcTemplate, currentMember, sessionId)
     }
 
@@ -41,7 +38,6 @@ class JdbcArchiveQueryAdapter(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ): CursorPage<MyArchiveQuestionResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return CursorPage(emptyList(), null)
         return listQueries.loadMyQuestions(jdbcTemplate, currentMember, pageRequest)
     }
 
@@ -49,12 +45,10 @@ class JdbcArchiveQueryAdapter(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
     ): CursorPage<MyArchiveReviewResult> {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return CursorPage(emptyList(), null)
         return listQueries.loadMyReviews(jdbcTemplate, currentMember, pageRequest)
     }
 
     override fun loadMyPage(currentMember: CurrentMember): MyPageResult {
-        val jdbcTemplate = jdbcTemplateProvider.ifAvailable ?: return listQueries.defaultMyPageResult(currentMember)
         return listQueries.loadMyPage(jdbcTemplate, currentMember)
     }
 }
