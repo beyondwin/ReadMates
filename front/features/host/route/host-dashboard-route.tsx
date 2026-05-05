@@ -1,19 +1,8 @@
 import { useLoaderData, useRevalidator } from "react-router-dom";
 import HostDashboard, { type HostDashboardLinkComponent } from "@/features/host/ui/host-dashboard";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { hostDashboardActions, type HostDashboardRouteData } from "./host-dashboard-data";
-
-type ReadmatesReturnState = {
-  readmatesReturnTo: string;
-  readmatesReturnLabel: string;
-  readmatesReturnState?: ReadmatesReturnState;
-};
-
-type ReadmatesReturnTarget = {
-  href: string;
-  label: string;
-  state?: ReadmatesReturnState;
-};
 
 export function HostDashboardRoute({
   auth,

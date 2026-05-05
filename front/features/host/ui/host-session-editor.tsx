@@ -35,6 +35,8 @@ import {
 } from "@/features/host/model/host-session-editor-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { SessionIdentity } from "@/shared/ui/session-identity";
+import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/routing/readmates-route-state";
+import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { HostSessionAttendanceEditor } from "./host-session-attendance-editor";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
@@ -135,21 +137,9 @@ type AttendanceWriteState = {
 
 type JsonResponse<T> = Response & { json(): Promise<T> };
 
-type ReadmatesReturnState = {
-  readmatesReturnTo: string;
-  readmatesReturnLabel: string;
-  readmatesReturnState?: ReadmatesReturnState;
-};
-
-type ReadmatesReturnTarget = {
-  href: string;
-  label: string;
-  state?: ReadmatesReturnState;
-};
-
 type HostSessionEditorLinkProps = {
   to: string;
-  state?: unknown;
+  state?: ReadmatesReturnState;
   className?: string;
   children: ReactNode;
   style?: CSSProperties;
@@ -201,19 +191,6 @@ function DefaultLinkComponent(props: HostSessionEditorLinkProps) {
       {children}
     </a>
   );
-}
-
-function defaultReadmatesReturnState(target: ReadmatesReturnTarget) {
-  const state: ReadmatesReturnState = {
-    readmatesReturnTo: target.href,
-    readmatesReturnLabel: target.label,
-  };
-
-  if (target.state) {
-    state.readmatesReturnState = target.state;
-  }
-
-  return state;
 }
 
 export default function HostSessionEditor({

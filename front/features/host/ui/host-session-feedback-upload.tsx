@@ -1,21 +1,16 @@
 "use client";
 
 import type { ChangeEventHandler, ComponentType, ReactNode, RefObject } from "react";
+import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 
 type FeedbackDocumentUploadStatus = {
   uploaded: boolean;
   fileName: string | null;
 };
 
-type ReadmatesReturnState = {
-  readmatesReturnTo: string;
-  readmatesReturnLabel: string;
-  readmatesReturnState?: ReadmatesReturnState;
-};
-
 type FeedbackUploadLinkProps = {
   to: string;
-  state?: unknown;
+  state?: ReadmatesReturnState;
   className?: string;
   children: ReactNode;
 };
