@@ -26,6 +26,7 @@
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/deploy-front.yml`
+- `.github/workflows/deploy-server.yml`
 - `.github/CODEOWNERS`, 파일이 있을 때만 포함
 - `.gitignore`
 - `.gitleaks.toml`, 파일이 있을 때만 포함

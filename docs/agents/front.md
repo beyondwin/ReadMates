@@ -35,6 +35,10 @@ src/app -> src/pages -> features -> shared
 
 Do not add new imports from removed `shared/api/readmates`. Use feature-owned API modules or `shared/api` primitives.
 
+Do not add Next/React Server Component directives such as `"use client"` to Vite source files.
+
+When validating club slugs in browser proxy or Pages Functions code, reuse `front/shared/security/club-slug.ts` so local Vite and Cloudflare behavior stay aligned.
+
 When touching a migrated feature, prefer `api`, `model`, `route`, `ui` placement over adding to legacy `components`. If a feature has `ui`, that directory is the public presentation surface; do not expose `components` as a new public import surface.
 
 Read another guide when the frontend task crosses surfaces:

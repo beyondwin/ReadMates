@@ -97,7 +97,7 @@ pnpm --dir front test:e2e -- member-profile-permissions
 ./server/gradlew -p server clean test
 ```
 
-Backend test suite에는 MySQL 기반 repository/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
+Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
 Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, `./server/gradlew -p server clean test`를 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
 
@@ -126,7 +126,7 @@ Redis-backed 기능은 Redis가 꺼진 기본 상태와 Redis가 켜진 adapter 
 pnpm --dir front test:e2e
 ```
 
-Targeted Redis adapter test는 Testcontainers Redis를 직접 띄우므로 수동 Redis server가 필요하지 않습니다. Rate limit, auth session cache, public cache, notes cache, read-cache invalidation을 바꾸면 관련 `Redis*AdapterTest`, application cache test, `ServerArchitectureBoundaryTest`를 함께 확인합니다.
+Targeted Redis adapter test는 Testcontainers Redis를 직접 띄우므로 수동 Redis server가 필요하지 않습니다. Testcontainers가 로컬 `localhost`를 반환하면 test helper는 Redis URL host를 `127.0.0.1`로 정규화해 IPv6 localhost에서 다른 로컬 서비스와 port가 겹치는 flake를 피합니다. Rate limit, auth session cache, public cache, notes cache, read-cache invalidation을 바꾸면 관련 `Redis*AdapterTest`, application cache test, `ServerArchitectureBoundaryTest`를 함께 확인합니다.
 
 Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인하고, 전환된 application package가 adapter, Spring JDBC, Spring DAO, Spring Web/HTTP 세부사항에 의존하지 않는지 확인합니다. Application service에서 `ResponseStatusException`, `HttpStatus`, Spring Web type을 쓰지 말고 feature application error를 `adapter.in.web`에서 HTTP response로 매핑합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
 

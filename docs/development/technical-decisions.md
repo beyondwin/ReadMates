@@ -83,7 +83,7 @@
 
 ## 알림은 transactional outbox와 Kafka relay/consumer로 처리한다
 
-**결정:** 알림 이벤트는 먼저 MySQL `notification_event_outbox`에 저장하고, relay scheduler가 Kafka topic으로 발행합니다. Kafka consumer는 수신자와 선호도를 계산해 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 copy는 application model의 순수 템플릿 helper가 subject/plain/HTML을 함께 렌더링하고, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 보냅니다.
+**결정:** 알림 이벤트는 먼저 MySQL `notification_event_outbox`에 저장하고, relay scheduler가 Kafka topic으로 발행합니다. Kafka consumer는 수신자와 선호도를 계산해 `notification_deliveries`와 `member_notifications`를 만듭니다. 이메일 발송은 `NotificationDeliveryEngine`이 공통으로 처리해 dispatch path와 pending-delivery worker path가 같은 retry/dead 전환, redacted error 저장, metrics/logging을 사용합니다. 이메일 copy는 application model의 순수 템플릿 helper가 subject/plain/HTML을 함께 렌더링하고, SMTP adapter는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 보냅니다.
 
 **이유:** 세션 발행, 피드백 문서 공개, 서평 공개 같은 domain mutation과 알림 생성 시점을 분리하되, 이벤트 발생 사실은 MySQL transaction 안에 남기기 위해서입니다. 이메일 발송은 retryable side effect로 `notification_deliveries`에 남기고, in-app 알림은 `member_notifications`를 source of truth로 사용합니다. Plain/HTML copy를 같은 helper에서 만들면 in-app deep link, 이메일 CTA, 테스트 메일, host ledger privacy 경계가 서로 드리프트하지 않습니다.
 
@@ -103,7 +103,7 @@
 
 ## 서버는 feature 단위 clean architecture로 점진 전환한다
 
-**결정:** 전환된 서버 API surface는 `adapter.in.web -> application.port.in -> application.service -> application.port.out -> adapter.out.persistence` 방향을 따릅니다.
+**결정:** 전환된 서버 API surface는 `adapter.in.web -> application.port.in -> application.service -> application.port.out -> adapter.out.persistence` 방향을 따릅니다. 현재 backend는 JDBC/Flyway 중심이며 JPA starter나 Hibernate runtime을 사용하지 않습니다.
 
 **이유:** Spring controller가 persistence detail이나 `JdbcTemplate`에 직접 묶이면 권한 검증, transaction orchestration, retryable side effect 처리가 route별로 흩어집니다. Inbound/outbound port를 두면 web, scheduler, Kafka adapter가 같은 application service를 호출할 수 있습니다.
 
