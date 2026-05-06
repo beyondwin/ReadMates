@@ -283,7 +283,7 @@ git commit -m "feat: add shared api error response"
 - Create: `server/src/test/kotlin/com/readmates/session/api/SessionApplicationErrorHandlerTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/auth/api/InvitationErrorHandlerTest.kt`
 
-- [ ] **Step 1: Write failing feature error-handler tests**
+- [x] **Step 1: Write failing feature error-handler tests**
 
 Create `server/src/test/kotlin/com/readmates/archive/api/ArchiveErrorHandlerTest.kt`:
 
@@ -413,7 +413,7 @@ class InvitationErrorHandlerTest {
 }
 ```
 
-- [ ] **Step 2: Run feature error-handler tests and verify they fail**
+- [x] **Step 2: Run feature error-handler tests and verify they fail**
 
 Run:
 
@@ -426,7 +426,7 @@ Run:
 
 Expected: FAIL because handlers still return `ResponseEntity<Void>` or feature-specific response types.
 
-- [ ] **Step 3: Update archive and session handlers to return shared bodies**
+- [x] **Step 3: Update archive and session handlers to return shared bodies**
 
 Modify `server/src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveErrorHandler.kt`:
 
@@ -540,7 +540,7 @@ class SessionApplicationErrorHandler {
 }
 ```
 
-- [ ] **Step 4: Update auth handlers to return shared bodies**
+- [x] **Step 4: Update auth handlers to return shared bodies**
 
 Modify `server/src/main/kotlin/com/readmates/auth/adapter/in/web/InvitationErrorHandler.kt`:
 
@@ -639,7 +639,7 @@ import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 ```
 
-- [ ] **Step 5: Run feature error-handler tests and verify they pass**
+- [x] **Step 5: Run feature error-handler tests and verify they pass**
 
 Run:
 
@@ -652,7 +652,7 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 6: Run targeted existing server controller tests**
+- [x] **Step 6: Run targeted existing server controller tests**
 
 Run:
 
@@ -665,7 +665,7 @@ Run:
 
 Expected: PASS. If a test asserts an empty body, update that assertion to the new `{ code, message, status }` body.
 
-- [ ] **Step 7: Commit server feature error bodies**
+- [x] **Step 7: Commit server feature error bodies**
 
 Run:
 
