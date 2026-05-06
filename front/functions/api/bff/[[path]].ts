@@ -5,6 +5,7 @@ import {
   copyUpstreamHeaders,
   normalizedHostFromRequest,
 } from "../../_shared/proxy";
+import { bffErrorResponse } from "../../_shared/errors";
 import { normalizedClubSlug } from "../../../shared/security/club-slug";
 
 type Env = {
@@ -94,22 +95,22 @@ function normalizedClubSlugFromRequest(request: Request) {
 export const onRequest: PagesFunction<Env> = async (context) => {
   const upstreamPath = buildApiUpstreamPath(pathSegments(context.params.path));
   if (!upstreamPath) {
-    return new Response(null, { status: 404 });
+    return bffErrorResponse(404, "RESOURCE_NOT_FOUND");
   }
 
   const upstreamUrl = new URL(upstreamPath, apiBaseUrlFromEnv(context.env));
   if (upstreamUrl.pathname !== "/api" && !upstreamUrl.pathname.startsWith("/api/")) {
-    return new Response(null, { status: 404 });
+    return bffErrorResponse(404, "RESOURCE_NOT_FOUND");
   }
 
   if (!isSameOriginMutation(context.request)) {
-    return new Response(null, { status: 403 });
+    return bffErrorResponse(403, "PERMISSION_DENIED");
   }
 
   const requestUrl = new URL(context.request.url);
   const clubSlug = normalizedClubSlugFromRequest(context.request);
   if (clubSlug === "") {
-    return new Response(null, { status: 400 });
+    return bffErrorResponse(400, "INVALID_REQUEST");
   }
 
   upstreamUrl.search = requestUrl.search;

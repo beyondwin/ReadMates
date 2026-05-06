@@ -690,7 +690,7 @@ git commit -m "feat: return structured server api errors"
 - Modify: `front/tests/unit/cloudflare-bff.test.ts`
 - Modify: `front/tests/unit/cloudflare-oauth-proxy.test.ts`
 
-- [ ] **Step 1: Write failing BFF JSON error tests**
+- [x] **Step 1: Write failing BFF JSON error tests**
 
 Add this helper to `front/tests/unit/cloudflare-bff.test.ts`:
 
@@ -730,7 +730,7 @@ await expect(response.json()).resolves.toMatchObject({
 });
 ```
 
-- [ ] **Step 2: Run BFF tests and verify they fail**
+- [x] **Step 2: Run BFF tests and verify they fail**
 
 Run:
 
@@ -740,7 +740,7 @@ pnpm --dir front test -- cloudflare-bff.test.ts cloudflare-oauth-proxy.test.ts
 
 Expected: FAIL because the BFF returns empty bodies for originated 400/403/404 responses.
 
-- [ ] **Step 3: Implement the BFF error helper**
+- [x] **Step 3: Implement the BFF error helper**
 
 Create `front/functions/_shared/errors.ts`:
 
@@ -773,7 +773,7 @@ export function bffErrorResponse(status: number, code: string, message = default
 }
 ```
 
-- [ ] **Step 4: Use the helper in Pages Functions**
+- [x] **Step 4: Use the helper in Pages Functions**
 
 Modify `front/functions/api/bff/[[path]].ts` imports:
 
@@ -819,7 +819,7 @@ Replace unsupported registration/callback responses:
 return bffErrorResponse(404, "RESOURCE_NOT_FOUND");
 ```
 
-- [ ] **Step 5: Run BFF tests and verify they pass**
+- [x] **Step 5: Run BFF tests and verify they pass**
 
 Run:
 
@@ -829,7 +829,7 @@ pnpm --dir front test -- cloudflare-bff.test.ts cloudflare-oauth-proxy.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit BFF error contract**
+- [x] **Step 6: Commit BFF error contract**
 
 Run:
 
