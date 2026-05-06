@@ -21,8 +21,3 @@ data class MemberProfileResponse(
         )
     }
 }
-
-data class MemberProfileErrorResponse(
-    val code: String,
-    val message: String,
-)

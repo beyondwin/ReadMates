@@ -1,4 +1,5 @@
 import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { PublicClubResponse, PublicSessionDetailResponse } from "@/features/public/api/public-contracts";
 
 export function fetchPublicClub(clubSlug: string) {
@@ -15,7 +16,7 @@ export async function fetchPublicSession(clubSlug: string, sessionId: string) {
   }
 
   if (!response.ok) {
-    throw new Error(`ReadMates public session fetch failed: ${sessionId} (${response.status})`);
+    throw await apiErrorFromResponse(response);
   }
 
   return response.json() as Promise<PublicSessionDetailResponse>;

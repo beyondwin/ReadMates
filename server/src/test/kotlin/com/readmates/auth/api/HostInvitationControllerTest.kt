@@ -81,6 +81,7 @@ class HostInvitationControllerTest(
             .andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_INVITATION_EMAIL") }
+                jsonPath("$.status") { value(400) }
             }
 
         val count = jdbcTemplate.queryForObject(
@@ -102,6 +103,7 @@ class HostInvitationControllerTest(
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_INVITATION_EMAIL") }
                 jsonPath("$.message") { value("Invalid invitation email") }
+                jsonPath("$.status") { value(400) }
             }
     }
 

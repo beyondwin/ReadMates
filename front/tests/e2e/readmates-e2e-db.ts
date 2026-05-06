@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
+import { resolveE2eDatabaseName } from "./readmates-e2e-config";
 
 const clubId = "00000000-0000-0000-0000-000000000001";
 const secondClubId = "00000000-0000-0000-0000-000000000002";
@@ -39,7 +40,7 @@ export function runMysql(sql: string) {
       process.env.READMATES_E2E_DB_PORT ?? "3306",
       "-u",
       process.env.READMATES_E2E_DB_USER ?? "readmates",
-      process.env.READMATES_E2E_DB_NAME ?? "readmates_e2e",
+      resolveE2eDatabaseName(),
       "--batch",
       "--raw",
       "--execute",

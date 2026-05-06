@@ -575,7 +575,7 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader()).rejects.toThrow("ReadMates API failed: 403");
+    await expect(hostDashboardLoader()).rejects.toThrow("이 작업을 수행할 권한이 없습니다.");
   });
 
   it("renders notification status without full recipient email addresses", () => {

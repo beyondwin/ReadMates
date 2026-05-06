@@ -5,6 +5,8 @@ import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.service.MemberProfileError
 import com.readmates.auth.application.service.MemberProfileException
+import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
+import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import com.readmates.shared.security.emailOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -47,15 +49,12 @@ class MemberProfileController(
     )
 
     @ExceptionHandler(MemberProfileException::class)
-    fun handleMemberProfileException(exception: MemberProfileException): ResponseEntity<MemberProfileErrorResponse> =
-        ResponseEntity
-            .status(exception.error.httpStatus())
-            .body(
-                MemberProfileErrorResponse(
-                    code = exception.error.code,
-                    message = exception.error.responseMessage(),
-                ),
-            )
+    fun handleMemberProfileException(exception: MemberProfileException): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = exception.error.httpStatus(),
+            code = exception.error.code,
+            message = exception.error.responseMessage(),
+        )
 
     private fun MemberProfileUpdateRequest.toCommand(): UpdateMemberProfileCommand =
         UpdateMemberProfileCommand(displayName = displayName)

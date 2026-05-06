@@ -21,6 +21,15 @@ function context(
   } as Parameters<typeof onRequest>[0];
 }
 
+async function expectApiErrorBody(response: Response, expected: { status: number; code: string }) {
+  expect(response.status).toBe(expected.status);
+  expect(response.headers.get("content-type")).toContain("application/json");
+  await expect(response.json()).resolves.toMatchObject({
+    code: expected.code,
+    status: expected.status,
+  });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -192,7 +201,7 @@ describe("Cloudflare BFF function", () => {
       ),
     );
 
-    expect(response.status).toBe(400);
+    await expectApiErrorBody(response, { status: 400, code: "INVALID_REQUEST" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -329,7 +338,7 @@ describe("Cloudflare BFF function", () => {
       }),
     );
 
-    expect(response.status).toBe(404);
+    await expectApiErrorBody(response, { status: 404, code: "RESOURCE_NOT_FOUND" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -346,7 +355,7 @@ describe("Cloudflare BFF function", () => {
       ),
     );
 
-    expect(response.status).toBe(404);
+    await expectApiErrorBody(response, { status: 404, code: "RESOURCE_NOT_FOUND" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -364,7 +373,7 @@ describe("Cloudflare BFF function", () => {
       context(new Request(`https://readmates.pages.dev/api/bff/${path.join("/")}`), { path }),
     );
 
-    expect(response.status).toBe(404);
+    await expectApiErrorBody(response, { status: 404, code: "RESOURCE_NOT_FOUND" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -384,7 +393,7 @@ describe("Cloudflare BFF function", () => {
       ),
     );
 
-    expect(response.status).toBe(403);
+    await expectApiErrorBody(response, { status: 403, code: "PERMISSION_DENIED" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -401,7 +410,7 @@ describe("Cloudflare BFF function", () => {
       ),
     );
 
-    expect(response.status).toBe(403);
+    await expectApiErrorBody(response, { status: 403, code: "PERMISSION_DENIED" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

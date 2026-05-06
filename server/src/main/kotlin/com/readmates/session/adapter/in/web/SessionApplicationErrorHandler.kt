@@ -11,6 +11,8 @@ import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidQuestionSetException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
+import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
+import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -26,21 +28,33 @@ class SessionApplicationErrorHandler {
         HostSessionCloseNotAllowedException::class,
         HostSessionPublishNotAllowedException::class,
     )
-    fun handleConflict(): ResponseEntity<Void> =
-        ResponseEntity.status(HttpStatus.CONFLICT).build()
+    fun handleConflict(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "CONFLICT",
+            message = "요청한 작업이 현재 세션 상태와 충돌합니다.",
+        )
 
     @ExceptionHandler(
         HostSessionNotFoundException::class,
         HostSessionParticipantNotFoundException::class,
     )
-    fun handleNotFound(): ResponseEntity<Void> =
-        ResponseEntity.status(HttpStatus.NOT_FOUND).build()
+    fun handleNotFound(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.NOT_FOUND,
+            code = "SESSION_NOT_FOUND",
+            message = "요청한 세션을 찾을 수 없습니다.",
+        )
 
     @ExceptionHandler(
         InvalidMembershipIdException::class,
         InvalidSessionScheduleException::class,
         InvalidQuestionSetException::class,
     )
-    fun handleBadRequest(): ResponseEntity<Void> =
-        ResponseEntity.status(HttpStatus.BAD_REQUEST).build()
+    fun handleBadRequest(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "INVALID_REQUEST",
+            message = "세션 요청 값을 확인해 주세요.",
+        )
 }
