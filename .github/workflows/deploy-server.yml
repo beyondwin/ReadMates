@@ -51,6 +51,18 @@ jobs:
           echo "name=$image_name" >> "$GITHUB_OUTPUT"
           echo "tag=$image_tag" >> "$GITHUB_OUTPUT"
 
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Build server jar
+        run: ./server/gradlew -p server bootJar
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
         with:
@@ -63,7 +75,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: server
-          file: server/Dockerfile
+          file: server/Dockerfile.release
           platforms: linux/arm64
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}

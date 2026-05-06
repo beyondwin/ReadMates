@@ -12,6 +12,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - `Deploy Server Image` workflow의 `docker/login-action` pin을 실제 `v3.6.0` commit으로 고쳐 GHCR server image 게시가 tag/manual dispatch에서 시작되도록 했습니다.
 - GHCR server image를 OCI A1 VM과 맞는 `linux/arm64` platform으로 게시하도록 QEMU/Buildx 설정을 추가했습니다.
+- Release image workflow는 native runner에서 `bootJar`를 만든 뒤 별도 runtime Dockerfile로 ARM64 image를 조립해 Gradle build가 QEMU emulation에 묶이지 않게 했습니다.
 
 ## v1.5.0 - 2026-05-06
 
