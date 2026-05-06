@@ -130,6 +130,62 @@ describe("readmatesFetchResponse", () => {
     await expect(readmatesFetch("/api/app/logout", { method: "POST" })).resolves.toBeUndefined();
   });
 
+  it("throws API errors with parsed server code message and status", async () => {
+    const response = new Response(
+      JSON.stringify({
+        code: "SESSION_NOT_FOUND",
+        message: "요청한 세션을 찾을 수 없습니다.",
+        status: 404,
+      }),
+      {
+        status: 404,
+        statusText: "Not Found",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+
+    await expect(readmatesFetch("/api/archive/sessions/missing")).rejects.toMatchObject({
+      name: "ReadmatesApiError",
+      message: "요청한 세션을 찾을 수 없습니다.",
+      status: 404,
+      code: "SESSION_NOT_FOUND",
+      fallback: false,
+    });
+  });
+
+  it("throws API errors with safe fallback body when the response body is empty", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 403 })));
+
+    await expect(readmatesFetch("/api/host/dashboard")).rejects.toMatchObject({
+      name: "ReadmatesApiError",
+      message: "이 작업을 수행할 권한이 없습니다.",
+      status: 403,
+      code: "PERMISSION_DENIED",
+      fallback: true,
+    });
+  });
+
+  it("throws API errors with safe fallback body when the response body is malformed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response("{not-json", {
+          status: 500,
+          statusText: "Internal Server Error",
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(readmatesFetch("/api/app/me")).rejects.toMatchObject({
+      name: "ReadmatesApiError",
+      status: 500,
+      code: "INTERNAL_ERROR",
+      fallback: true,
+    });
+  });
+
   it("throws a typed API error while preserving the existing failure message", async () => {
     const response = new Response(JSON.stringify({ message: "failed" }), {
       status: 500,
@@ -143,7 +199,7 @@ describe("readmatesFetchResponse", () => {
       throw new Error("Expected readmatesFetch to reject");
     } catch (error) {
       expect(error).toBeInstanceOf(Error);
-      expect(error).toHaveProperty("message", "ReadMates API failed: 500");
+      expect(error).toHaveProperty("message", "서비스 오류가 발생했습니다.");
       expect(isReadmatesApiError(error)).toBe(true);
 
       if (isReadmatesApiError(error)) {
