@@ -1542,7 +1542,7 @@ git commit -m "feat: add route error boundaries"
 **Files:**
 - Modify: `docs/development/architecture.md`
 
-- [ ] **Step 1: Add the architecture section**
+- [x] **Step 1: Add the architecture section**
 
 Insert this section after `## 요청 흐름` and before `## 멀티 클럽 context와 도메인 모델` in `docs/development/architecture.md`:
 
@@ -1561,16 +1561,16 @@ Insert this section after `## 요청 흐름` and before `## 멀티 클럽 contex
 
 `code`는 stable uppercase identifier이고, `message`는 사용자에게 보여줄 수 있는 안전한 문구이며, `status`는 HTTP status code와 일치해야 한다. 서버는 stack trace, SQL detail, upstream host, SMTP detail, secret, token 원문, private member data, 내부 exception class name을 오류 body에 넣지 않는다.
 
-Spring API의 application service는 Spring Web/HTTP type에 의존하지 않는다. Feature application/domain error는 `adapter.in.web`의 handler가 HTTP status와 `ApiErrorResponse`로 매핑한다. 공통 framework error와 shared access-denied error는 shared web advice가 안전한 기본 code/message로 매핑한다.
+Spring API의 application service는 Spring Web/HTTP type에 의존하지 않는다. 이번 전환 범위의 feature application/domain error는 `adapter.in.web`의 handler가 HTTP status와 `ApiErrorResponse`로 매핑한다. 이후 새로 추가하거나 전환하는 web handler도 이 contract를 따른다. 공통 framework error와 shared access-denied error는 shared web advice가 안전한 기본 code/message로 매핑한다.
 
 Cloudflare Pages Functions BFF가 upstream Spring API에 도달하기 전에 거절하는 요청도 같은 shape를 사용한다. 예를 들어 invalid `/api/bff/**` path는 `404 RESOURCE_NOT_FOUND`, cross-origin mutation은 `403 PERMISSION_DENIED`, invalid `clubSlug`는 `400 INVALID_REQUEST`를 반환한다. Upstream Spring API 응답은 status와 안전한 body를 유지하되, 내부 `x-readmates-*` response header와 secret은 계속 제거한다.
 
-프런트엔드 `shared/api`는 non-OK 응답을 `ReadmatesApiError`로 변환한다. JSON body가 비어 있거나 잘못된 형태여도 HTTP status를 기준으로 안전한 fallback code/message를 만든다. React Router route boundary는 `status`와 `code`를 기준으로 public/member/host context에 맞는 404, 403, 409, 410, 5xx 화면을 보여준다. 정상적인 401 session 만료는 기존 login return flow를 유지한다.
+프런트엔드 `shared/api`는 non-OK 응답을 `ReadmatesApiError`로 변환하고 status, code, message, fallback 여부, response metadata를 보존한다. JSON body가 비어 있거나 잘못된 형태여도 HTTP status를 기준으로 안전한 fallback code/message를 만든다. React Router route boundary는 HTTP status와 public/member/host/auth context를 기준으로 404, 403, 409, 410, 5xx 화면을 보여주며, code와 message는 `ReadmatesApiError`에 보존한다. 정상적인 401 session 만료는 기존 login return flow를 유지한다.
 
 Feature-specific unavailable state는 feature가 계속 소유한다. 공개 세션이 없는 상태, 피드백 문서가 없거나 권한이 없는 상태, 초대 링크 검증 오류처럼 제품 맥락이 있는 화면은 generic route error page로 대체하지 않는다.
 ````
 
-- [ ] **Step 2: Run docs whitespace check**
+- [x] **Step 2: Run docs whitespace check**
 
 Run:
 
@@ -1580,7 +1580,7 @@ git diff --check -- docs/development/architecture.md
 
 Expected: PASS.
 
-- [ ] **Step 3: Commit docs**
+- [x] **Step 3: Commit docs**
 
 Run:
 
