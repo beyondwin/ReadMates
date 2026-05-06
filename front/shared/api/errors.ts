@@ -57,11 +57,15 @@ async function parseApiErrorBody(response: Response): Promise<ReadmatesApiErrorB
       return fallbackApiErrorBody(response.status);
     }
 
+    if (parsed.status !== response.status) {
+      return fallbackApiErrorBody(response.status);
+    }
+
     return {
       code: parsed.code,
       message: parsed.message,
       status: response.status,
-      fallback: parsed.status !== response.status,
+      fallback: false,
     };
   } catch {
     return fallbackApiErrorBody(response.status);

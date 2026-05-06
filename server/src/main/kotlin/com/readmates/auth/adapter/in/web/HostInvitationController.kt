@@ -1,6 +1,8 @@
 package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
+import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
+import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
@@ -55,29 +57,19 @@ class HostInvitationController(
     ) = invitations.revokeInvitation(currentMember, parseInvitationId(invitationId))
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleValidationError(error: MethodArgumentNotValidException): ResponseEntity<InvitationErrorResponse> {
+    fun handleValidationError(error: MethodArgumentNotValidException): ResponseEntity<ApiErrorResponse> {
         val fieldErrors = error.bindingResult.fieldErrors
-        val response = when {
+        val (code, message) = when {
             fieldErrors.any { it.field == "email" && isOverEmailLengthLimit(it.rejectedValue) } ->
-                InvitationErrorResponse(
-                    code = "INVALID_INVITATION_EMAIL",
-                    message = "Email must be 320 characters or less",
-                )
+                "INVALID_INVITATION_EMAIL" to "Email must be 320 characters or less"
             fieldErrors.any { it.field == "email" } ->
-                InvitationErrorResponse(
-                    code = "INVALID_INVITATION_EMAIL",
-                    message = "Invalid invitation email",
-                )
-            fieldErrors.any { it.field == "name" } -> InvitationErrorResponse(
-                code = "INVALID_INVITATION_NAME",
-                message = "Name is required",
-            )
-            else -> InvitationErrorResponse(
-                code = "INVALID_INVITATION_REQUEST",
-                message = "Invalid invitation request",
-            )
+                "INVALID_INVITATION_EMAIL" to "Invalid invitation email"
+            fieldErrors.any { it.field == "name" } ->
+                "INVALID_INVITATION_NAME" to "Name is required"
+            else ->
+                "INVALID_INVITATION_REQUEST" to "Invalid invitation request"
         }
-        return ResponseEntity.badRequest().body(response)
+        return apiErrorResponse(HttpStatus.BAD_REQUEST, code, message)
     }
 
     private fun isOverEmailLengthLimit(value: Any?): Boolean =

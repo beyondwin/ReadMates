@@ -1594,7 +1594,7 @@ git commit -m "docs: document api error contract"
 **Files:**
 - No new files unless a previous task revealed a concrete compile or test failure.
 
-- [ ] **Step 1: Run frontend checks**
+- [x] **Step 1: Run frontend checks**
 
 Run:
 
@@ -1606,7 +1606,9 @@ pnpm --dir front build
 
 Expected: all PASS.
 
-- [ ] **Step 2: Run server checks**
+Actual: PASS after Task 7 fix commit. `pnpm --dir front lint`, `pnpm --dir front test`, and `pnpm --dir front build` passed.
+
+- [x] **Step 2: Run server checks**
 
 Run:
 
@@ -1616,7 +1618,9 @@ Run:
 
 Expected: PASS.
 
-- [ ] **Step 3: Run end-to-end checks for route/auth/BFF behavior**
+Actual: PASS after Task 7 fix commit. `./server/gradlew -p server clean test` passed.
+
+- [x] **Step 3: Run end-to-end checks for route/auth/BFF behavior**
 
 Run:
 
@@ -1626,13 +1630,21 @@ pnpm --dir front test:e2e
 
 Expected: PASS. This is required because the change touches route/auth/BFF behavior.
 
-- [ ] **Step 4: Inspect final diff for safety and scope**
+Actual: The default `readmates_e2e` schema is blocked by local Flyway checksum mismatches for existing migrations 16, 18, 20, and 21. Following `docs/development/test-guide.md`, the full suite passed on a fresh schema and isolated ports:
+
+```bash
+PLAYWRIGHT_PORT='3110' READMATES_API_BASE_URL='http://127.0.0.1:18090' READMATES_E2E_DB_NAME='readmates_e2e_codex_error_boundary_final' pnpm --dir front test:e2e
+```
+
+Result: 22 passed.
+
+- [x] **Step 4: Inspect final diff for safety and scope**
 
 Run:
 
 ```bash
-git diff --stat HEAD~6..HEAD
-git diff HEAD~6..HEAD -- docs/development/architecture.md front/functions front/shared/api front/src/app server/src/main/kotlin/com/readmates/shared
+git diff --stat main...HEAD
+git diff main...HEAD -- docs/development/architecture.md front/functions front/shared/api front/src/app server/src/main/kotlin/com/readmates/shared
 rg -n "READMATES_BFF_SECRET|BEGIN [A-Z ]*PRIVATE KEY|token=[A-Za-z0-9_-]{16,}|password=|OCID|kws/source" docs/development/architecture.md front server
 ```
 
@@ -1642,7 +1654,9 @@ Expected:
 - No real secrets, private deployment IDs, local absolute paths in committed public docs or source changes.
 - No `x-readmates-*` response header exposure is introduced.
 
-- [ ] **Step 5: Commit verification fixes if needed**
+Actual: PASS. The final diff stayed within planned server, BFF, frontend API, router, test, and architecture-doc surfaces. Safety scan hits were existing env var names and test placeholders only; diff-added `x-readmates-*` mentions document that those headers remain stripped.
+
+- [x] **Step 5: Commit verification fixes if needed**
 
 If Step 1, Step 2, Step 3, or Step 4 required a code or doc fix, run the relevant targeted test again, then commit:
 
@@ -1652,6 +1666,8 @@ git commit -m "fix: stabilize error boundary contract"
 ```
 
 If no fixes were needed, do not create an empty commit.
+
+Actual: Verification review found two contract fixes and one stale DTO cleanup. Targeted tests passed, re-review approved, and fixes were committed with `fix: stabilize error boundary contract`.
 
 ## Self-Review
 
