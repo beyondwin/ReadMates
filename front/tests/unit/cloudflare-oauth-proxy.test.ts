@@ -15,6 +15,15 @@ function context(request: Request, registrationId: string | string[]) {
   } as Parameters<typeof authorizationGet>[0];
 }
 
+async function expectApiErrorBody(response: Response, expected: { status: number; code: string }) {
+  expect(response.status).toBe(expected.status);
+  expect(response.headers.get("content-type")).toContain("application/json");
+  await expect(response.json()).resolves.toMatchObject({
+    code: expected.code,
+    status: expected.status,
+  });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -206,7 +215,7 @@ describe("Cloudflare OAuth proxy functions", () => {
       ),
     );
 
-    expect(response.status).toBe(404);
+    await expectApiErrorBody(response, { status: 404, code: "RESOURCE_NOT_FOUND" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -225,7 +234,7 @@ describe("Cloudflare OAuth proxy functions", () => {
       ),
     );
 
-    expect(response.status).toBe(404);
+    await expectApiErrorBody(response, { status: 404, code: "RESOURCE_NOT_FOUND" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
