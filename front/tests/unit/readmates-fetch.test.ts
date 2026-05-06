@@ -186,6 +186,34 @@ describe("readmatesFetchResponse", () => {
     });
   });
 
+  it("throws API errors with safe fallback body when body status disagrees with HTTP status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: "SESSION_NOT_FOUND",
+            message: "요청한 세션을 찾을 수 없습니다.",
+            status: 404,
+          }),
+          {
+            status: 500,
+            statusText: "Internal Server Error",
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    );
+
+    await expect(readmatesFetch("/api/archive/sessions/missing")).rejects.toMatchObject({
+      name: "ReadmatesApiError",
+      message: "서비스 오류가 발생했습니다.",
+      status: 500,
+      code: "INTERNAL_ERROR",
+      fallback: true,
+    });
+  });
+
   it("throws a typed API error while preserving the existing failure message", async () => {
     const response = new Response(JSON.stringify({ message: "failed" }), {
       status: 500,
