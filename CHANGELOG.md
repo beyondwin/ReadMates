@@ -6,12 +6,26 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+다음 릴리즈 후보가 정해지면 여기에 기록합니다.
+
+## v1.5.0 - 2026-05-06
+
+### Highlights
+
+ReadMates v1.5.0은 서버, Cloudflare Pages Functions, 프런트엔드가 같은 public-safe API 오류 계약을 사용하도록 맞춘 릴리즈입니다. 사용자는 403/404/409/410/5xx 상황에서 내부 예외나 인프라 세부사항 대신 route context에 맞는 안전한 오류 화면을 보게 됩니다.
+
+운영 측면에서는 GHCR server image 게시 workflow와 OCI compose image tag 배포 기준을 정리했고, 기본 Playwright E2E 실행이 오래된 로컬 Flyway schema history에 막히지 않도록 현재 migration fingerprint 기반 schema를 사용합니다.
+
 ### Added
 
 - 서버 이미지를 GitHub Container Registry에 게시하는 `Deploy Server Image` workflow를 추가했습니다. Release tag push와 수동 `image_tag` 입력 모두 같은 Docker tag 검증 경로를 사용합니다.
 - 공개 archive/public visibility regression coverage와 BFF header/club slug regression coverage를 추가했습니다.
 - 알림 이메일 delivery를 dispatch path와 pending worker path가 공유하는 `NotificationDeliveryEngine`으로 분리하고 retry/dead 전환, redacted error 저장, metrics/logging을 한 곳에서 처리합니다.
 - HostDashboard, MyPage, HostSessionEditor, HostMembers UI를 route/API 호출 없는 작은 presentation module로 분리했습니다.
+- Spring API 오류 응답을 public-safe `{ code, message, status }` JSON body로 통일하는 shared `ApiErrorResponse`와 feature별 error handler coverage를 추가했습니다.
+- Cloudflare Pages Functions BFF 자체 400/403/404 거절도 같은 오류 body shape를 반환하도록 shared error helper를 추가했습니다.
+- React Router root/member/host/public/auth route error boundary와 unmatched route용 `NotFoundRoute`를 추가했습니다.
+- Playwright E2E 기본 database 이름을 현재 운영 migration과 dev seed SQL fingerprint 기반으로 정하는 regression coverage를 추가했습니다.
 
 ### Changed
 
@@ -21,28 +35,34 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - OCI compose release deploy는 GHCR image tag를 VM에서 pull하고, 로컬 non-GHCR tag는 build/save/load 전환 검증 경로로 남깁니다.
 - Vite frontend source에서 불필요한 `"use client"` directive를 제거하고 agent guide에 재도입 금지 기준을 추가했습니다.
 - 공개 릴리즈 후보 builder가 server image workflow도 후보 tree에 포함하도록 manifest를 갱신했습니다.
+- 프런트엔드 `shared/api` parser가 non-OK 응답을 `ReadmatesApiError`로 변환하고, empty 또는 malformed response body는 HTTP status 기준 fallback code/message로 안전하게 처리합니다.
+- Route error UI는 HTTP status와 public/member/host/auth context를 기준으로 안내 문구와 복귀 버튼을 선택하되, 공개 세션 없음이나 피드백 문서 unavailable 같은 feature-specific 상태는 각 feature가 계속 소유합니다.
 
 ### Fixed
 
 - Redis Testcontainers가 `localhost`를 반환할 때 Redis URL host를 `127.0.0.1`로 정규화해, 로컬 IPv6 `localhost`의 다른 서비스와 mapped port가 겹치는 테스트 flake를 줄였습니다.
 - 로그는 BFF secret rejection, notification relay/delivery, session lifecycle의 운영 이벤트를 남기되 raw secret, token, recipient 원문 같은 민감 값을 기록하지 않도록 보강했습니다.
+- 기본 `pnpm --dir front test:e2e`가 오래된 로컬 `readmates_e2e` schema의 Flyway checksum mismatch에 막히던 리스크를 제거했습니다. 명시적 `READMATES_E2E_DB_NAME` override는 그대로 유지됩니다.
 
 ### Deployment Notes
 
-이 변경 묶음은 DB schema migration을 추가하지 않습니다. 서버 변경이 포함된 release는 먼저 `Deploy Server Image` workflow로 같은 release tag의 `ghcr.io/<owner>/<repo>/readmates-server:<tag>` 이미지를 게시하고, OCI compose backend는 그 image tag를 pull해 배포합니다.
+이 변경 묶음은 새 운영 DB schema migration을 추가하지 않습니다. 사용하지 않는 legacy `server/src/main/resources/db/migration` tree를 제거했지만 운영 Flyway 경로는 `server/src/main/resources/db/mysql/migration`입니다.
 
-기본 `pnpm --dir front test:e2e`는 로컬 기본 E2E schema의 Flyway checksum 상태에 의존합니다. 기존 schema가 오래된 checksum을 갖고 있으면 destructive repair/drop 대신 새 E2E schema를 지정해 재검증합니다.
+서버 API, Cloudflare Pages Functions, 프런트엔드 route/API parser가 함께 바뀌므로 서버와 프런트엔드를 같은 `v1.5.0` tag 기준으로 배포합니다. 먼저 `Deploy Server Image` workflow로 `ghcr.io/<owner>/<repo>/readmates-server:v1.5.0` 이미지를 게시하고, OCI compose backend는 그 image tag를 pull해 배포합니다. 이후 같은 tag의 Cloudflare Pages frontend/Functions 배포가 완료됐는지 확인합니다.
+
+배포 후에는 Spring `/internal/health`, Pages `/api/bff/api/auth/me`, OAuth start redirect, public club API, 그리고 public 404 route error 화면을 smoke합니다. 비정상 응답 body는 stack trace, SQL detail, upstream host, secret, token 원문, 내부 exception class name을 포함하지 않는 `{ code, message, status }` shape여야 합니다.
 
 ### Verification
 
-- `./server/gradlew -p server clean test`
 - `pnpm --dir front lint`
-- `pnpm --dir front test` - 49 files, 647 tests passed
+- `./server/gradlew -p server clean test`
+- `pnpm --dir front test` - 50 files, 660 tests passed
 - `pnpm --dir front build`
+- `pnpm --dir front test:e2e` - 22 tests passed
+- `git diff --check -- docs/development/architecture.md`
+- `git diff --check -- docs/development/test-guide.md docs/superpowers/plans/2026-05-06-readmates-error-boundary-contract-implementation-plan.md front/playwright.config.ts front/tests/e2e/readmates-e2e-config.ts front/tests/e2e/readmates-e2e-db.ts front/tests/unit/playwright-e2e-config.test.ts`
 - `./scripts/build-public-release-candidate.sh`
 - `./scripts/public-release-check.sh .tmp/public-release-candidate`
-- `git diff --check`
-- `pnpm --dir front test:e2e` - blocked before browser tests by existing local E2E schema Flyway checksum mismatches for migrations 16, 18, 20, and 21; no repair/drop/reset was run.
 
 ## v1.4.2 - 2026-05-05
 
