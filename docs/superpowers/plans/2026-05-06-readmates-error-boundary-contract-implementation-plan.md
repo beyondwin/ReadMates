@@ -1630,10 +1630,18 @@ pnpm --dir front test:e2e
 
 Expected: PASS. This is required because the change touches route/auth/BFF behavior.
 
-Actual: The default `readmates_e2e` schema is blocked by local Flyway checksum mismatches for existing migrations 16, 18, 20, and 21. Following `docs/development/test-guide.md`, the full suite passed on a fresh schema and isolated ports:
+Actual: Initial verification found that the fixed default `readmates_e2e` schema was blocked by local Flyway checksum mismatches for existing migrations 16, 18, 20, and 21. Following `docs/development/test-guide.md`, the full suite passed on a fresh schema and isolated ports:
 
 ```bash
 PLAYWRIGHT_PORT='3110' READMATES_API_BASE_URL='http://127.0.0.1:18090' READMATES_E2E_DB_NAME='readmates_e2e_codex_error_boundary_final' pnpm --dir front test:e2e
+```
+
+Result: 22 passed.
+
+Follow-up: the remaining local-environment risk was resolved by deriving the default E2E schema name from the current operational migration and dev seed SQL fingerprint, while preserving explicit `READMATES_E2E_DB_NAME` overrides. The default command now avoids stale `readmates_e2e` Flyway history without requiring `repair` or schema drop. Re-run:
+
+```bash
+pnpm --dir front test:e2e
 ```
 
 Result: 22 passed.
@@ -1687,3 +1695,4 @@ Actual: Verification review found two contract fixes and one stale DTO cleanup. 
   - No request-id field is added.
   - No observability platform is added.
   - No product-specific unavailable page is replaced by a generic page.
+  - Default E2E verification no longer depends on a fixed local `readmates_e2e` schema whose Flyway history may predate the current migration files.
