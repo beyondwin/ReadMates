@@ -1,4 +1,5 @@
 import { readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type {
   FeedbackDocumentListPage,
   FeedbackDocumentResponse,
@@ -17,7 +18,7 @@ export async function fetchFeedbackDocumentList(context?: ReadmatesApiContext, p
   }
 
   if (!response.ok) {
-    throw new Error(`ReadMates feedback document list fetch failed: ${response.status}`);
+    throw await apiErrorFromResponse(response);
   }
 
   return response.json() as Promise<FeedbackDocumentListPage>;
@@ -39,7 +40,7 @@ export async function fetchFeedbackDocument(sessionId: string, context?: Readmat
   }
 
   if (!response.ok) {
-    throw new Error(`ReadMates feedback document fetch failed: ${sessionId} (${response.status})`);
+    throw await apiErrorFromResponse(response);
   }
 
   return { status: "ready", document: (await response.json()) as FeedbackDocumentResponse };

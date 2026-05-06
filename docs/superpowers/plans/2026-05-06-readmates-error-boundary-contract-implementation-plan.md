@@ -853,7 +853,7 @@ git commit -m "feat: return structured bff errors"
 - Modify: `front/features/archive/api/archive-api.ts`
 - Modify: `front/tests/unit/readmates-fetch.test.ts`
 
-- [ ] **Step 1: Write failing parser tests**
+- [x] **Step 1: Write failing parser tests**
 
 Add these tests to `front/tests/unit/readmates-fetch.test.ts`:
 
@@ -921,7 +921,7 @@ Update the existing typed API error test expectation from `"ReadMates API failed
 expect(error).toHaveProperty("message", "서비스 오류가 발생했습니다.");
 ```
 
-- [ ] **Step 2: Run parser tests and verify they fail**
+- [x] **Step 2: Run parser tests and verify they fail**
 
 Run:
 
@@ -931,7 +931,7 @@ pnpm --dir front test -- readmates-fetch.test.ts
 
 Expected: FAIL because `ReadmatesApiError` does not expose `code` or parse JSON bodies.
 
-- [ ] **Step 3: Implement async API error parsing**
+- [x] **Step 3: Implement async API error parsing**
 
 Replace `front/shared/api/errors.ts` with:
 
@@ -1047,7 +1047,7 @@ Modify `front/shared/api/client.ts`:
   }
 ```
 
-- [ ] **Step 4: Convert route-facing manual non-OK throws to typed API errors**
+- [x] **Step 4: Convert route-facing manual non-OK throws to typed API errors**
 
 Modify `front/features/public/api/public-api.ts`:
 
@@ -1085,7 +1085,7 @@ throw await apiErrorFromResponse(response);
 
 Keep existing feature-specific `403` or `404` unavailable returns where the feature intentionally renders its own state.
 
-- [ ] **Step 5: Run parser tests and verify they pass**
+- [x] **Step 5: Run parser tests and verify they pass**
 
 Run:
 
@@ -1095,7 +1095,7 @@ pnpm --dir front test -- readmates-fetch.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit frontend API parser**
+- [x] **Step 6: Commit frontend API parser**
 
 Run:
 
