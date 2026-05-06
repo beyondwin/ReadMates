@@ -84,7 +84,7 @@ class InvitationControllerDbTest(
     fun `club scoped password invitation accept endpoint is gone`() {
         val token = createInvitation("scoped.accepted.member@example.com", "초대 멤버")
 
-        val result = mockMvc.post("/api/clubs/reading-sai/invitations/$token/accept") {
+        mockMvc.post("/api/clubs/reading-sai/invitations/$token/accept") {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -94,16 +94,17 @@ class InvitationControllerDbTest(
             """.trimIndent()
         }.andExpect {
             status { isGone() }
-        }.andReturn()
-
-        assertEquals("Password invitation acceptance has been removed", result.response.errorMessage)
+            jsonPath("$.code") { value("GONE") }
+            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+            jsonPath("$.status") { value(410) }
+        }
     }
 
     @Test
     fun `legacy password invitation accept endpoint is gone`() {
         val token = createInvitation("accepted.member@example.com", "초대 멤버")
 
-        val result = mockMvc.post("/api/invitations/$token/accept") {
+        mockMvc.post("/api/invitations/$token/accept") {
             contentType = MediaType.APPLICATION_JSON
             content = """
                 {
@@ -113,9 +114,10 @@ class InvitationControllerDbTest(
             """.trimIndent()
         }.andExpect {
             status { isGone() }
-        }.andReturn()
-
-        assertEquals("Password invitation acceptance has been removed", result.response.errorMessage)
+            jsonPath("$.code") { value("GONE") }
+            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+            jsonPath("$.status") { value(410) }
+        }
     }
 
     @Test

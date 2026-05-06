@@ -1,4 +1,5 @@
 import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type {
   ArchiveSessionPage,
   CurrentSessionPolicy,
@@ -44,7 +45,7 @@ export async function fetchMyFeedbackDocuments(context?: ReadmatesApiContext, pa
   }
 
   if (!response.ok) {
-    throw new Error(`ReadMates feedback documents fetch failed: ${response.status}`);
+    throw await apiErrorFromResponse(response);
   }
 
   return response.json() as Promise<FeedbackDocumentListPage>;
@@ -58,7 +59,7 @@ export async function fetchMemberArchiveSession(sessionId: string, context?: Rea
   }
 
   if (!response.ok) {
-    throw new Error(`ReadMates member session fetch failed: ${sessionId} (${response.status})`);
+    throw await apiErrorFromResponse(response);
   }
 
   return response.json() as Promise<MemberArchiveSessionDetailResponse>;

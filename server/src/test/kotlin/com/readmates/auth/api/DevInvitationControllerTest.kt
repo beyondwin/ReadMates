@@ -1,7 +1,6 @@
 package com.readmates.auth.api
 
 import com.readmates.support.MySqlTestContainer
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -32,12 +31,13 @@ class DevInvitationControllerTest(
     fun `legacy dev password invitation accept endpoint returns gone`() {
         val token = createInvitation("dev.invited@example.com")
 
-        val result = mockMvc.post("/api/dev/invitations/$token/accept")
+        mockMvc.post("/api/dev/invitations/$token/accept")
             .andExpect {
                 status { isGone() }
-            }.andReturn()
-
-        assertEquals("Password invitation acceptance has been removed", result.response.errorMessage)
+                jsonPath("$.code") { value("GONE") }
+                jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+                jsonPath("$.status") { value(410) }
+            }
     }
 
     private fun createInvitation(email: String): String {

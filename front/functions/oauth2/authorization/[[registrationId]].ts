@@ -4,6 +4,7 @@ import {
   forwardedOAuthRequestHeaders,
   safeRouteSegment,
 } from "../../_shared/proxy";
+import { bffErrorResponse } from "../../_shared/errors";
 
 type Env = {
   READMATES_API_BASE_URL: string;
@@ -19,7 +20,7 @@ type PagesFunction<Env> = (context: {
 export const onRequestGet: PagesFunction<Env> = async ({ request, env, params }) => {
   const registrationId = safeRouteSegment(params.registrationId);
   if (!registrationId) {
-    return new Response(null, { status: 404 });
+    return bffErrorResponse(404, "RESOURCE_NOT_FOUND");
   }
 
   const sourceUrl = new URL(request.url);

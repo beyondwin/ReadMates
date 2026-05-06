@@ -60,7 +60,7 @@ export async function readmatesFetch<T>(path: string, init?: RequestInit, contex
   const response = await readmatesFetchResponse(path, init, context);
 
   if (!response.ok) {
-    throw apiErrorFromResponse(response);
+    throw await apiErrorFromResponse(response);
   }
 
   return parseReadmatesResponse<T>(response);

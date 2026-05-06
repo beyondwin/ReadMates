@@ -3,7 +3,6 @@ package com.readmates.auth.api
 import com.readmates.auth.application.AuthSessionService
 import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -32,14 +31,15 @@ class PasswordAuthControllerTest(
 ) {
     @Test
     fun `legacy password login endpoint is gone`() {
-        val result = mockMvc.post("/api/auth/login") {
+        mockMvc.post("/api/auth/login") {
             contentType = org.springframework.http.MediaType.APPLICATION_JSON
             content = """{"email":"member@example.com","password":"correct horse battery staple"}"""
         }.andExpect {
             status { isGone() }
-        }.andReturn()
-
-        assertEquals("Password login has been removed", result.response.errorMessage)
+            jsonPath("$.code") { value("GONE") }
+            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+            jsonPath("$.status") { value(410) }
+        }
     }
 
     @Test

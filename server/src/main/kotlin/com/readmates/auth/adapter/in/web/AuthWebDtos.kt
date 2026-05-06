@@ -185,8 +185,3 @@ data class DevLoginRequest(
     @field:Email
     val email: String,
 )
-
-data class InvitationErrorResponse(
-    val code: String,
-    val message: String,
-)

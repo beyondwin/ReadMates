@@ -1,7 +1,6 @@
 package com.readmates.auth.api
 
 import com.readmates.support.MySqlTestContainer
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -26,25 +25,27 @@ class PasswordResetControllerTest(
 ) {
     @Test
     fun `legacy host password reset issue endpoint is gone`() {
-        val result = mockMvc.post("/api/host/members/00000000-0000-0000-0000-000000009999/password-reset") {
+        mockMvc.post("/api/host/members/00000000-0000-0000-0000-000000009999/password-reset") {
             with(user("host@example.com"))
         }.andExpect {
             status { isGone() }
-        }.andReturn()
-
-        assertEquals("Password reset has been removed", result.response.errorMessage)
+            jsonPath("$.code") { value("GONE") }
+            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+            jsonPath("$.status") { value(410) }
+        }
     }
 
     @Test
     fun `legacy password reset consume endpoint is gone`() {
-        val result = mockMvc.post("/api/auth/password-reset/raw-reset-token") {
+        mockMvc.post("/api/auth/password-reset/raw-reset-token") {
             contentType = MediaType.APPLICATION_JSON
             content = """{"password":"new correct password","passwordConfirmation":"new correct password"}"""
         }.andExpect {
             status { isGone() }
-        }.andReturn()
-
-        assertEquals("Password reset has been removed", result.response.errorMessage)
+            jsonPath("$.code") { value("GONE") }
+            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+            jsonPath("$.status") { value(410) }
+        }
     }
 
     companion object {
