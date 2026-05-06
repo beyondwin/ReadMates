@@ -8,6 +8,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 다음 릴리즈 후보가 정해지면 여기에 기록합니다.
 
+## v1.5.1 - 2026-05-06
+
+### Highlights
+
+ReadMates v1.5.1은 v1.5.0 배포 중 확인된 server image release workflow 문제를 고친 patch release입니다. 애플리케이션 런타임 동작은 v1.5.0과 같고, GHCR server image를 OCI A1 VM에서 바로 실행할 수 있는 ARM64 image로 tag 기준 재현 가능하게 게시합니다.
+
 ### Fixed
 
 - `Deploy Server Image` workflow의 `docker/login-action` pin을 실제 `v3.6.0` commit으로 고쳐 GHCR server image 게시가 tag/manual dispatch에서 시작되도록 했습니다.
