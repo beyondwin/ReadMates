@@ -8,6 +8,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 다음 릴리즈 후보가 정해지면 여기에 기록합니다.
 
+## v1.5.2 - 2026-05-06
+
+### Fixed
+
+- `Deploy Server Image` workflow의 Docker action pin을 Node.js 24 기반 release로 갱신해 GitHub Actions Node.js 20 deprecation warning을 제거했습니다.
+
 ## v1.5.1 - 2026-05-06
 
 ### Highlights
