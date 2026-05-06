@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { resolveE2eDatabaseName } from "./tests/e2e/readmates-e2e-config";
 
 delete process.env.NO_COLOR;
 
@@ -13,7 +14,8 @@ const dbHost = process.env.READMATES_E2E_DB_HOST ?? "127.0.0.1";
 const dbPort = process.env.READMATES_E2E_DB_PORT ?? "3306";
 const dbUser = process.env.READMATES_E2E_DB_USER ?? "readmates";
 const dbPassword = process.env.READMATES_E2E_DB_PASSWORD ?? process.env.MYSQL_PWD ?? "readmates";
-const dbName = process.env.READMATES_E2E_DB_NAME ?? "readmates_e2e";
+const dbName = resolveE2eDatabaseName();
+process.env.READMATES_E2E_DB_NAME = dbName;
 const jdbcUrl =
   process.env.SPRING_DATASOURCE_URL ??
   `jdbc:mysql://${dbHost}:${dbPort}/${dbName}?serverTimezone=UTC&allowPublicKeyRetrieval=true&useSSL=false`;
