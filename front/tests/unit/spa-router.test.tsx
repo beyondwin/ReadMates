@@ -35,6 +35,15 @@ function installRouterRequestShim() {
   );
 }
 
+function renderRouterAt(path: string) {
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  render(
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>,
+  );
+}
+
 const anonymousAuth = {
   authenticated: false,
   userId: null,
@@ -179,6 +188,89 @@ describe("SPA router", () => {
 
   it("defines hydration fallbacks for every loader route", () => {
     expect(loaderRoutesWithoutHydrateFallback(routes)).toEqual([]);
+  });
+
+  it.each([
+    ["/missing-page", "페이지를 찾을 수 없습니다."],
+    ["/clubs/reading-sai/missing-page", "페이지를 찾을 수 없습니다."],
+    ["/app/missing-page", "페이지를 찾을 수 없습니다."],
+    ["/clubs/reading-sai/app/missing-page", "페이지를 찾을 수 없습니다."],
+    ["/app/host/missing-page", "페이지를 찾을 수 없습니다."],
+    ["/clubs/reading-sai/app/host/missing-page", "페이지를 찾을 수 없습니다."],
+  ])("renders a not-found route for %s", async (path, heading) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+          return Promise.resolve(
+            jsonResponse({
+              authenticated: true,
+              userId: "host-user",
+              membershipId: "host-membership",
+              clubId: "club-id",
+              email: "host@example.com",
+              displayName: "호스트",
+              accountName: "호스트",
+              role: "HOST",
+              membershipStatus: "ACTIVE",
+              approvalState: "ACTIVE",
+            }),
+          );
+        }
+
+        return Promise.resolve(jsonResponse(publicClubResponse));
+      }),
+    );
+
+    installRouterRequestShim();
+    renderRouterAt(path);
+
+    expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+  });
+
+  it("renders permission denied copy from a structured API route error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const url = input.toString();
+        if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+          return Promise.resolve(
+            jsonResponse({
+              authenticated: true,
+              userId: "member-user",
+              membershipId: "member-membership",
+              clubId: "club-id",
+              email: "member@example.com",
+              displayName: "멤버",
+              accountName: "멤버",
+              role: "MEMBER",
+              membershipStatus: "ACTIVE",
+              approvalState: "ACTIVE",
+            }),
+          );
+        }
+        if (url === "/api/bff/api/archive/sessions?limit=30&clubSlug=reading-sai") {
+          return Promise.resolve(
+            jsonResponse(
+              {
+                code: "PERMISSION_DENIED",
+                message: "멤버 공간에 접근할 권한이 없습니다.",
+                status: 403,
+              },
+              403,
+            ),
+          );
+        }
+
+        return Promise.resolve(jsonResponse(publicClubResponse));
+      }),
+    );
+
+    installRouterRequestShim();
+    renderRouterAt("/clubs/reading-sai/app/archive");
+
+    expect(await screen.findByRole("heading", { name: "접근할 수 없습니다." })).toBeInTheDocument();
   });
 
   it("renders the login route", () => {

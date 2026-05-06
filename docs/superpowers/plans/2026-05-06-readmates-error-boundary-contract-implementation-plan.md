@@ -1121,7 +1121,7 @@ git commit -m "feat: parse structured frontend api errors"
 - Modify: `front/features/current-session/route/current-session-route.tsx`
 - Modify: `front/tests/unit/spa-router.test.tsx`
 
-- [ ] **Step 1: Write failing router not-found and route-error tests**
+- [x] **Step 1: Write failing router not-found and route-error tests**
 
 Add this helper to `front/tests/unit/spa-router.test.tsx`:
 
@@ -1227,7 +1227,7 @@ it("renders permission denied copy from a structured API route error", async () 
 });
 ```
 
-- [ ] **Step 2: Run router tests and verify they fail**
+- [x] **Step 2: Run router tests and verify they fail**
 
 Run:
 
@@ -1237,7 +1237,7 @@ pnpm --dir front test -- spa-router.test.tsx
 
 Expected: FAIL because unmatched routes and structured route error classification are not implemented.
 
-- [ ] **Step 3: Implement shared route error UI**
+- [x] **Step 3: Implement shared route error UI**
 
 Create `front/src/app/route-error.tsx`:
 
@@ -1366,7 +1366,7 @@ export function NotFoundRoute({ variant }: { variant: RouteErrorVariant }) {
 }
 ```
 
-- [ ] **Step 4: Delegate feature generic error states to shared UI**
+- [x] **Step 4: Delegate feature generic error states to shared UI**
 
 Update each existing generic route error component to use `RouteErrorBoundary`:
 
@@ -1436,7 +1436,7 @@ Add the import:
 import { RouteErrorBoundary } from "@/src/app/route-error";
 ```
 
-- [ ] **Step 5: Wire route-level error elements and catch-all routes**
+- [x] **Step 5: Wire route-level error elements and catch-all routes**
 
 Modify `front/src/app/router.tsx` imports:
 
@@ -1511,7 +1511,7 @@ For `/admin`, use:
 errorElement: <RouteErrorBoundary variant="auth" />,
 ```
 
-- [ ] **Step 6: Run router tests and verify they pass**
+- [x] **Step 6: Run router tests and verify they pass**
 
 Run:
 
@@ -1521,7 +1521,7 @@ pnpm --dir front test -- spa-router.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit router boundaries**
+- [x] **Step 7: Commit router boundaries**
 
 Run:
 

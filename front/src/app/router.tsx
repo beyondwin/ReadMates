@@ -47,6 +47,7 @@ import {
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
+import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireHost, RequireMemberApp, RequirePlatformAdmin } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import AboutPage from "@/src/pages/about";
@@ -146,6 +147,10 @@ function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[
       errorElement: <FeedbackRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="피드백 문서를 불러오는 중" variant="member" />,
     },
+    {
+      path: "*",
+      element: <NotFoundRoute variant="member" />,
+    },
   ];
 }
 
@@ -191,12 +196,17 @@ function hostAppRoutes(): RouteObject[] {
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
     },
+    {
+      path: "*",
+      element: <NotFoundRoute variant="host" />,
+    },
   ];
 }
 
 export const routes: RouteObject[] = [
   {
     element: <PublicRouteLayout />,
+    errorElement: <RouteErrorBoundary variant="public" />,
     children: [
       {
         path: "/",
@@ -258,6 +268,7 @@ export const routes: RouteObject[] = [
       { path: "/clubs/:clubSlug/invite/:token", element: <InvitePage /> },
       { path: "/invite/:token", element: <InvitePage /> },
       { path: "/reset-password/:token", element: <ResetPasswordPage /> },
+      { path: "*", element: <NotFoundRoute variant="public" /> },
     ],
   },
   {
@@ -268,7 +279,7 @@ export const routes: RouteObject[] = [
       </RequirePlatformAdmin>
     ),
     loader: platformAdminLoader,
-    errorElement: <ArchiveRouteError />,
+    errorElement: <RouteErrorBoundary variant="auth" />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="플랫폼 관리를 불러오는 중" variant="member" />,
   },
   {
@@ -289,6 +300,7 @@ export const routes: RouteObject[] = [
   },
   {
     path: "/app",
+    errorElement: <RouteErrorBoundary variant="member" />,
     children: [
       {
         index: true,
@@ -321,6 +333,7 @@ export const routes: RouteObject[] = [
       </RequireMemberApp>
     ),
     loader: loadMemberAppAuth,
+    errorElement: <RouteErrorBoundary variant="member" />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 공간을 불러오는 중" variant="member" />,
     children: memberAppRoutes(),
   },
@@ -333,6 +346,7 @@ export const routes: RouteObject[] = [
       </RequireHost>
     ),
     loader: requireHostLoaderAuth,
+    errorElement: <RouteErrorBoundary variant="host" />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
     children: hostAppRoutes(),
   },
@@ -345,6 +359,7 @@ export const routes: RouteObject[] = [
       </RequireHost>
     ),
     loader: requireHostLoaderAuth,
+    errorElement: <RouteErrorBoundary variant="host" />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
     children: hostAppRoutes(),
   },
