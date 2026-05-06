@@ -42,7 +42,7 @@ type ApiErrorResponse = {
 };
 ```
 
-Server handlers map application, domain, validation, and selected framework errors to this shape. BFF functions use the same shape for errors they originate and continue to strip internal headers from upstream responses. The frontend shared API layer parses the response into a richer `ReadmatesApiError`. Route boundaries classify that error by `status` and `code` to choose public/member/host-specific UI.
+Converted Spring web handlers map selected application, domain, validation, and framework errors to this shape. BFF functions use the same shape for errors they originate and continue to strip internal headers from upstream responses. The frontend shared API layer parses the response into a richer `ReadmatesApiError`. Route boundaries use HTTP status and route context to choose public/member/host/auth-specific UI while preserving `code` on the typed error.
 
 ```text
 Application/domain error
