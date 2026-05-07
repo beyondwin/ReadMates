@@ -76,3 +76,12 @@ jobs:
 
       - name: Test
         run: ./server/gradlew -p server clean test
+
+      - name: OSV Scanner (JVM dependencies)
+        uses: google/osv-scanner-action/osv-scanner-action@v2.2.3
+        with:
+          scan-args: |-
+            --recursive
+            --lockfile=server/gradle.lockfile
+            ./server
+        continue-on-error: true
