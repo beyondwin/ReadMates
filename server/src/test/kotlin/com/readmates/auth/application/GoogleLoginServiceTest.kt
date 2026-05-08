@@ -149,8 +149,6 @@ class GoogleLoginServiceTest(
             set google_subject_id = 'readmates-dev-google-host',
                 profile_image_url = null,
                 auth_provider = 'GOOGLE',
-                legacy_password_hash = null,
-                legacy_password_set_at = null,
                 updated_at = utc_timestamp(6)
             where email = 'host@example.com';
 
