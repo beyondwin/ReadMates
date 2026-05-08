@@ -1,7 +1,7 @@
 package com.readmates.archive.application.port.out
 
+import com.readmates.archive.application.model.ArchiveSessionDetailHeader
 import com.readmates.archive.application.model.ArchiveSessionResult
-import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
 import com.readmates.archive.application.model.MyPageResult
@@ -16,7 +16,7 @@ interface LoadArchiveDataPort {
     fun loadArchiveSessionDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): MemberArchiveSessionDetailResult?
+    ): ArchiveSessionDetailHeader?
 
     fun loadMyQuestions(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<MyArchiveQuestionResult>
 

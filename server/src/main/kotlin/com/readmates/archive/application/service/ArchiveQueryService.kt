@@ -2,11 +2,13 @@ package com.readmates.archive.application.service
 
 import com.readmates.archive.application.ArchiveApplicationError
 import com.readmates.archive.application.ArchiveApplicationException
+import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.archive.application.port.`in`.GetArchiveSessionDetailUseCase
 import com.readmates.archive.application.port.`in`.GetMyPageSummaryUseCase
 import com.readmates.archive.application.port.`in`.ListArchiveSessionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveQuestionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveReviewsUseCase
+import com.readmates.archive.application.port.out.ArchiveDetailBatchReadPort
 import com.readmates.archive.application.port.out.LoadArchiveDataPort
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
@@ -16,6 +18,7 @@ import java.util.UUID
 @Service
 class ArchiveQueryService(
     private val loadArchiveDataPort: LoadArchiveDataPort,
+    private val archiveDetailBatchReadPort: ArchiveDetailBatchReadPort,
 ) : ListArchiveSessionsUseCase,
     GetArchiveSessionDetailUseCase,
     ListMyArchiveQuestionsUseCase,
@@ -27,8 +30,39 @@ class ArchiveQueryService(
     override fun getArchiveSessionDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
-    ) = withMemberAppAccess(currentMember) {
-        loadArchiveDataPort.loadArchiveSessionDetail(currentMember, sessionId)
+    ): MemberArchiveSessionDetailResult? = withMemberAppAccess(currentMember) {
+        val header = loadArchiveDataPort.loadArchiveSessionDetail(currentMember, sessionId) ?: return@withMemberAppAccess null
+        val fragments = archiveDetailBatchReadPort.loadDetail(
+            currentMember = currentMember,
+            sessionId = sessionId,
+            sessionNumber = header.sessionNumber,
+            myAttendanceStatus = header.myAttendanceStatus,
+        )
+        MemberArchiveSessionDetailResult(
+            sessionId = header.sessionId,
+            sessionNumber = header.sessionNumber,
+            title = header.title,
+            bookTitle = header.bookTitle,
+            bookAuthor = header.bookAuthor,
+            bookImageUrl = header.bookImageUrl,
+            date = header.date,
+            locationLabel = header.locationLabel,
+            attendance = header.attendance,
+            total = header.total,
+            state = header.state,
+            myAttendanceStatus = header.myAttendanceStatus,
+            isHost = header.isHost,
+            publicSummary = header.publicSummary,
+            publicHighlights = fragments.publicHighlights,
+            clubQuestions = fragments.clubQuestions,
+            clubOneLiners = fragments.clubOneLiners,
+            publicOneLiners = fragments.publicOneLiners,
+            myQuestions = fragments.myQuestions,
+            myCheckin = fragments.myCheckin,
+            myOneLineReview = fragments.myOneLineReview,
+            myLongReview = fragments.myLongReview,
+            feedbackDocument = fragments.feedbackDocument,
+        )
     }
 
     override fun listMyQuestions(currentMember: CurrentMember, pageRequest: PageRequest) =
