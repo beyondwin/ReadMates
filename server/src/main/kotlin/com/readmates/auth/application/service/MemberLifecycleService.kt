@@ -40,8 +40,8 @@ class MemberLifecycleService(
     override fun suspend(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse {
         requireHost(host)
         val membership = ensureMutableMembership(host, membershipId)
-        if (membership.status != MembershipStatus.ACTIVE) {
-            throw lifecycleConflict("Only active members can be suspended")
+        if (!membership.status.canTransitionTo(MembershipStatus.SUSPENDED)) {
+            throw lifecycleConflict("${membership.status} → SUSPENDED is not allowed")
         }
 
         if (!memberLifecycleStore.suspendActiveMember(host.clubId, membershipId)) {
@@ -59,8 +59,8 @@ class MemberLifecycleService(
     override fun restore(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse {
         requireHost(host)
         val membership = ensureMutableMembership(host, membershipId)
-        if (membership.status != MembershipStatus.SUSPENDED) {
-            throw lifecycleConflict("Only suspended members can be restored")
+        if (!membership.status.canTransitionTo(MembershipStatus.ACTIVE)) {
+            throw lifecycleConflict("${membership.status} → ACTIVE is not allowed")
         }
 
         if (!memberLifecycleStore.restoreSuspendedMember(host.clubId, membershipId)) {
@@ -77,8 +77,8 @@ class MemberLifecycleService(
     override fun deactivate(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse {
         requireHost(host)
         val membership = ensureMutableMembership(host, membershipId)
-        if (membership.status !in setOf(MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED)) {
-            throw lifecycleConflict("Only active or suspended members can leave")
+        if (!membership.status.canTransitionTo(MembershipStatus.LEFT)) {
+            throw lifecycleConflict("${membership.status} → LEFT is not allowed")
         }
 
         if (!memberLifecycleStore.markMemberLeftByHost(host.clubId, membershipId)) {
@@ -140,8 +140,8 @@ class MemberLifecycleService(
         if (membership.role == MembershipRole.HOST && memberLifecycleStore.activeHostCount(member.clubId) <= 1) {
             throw lifecycleConflict("Last active host cannot leave")
         }
-        if (membership.status !in setOf(MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED)) {
-            throw lifecycleConflict("Only active or suspended members can leave")
+        if (!membership.status.canTransitionTo(MembershipStatus.LEFT)) {
+            throw lifecycleConflict("${membership.status} → LEFT is not allowed")
         }
 
         memberLifecycleStore.markMembershipLeft(member.clubId, member.membershipId)
