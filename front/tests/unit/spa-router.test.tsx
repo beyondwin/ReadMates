@@ -177,6 +177,30 @@ function loaderRoutesWithoutHydrateFallback(routeObjects: RouteObject[], parent 
   return missing;
 }
 
+function lazyRoutesWithoutHydrateFallback(routeObjects: RouteObject[], parent = ""): string[] {
+  const missing: string[] = [];
+
+  for (const route of routeObjects) {
+    const ownPath =
+      route.path === undefined
+        ? parent
+        : route.path.startsWith("/")
+          ? route.path
+          : `${parent.replace(/\/$/, "")}/${route.path}`;
+    const routeLabel = route.index ? `${parent || "/"}/(index)` : ownPath || "/";
+
+    if (route.lazy && route.hydrateFallbackElement === undefined) {
+      missing.push(routeLabel);
+    }
+
+    if (route.children) {
+      missing.push(...lazyRoutesWithoutHydrateFallback(route.children, ownPath));
+    }
+  }
+
+  return missing;
+}
+
 describe("SPA router", () => {
   it("defines club-scoped member and host app routes", () => {
     const paths = routePathSet(routes);
@@ -188,6 +212,10 @@ describe("SPA router", () => {
 
   it("defines hydration fallbacks for every loader route", () => {
     expect(loaderRoutesWithoutHydrateFallback(routes)).toEqual([]);
+  });
+
+  it("defines hydration fallbacks for every lazy route", () => {
+    expect(lazyRoutesWithoutHydrateFallback(routes)).toEqual([]);
   });
 
   it.each([
