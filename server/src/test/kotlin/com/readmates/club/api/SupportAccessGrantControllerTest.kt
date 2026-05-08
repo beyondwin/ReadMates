@@ -282,7 +282,7 @@ class SupportAccessGrantControllerTest(
         val grantId = checkNotNull(createResult.response.jsonPathValue<String>("$.id"))
         createdGrantIds += grantId
 
-        // Verify the grant is active in DB — MemberAuthoritiesFilter uses this for elevation
+        // Verify the grant is active in DB
         val count = jdbcTemplate.queryForObject(
             """
             select count(*) from support_access_grants

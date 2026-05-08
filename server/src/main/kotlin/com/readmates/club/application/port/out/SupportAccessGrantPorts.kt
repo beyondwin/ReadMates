@@ -26,7 +26,6 @@ interface RevokeSupportAccessGrantPort {
 interface LoadSupportAccessGrantPort {
     fun loadActiveGrantsByClub(clubId: UUID): List<SupportAccessGrant>
     fun loadActiveGrantsByGrantee(granteeUserId: UUID): List<SupportAccessGrant>
-    fun hasActiveGrant(granteeUserId: UUID, clubId: UUID): Boolean
 }
 
 interface WritePlatformAuditEventPort {

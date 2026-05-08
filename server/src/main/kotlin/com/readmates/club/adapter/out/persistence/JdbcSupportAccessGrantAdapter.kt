@@ -103,19 +103,6 @@ class JdbcSupportAccessGrantAdapter(
             granteeUserId.dbString(),
         )
 
-    override fun hasActiveGrant(granteeUserId: UUID, clubId: UUID): Boolean {
-        val count = jdbcTemplate.queryForObject(
-            """
-            select count(*) from support_access_grants
-            where grantee_user_id = ? and club_id = ? and revoked_at is null and expires_at > utc_timestamp(6)
-            """.trimIndent(),
-            Long::class.java,
-            granteeUserId.dbString(),
-            clubId.dbString(),
-        ) ?: 0L
-        return count > 0
-    }
-
     private fun loadGrant(grantId: UUID): SupportAccessGrant? =
         jdbcTemplate.query(
             """
