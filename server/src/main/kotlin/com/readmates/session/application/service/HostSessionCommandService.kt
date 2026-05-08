@@ -11,8 +11,9 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.`in`.ConfirmAttendanceUseCase
 import com.readmates.session.application.port.`in`.GetHostDashboardUseCase
+import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
+import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.`in`.ListUpcomingSessionsUseCase
-import com.readmates.session.application.port.`in`.ManageHostSessionUseCase
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
 import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
@@ -29,7 +30,8 @@ class HostSessionCommandService(
     private val port: HostSessionWritePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val recordNotificationEventUseCase: RecordNotificationEventUseCase = NoopRecordNotificationEventUseCase,
-) : ManageHostSessionUseCase,
+) : HostSessionLifecycleUseCase,
+    HostSessionDraftUseCase,
     ConfirmAttendanceUseCase,
     UpsertPublicationUseCase,
     ListUpcomingSessionsUseCase,
