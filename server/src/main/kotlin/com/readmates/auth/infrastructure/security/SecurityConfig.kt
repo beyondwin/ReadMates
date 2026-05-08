@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestRedirectFilter
@@ -103,21 +105,21 @@ class SecurityConfig(
                     .requestMatchers(methodAndPath("GET", Regex("^/api/clubs/[^/]+/invitations/[^/]+$"))).permitAll()
                     .requestMatchers(methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$"))).permitAll()
                     .requestMatchers(methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$"))).permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/sessions/current").hasAnyRole("HOST", "MEMBER", "VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/sessions/upcoming").hasAnyRole("HOST", "MEMBER", "VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/archive/**").hasAnyRole("HOST", "MEMBER", "VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/notes/**").hasAnyRole("HOST", "MEMBER", "VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/app/me").hasAnyRole("HOST", "MEMBER", "VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer").hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/sessions/current").hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/sessions/upcoming").hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/archive/**").hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/notes/**").hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/app/me").hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer").hasAuthority("ROLE_VIEWER")
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$"))).authenticated()
                     .requestMatchers(methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$"))).authenticated()
                     .requestMatchers("/api/admin/**").hasRole("PLATFORM_ADMIN")
                     .requestMatchers("/api/host/**").hasRole("HOST")
-                    .requestMatchers(HttpMethod.GET, "/api/feedback-documents/me").hasAnyRole("HOST", "MEMBER", "VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/feedback-documents/me").hasRole("VIEWER")
                     .requestMatchers(RegexRequestMatcher("^/api/sessions/[^/]+/feedback-document$", "GET"))
-                    .hasAnyRole("HOST", "MEMBER", "VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole("HOST", "MEMBER")
-                    .requestMatchers("/api/**").hasAnyRole("HOST", "MEMBER")
+                    .hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/**").hasRole("MEMBER")
+                    .requestMatchers("/api/**").hasRole("MEMBER")
                     .anyRequest().authenticated()
             }
             .exceptionHandling {
@@ -149,6 +151,16 @@ class SecurityConfig(
 
         return http.build()
     }
+
+    @Bean
+    fun roleHierarchy(): RoleHierarchy =
+        RoleHierarchyImpl.fromHierarchy(
+            """
+            ROLE_PLATFORM_ADMIN > ROLE_HOST
+            ROLE_HOST > ROLE_MEMBER
+            ROLE_MEMBER > ROLE_VIEWER
+            """.trimIndent(),
+        )
 
     @Bean
     fun rateLimitFilterRegistration(rateLimitFilter: RateLimitFilter): FilterRegistrationBean<RateLimitFilter> =
