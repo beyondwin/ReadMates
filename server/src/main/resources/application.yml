@@ -19,14 +19,16 @@ management:
   server:
     address: ${READMATES_MANAGEMENT_ADDRESS:127.0.0.1}
     port: ${READMATES_MANAGEMENT_PORT:8081}
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus,metrics
   endpoint:
     health:
       probes:
         enabled: true
+      show-details: never
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: health,prometheus
   health:
     redis:
       enabled: ${READMATES_REDIS_ENABLED:false}

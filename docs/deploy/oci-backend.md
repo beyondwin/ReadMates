@@ -10,6 +10,14 @@
 
 VM IP, SSH key path, private DB host, SMTP credential, OCI resource identifiers, 운영 smoke 결과 전문은 Git에 남기지 않습니다. 실제 provider 설정이나 비용 관련 판단은 현재 OCI/Cloudflare/Google 콘솔을 확인한 뒤 실행합니다.
 
+## Health check contract
+
+- liveness: `GET http://<server>:8080/internal/health` → `{ "status": "UP", "kind": "liveness" }`.
+  process up이면 항상 UP. systemd `ExecStartPost`/Caddy `health_uri`가 사용.
+- readiness: `GET http://<server>:8081/actuator/health/readiness` → DB/Redis/Kafka
+  health 종합. Pages Functions 또는 Caddy upstream 등록 시 readiness를 사용.
+- 8081 internal port는 firewall에서 외부 접근을 막는다(이미 v1에서 인지).
+
 ## 런타임 기준
 
 | 항목 | 값 |

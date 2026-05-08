@@ -37,7 +37,8 @@ class HealthControllerTest(
         mockMvc.get("/internal/health")
             .andExpect {
                 status { isOk() }
-                jsonPath("$.service") { value("readmates-server") }
+                jsonPath("$.status") { value("UP") }
+                jsonPath("$.kind") { value("liveness") }
             }
     }
 
