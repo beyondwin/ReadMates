@@ -1,9 +1,9 @@
-import type { CSSProperties } from "react";
+import { memo, type CSSProperties } from "react";
 import { BookCover } from "@/shared/ui/book-cover";
 import { Panel } from "./session-editor-panel";
 import type { MobileEditorSection } from "./mobile-editor-tabs";
 
-export function BasicSessionPanel({
+export const BasicSessionPanel = memo(function BasicSessionPanel({
   activeMobileSection,
   title,
   bookTitle,
@@ -224,4 +224,4 @@ export function BasicSessionPanel({
       </Panel>
     </>
   );
-}
+});

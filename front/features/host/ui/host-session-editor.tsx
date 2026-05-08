@@ -4,6 +4,9 @@ import {
   type CSSProperties,
   type FormEvent,
   type ReactNode,
+  useCallback,
+  useMemo,
+  useReducer,
   useRef,
   useState,
 } from "react";
@@ -18,16 +21,15 @@ import {
   buildHostSessionRequest,
   buildPublicationRequest,
   getDestructiveActionAvailability,
-  hydrateHostSessionFormValues,
-  initialAttendanceStatuses,
-  initialFeedbackDocumentStatus,
-  initialPublicationSummary,
-  initialRecordVisibility,
   questionDeadlineLabelForForm,
   type HostSessionPublicationRequest,
   type HostSessionRequest,
-  type SessionRecordVisibility,
 } from "@/features/host/model/host-session-editor-model";
+import {
+  hostSessionEditorReducer,
+  initialHostSessionEditorState,
+} from "@/features/host/model/host-session-editor-form-state";
+import type { BasicSessionField } from "@/features/host/model/host-session-editor-form-state";
 import { SessionIdentity } from "@/shared/ui/session-identity";
 import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/routing/readmates-route-state";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
@@ -144,46 +146,66 @@ export default function HostSessionEditor({
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
 }) {
-  const [formDefaults] = useState(() => hydrateHostSessionFormValues(session));
-  const [title, setTitle] = useState(formDefaults.title);
-  const [bookTitle, setBookTitle] = useState(formDefaults.bookTitle);
-  const [bookAuthor, setBookAuthor] = useState(formDefaults.bookAuthor);
-  const [bookLink, setBookLink] = useState(formDefaults.bookLink);
-  const [bookImageUrl, setBookImageUrl] = useState(formDefaults.bookImageUrl);
-  const [date, setDate] = useState(formDefaults.date);
-  const [time, setTime] = useState(formDefaults.startTime);
-  const [locationLabel, setLocationLabel] = useState(formDefaults.locationLabel);
-  const [meetingUrl, setMeetingUrl] = useState(formDefaults.meetingUrl);
-  const [meetingPasscode, setMeetingPasscode] = useState(formDefaults.meetingPasscode);
-  const [recordVisibility, setRecordVisibility] =
-    useState<SessionRecordVisibility>(() => initialRecordVisibility(session));
-  const [summary, setSummary] = useState(() => initialPublicationSummary(session));
-  const [hasPublicationRecord, setHasPublicationRecord] = useState(() => Boolean(session?.publication));
-  const [recordSaveInFlight, setRecordSaveInFlight] = useState(false);
-  const [sessionState, setSessionState] = useState<HostSessionDetailResponse["state"]>(() => session?.state ?? "DRAFT");
-  const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" | "error">("idle");
-  const [displaySessionSnapshot, setDisplaySessionSnapshot] = useState<HostSessionDetailResponse | null>(null);
-  const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
+  // ---------------------------------------------------------------------------
+  // Form state (reducer)
+  // ---------------------------------------------------------------------------
+  const [formState, dispatch] = useReducer(
+    hostSessionEditorReducer,
+    session,
+    initialHostSessionEditorState,
+  );
+
+  const {
+    title,
+    bookTitle,
+    bookAuthor,
+    bookLink,
+    bookImageUrl,
+    date,
+    time,
+    locationLabel,
+    meetingUrl,
+    meetingPasscode,
+    recordVisibility,
+    summary,
+    hasPublicationRecord,
+    sessionState,
+    displaySessionSnapshot,
+    attendanceStatuses,
+    feedbackDocument,
+  } = formState;
+
+  // ---------------------------------------------------------------------------
+  // Transient UI state (separate useState — not form data)
+  // ---------------------------------------------------------------------------
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [activeMobileSection, setActiveMobileSection] = useState<MobileEditorSection>("basic");
-  const [attendanceStatuses, setAttendanceStatuses] =
-    useState<Record<string, AttendanceStatus>>(() => initialAttendanceStatuses(session?.attendees));
-  const [feedbackDocument, setFeedbackDocument] = useState(
-    () => initialFeedbackDocumentStatus(session),
-  );
+  const [recordSaveInFlight, setRecordSaveInFlight] = useState(false);
+  const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [publicationFeedback, setPublicationFeedback] = useState<PublicationFeedback | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletePreview, setDeletePreview] = useState<HostSessionDeletionPreviewResponse | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletePreviewLoading, setDeletePreviewLoading] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Refs
+  // ---------------------------------------------------------------------------
   const feedbackDocumentInputRef = useRef<HTMLInputElement>(null);
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
   const deleteRestoreFocusRef = useRef<HTMLElement | null>(null);
   const committedAttendanceStatusesRef = useRef<Record<string, AttendanceStatus>>(
-    initialAttendanceStatuses(session?.attendees),
+    Object.fromEntries(
+      (session?.attendees ?? []).map((a) => [a.membershipId, a.attendanceStatus]),
+    ),
   );
   const attendanceWriteStatesRef = useRef<Record<string, AttendanceWriteState>>({});
+
+  // ---------------------------------------------------------------------------
+  // Derived values
+  // ---------------------------------------------------------------------------
   const deadline = questionDeadlineLabelForForm(session, date);
   const isNewSession = session === null || session === undefined;
   const editorTitle = isNewSession ? "세션 문서 만들기" : "세션 문서 편집";
@@ -201,8 +223,14 @@ export default function HostSessionEditor({
         state: readmatesReturnState(returnTarget),
       })
     : undefined;
-  const displaySession = displaySessionSnapshot ?? (session ? { ...session, state: sessionState } : session);
-  const destructiveActionAvailability = getDestructiveActionAvailability(displaySession);
+  const displaySession = useMemo(
+    () => displaySessionSnapshot ?? (session ? { ...session, state: sessionState } : session),
+    [displaySessionSnapshot, session, sessionState],
+  );
+  const destructiveActionAvailability = useMemo(
+    () => getDestructiveActionAvailability(displaySession),
+    [displaySession],
+  );
   const publicationLifecycleHelp =
     sessionState === "OPEN"
       ? "진행 중인 세션은 먼저 마감한 뒤 기록 공개를 완료할 수 있습니다."
@@ -212,10 +240,42 @@ export default function HostSessionEditor({
           ? "공개된 기록입니다. 공개 대상은 저장 버튼으로 변경할 수 있습니다."
           : "세션을 만든 뒤 기록 요약과 공개 범위를 저장할 수 있습니다.";
 
-  const flash = (message: string) => {
+  // ---------------------------------------------------------------------------
+  // Stable dispatch helpers
+  // ---------------------------------------------------------------------------
+  const setField = useCallback((key: BasicSessionField, value: string) => {
+    dispatch({ type: "SET_FIELD", key, value });
+  }, []);
+
+  // Stable per-field setters for panel props
+  const onTitleChange = useCallback((value: string) => setField("title", value), [setField]);
+  const onBookTitleChange = useCallback((value: string) => setField("bookTitle", value), [setField]);
+  const onBookAuthorChange = useCallback((value: string) => setField("bookAuthor", value), [setField]);
+  const onBookLinkChange = useCallback((value: string) => setField("bookLink", value), [setField]);
+  const onBookImageUrlChange = useCallback((value: string) => setField("bookImageUrl", value), [setField]);
+  const onDateChange = useCallback((value: string) => setField("date", value), [setField]);
+  const onTimeChange = useCallback((value: string) => setField("time", value), [setField]);
+  const onLocationLabelChange = useCallback((value: string) => setField("locationLabel", value), [setField]);
+  const onMeetingUrlChange = useCallback((value: string) => setField("meetingUrl", value), [setField]);
+  const onMeetingPasscodeChange = useCallback((value: string) => setField("meetingPasscode", value), [setField]);
+
+  const onRecordVisibilityChange = useCallback(
+    (visibility: typeof recordVisibility) =>
+      dispatch({ type: "SET_RECORD_VISIBILITY", visibility }),
+    [],
+  );
+  const onSummaryChange = useCallback(
+    (value: string) => setField("summary", value),
+    [setField],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Utility helpers
+  // ---------------------------------------------------------------------------
+  const flash = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 1600);
-  };
+  }, []);
 
   const deletionErrorMessage = (status?: number) => {
     if (status === 404) {
@@ -227,15 +287,15 @@ export default function HostSessionEditor({
     return "세션 삭제에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
   };
 
-  const closeDeleteModal = () => {
+  const closeDeleteModal = useCallback(() => {
     if (deleteSubmitting) {
       return;
     }
 
     setDeleteModalOpen(false);
-  };
+  }, [deleteSubmitting]);
 
-  const openDeleteModal = async () => {
+  const openDeleteModal = useCallback(async () => {
     if (!session || !destructiveActionAvailability.canDelete) {
       return;
     }
@@ -260,9 +320,9 @@ export default function HostSessionEditor({
     } finally {
       setDeletePreviewLoading(false);
     }
-  };
+  }, [session, destructiveActionAvailability.canDelete, actions]);
 
-  const confirmDeleteSession = async () => {
+  const confirmDeleteSession = useCallback(async () => {
     if (!session || !deletePreview || deleteSubmitting) {
       return;
     }
@@ -284,16 +344,52 @@ export default function HostSessionEditor({
     } finally {
       setDeleteSubmitting(false);
     }
-  };
+  }, [session, deletePreview, deleteSubmitting, actions]);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (saveState === "saving") {
-      return;
-    }
+  const handleSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (saveState === "saving") {
+        return;
+      }
 
-    setSaveState("saving");
-    const payload = buildHostSessionRequest({
+      setSaveState("saving");
+      const payload = buildHostSessionRequest({
+        title,
+        bookTitle,
+        bookAuthor,
+        bookLink,
+        bookImageUrl,
+        locationLabel,
+        meetingUrl,
+        meetingPasscode,
+        date,
+        startTime: time,
+      }, session ?? undefined);
+      try {
+        const response = await actions.saveSession(session?.sessionId ?? null, payload);
+
+        if (response.ok) {
+          setSaveState("saved");
+          if (isNewSession) {
+            const created = (await response.json()) as { sessionId: string };
+            globalThis.location.href = scopedHostRedirectHref(`/app/host/sessions/${encodeURIComponent(created.sessionId)}/edit`);
+            return;
+          }
+
+          globalThis.location.href = returnTarget.href;
+          return;
+        }
+
+        setSaveState("error");
+        flash("저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요");
+      } catch {
+        setSaveState("error");
+        flash("저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
+      }
+    },
+    [
+      saveState,
       title,
       bookTitle,
       bookAuthor,
@@ -303,32 +399,16 @@ export default function HostSessionEditor({
       meetingUrl,
       meetingPasscode,
       date,
-      startTime: time,
-    }, session ?? undefined);
-    try {
-      const response = await actions.saveSession(session?.sessionId ?? null, payload);
+      time,
+      session,
+      isNewSession,
+      actions,
+      returnTarget.href,
+      flash,
+    ],
+  );
 
-      if (response.ok) {
-        setSaveState("saved");
-        if (isNewSession) {
-          const created = (await response.json()) as { sessionId: string };
-          globalThis.location.href = scopedHostRedirectHref(`/app/host/sessions/${encodeURIComponent(created.sessionId)}/edit`);
-          return;
-        }
-
-        globalThis.location.href = returnTarget.href;
-        return;
-      }
-
-      setSaveState("error");
-      flash("저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요");
-    } catch {
-      setSaveState("error");
-      flash("저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
-    }
-  };
-
-  const savePublication = async () => {
+  const savePublication = useCallback(async () => {
     if (!session || recordSaveInFlight) {
       return;
     }
@@ -360,9 +440,11 @@ export default function HostSessionEditor({
         return;
       }
 
-      setSummary(publicationRequest.publicSummary);
-      setRecordVisibility(publicationRequest.visibility);
-      setHasPublicationRecord(true);
+      dispatch({
+        type: "PUBLICATION_SAVED",
+        publicSummary: publicationRequest.publicSummary,
+        visibility: publicationRequest.visibility,
+      });
       setPublicationFeedback({
         tone: "success",
         message: "기록 공개 범위를 저장했습니다.",
@@ -375,9 +457,9 @@ export default function HostSessionEditor({
     } finally {
       setRecordSaveInFlight(false);
     }
-  };
+  }, [session, recordSaveInFlight, summary, recordVisibility, actions]);
 
-  const closeSession = async () => {
+  const closeSession = useCallback(async () => {
     if (!session || lifecycleSaveState === "saving") {
       return;
     }
@@ -393,17 +475,16 @@ export default function HostSessionEditor({
       }
 
       const nextSession = await response.json();
-      setSessionState(nextSession.state);
-      setDisplaySessionSnapshot(nextSession);
+      dispatch({ type: "SESSION_LIFECYCLE_UPDATED", snapshot: nextSession });
       setLifecycleSaveState("idle");
       flash("세션을 마감했습니다.");
     } catch {
       setLifecycleSaveState("error");
       flash("세션 마감에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요");
     }
-  };
+  }, [session, lifecycleSaveState, actions, flash]);
 
-  const publishRecord = async () => {
+  const publishRecord = useCallback(async () => {
     if (!session || recordSaveInFlight || lifecycleSaveState === "saving") {
       return;
     }
@@ -452,11 +533,12 @@ export default function HostSessionEditor({
       }
 
       const nextSession = await publishResponse.json();
-      setSummary(publicationRequest.publicSummary);
-      setRecordVisibility(publicationRequest.visibility);
-      setHasPublicationRecord(true);
-      setSessionState(nextSession.state);
-      setDisplaySessionSnapshot(nextSession);
+      dispatch({
+        type: "PUBLICATION_SAVED",
+        publicSummary: publicationRequest.publicSummary,
+        visibility: publicationRequest.visibility,
+      });
+      dispatch({ type: "SESSION_LIFECYCLE_UPDATED", snapshot: nextSession });
       setPublicationFeedback({
         tone: "success",
         message: publicationRequest.visibility === "PUBLIC" ? "외부 공개가 완료되었습니다." : "멤버 기록 공개가 완료되었습니다.",
@@ -470,124 +552,137 @@ export default function HostSessionEditor({
       setRecordSaveInFlight(false);
       setLifecycleSaveState("idle");
     }
-  };
+  }, [session, recordSaveInFlight, lifecycleSaveState, recordVisibility, summary, actions]);
 
-  const updateAttendance = async (membershipId: string, attendanceStatus: AttendanceStatus) => {
-    if (!session) {
-      return;
-    }
+  const updateAttendance = useCallback(
+    async (membershipId: string, attendanceStatus: AttendanceStatus) => {
+      if (!session) {
+        return;
+      }
 
-    setAttendanceStatuses((current) => ({ ...current, [membershipId]: attendanceStatus }));
+      dispatch({ type: "UPDATE_ATTENDANCE", membershipId, status: attendanceStatus });
 
-    const writeState = attendanceWriteStatesRef.current[membershipId] ?? {
-      inFlight: false,
-      inFlightStatus: null,
-      queuedStatus: null,
-    };
-    attendanceWriteStatesRef.current[membershipId] = writeState;
-
-    if (writeState.inFlight) {
-      writeState.queuedStatus = writeState.inFlightStatus === attendanceStatus ? null : attendanceStatus;
-      return;
-    }
-
-    const sendAttendanceWrite = async (status: AttendanceStatus) => {
-      const currentWriteState = attendanceWriteStatesRef.current[membershipId] ?? {
+      const writeState = attendanceWriteStatesRef.current[membershipId] ?? {
         inFlight: false,
         inFlightStatus: null,
         queuedStatus: null,
       };
-      attendanceWriteStatesRef.current[membershipId] = currentWriteState;
-      currentWriteState.inFlight = true;
-      currentWriteState.inFlightStatus = status;
+      attendanceWriteStatesRef.current[membershipId] = writeState;
 
-      let writeSucceeded = false;
-
-      const rollbackToCommittedStatus = () => {
-        const committedStatus = committedAttendanceStatusesRef.current[membershipId] ?? "UNKNOWN";
-
-        setAttendanceStatuses((current) => {
-          if (currentWriteState.queuedStatus !== null) {
-            return current;
-          }
-
-          return { ...current, [membershipId]: committedStatus };
-        });
-      };
-
-      try {
-        const response = await actions.updateAttendance(session.sessionId, [{ membershipId, attendanceStatus: status }]);
-
-        writeSucceeded = response.ok;
-
-        if (response.ok) {
-          committedAttendanceStatusesRef.current[membershipId] = status;
-
-          if (currentWriteState.queuedStatus === null || currentWriteState.queuedStatus === status) {
-            currentWriteState.queuedStatus = null;
-          }
-        } else if (currentWriteState.queuedStatus === null) {
-          rollbackToCommittedStatus();
-          flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
-        }
-      } catch {
-        if (currentWriteState.queuedStatus === null) {
-          rollbackToCommittedStatus();
-          flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
-        }
-      } finally {
-        const nextStatus = currentWriteState.queuedStatus;
-        currentWriteState.inFlight = false;
-        currentWriteState.inFlightStatus = null;
-        currentWriteState.queuedStatus = null;
-
-        if (nextStatus !== null) {
-          void sendAttendanceWrite(nextStatus);
-        } else if (!writeSucceeded) {
-          delete attendanceWriteStatesRef.current[membershipId];
-        }
-      }
-    };
-
-    void sendAttendanceWrite(attendanceStatus);
-  };
-
-  const uploadFeedbackDocument = async (event: ChangeEvent<HTMLInputElement>) => {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    if (!session) {
-      input.value = "";
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await actions.uploadFeedbackDocument(session.sessionId, formData);
-
-      if (!response.ok) {
-        flash("피드백 문서 업로드에 실패했습니다. 파일 형식과 권한을 확인해 주세요");
+      if (writeState.inFlight) {
+        writeState.queuedStatus = writeState.inFlightStatus === attendanceStatus ? null : attendanceStatus;
         return;
       }
 
-      const uploaded = (await response.json()) as FeedbackDocumentResponse;
-      setFeedbackDocument({
-        uploaded: true,
-        fileName: uploaded.fileName,
-        uploadedAt: uploaded.uploadedAt,
-      });
-      flash("피드백 문서가 업로드되었습니다");
-    } catch {
-      flash("피드백 문서 업로드에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
-    } finally {
-      input.value = "";
-    }
-  };
+      const sendAttendanceWrite = async (status: AttendanceStatus) => {
+        const currentWriteState = attendanceWriteStatesRef.current[membershipId] ?? {
+          inFlight: false,
+          inFlightStatus: null,
+          queuedStatus: null,
+        };
+        attendanceWriteStatesRef.current[membershipId] = currentWriteState;
+        currentWriteState.inFlight = true;
+        currentWriteState.inFlightStatus = status;
+
+        let writeSucceeded = false;
+
+        const rollbackToCommittedStatus = () => {
+          const committedStatus = committedAttendanceStatusesRef.current[membershipId] ?? "UNKNOWN";
+
+          if (currentWriteState.queuedStatus === null) {
+            dispatch({ type: "UPDATE_ATTENDANCE", membershipId, status: committedStatus });
+          }
+        };
+
+        try {
+          const response = await actions.updateAttendance(session.sessionId, [{ membershipId, attendanceStatus: status }]);
+
+          writeSucceeded = response.ok;
+
+          if (response.ok) {
+            committedAttendanceStatusesRef.current[membershipId] = status;
+
+            if (currentWriteState.queuedStatus === null || currentWriteState.queuedStatus === status) {
+              currentWriteState.queuedStatus = null;
+            }
+          } else if (currentWriteState.queuedStatus === null) {
+            rollbackToCommittedStatus();
+            flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
+          }
+        } catch {
+          if (currentWriteState.queuedStatus === null) {
+            rollbackToCommittedStatus();
+            flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
+          }
+        } finally {
+          const nextStatus = currentWriteState.queuedStatus;
+          currentWriteState.inFlight = false;
+          currentWriteState.inFlightStatus = null;
+          currentWriteState.queuedStatus = null;
+
+          if (nextStatus !== null) {
+            void sendAttendanceWrite(nextStatus);
+          } else if (!writeSucceeded) {
+            delete attendanceWriteStatesRef.current[membershipId];
+          }
+        }
+      };
+
+      void sendAttendanceWrite(attendanceStatus);
+    },
+    [session, actions, flash],
+  );
+
+  const uploadFeedbackDocument = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const input = event.currentTarget;
+      const file = input.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      if (!session) {
+        input.value = "";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const response = await actions.uploadFeedbackDocument(session.sessionId, formData);
+
+        if (!response.ok) {
+          flash("피드백 문서 업로드에 실패했습니다. 파일 형식과 권한을 확인해 주세요");
+          return;
+        }
+
+        const uploaded = (await response.json()) as FeedbackDocumentResponse;
+        dispatch({
+          type: "FEEDBACK_DOCUMENT_UPDATED",
+          feedbackDocument: {
+            uploaded: true,
+            fileName: uploaded.fileName,
+            uploadedAt: uploaded.uploadedAt,
+          },
+        });
+        flash("피드백 문서가 업로드되었습니다");
+      } catch {
+        flash("피드백 문서 업로드에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
+      } finally {
+        input.value = "";
+      }
+    },
+    [session, actions, flash],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Stable memoized props for panels
+  // ---------------------------------------------------------------------------
+  const feedbackDocumentForPanel = useMemo(
+    () => ({ uploaded: feedbackDocument.uploaded, fileName: feedbackDocument.fileName }),
+    [feedbackDocument.uploaded, feedbackDocument.fileName],
+  );
 
   return (
     <main className="rm-host-session-editor">
@@ -721,16 +816,16 @@ export default function HostSessionEditor({
                 locationLabel={locationLabel}
                 meetingUrl={meetingUrl}
                 meetingPasscode={meetingPasscode}
-                onTitleChange={setTitle}
-                onBookTitleChange={setBookTitle}
-                onBookAuthorChange={setBookAuthor}
-                onBookLinkChange={setBookLink}
-                onBookImageUrlChange={setBookImageUrl}
-                onDateChange={setDate}
-                onTimeChange={setTime}
-                onLocationLabelChange={setLocationLabel}
-                onMeetingUrlChange={setMeetingUrl}
-                onMeetingPasscodeChange={setMeetingPasscode}
+                onTitleChange={onTitleChange}
+                onBookTitleChange={onBookTitleChange}
+                onBookAuthorChange={onBookAuthorChange}
+                onBookLinkChange={onBookLinkChange}
+                onBookImageUrlChange={onBookImageUrlChange}
+                onDateChange={onDateChange}
+                onTimeChange={onTimeChange}
+                onLocationLabelChange={onLocationLabelChange}
+                onMeetingUrlChange={onMeetingUrlChange}
+                onMeetingPasscodeChange={onMeetingPasscodeChange}
               />
 
               <PublicationPanel
@@ -743,8 +838,8 @@ export default function HostSessionEditor({
                 summary={summary}
                 publicationFeedback={publicationFeedback}
                 publicationLifecycleHelp={publicationLifecycleHelp}
-                onRecordVisibilityChange={setRecordVisibility}
-                onSummaryChange={setSummary}
+                onRecordVisibilityChange={onRecordVisibilityChange}
+                onSummaryChange={onSummaryChange}
                 onPublicationFeedbackChange={setPublicationFeedback}
                 onSavePublication={savePublication}
                 onCloseSession={closeSession}
@@ -769,7 +864,7 @@ export default function HostSessionEditor({
               >
                 <HostSessionFeedbackUpload
                   sessionId={session?.sessionId}
-                  feedbackDocument={{ uploaded: feedbackDocument.uploaded, fileName: feedbackDocument.fileName }}
+                  feedbackDocument={feedbackDocumentForPanel}
                   inputRef={feedbackDocumentInputRef}
                   emptyMessage={emptyManagementMessage}
                   previewState={feedbackPreviewState}
