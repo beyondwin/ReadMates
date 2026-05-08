@@ -111,6 +111,16 @@
 
 **관련 문서와 검증:** [architecture.md](architecture.md#서버-내부-구조), `./server/gradlew -p server clean test`
 
+## Prometheus metric tag에는 enum/low-cardinality 값만 사용한다
+
+**결정:** Prometheus metric tag 값은 `NotificationEventType`처럼 enum 또는 `pending`/`failed` 같은 고정 문자열만 사용합니다. `club_id`, `user_id`, `membership_id`, `recipient_email`, `event_id`, `delivery_id`, `session_id` 같은 row-level identifier는 tag로 넣지 않습니다.
+
+**이유:** Prometheus는 tag 값 조합마다 별도 time series를 만듭니다. row-level ID를 tag로 사용하면 운영 데이터가 늘어날수록 time series 수가 무한히 증가해 무료 Prometheus storage를 빠르게 소진하고, scrape/query 지연을 일으킵니다.
+
+**Trade-off:** metric만으로 "특정 사용자의 알림 전송 내역"을 Grafana에서 직접 조회할 수 없습니다. row-level 조회가 필요하면 `notification_deliveries` audit table에 JOIN 쿼리를 사용하거나, Grafana table panel에 DB datasource를 직접 연결합니다.
+
+**관련 문서와 검증:** `server/src/main/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetrics.kt` KDoc 참고
+
 ## 공개 릴리즈 후보를 별도 scan한다
 
 **결정:** 공개 저장소로 내보낼 후보는 `scripts/build-public-release-candidate.sh`로 별도 tree를 만든 뒤 `scripts/public-release-check.sh`로 scanner를 실행합니다.
