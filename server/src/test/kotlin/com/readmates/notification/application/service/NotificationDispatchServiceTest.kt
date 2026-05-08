@@ -413,6 +413,7 @@ class NotificationDispatchServiceTest {
                 maxAttempts = maxAttempts,
                 retryDelayMinutesConfig = retryDelayMinutesConfig,
             ),
+            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
         )
 
     private fun message(): NotificationEventMessage =

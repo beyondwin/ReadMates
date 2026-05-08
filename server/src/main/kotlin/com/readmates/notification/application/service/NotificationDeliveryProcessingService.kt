@@ -2,23 +2,22 @@ package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.port.`in`.ProcessNotificationDeliveriesUseCase
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
 class NotificationDeliveryProcessingService(
-    private val notificationDeliveryPort: NotificationDeliveryPort,
     private val deliveryEngine: NotificationDeliveryEngine,
-    @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
+    private val transactionalOps: NotificationDeliveryTransactionalOperations,
+    @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean,
 ) : ProcessNotificationDeliveriesUseCase {
     override fun processPending(limit: Int): Int {
         if (limit <= 0 || !deliveryEnabled) {
             return 0
         }
 
-        val items = notificationDeliveryPort.claimEmailDeliveries(limit)
+        val items = transactionalOps.claimEmailDeliveries(limit)
         items.forEach(::processClaimed)
         return items.size
     }
@@ -28,7 +27,7 @@ class NotificationDeliveryProcessingService(
             return 0
         }
 
-        val items = notificationDeliveryPort.claimEmailDeliveriesForClub(clubId, limit)
+        val items = transactionalOps.claimEmailDeliveriesForClub(clubId, limit)
         items.forEach(::processClaimed)
         return items.size
     }

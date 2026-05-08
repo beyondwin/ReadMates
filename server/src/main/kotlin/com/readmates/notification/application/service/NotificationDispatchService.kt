@@ -13,12 +13,12 @@ import java.util.UUID
 class NotificationDispatchService(
     private val deliveryPort: NotificationDeliveryPort,
     private val deliveryEngine: NotificationDeliveryEngine,
+    private val transactionalOps: NotificationDeliveryTransactionalOperations,
 ) : DispatchNotificationEventUseCase {
     override fun dispatch(message: NotificationEventMessage) {
-        val deliveries = deliveryPort.persistPlannedDeliveries(message)
+        val deliveries = transactionalOps.persistPlannedDeliveries(message)
         val retryableFailures = mutableListOf<NotificationDeliveryRetryableException>()
         deliveries
-            .asSequence()
             .filter { it.channel == NotificationChannel.EMAIL }
             .forEach { delivery ->
                 dispatchEmail(delivery)?.let(retryableFailures::add)
@@ -29,7 +29,7 @@ class NotificationDispatchService(
     }
 
     private fun dispatchEmail(delivery: NotificationDeliveryItem): NotificationDeliveryRetryableException? {
-        val claimed = deliveryPort.claimEmailDelivery(delivery.id) ?: return handleUnclaimedEmailDelivery(delivery.id)
+        val claimed = transactionalOps.claimEmailDelivery(delivery.id) ?: return handleUnclaimedEmailDelivery(delivery.id)
         return when (val result = deliveryEngine.sendClaimed(claimed)) {
             DeliveryEngineResult.Sent,
             DeliveryEngineResult.Dead,
