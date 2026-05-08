@@ -546,7 +546,7 @@ class PublicControllerDbTest(
               '00000000-0000-0000-0000-000000000001',
               994, '994회차 · 공개 범위 테스트 책 - 예정 공개', '공개 범위 테스트 책 - 예정 공개',
               '공개 범위 테스트 저자', null, null, null, '2026-11-04', '20:00', '22:00', '온라인',
-              '2026-11-03 14:59:00.000000', 'DRAFT', 'PUBLIC'
+              '2026-11-03 14:59:00.000000', 'DRAFT', 'MEMBER'
             ),
             (
               '00000000-0000-0000-0000-000000000995',
@@ -641,14 +641,14 @@ class PublicControllerDbTest(
         private const val INSERT_MEMBER_PUBLISHED_SESSION_SQL = """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
-              session_date, start_time, end_time, location_label, question_deadline_at, state
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
             )
             values (
               '00000000-0000-0000-0000-000000000997',
               '00000000-0000-0000-0000-000000000001',
               97, '97회차 · 멤버 공개 테스트 책', '멤버 공개 테스트 책', '멤버 공개 테스트 저자', null, null, null,
               '2026-12-29', '20:00', '22:00', '온라인',
-              '2026-12-28 14:59:00.000000', 'PUBLISHED'
+              '2026-12-28 14:59:00.000000', 'PUBLISHED', 'MEMBER'
             );
         """
 
@@ -670,14 +670,14 @@ class PublicControllerDbTest(
         private const val INSERT_HOST_ONLY_PUBLISHED_SESSION_SQL = """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
-              session_date, start_time, end_time, location_label, question_deadline_at, state
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
             )
             values (
               '00000000-0000-0000-0000-000000000996',
               '00000000-0000-0000-0000-000000000001',
               96, '96회차 · 호스트 공개 테스트 책', '호스트 공개 테스트 책', '호스트 공개 테스트 저자', null, null, null,
               '2026-12-28', '20:00', '22:00', '온라인',
-              '2026-12-27 14:59:00.000000', 'PUBLISHED'
+              '2026-12-27 14:59:00.000000', 'CLOSED', 'HOST_ONLY'
             );
         """
 

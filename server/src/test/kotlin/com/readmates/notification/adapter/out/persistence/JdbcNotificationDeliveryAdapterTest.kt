@@ -489,14 +489,18 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     private fun updateSessionState(state: String) {
+        // PUBLISHED requires MEMBER or PUBLIC visibility; DRAFT requires HOST_ONLY or MEMBER.
+        // The seeded session uses PUBLIC visibility, so when transitioning to DRAFT we use MEMBER.
+        val visibility = if (state == "DRAFT") "MEMBER" else "PUBLIC"
         jdbcTemplate.update(
             """
             update sessions
-            set state = ?
+            set state = ?, visibility = ?
             where id = ?
               and club_id = ?
             """.trimIndent(),
             state,
+            visibility,
             sessionId.toString(),
             clubId.toString(),
         )

@@ -275,6 +275,9 @@ class HostSessionControllerDbTest(
     @Test
     fun `host visibility update syncs existing publication compatibility columns`() {
         val sessionId = createDraftSessionSeven()
+        // Transition to CLOSED state first so that PUBLIC visibility is valid (DRAFT+PUBLIC violates the invariant)
+        updateSessionState(sessionId, "OPEN")
+        updateSessionState(sessionId, "CLOSED")
         insertPublicationRow(sessionId, visibility = "MEMBER", isPublic = false, published = false)
 
         mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
@@ -312,16 +315,20 @@ class HostSessionControllerDbTest(
     fun `member upcoming sessions include only draft member or public sessions`() {
         val memberSessionId = createDraftSession("7회차 · 멤버 공개 책", "멤버 공개 책", "2026-05-20")
         updateSessionVisibility(memberSessionId, "MEMBER")
-        val publicSessionId = createDraftSession("8회차 · 공개 책", "공개 책", "2026-06-17")
-        updateSessionVisibility(publicSessionId, "PUBLIC")
+        // DRAFT+PUBLIC violates the state×visibility invariant; use a second DRAFT+MEMBER session instead
+        val memberSessionId2 = createDraftSession("8회차 · 멤버 공개 책 2", "멤버 공개 책 2", "2026-06-17")
+        updateSessionVisibility(memberSessionId2, "MEMBER")
         val hostOnlySessionId = createDraftSession("9회차 · 호스트 책", "호스트 책", "2026-07-15")
         val openSessionId = createDraftSession("10회차 · 열린 책", "열린 책", "2026-08-19")
         updateSessionVisibility(openSessionId, "MEMBER")
         updateSessionState(openSessionId, "OPEN")
         val closedSessionId = createDraftSession("11회차 · 닫힌 책", "닫힌 책", "2026-09-16")
-        updateSessionVisibility(closedSessionId, "PUBLIC")
+        // Must set state to CLOSED before setting PUBLIC visibility (DRAFT+PUBLIC violates the invariant)
+        updateSessionState(closedSessionId, "OPEN")
         updateSessionState(closedSessionId, "CLOSED")
-        createOutsideClubSession(state = "DRAFT", visibility = "PUBLIC")
+        updateSessionVisibility(closedSessionId, "PUBLIC")
+        // Outside club session uses MEMBER visibility (DRAFT+PUBLIC violates the invariant)
+        createOutsideClubSession(state = "DRAFT", visibility = "MEMBER")
 
         mockMvc.get("/api/sessions/upcoming") {
             with(user("member1@example.com"))
@@ -330,8 +337,8 @@ class HostSessionControllerDbTest(
             jsonPath("$.length()") { value(2) }
             jsonPath("$[0].sessionId") { value(memberSessionId) }
             jsonPath("$[0].visibility") { value("MEMBER") }
-            jsonPath("$[1].sessionId") { value(publicSessionId) }
-            jsonPath("$[1].visibility") { value("PUBLIC") }
+            jsonPath("$[1].sessionId") { value(memberSessionId2) }
+            jsonPath("$[1].visibility") { value("MEMBER") }
         }
 
         assertEquals("HOST_ONLY", findSessionVisibility(hostOnlySessionId))
@@ -387,6 +394,9 @@ class HostSessionControllerDbTest(
     @Test
     fun `host cannot open published session`() {
         createSessionSeven()
+        // OPEN→CLOSED to maintain valid state, then set visibility before PUBLISHED (PUBLISHED+HOST_ONLY violates invariant)
+        updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
+        updateSessionVisibility("00000000-0000-0000-0000-000000009777", "MEMBER")
         updateSessionState("00000000-0000-0000-0000-000000009777", "PUBLISHED")
 
         mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
@@ -540,6 +550,8 @@ class HostSessionControllerDbTest(
             status { isConflict() }
         }
 
+        // PUBLISHED+HOST_ONLY violates the invariant; set visibility to MEMBER first
+        updateSessionVisibility(sessionId, "MEMBER")
         updateSessionState(sessionId, "PUBLISHED")
 
         mockMvc.post("/api/host/sessions/$sessionId/close") {
@@ -746,7 +758,7 @@ class HostSessionControllerDbTest(
         jdbcTemplate.update(
             """
             update sessions
-            set state = 'PUBLISHED'
+            set visibility = 'MEMBER', state = 'PUBLISHED'
             where id = '00000000-0000-0000-0000-000000009777'
             """.trimIndent(),
         )
@@ -1534,7 +1546,7 @@ private class CloseRaceJdbcTemplate(private val rawDataSource: DataSource) : Jdb
                 connection.prepareStatement(
                     """
                     update sessions
-                    set state = 'PUBLISHED'
+                    set state = 'PUBLISHED', visibility = 'MEMBER'
                     where id = ?
                       and club_id = '00000000-0000-0000-0000-000000000001'
                     """.trimIndent(),
