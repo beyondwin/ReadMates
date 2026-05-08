@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { onRequest } from "../../functions/api/bff/[[path]]";
+import { stripCookieDomain } from "../../functions/_shared/proxy";
 
 type Env = {
   READMATES_API_BASE_URL: string;
@@ -594,5 +595,51 @@ describe("Cloudflare BFF cache layer", () => {
 
     expect(cacheMatch).not.toHaveBeenCalled();
     expect(ctx.waitUntil).not.toHaveBeenCalled();
+  });
+});
+
+describe("stripCookieDomain", () => {
+  it("strips Domain attribute from a Set-Cookie header value", () => {
+    const raw = "foo=bar; Path=/; Domain=upstream.example.com; HttpOnly";
+    const result = stripCookieDomain(raw);
+    expect(result).toBe("foo=bar; Path=/; HttpOnly");
+    expect(result).not.toMatch(/Domain=/i);
+  });
+
+  it("returns the cookie unchanged when no Domain attribute is present", () => {
+    const raw = "foo=bar; Path=/; HttpOnly";
+    expect(stripCookieDomain(raw)).toBe("foo=bar; Path=/; HttpOnly");
+  });
+
+  it("strips Domain from all cookies when upstream sends multiple Set-Cookie lines", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const upstream = new Response(null, { status: 204 });
+        Object.defineProperty(upstream.headers, "getSetCookie", {
+          value: () => [
+            "session=abc; Path=/; Domain=upstream.example.com; HttpOnly",
+            "pref=dark; Path=/; Domain=upstream.example.com",
+          ],
+        });
+        return upstream;
+      }),
+    );
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/auth/logout", {
+          method: "POST",
+          headers: { Origin: "https://readmates.pages.dev" },
+        }),
+        { path: ["api", "auth", "logout"] },
+      ),
+    );
+
+    expect(response.status).toBe(204);
+    const setCookieHeader = response.headers.get("set-cookie");
+    expect(setCookieHeader).not.toMatch(/Domain=/i);
+    expect(setCookieHeader).toContain("session=abc");
+    expect(setCookieHeader).toContain("pref=dark");
   });
 });

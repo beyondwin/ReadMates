@@ -4,6 +4,10 @@ export type HeadersWithSetCookie = Headers & {
 
 const MAX_CLIENT_IP_LENGTH = 128;
 
+export function stripCookieDomain(rawSetCookie: string): string {
+  return rawSetCookie.replace(/;\s*Domain=[^;]*/i, "");
+}
+
 export function copyUpstreamHeaders(headers: Headers) {
   const copiedHeaders = new Headers(headers);
   copiedHeaders.delete("set-cookie");
@@ -14,13 +18,13 @@ export function copyUpstreamHeaders(headers: Headers) {
 
   const setCookies = (headers as HeadersWithSetCookie).getSetCookie?.() ?? [];
   for (const cookie of setCookies) {
-    copiedHeaders.append("set-cookie", cookie);
+    copiedHeaders.append("set-cookie", stripCookieDomain(cookie));
   }
 
   if (setCookies.length === 0) {
     const setCookie = headers.get("set-cookie");
     if (setCookie) {
-      copiedHeaders.append("set-cookie", setCookie);
+      copiedHeaders.append("set-cookie", stripCookieDomain(setCookie));
     }
   }
 
