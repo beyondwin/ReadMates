@@ -121,6 +121,23 @@
 
 **관련 문서와 검증:** `server/src/main/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetrics.kt` KDoc 참고
 
+## Kafka relay/consumer worker process를 단일 jar로 분리 운영한다
+
+**결정:** 현재 single Spring Boot process에서 web + scheduler + Kafka listener가 함께
+boot하므로, process 1개 죽으면 web과 notification 발송이 함께 정지한다.
+`readmates.notifications.worker.enabled=false/true` flag를 두고 systemd service를
+2개(web replica, worker instance)로 분리하면 infra cost 없이 failure isolation이 가능하다.
+
+**이유:** 단일 jar 재사용으로 infra cost 0. Gradle multi-module 분리(선택지 B)는
+2 instance 이상 운영하게 됐을 때 재검토한다.
+
+**Trade-off:** web replica와 worker instance가 같은 jar를 쓰므로 classpath isolation은
+없다. Kafka listener class는 web instance에서도 로드된다
+(`@ConditionalOnProperty`로 bean만 skip).
+
+**관련 문서와 검증:** v1 TASK-075 보강. `readmates.notifications.worker.enabled=false`로
+boot 시 Kafka listener bean이 등록되지 않는지 log 확인.
+
 ## 공개 릴리즈 후보를 별도 scan한다
 
 **결정:** 공개 저장소로 내보낼 후보는 `scripts/build-public-release-candidate.sh`로 별도 tree를 만든 뒤 `scripts/public-release-check.sh`로 scanner를 실행합니다.
