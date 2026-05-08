@@ -40,7 +40,7 @@ class MySqlFlywayMigrationTest(
         assertEquals(3, tableCount)
         assertKafkaNotificationTablesExist(jdbcTemplate)
         assertKafkaNotificationForeignKeys()
-        assertEquals("YES", columnValue("users", "password_hash", "is_nullable"))
+        assertEquals("YES", columnValue("users", "legacy_password_hash", "is_nullable"))
         assertEquals("NO", columnValue("users", "short_name", "is_nullable"))
         assertEquals("NO", columnValue("memberships", "short_name", "is_nullable"))
         assertEquals("NO", columnValue("invitations", "invited_name", "is_nullable"))
