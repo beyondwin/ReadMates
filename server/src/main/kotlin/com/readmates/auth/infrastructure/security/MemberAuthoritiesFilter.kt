@@ -1,6 +1,6 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.auth.application.AuthenticatedMemberResolver
+import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.club.adapter.`in`.web.ClubContextHeader
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase

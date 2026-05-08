@@ -1,5 +1,7 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
+import com.readmates.auth.application.AuthApplicationError
+import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
 import com.readmates.auth.application.port.out.PendingApprovalRow
 import com.readmates.auth.application.port.out.PendingApprovalStorePort

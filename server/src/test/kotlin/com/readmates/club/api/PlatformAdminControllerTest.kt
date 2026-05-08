@@ -1,6 +1,6 @@
 package com.readmates.club.api
 
-import com.readmates.auth.application.AuthSessionService
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.club.application.model.ClubDomainActualCheckResult
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.domain.ClubDomainStatus

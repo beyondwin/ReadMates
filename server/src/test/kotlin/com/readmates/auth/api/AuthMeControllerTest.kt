@@ -1,6 +1,6 @@
 package com.readmates.auth.api
 
-import com.readmates.auth.application.AuthSessionService
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.infrastructure.security.MemberAuthoritiesFilter
 import com.readmates.auth.infrastructure.security.SessionCookieAuthenticationFilter
 import com.readmates.support.MySqlTestContainer

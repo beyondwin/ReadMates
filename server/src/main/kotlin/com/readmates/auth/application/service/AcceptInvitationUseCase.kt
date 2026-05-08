@@ -1,4 +1,4 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import com.readmates.auth.domain.InvitationStatus
 import org.springframework.stereotype.Service

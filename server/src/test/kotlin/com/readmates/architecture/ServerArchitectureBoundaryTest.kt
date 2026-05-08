@@ -2,7 +2,9 @@ package com.readmates.architecture
 
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
+import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import org.springframework.stereotype.Service
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
@@ -203,6 +205,15 @@ class ServerArchitectureBoundaryTest {
     private fun sourceRoot(): Path =
         listOf(Path.of("src/main/kotlin"), Path.of("server/src/main/kotlin"))
             .first(Files::exists)
+
+    @Test
+    fun `auth application services live in application service package`() {
+        classes()
+            .that().resideInAPackage("com.readmates.auth.application..")
+            .and().areAnnotatedWith(Service::class.java)
+            .should().resideInAPackage("com.readmates.auth.application.service..")
+            .check(importedClasses)
+    }
 
     @Test
     fun `domain classes do not depend on adapters or web and jdbc frameworks`() {

@@ -1,6 +1,8 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.auth.application.AuthApplicationError
+import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
 import com.readmates.auth.application.port.out.MemberApprovalStorePort
 import com.readmates.auth.application.port.out.ViewerMemberRow

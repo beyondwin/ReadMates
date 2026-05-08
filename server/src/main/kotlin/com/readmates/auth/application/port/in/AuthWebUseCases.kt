@@ -1,12 +1,12 @@
 package com.readmates.auth.application.port.`in`
 
-import com.readmates.auth.application.HostInvitationResponse
 import com.readmates.auth.application.HostMemberListItem
-import com.readmates.auth.application.InvitationPreviewResponse
 import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.MemberLifecycleResponse
-import com.readmates.auth.application.PendingApprovalAppResponse
-import com.readmates.auth.application.ViewerMemberResponse
+import com.readmates.auth.application.service.HostInvitationResponse
+import com.readmates.auth.application.service.InvitationPreviewResponse
+import com.readmates.auth.application.service.PendingApprovalAppResponse
+import com.readmates.auth.application.service.ViewerMemberResponse
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember

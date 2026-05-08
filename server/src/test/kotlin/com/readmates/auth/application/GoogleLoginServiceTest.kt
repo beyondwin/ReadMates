@@ -1,4 +1,4 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember

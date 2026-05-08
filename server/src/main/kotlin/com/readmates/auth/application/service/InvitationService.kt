@@ -1,7 +1,9 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import com.readmates.auth.domain.InvitationStatus
 import com.readmates.auth.domain.MembershipRole
+import com.readmates.auth.application.InvitationDomainError
+import com.readmates.auth.application.InvitationDomainException
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
 import com.readmates.auth.application.port.`in`.PreviewInvitationUseCase
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand

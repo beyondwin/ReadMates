@@ -1,4 +1,4 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import com.readmates.auth.application.model.StoredAuthSession
 import com.readmates.auth.application.port.`in`.LogoutAuthSessionUseCase
