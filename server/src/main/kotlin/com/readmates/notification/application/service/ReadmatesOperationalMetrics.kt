@@ -1,7 +1,6 @@
 package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationEventType
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
@@ -13,7 +12,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 class ReadmatesOperationalMetrics(
     private val meterRegistry: MeterRegistry,
-    private val notificationDeliveryPort: NotificationDeliveryPort? = null,
+    private val cachedBacklogProvider: CachedNotificationBacklogProvider? = null,
 ) {
     init {
         registerOutboxBacklogGauges()
@@ -66,10 +65,10 @@ class ReadmatesOperationalMetrics(
     }
 
     private fun registerOutboxBacklogGauges() {
-        val port = notificationDeliveryPort ?: return
+        val provider = cachedBacklogProvider ?: return
         OutboxBacklogStatus.entries.forEach { status ->
             Gauge.builder("readmates.notifications.outbox.backlog") {
-                port.deliveryBacklog().count(status).toDouble()
+                provider.snapshot().count(status).toDouble()
             }
                 .description("Current email notification delivery rows by status")
                 .tag("status", status.tag)
