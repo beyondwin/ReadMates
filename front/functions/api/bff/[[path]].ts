@@ -6,6 +6,11 @@ import {
   normalizedHostFromRequest,
 } from "../../_shared/proxy";
 import { bffErrorResponse } from "../../_shared/errors";
+import {
+  buildPublicCacheKey,
+  isCacheableUpstreamResponse,
+  isPublicCacheableRequest,
+} from "../../_shared/cache";
 import { normalizedClubSlug } from "../../../shared/security/club-slug";
 
 type Env = {
@@ -17,6 +22,7 @@ type PagesFunction<Env> = (context: {
   request: Request;
   env: Env;
   params: Record<string, string | string[] | undefined>;
+  waitUntil: (promise: Promise<unknown>) => void;
 }) => Response | Promise<Response>;
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -113,6 +119,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return bffErrorResponse(400, "INVALID_REQUEST");
   }
 
+  if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
+    const cacheKey = buildPublicCacheKey(context.request);
+    const cached = await caches.default.match(cacheKey);
+    if (cached) {
+      return cached;
+    }
+  }
+
   upstreamUrl.search = requestUrl.search;
 
   const headers = new Headers();
@@ -162,8 +176,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     ? null
     : upstream.body;
 
-  return new Response(responseBody, {
+  const outboundResponse = new Response(responseBody, {
     status: upstream.status,
     headers: copyUpstreamHeaders(upstream.headers),
   });
+
+  if (isPublicCacheableRequest(context.request.method, upstreamPath) && isCacheableUpstreamResponse(upstream)) {
+    const cacheKey = buildPublicCacheKey(context.request);
+    context.waitUntil(caches.default.put(cacheKey, outboundResponse.clone()));
+  }
+
+  return outboundResponse;
 };

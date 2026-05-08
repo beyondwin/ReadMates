@@ -18,6 +18,7 @@ function context(
     request,
     env,
     params,
+    waitUntil: vi.fn(),
   } as Parameters<typeof onRequest>[0];
 }
 
@@ -491,5 +492,107 @@ describe("Cloudflare BFF function", () => {
     expect(forwardedInit?.body).toBeUndefined();
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
+  });
+});
+
+describe("Cloudflare BFF cache layer", () => {
+  it("returns cached response on cache hit without calling upstream fetch", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const cachedResponse = new Response('{"cached":true}', {
+      status: 200,
+      headers: { "Cache-Control": "public, max-age=120" },
+    });
+    const cacheMatch = vi.fn(async () => cachedResponse);
+    const cachePut = vi.fn(async () => undefined);
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai"),
+        { path: ["api", "public", "clubs", "reading-sai"] },
+      ),
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({ cached: true });
+  });
+
+  it("fetches from upstream and stores in cache on cache miss for cacheable public path", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('{"fresh":true}', {
+          status: 200,
+          headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=600" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const cacheMatch = vi.fn(async () => undefined);
+    const cachePut = vi.fn(async () => undefined);
+    const ctx = context(
+      new Request("https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai"),
+      { path: ["api", "public", "clubs", "reading-sai"] },
+    );
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+
+    const response = await onRequest(ctx);
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(response.status).toBe(200);
+    expect(ctx.waitUntil).toHaveBeenCalledOnce();
+  });
+
+  it("does not store in cache when upstream response has Set-Cookie", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const upstream = new Response("{}", {
+          status: 200,
+          headers: { "Cache-Control": "public, max-age=120" },
+        });
+        Object.defineProperty(upstream.headers, "getSetCookie", {
+          value: () => ["session=abc; HttpOnly"],
+        });
+        return upstream;
+      }),
+    );
+
+    const cacheMatch = vi.fn(async () => undefined);
+    const cachePut = vi.fn(async () => undefined);
+    const ctx = context(
+      new Request("https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai"),
+      { path: ["api", "public", "clubs", "reading-sai"] },
+    );
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+
+    await onRequest(ctx);
+
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
+  });
+
+  it("does not use cache for mutation requests on public paths", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const cacheMatch = vi.fn(async () => undefined);
+    const cachePut = vi.fn(async () => undefined);
+    const ctx = context(
+      new Request("https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai", {
+        method: "POST",
+        headers: { Origin: "https://readmates.pages.dev" },
+        body: "{}",
+      }),
+      { path: ["api", "public", "clubs", "reading-sai"] },
+    );
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+
+    await onRequest(ctx);
+
+    expect(cacheMatch).not.toHaveBeenCalled();
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
   });
 });
