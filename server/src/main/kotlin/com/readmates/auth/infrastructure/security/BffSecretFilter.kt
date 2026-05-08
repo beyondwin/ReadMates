@@ -1,12 +1,11 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.application.port.out.AllowedOriginPort
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.core.env.Environment
-import org.springframework.core.env.StandardEnvironment
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.net.URI
@@ -17,15 +16,10 @@ import java.security.MessageDigest
 class BffSecretFilter(
     @param:Value("\${readmates.bff-secret:}")
     private val expectedSecret: String,
-    private val environment: Environment = StandardEnvironment(),
-    @Value("\${readmates.allowed-origins:}")
-    allowedOrigins: String = "",
-    @Value("\${readmates.app-base-url:http://localhost:3000}")
-    appBaseUrl: String = "http://localhost:3000",
+    private val allowedOriginPort: AllowedOriginPort,
     @param:Value("\${readmates.bff-secret-required:true}")
-    private val bffSecretRequired: Boolean = true,
+    private val bffSecretRequired: Boolean,
 ) : OncePerRequestFilter() {
-    private val allowedOriginSet = parseAllowedOrigins(allowedOrigins, appBaseUrl)
 
     init {
         if (bffSecretRequired && expectedSecret.trim().isBlank()) {
@@ -78,7 +72,7 @@ class BffSecretFilter(
             ?: request.getHeader("Referer")?.toOrigin()
             ?: return false
 
-        return origin in allowedOriginSet
+        return allowedOriginPort.isAllowed(origin)
     }
 
     private fun isMutatingRequest(request: HttpServletRequest): Boolean =
@@ -91,7 +85,7 @@ class BffSecretFilter(
         return path == "/api" || path.startsWith("/api/")
     }
 
-    private companion object {
+    internal companion object {
         private val operationalLogger = LoggerFactory.getLogger(BffSecretFilter::class.java)
         const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")

@@ -69,15 +69,14 @@ https://<primary-domain>/login/oauth2/code/google
 
 ## Allowed Origins
 
-`READMATES_ALLOWED_ORIGINS`는 mutating request의 `Origin` 또는 `Referer` 검증에 쓰는 정적 comma-separated 목록입니다. 현재 구현은 DB의 active `club_domains`를 runtime allowlist로 자동 반영하지 않습니다.
+`READMATES_ALLOWED_ORIGINS`는 mutating request의 `Origin` 또는 `Referer` 검증에 쓰는 정적 comma-separated 목록입니다. DB의 `club_domains` 테이블에서 `status='ACTIVE'`인 hostname은 60초 TTL 캐시로 동적으로 allowlist에 반영됩니다. backend 재시작 없이 1분 내 allowlist에 반영됩니다.
 
 새 registered host를 운영에 넣을 때는 아래 순서를 지킵니다.
 
 1. Cloudflare Pages custom domain 연결을 준비합니다.
-2. Spring 환경 파일의 `READMATES_ALLOWED_ORIGINS`에 browser-facing origin을 추가합니다.
-3. Spring을 재시작해 allowlist를 반영합니다.
-4. Host가 HTTPS로 Pages 앱을 서빙하고 BFF 요청이 통과하는지 smoke test합니다.
-5. 확인된 host만 `ACTIVE`로 운영합니다.
+2. Admin UI에서 상태 확인을 실행해 host를 `ACTIVE`로 전환합니다.
+3. Host가 HTTPS로 Pages 앱을 서빙하고 BFF 요청이 통과하는지 smoke test합니다. 동적 allowlist 반영까지 최대 1분이 소요될 수 있습니다.
+4. 정적 목록에 추가하려면 `READMATES_ALLOWED_ORIGINS`에 origin을 추가하고 재시작합니다.
 
 Wildcard origin은 사용하지 않습니다. Placeholder 문서에는 실제 운영 domain 목록을 적지 않습니다.
 
