@@ -1,3 +1,9 @@
+import { SupportAccessGrantsPanel } from "@/features/platform-admin/ui/support-access-grants-panel";
+import type {
+  CreateSupportAccessGrantFields,
+  SupportAccessGrantView,
+} from "@/features/platform-admin/ui/support-access-grants-panel";
+
 type PlatformAdminDomainStatus =
   | "REQUESTED"
   | "ACTION_REQUIRED"
@@ -33,6 +39,9 @@ type PlatformAdminDashboardProps = {
   checkingDomainIds?: ReadonlySet<string>;
   domainCheckErrors?: Record<string, string>;
   onCheckDomain?: (domainId: string) => void;
+  activeGrants?: SupportAccessGrantView[];
+  onCreateGrant?: (fields: CreateSupportAccessGrantFields) => Promise<void>;
+  onRevokeGrant?: (grantId: string) => Promise<void>;
 };
 
 export function PlatformAdminDashboard({
@@ -40,6 +49,9 @@ export function PlatformAdminDashboard({
   checkingDomainIds = new Set<string>(),
   domainCheckErrors = {},
   onCheckDomain,
+  activeGrants = [],
+  onCreateGrant,
+  onRevokeGrant,
 }: PlatformAdminDashboardProps) {
   const domains = summary.domains ?? summary.domainsRequiringAction ?? [];
 
@@ -85,6 +97,12 @@ export function PlatformAdminDashboard({
             <p className="muted platform-admin-domain-empty">등록된 도메인이 없습니다.</p>
           )}
         </section>
+
+        <SupportAccessGrantsPanel
+          grants={activeGrants}
+          onCreateGrant={onCreateGrant}
+          onRevokeGrant={onRevokeGrant}
+        />
       </section>
     </main>
   );

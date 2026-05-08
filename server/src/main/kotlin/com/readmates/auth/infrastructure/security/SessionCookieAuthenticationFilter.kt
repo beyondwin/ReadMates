@@ -76,6 +76,17 @@ class SessionCookieAuthenticationFilter(
                                     emptyList(),
                                 )
                             }
+                } else if (requestedClubContext.supplied) {
+                    // Non-member accessing a club-context request — still authenticate as CurrentUser
+                    // so PlatformAdminAuthoritiesFilter and MemberAuthoritiesFilter can do elevation.
+                    authenticatedMemberResolver.resolveUserById(session.userId)
+                        ?.let { currentUser ->
+                            UsernamePasswordAuthenticationToken(
+                                currentUser,
+                                null,
+                                emptyList(),
+                            )
+                        }
                 } else {
                     null
                 }

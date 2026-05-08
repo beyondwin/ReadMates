@@ -4,6 +4,9 @@ import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.club.adapter.`in`.web.ClubContextHeader
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
+import com.readmates.club.application.port.out.LoadSupportAccessGrantPort
+import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.CurrentUser
 import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -18,6 +21,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 class MemberAuthoritiesFilter(
     private val authenticatedMemberResolver: AuthenticatedMemberResolver,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
+    private val loadSupportAccessGrantPort: LoadSupportAccessGrantPort,
 ) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -45,6 +49,20 @@ class MemberAuthoritiesFilter(
                     "ROLE_${member.role}"
                 }
                 authorities += SimpleGrantedAuthority(roleAuthority)
+            } else if (requestedClubContext.context != null &&
+                authentication.authorities.any { it.authority == PLATFORM_ADMIN_AUTHORITY }
+            ) {
+                // Platform admin with an active support access grant gets elevated to ROLE_HOST
+                val userId = when (val principal = authentication.principal) {
+                    is CurrentUser -> principal.userId
+                    is CurrentPlatformAdmin -> principal.userId
+                    else -> null
+                }
+                if (userId != null &&
+                    loadSupportAccessGrantPort.hasActiveGrant(userId, requestedClubContext.context.clubId)
+                ) {
+                    authorities += SimpleGrantedAuthority("ROLE_HOST")
+                }
             }
 
             val mappedAuthentication = UsernamePasswordAuthenticationToken(
@@ -79,6 +97,7 @@ class MemberAuthoritiesFilter(
 
     private companion object {
         val MEMBER_ROLE_AUTHORITIES = setOf("ROLE_HOST", "ROLE_MEMBER", "ROLE_VIEWER")
+        const val PLATFORM_ADMIN_AUTHORITY = "ROLE_PLATFORM_ADMIN"
     }
 
     private data class RequestedClubContext(

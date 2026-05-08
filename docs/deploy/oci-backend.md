@@ -203,6 +203,77 @@ Google Cloud OAuth client에는 `READMATES_AUTH_BASE_URL`의 `/login/oauth2/code
 
 Registered club host를 새로 추가한 뒤에는 Cloudflare Pages custom domain 연결, Spring `READMATES_ALLOWED_ORIGINS` 갱신과 재시작, Platform admin 상태 확인 action을 같은 rollout로 묶습니다. 마지막에는 `scripts/smoke-production-integrations.sh`로 Pages marker와 OAuth `redirect_uri`를 확인하고, 실제 운영 결과는 공개 문서나 Git에 붙이지 않습니다.
 
+## Emergency support access flow
+
+플랫폼 관리자가 특정 클럽에 일시적으로 HOST 권한을 부여해야 할 때(고객 에스컬레이션 등) 아래 절차를 따릅니다.
+
+### 권한 생성
+
+플랫폼 관리자 대시보드(`/app/admin`) → "긴급 지원 접근 권한" 섹션에서 생성합니다.
+
+필수 입력:
+- **Club ID**: 대상 클럽의 UUID
+- **Grantee User ID**: 접근 권한을 받을 플랫폼 관리자 UUID
+- **사유(reason)**: 접근 이유 (예: "고객 에스컬레이션 티켓 #1234")
+- **만료 시각(expiresAt)**: datetime-local 형식, 기본값 현재 시각+1시간
+
+또는 API 직접 호출:
+
+```bash
+curl -X POST https://<api-origin>/api/admin/support-access-grants \
+  -H 'Content-Type: application/json' \
+  -b '<session-cookie>' \
+  -d '{
+    "clubId": "<club-uuid>",
+    "granteeUserId": "<grantee-user-uuid>",
+    "scope": "HOST_SUPPORT_READ",
+    "reason": "고객 에스컬레이션 티켓 #1234",
+    "expiresAt": "2026-05-09T13:00:00Z"
+  }'
+```
+
+### 권한 취소
+
+만료 전에 수동으로 취소하려면:
+
+```bash
+curl -X DELETE https://<api-origin>/api/admin/support-access-grants/<grant-uuid> \
+  -b '<session-cookie>'
+```
+
+또는 대시보드 → "권한 취소" 버튼 클릭.
+
+### 활성 권한 조회
+
+```bash
+# club 기준
+curl https://<api-origin>/api/admin/support-access-grants?clubId=<club-uuid> \
+  -b '<session-cookie>'
+
+# grantee 기준
+curl https://<api-origin>/api/admin/support-access-grants?granteeUserId=<user-uuid> \
+  -b '<session-cookie>'
+```
+
+### 감사 로그 확인
+
+모든 CREATE와 REVOKE 이벤트는 `platform_audit_events` 테이블에 기록됩니다.
+
+```sql
+-- 최근 지원 접근 이벤트 확인
+SELECT actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at
+FROM platform_audit_events
+WHERE event_type IN ('SUPPORT_ACCESS_GRANT_CREATED', 'SUPPORT_ACCESS_GRANT_REVOKED')
+ORDER BY created_at DESC
+LIMIT 20;
+```
+
+### 주의사항
+
+- 권한은 만료(`expires_at`) 또는 취소(`revoked_at`) 시 자동으로 비활성화됩니다.
+- 권한이 활성 상태인 동안 grantee 플랫폼 관리자는 해당 클럽의 HOST 역할 권한이 추가됩니다.
+- 불필요한 권한은 즉시 취소하고, 활성 권한 목록을 정기적으로 확인합니다.
+
 ## Legacy JAR Rollback
 
 ```bash

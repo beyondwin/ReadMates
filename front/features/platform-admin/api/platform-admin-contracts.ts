@@ -1,5 +1,27 @@
 export type PlatformAdminRole = "OWNER" | "OPERATOR" | "SUPPORT";
 
+export type SupportAccessGrantScope = "METADATA_READ" | "HOST_SUPPORT_READ";
+
+export type SupportAccessGrantResponse = {
+  id: string;
+  clubId: string;
+  grantedByUserId: string;
+  granteeUserId: string;
+  scope: SupportAccessGrantScope;
+  reason: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  createdAt: string;
+};
+
+export type CreateSupportAccessGrantRequest = {
+  clubId: string;
+  granteeUserId: string;
+  scope: SupportAccessGrantScope;
+  reason: string;
+  expiresAt: string;
+};
+
 export type PlatformAdminDomainKind = "SUBDOMAIN" | "CUSTOM_DOMAIN";
 export type PlatformAdminDomainStatus =
   | "REQUESTED"
