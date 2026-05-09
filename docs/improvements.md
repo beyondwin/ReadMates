@@ -23,7 +23,7 @@ ReadMates는 멀티 클럽 정기 독서모임의 운영 워크플로우(공개 
 - **(프런트 P1)** `archive-page.tsx`(1074), `host-session-editor.tsx`(857), `host-notifications-page.tsx`(856), `current-session-mobile.tsx`(798), `member-session-detail-page.tsx`(776) 등 700 LOC를 넘는 거대 컴포넌트가 다수다. 모바일/데스크톱이 같은 파일 안에서 분기되는 구조이고 mobile.css(1485) + globals.css(1620)도 한 곳에 모여 있어 변경 비용이 빠르게 증가한다.
 - **(테스트 P2)** 서버 테스트 LOC가 main과 거의 1:1.3이며 `ServerQueryBudgetTest`/`MySqlQueryPlanTest`/`ServerArchitectureBoundaryTest` 등 가드레일이 잘 갖춰져 있는 반면, OWASP Dependency-Check/OSV Scanner 같은 JVM 의존성 CVE 게이트가 CI에 없다. e2e도 Chrome 단일 프로젝트이고 sharding이 없다.
 - **(인프라/배포 P1)** `deploy-server.yml`이 `bootJar`를 native runner에서 만든 뒤 ARM64 Docker image를 따로 조립하는 구조는 잘 정리되어 있지만, `Dockerfile`(legacy multi-stage)과 `Dockerfile.release`가 공존하고 SBOM/이미지 서명/취약점 스캔이 없다. `compose.yml`의 Redis/Kafka에 healthcheck는 있지만 인증/네트워크 분리가 없어 로컬 실행 가정에 묶여 있다.
-- **(DX P2)** README/agents 문서는 풍부하지만 `<local-user-path> 같은 cwd 의존이 reset되는 환경 외에서도 안전하게 동작하도록 한 곳에서 통합된 `Makefile` 또는 `Justfile`가 없고, 단일 명령어로 `lint+test+build+e2e` 통합 실행을 제공하지 않는다. Server는 Gradle alias도 없다.
+- **(DX P2)** README/agents 문서는 풍부하지만 특정 workstation cwd에 의존하지 않고도 안전하게 동작하도록 한 곳에서 통합된 `Makefile` 또는 `Justfile`가 없고, 단일 명령어로 `lint+test+build+e2e` 통합 실행을 제공하지 않는다. Server는 Gradle alias도 없다.
 
 ---
 
@@ -268,23 +268,23 @@ ReadMates는 멀티 클럽 정기 독서모임의 운영 워크플로우(공개 
   - `./server/gradlew -p server clean test`
   - 인증/route 변경 시 `pnpm --dir front test:e2e`
   - public release 검증 시 `./scripts/build-public-release-candidate.sh && ./scripts/public-release-check.sh .tmp/public-release-candidate`
-- **본 보고서가 참조한 위치**(절대 경로):
-  - 보안 리포트: `<local-user-path>
-  - 아키텍처 SoT: `<local-user-path>
-  - 서버 entry: `<local-user-path>, `<local-user-path>
-  - 보안 wiring: `<local-user-path>, `BffSecretFilter.kt`, `RateLimitFilter.kt`
+- **본 보고서가 참조한 위치**(repo-relative path):
+  - 보안 리포트: `.gstack/security-reports/2026-04-27-194155+0900-readmates-security-posture.md` (local ignored report)
+  - 아키텍처 SoT: `docs/development/architecture.md`
+  - 서버 entry: `server/build.gradle.kts`, `server/src/main/resources/application.yml`
+  - 보안 wiring: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt`, `BffSecretFilter.kt`, `RateLimitFilter.kt`
   - 거대 파일 후보:
-    - `<local-user-path> (612 LOC)
-    - `<local-user-path> (576)
-    - `<local-user-path> (574)
-    - `<local-user-path> (540)
-    - `<local-user-path> (1074)
-    - `<local-user-path> (857)
-    - `<local-user-path> (856)
-    - `<local-user-path> (798)
-  - CI 워크플로우: `<local-user-path>,deploy-front,deploy-server}.yml`
-  - BFF: `<local-user-path>, `<local-user-path>
-  - DB 마이그레이션: `<local-user-path> (V1, V9~V22)
-  - `.gitleaks.toml`: `<local-user-path>
+    - `server/src/main/kotlin/com/readmates/auth/adapter/out/persistence/JdbcMemberAccountAdapter.kt` (612 LOC)
+    - `server/src/main/kotlin/com/readmates/note/adapter/out/persistence/JdbcNotesFeedAdapter.kt` (576)
+    - `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/NotificationDeliveryQueries.kt` (574)
+    - `server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostSessionWriteOperations.kt` (540)
+    - `front/features/archive/ui/archive-page.tsx` (1074)
+    - `front/features/host/ui/host-session-editor.tsx` (857)
+    - `front/features/host/ui/host-notifications-page.tsx` (856)
+    - `front/features/current-session/ui/current-session-mobile.tsx` (798)
+  - CI 워크플로우: `.github/workflows/{ci,deploy-front,deploy-server}.yml`
+  - BFF: `front/functions/api/bff/[[path]].ts`, `front/functions/_shared/proxy.ts`
+  - DB 마이그레이션: `server/src/main/resources/db/mysql/migration/` (V1, V9~V22)
+  - `.gitleaks.toml`: `.gitleaks.toml`
 
 이 문서의 각 항목은 PR 단위로 잘게 끊어 처리해도 안전하게 동작하도록 의도해 정렬했고, 우선순위는 보안 history 정비(P0) → 아키텍처/거대 파일 분해/보안 강화(P1) → DX/문서 자동화(P2) 순서를 권장합니다.
