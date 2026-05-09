@@ -36,6 +36,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Observability ADR, metric tag 정책, health endpoint 문서, worker process flag 문서를 추가했습니다. (TASK-V2-014 ~ V2-018)
 - `legacy_password_hash` 컬럼에 대한 2-phase DB rename/drop을 진행했습니다. (TASK-V2-022/023)
 
+### Removed
+
+- Legacy password column dropped from `users` table (Flyway V24+V25 deployed together).
+- `POST /api/auth/password-reset/{token}` and `POST /api/host/members/{id}/password-reset` endpoints removed (previously returned 410 GONE; now 404).
+
 ## v1.5.2 - 2026-05-06
 
 ### Fixed
