@@ -33,7 +33,7 @@ export default defineConfig({
   testDir: ".",
   testMatch: ["tests/e2e/**/*.spec.ts"],
   fullyParallel: true,
-  workers: process.env.CI ? 4 : 2,
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: "list",

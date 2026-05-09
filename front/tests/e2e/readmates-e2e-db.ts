@@ -127,12 +127,6 @@ export function resetSeedGoogleLogins(emails: string[]) {
   const emailList = sqlEmailList(emails);
 
   runMysql(`
-delete auth_sessions
-from auth_sessions
-join users on users.id = auth_sessions.user_id
-where lower(users.email) in (${emailList})
-  and auth_sessions.user_agent = 'readmates-e2e';
-
 update users
 set google_subject_id = ${seedGoogleSubjectCase(emails)},
     auth_provider = 'GOOGLE',

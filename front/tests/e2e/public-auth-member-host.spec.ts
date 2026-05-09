@@ -10,6 +10,8 @@ import {
 const seededFeedbackSessionId = "00000000-0000-0000-0000-000000000301";
 const viewerEmails: string[] = [];
 
+test.describe.configure({ mode: "serial" });
+
 test.beforeEach(() => {
   viewerEmails.length = 0;
   cleanupGeneratedSessions();

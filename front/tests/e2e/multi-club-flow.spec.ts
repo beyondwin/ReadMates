@@ -10,6 +10,8 @@ import {
 
 const secondClubInviteEmail = "sample.club.invited@example.com";
 
+test.describe.configure({ mode: "serial" });
+
 test.beforeEach(() => {
   ensureSecondClubFixture();
   resetSeedGoogleLogins(["host@example.com", secondClubInviteEmail]);
