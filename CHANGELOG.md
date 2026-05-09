@@ -6,6 +6,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Changed
+
+- 공개 저장소 위생 기준을 정리해 `.orchestrator/**`와 `.claude/settings.json`을 Git 추적 대상에서 제거하고, `.gitignore`에 `.claude/`와 `.orchestrator/`를 명시했습니다.
+- `docs/improvements.md`의 workstation 절대경로를 repo-relative path로 바꾸고, release/public-safety 문서에 GitHub Release 누락 복구와 ignored 파일 제외 검증 기준을 보강했습니다.
+
 ## v1.6.0 - 2026-05-09
 
 ### Highlights

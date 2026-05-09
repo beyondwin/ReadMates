@@ -141,11 +141,33 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    ```bash
    gh release create v1.2.0 \
-     --title "v1.2.0" \
+     --title "ReadMates v1.2.0" \
      --notes-file <release-note-file>
    ```
 
    기존 tag에 release만 없으면 `gh release create`를 사용합니다. 이미 release가 있으면 `gh release edit`로 본문을 갱신합니다.
+
+   Release 작업이 끝났는지는 tag 존재만으로 판단하지 않습니다. 아래 명령이 release URL을 출력해야 GitHub의 릴리즈 노트가 공개 화면에서 보입니다.
+
+   ```bash
+   gh release view v1.2.0 --json tagName,name,url,publishedAt
+   ```
+
+   tag는 이미 push됐지만 release가 없으면 `CHANGELOG.md`의 해당 버전 섹션을 파일로 추출한 뒤 release만 생성합니다.
+
+   ```bash
+   awk '
+     /^## v1[.]2[.]0 - / { capture=1; next }
+     capture && /^## / { exit }
+     capture { print }
+   ' CHANGELOG.md > .tmp/release-notes-v1.2.0.md
+
+   gh release create v1.2.0 \
+     --title "ReadMates v1.2.0" \
+     --notes-file .tmp/release-notes-v1.2.0.md
+   ```
+
+   release body를 고친 뒤에는 `gh release view v1.2.0 --json body`로 공개 본문이 `CHANGELOG.md`의 같은 버전 섹션과 맞는지 확인합니다.
 
 ## 운영 배포와 릴리즈 노트
 
@@ -174,11 +196,12 @@ GitHub Releases는 태그별 public-facing 기록입니다.
 
 ReadMates에서는 아래 방식으로 관리합니다.
 
-- release title은 tag와 동일하게 둡니다. 예: `v1.2.0`
+- release title은 제품명과 tag를 함께 둡니다. 예: `ReadMates v1.2.0`
 - release body는 `CHANGELOG.md`의 해당 버전 섹션과 같은 내용을 사용합니다.
 - GitHub의 자동 생성 `What's Changed`는 참고만 하고, 최종 body에는 사용자/운영자 관점 요약을 넣습니다.
 - dependency-only 변경이 많은 프로젝트처럼 PR 목록만 나열하지 않습니다.
 - DB migration, 배포 순서, smoke check는 GitHub Release에도 반드시 남깁니다.
+- 배포 후 GitHub release notes가 보이지 않으면 먼저 `gh release view <tag>`로 release 객체가 있는지 확인합니다. `release not found`이면 tag push는 되었지만 GitHub Release 생성 단계가 빠진 상태입니다.
 
 ## 다음 버전 판단
 

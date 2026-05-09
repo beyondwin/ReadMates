@@ -35,7 +35,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 6. `git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"`를 만들고 push합니다.
 7. Tag push가 `.github/workflows/deploy-front.yml`을 통해 Cloudflare Pages frontend와 Pages Functions를 배포하고, `.github/workflows/deploy-server.yml`을 통해 같은 tag의 GHCR server image를 게시합니다.
 8. 서버 변경이 있으면 `Deploy Server Image` workflow 성공 뒤 OCI backend를 같은 GHCR image tag로 배포합니다.
-9. GitHub Release body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
+9. GitHub Release를 생성하거나 갱신하고, body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
+10. `gh release view vX.Y.Z --json tagName,name,url,publishedAt`로 GitHub Release 객체가 실제로 존재하는지 확인합니다. tag만 있고 release가 없으면 GitHub의 릴리즈 노트 화면에는 아무것도 보이지 않습니다.
 
 `main` push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend 배포 기준은 `v*` tag push입니다.
 
@@ -57,7 +58,7 @@ Rollback은 `/opt/readmates/.env`의 `READMATES_SERVER_IMAGE`를 이전 검증 t
 릴리즈 버전 작업은 아래가 맞을 때 완료입니다.
 
 - `CHANGELOG.md`에 새 버전 섹션, deployment notes, verification 결과가 있습니다.
-- Git tag, GitHub Release title, 서버 image tag가 같은 `vX.Y.Z`를 사용합니다.
+- Git tag, GitHub Release title, 서버 image tag가 같은 `vX.Y.Z`를 사용하고 `gh release view vX.Y.Z`가 성공합니다.
 - 서버 변경이 있으면 backend 배포와 `/internal/health` smoke가 통과했거나, 배포 blocker가 명확히 기록되어 있습니다.
 - Frontend tag deployment workflow가 성공했거나, GitHub Actions blocker가 명확히 기록되어 있습니다.
 - 공개 릴리즈 후보 scan이 통과했거나, 실행하지 못한 사유가 남아 있습니다.

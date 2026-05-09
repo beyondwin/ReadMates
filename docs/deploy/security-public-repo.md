@@ -43,10 +43,14 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `front/output/`
 - `front/dist/`
 - `.gstack/`
+- `.claude/`
+- `.orchestrator/`
+- `.server-config/`
 - `.superpowers/`
 - `.idea/`
 - `.playwright-cli/`
 - `.tmp/`
+- `docs/private/`
 - `recode/`
 - `deploy/oci/.deploy-state`
 - `deploy/oci/*.env`
@@ -113,10 +117,15 @@ deploy/oci/*.state
 .cloudflare
 .vercel
 .gstack/
+.claude/
+.orchestrator/
 .tmp
+.server-config/
+docs/private/
 ```
 
 `design/`은 로컬 설계 산출물 폴더로 취급하고 공개 저장소에는 올리지 않습니다.
+`.claude/`와 `.orchestrator/`는 local agent 설정과 실행 state이며 product source of truth가 아니므로 Git에 추적하지 않습니다. 이미 추적된 파일이 발견되면 `git rm --cached`로 index에서 제거하고 local copy는 ignore된 상태로 남깁니다.
 
 ## 공개 전 scan
 
@@ -136,6 +145,18 @@ deploy/oci/*.state
 현재 tree 검사는 `git ls-files` 기준으로 금지 경로와 tracked symlink를 확인하고, 공개 릴리즈 후보 검사는 `find` 기준으로 후보 디렉터리 전체의 금지 경로와 symlink를 확인합니다. 공개 릴리즈 후보 builder는 승인된 source root의 `.envrc*` loader 파일도 복사 전에 거부합니다. 두 scan 모드 모두 private key, OCI OCID, GitHub token, OpenAI/API key 형태의 token, 실제처럼 보이는 DB/BFF/OAuth secret 할당, Gmail 주소, private club domain, 로컬 workstation path를 찾습니다.
 
 `gitleaks`가 설치되어 있으면 스크립트가 `.gitleaks.toml` 설정으로 `gitleaks dir <path>`를 실행합니다. 공개 릴리즈 후보에는 root `.gitleaks.toml`도 포함됩니다. 설치된 구버전 `gitleaks`가 `dir` subcommand를 지원하지 않으면 compatibility fallback으로 `gitleaks detect --source <path>`를 실행하고 downgrade 메시지를 출력합니다. `gitleaks`가 없으면 명확한 fallback 메시지를 출력하고 targeted path/content scan만 실행합니다. Fallback scan 통과는 전문적이거나 완전한 secret scan 통과와 같지 않으며, 로컬 반복 전에 명백한 실수를 막는 최소 안전장치로만 봅니다.
+
+ignored 로컬 운영 백업이나 agent state를 이번 검증 범위에서 제외해야 하는 작업은 no-argument current-tree mode를 pass/fail gate로 쓰지 않습니다. 대신 clean candidate scan과 tracked archive scan을 함께 사용합니다.
+
+```bash
+./scripts/build-public-release-candidate.sh
+./scripts/public-release-check.sh .tmp/public-release-candidate
+
+tmp="$(mktemp -d)"
+git archive HEAD | tar -x -C "$tmp"
+gitleaks dir "$tmp" --config "$tmp/.gitleaks.toml" --no-banner --redact=100 --verbose
+rm -rf "$tmp"
+```
 
 `docs/superpowers/`는 sanitized historical documentation만 공개 후보에 포함할 수 있습니다. 이 경로를 포함하려면 current-tree scan과 candidate scan 모두에서 local path, private domain, Gmail address, provider token, real-looking secret assignment 검사를 통과해야 합니다. no-arg current-tree scan이 `docs/superpowers/`에서 실패하면 공개 후보를 만들기 전에 해당 문서를 먼저 정리합니다.
 

@@ -66,6 +66,18 @@ clean 공개 릴리즈 후보를 검사합니다.
 
 현재 tree 모드는 `git ls-files`를 기준으로 tracked 금지 경로와 tracked symlink를 확인합니다. 후보 모드는 전달한 디렉터리를 `find`로 순회하며, 후보 안의 모든 symlink와 금지 경로를 거부합니다.
 
+no-argument current-tree mode는 private 작업 tree의 ignored 파일까지 `gitleaks dir .`로 읽을 수 있습니다. `.server-config/`, `.wrangler/`, `.gstack/`, `.tmp/`, `docs/private/`, `.claude/`, `.orchestrator/`처럼 ignored local 운영/도구 파일을 일부러 검증 범위에서 제외하는 작업에서는 current-tree mode를 pass/fail gate로 삼지 말고, clean 후보와 tracked archive를 검사합니다.
+
+```bash
+./scripts/build-public-release-candidate.sh
+./scripts/public-release-check.sh .tmp/public-release-candidate
+
+tmp="$(mktemp -d)"
+git archive HEAD | tar -x -C "$tmp"
+gitleaks dir "$tmp" --config "$tmp/.gitleaks.toml" --no-banner --redact=100 --verbose
+rm -rf "$tmp"
+```
+
 `docs/superpowers/`는 sanitized historical documentation만 공개 후보에 포함할 수 있습니다. 이 경로를 포함하려면 no-arg current-tree scan과 candidate scan 모두에서 local workstation path, private club domain, Gmail address, provider-token-shaped string, real-looking secret assignment 검사를 통과해야 합니다. no-arg current-tree scan이 `docs/superpowers/`에서 실패하면 공개 후보를 만들기 전에 해당 문서를 먼저 정리합니다.
 
 checker가 차단하는 주요 항목은 다음과 같습니다.
