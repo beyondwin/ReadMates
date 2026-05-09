@@ -31,6 +31,11 @@ import type {
   UpdateHostMemberProfileRequest,
   ViewerMember,
 } from "./host-contracts";
+import {
+  parseHostSessionDetailResponse,
+  parseHostNotificationDeliveryListResponse,
+  parseHostInvitationListPage,
+} from "./host-contracts";
 import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
 
 export function fetchHostCurrentSession(context?: ReadmatesApiContext) {
@@ -74,7 +79,7 @@ export function fetchHostNotificationEvents(context?: ReadmatesApiContext, page?
 }
 
 export function fetchHostNotificationDeliveries(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetch<HostNotificationDeliveryListResponse>(`/api/host/notifications/deliveries${pagingSearchParams(page)}`, undefined, context);
+  return readmatesFetch<HostNotificationDeliveryListResponse>(`/api/host/notifications/deliveries${pagingSearchParams(page)}`, undefined, context).then(parseHostNotificationDeliveryListResponse);
 }
 
 export function fetchHostNotificationDetail(id: string, context?: ReadmatesApiContext) {
@@ -116,7 +121,7 @@ export function fetchHostSessions(context?: ReadmatesApiContext, page?: PageRequ
 }
 
 export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApiContext) {
-  return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, undefined, context);
+  return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, undefined, context).then(parseHostSessionDetailResponse);
 }
 
 export function createHostSession(request: HostSessionRequest) {
@@ -228,7 +233,7 @@ export function submitHostMemberProfile(membershipId: string, displayName: strin
 }
 
 export function fetchHostInvitations(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetch<HostInvitationListPage>(`/api/host/invitations${pagingSearchParams(page)}`, undefined, context);
+  return readmatesFetch<HostInvitationListPage>(`/api/host/invitations${pagingSearchParams(page)}`, undefined, context).then(parseHostInvitationListPage);
 }
 
 export function listHostInvitationsResponse(context?: ReadmatesApiContext, page?: PageRequest) {
