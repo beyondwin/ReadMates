@@ -85,19 +85,22 @@ jobs:
   e2e:
     name: E2E (${{ matrix.shard }})
     runs-on: ubuntu-latest
+    env:
+      READMATES_CI_MYSQL_ROOT_PASSWORD: ${{ secrets.READMATES_CI_MYSQL_ROOT_PASSWORD }}
+      READMATES_CI_MYSQL_USER: ${{ secrets.READMATES_CI_MYSQL_USER }}
+      READMATES_CI_MYSQL_PASSWORD: ${{ secrets.READMATES_CI_MYSQL_PASSWORD }}
     services:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: <ci-mysql-password>
+          MYSQL_ROOT_PASSWORD: ${{ secrets.READMATES_CI_MYSQL_ROOT_PASSWORD }}
           MYSQL_ROOT_HOST: "%"
-          MYSQL_DATABASE: readmates
-          MYSQL_USER: readmates
-          MYSQL_PASSWORD: <ci-mysql-password>
+          MYSQL_USER: ${{ secrets.READMATES_CI_MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.READMATES_CI_MYSQL_PASSWORD }}
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p<ci-mysql-password> --silent"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -p$MYSQL_ROOT_PASSWORD --silent"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=12
@@ -141,8 +144,15 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm --dir front exec playwright install --with-deps chromium
 
+      - name: Grant E2E database privileges
+        env:
+          MYSQL_PWD: ${{ env.READMATES_CI_MYSQL_ROOT_PASSWORD }}
+        run: |
+          mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root --execute \
+            "grant all privileges on \`readmates_e2e_%\`.* to '${READMATES_CI_MYSQL_USER}'@'%';"
+
       - name: Run E2E tests (shard ${{ matrix.shard }})
         env:
-          READMATES_E2E_DB_USER: <ci-mysql-user>
-          READMATES_E2E_DB_PASSWORD: <ci-mysql-password>
+          READMATES_E2E_DB_USER: ${{ env.READMATES_CI_MYSQL_USER }}
+          READMATES_E2E_DB_PASSWORD: ${{ env.READMATES_CI_MYSQL_PASSWORD }}
         run: pnpm --dir front exec playwright test --shard=${{ matrix.shard }}

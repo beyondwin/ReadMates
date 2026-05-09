@@ -9,6 +9,8 @@ import {
   setMembershipStatus,
 } from "./readmates-e2e-db";
 
+test.describe.configure({ mode: "serial" });
+
 const hostEmail = "host@example.com";
 const selfEditMemberEmail = "member5@example.com";
 const hostTargetMemberEmail = "member4@example.com";
