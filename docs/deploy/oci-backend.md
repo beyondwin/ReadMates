@@ -91,6 +91,7 @@ SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
 # Legacy host JAR rollback only. Compose stack overrides this to container-internal 0.0.0.0 and does not publish 8081.
 READMATES_MANAGEMENT_ADDRESS=127.0.0.1
 READMATES_MANAGEMENT_PORT=8081
+READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성, 1Password에 저장>
 ```
 
 Git에는 변수 이름과 placeholder만 둡니다. 프로덕션 secret 실제 값은 VM, Cloudflare, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 둡니다. Compose stack은 `READMATES_REDIS_URL=redis://redis:6379`, `READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092`, `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`을 container 환경으로 주입합니다.
@@ -395,3 +396,9 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 - 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
 - 백엔드 프로덕션 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
 - Compose Caddy 로그는 container stdout으로 확인합니다. Legacy host Caddy rollback에서는 `/var/log/caddy/readmates.log`를 확인합니다. Caddy access log 설정은 request URI와 `Authorization`, `Cookie`, `X-Readmates-Bff-Secret` request header를 기록하지 않아야 합니다.
+
+### IP hash base secret
+
+`READMATES_IP_HASH_BASE_SECRET` 환경변수는 client IP hash의 주간 salt rotation에서 base secret 역할을 한다. 한 번 생성한 후 manual rotation 대상이 아니다.
+생성: `openssl rand -base64 32`. 값은 `/etc/readmates/readmates.env`에 추가하고 1Password에 저장한다.
+누락 시 rate limit 자체는 동작하지만, cross-week linking 방지 효과가 사라지고 Spring startup log에 WARN이 출력된다.
