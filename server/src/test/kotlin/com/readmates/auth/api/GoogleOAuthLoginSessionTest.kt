@@ -1,7 +1,7 @@
 package com.readmates.auth.api
 
-import com.readmates.auth.application.AuthSessionService
-import com.readmates.auth.application.InvitationTokenService
+import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.auth.infrastructure.security.OAuthReturnState
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession

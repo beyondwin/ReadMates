@@ -54,6 +54,8 @@ fun Authentication?.emailOrNull(): String? {
     }
 
     val email = when (val principal = principal) {
+        is CurrentMember -> principal.email
+        is CurrentUser -> principal.email
         is OidcUser -> principal.email
         is UserDetails -> principal.username
         is String -> principal

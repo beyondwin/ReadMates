@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { memo, type CSSProperties } from "react";
 import type { HostSessionDetailResponse } from "@/features/host/ui/host-ui-types";
 import {
   hostSessionStateLabel,
@@ -8,7 +8,7 @@ import {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-export function DocumentStatePanel({
+export const DocumentStatePanel = memo(function DocumentStatePanel({
   session,
   saveState,
   recordVisibility,
@@ -66,7 +66,7 @@ export function DocumentStatePanel({
       </div>
     </div>
   );
-}
+});
 
 function sessionStateBadgeClass(state?: HostSessionDetailResponse["state"]) {
   if (state === "OPEN") {

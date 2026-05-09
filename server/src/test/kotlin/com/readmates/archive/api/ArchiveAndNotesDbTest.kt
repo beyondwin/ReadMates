@@ -1,6 +1,6 @@
 package com.readmates.archive.api
 
-import com.readmates.auth.application.AuthSessionService
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.hamcrest.Matchers.empty
@@ -359,7 +359,7 @@ class ArchiveAndNotesDbTest(
             )
             values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
               null, null, null, '2026-09-16', '20:00:00', '22:00:00',
-              '온라인', null, null, '2026-09-15 14:59:00.000000', 'PUBLISHED', 'HOST_ONLY')
+              '온라인', null, null, '2026-09-15 14:59:00.000000', 'CLOSED', 'HOST_ONLY')
             """.trimIndent(),
             HOST_ONLY_PUBLISHED_NOTE_SESSION_ID,
             number,
@@ -1504,7 +1504,8 @@ class ArchiveAndNotesDbTest(
               meeting_url,
               meeting_passcode,
               question_deadline_at,
-              state
+              state,
+              visibility
             )
             values (
               '00000000-0000-0000-0000-000000009073',
@@ -1523,7 +1524,8 @@ class ArchiveAndNotesDbTest(
               null,
               null,
               '2030-02-28 14:59:00.000000',
-              'PUBLISHED'
+              'PUBLISHED',
+              'MEMBER'
             );
         """
         private const val INSERT_HIDDEN_OTHER_CLUB_QUESTION_SQL = """

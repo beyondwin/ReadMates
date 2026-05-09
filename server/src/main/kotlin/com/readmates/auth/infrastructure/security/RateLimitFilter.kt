@@ -3,6 +3,7 @@ package com.readmates.auth.infrastructure.security
 import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitPort
 import com.readmates.shared.cache.RateLimitProperties
+import com.readmates.shared.security.ClientIpHashing
 import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -22,6 +23,8 @@ class RateLimitFilter(
     private val properties: RateLimitProperties,
     @param:Value("\${readmates.bff-secret:}")
     private val expectedBffSecret: String = "",
+    @param:Value("\${READMATES_IP_HASH_BASE_SECRET:}")
+    private val ipHashBaseSecret: String = "",
 ) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -45,7 +48,7 @@ class RateLimitFilter(
 
     private fun HttpServletRequest.toRateLimitCheck(): RateLimitCheck? {
         val path = requestURI
-        val ipHash = stableHash(rateLimitIdentifier())
+        val ipHash = ClientIpHashing.hashClientIp(rateLimitIdentifier(), ipHashBaseSecret)
 
         return when {
             method == "GET" && path.startsWith("/oauth2/authorization/") ->

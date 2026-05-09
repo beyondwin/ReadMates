@@ -1,4 +1,4 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals

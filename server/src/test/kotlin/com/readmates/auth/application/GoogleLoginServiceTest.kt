@@ -1,4 +1,4 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
@@ -149,8 +149,6 @@ class GoogleLoginServiceTest(
             set google_subject_id = 'readmates-dev-google-host',
                 profile_image_url = null,
                 auth_provider = 'GOOGLE',
-                password_hash = null,
-                password_set_at = null,
                 updated_at = utc_timestamp(6)
             where email = 'host@example.com';
 

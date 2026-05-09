@@ -1,5 +1,7 @@
 package com.readmates.shared.adapter.`in`.web
 
+import com.readmates.shared.observability.RequestIdFilter
+import org.slf4j.MDC
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 
@@ -7,6 +9,7 @@ data class ApiErrorResponse(
     val code: String,
     val message: String,
     val status: Int,
+    val traceId: String? = null,
 )
 
 fun apiErrorResponse(
@@ -16,7 +19,14 @@ fun apiErrorResponse(
 ): ResponseEntity<ApiErrorResponse> =
     ResponseEntity
         .status(status)
-        .body(ApiErrorResponse(code = code, message = message, status = status.value()))
+        .body(
+            ApiErrorResponse(
+                code = code,
+                message = message,
+                status = status.value(),
+                traceId = MDC.get(RequestIdFilter.MDC_KEY),
+            ),
+        )
 
 fun HttpStatus.defaultApiErrorCode(): String =
     when (this) {

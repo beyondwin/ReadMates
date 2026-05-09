@@ -76,6 +76,7 @@ export class ReadmatesApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly fallback: boolean;
+  readonly traceId: string | null;
   readonly metadata: ReadmatesApiErrorMetadata;
   readonly response: Response;
 
@@ -85,6 +86,7 @@ export class ReadmatesApiError extends Error {
     this.status = response.status;
     this.code = body.code;
     this.fallback = body.fallback;
+    this.traceId = response.headers.get("X-Readmates-Request-Id");
     this.metadata = {
       status: response.status,
       statusText: response.statusText,

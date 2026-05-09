@@ -1,4 +1,4 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
 import org.springframework.stereotype.Component
 import java.security.MessageDigest

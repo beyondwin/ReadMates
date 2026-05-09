@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { memo, type CSSProperties } from "react";
 import type { HostSessionDetailResponse } from "@/features/host/ui/host-ui-types";
 import {
   recordVisibilityDescription,
@@ -13,7 +13,7 @@ type PublicationFeedback = {
   message: string;
 };
 
-export function PublicationPanel({
+export const PublicationPanel = memo(function PublicationPanel({
   activeMobileSection,
   session,
   sessionState,
@@ -179,4 +179,4 @@ export function PublicationPanel({
       )}
     </Panel>
   );
-}
+});

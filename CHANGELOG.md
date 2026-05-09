@@ -6,7 +6,35 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-다음 릴리즈 후보가 정해지면 여기에 기록합니다.
+### Security
+
+- `ClientIpHashing.kt`를 추가해 `RateLimitFilter`의 IP 해시 salt를 ISO 주차 기준으로 자동 rotate합니다. base secret은 `READMATES_IP_HASH_BASE_SECRET` 환경 변수로 주입하며, 미설정 시 빈 문자열 fallback을 사용합니다. (TASK-V2-028)
+- Spring Security role hierarchy를 `ROLE_PLATFORM_ADMIN > ROLE_MEMBER`, `ROLE_HOST > ROLE_MEMBER`로 정리했습니다. (TASK-V2-005)
+- Set-Cookie `Domain` 속성 stripping fix를 적용해 cross-origin cookie 노출을 방지합니다. (TASK-V2-004)
+- Support access grants: platform admin이 활성 `HOST_SUPPORT_READ` grant를 가지면 `CheckSupportAccessGrantUseCase`가 합성 HOST membership을 부여합니다. `MemberAuthoritiesFilter`, `CurrentMemberArgumentResolver`, `ClubContextResolver.kt`가 갱신됐습니다. (TASK-V2-024)
+- Sessions invariant enforcement: 세션 상태 전이 불변식을 서버에서 검증합니다. (TASK-V2-003)
+
+### Performance
+
+- `CachedNotificationBacklogProvider.kt`를 추가해 notification backlog gauge를 1분 주기 scheduled refresh로 캐싱합니다. `ReadmatesOperationalMetrics`가 캐시된 snapshot을 사용합니다. (TASK-V2-001)
+- 공개 endpoint에 `Cache-Control` 헤더를 추가하고 BFF cache를 연동했습니다. (TASK-V2-002)
+- 프런트엔드 route lazy loading을 적용해 초기 번들 크기를 줄였습니다. (TASK-V2-019)
+- archive detail batching으로 상세 페이지 API 호출 수를 줄였습니다. (TASK-V2-020)
+- `HostSessionEditor`에 `useReducer` + `memo`를 적용해 불필요한 re-render를 제거했습니다. (TASK-V2-021)
+- Dynamic CORS origins 지원을 추가했습니다. (TASK-V2-016)
+
+### Testing
+
+- `FrontendFixtureContractTest.kt`(서버 측 계약 bridge 테스트)와 `front/tests/unit/__fixtures__/` 하위 JSON fixture 4개를 추가했습니다. (TASK-V2-026)
+- Playwright 설정에 `fullyParallel: true`, `workers: CI ? 4 : 2`를 적용하고 CI shard 매트릭스(`1/3`, `2/3`, `3/3`)를 추가했습니다. (TASK-V2-027)
+- `FrontendZodSchemaContractTest.kt`와 `zod:export-fixtures` npm script를 추가해 Zod 스키마 CI gate를 구성했습니다. (TASK-V2-030)
+- 3개 host contract에 Zod 런타임 검증을 추가했습니다(`import.meta.env.DEV`에서만 활성화). `zod`를 devDependency로 추가했습니다. (TASK-V2-025)
+
+### Architecture
+
+- UseCase 인터페이스 분리, auth/application layer 정리, `@Transactional` 마이그레이션, `MembershipStatus` FSM 문서화를 포함한 아키텍처 클린업을 진행했습니다. (TASK-V2-010 ~ V2-013)
+- Observability ADR, metric tag 정책, health endpoint 문서, worker process flag 문서를 추가했습니다. (TASK-V2-014 ~ V2-018)
+- `legacy_password_hash` 컬럼에 대한 2-phase DB rename/drop을 진행했습니다. (TASK-V2-022/023)
 
 ## v1.5.2 - 2026-05-06
 

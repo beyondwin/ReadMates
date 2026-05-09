@@ -1,9 +1,10 @@
+import { memo } from "react";
 import type { AttendanceStatus, HostSessionDetailResponse } from "@/features/host/ui/host-ui-types";
 import { HostSessionAttendanceEditor } from "../host-session-attendance-editor";
 import { Panel } from "./session-editor-panel";
 import type { MobileEditorSection } from "./mobile-editor-tabs";
 
-export function AttendancePanel({
+export const AttendancePanel = memo(function AttendancePanel({
   activeMobileSection,
   session,
   attendanceStatuses,
@@ -33,4 +34,4 @@ export function AttendancePanel({
       />
     </Panel>
   );
-}
+});

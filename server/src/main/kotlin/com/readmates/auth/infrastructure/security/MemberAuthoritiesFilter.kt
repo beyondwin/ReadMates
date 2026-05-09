@@ -1,9 +1,11 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.auth.application.AuthenticatedMemberResolver
-import com.readmates.club.adapter.`in`.web.ClubContextHeader
-import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.auth.application.service.AuthenticatedMemberResolver
+import com.readmates.club.adapter.`in`.web.resolveClubContext
+import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
+import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentUser
 import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -18,6 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 class MemberAuthoritiesFilter(
     private val authenticatedMemberResolver: AuthenticatedMemberResolver,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
+    private val checkSupportAccessGrantUseCase: CheckSupportAccessGrantUseCase,
 ) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -28,7 +31,7 @@ class MemberAuthoritiesFilter(
         val email = authentication.emailOrNull()
 
         if (authentication != null && email != null) {
-            val requestedClubContext = request.resolveRequestedClubContext()
+            val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
             val member = if (requestedClubContext.supplied && requestedClubContext.context == null) {
                 null
             } else {
@@ -45,6 +48,32 @@ class MemberAuthoritiesFilter(
                     "ROLE_${member.role}"
                 }
                 authorities += SimpleGrantedAuthority(roleAuthority)
+            } else if (
+                authentication.authorities.any { it.authority == PLATFORM_ADMIN_AUTHORITY } &&
+                requestedClubContext.supplied &&
+                requestedClubContext.context != null
+            ) {
+                // Platform admin with no club membership — check for an active HOST_SUPPORT_READ grant
+                val clubContext = requestedClubContext.context
+                val userId = when (val principal = authentication.principal) {
+                    is CurrentMember -> principal.userId
+                    is CurrentUser -> principal.userId
+                    else -> null
+                }
+                if (userId != null) {
+                    val synthesis = checkSupportAccessGrantUseCase.synthesizeHostCurrentMember(
+                        userId = userId,
+                        email = email,
+                        clubId = clubContext.clubId,
+                        clubSlug = clubContext.slug,
+                        clubName = clubContext.name,
+                    )
+                    if (synthesis != null) {
+                        // Store in request attribute so CurrentMemberArgumentResolver can reuse it
+                        request.setAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR, synthesis)
+                        authorities += SimpleGrantedAuthority("ROLE_HOST")
+                    }
+                }
             }
 
             val mappedAuthentication = UsernamePasswordAuthenticationToken(
@@ -59,30 +88,8 @@ class MemberAuthoritiesFilter(
         filterChain.doFilter(request, response)
     }
 
-    private fun HttpServletRequest.resolveRequestedClubContext(): RequestedClubContext {
-        val slug = getHeader(ClubContextHeader.CLUB_SLUG)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        if (slug != null) {
-            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveBySlug(slug))
-        }
-
-        val host = getHeader(ClubContextHeader.CLUB_HOST)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        if (host != null) {
-            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveByHost(host))
-        }
-
-        return RequestedClubContext(supplied = false, context = null)
-    }
-
     private companion object {
         val MEMBER_ROLE_AUTHORITIES = setOf("ROLE_HOST", "ROLE_MEMBER", "ROLE_VIEWER")
+        const val PLATFORM_ADMIN_AUTHORITY = "ROLE_PLATFORM_ADMIN"
     }
-
-    private data class RequestedClubContext(
-        val supplied: Boolean,
-        val context: ResolvedClubContext?,
-    )
 }

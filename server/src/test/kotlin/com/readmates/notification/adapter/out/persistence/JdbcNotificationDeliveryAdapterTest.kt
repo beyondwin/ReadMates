@@ -6,6 +6,7 @@ import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.service.NotificationDeliveryEngine
 import com.readmates.notification.application.service.NotificationDeliveryProcessingService
+import com.readmates.notification.application.service.NotificationDeliveryTransactionalOperations
 import com.readmates.notification.application.service.ReadmatesOperationalMetrics
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
@@ -71,6 +72,7 @@ class JdbcNotificationDeliveryAdapterTest(
     @param:Autowired private val deliveryAdapter: JdbcNotificationDeliveryAdapter,
     @param:Autowired private val memberNotificationAdapter: JdbcMemberNotificationAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val transactionalOps: NotificationDeliveryTransactionalOperations,
 ) {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val eventId = UUID.fromString("00000000-0000-0000-0000-000000009701")
@@ -248,7 +250,6 @@ class JdbcNotificationDeliveryAdapterTest(
         deliveryAdapter.persistPlannedDeliveries(message())
         val mailPort = RecordingMailPort()
         val service = NotificationDeliveryProcessingService(
-            notificationDeliveryPort = deliveryAdapter,
             deliveryEngine = NotificationDeliveryEngine(
                 deliveryPort = deliveryAdapter,
                 mailDeliveryPort = mailPort,
@@ -256,6 +257,7 @@ class JdbcNotificationDeliveryAdapterTest(
                 maxAttempts = 5,
                 retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
             ),
+            transactionalOps = transactionalOps,
             deliveryEnabled = true,
         )
 
@@ -489,14 +491,16 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     private fun updateSessionState(state: String) {
+        val visibility = if (state == "DRAFT") "MEMBER" else "PUBLIC"
         jdbcTemplate.update(
             """
             update sessions
-            set state = ?
+            set state = ?, visibility = ?
             where id = ?
               and club_id = ?
             """.trimIndent(),
             state,
+            visibility,
             sessionId.toString(),
             clubId.toString(),
         )

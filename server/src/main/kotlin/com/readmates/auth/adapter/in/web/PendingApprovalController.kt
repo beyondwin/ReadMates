@@ -1,6 +1,6 @@
 package com.readmates.auth.adapter.`in`.web
 
-import com.readmates.auth.application.PendingApprovalAppResponse
+import com.readmates.auth.application.service.PendingApprovalAppResponse
 import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
 import com.readmates.shared.security.CurrentMember
 import org.springframework.web.bind.annotation.GetMapping

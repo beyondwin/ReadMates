@@ -42,7 +42,6 @@ class HostNotificationOperationsServiceTest {
         )
         val mailPort = RecordingMailPort()
         val processingService = NotificationDeliveryProcessingService(
-            notificationDeliveryPort = deliveryPort,
             deliveryEngine = NotificationDeliveryEngine(
                 deliveryPort = deliveryPort,
                 mailDeliveryPort = mailPort,
@@ -50,12 +49,14 @@ class HostNotificationOperationsServiceTest {
                 maxAttempts = 5,
                 retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
             ),
+            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
             deliveryEnabled = false,
         )
         val service = HostNotificationOperationsService(
             notificationEventOutboxPort = EmptyEventOutboxPort,
             notificationDeliveryPort = deliveryPort,
             notificationDeliveryProcessingService = processingService,
+            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
             deliveryEnabled = false,
         )
 

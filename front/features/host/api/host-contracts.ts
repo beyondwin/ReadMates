@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type { PagedResponse } from "@/shared/model/paging";
 export type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
@@ -445,3 +446,118 @@ export type HostAttendanceUpdate = {
   membershipId: string;
   attendanceStatus: AttendanceStatus;
 };
+
+// ---------------------------------------------------------------------------
+// Zod runtime validators — DEV-only, tree-shaken from production bundle.
+// Each schema constant is wrapped in `import.meta.env.DEV ? ... : null as never`
+// so Rollup dead-code-eliminates all z.* references in production, allowing
+// the `import { z } from "zod"` import to be tree-shaken from the bundle.
+// ---------------------------------------------------------------------------
+
+export const HostSessionDetailResponseSchema = import.meta.env.DEV
+  ? z.object({
+      sessionId: z.string(),
+      sessionNumber: z.number(),
+      title: z.string(),
+      bookTitle: z.string(),
+      bookAuthor: z.string(),
+      bookLink: z.string().nullable(),
+      bookImageUrl: z.string().nullable(),
+      locationLabel: z.string(),
+      meetingUrl: z.string().nullable(),
+      meetingPasscode: z.string().nullable(),
+      date: z.string(),
+      startTime: z.string(),
+      endTime: z.string(),
+      questionDeadlineAt: z.string(),
+      visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]),
+      publication: z
+        .object({
+          publicSummary: z.string(),
+          visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]),
+        })
+        .nullable(),
+      state: z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]),
+      attendees: z.array(
+        z.object({
+          membershipId: z.string(),
+          displayName: z.string(),
+          accountName: z.string(),
+          rsvpStatus: z.enum(["NO_RESPONSE", "GOING", "MAYBE", "DECLINED"]),
+          attendanceStatus: z.enum(["UNKNOWN", "ATTENDED", "ABSENT"]),
+          participationStatus: z.enum(["ACTIVE", "REMOVED"]).optional(),
+        }),
+      ),
+      feedbackDocument: z.object({
+        uploaded: z.boolean(),
+        fileName: z.string().nullable(),
+        uploadedAt: z.string().nullable(),
+      }),
+    })
+  : (null as never);
+
+export const HostNotificationDeliveryListResponseSchema = import.meta.env.DEV
+  ? z.object({
+      items: z.array(
+        z.object({
+          id: z.string(),
+          eventId: z.string(),
+          channel: z.enum(["EMAIL", "IN_APP"]),
+          status: z.enum(["PENDING", "SENDING", "SENT", "FAILED", "DEAD", "SKIPPED"]),
+          recipientEmail: z.string().nullable(),
+          attemptCount: z.number(),
+          updatedAt: z.string(),
+        }),
+      ),
+      // nextCursor may be omitted by the backend — nullable().optional() handles both null and missing
+      nextCursor: z.string().nullable().optional(),
+    })
+  : (null as never);
+
+export const HostInvitationListPageSchema = import.meta.env.DEV
+  ? z.object({
+      items: z.array(
+        z.object({
+          invitationId: z.string(),
+          email: z.string(),
+          name: z.string(),
+          role: z.enum(["HOST", "MEMBER"]),
+          status: z.enum(["PENDING", "ACCEPTED", "EXPIRED", "REVOKED"]),
+          effectiveStatus: z.enum(["PENDING", "ACCEPTED", "EXPIRED", "REVOKED"]),
+          expiresAt: z.string(),
+          acceptedAt: z.string().nullable(),
+          createdAt: z.string(),
+          applyToCurrentSession: z.boolean(),
+          canRevoke: z.boolean(),
+          canReissue: z.boolean(),
+        }),
+      ),
+      nextCursor: z.string().nullable(),
+    })
+  : (null as never);
+
+// Type aliases — erased at build time, z.infer<> resolves from the truthy branch
+export type HostSessionDetailResponseParsed = z.infer<typeof HostSessionDetailResponseSchema>;
+export type HostNotificationDeliveryListResponseParsed = z.infer<typeof HostNotificationDeliveryListResponseSchema>;
+export type HostInvitationListPageParsed = z.infer<typeof HostInvitationListPageSchema>;
+
+export function parseHostSessionDetailResponse(value: unknown): HostSessionDetailResponse {
+  if (import.meta.env.DEV) {
+    return HostSessionDetailResponseSchema.parse(value) as HostSessionDetailResponse;
+  }
+  return value as HostSessionDetailResponse;
+}
+
+export function parseHostNotificationDeliveryListResponse(value: unknown): HostNotificationDeliveryListResponse {
+  if (import.meta.env.DEV) {
+    return HostNotificationDeliveryListResponseSchema.parse(value) as HostNotificationDeliveryListResponse;
+  }
+  return value as HostNotificationDeliveryListResponse;
+}
+
+export function parseHostInvitationListPage(value: unknown): HostInvitationListPage {
+  if (import.meta.env.DEV) {
+    return HostInvitationListPageSchema.parse(value) as HostInvitationListPage;
+  }
+  return value as HostInvitationListPage;
+}

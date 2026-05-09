@@ -1,10 +1,10 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.auth.application.AuthSessionService
-import com.readmates.auth.application.GoogleLoginException
-import com.readmates.auth.application.GoogleLoginService
 import com.readmates.auth.application.InvitationDomainException
-import com.readmates.auth.application.InvitationService
+import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.application.service.GoogleLoginException
+import com.readmates.auth.application.service.GoogleLoginService
+import com.readmates.auth.application.service.InvitationService
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value

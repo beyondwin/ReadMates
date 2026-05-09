@@ -185,6 +185,24 @@ Redis 사용 범위는 재생성 가능한 보조 데이터로 제한합니다.
 
 Redis key와 metric label에는 raw session token, 초대 token 원문, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다. Cache invalidation은 command transaction commit 이후 실행해 pre-commit DB 상태가 cache로 다시 채워지는 race를 줄입니다.
 
+## 공개 API 2계층 캐시
+
+공개 API 응답은 Spring과 Cloudflare Pages Functions BFF 두 계층에서 캐시합니다.
+
+**1계층: Spring `Cache-Control` 헤더**
+
+`/api/public/clubs/{slug}`, `/api/public/clubs/{slug}/sessions/{sessionId}` 등 `PublicController`의 GET endpoint는 `Cache-Control: public, max-age=120, stale-while-revalidate=600`을 응답 헤더에 포함합니다. CDN 또는 브라우저가 이 지시어를 해석해 120초간 신선한 캐시를 사용하고, 이후 최대 600초간 오래된 캐시를 허용하면서 백그라운드 재검증을 수행합니다.
+
+**2계층: BFF `caches.default` 저장**
+
+Cloudflare Pages Functions BFF(`front/functions/api/bff/[[path]].ts`)는 `/api/public/clubs/`, `/api/public/records/` 경로 prefix에 해당하는 GET 요청에 대해 `caches.default`를 사용합니다.
+
+- 캐시 히트 시 upstream fetch 없이 즉시 반환합니다.
+- 캐시 미스 시 upstream을 fetch하고, 응답이 캐시 가능한 조건(`response.ok`, `Cache-Control: public` 또는 `max-age` 포함, `Set-Cookie` 없음, `Vary: Cookie/Authorization` 없음)을 만족하면 `context.waitUntil`로 비동기 저장합니다.
+- 캐시 키는 pathname과 search만 포함하고 cookie, authorization 같은 사용자 컨텍스트를 제거합니다.
+- 저장하는 응답은 `copyUpstreamHeaders`로 내부 `x-readmates-*` 헤더와 `set-cookie`를 제거한 sanitized 응답입니다.
+- 변이 메서드(`POST`, `PUT`, `PATCH`, `DELETE`)와 prefix에 해당하지 않는 경로는 캐시 계층을 거치지 않습니다.
+
 ## 멤버십과 역할 모델
 
 ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅니다. Membership row는 club별로 독립적이고, platform admin 권한은 `platform_admins`에서 별도로 확인합니다.

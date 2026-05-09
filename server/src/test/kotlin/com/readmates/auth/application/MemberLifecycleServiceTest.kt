@@ -1,5 +1,6 @@
-package com.readmates.auth.application
+package com.readmates.auth.application.service
 
+import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.port.out.HostMemberListRow
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort

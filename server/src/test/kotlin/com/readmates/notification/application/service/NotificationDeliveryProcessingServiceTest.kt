@@ -14,6 +14,7 @@ import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.out.MailDeliveryCommand
+import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
@@ -138,13 +139,12 @@ class NotificationDeliveryProcessingServiceTest {
 
     private fun notificationDeliveryProcessingService(
         deliveryPort: NotificationDeliveryPort,
-        mailPort: com.readmates.notification.application.port.out.MailDeliveryPort,
+        mailPort: MailDeliveryPort,
         metrics: ReadmatesOperationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
         maxAttempts: Int = 5,
         retryDelayMinutesConfig: List<Long> = listOf(5L, 15L, 60L, 240L),
     ): NotificationDeliveryProcessingService =
         NotificationDeliveryProcessingService(
-            notificationDeliveryPort = deliveryPort,
             deliveryEngine = NotificationDeliveryEngine(
                 deliveryPort = deliveryPort,
                 mailDeliveryPort = mailPort,
@@ -152,16 +152,18 @@ class NotificationDeliveryProcessingServiceTest {
                 maxAttempts = maxAttempts,
                 retryDelayMinutesConfig = retryDelayMinutesConfig,
             ),
+            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            deliveryEnabled = true,
         )
 }
 
-private class FailingMailPort(private val message: String) : com.readmates.notification.application.port.out.MailDeliveryPort {
+private class FailingMailPort(private val message: String) : MailDeliveryPort {
     override fun send(command: MailDeliveryCommand) {
         error(message)
     }
 }
 
-private class ProcessingRecordingMailPort : com.readmates.notification.application.port.out.MailDeliveryPort {
+private class ProcessingRecordingMailPort : MailDeliveryPort {
     val sent = mutableListOf<MailDeliveryCommand>()
 
     override fun send(command: MailDeliveryCommand) {

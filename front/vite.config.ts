@@ -14,7 +14,7 @@ export default defineConfig({
   plugins: [react()],
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   build: {
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 350,
     rolldownOptions: {
       output: {
         codeSplitting: {

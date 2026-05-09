@@ -113,14 +113,15 @@ class ReadmatesOperationalMetricsTest {
                 sending = 7,
             ),
         )
+        val provider = CachedNotificationBacklogProvider(deliveryPort)
+        provider.refresh()
 
-        ReadmatesOperationalMetrics(registry, deliveryPort)
+        ReadmatesOperationalMetrics(registry, provider)
 
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "pending").gauge()?.value()).isEqualTo(2.0)
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "failed").gauge()?.value()).isEqualTo(3.0)
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "dead").gauge()?.value()).isEqualTo(5.0)
         assertThat(registry.find("readmates.notifications.outbox.backlog").tag("status", "sending").gauge()?.value()).isEqualTo(7.0)
-        assertThat(deliveryPort.backlogReads).isGreaterThan(0)
         assertThat(
             registry.find("readmates.notifications.outbox.backlog")
                 .meters()
@@ -132,8 +133,6 @@ class ReadmatesOperationalMetricsTest {
 private class FixedBacklogNotificationDeliveryPort(
     private val backlog: NotificationDeliveryBacklog,
 ) : NotificationDeliveryPort {
-    var backlogReads = 0
-
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
         emptyList()
 
@@ -171,10 +170,7 @@ private class FixedBacklogNotificationDeliveryPort(
 
     override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
 
-    override fun deliveryBacklog(): NotificationDeliveryBacklog {
-        backlogReads += 1
-        return backlog
-    }
+    override fun deliveryBacklog(): NotificationDeliveryBacklog = backlog
 
     override fun countByStatus(
         clubId: UUID,

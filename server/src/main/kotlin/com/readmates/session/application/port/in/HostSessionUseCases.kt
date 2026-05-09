@@ -19,18 +19,29 @@ import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 
-interface ManageHostSessionUseCase {
-    fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem>
-    fun create(command: HostSessionCommand): CreatedSessionResponse
-    fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
-    fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
-    fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse
+interface HostSessionLifecycleUseCase {
     fun open(command: HostSessionIdCommand): HostSessionDetailResponse
     fun close(command: HostSessionIdCommand): HostSessionDetailResponse
     fun publish(command: HostSessionIdCommand): HostSessionDetailResponse
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
     fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse
+    fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse
 }
+
+interface HostSessionDraftUseCase {
+    fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem>
+    fun create(command: HostSessionCommand): CreatedSessionResponse
+    fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
+    fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
+}
+
+@Deprecated(
+    "split into HostSessionLifecycleUseCase + HostSessionDraftUseCase",
+    level = DeprecationLevel.WARNING,
+)
+interface ManageHostSessionUseCase :
+    HostSessionLifecycleUseCase,
+    HostSessionDraftUseCase
 
 interface ListUpcomingSessionsUseCase {
     fun upcoming(member: CurrentMember): List<UpcomingSessionItem>

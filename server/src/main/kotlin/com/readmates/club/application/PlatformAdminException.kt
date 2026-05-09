@@ -9,4 +9,6 @@ enum class PlatformAdminError {
     INVALID_DOMAIN,
     CLUB_DOMAIN_NOT_FOUND,
     CLUB_DOMAIN_CONFLICT,
+    GRANT_NOT_FOUND,
+    GRANT_REASON_REQUIRED,
 }

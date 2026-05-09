@@ -1,6 +1,6 @@
 package com.readmates.auth.api
 
-import com.readmates.auth.application.AuthSessionService
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
@@ -232,13 +232,15 @@ class PendingApprovalControllerTest(
         state: String,
     ) {
         val sessionId = UUID.randomUUID().toString()
+        // PUBLISHED requires MEMBER or PUBLIC visibility (PUBLISHED+HOST_ONLY violates the invariant)
+        val visibility = if (state == "PUBLISHED") "MEMBER" else "HOST_ONLY"
         jdbcTemplate.update(
             """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, book_translator, book_link,
-              session_date, start_time, end_time, location_label, question_deadline_at, state
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
             )
-            values (?, ?, ?, ?, ?, ?, null, null, ?, '20:00', '22:00', ?, concat(?, ' 14:59:00.000000'), ?)
+            values (?, ?, ?, ?, ?, ?, null, null, ?, '20:00', '22:00', ?, concat(?, ' 14:59:00.000000'), ?, ?)
             """.trimIndent(),
             sessionId,
             clubId,
@@ -250,6 +252,7 @@ class PendingApprovalControllerTest(
             locationLabel,
             sessionDate,
             state,
+            visibility,
         )
         createdSessionIds += sessionId
     }

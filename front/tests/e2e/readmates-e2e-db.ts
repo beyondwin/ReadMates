@@ -135,8 +135,6 @@ where lower(users.email) in (${emailList})
 
 update users
 set google_subject_id = ${seedGoogleSubjectCase(emails)},
-    password_hash = null,
-    password_set_at = null,
     auth_provider = 'GOOGLE',
     updated_at = utc_timestamp(6)
 where lower(email) in (${emailList});
@@ -284,8 +282,6 @@ insert into users (
   name,
   short_name,
   profile_image_url,
-  password_hash,
-  password_set_at,
   auth_provider
 )
 select
@@ -295,8 +291,6 @@ select
   ${sqlString(displayName)},
   ${sqlString(shortName)},
   ${profileImageUrl === null ? "null" : sqlString(profileImageUrl)},
-  null,
-  null,
   'GOOGLE'
 where not exists (
   select 1 from users where lower(email) = ${sqlString(normalizedEmail)}
@@ -304,8 +298,6 @@ where not exists (
 
 update users
 set google_subject_id = coalesce(google_subject_id, ${sqlString(googleSubjectId)}),
-    password_hash = null,
-    password_set_at = null,
     auth_provider = 'GOOGLE',
     updated_at = utc_timestamp(6)
 where lower(email) = ${sqlString(normalizedEmail)};
@@ -357,8 +349,6 @@ insert into users (
   name,
   short_name,
   profile_image_url,
-  password_hash,
-  password_set_at,
   auth_provider
 )
 select
@@ -386,8 +376,6 @@ select
     ${sqlString(shortName)}
   ), 50),
   ${profileImageUrl === null ? "null" : sqlString(profileImageUrl)},
-  null,
-  null,
   'GOOGLE'
 where not exists (
   select 1 from users where lower(email) = ${sqlString(normalizedEmail)}
@@ -395,8 +383,6 @@ where not exists (
 
 update users
 set google_subject_id = coalesce(google_subject_id, ${sqlString(googleSubjectId)}),
-    password_hash = null,
-    password_set_at = null,
     auth_provider = 'GOOGLE',
     updated_at = utc_timestamp(6)
 where lower(email) = ${sqlString(normalizedEmail)};
@@ -700,8 +686,6 @@ insert into users (
   name,
   short_name,
   profile_image_url,
-  password_hash,
-  password_set_at,
   auth_provider
 )
 values (
@@ -710,8 +694,6 @@ values (
   ${sqlString(normalizedEmail)},
   'E2E Viewer Google',
   'Viewer',
-  null,
-  null,
   null,
   'GOOGLE'
 );

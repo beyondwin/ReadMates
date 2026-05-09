@@ -26,7 +26,8 @@ class HostNotificationOperationsService(
     private val notificationEventOutboxPort: NotificationEventOutboxPort,
     private val notificationDeliveryPort: NotificationDeliveryPort,
     private val notificationDeliveryProcessingService: NotificationDeliveryProcessingService,
-    @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean = true,
+    private val transactionalOps: NotificationDeliveryTransactionalOperations,
+    @param:Value("\${readmates.notifications.enabled:false}") private val deliveryEnabled: Boolean,
 ) : GetHostNotificationSummaryUseCase,
     ManageHostNotificationsUseCase {
     override fun getHostNotificationSummary(host: CurrentMember): HostNotificationSummary =
@@ -91,7 +92,7 @@ class HostNotificationOperationsService(
                 ?: throw notificationAccessDenied()
         }
 
-        val item = notificationDeliveryPort.claimHostEmailDelivery(currentHost.clubId, id)
+        val item = transactionalOps.claimHostEmailDelivery(currentHost.clubId, id)
             ?: throw notificationAccessDenied()
         notificationDeliveryProcessingService.processClaimed(item)
         return notificationDeliveryPort.hostEmailDetail(currentHost.clubId, id)

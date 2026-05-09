@@ -1,6 +1,6 @@
 package com.readmates.auth.api
 
-import com.readmates.auth.application.AuthSessionService
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.feedback.application.FeedbackDocumentError
 import com.readmates.feedback.application.FeedbackDocumentException

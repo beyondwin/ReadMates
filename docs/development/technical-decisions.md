@@ -111,6 +111,33 @@
 
 **관련 문서와 검증:** [architecture.md](architecture.md#서버-내부-구조), `./server/gradlew -p server clean test`
 
+## Prometheus metric tag에는 enum/low-cardinality 값만 사용한다
+
+**결정:** Prometheus metric tag 값은 `NotificationEventType`처럼 enum 또는 `pending`/`failed` 같은 고정 문자열만 사용합니다. `club_id`, `user_id`, `membership_id`, `recipient_email`, `event_id`, `delivery_id`, `session_id` 같은 row-level identifier는 tag로 넣지 않습니다.
+
+**이유:** Prometheus는 tag 값 조합마다 별도 time series를 만듭니다. row-level ID를 tag로 사용하면 운영 데이터가 늘어날수록 time series 수가 무한히 증가해 무료 Prometheus storage를 빠르게 소진하고, scrape/query 지연을 일으킵니다.
+
+**Trade-off:** metric만으로 "특정 사용자의 알림 전송 내역"을 Grafana에서 직접 조회할 수 없습니다. row-level 조회가 필요하면 `notification_deliveries` audit table에 JOIN 쿼리를 사용하거나, Grafana table panel에 DB datasource를 직접 연결합니다.
+
+**관련 문서와 검증:** `server/src/main/kotlin/com/readmates/notification/application/service/ReadmatesOperationalMetrics.kt` KDoc 참고
+
+## Kafka relay/consumer worker process를 단일 jar로 분리 운영한다
+
+**결정:** 현재 single Spring Boot process에서 web + scheduler + Kafka listener가 함께
+boot하므로, process 1개 죽으면 web과 notification 발송이 함께 정지한다.
+`readmates.notifications.worker.enabled=false/true` flag를 두고 systemd service를
+2개(web replica, worker instance)로 분리하면 infra cost 없이 failure isolation이 가능하다.
+
+**이유:** 단일 jar 재사용으로 infra cost 0. Gradle multi-module 분리(선택지 B)는
+2 instance 이상 운영하게 됐을 때 재검토한다.
+
+**Trade-off:** web replica와 worker instance가 같은 jar를 쓰므로 classpath isolation은
+없다. Kafka listener class는 web instance에서도 로드된다
+(`@ConditionalOnProperty`로 bean만 skip).
+
+**관련 문서와 검증:** v1 TASK-075 보강. `readmates.notifications.worker.enabled=false`로
+boot 시 Kafka listener bean이 등록되지 않는지 log 확인.
+
 ## 공개 릴리즈 후보를 별도 scan한다
 
 **결정:** 공개 저장소로 내보낼 후보는 `scripts/build-public-release-candidate.sh`로 별도 tree를 만든 뒤 `scripts/public-release-check.sh`로 scanner를 실행합니다.
@@ -120,3 +147,13 @@
 **Trade-off:** 공개 릴리즈 전 단계가 하나 늘어납니다. 대신 README, docs, scripts, deploy runbook이 public-safe placeholder 정책을 유지하는지 반복적으로 확인할 수 있습니다.
 
 **관련 문서와 검증:** [../deploy/security-public-repo.md](../deploy/security-public-repo.md), [../../scripts/README.md](../../scripts/README.md), `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`
+
+## IP hash salt를 ISO 주 단위로 회전한다
+
+**결정:** `RateLimitFilter`의 IP 해시는 `ClientIpHashing.hashClientIp`를 통해 `${READMATES_IP_HASH_BASE_SECRET}::${year}-W${week}` 형식의 salt로 생성합니다. salt는 ISO 주차가 바뀔 때마다 자동으로 변경되며, base secret은 환경 변수 `READMATES_IP_HASH_BASE_SECRET`으로 주입합니다. 미설정 시 빈 문자열 fallback을 사용해 filter는 동작하지만, 운영 환경에서는 반드시 설정해야 합니다.
+
+**이유:** salt가 정적이면 같은 IP의 요청 패턴이 장기간 누적되어 교차 분석 가능성이 생깁니다. 주 단위 salt 회전으로 cross-week linking을 차단해 IP 해시 공간이 week 경계에서 분리됩니다.
+
+**Trade-off:** token bucket이 주 경계에서 reset되는 의도된 부작용이 있습니다. 율 제한은 단기(분~시간 단위) 정책이므로 실질적인 영향은 없습니다. 토큰·세션 ID 해시에는 여전히 `stableHash`(salt 없음)를 사용해 주 경계 영향을 받지 않습니다.
+
+**관련 문서와 검증:** `./server/gradlew -p server test --tests '*ClientIpHashing*'`

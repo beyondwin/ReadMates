@@ -2,17 +2,42 @@ import { useState } from "react";
 import { useLoaderData } from "react-router-dom";
 import type { PlatformAdminRouteData } from "@/features/platform-admin/route/platform-admin-data";
 import { PlatformAdminDashboard } from "@/features/platform-admin/ui/platform-admin-dashboard";
-import { checkPlatformAdminDomainProvisioning } from "@/features/platform-admin/api/platform-admin-api";
+import {
+  checkPlatformAdminDomainProvisioning,
+  createSupportAccessGrant,
+  revokeSupportAccessGrant,
+} from "@/features/platform-admin/api/platform-admin-api";
 import type {
+  CreateSupportAccessGrantRequest,
   PlatformAdminDomainResponse,
   PlatformAdminSummaryResponse,
+  SupportAccessGrantResponse,
 } from "@/features/platform-admin/api/platform-admin-contracts";
+import type { CreateSupportAccessGrantFields } from "@/features/platform-admin/ui/support-access-grants-panel";
 
 export function PlatformAdminRoute() {
   const data = useLoaderData() as PlatformAdminRouteData;
   const [summary, setSummary] = useState(data.summary);
   const [checkingDomainIds, setCheckingDomainIds] = useState<ReadonlySet<string>>(new Set());
   const [checkErrorByDomainId, setCheckErrorByDomainId] = useState<Record<string, string>>({});
+  const [activeGrants, setActiveGrants] = useState<SupportAccessGrantResponse[]>([]);
+
+  async function handleCreateGrant(fields: CreateSupportAccessGrantFields) {
+    const request: CreateSupportAccessGrantRequest = {
+      clubId: fields.clubId,
+      granteeUserId: fields.granteeUserId,
+      scope: fields.scope,
+      reason: fields.reason,
+      expiresAt: fields.expiresAt,
+    };
+    const grant = await createSupportAccessGrant(request);
+    setActiveGrants((current) => [grant, ...current]);
+  }
+
+  async function handleRevokeGrant(grantId: string) {
+    await revokeSupportAccessGrant(grantId);
+    setActiveGrants((current) => current.filter((g) => g.id !== grantId));
+  }
 
   return (
     <PlatformAdminDashboard
@@ -34,6 +59,9 @@ export function PlatformAdminRoute() {
           setCheckingDomainIds((current) => withoutSetValue(current, domainId));
         }
       }}
+      activeGrants={activeGrants}
+      onCreateGrant={handleCreateGrant}
+      onRevokeGrant={handleRevokeGrant}
     />
   );
 }

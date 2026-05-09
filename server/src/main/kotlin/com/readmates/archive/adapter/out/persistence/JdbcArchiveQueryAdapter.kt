@@ -1,7 +1,7 @@
 package com.readmates.archive.adapter.out.persistence
 
+import com.readmates.archive.application.model.ArchiveSessionDetailHeader
 import com.readmates.archive.application.model.ArchiveSessionResult
-import com.readmates.archive.application.model.MemberArchiveSessionDetailResult
 import com.readmates.archive.application.model.MyArchiveQuestionResult
 import com.readmates.archive.application.model.MyArchiveReviewResult
 import com.readmates.archive.application.model.MyPageResult
@@ -30,7 +30,7 @@ class JdbcArchiveQueryAdapter(
     override fun loadArchiveSessionDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): MemberArchiveSessionDetailResult? {
+    ): ArchiveSessionDetailHeader? {
         return detailQueries.loadArchiveSessionDetail(jdbcTemplate, currentMember, sessionId)
     }
 

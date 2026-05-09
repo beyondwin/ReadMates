@@ -37,6 +37,23 @@ data class MyArchiveReviewResult(
     val text: String,
 )
 
+data class ArchiveSessionDetailHeader(
+    val sessionId: String,
+    val sessionNumber: Int,
+    val title: String,
+    val bookTitle: String,
+    val bookAuthor: String,
+    val bookImageUrl: String?,
+    val date: String,
+    val locationLabel: String,
+    val attendance: Int,
+    val total: Int,
+    val state: String,
+    val myAttendanceStatus: String?,
+    val isHost: Boolean,
+    val publicSummary: String?,
+)
+
 data class MemberArchiveSessionDetailResult(
     val sessionId: String,
     val sessionNumber: Int,

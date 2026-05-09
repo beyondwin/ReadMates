@@ -17,7 +17,6 @@ import com.readmates.shared.paging.PageRequest
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
-import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -32,23 +31,18 @@ class JdbcNotificationDeliveryAdapter(
     private val queries = NotificationDeliveryQueries(rowMappers)
     private val writeOperations = NotificationDeliveryWriteOperations(queries, rowMappers)
 
-    @Transactional
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
         writeOperations.persistPlannedDeliveries(jdbcTemplate, message)
 
-    @Transactional
     override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? =
         writeOperations.claimEmailDelivery(jdbcTemplate, id)
 
-    @Transactional
     override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> =
         writeOperations.claimEmailDeliveries(jdbcTemplate, limit)
 
-    @Transactional
     override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
         writeOperations.claimEmailDeliveriesForClub(jdbcTemplate, clubId, limit)
 
-    @Transactional
     override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? =
         writeOperations.claimHostEmailDelivery(jdbcTemplate, clubId, id)
 

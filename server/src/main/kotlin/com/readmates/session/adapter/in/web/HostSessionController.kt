@@ -4,7 +4,8 @@ import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
-import com.readmates.session.application.port.`in`.ManageHostSessionUseCase
+import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
+import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
@@ -32,34 +33,35 @@ data class HostSessionVisibilityRequest(
 @RestController
 @RequestMapping("/api/host/sessions")
 class HostSessionController(
-    private val manageHostSessionUseCase: ManageHostSessionUseCase,
+    private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
+    private val hostSessionDraftUseCase: HostSessionDraftUseCase,
 ) {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         @Valid @RequestBody request: HostSessionRequest,
         member: CurrentMember,
-    ) = manageHostSessionUseCase.create(request.toCommand(member))
+    ) = hostSessionDraftUseCase.create(request.toCommand(member))
 
     @GetMapping
     fun list(
         member: CurrentMember,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
-    ) = manageHostSessionUseCase.list(member, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+    ) = hostSessionDraftUseCase.list(member, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
 
     @GetMapping("/{sessionId}")
     fun detail(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = manageHostSessionUseCase.detail(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionDraftUseCase.detail(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @PatchMapping("/{sessionId}")
     fun update(
         @PathVariable sessionId: String,
         @Valid @RequestBody request: HostSessionRequest,
         member: CurrentMember,
-    ) = manageHostSessionUseCase.update(
+    ) = hostSessionDraftUseCase.update(
         UpdateHostSessionCommand(
             host = member,
             sessionId = parseHostSessionId(sessionId),
@@ -72,37 +74,37 @@ class HostSessionController(
         @PathVariable sessionId: String,
         @Valid @RequestBody request: HostSessionVisibilityRequest,
         member: CurrentMember,
-    ) = manageHostSessionUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionLifecycleUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
 
     @PostMapping("/{sessionId}/open")
     fun open(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = manageHostSessionUseCase.open(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionLifecycleUseCase.open(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @PostMapping("/{sessionId}/close")
     fun close(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = manageHostSessionUseCase.close(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionLifecycleUseCase.close(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @PostMapping("/{sessionId}/publish")
     fun publish(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = manageHostSessionUseCase.publish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionLifecycleUseCase.publish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = manageHostSessionUseCase.deletionPreview(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionLifecycleUseCase.deletionPreview(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @DeleteMapping("/{sessionId}")
     fun delete(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = manageHostSessionUseCase.delete(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionLifecycleUseCase.delete(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 }
 
 internal fun parseHostSessionId(sessionId: String): UUID =
