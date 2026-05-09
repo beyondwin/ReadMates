@@ -50,6 +50,10 @@ val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/defaul
 tasks.withType<Test> {
     useJUnitPlatform()
     jvmArgs("-Xshare:off")
+    systemProperty(
+        "readmates.frontend.fixtures.dir",
+        rootProject.file("../front/tests/unit/__fixtures__").absolutePath,
+    )
 
     if (System.getenv("DOCKER_HOST").isNullOrBlank() && colimaDockerSocket.exists()) {
         environment("DOCKER_HOST", "unix://${colimaDockerSocket.absolutePath}")
