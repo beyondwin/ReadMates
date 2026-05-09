@@ -20,27 +20,47 @@ class BffSecretFilterUnitTest {
     @Test
     fun `blank bff secret fails at startup when required`() {
         assertThrows(IllegalStateException::class.java) {
-            BffSecretFilter("", noopAllowedOriginPort(), bffSecretRequired = true)
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+            )
         }
     }
 
     @Test
     fun `blank bff secret fails at startup when required with whitespace`() {
         assertThrows(IllegalStateException::class.java) {
-            BffSecretFilter("   ", noopAllowedOriginPort(), bffSecretRequired = true)
+            BffSecretFilter(
+                configuredSecretsRaw = "   ",
+                legacyExpectedSecret = "   ",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+            )
         }
     }
 
     @Test
     fun `blank bff secret remains allowed when explicitly optional`() {
         assertDoesNotThrow {
-            BffSecretFilter(" ", noopAllowedOriginPort(), bffSecretRequired = false)
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = " ",
+                bffSecretRequired = false,
+                allowedOriginPort = noopAllowedOriginPort(),
+            )
         }
     }
 
     @Test
     fun `blank dev secret lets api requests pass through`() {
-        val filter = BffSecretFilter(" ", noopAllowedOriginPort(), bffSecretRequired = false)
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = " ",
+            bffSecretRequired = false,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
         val request = MockHttpServletRequest("GET", "/api/auth/me")
         val response = MockHttpServletResponse()
         val filterChain = MockFilterChain()
@@ -52,7 +72,12 @@ class BffSecretFilterUnitTest {
 
     @Test
     fun `configured secret is trimmed before comparison`() {
-        val filter = BffSecretFilter(" test-bff-secret ", noopAllowedOriginPort(), bffSecretRequired = true)
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = " test-bff-secret ",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
         val request = MockHttpServletRequest("GET", "/api/auth/me")
         val response = MockHttpServletResponse()
         val filterChain = MockFilterChain()
@@ -70,9 +95,10 @@ class BffSecretFilterUnitTest {
             appBaseUrl = "http://localhost:3000/app",
         )
         val filter = BffSecretFilter(
-            expectedSecret = "test-bff-secret",
-            allowedOriginPort = allowedOriginPort,
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = "test-bff-secret",
             bffSecretRequired = true,
+            allowedOriginPort = allowedOriginPort,
         )
         val request = MockHttpServletRequest("POST", "/api/auth/logout")
         val response = MockHttpServletResponse()
@@ -87,7 +113,12 @@ class BffSecretFilterUnitTest {
 
     @Test
     fun `missing bff secret rejection logs method path and client ip only`() {
-        val filter = BffSecretFilter("test-bff-secret", noopAllowedOriginPort(), bffSecretRequired = true)
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = "test-bff-secret",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
         val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
             servletPath = "/api/auth/me"
             remoteAddr = "203.0.113.10"
@@ -115,9 +146,10 @@ class BffSecretFilterUnitTest {
             appBaseUrl = "http://localhost:3000",
         )
         val filter = BffSecretFilter(
-            expectedSecret = "test-bff-secret",
-            allowedOriginPort = allowedOriginPort,
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = "test-bff-secret",
             bffSecretRequired = true,
+            allowedOriginPort = allowedOriginPort,
         )
         val request = MockHttpServletRequest("POST", "/api/auth/logout").apply {
             servletPath = "/api/auth/logout"
@@ -139,6 +171,164 @@ class BffSecretFilterUnitTest {
                 .doesNotContain("test-bff-secret")
                 .doesNotContain("evil.example.com")
         }
+    }
+
+    // --- New scenarios for REQ-R-003a-9 ---
+
+    @Test
+    fun `primary secret from secrets list passes`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "secret1,secret2",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader("X-Readmates-Bff-Secret", "secret1")
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `secondary secret from secrets list passes`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "secret1,secret2",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader("X-Readmates-Bff-Secret", "secret2")
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `unknown secret is rejected with 401`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "secret1,secret2",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader("X-Readmates-Bff-Secret", "unknown-secret")
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(401, response.status)
+    }
+
+    @Test
+    fun `blank entries in comma-separated list are ignored`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = ",a,,b,",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader("X-Readmates-Bff-Secret", "a")
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `empty secrets with bff-secret-required false passes through`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = "",
+            bffSecretRequired = false,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `empty secrets with bff-secret-required true fails at startup with exact message`() {
+        val ex = assertThrows(IllegalStateException::class.java) {
+            BffSecretFilter(
+                configuredSecretsRaw = "",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+            )
+        }
+        assertEquals(
+            "readmates.security.bff.secrets must contain at least one entry when readmates.bff-secret-required is true",
+            ex.message,
+        )
+    }
+
+    @Test
+    fun `legacy single bff-secret backward compat returns 200`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = "legacy-secret",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader("X-Readmates-Bff-Secret", "legacy-secret")
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `configuredSecretsRaw takes priority over legacyExpectedSecret`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-secret",
+            legacyExpectedSecret = "legacy-secret",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        // primary secret works
+        val requestPrimary = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader("X-Readmates-Bff-Secret", "primary-secret")
+        }
+        val responsePrimary = MockHttpServletResponse()
+        filter.doFilter(requestPrimary, responsePrimary, MockFilterChain())
+        assertEquals(200, responsePrimary.status)
+
+        // legacy secret does NOT work when configuredSecretsRaw is non-empty
+        val requestLegacy = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader("X-Readmates-Bff-Secret", "legacy-secret")
+        }
+        val responseLegacy = MockHttpServletResponse()
+        filter.doFilter(requestLegacy, responseLegacy, MockFilterChain())
+        assertEquals(401, responseLegacy.status)
     }
 
     private fun noopAllowedOriginPort(): AllowedOriginPort = object : AllowedOriginPort {

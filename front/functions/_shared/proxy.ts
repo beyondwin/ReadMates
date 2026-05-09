@@ -53,18 +53,26 @@ export function apiBaseUrlFromEnv(env: { READMATES_API_BASE_URL: string }) {
   return apiBaseUrl;
 }
 
-export function bffSecretFromEnv(env: { READMATES_BFF_SECRET?: string }) {
-  const directSecret = env.READMATES_BFF_SECRET?.trim();
-  if (directSecret) {
-    return directSecret;
+export function bffSecretFromEnv(env: {
+  READMATES_BFF_SECRETS?: string;
+  READMATES_BFF_SECRET?: string;
+}): string | null {
+  const list = env.READMATES_BFF_SECRETS?.trim();
+  if (list) {
+    const first = list
+      .split(",")
+      .map((s) => s.trim())
+      .find((s) => s.length > 0);
+    if (first) return first;
   }
-
+  const legacy = env.READMATES_BFF_SECRET?.trim();
+  if (legacy) return legacy;
   return null;
 }
 
 export function forwardedOAuthRequestHeaders(
   request: Request,
-  env: { READMATES_BFF_SECRET?: string },
+  env: { READMATES_BFF_SECRETS?: string; READMATES_BFF_SECRET?: string },
 ) {
   const sourceUrl = new URL(request.url);
   const headers = new Headers();
