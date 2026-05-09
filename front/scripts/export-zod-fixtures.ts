@@ -65,7 +65,6 @@ const hostInvitationList = {
 function write(filename: string, data: unknown): void {
   const path = join(fixturesDir, filename);
   writeFileSync(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
-  console.log(`Written: ${path}`);
 }
 
 write("host-session-detail.json", hostSessionDetail);
