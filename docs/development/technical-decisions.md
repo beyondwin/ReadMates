@@ -147,3 +147,13 @@ boot 시 Kafka listener bean이 등록되지 않는지 log 확인.
 **Trade-off:** 공개 릴리즈 전 단계가 하나 늘어납니다. 대신 README, docs, scripts, deploy runbook이 public-safe placeholder 정책을 유지하는지 반복적으로 확인할 수 있습니다.
 
 **관련 문서와 검증:** [../deploy/security-public-repo.md](../deploy/security-public-repo.md), [../../scripts/README.md](../../scripts/README.md), `./scripts/build-public-release-candidate.sh`, `./scripts/public-release-check.sh .tmp/public-release-candidate`
+
+## IP hash salt를 ISO 주 단위로 회전한다
+
+**결정:** `RateLimitFilter`의 IP 해시는 `ClientIpHashing.hashClientIp`를 통해 `${READMATES_IP_HASH_BASE_SECRET}::${year}-W${week}` 형식의 salt로 생성합니다. salt는 ISO 주차가 바뀔 때마다 자동으로 변경되며, base secret은 환경 변수 `READMATES_IP_HASH_BASE_SECRET`으로 주입합니다. 미설정 시 빈 문자열 fallback을 사용해 filter는 동작하지만, 운영 환경에서는 반드시 설정해야 합니다.
+
+**이유:** salt가 정적이면 같은 IP의 요청 패턴이 장기간 누적되어 교차 분석 가능성이 생깁니다. 주 단위 salt 회전으로 cross-week linking을 차단해 IP 해시 공간이 week 경계에서 분리됩니다.
+
+**Trade-off:** token bucket이 주 경계에서 reset되는 의도된 부작용이 있습니다. 율 제한은 단기(분~시간 단위) 정책이므로 실질적인 영향은 없습니다. 토큰·세션 ID 해시에는 여전히 `stableHash`(salt 없음)를 사용해 주 경계 영향을 받지 않습니다.
+
+**관련 문서와 검증:** `./server/gradlew -p server test --tests '*ClientIpHashing*'`
