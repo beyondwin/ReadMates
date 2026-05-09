@@ -79,7 +79,7 @@ class AuthMeController(
 
     private fun authenticatedWithoutMembership(email: String?, knownUserId: UUID? = null): AuthMemberResponse {
         val resolvedEmail = email ?: return AuthMemberResponse.anonymous(null)
-        val userId = knownUserId ?: email?.let(resolveCurrentMemberUseCase::findUserIdByEmail)
+        val userId = knownUserId ?: resolveCurrentMemberUseCase.findUserIdByEmail(resolvedEmail)
             ?: return AuthMemberResponse.anonymous(email)
         return AuthMemberResponse.authenticatedUser(
             userId = userId,
