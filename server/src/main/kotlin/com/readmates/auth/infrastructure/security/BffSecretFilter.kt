@@ -1,16 +1,20 @@
 package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.application.port.out.AllowedOriginPort
+import com.readmates.auth.application.port.out.BffSecretRotationAuditPort
+import com.readmates.shared.security.ClientIpHashing
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.concurrent.CompletableFuture
 
 @Component
 class BffSecretFilter(
@@ -21,6 +25,10 @@ class BffSecretFilter(
     @param:Value("\${readmates.bff-secret-required:true}")
     private val bffSecretRequired: Boolean,
     private val allowedOriginPort: AllowedOriginPort,
+    @param:Value("\${READMATES_IP_HASH_BASE_SECRET:}")
+    private val ipHashBaseSecret: String = "",
+    @Autowired(required = false)
+    private val auditPort: BffSecretRotationAuditPort? = null,
 ) : OncePerRequestFilter() {
 
     private val secrets: List<String> = run {
@@ -51,7 +59,8 @@ class BffSecretFilter(
     ) {
         if (isApiRequest(request) && secrets.isNotEmpty()) {
             val provided = request.getHeader(BFF_SECRET_HEADER)
-            if (provided.isNullOrBlank() || !matchesAny(provided, secrets)) {
+            val alias = provided?.let { aliasFor(it) }
+            if (alias == null) {
                 operationalLogger.warn(
                     "BFF secret rejected method={} path={} clientIp={}",
                     request.method,
@@ -61,6 +70,7 @@ class BffSecretFilter(
                 response.status = HttpServletResponse.SC_UNAUTHORIZED
                 return
             }
+            auditAsync(alias, request)
 
             if (isMutatingRequest(request) && !hasAllowedOrigin(request)) {
                 operationalLogger.warn(
@@ -77,6 +87,19 @@ class BffSecretFilter(
         filterChain.doFilter(request, response)
     }
 
+    private fun auditAsync(alias: String, request: HttpServletRequest) {
+        val port = auditPort ?: return
+        val clientIpHash = ClientIpHashing.hashClientIp(request.remoteAddr, ipHashBaseSecret)
+        val path = request.requestURI
+        CompletableFuture.runAsync {
+            try {
+                port.recordUsage(alias, clientIpHash, path)
+            } catch (ex: Exception) {
+                operationalLogger.warn("BFF audit record failed: {}", ex.message)
+            }
+        }
+    }
+
     private fun matchesAny(provided: String, candidates: List<String>): Boolean {
         val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
         var matched = false
@@ -90,7 +113,6 @@ class BffSecretFilter(
         return matched
     }
 
-    @Suppress("unused")
     internal fun aliasFor(provided: String): String? {
         val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
         secrets.forEachIndexed { idx, candidate ->

@@ -36,6 +36,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Observability ADR, metric tag 정책, health endpoint 문서, worker process flag 문서를 추가했습니다. (TASK-V2-014 ~ V2-018)
 - `legacy_password_hash` 컬럼에 대한 2-phase DB rename/drop을 진행했습니다. (TASK-V2-022/023)
 
+### Added
+
+- BFF secret rotation audit log (`bff_secret_rotation_audit` table, V26 migration) records which
+  secret alias is used per request, enabling traffic distribution monitoring during rotation.
+
 ### Changed
 
 - BFF secret filter now supports comma-separated `READMATES_BFF_SECRETS` env var for zero-downtime secret rotation. Legacy `READMATES_BFF_SECRET` is still accepted as fallback. Secret matching is timing-safe.
