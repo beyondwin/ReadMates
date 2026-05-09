@@ -6,8 +6,16 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+## v1.6.0 - 2026-05-09
+
+### Highlights
+
+보안 강화, BFF secret 무중단 rotation, 성능 개선, 아키텍처 정리를 포함한 대규모 업데이트입니다. DB migration 3개(V24 legacy password rename, V25 drop, V26 BFF rotation audit)가 포함되며, 신규 환경 변수 `READMATES_IP_HASH_BASE_SECRET`가 추가됩니다.
+
 ### Security
 
+- BFF secret 무중단 rotation 지원: `READMATES_BFF_SECRETS` 환경 변수에 쉼표로 구분된 여러 시크릿을 설정할 수 있습니다. 기존 `READMATES_BFF_SECRET`은 fallback으로 계속 동작합니다. 매칭은 timing-safe 방식으로 모든 후보를 끝까지 비교합니다.
+- BFF rotation 감사 로그: 인증 성공 요청마다 사용된 secret alias("primary"/"secondary"/"index_N")를 `bff_secret_rotation_audit` 테이블에 비동기로 기록합니다. rotation 중 old-secret 트래픽이 0으로 떨어진 시점을 SQL로 확인할 수 있습니다. (V26 migration)
 - `ClientIpHashing.kt`를 추가해 `RateLimitFilter`의 IP 해시 salt를 ISO 주차 기준으로 자동 rotate합니다. base secret은 `READMATES_IP_HASH_BASE_SECRET` 환경 변수로 주입하며, 미설정 시 빈 문자열 fallback을 사용하고 startup 시 WARN을 출력합니다. (TASK-V2-028)
 - Spring Security role hierarchy를 `ROLE_PLATFORM_ADMIN > ROLE_MEMBER`, `ROLE_HOST > ROLE_MEMBER`로 정리했습니다. (TASK-V2-005)
 - Set-Cookie `Domain` 속성 stripping fix를 적용해 cross-origin cookie 노출을 방지합니다. (TASK-V2-004)
@@ -23,32 +31,40 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - `HostSessionEditor`에 `useReducer` + `memo`를 적용해 불필요한 re-render를 제거했습니다. (TASK-V2-021)
 - Dynamic CORS origins 지원을 추가했습니다. (TASK-V2-016)
 
-### Testing
-
-- `FrontendFixtureContractTest.kt`(서버 측 계약 bridge 테스트)와 `front/tests/unit/__fixtures__/` 하위 JSON fixture 4개를 추가했습니다. (TASK-V2-026)
-- Playwright 설정에 `fullyParallel: true`, `workers: CI ? 4 : 2`를 적용하고 CI shard 매트릭스(`1/3`, `2/3`, `3/3`)를 추가했습니다. (TASK-V2-027)
-- `FrontendZodSchemaContractTest.kt`와 `zod:export-fixtures` npm script를 추가해 Zod 스키마 CI gate를 구성했습니다. (TASK-V2-030)
-- 3개 host contract에 Zod 런타임 검증을 추가했습니다(`import.meta.env.DEV`에서만 활성화). `zod`를 devDependency로 추가했습니다. (TASK-V2-025)
-
-### Architecture
-
-- UseCase 인터페이스 분리, auth/application layer 정리, `@Transactional` 마이그레이션, `MembershipStatus` FSM 문서화를 포함한 아키텍처 클린업을 진행했습니다. (TASK-V2-010 ~ V2-013)
-- Observability ADR, metric tag 정책, health endpoint 문서, worker process flag 문서를 추가했습니다. (TASK-V2-014 ~ V2-018)
-- `legacy_password_hash` 컬럼에 대한 2-phase DB rename/drop을 진행했습니다. (TASK-V2-022/023)
-
-### Added
-
-- BFF secret rotation audit log (`bff_secret_rotation_audit` table, V26 migration) records which
-  secret alias is used per request, enabling traffic distribution monitoring during rotation.
-
-### Changed
-
-- BFF secret filter now supports comma-separated `READMATES_BFF_SECRETS` env var for zero-downtime secret rotation. Legacy `READMATES_BFF_SECRET` is still accepted as fallback. Secret matching is timing-safe.
-
 ### Removed
 
 - Legacy password column dropped from `users` table (Flyway V24+V25 deployed together).
 - `POST /api/auth/password-reset/{token}` and `POST /api/host/members/{id}/password-reset` endpoints removed (previously returned 410 GONE; now 404).
+
+### Deployment Notes
+
+**서버 배포 순서**
+
+1. `/etc/readmates/readmates.env`에 신규 환경 변수 추가:
+   ```
+   READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성>
+   ```
+2. GHCR image `ghcr.io/<owner>/readmates-server:v1.6.0` pull 후 compose stack 재시작.
+3. Flyway V24, V25, V26 migration 자동 적용 확인.
+4. `/internal/health` 및 BFF smoke 확인.
+
+**Flyway migration**
+
+| 버전 | 내용 |
+| --- | --- |
+| V24 | `users.password_hash` → `legacy_password_hash` rename |
+| V25 | `legacy_password_hash`, `legacy_password_set_at` drop |
+| V26 | `bff_secret_rotation_audit` 테이블 생성 (감사 로그) |
+
+**프론트엔드**
+
+v1.6.0 tag push로 GitHub Actions `deploy-front.yml`이 Cloudflare Pages 배포를 자동 실행합니다. `zod`가 devDependency로 추가됐으므로 빌드 시 `pnpm install`이 정상 실행돼야 합니다.
+
+### Verification
+
+- 서버 테스트: 707개 통과 (baseline 696 + 11)
+- 프론트 테스트: 705개 통과 (baseline 697 + 8)
+- TypeScript 오류: 36개 (pre-existing, 신규 없음)
 
 ## v1.5.2 - 2026-05-06
 
