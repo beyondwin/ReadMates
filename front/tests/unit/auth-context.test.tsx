@@ -362,7 +362,9 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("short-name")).toHaveTextContent(activeMemberAuth.displayName ?? "");
+    await waitFor(() => {
+      expect(screen.getByTestId("short-name")).toHaveTextContent(activeMemberAuth.displayName ?? "");
+    });
 
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
