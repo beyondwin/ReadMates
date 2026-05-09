@@ -25,3 +25,5 @@ deploy/cloudflare/.deploy-hook.env
 .playwright-mcp
 docs/private/
 .server-config/
+.claude/
+.orchestrator/
