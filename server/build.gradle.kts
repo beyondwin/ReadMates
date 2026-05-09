@@ -54,6 +54,10 @@ tasks.withType<Test> {
         "readmates.frontend.fixtures.dir",
         rootProject.file("../front/tests/unit/__fixtures__").absolutePath,
     )
+    systemProperty(
+        "readmates.frontend.zod.fixtures.dir",
+        rootProject.file("../front/tests/unit/__fixtures__/zod-schemas").absolutePath,
+    )
 
     if (System.getenv("DOCKER_HOST").isNullOrBlank() && colimaDockerSocket.exists()) {
         environment("DOCKER_HOST", "unix://${colimaDockerSocket.absolutePath}")

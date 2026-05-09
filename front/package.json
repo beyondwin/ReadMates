@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "zod:export-fixtures": "tsx scripts/export-zod-fixtures.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -36,6 +37,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
     "jsdom": "^26.1.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.8.0",
     "typescript-eslint": "^8.59.0",
     "vite": "8.0.9",

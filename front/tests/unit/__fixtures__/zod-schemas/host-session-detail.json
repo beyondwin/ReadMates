@@ -1,0 +1,25 @@
+{
+  "sessionId": "00000000-0000-0000-0000-000000000301",
+  "sessionNumber": 1,
+  "title": "1회차 · 팩트풀니스",
+  "bookTitle": "팩트풀니스",
+  "bookAuthor": "한스 로슬링",
+  "bookLink": null,
+  "bookImageUrl": null,
+  "locationLabel": "온라인",
+  "meetingUrl": null,
+  "meetingPasscode": null,
+  "date": "2025-11-26",
+  "startTime": "19:30",
+  "endTime": "21:30",
+  "questionDeadlineAt": "2025-11-25T14:59:00Z",
+  "visibility": "PUBLIC",
+  "publication": null,
+  "state": "PUBLISHED",
+  "attendees": [],
+  "feedbackDocument": {
+    "uploaded": false,
+    "fileName": null,
+    "uploadedAt": null
+  }
+}

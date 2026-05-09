@@ -55,6 +55,11 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Check zod fixtures are up to date
+        run: |
+          pnpm zod:export-fixtures
+          git diff --exit-code tests/unit/__fixtures__/zod-schemas/
+
   backend:
     name: Backend
     runs-on: ubuntu-latest
