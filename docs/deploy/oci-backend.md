@@ -408,7 +408,17 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 1. `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 `/etc/readmates/readmates.env`에 추가하고 서버를 재시작합니다.
 2. Cloudflare Pages 환경 변수에도 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 배포합니다. (또는 BFF를 먼저 `<new-secret>`만으로 전환합니다.)
 3. BFF `/api/bff/api/auth/me` smoke로 정상 동작을 확인합니다.
-4. `<old-secret>`을 제거하고 `READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET=<shared-bff-secret>`으로 env를 정리한 뒤 재시작합니다.
+4. `bff_secret_rotation_audit` 테이블에서 old-secret alias 트래픽이 0으로 떨어졌는지 확인합니다. rotation 중 서버는 인증에 성공한 각 요청에 사용된 secret alias를 이 테이블에 비동기로 기록합니다. old-secret alias의 최근 row가 없으면 모든 트래픽이 new-secret으로 전환된 것입니다.
+
+   ```sql
+   SELECT secret_alias, COUNT(*) AS cnt, MAX(created_at) AS last_seen
+   FROM bff_secret_rotation_audit
+   WHERE created_at > NOW() - INTERVAL 10 MINUTE
+   GROUP BY secret_alias
+   ORDER BY last_seen DESC;
+   ```
+
+5. `<old-secret>`을 제거하고 `READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET=<shared-bff-secret>`으로 env를 정리한 뒤 재시작합니다.
 
 `READMATES_BFF_SECRETS`가 설정되면 `READMATES_BFF_SECRET`은 fallback으로만 쓰입니다.
 
