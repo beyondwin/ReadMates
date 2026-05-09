@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -336,6 +337,97 @@ class SupportAccessGrantControllerTest(
     }
 
     @Test
+    fun `platform admin with active HOST_SUPPORT_READ grant can access host endpoint`() {
+        val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+
+        val createResult = mockMvc.post("/api/admin/support-access-grants") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "clubId": "$TEST_CLUB_ID",
+                  "granteeUserId": "$grantee",
+                  "scope": "HOST_SUPPORT_READ",
+                  "reason": "Support access for host endpoint test",
+                  "expiresAt": "2099-01-01T12:00:00Z"
+                }
+            """.trimIndent()
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isOk() }
+        }.andReturn()
+        createdGrantIds += checkNotNull(createResult.response.jsonPathValue<String>("$.id"))
+
+        mockMvc.get("/api/host/dashboard") {
+            cookie(sessionCookieForUser(grantee))
+            header("X-Readmates-Club-Slug", TEST_CLUB_SLUG)
+        }.andExpect {
+            status { isOk() }
+        }
+    }
+
+    @Test
+    fun `platform admin without a support grant cannot access host endpoint`() {
+        val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+
+        mockMvc.get("/api/host/dashboard") {
+            cookie(sessionCookieForUser(grantee))
+            header("X-Readmates-Club-Slug", TEST_CLUB_SLUG)
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
+    fun `platform admin with a revoked support grant cannot access host endpoint`() {
+        val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+
+        val createResult = mockMvc.post("/api/admin/support-access-grants") {
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+                {
+                  "clubId": "$TEST_CLUB_ID",
+                  "granteeUserId": "$grantee",
+                  "scope": "HOST_SUPPORT_READ",
+                  "reason": "Revoked grant host endpoint test",
+                  "expiresAt": "2099-01-01T12:00:00Z"
+                }
+            """.trimIndent()
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isOk() }
+        }.andReturn()
+        val grantId = checkNotNull(createResult.response.jsonPathValue<String>("$.id"))
+        createdGrantIds += grantId
+
+        mockMvc.delete("/api/admin/support-access-grants/$grantId") {
+            cookie(sessionCookieForUser(owner))
+        }.andExpect {
+            status { isNoContent() }
+        }
+
+        mockMvc.get("/api/host/dashboard") {
+            cookie(sessionCookieForUser(grantee))
+            header("X-Readmates-Club-Slug", TEST_CLUB_SLUG)
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
+    fun `non-platform-admin user cannot access host endpoint`() {
+        // Uses Spring Security's user(...) helper to bypass cookie auth and inject a plain user principal.
+        // member5@example.com is not a platform admin and has no club membership, so ROLE_HOST is never granted.
+        mockMvc.get("/api/host/dashboard") {
+            with(user("member5@example.com"))
+            header("X-Readmates-Club-Slug", TEST_CLUB_SLUG)
+        }.andExpect {
+            status { isForbidden() }
+        }
+    }
+
+    @Test
     fun `revoke audit event is written when grant is revoked`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
         val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
@@ -407,6 +499,9 @@ class SupportAccessGrantControllerTest(
 
     private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
         if (values.isEmpty()) return
+        // test-only helper; all call sites use hardcoded table/column names
+        require(tableName.matches(Regex("[a-z_]+"))) { "tableName must be a safe identifier: $tableName" }
+        require(columnName.matches(Regex("[a-z_]+"))) { "columnName must be a safe identifier: $columnName" }
         val placeholders = values.joinToString(",") { "?" }
         jdbcTemplate.update(
             "delete from $tableName where $columnName in ($placeholders)",

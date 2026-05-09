@@ -1,8 +1,7 @@
 package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
-import com.readmates.club.adapter.`in`.web.ClubContextHeader
-import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
@@ -24,7 +23,7 @@ class AuthMeController(
     fun me(authentication: Authentication?, request: HttpServletRequest): AuthMemberResponse {
         val sessionProfileMember = authentication?.principal as? CurrentMember
         val sessionUser = authentication?.principal as? CurrentUser
-        val requestedClubContext = request.resolveRequestedClubContext()
+        val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
         if (sessionProfileMember != null) {
             val joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(sessionProfileMember.userId)
             val platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(sessionProfileMember.userId)
@@ -89,27 +88,4 @@ class AuthMeController(
             platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(userId),
         )
     }
-
-    private fun HttpServletRequest.resolveRequestedClubContext(): RequestedClubContext {
-        val slug = getHeader(ClubContextHeader.CLUB_SLUG)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        if (slug != null) {
-            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveBySlug(slug))
-        }
-
-        val host = getHeader(ClubContextHeader.CLUB_HOST)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        if (host != null) {
-            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveByHost(host))
-        }
-
-        return RequestedClubContext(supplied = false, context = null)
-    }
-
-    private data class RequestedClubContext(
-        val supplied: Boolean,
-        val context: ResolvedClubContext?,
-    )
 }

@@ -5,9 +5,11 @@ import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.CreateSupportAccessGrantCommand
 import com.readmates.club.application.model.SupportAccessGrant
+import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.CreateSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ListSupportAccessGrantsUseCase
 import com.readmates.club.application.port.`in`.RevokeSupportAccessGrantUseCase
+import com.readmates.club.application.port.`in`.SupportMemberSynthesis
 import com.readmates.club.application.port.out.CreateSupportAccessGrantPort
 import com.readmates.club.application.port.out.LoadSupportAccessGrantPort
 import com.readmates.club.application.port.out.RevokeSupportAccessGrantPort
@@ -25,9 +27,25 @@ class SupportAccessGrantService(
     private val loadGrantPort: LoadSupportAccessGrantPort,
     private val auditEventPort: WritePlatformAuditEventPort,
     private val objectMapper: ObjectMapper,
-) : CreateSupportAccessGrantUseCase,
+) : CheckSupportAccessGrantUseCase,
+    CreateSupportAccessGrantUseCase,
     RevokeSupportAccessGrantUseCase,
     ListSupportAccessGrantsUseCase {
+
+    override fun synthesizeHostCurrentMember(
+        userId: UUID,
+        email: String,
+        clubId: UUID,
+        clubSlug: String,
+        clubName: String,
+    ): SupportMemberSynthesis? {
+        val grant = loadGrantPort.loadActiveGrantByGranteeAndClub(userId, clubId) ?: return null
+        return SupportMemberSynthesis(
+            membershipProxyId = grant.id,
+            displayName = email,
+            accountName = email,
+        )
+    }
 
     override fun createSupportAccessGrant(
         admin: CurrentPlatformAdmin,

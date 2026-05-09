@@ -103,6 +103,21 @@ class JdbcSupportAccessGrantAdapter(
             granteeUserId.dbString(),
         )
 
+    override fun loadActiveGrantByGranteeAndClub(granteeUserId: UUID, clubId: UUID): SupportAccessGrant? =
+        jdbcTemplate.query(
+            """
+            select id, club_id, granted_by_user_id, grantee_user_id, scope, reason, expires_at, revoked_at, created_at
+            from support_access_grants
+            where grantee_user_id = ? and club_id = ?
+              and scope = 'HOST_SUPPORT_READ'
+              and revoked_at is null and expires_at > utc_timestamp(6)
+            limit 1
+            """.trimIndent(),
+            ::mapGrant,
+            granteeUserId.dbString(),
+            clubId.dbString(),
+        ).firstOrNull()
+
     private fun loadGrant(grantId: UUID): SupportAccessGrant? =
         jdbcTemplate.query(
             """

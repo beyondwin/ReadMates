@@ -158,7 +158,7 @@ class SecurityConfig(
     fun roleHierarchy(): RoleHierarchy =
         RoleHierarchyImpl.fromHierarchy(
             """
-            ROLE_PLATFORM_ADMIN > ROLE_HOST
+            ROLE_PLATFORM_ADMIN > ROLE_MEMBER
             ROLE_HOST > ROLE_MEMBER
             ROLE_MEMBER > ROLE_VIEWER
             """.trimIndent(),

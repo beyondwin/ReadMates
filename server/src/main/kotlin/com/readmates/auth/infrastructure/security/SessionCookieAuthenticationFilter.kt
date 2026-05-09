@@ -2,8 +2,7 @@ package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.service.AuthenticatedMemberResolver
-import com.readmates.club.adapter.`in`.web.ClubContextHeader
-import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
@@ -38,7 +37,7 @@ class SessionCookieAuthenticationFilter(
                 ?.takeUnless { it.revoked }
 
             if (session != null) {
-                val requestedClubContext = request.resolveRequestedClubContext()
+                val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
                 val member = if (requestedClubContext.supplied && requestedClubContext.context == null) {
                     null
                 } else {
@@ -76,6 +75,18 @@ class SessionCookieAuthenticationFilter(
                                     emptyList(),
                                 )
                             }
+                } else if (request.isHostApi()) {
+                    // Platform admins hitting /api/host/** have no club membership, but may have a support grant.
+                    // Emit a CurrentUser principal with no authorities; MemberAuthoritiesFilter will add ROLE_HOST
+                    // if an active HOST_SUPPORT_READ grant exists for this request's club context.
+                    authenticatedMemberResolver.resolveUserById(session.userId)
+                        ?.let { currentUser ->
+                            UsernamePasswordAuthenticationToken(
+                                currentUser,
+                                null,
+                                emptyList(),
+                            )
+                        }
                 } else {
                     null
                 }
@@ -106,26 +117,6 @@ class SessionCookieAuthenticationFilter(
     private fun HttpServletRequest.isAdminApi(): Boolean =
         requestURI == "/api/admin" || requestURI.startsWith("/api/admin/")
 
-    private fun HttpServletRequest.resolveRequestedClubContext(): RequestedClubContext {
-        val slug = getHeader(ClubContextHeader.CLUB_SLUG)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        if (slug != null) {
-            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveBySlug(slug))
-        }
-
-        val host = getHeader(ClubContextHeader.CLUB_HOST)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-        if (host != null) {
-            return RequestedClubContext(supplied = true, context = resolveClubContextUseCase.resolveByHost(host))
-        }
-
-        return RequestedClubContext(supplied = false, context = null)
-    }
-
-    private data class RequestedClubContext(
-        val supplied: Boolean,
-        val context: ResolvedClubContext?,
-    )
+    private fun HttpServletRequest.isHostApi(): Boolean =
+        requestURI == "/api/host" || requestURI.startsWith("/api/host/")
 }
