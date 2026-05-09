@@ -219,7 +219,7 @@ ReadMates는 멀티 클럽 정기 독서모임의 운영 워크플로우(공개 
 | 7 | `JdbcFeedbackDocumentStoreAdapter`의 `select *` 두 곳을 explicit column projection으로 교체 | 0.25d | `server/src/main/kotlin/com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt:36,73` |
 | 8 | `host-notifications-page.tsx`에서 중복 선언된 notification status 타입을 `notifications-contracts.ts`/`host-contracts.ts`에서 import | 0.5d | `front/features/host/ui/host-notifications-page.tsx:12-19` |
 | 9 | `server/Dockerfile`(local-from-source) vs `server/Dockerfile.release` 하나로 정리 또는 명확한 이름 | 0.25d | `server/Dockerfile`, `server/Dockerfile.release` |
-| 10 | `Justfile`(또는 root `package.json` script) 도입해 `just check`, `just release-check` 단일 명령 제공 | 0.5d | `/Justfile` |
+| 10 | `Justfile`(또는 root `package.json` script) 도입해 `just check`, `just release-check` 단일 명령 제공 | 0.5d | `Justfile` |
 | 11 | `.editorconfig` 추가(LF, UTF-8, indent_style) | 0.1d | `.editorconfig` |
 | 12 | Flyway `V2~V8` 누락에 대한 의도 표기를 `docs/development/local-setup.md` 또는 migration README에 1줄 명시 | 0.1d | `docs/development/local-setup.md` |
 | 13 | `BffSecretFilter` 로그에서 `request.remoteAddr`를 hash 처리 | 0.25d | `server/src/main/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilter.kt:42-64` |
