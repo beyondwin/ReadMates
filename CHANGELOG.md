@@ -8,7 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Security
 
-- `ClientIpHashing.kt`를 추가해 `RateLimitFilter`의 IP 해시 salt를 ISO 주차 기준으로 자동 rotate합니다. base secret은 `READMATES_IP_HASH_BASE_SECRET` 환경 변수로 주입하며, 미설정 시 빈 문자열 fallback을 사용합니다. (TASK-V2-028)
+- `ClientIpHashing.kt`를 추가해 `RateLimitFilter`의 IP 해시 salt를 ISO 주차 기준으로 자동 rotate합니다. base secret은 `READMATES_IP_HASH_BASE_SECRET` 환경 변수로 주입하며, 미설정 시 빈 문자열 fallback을 사용하고 startup 시 WARN을 출력합니다. (TASK-V2-028)
 - Spring Security role hierarchy를 `ROLE_PLATFORM_ADMIN > ROLE_MEMBER`, `ROLE_HOST > ROLE_MEMBER`로 정리했습니다. (TASK-V2-005)
 - Set-Cookie `Domain` 속성 stripping fix를 적용해 cross-origin cookie 노출을 방지합니다. (TASK-V2-004)
 - Support access grants: platform admin이 활성 `HOST_SUPPORT_READ` grant를 가지면 `CheckSupportAccessGrantUseCase`가 합성 HOST membership을 부여합니다. `MemberAuthoritiesFilter`, `CurrentMemberArgumentResolver`, `ClubContextResolver.kt`가 갱신됐습니다. (TASK-V2-024)
