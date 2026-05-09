@@ -63,6 +63,8 @@ READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
 READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
 READMATES_BFF_SECRET=<shared-bff-secret>
 READMATES_BFF_SECRET_REQUIRED=true
+# 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
+READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
@@ -396,6 +398,19 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 - 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
 - 백엔드 프로덕션 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
 - Compose Caddy 로그는 container stdout으로 확인합니다. Legacy host Caddy rollback에서는 `/var/log/caddy/readmates.log`를 확인합니다. Caddy access log 설정은 request URI와 `Authorization`, `Cookie`, `X-Readmates-Bff-Secret` request header를 기록하지 않아야 합니다.
+
+### BFF Secret Rotation
+
+`READMATES_BFF_SECRETS`에 쉼표로 구분된 값을 설정하면 재배포 없이 BFF secret을 교체할 수 있습니다. 서버는 목록의 모든 값을 timing-safe 방식으로 검증합니다.
+
+무중단 rotation 절차:
+
+1. `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 `/etc/readmates/readmates.env`에 추가하고 서버를 재시작합니다.
+2. Cloudflare Pages 환경 변수에도 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 배포합니다. (또는 BFF를 먼저 `<new-secret>`만으로 전환합니다.)
+3. BFF `/api/bff/api/auth/me` smoke로 정상 동작을 확인합니다.
+4. `<old-secret>`을 제거하고 `READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET=<shared-bff-secret>`으로 env를 정리한 뒤 재시작합니다.
+
+`READMATES_BFF_SECRETS`가 설정되면 `READMATES_BFF_SECRET`은 fallback으로만 쓰입니다.
 
 ### IP hash base secret
 
