@@ -8,7 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Security
 
-- `ClientIpHashing.kt`를 추가해 `RateLimitFilter`의 IP 해시 salt를 ISO 주차 기준으로 자동 rotate합니다. base secret은 `READMATES_IP_HASH_BASE_SECRET` 환경 변수로 주입하며, 미설정 시 빈 문자열 fallback을 사용합니다. (TASK-V2-028)
+- `ClientIpHashing.kt`를 추가해 `RateLimitFilter`의 IP 해시 salt를 ISO 주차 기준으로 자동 rotate합니다. base secret은 `READMATES_IP_HASH_BASE_SECRET` 환경 변수로 주입하며, 미설정 시 빈 문자열 fallback을 사용하고 startup 시 WARN을 출력합니다. (TASK-V2-028)
 - Spring Security role hierarchy를 `ROLE_PLATFORM_ADMIN > ROLE_MEMBER`, `ROLE_HOST > ROLE_MEMBER`로 정리했습니다. (TASK-V2-005)
 - Set-Cookie `Domain` 속성 stripping fix를 적용해 cross-origin cookie 노출을 방지합니다. (TASK-V2-004)
 - Support access grants: platform admin이 활성 `HOST_SUPPORT_READ` grant를 가지면 `CheckSupportAccessGrantUseCase`가 합성 HOST membership을 부여합니다. `MemberAuthoritiesFilter`, `CurrentMemberArgumentResolver`, `ClubContextResolver.kt`가 갱신됐습니다. (TASK-V2-024)
@@ -35,6 +35,20 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - UseCase 인터페이스 분리, auth/application layer 정리, `@Transactional` 마이그레이션, `MembershipStatus` FSM 문서화를 포함한 아키텍처 클린업을 진행했습니다. (TASK-V2-010 ~ V2-013)
 - Observability ADR, metric tag 정책, health endpoint 문서, worker process flag 문서를 추가했습니다. (TASK-V2-014 ~ V2-018)
 - `legacy_password_hash` 컬럼에 대한 2-phase DB rename/drop을 진행했습니다. (TASK-V2-022/023)
+
+### Added
+
+- BFF secret rotation audit log (`bff_secret_rotation_audit` table, V26 migration) records which
+  secret alias is used per request, enabling traffic distribution monitoring during rotation.
+
+### Changed
+
+- BFF secret filter now supports comma-separated `READMATES_BFF_SECRETS` env var for zero-downtime secret rotation. Legacy `READMATES_BFF_SECRET` is still accepted as fallback. Secret matching is timing-safe.
+
+### Removed
+
+- Legacy password column dropped from `users` table (Flyway V24+V25 deployed together).
+- `POST /api/auth/password-reset/{token}` and `POST /api/host/members/{id}/password-reset` endpoints removed (previously returned 410 GONE; now 404).
 
 ## v1.5.2 - 2026-05-06
 

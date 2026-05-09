@@ -8,7 +8,8 @@ import { bffErrorResponse } from "../../_shared/errors";
 
 type Env = {
   READMATES_API_BASE_URL: string;
-  READMATES_BFF_SECRET?: string;
+  READMATES_BFF_SECRET?: string;    // legacy fallback
+  READMATES_BFF_SECRETS?: string;   // comma-separated, primary first
 };
 
 type PagesFunction<Env> = (context: {

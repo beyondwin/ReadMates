@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.get
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
-        "readmates.bff-secret=test-bff-secret",
+        "readmates.security.bff.secrets=test-bff-secret",
     ],
 )
 @AutoConfigureMockMvc

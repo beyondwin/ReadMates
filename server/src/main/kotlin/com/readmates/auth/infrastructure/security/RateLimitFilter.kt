@@ -8,6 +8,7 @@ import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
@@ -26,6 +27,17 @@ class RateLimitFilter(
     @param:Value("\${READMATES_IP_HASH_BASE_SECRET:}")
     private val ipHashBaseSecret: String = "",
 ) : OncePerRequestFilter() {
+    private val log = LoggerFactory.getLogger(javaClass)
+
+    init {
+        if (ipHashBaseSecret.isBlank()) {
+            log.warn(
+                "READMATES_IP_HASH_BASE_SECRET is empty; weekly IP-hash salt rotation " +
+                "is degraded. Set this env var in production."
+            )
+        }
+    }
+
     override fun doFilterInternal(
         request: HttpServletRequest,
         response: HttpServletResponse,

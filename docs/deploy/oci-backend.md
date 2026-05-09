@@ -63,6 +63,8 @@ READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
 READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
 READMATES_BFF_SECRET=<shared-bff-secret>
 READMATES_BFF_SECRET_REQUIRED=true
+# 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
+READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID=<google-oauth-client-id>
 SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET=<google-oauth-client-secret>
@@ -91,6 +93,7 @@ SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
 # Legacy host JAR rollback only. Compose stack overrides this to container-internal 0.0.0.0 and does not publish 8081.
 READMATES_MANAGEMENT_ADDRESS=127.0.0.1
 READMATES_MANAGEMENT_PORT=8081
+READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성, 1Password에 저장>
 ```
 
 Git에는 변수 이름과 placeholder만 둡니다. 프로덕션 secret 실제 값은 VM, Cloudflare, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 둡니다. Compose stack은 `READMATES_REDIS_URL=redis://redis:6379`, `READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092`, `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`을 container 환경으로 주입합니다.
@@ -395,3 +398,32 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 - 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
 - 백엔드 프로덕션 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
 - Compose Caddy 로그는 container stdout으로 확인합니다. Legacy host Caddy rollback에서는 `/var/log/caddy/readmates.log`를 확인합니다. Caddy access log 설정은 request URI와 `Authorization`, `Cookie`, `X-Readmates-Bff-Secret` request header를 기록하지 않아야 합니다.
+
+### BFF Secret Rotation
+
+`READMATES_BFF_SECRETS`에 쉼표로 구분된 값을 설정하면 재배포 없이 BFF secret을 교체할 수 있습니다. 서버는 목록의 모든 값을 timing-safe 방식으로 검증합니다.
+
+무중단 rotation 절차:
+
+1. `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 `/etc/readmates/readmates.env`에 추가하고 서버를 재시작합니다.
+2. Cloudflare Pages 환경 변수에도 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 배포합니다. (또는 BFF를 먼저 `<new-secret>`만으로 전환합니다.)
+3. BFF `/api/bff/api/auth/me` smoke로 정상 동작을 확인합니다.
+4. `bff_secret_rotation_audit` 테이블에서 old-secret alias 트래픽이 0으로 떨어졌는지 확인합니다. rotation 중 서버는 인증에 성공한 각 요청에 사용된 secret alias를 이 테이블에 비동기로 기록합니다. old-secret alias의 최근 row가 없으면 모든 트래픽이 new-secret으로 전환된 것입니다.
+
+   ```sql
+   SELECT secret_alias, COUNT(*) AS cnt, MAX(created_at) AS last_seen
+   FROM bff_secret_rotation_audit
+   WHERE created_at > NOW() - INTERVAL 10 MINUTE
+   GROUP BY secret_alias
+   ORDER BY last_seen DESC;
+   ```
+
+5. `<old-secret>`을 제거하고 `READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET=<shared-bff-secret>`으로 env를 정리한 뒤 재시작합니다.
+
+`READMATES_BFF_SECRETS`가 설정되면 `READMATES_BFF_SECRET`은 fallback으로만 쓰입니다.
+
+### IP hash base secret
+
+`READMATES_IP_HASH_BASE_SECRET` 환경변수는 client IP hash의 주간 salt rotation에서 base secret 역할을 한다. 한 번 생성한 후 manual rotation 대상이 아니다.
+생성: `openssl rand -base64 32`. 값은 `/etc/readmates/readmates.env`에 추가하고 1Password에 저장한다.
+누락 시 rate limit 자체는 동작하지만, cross-week linking 방지 효과가 사라지고 Spring startup log에 WARN이 출력된다.
