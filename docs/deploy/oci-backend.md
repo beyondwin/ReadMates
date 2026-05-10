@@ -4,7 +4,7 @@
 
 상위 배포 허브는 [README.md](README.md)입니다. Cloudflare Pages와 Pages Functions 설정은 [cloudflare-pages.md](cloudflare-pages.md)를 함께 확인합니다. 멀티 클럽 domain alias와 OAuth origin 운영은 [multi-club-domains.md](multi-club-domains.md)를 기준으로 맞춥니다.
 
-2026-04-30 Compose cutover와 BFF secret 처리 이슈의 사건 기록은 [OCI Compose Cutover 배포 보고서](2026-04-30-oci-compose-cutover-deployment-report.md)에 남겨 두며, 반복 가능한 현재 절차는 이 문서와 [compose-stack.md](compose-stack.md)를 기준으로 합니다.
+2026-04-30 Compose cutover와 BFF secret 처리 이슈의 사건 기록은 [OCI Compose Cutover 배포 보고서](../reports/2026-04-30-oci-compose-cutover.md)에 남겨 두며, 반복 가능한 현재 절차는 이 문서와 [compose-stack.md](compose-stack.md)를 기준으로 합니다.
 
 백엔드 배포는 compose stack이 새 image로 실행되고, Flyway 결과와 `/internal/health`, Cloudflare BFF smoke, OAuth start smoke가 변경 범위에 맞게 확인됐을 때 완료입니다. DB migration, notification pipeline, mail delivery, Object Storage backup을 건드린 경우에는 해당 섹션의 targeted smoke도 함께 확인합니다.
 

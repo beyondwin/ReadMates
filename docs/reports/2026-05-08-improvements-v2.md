@@ -2,7 +2,7 @@
 
 *분석 기준일: 2026-05-08 / 대상 버전: v1.5.2*
 
-> 본 문서는 `docs/improvements.md`(v1)과 `docs/implementation-plan.md`(36 task plan)를
+> 본 문서는 `2026-05-08-improvements-v1.md`(v1)과 `2026-05-08-implementation-plan-v1.md`(36 task plan)를
 > 보완하는 **두 번째 시야**입니다. v1이 "보안 history 정비, 거대 파일 분해, CI 가드 추가" 같은
 > 측정 가능한 단기 항목을 36개 PR로 정리했다면, v2는 **다음 1년 동안 ReadMates가 안정적으로
 > 성장하기 위한 더 큰 lens** — 도메인 모델 진화, 트랜잭션·관측성 경계, UseCase 인터페이스

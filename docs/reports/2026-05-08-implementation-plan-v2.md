@@ -1,12 +1,12 @@
 # ReadMates 구현 플랜 v2
 
-*작성일: 2026-05-08 / `docs/improvements-v2.md` 기반 / 대상 버전: v1.5.2 이후*
+*작성일: 2026-05-08 / `2026-05-08-improvements-v2.md` 기반 / 대상 버전: v1.5.2 이후*
 
 ## 개요
 
-본 문서는 `docs/improvements-v2.md`(두 번째 시야 분석)에서 도출된 항목을
+본 문서는 `2026-05-08-improvements-v2.md`(두 번째 시야 분석)에서 도출된 항목을
 **PR 단위로 실행 가능한 30개 task(TASK-V2-001 ~ TASK-V2-030)**로 분해한 실행
-계획이다. v1 plan(`docs/implementation-plan.md`, TASK-001 ~ TASK-076)이 거대 파일
+계획이다. v1 plan(`2026-05-08-implementation-plan-v1.md`, TASK-001 ~ TASK-076)이 거대 파일
 분해/CI 가드/보안 history 정비에 집중했다면, v2 plan은 **도메인 모델 진화,
 트랜잭션·관측성 경계, UseCase 인터페이스 디자인, 무료 플랜에서의 사용자 체감
 성능, 멀티 클럽 운영 가시화**를 다룬다.
