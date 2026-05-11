@@ -55,7 +55,7 @@ Do not modify:
 - Create: `docs/operations/runbooks/README.md`
 - Modify: `docs/operations/README.md`
 
-- [ ] **Step 1: Create `docs/operations/runbooks/README.md`**
+- [x] **Step 1: Create `docs/operations/runbooks/README.md`**
 
 Use this exact content:
 
@@ -85,7 +85,7 @@ ReadMates 운영자가 반복적으로 수행하는 배포, 진단, 장애 대�
 - [Post-mortems](../postmortems/README.md)
 ```
 
-- [ ] **Step 2: Update `docs/operations/README.md`**
+- [x] **Step 2: Update `docs/operations/README.md`**
 
 Replace the current subdocument list and remove the runbook follow-up section so it reads:
 
@@ -101,7 +101,7 @@ ReadMates 운영 관련 문서를 모은 진입점입니다. 배포 절차는 `d
 - [Observability](observability/README.md) — 메트릭, 대시보드, 알림 룰, SLO.
 ```
 
-- [ ] **Step 3: Verify links**
+- [x] **Step 3: Verify links**
 
 Run:
 
@@ -114,7 +114,7 @@ rg -n "runbooks/README.md|postmortems/README.md|observability/README.md" docs/op
 
 Expected: all `test` commands exit 0 and `rg` prints the three links.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/operations/README.md docs/operations/runbooks/README.md
@@ -129,7 +129,7 @@ git commit -m "docs: add operations runbook index"
 
 - Create: `docs/operations/runbooks/deploy-attempts.md`
 
-- [ ] **Step 1: Create `deploy-attempts.md`**
+- [x] **Step 1: Create `deploy-attempts.md`**
 
 Use this exact content:
 
@@ -215,7 +215,7 @@ Ledger에 아래 값을 넣지 않습니다.
 Rollback command는 [OCI Compose Stack](../../deploy/compose-stack.md#rollback)을 따른다. 자동 rollback은 수행하지 않는다.
 ```
 
-- [ ] **Step 2: Verify no forbidden raw values**
+- [x] **Step 2: Verify no forbidden raw values**
 
 Run:
 
@@ -225,7 +225,7 @@ rg -n "password=|secret=|BEGIN .*PRIVATE KEY|ocid1\\.|@[A-Za-z0-9.-]+\\.[A-Za-z]
 
 Expected: no output.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/operations/runbooks/deploy-attempts.md
@@ -240,7 +240,7 @@ git commit -m "docs: define deploy attempt model"
 
 - Create: `docs/operations/runbooks/read-only-diagnostics.md`
 
-- [ ] **Step 1: Create `read-only-diagnostics.md`**
+- [x] **Step 1: Create `read-only-diagnostics.md`**
 
 Use this exact content:
 
@@ -304,7 +304,7 @@ readmates-collect 실행 결과: readmates-api health는 UP, recent ERROR 0건, 
 - `deploy/oci/install-readmates-collector.sh`
 ```
 
-- [ ] **Step 2: Verify links and safety**
+- [x] **Step 2: Verify links and safety**
 
 Run:
 
@@ -316,7 +316,7 @@ rg -n "BEGIN .*PRIVATE KEY|ocid1\\.|/(Users|home)/[A-Za-z0-9._-]+" docs/operatio
 
 Expected: first two commands print matches; final command prints no output.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/operations/runbooks/read-only-diagnostics.md
@@ -331,7 +331,7 @@ git commit -m "docs: add read-only diagnostics runbook"
 
 - Create: `docs/operations/runbooks/post-deploy-watch.md`
 
-- [ ] **Step 1: Create `post-deploy-watch.md`**
+- [x] **Step 1: Create `post-deploy-watch.md`**
 
 Use this exact content:
 
@@ -388,7 +388,7 @@ Post-deploy watch: health/BFF/OAuth smoke 통과, recent ERROR 없음. 운영 �
 ```
 ```
 
-- [ ] **Step 2: Verify link targets**
+- [x] **Step 2: Verify link targets**
 
 Run:
 
@@ -400,7 +400,7 @@ test -f docs/operations/runbooks/read-only-diagnostics.md
 
 Expected: all exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/operations/runbooks/post-deploy-watch.md
@@ -415,7 +415,7 @@ git commit -m "docs: add post-deploy watch runbook"
 
 - Create: `deploy/oci/readmates-collect.sh`
 
-- [ ] **Step 1: Create `deploy/oci/readmates-collect.sh`**
+- [x] **Step 1: Create `deploy/oci/readmates-collect.sh`**
 
 Use this exact content:
 
@@ -509,7 +509,7 @@ fi
 section "collector complete"
 ```
 
-- [ ] **Step 2: Make script executable**
+- [x] **Step 2: Make script executable**
 
 Run:
 
@@ -517,7 +517,7 @@ Run:
 chmod +x deploy/oci/readmates-collect.sh
 ```
 
-- [ ] **Step 3: Syntax check**
+- [x] **Step 3: Syntax check**
 
 Run:
 
@@ -527,7 +527,7 @@ bash -n deploy/oci/readmates-collect.sh
 
 Expected: no output, exit 0.
 
-- [ ] **Step 4: Safety grep**
+- [x] **Step 4: Safety grep**
 
 Run:
 
@@ -537,7 +537,7 @@ rg -n "readmates.env|SPRING_DATASOURCE_PASSWORD|READMATES_BFF_SECRET|OAUTH|cat /
 
 Expected: no output.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add deploy/oci/readmates-collect.sh
@@ -552,7 +552,7 @@ git commit -m "ops: add read-only compose diagnostics collector"
 
 - Create: `deploy/oci/install-readmates-collector.sh`
 
-- [ ] **Step 1: Create `install-readmates-collector.sh`**
+- [x] **Step 1: Create `install-readmates-collector.sh`**
 
 Use this exact content:
 
@@ -575,7 +575,7 @@ echo "To use a diagnostic SSH key, add an authorized_keys entry like:"
 echo 'command="/usr/local/bin/readmates-collect",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,restrict ssh-ed25519 <diagnostic-public-key> readmates-diagnostic'
 ```
 
-- [ ] **Step 2: Make script executable and validate**
+- [x] **Step 2: Make script executable and validate**
 
 Run:
 
@@ -586,7 +586,7 @@ bash -n deploy/oci/install-readmates-collector.sh
 
 Expected: no output from `bash -n`, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add deploy/oci/install-readmates-collector.sh
@@ -601,7 +601,7 @@ git commit -m "ops: add collector installer"
 
 - Create: `deploy/oci/watch-compose-post-deploy.sh`
 
-- [ ] **Step 1: Create `watch-compose-post-deploy.sh`**
+- [x] **Step 1: Create `watch-compose-post-deploy.sh`**
 
 Use this exact content:
 
@@ -651,7 +651,7 @@ EOF
 echo "Post-deploy watch passed"
 ```
 
-- [ ] **Step 2: Make script executable and validate**
+- [x] **Step 2: Make script executable and validate**
 
 Run:
 
@@ -662,7 +662,7 @@ bash -n deploy/oci/watch-compose-post-deploy.sh
 
 Expected: no output from `bash -n`, exit 0.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add deploy/oci/watch-compose-post-deploy.sh
@@ -677,7 +677,7 @@ git commit -m "ops: add post-deploy watch script"
 
 - Modify: `deploy/oci/05-deploy-compose-stack.sh`
 
-- [ ] **Step 1: Insert variables after existing variable block**
+- [x] **Step 1: Insert variables after existing variable block**
 
 After `REMOTE_DIR="/opt/readmates"`, add:
 
@@ -688,7 +688,7 @@ ATTEMPT_STAGE="init"
 REMOTE_LEDGER="${READMATES_DEPLOY_LEDGER:-/var/log/readmates/deploy-attempts.jsonl}"
 ```
 
-- [ ] **Step 2: Add JSON helper functions after `uses_registry_image`**
+- [x] **Step 2: Add JSON helper functions after `uses_registry_image`**
 
 Add:
 
@@ -739,7 +739,7 @@ on_deploy_error() {
 }
 ```
 
-- [ ] **Step 3: Install trap after `SSH_OPTIONS` is defined**
+- [x] **Step 3: Install trap after `SSH_OPTIONS` is defined**
 
 Add:
 
@@ -747,7 +747,7 @@ Add:
 trap on_deploy_error ERR
 ```
 
-- [ ] **Step 4: Add stage markers and events**
+- [x] **Step 4: Add stage markers and events**
 
 Add these calls at the existing stages:
 
@@ -814,7 +814,7 @@ remote_ledger_append "SUCCESS" "SUCCESS" "image=${IMAGE_TAG}"
 trap - ERR
 ```
 
-- [ ] **Step 5: Validate syntax**
+- [x] **Step 5: Validate syntax**
 
 Run:
 
@@ -824,7 +824,7 @@ bash -n deploy/oci/05-deploy-compose-stack.sh
 
 Expected: no output, exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add deploy/oci/05-deploy-compose-stack.sh
@@ -840,7 +840,7 @@ git commit -m "ops: record compose deploy attempts"
 - Modify: `deploy/oci/05-deploy-compose-stack.sh`
 - Modify: `docs/operations/runbooks/deploy-attempts.md`
 
-- [ ] **Step 1: Add remote image id capture after image pull/load**
+- [x] **Step 1: Add remote image id capture after image pull/load**
 
 After the existing pull/load remote block, add a remote command that writes the expected image id:
 
@@ -852,7 +852,7 @@ EXPECTED_IMAGE_ID="$(
 remote_ledger_append "IMAGE_ID_RESOLVED" "RUNNING" "imageId=${EXPECTED_IMAGE_ID}"
 ```
 
-- [ ] **Step 2: Add running container image id verification after compose up**
+- [x] **Step 2: Add running container image id verification after compose up**
 
 After `sudo docker compose -f compose.yml ps`, add:
 
@@ -868,7 +868,7 @@ fi
 remote_ledger_append "IMAGE_VERIFIED" "RUNNING" "imageId=${RUNNING_IMAGE_ID}"
 ```
 
-- [ ] **Step 3: Document verification**
+- [x] **Step 3: Document verification**
 
 In `docs/operations/runbooks/deploy-attempts.md`, add this section after "이벤트 필드":
 
@@ -883,7 +883,7 @@ In `docs/operations/runbooks/deploy-attempts.md`, add this section after "이벤
 4. 값이 다르면 배포를 실패로 처리하고 자동 rollback하지 않습니다.
 ```
 
-- [ ] **Step 4: Validate**
+- [x] **Step 4: Validate**
 
 Run:
 
@@ -894,7 +894,7 @@ git diff --check -- deploy/oci/05-deploy-compose-stack.sh docs/operations/runboo
 
 Expected: both commands pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add deploy/oci/05-deploy-compose-stack.sh docs/operations/runbooks/deploy-attempts.md
@@ -910,7 +910,7 @@ git commit -m "ops: verify deployed server image"
 - Modify: `deploy/oci/05-deploy-compose-stack.sh`
 - Modify: `docs/operations/runbooks/post-deploy-watch.md`
 
-- [ ] **Step 1: Add watch toggle variable**
+- [x] **Step 1: Add watch toggle variable**
 
 After `REMOTE_DIR="/opt/readmates"`, add:
 
@@ -918,7 +918,7 @@ After `REMOTE_DIR="/opt/readmates"`, add:
 READMATES_RUN_POST_DEPLOY_WATCH="${READMATES_RUN_POST_DEPLOY_WATCH:-true}"
 ```
 
-- [ ] **Step 2: Call watch script after BFF smoke**
+- [x] **Step 2: Call watch script after BFF smoke**
 
 After `curl -fsS "${APP_BASE_URL}/api/bff/api/auth/me" >/dev/null`, add:
 
@@ -936,7 +936,7 @@ if [ "$READMATES_RUN_POST_DEPLOY_WATCH" = "true" ]; then
 fi
 ```
 
-- [ ] **Step 3: Document opt-out**
+- [x] **Step 3: Document opt-out**
 
 In `docs/operations/runbooks/post-deploy-watch.md`, add:
 
@@ -956,7 +956,7 @@ CADDY_SITE=api.example.com \
 watch를 끈 경우 같은 release 작업 안에서 `deploy/oci/watch-compose-post-deploy.sh`를 수동 실행합니다.
 ```
 
-- [ ] **Step 4: Validate**
+- [x] **Step 4: Validate**
 
 Run:
 
@@ -966,7 +966,7 @@ bash -n deploy/oci/05-deploy-compose-stack.sh deploy/oci/watch-compose-post-depl
 
 Expected: no output, exit 0.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add deploy/oci/05-deploy-compose-stack.sh docs/operations/runbooks/post-deploy-watch.md
@@ -981,7 +981,7 @@ git commit -m "ops: run post-deploy watch from compose deploy"
 
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Add `scripts` job after permissions/concurrency and before frontend**
+- [x] **Step 1: Add `scripts` job after permissions/concurrency and before frontend**
 
 Insert this job under `jobs:` before `frontend`:
 
@@ -1003,7 +1003,7 @@ Insert this job under `jobs:` before `frontend`:
         run: shellcheck scripts/*.sh deploy/oci/*.sh
 ```
 
-- [ ] **Step 2: Run local syntax check**
+- [x] **Step 2: Run local syntax check**
 
 Run:
 
@@ -1013,7 +1013,7 @@ bash -n scripts/*.sh deploy/oci/*.sh
 
 Expected: no output, exit 0.
 
-- [ ] **Step 3: Run shellcheck locally if installed**
+- [x] **Step 3: Run shellcheck locally if installed**
 
 Run:
 
@@ -1023,7 +1023,7 @@ if command -v shellcheck >/dev/null 2>&1; then shellcheck scripts/*.sh deploy/oc
 
 Expected: shellcheck passes, or local environment prints `shellcheck not installed locally`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
@@ -1038,7 +1038,7 @@ git commit -m "ci: validate shell scripts"
 
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Add `public-release` job**
+- [x] **Step 1: Add `public-release` job**
 
 Insert this job under `jobs:` after the `scripts` job:
 
@@ -1059,7 +1059,7 @@ Insert this job under `jobs:` after the `scripts` job:
 
 Do not upload `.tmp/public-release-candidate` as an artifact. If the scanner ever fails because of an active-secret-looking value, artifact upload could create a second exposure path.
 
-- [ ] **Step 2: Add failure-only test report artifacts**
+- [x] **Step 2: Add failure-only test report artifacts**
 
 Use `actions/upload-artifact` pinned to a full commit SHA, not a floating `@v*` tag. Resolve the current SHA at implementation time and add `if-no-files-found: ignore`.
 
@@ -1091,7 +1091,7 @@ Artifact rules:
 - no `.env`, `.wrangler`, `.tmp/public-release-candidate`, provider state, smoke output 전문, private host 목록
 - artifact names include the job and shard where relevant, for example `e2e-${{ matrix.shard }}-reports`
 
-- [ ] **Step 3: Validate workflow text**
+- [x] **Step 3: Validate workflow text**
 
 Run:
 
@@ -1102,7 +1102,7 @@ rg -n "public-release|build-public-release-candidate|public-release-check|upload
 
 Expected: diff check passes and `rg` prints the new job plus artifact upload steps.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
@@ -1118,7 +1118,7 @@ git commit -m "ci: add public release safety checks"
 - Modify: `.github/workflows/deploy-front.yml`
 - Modify: `.github/workflows/deploy-server.yml`
 
-- [ ] **Step 1: Add production environment boundary**
+- [x] **Step 1: Add production environment boundary**
 
 Add a production environment to both deploy jobs.
 
@@ -1139,7 +1139,7 @@ For `deploy-server.yml`:
 
 GitHub repository settings must separately configure required reviewers and environment secrets. This YAML change creates the workflow boundary; it does not add backend VM SSH deploy credentials.
 
-- [ ] **Step 2: Add frontend release fixture drift check**
+- [x] **Step 2: Add frontend release fixture drift check**
 
 In `deploy-front.yml`, after the `Build` step and before `Deploy to Cloudflare Pages`, add:
 
@@ -1152,7 +1152,7 @@ In `deploy-front.yml`, after the `Build` step and before `Deploy to Cloudflare P
 
 Expected behavior: a release tag cannot deploy the frontend if generated API contract fixtures are stale.
 
-- [ ] **Step 3: Add server test gate before image publish**
+- [x] **Step 3: Add server test gate before image publish**
 
 In `deploy-server.yml`, replace:
 
@@ -1170,7 +1170,7 @@ with:
 
 Expected behavior: a release tag cannot publish a GHCR server image unless the server test suite passes in the release workflow itself.
 
-- [ ] **Step 4: Add image SBOM and provenance metadata**
+- [x] **Step 4: Add image SBOM and provenance metadata**
 
 In the `docker/build-push-action` step, add:
 
@@ -1181,7 +1181,7 @@ In the `docker/build-push-action` step, add:
 
 Keep the existing `platforms: linux/arm64`, `push: true`, and tag calculation.
 
-- [ ] **Step 5: Add image vulnerability scan**
+- [x] **Step 5: Add image vulnerability scan**
 
 Add an image scan after the build-and-push step. Use a scanner action pinned to a full commit SHA. The scan target is:
 
@@ -1196,7 +1196,7 @@ Initial rollout options:
 
 Do not print secrets, environment files, or private host lists in scanner output.
 
-- [ ] **Step 6: Add release workflow failure artifacts**
+- [x] **Step 6: Add release workflow failure artifacts**
 
 Use the same pinned `actions/upload-artifact` SHA selected in Task 11A.
 
@@ -1216,7 +1216,7 @@ server/build/test-results
 
 Do not upload Docker credentials, `.docker/config.json`, `.env`, Cloudflare state, or release smoke output.
 
-- [ ] **Step 7: Validate workflow text**
+- [x] **Step 7: Validate workflow text**
 
 Run:
 
@@ -1227,7 +1227,7 @@ rg -n "environment:|zod:export-fixtures|clean test bootJar|sbom:|provenance:|upl
 
 Expected: diff check passes and `rg` prints all new release hardening points.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml
@@ -1244,7 +1244,7 @@ git commit -m "ci: harden release deploy workflows"
 - Modify: `docs/deploy/oci-backend.md`
 - Modify: `scripts/README.md`
 
-- [ ] **Step 1: Update `docs/deploy/compose-stack.md`**
+- [x] **Step 1: Update `docs/deploy/compose-stack.md`**
 
 Add this section after "Deploy":
 
@@ -1266,7 +1266,7 @@ The compose deploy script runs `deploy/oci/watch-compose-post-deploy.sh` by defa
 See [Post-deploy watch](../operations/runbooks/post-deploy-watch.md).
 ```
 
-- [ ] **Step 2: Update `docs/deploy/oci-backend.md`**
+- [x] **Step 2: Update `docs/deploy/oci-backend.md`**
 
 Add this paragraph after the deploy completion paragraph near the top:
 
@@ -1274,7 +1274,7 @@ Add this paragraph after the deploy completion paragraph near the top:
 운영 진단이 필요하면 [Read-only diagnostics](../operations/runbooks/read-only-diagnostics.md)의 ForceCommand 기반 collector를 사용합니다. Collector 출력 전문은 Git에 저장하지 않고, post-mortem이나 release note에는 sanitized summary만 남깁니다.
 ```
 
-- [ ] **Step 3: Update `scripts/README.md`**
+- [x] **Step 3: Update `scripts/README.md`**
 
 In the manifest list, ensure `deploy/oci/` remains included and add:
 
@@ -1282,7 +1282,7 @@ In the manifest list, ensure `deploy/oci/` remains included and add:
 `deploy/oci/`에는 compose 배포 script뿐 아니라 read-only diagnostics collector와 post-deploy watch helper도 포함됩니다. 이 script들은 공개 후보 scanner 대상이며 실제 운영 출력이나 state file을 포함하지 않습니다.
 ```
 
-- [ ] **Step 4: Validate docs**
+- [x] **Step 4: Validate docs**
 
 Run:
 
@@ -1293,7 +1293,7 @@ rg -n "deploy-attempts.md|post-deploy-watch.md|read-only-diagnostics.md" docs/de
 
 Expected: diff check passes and `rg` prints the new links.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add docs/deploy/compose-stack.md docs/deploy/oci-backend.md scripts/README.md
@@ -1309,7 +1309,7 @@ git commit -m "docs: document deploy diagnostics workflow"
 - Modify only if needed: `scripts/build-public-release-candidate.sh`
 - Modify only if needed: `scripts/public-release-check.sh`
 
-- [ ] **Step 1: Build public release candidate**
+- [x] **Step 1: Build public release candidate**
 
 Run:
 
@@ -1319,7 +1319,7 @@ Run:
 
 Expected: candidate is created at `.tmp/public-release-candidate`.
 
-- [ ] **Step 2: Check that new files are included**
+- [x] **Step 2: Check that new files are included**
 
 Run:
 
@@ -1332,7 +1332,7 @@ test -f .tmp/public-release-candidate/docs/operations/runbooks/README.md
 
 Expected: all commands exit 0.
 
-- [ ] **Step 3: Run public release check**
+- [x] **Step 3: Run public release check**
 
 Run:
 
@@ -1342,11 +1342,11 @@ Run:
 
 Expected: pass.
 
-- [ ] **Step 4: Patch candidate scripts only if Step 2 or Step 3 fails for manifest reasons**
+- [x] **Step 4: Patch candidate scripts only if Step 2 or Step 3 fails for manifest reasons**
 
 If new files are missing because the manifest excludes them, update `scripts/build-public-release-candidate.sh` so the existing `copy_dir "deploy/oci"` and docs allowlist include the new runbook paths. If scanner rejects a real safety issue, remove the unsafe content instead of allowlisting it.
 
-- [ ] **Step 5: Commit if scanner scripts changed**
+- [x] **Step 5: Commit if scanner scripts changed**
 
 If Step 4 changed files:
 
@@ -1365,7 +1365,7 @@ If Step 4 changed nothing, do not create a commit.
 
 - All changed files in this plan.
 
-- [ ] **Step 1: Run docs whitespace check**
+- [x] **Step 1: Run docs whitespace check**
 
 Run:
 
@@ -1375,7 +1375,7 @@ git diff --check -- .github/workflows/ci.yml .github/workflows/deploy-front.yml 
 
 Expected: no whitespace errors.
 
-- [ ] **Step 2: Run shell syntax**
+- [x] **Step 2: Run shell syntax**
 
 Run:
 
@@ -1385,7 +1385,7 @@ bash -n scripts/*.sh deploy/oci/*.sh
 
 Expected: no output, exit 0.
 
-- [ ] **Step 3: Run shellcheck**
+- [x] **Step 3: Run shellcheck**
 
 Run:
 
@@ -1395,7 +1395,7 @@ shellcheck scripts/*.sh deploy/oci/*.sh
 
 Expected: pass. If shellcheck is not installed in the local environment, record it as skipped and rely on CI for this check.
 
-- [ ] **Step 4: Run public release candidate checks**
+- [x] **Step 4: Run public release candidate checks**
 
 Run:
 
@@ -1406,7 +1406,7 @@ Run:
 
 Expected: both pass.
 
-- [ ] **Step 5: Review release workflow hardening**
+- [x] **Step 5: Review release workflow hardening**
 
 Run:
 
@@ -1416,7 +1416,7 @@ rg -n "public-release|zod:export-fixtures|clean test bootJar|environment:|sbom:|
 
 Expected: matches for public release CI, frontend fixture drift, server release test gate, production environment boundary, and image metadata.
 
-- [ ] **Step 6: Review changed docs for forbidden operational values**
+- [x] **Step 6: Review changed docs for forbidden operational values**
 
 Run:
 
@@ -1426,7 +1426,7 @@ rg -n "BEGIN .*PRIVATE KEY|ocid1\\.|/(Users|home)/[A-Za-z0-9._-]+|SPRING_DATASOU
 
 Expected: no output for newly added content. Existing placeholder lines with `<db-password>` or `<shared-bff-secret>` are acceptable.
 
-- [ ] **Step 7: Final commit**
+- [x] **Step 7: Final commit**
 
 If previous tasks were committed task-by-task, create no extra commit. If the work was batched, commit all remaining changes:
 
@@ -1439,14 +1439,14 @@ git commit -m "ops: adopt safer deployment diagnostics workflow"
 
 ## Self-Review Checklist
 
-- [ ] Spec requirement "runbook directory" maps to Tasks 1-4 and 12.
-- [ ] Spec requirement "read-only diagnostics collector" maps to Tasks 3, 5, and 6.
-- [ ] Spec requirement "deploy attempt ledger" maps to Tasks 2 and 8.
-- [ ] Spec requirement "image digest/id verification" maps to Task 9.
-- [ ] Spec requirement "post-deploy watch" maps to Tasks 4, 7, and 10.
-- [ ] Spec requirement "shell script CI gate" maps to Task 11.
-- [ ] Spec requirement "public release safety CI" maps to Task 11A.
-- [ ] Spec requirement "release tag workflow hardening" maps to Task 11B.
-- [ ] Spec requirement "public release safety" maps to Tasks 12-14.
-- [ ] No frontend/server application code is modified.
-- [ ] No real operational values are introduced.
+- [x] Spec requirement "runbook directory" maps to Tasks 1-4 and 12.
+- [x] Spec requirement "read-only diagnostics collector" maps to Tasks 3, 5, and 6.
+- [x] Spec requirement "deploy attempt ledger" maps to Tasks 2 and 8.
+- [x] Spec requirement "image digest/id verification" maps to Task 9.
+- [x] Spec requirement "post-deploy watch" maps to Tasks 4, 7, and 10.
+- [x] Spec requirement "shell script CI gate" maps to Task 11.
+- [x] Spec requirement "public release safety CI" maps to Task 11A.
+- [x] Spec requirement "release tag workflow hardening" maps to Task 11B.
+- [x] Spec requirement "public release safety" maps to Tasks 12-14.
+- [x] No frontend/server application code is modified.
+- [x] No real operational values are introduced.
