@@ -1,0 +1,23 @@
+# Runbooks
+
+ReadMates 운영자가 반복적으로 수행하는 배포, 진단, 장애 대응 절차를 모은 문서입니다. 배포 대상의 실제 VM IP, private host, OAuth secret, BFF secret, DB password, SMTP credential, smoke 결과 전문은 Git에 기록하지 않습니다.
+
+## 원칙
+
+- 실패한 배포나 진단 명령을 자동 재시도하지 않습니다. 실패 stage와 증거를 남기고 운영자가 다음 행동을 결정합니다.
+- 운영 진단은 가능한 한 읽기 전용 command로 제한합니다.
+- Claude나 다른 자동화 도구에 production 진단을 맡길 때는 진단 전용 SSH 키와 server-side ForceCommand를 사용합니다.
+- runbook command에는 placeholder를 사용합니다. 실제 값은 VM, provider console, 또는 Git 밖 운영 채널에서만 다룹니다.
+
+## 문서
+
+- [Deploy attempts](deploy-attempts.md) — 배포 attempt 상태 모델, JSONL ledger, 실패 stage별 대응.
+- [Read-only diagnostics](read-only-diagnostics.md) — 진단 전용 SSH 키와 collector 운영.
+- [Post-deploy watch](post-deploy-watch.md) — 배포 직후 health, BFF/OAuth smoke, recent log scan 절차.
+
+## 관련 문서
+
+- [OCI Compose Stack](../../deploy/compose-stack.md)
+- [OCI backend](../../deploy/oci-backend.md)
+- [Observability](../observability/README.md)
+- [Post-mortems](../postmortems/README.md)
