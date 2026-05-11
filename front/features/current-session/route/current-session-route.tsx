@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData, useParams } from "react-router-dom";
 import { saveCheckin } from "@/features/current-session/actions/save-checkin";
 import { saveQuestions } from "@/features/current-session/actions/save-question";
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
@@ -47,6 +47,7 @@ export function CurrentSessionRoute({
   internalLinkComponent?: InternalLinkComponent;
 }) {
   const loaderData = useLoaderData() as CurrentSessionRouteData;
+  const params = useParams();
   const [routeDataState, setRouteDataState] = useState(() => ({
     loaderData,
     routeData: loaderData,
@@ -58,7 +59,7 @@ export function CurrentSessionRoute({
       const requestSequence = refreshSequence.current + 1;
       refreshSequence.current = requestSequence;
 
-      void loadCurrentSessionRouteData()
+      void loadCurrentSessionRouteData({ params })
         .then((nextData) => {
           if (refreshSequence.current === requestSequence) {
             setRouteDataState((currentState) => {
@@ -81,7 +82,7 @@ export function CurrentSessionRoute({
       refreshSequence.current += 1;
       window.removeEventListener(READMATES_ROUTE_REFRESH_EVENT, refresh);
     };
-  }, [loaderData]);
+  }, [loaderData, params]);
 
   if (routeDataState.loaderData !== loaderData) {
     setRouteDataState({ loaderData, routeData: loaderData });
