@@ -98,7 +98,7 @@ require_file "$SERVICE_FILE"
 
 if uses_registry_image; then
   IMAGE_SOURCE="registry"
-  echo "==> [2/11] Docker image pull on VM: ${IMAGE_TAG}"
+  echo "==> [2/11] Docker image source: registry ${IMAGE_TAG}"
 else
   IMAGE_SOURCE="local"
   echo "==> [2/11] Docker image build: ${IMAGE_TAG}"
@@ -166,6 +166,7 @@ echo "==> [8/11] compose 설정 검증"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "cd ${REMOTE_DIR} && sudo docker compose -f compose.yml config >/dev/null"
 
+mark_stage "service-stop"
 echo "==> [9/11] 기존 host Caddy/Spring 서비스 정지"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<'EOF'
 set -euo pipefail
