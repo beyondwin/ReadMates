@@ -99,7 +99,7 @@ Cloudflare 환경에서 `CF-Connecting-IP`가 우선이며, 로컬 dev 환경에
 
 ### BFF 요청 헤더 조합
 
-`front/functions/api/bff/[[path]].ts:151-154`에서 club context 헤더와 BFF secret을 upstream으로 전송합니다.
+`front/functions/api/bff/[[path]].ts:151-158`에서 club context 헤더와 BFF secret을 upstream으로 전송합니다.
 
 ```typescript
 // front/functions/api/bff/[[path]].ts (발췌)
@@ -122,22 +122,21 @@ if (bffSecret) {
 ```kotlin
 // server/src/main/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilter.kt
 
-internal fun aliasFor(provided: String): String? {
+private fun matchesAny(provided: String, candidates: List<String>): Boolean {
     val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
-    secrets.forEachIndexed { idx, candidate ->
-        if (MessageDigest.isEqual(providedBytes, candidate.toByteArray(StandardCharsets.UTF_8))) {
-            return when (idx) {
-                0 -> "primary"
-                1 -> "secondary"
-                else -> "index_$idx"
-            }
+    var matched = false
+    for (candidate in candidates) {
+        val candidateBytes = candidate.toByteArray(StandardCharsets.UTF_8)
+        if (MessageDigest.isEqual(providedBytes, candidateBytes)) {
+            matched = true
+            // no early return — iterate all for timing uniformity
         }
     }
-    return null
+    return matched
 }
 ```
 
-`MessageDigest.isEqual`은 길이가 같으면 상수 시간 비교를 수행합니다. 또한 `forEachIndexed`가 매칭 후 **early return 없이 모든 candidates를 순회**합니다(`// no early return — iterate all for timing uniformity` 주석). 이는 timing side-channel으로 어느 index의 secret이 유효한지 추론하지 못하게 하는 구현입니다.
+`MessageDigest.isEqual`은 길이가 같으면 상수 시간 비교를 수행합니다. 그리고 매칭이 성공한 뒤에도 `break` 없이 **모든 candidates를 끝까지 순회**합니다(`// no early return — iterate all for timing uniformity` 주석). 이는 timing side-channel으로 어느 index의 secret이 유효한지 추론하지 못하게 하는 구현입니다. alias 매핑(primary/secondary/index_N)과 audit 로깅은 `aliasFor`가 담당하며, `matchesAny`는 순수 timing-uniform 통과/차단 판정만 수행합니다.
 
 매칭이 성공하면 `auditAsync`가 비동기로 `bff_secret_rotation_audit`에 row를 기록합니다.
 
