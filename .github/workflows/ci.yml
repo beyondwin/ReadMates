@@ -25,7 +25,10 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
 
       - name: Bash syntax
-        run: bash -n scripts/*.sh deploy/oci/*.sh
+        run: |
+          for f in scripts/*.sh deploy/oci/*.sh; do
+            bash -n "$f"
+          done
 
       - name: ShellCheck
         run: shellcheck scripts/*.sh deploy/oci/*.sh
