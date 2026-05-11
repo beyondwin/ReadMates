@@ -54,7 +54,7 @@ READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLI
 
 `05-deploy-compose-stack.sh`는 운영 VM의 `/var/log/readmates/deploy-attempts.jsonl`에 배포 attempt를 JSONL로 기록합니다. 이 ledger는 자동 rollback이나 재시도 트리거가 아니라, 실패 stage와 근거를 남겨 운영자가 rollback, 재시도, 조사를 판단하기 위한 기록입니다. 상태 모델과 stage별 대응은 [Deploy Attempts](../operations/runbooks/deploy-attempts.md)를 기준으로 합니다.
 
-Ledger에는 `attemptId`, `event`, `stage`, `at`, sanitized image reference, registry digest, Docker image id, exit code, duration 같은 낮은 민감도 field만 남깁니다. `/etc/readmates/readmates.env` 내용, DB host 실제 값, password, OAuth secret, BFF secret, SMTP credential, cookie, Authorization header, OAuth code, token, request/response body 전문, 운영 smoke 결과 전문, 실제 멤버/club 운영 데이터는 기록하지 않습니다.
+Ledger JSON field는 `attemptId`, `event`, `status`, `stage`, `at`, `durationSeconds`, 선택적 `detail`입니다. `detail`에는 `image=...`, `imageSource=...`, `imageId=...`, expected/running image id, `services=compose`, `path=...`, `watch=true/false`, `exitCode=...` 같은 짧은 문자열만 기록합니다. Image reference는 JSON escaping만 거치므로 외부 공유 전 image 이름과 `detail` 값이 public-safe인지 운영자가 확인해야 합니다. `/etc/readmates/readmates.env` 내용, DB host 실제 값, password, OAuth secret, BFF secret, SMTP credential, cookie, Authorization header, OAuth code, token, request/response body 전문, 운영 smoke 결과 전문, 실제 멤버/club 운영 데이터는 기록하지 않습니다.
 
 ## Smoke
 
