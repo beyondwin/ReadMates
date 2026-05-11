@@ -249,6 +249,79 @@ describe("CurrentSession", () => {
     expect(screen.getAllByRole("button", { name: "참석" }).length).toBeGreaterThan(0);
   });
 
+  it("carries clubSlug through route refresh on a club-scoped path", async () => {
+    installRouterRequestShim();
+    const requestedUrls: string[] = [];
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      requestedUrls.push(url);
+
+      if (url.startsWith("/api/bff/api/auth/me")) {
+        return Promise.resolve(jsonResponse(routeAuthFixture));
+      }
+
+      if (url.startsWith("/api/bff/api/sessions/current")) {
+        return Promise.resolve(jsonResponse(currentSessionData));
+      }
+
+      return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/clubs/:clubSlug/app/session/current",
+          element: <CurrentSessionRoute />,
+          loader: currentSessionLoader,
+          errorElement: <div>route error</div>,
+          hydrateFallbackElement: <div>세션을 불러오는 중</div>,
+        },
+      ],
+      { initialEntries: ["/clubs/reading-sai/app/session/current"] },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    expect((await screen.findAllByText("테스트 책")).length).toBeGreaterThan(0);
+
+    // Initial loader must have used the club slug.
+    const initialSessionRequests = requestedUrls.filter((url) =>
+      url.startsWith("/api/bff/api/sessions/current"),
+    );
+    expect(initialSessionRequests.length).toBeGreaterThan(0);
+    for (const url of initialSessionRequests) {
+      expect(url).toContain("clubSlug=reading-sai");
+    }
+
+    // Save-triggered refresh must reuse the same slug.
+    const initialSessionRequestCount = initialSessionRequests.length;
+    window.dispatchEvent(new Event("readmates:route-refresh"));
+
+    await waitFor(() => {
+      const sessionRequests = requestedUrls.filter((url) =>
+        url.startsWith("/api/bff/api/sessions/current"),
+      );
+      expect(sessionRequests.length).toBe(initialSessionRequestCount + 1);
+    });
+
+    const sessionRequestsAfterRefresh = requestedUrls.filter((url) =>
+      url.startsWith("/api/bff/api/sessions/current"),
+    );
+    for (const url of sessionRequestsAfterRefresh) {
+      expect(url).toContain("clubSlug=reading-sai");
+    }
+
+    // Auth refresh during route refresh must also carry the slug.
+    const authRequests = requestedUrls.filter((url) =>
+      url.startsWith("/api/bff/api/auth/me"),
+    );
+    expect(authRequests.length).toBeGreaterThan(1);
+    for (const url of authRequests) {
+      expect(url).toContain("clubSlug=reading-sai");
+    }
+  });
+
   it("shows the empty state when there is no current session", () => {
     render(<CurrentSession data={{ currentSession: null }} />);
 
