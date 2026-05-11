@@ -2,6 +2,20 @@
 
 Post-deploy watch는 backend compose 배포 직후 5-10분 동안 health, BFF/OAuth smoke, recent log error를 묶어 확인하는 절차입니다. 실패 시 자동 rollback하지 않고 운영자가 판단합니다.
 
+## 배포 script 통합
+
+`deploy/oci/05-deploy-compose-stack.sh`는 기본적으로 post-deploy watch를 실행합니다. 장애 대응 중 watch를 별도로 수행해야 하면 아래처럼 배포 script의 자동 watch만 끕니다.
+
+```bash
+READMATES_RUN_POST_DEPLOY_WATCH=false \
+READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
+VM_PUBLIC_IP='<vm-public-ip>' \
+CADDY_SITE=api.example.com \
+./deploy/oci/05-deploy-compose-stack.sh
+```
+
+watch를 끈 경우 같은 release 작업 안에서 `deploy/oci/watch-compose-post-deploy.sh`를 수동 실행합니다.
+
 ## 기본 실행
 
 ```bash

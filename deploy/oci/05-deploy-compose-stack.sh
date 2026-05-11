@@ -16,6 +16,7 @@ COMPOSE_FILE="deploy/oci/compose.yml"
 CADDYFILE="deploy/oci/Caddyfile"
 SERVICE_FILE="deploy/oci/readmates-stack.service"
 REMOTE_DIR="/opt/readmates"
+READMATES_RUN_POST_DEPLOY_WATCH="${READMATES_RUN_POST_DEPLOY_WATCH:-true}"
 ATTEMPT_ID="${READMATES_DEPLOY_ATTEMPT_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$RANDOM}"
 ATTEMPT_STARTED_EPOCH="$(date -u +%s)"
 ATTEMPT_STAGE="init"
@@ -227,6 +228,18 @@ remote_ledger_append "HEALTH_PASSED" "RUNNING" "endpoint=/internal/health"
 mark_stage "bff-smoke"
 curl -fsS "${APP_BASE_URL}/api/bff/api/auth/me" >/dev/null
 remote_ledger_append "BFF_SMOKE_PASSED" "RUNNING" "path=/api/bff/api/auth/me"
+
+if [ "$READMATES_RUN_POST_DEPLOY_WATCH" = "true" ]; then
+  mark_stage "post-deploy-watch"
+  READMATES_SMOKE_BASE_URL="$APP_BASE_URL" \
+  READMATES_SMOKE_AUTH_BASE_URL="${READMATES_SMOKE_AUTH_BASE_URL:-$APP_BASE_URL}" \
+  VM_PUBLIC_IP="$VM_PUBLIC_IP" \
+  SSH_KEY="$SSH_KEY" \
+  REMOTE_USER="$REMOTE_USER" \
+  SSH_STRICT_HOST_KEY_CHECKING="$SSH_STRICT_HOST_KEY_CHECKING" \
+  ./deploy/oci/watch-compose-post-deploy.sh
+  remote_ledger_append "POST_DEPLOY_WATCH_PASSED" "RUNNING" "watch=true"
+fi
 
 mark_stage "complete"
 remote_ledger_append "SUCCESS" "SUCCESS" "image=${IMAGE_TAG}"
