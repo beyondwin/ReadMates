@@ -16,14 +16,19 @@ COMPOSE_FILE="deploy/oci/compose.yml"
 CADDYFILE="deploy/oci/Caddyfile"
 SERVICE_FILE="deploy/oci/readmates-stack.service"
 REMOTE_DIR="/opt/readmates"
+ATTEMPT_ID="${READMATES_DEPLOY_ATTEMPT_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$RANDOM}"
+ATTEMPT_STARTED_EPOCH="$(date -u +%s)"
+ATTEMPT_STAGE="init"
+REMOTE_LEDGER="${READMATES_DEPLOY_LEDGER:-/var/log/readmates/deploy-attempts.jsonl}"
 
 SSH_OPTIONS=(-i "$SSH_KEY" -o "StrictHostKeyChecking=${SSH_STRICT_HOST_KEY_CHECKING}")
+trap on_deploy_error ERR
 
 require_file() {
   local path="$1"
   if [ ! -f "$path" ]; then
     echo "필수 파일 없음: $path" >&2
-    exit 1
+    return 1
   fi
 }
 
@@ -34,6 +39,54 @@ shell_quote() {
 uses_registry_image() {
   [[ "$IMAGE_TAG" == ghcr.io/* ]]
 }
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/ }"
+  printf '%s' "$value"
+}
+
+utc_now() {
+  date -u +%Y-%m-%dT%H:%M:%SZ
+}
+
+duration_seconds() {
+  local now
+  now="$(date -u +%s)"
+  echo $((now - ATTEMPT_STARTED_EPOCH))
+}
+
+remote_ledger_append() {
+  local event="$1"
+  local status="$2"
+  local detail="${3:-}"
+  local at duration payload
+  at="$(utc_now)"
+  duration="$(duration_seconds)"
+  payload="{\"attemptId\":\"$(json_escape "$ATTEMPT_ID")\",\"event\":\"$(json_escape "$event")\",\"status\":\"$(json_escape "$status")\",\"stage\":\"$(json_escape "$ATTEMPT_STAGE")\",\"at\":\"$at\",\"durationSeconds\":$duration"
+  if [ -n "$detail" ]; then
+    payload="${payload},\"detail\":\"$(json_escape "$detail")\""
+  fi
+  payload="${payload}}"
+  ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+    "sudo install -d -o root -g readmates -m 0750 /var/log/readmates && sudo touch $(shell_quote "$REMOTE_LEDGER") && sudo chown root:readmates $(shell_quote "$REMOTE_LEDGER") && sudo chmod 0640 $(shell_quote "$REMOTE_LEDGER") && printf '%s\n' $(shell_quote "$payload") | sudo tee -a $(shell_quote "$REMOTE_LEDGER") >/dev/null" \
+    || true
+}
+
+mark_stage() {
+  ATTEMPT_STAGE="$1"
+}
+
+on_deploy_error() {
+  local exit_code="$?"
+  remote_ledger_append "FAILED" "FAILED" "exitCode=${exit_code}"
+  exit "$exit_code"
+}
+
+mark_stage "preflight"
+remote_ledger_append "STARTED" "RUNNING" "image=${IMAGE_TAG}"
 
 echo "==> [1/10] 필수 파일 확인"
 require_file "$COMPOSE_FILE"
@@ -50,6 +103,8 @@ else
   docker save "${IMAGE_TAG}" -o "${IMAGE_ARCHIVE}"
 fi
 
+remote_ledger_append "PREFLIGHT_PASSED" "RUNNING" "imageSource=${IMAGE_SOURCE}"
+
 echo "==> [3/10] VM Docker/Compose 확인"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "sudo docker version >/dev/null && sudo docker compose version >/dev/null"
@@ -62,6 +117,7 @@ scp "${SSH_OPTIONS[@]}" "$COMPOSE_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/rea
 scp "${SSH_OPTIONS[@]}" "$CADDYFILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-Caddyfile"
 scp "${SSH_OPTIONS[@]}" "$SERVICE_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-stack.service"
 
+mark_stage "install"
 echo "==> [5/10] VM runtime files 설치"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "sudo bash -s -- $(shell_quote "$REMOTE_DIR") $(shell_quote "$CADDY_SITE") $(shell_quote "$IMAGE_TAG") $(shell_quote "$IMAGE_SOURCE")" <<'EOF'
@@ -88,6 +144,10 @@ else
 fi
 EOF
 
+mark_stage "image"
+remote_ledger_append "IMAGE_RESOLVED" "RUNNING" "image=${IMAGE_TAG}"
+
+mark_stage "compose-config"
 echo "==> [6/10] compose 설정 검증"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "cd ${REMOTE_DIR} && sudo docker compose -f compose.yml config >/dev/null"
@@ -109,6 +169,7 @@ if systemctl list-unit-files caddy.service >/dev/null 2>&1; then
 fi
 EOF
 
+mark_stage "compose-up"
 echo "==> [9/10] compose stack 시작"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
 set -euo pipefail
@@ -118,6 +179,9 @@ sudo docker compose -f compose.yml up -d --remove-orphans
 sudo docker compose -f compose.yml ps
 EOF
 
+remote_ledger_append "STACK_STARTED" "RUNNING" "services=compose"
+
+mark_stage "health"
 echo "==> [10/10] health smoke"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
 set -euo pipefail
@@ -132,7 +196,15 @@ sudo docker compose -f compose.yml logs --tail=200 readmates-api
 exit 1
 EOF
 
+remote_ledger_append "HEALTH_PASSED" "RUNNING" "endpoint=/internal/health"
+
+mark_stage "bff-smoke"
 curl -fsS "${APP_BASE_URL}/api/bff/api/auth/me" >/dev/null
+remote_ledger_append "BFF_SMOKE_PASSED" "RUNNING" "path=/api/bff/api/auth/me"
+
+mark_stage "complete"
+remote_ledger_append "SUCCESS" "SUCCESS" "image=${IMAGE_TAG}"
+trap - ERR
 
 echo ""
 echo "Compose stack 배포 완료"
