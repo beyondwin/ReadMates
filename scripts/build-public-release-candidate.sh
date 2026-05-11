@@ -244,6 +244,10 @@ preflight_source_symlinks() {
           -path "$root/output" -o
           -path "$root/node_modules" -o
           -path "$root/dist" -o
+          -path "$root/test-results" -o
+          -path "$root/playwright-report" -o
+          -path "$root/coverage" -o
+          -path "$root/.nyc_output" -o
           -path "$root/.wrangler" -o
           -path "$root/.cloudflare" -o
           -path "$root/.vercel" -o
@@ -385,7 +389,11 @@ copy_manifest() {
   copy_dir "front" \
     --exclude='/output/' \
     --exclude='/node_modules/' \
-    --exclude='/dist/'
+    --exclude='/dist/' \
+    --exclude='/test-results/' \
+    --exclude='/playwright-report/' \
+    --exclude='/coverage/' \
+    --exclude='/.nyc_output/'
 
   copy_dir "server" \
     --exclude='/build/' \
@@ -445,6 +453,10 @@ is_forbidden_candidate_path() {
     node_modules|node_modules/*) return 0 ;;
     front/node_modules|front/node_modules/*) return 0 ;;
     front/dist|front/dist/*) return 0 ;;
+    front/test-results|front/test-results/*) return 0 ;;
+    front/playwright-report|front/playwright-report/*) return 0 ;;
+    front/coverage|front/coverage/*) return 0 ;;
+    front/.nyc_output|front/.nyc_output/*) return 0 ;;
     server/build|server/build/*) return 0 ;;
     server/.gradle|server/.gradle/*) return 0 ;;
     server/.kotlin|server/.kotlin/*) return 0 ;;
@@ -520,7 +532,7 @@ Public release candidate built:
 Next verification commands:
   find .tmp/public-release-candidate -type l -print
   find .tmp/public-release-candidate -name '.env*' -print
-  find .tmp/public-release-candidate \\( -path '*/design/*' -o -path '*/.gstack/*' -o -path '*/.superpowers/*' -o -path '*/.idea/*' -o -path '*/.playwright-cli/*' -o -path '*/.tmp/*' -o -path '*/recode/*' -o -path '*/front/output/*' -o -path '*/front/node_modules/*' -o -path '*/front/dist/*' -o -path '*/server/build/*' -o -path '*/server/.gradle/*' -o -path '*/server/.kotlin/*' -o -path '*/.wrangler' -o -path '*/.wrangler/*' -o -path '*/.cloudflare' -o -path '*/.cloudflare/*' -o -path '*/.vercel' -o -path '*/.vercel/*' -o -iname '*.env' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p8' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname 'id_ecdsa*' -o -iname 'id_dsa*' -o -iname '*.sql.gz' -o -iname '*.dump' -o -iname '*.tfstate' -o -iname '*.db' -o -iname '*.sqlite' \\) -print
+  find .tmp/public-release-candidate \\( -path '*/design/*' -o -path '*/.gstack/*' -o -path '*/.superpowers/*' -o -path '*/.idea/*' -o -path '*/.playwright-cli/*' -o -path '*/.tmp/*' -o -path '*/recode/*' -o -path '*/front/output/*' -o -path '*/front/node_modules/*' -o -path '*/front/dist/*' -o -path '*/front/test-results*' -o -path '*/front/playwright-report*' -o -path '*/front/coverage*' -o -path '*/front/.nyc_output*' -o -path '*/server/build/*' -o -path '*/server/.gradle/*' -o -path '*/server/.kotlin/*' -o -path '*/.wrangler' -o -path '*/.wrangler/*' -o -path '*/.cloudflare' -o -path '*/.cloudflare/*' -o -path '*/.vercel' -o -path '*/.vercel/*' -o -iname '*.env' -o -iname '*.pem' -o -iname '*.key' -o -iname '*.p8' -o -iname '*.p12' -o -iname '*.pfx' -o -iname '*.jks' -o -iname 'id_rsa*' -o -iname 'id_ed25519*' -o -iname 'id_ecdsa*' -o -iname 'id_dsa*' -o -iname '*.sql.gz' -o -iname '*.dump' -o -iname '*.tfstate' -o -iname '*.db' -o -iname '*.sqlite' \\) -print
   git diff --check
 EOF
 }

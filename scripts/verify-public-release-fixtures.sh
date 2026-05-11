@@ -6,6 +6,16 @@ fail() {
   exit 1
 }
 
+assert_file_contains() {
+  local file="$1"
+  local expected="$2"
+
+  if ! grep -Fq "$expected" "$file"; then
+    sed 's/^/  /' "$file" >&2
+    fail "expected $file to contain: $expected"
+  fi
+}
+
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || fail "run this script from inside the ReadMates repository"
 cd "$repo_root"
 repo_abs="$(pwd -P)"
@@ -113,5 +123,14 @@ if ! ./scripts/public-release-check.sh "$fixture_root/placeholders" > "$fixture_
   sed 's/^/  /' "$fixture_root/placeholders.err" >&2
   fail "documented placeholder fixture unexpectedly failed"
 fi
+
+artifact_fixture="$fixture_root/artifact-paths"
+mkdir -p "$artifact_fixture/front/test-results"
+printf '{}\n' > "$artifact_fixture/front/test-results/.last-run.json"
+
+if ./scripts/public-release-check.sh "$artifact_fixture" > "$artifact_fixture.out" 2> "$artifact_fixture.err"; then
+  fail "public release check should reject front/test-results"
+fi
+assert_file_contains "$artifact_fixture.err" "forbidden candidate path: front/test-results/.last-run.json"
 
 printf 'Public-release fixture checks passed.\n'

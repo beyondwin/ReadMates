@@ -170,6 +170,10 @@ is_forbidden_path() {
     node_modules|node_modules/*) return 0 ;;
     front/node_modules|front/node_modules/*) return 0 ;;
     front/dist|front/dist/*) return 0 ;;
+    front/test-results|front/test-results/*) return 0 ;;
+    front/playwright-report|front/playwright-report/*) return 0 ;;
+    front/coverage|front/coverage/*) return 0 ;;
+    front/.nyc_output|front/.nyc_output/*) return 0 ;;
     server/build|server/build/*) return 0 ;;
     server/.gradle|server/.gradle/*) return 0 ;;
     server/.kotlin|server/.kotlin/*) return 0 ;;
