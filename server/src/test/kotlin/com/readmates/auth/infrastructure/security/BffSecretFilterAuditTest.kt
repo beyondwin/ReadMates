@@ -6,6 +6,7 @@ import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
+import org.springframework.core.task.TaskExecutor
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
@@ -30,6 +31,8 @@ class BffSecretFilterAuditTest {
             }
         }
 
+    private fun directAuditExecutor(): TaskExecutor = TaskExecutor { it.run() }
+
     @Test
     fun `successful match calls audit port once with correct alias`() {
         val capturedAlias = AtomicReference<String>()
@@ -40,6 +43,7 @@ class BffSecretFilterAuditTest {
             allowedOriginPort = noopAllowedOriginPort(),
             ipHashBaseSecret = "test-base-secret",
             auditPort = capturingAuditPort(capturedAlias),
+            auditExecutor = directAuditExecutor(),
         )
         val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
             servletPath = "/api/auth/me"
@@ -54,25 +58,74 @@ class BffSecretFilterAuditTest {
     }
 
     @Test
-    fun `primary secret records primary alias`() {
+    fun `default audit mode skips primary secret`() {
         val capturedAlias = AtomicReference<String>()
         val filter = BffSecretFilter(
-            configuredSecretsRaw = "secret1,secret2",
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
             ipHashBaseSecret = "",
             auditPort = capturingAuditPort(capturedAlias),
+            auditExecutor = directAuditExecutor(),
         )
         val request = MockHttpServletRequest("GET", "/api/something").apply {
             servletPath = "/api/something"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret1")
+            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "primary-bff-test")
+        }
+
+        filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
+
+        Thread.sleep(100)
+        assertEquals(null, capturedAlias.get())
+    }
+
+    @Test
+    fun `all audit mode records primary secret`() {
+        val capturedAlias = AtomicReference<String>()
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+            ipHashBaseSecret = "",
+            auditPort = capturingAuditPort(capturedAlias),
+            auditModeRaw = "all",
+            auditExecutor = directAuditExecutor(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/something").apply {
+            servletPath = "/api/something"
+            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "primary-bff-test")
         }
 
         filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
 
         await().atMost(Duration.ofSeconds(2)).until { capturedAlias.get() != null }
         assertEquals("primary", capturedAlias.get())
+    }
+
+    @Test
+    fun `off audit mode skips secondary secret`() {
+        val capturedAlias = AtomicReference<String>()
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+            ipHashBaseSecret = "",
+            auditPort = capturingAuditPort(capturedAlias),
+            auditModeRaw = "off",
+            auditExecutor = directAuditExecutor(),
+        )
+        val request = MockHttpServletRequest("GET", "/api/something").apply {
+            servletPath = "/api/something"
+            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
+        }
+
+        filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
+
+        Thread.sleep(100)
+        assertEquals(null, capturedAlias.get())
     }
 
     @Test
@@ -108,22 +161,71 @@ class BffSecretFilterAuditTest {
             }
         }
         val filter = BffSecretFilter(
-            configuredSecretsRaw = "secret1",
+            configuredSecretsRaw = "secret1,secret2",
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
             ipHashBaseSecret = "",
             auditPort = auditPort,
+            auditExecutor = directAuditExecutor(),
         )
         val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
             servletPath = "/api/auth/me"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret1")
+            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret2")
         }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, MockFilterChain())
 
         assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `audit executor rejection does not affect response`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+            ipHashBaseSecret = "",
+            auditPort = capturingAuditPort(AtomicReference()),
+            auditExecutor = org.springframework.core.task.TaskExecutor {
+                throw org.springframework.core.task.TaskRejectedException("queue full")
+            },
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `missing audit executor skips recordable audit and preserves response`() {
+        val capturedAlias = AtomicReference<String>()
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+            ipHashBaseSecret = "",
+            auditPort = capturingAuditPort(capturedAlias),
+        )
+        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
+            servletPath = "/api/auth/me"
+            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
+        }
+        val response = MockHttpServletResponse()
+
+        filter.doFilter(request, response, MockFilterChain())
+
+        assertEquals(200, response.status)
+        Thread.sleep(100)
+        assertEquals(null, capturedAlias.get())
     }
 
     @Test

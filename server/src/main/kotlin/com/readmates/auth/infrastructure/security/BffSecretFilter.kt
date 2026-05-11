@@ -8,13 +8,15 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.core.task.TaskExecutor
+import org.springframework.core.task.TaskRejectedException
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
-import java.util.concurrent.CompletableFuture
 
 @Component
 class BffSecretFilter(
@@ -27,9 +29,16 @@ class BffSecretFilter(
     private val allowedOriginPort: AllowedOriginPort,
     @param:Value("\${READMATES_IP_HASH_BASE_SECRET:}")
     private val ipHashBaseSecret: String = "",
-    @Autowired(required = false)
+    @param:Autowired(required = false)
     private val auditPort: BffSecretRotationAuditPort? = null,
+    @param:Value("\${readmates.security.bff.audit-mode:rotation-only}")
+    private val auditModeRaw: String = "rotation-only",
+    @param:Qualifier("bffSecretAuditExecutor")
+    @param:Autowired(required = false)
+    private val auditExecutor: TaskExecutor? = null,
 ) : OncePerRequestFilter() {
+
+    private val auditMode = BffSecretAuditMode.from(auditModeRaw)
 
     private val secrets: List<String> = run {
         val fromList = configuredSecretsRaw
@@ -89,14 +98,28 @@ class BffSecretFilter(
 
     private fun auditAsync(alias: String, request: HttpServletRequest) {
         val port = auditPort ?: return
+        if (!auditMode.shouldRecord(alias)) {
+            return
+        }
+        val executor = auditExecutor ?: run {
+            operationalLogger.warn("BFF audit record skipped: bffSecretAuditExecutor is not configured")
+            return
+        }
+
         val clientIpHash = ClientIpHashing.hashClientIp(request.remoteAddr, ipHashBaseSecret)
         val path = request.requestURI
-        CompletableFuture.runAsync {
+        val task = Runnable {
             try {
                 port.recordUsage(alias, clientIpHash, path)
             } catch (ex: Exception) {
                 operationalLogger.warn("BFF audit record failed: {}", ex.message)
             }
+        }
+
+        try {
+            executor.execute(task)
+        } catch (ex: TaskRejectedException) {
+            operationalLogger.warn("BFF audit record skipped: {}", ex.message)
         }
     }
 
