@@ -3,6 +3,7 @@
 Status: draft (awaiting user review)
 Owner: frontend
 Last updated: 2026-05-11
+Post-mortem: [docs/operations/postmortems/2026-05-11-current-session-refresh-club-context.md](../../operations/postmortems/2026-05-11-current-session-refresh-club-context.md)
 
 ## Goal
 
