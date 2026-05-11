@@ -9,6 +9,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Added
 
 - Observability runbook 문서 모음 (`docs/operations/observability/`): 진입 README, 19개 custom 메트릭 카탈로그(근원 코드 인용), 22개 권장 dashboard panel(PromQL), 11개 alertmanager rule candidate, 3개 SLO 정의(API availability, read latency, notification delivery latency). `docs/operations/README.md` 진입점도 함께 추가했습니다. 코드 변경 없음 — 현재 배포된 메트릭과 권장 구성만 정리.
+- `docs/case-studies/` 디렉토리에 3개 deep-dive 문서를 추가했습니다 (BFF 보안과 secret rotation, notification outbox pipeline, multi-club domain platform). 각 case는 문제 → 접근 → 구현 → 검증 → trade-off → 다시 한다면 흐름을 따르며, case 03은 2026-05-11 current-session refresh incident의 root cause와 영구 수정 서사를 포함합니다.
+- README 최상단에 **Engineering Highlights** 섹션을 추가해 운영 중 풀어낸 비자명한 문제 3건을 case study deep-dive로 연결합니다.
 
 ### Changed
 
