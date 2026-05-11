@@ -11,6 +11,7 @@ Current source-of-truth order:
 
 - `README.md`: entry-point overview, concise product and architecture summary, and links to detailed docs.
 - `docs/development/`: local setup, testing, architecture, and contributor-facing technical guidance.
+- `docs/development/release-readiness-review.md`: release-readiness and residual-risk review checklist for post-merge or pre-ship checks.
 - `docs/deploy/`: public-safe deployment runbooks and release-safety policy.
 - `scripts/README.md`: public release helper behavior and scanner expectations.
 - `AGENTS.md`, `front/AGENTS.md`, `docs/agents/*.md`: agent routing and task-specific editing rules.
@@ -24,6 +25,7 @@ Documentation rules:
 - Use placeholders such as `https://api.example.com`, `<db-password>`, and `host@example.com`.
 - Preserve the Korean-first documentation style in current docs.
 - Prefer small factual patches over broad rewrites unless the user asks for a rewrite.
+- For CHANGELOG, release-readiness, or residual-risk review work, use `docs/development/release-readiness-review.md` and do not treat passing tests as sufficient evidence that release or operational risk is closed.
 - If docs describe frontend, server, or UI rules in detail, read the matching surface guide before changing those claims.
 - For unstable external facts such as product limits, pricing, APIs, laws, or platform behavior, verify against current official sources or clearly state that the fact was not revalidated.
 

@@ -23,6 +23,8 @@ Public repo safety matters: do not add real member data, secrets, deployment sta
 
 Ask before editing when the request needs private data, conflicts with the architecture source of truth, requires destructive git or deployment operations, or is too underspecified to choose a safe surface. If a relevant check cannot run, do not claim it passed; report the skipped command and reason.
 
+Residual risk and release readiness reviews: when asked to check remaining risk, release readiness, or whether a branch is safe after merge, do not limit the review to the latest implementation plan unless the user explicitly says so. Review the current branch against its base, usually `origin/main..HEAD`, and use `docs/development/release-readiness-review.md` to check CHANGELOG/Unreleased, CI/deploy scripts, operator-facing behavior changes, security-code hygiene, architecture-test baselines/exceptions, and public-release safety. Passing tests is evidence, not proof that no operational or release risk remains.
+
 Run the smallest relevant checks before finishing:
 
 - Frontend: `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`
