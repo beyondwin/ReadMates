@@ -213,6 +213,69 @@ class AuthMeControllerTest(
     }
 
     @Test
+    fun `auth me with unregistered host header falls back to session club without 404`() {
+        // HOST_FALLBACK source + lookup miss must NOT 404 (unlike the SLUG branch).
+        // In dev the BFF strips the host header to avoid scoping to a stranger's club,
+        // so an unrecognised host must yield the session's own currentMembership.
+        val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
+
+        mockMvc.get("/api/auth/me") {
+            header("X-Readmates-Club-Host", "not-a-registered-host.example.test")
+            cookie(cookie)
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.authenticated") { value(true) }
+            jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
+            jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000001") }
+            jsonPath("$.currentMembership.clubSlug") { value("reading-sai") }
+            jsonPath("$.currentMembership.membershipStatus") { value("ACTIVE") }
+            jsonPath("$.membershipStatus") { value("ACTIVE") }
+            jsonPath("$.role") { value("MEMBER") }
+        }
+    }
+
+    @Test
+    fun `auth me with host header resolving to user's own club returns scoped response`() {
+        val activeDomainId = UUID.randomUUID().toString()
+        insertReadingSaiClubDomain(activeDomainId)
+        try {
+            val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
+
+            mockMvc.get("/api/auth/me") {
+                header("X-Readmates-Club-Host", "readmates-authme.example.test")
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
+                jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000001") }
+                jsonPath("$.currentMembership.clubSlug") { value("reading-sai") }
+                jsonPath("$.currentMembership.membershipStatus") { value("ACTIVE") }
+                jsonPath("$.role") { value("MEMBER") }
+            }
+        } finally {
+            deleteClubDomain(activeDomainId)
+        }
+    }
+
+    private fun insertReadingSaiClubDomain(domainId: String) {
+        // Mirrors the @Sql fixture from ClubContextResolverTest: registers a synthetic
+        // hostname for the seeded reading-sai club so ResolveClubContextUseCase.resolveByHost
+        // can hit a real row.
+        jdbcTemplate.update(
+            """
+            insert into club_domains (id, club_id, hostname, kind, status, is_primary)
+            values (?, '00000000-0000-0000-0000-000000000001', 'readmates-authme.example.test', 'SUBDOMAIN', 'ACTIVE', false)
+            """.trimIndent(),
+            domainId,
+        )
+    }
+
+    private fun deleteClubDomain(domainId: String) {
+        jdbcTemplate.update("delete from club_domains where id = ?", domainId)
+    }
+
+    @Test
     fun `auth me returns viewer status without member write role`() {
         val viewerEmail = uniqueViewerEmail()
         val viewerCookie = loginAsGoogleViewerUser(viewerEmail)
