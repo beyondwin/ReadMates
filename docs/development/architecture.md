@@ -31,9 +31,11 @@ Feature는 가능한 범위에서 `api`, `model`, `route`, `ui`로 나눕니다.
 
 `shared/api/readmates` compatibility module은 제거되었고, feature route/page는 feature-owned API contract 또는 `shared/api` primitive를 사용해야 합니다. `features/*/components`는 `ui`로 이동하지 않은 legacy presentation surface에만 남길 수 있습니다. `ui` directory가 있는 feature에서는 외부 source가 `features/<name>/components`를 public surface처럼 import하지 않습니다. Host feature는 `features/host/ui`가 공개 presentation surface이며, host components legacy public surface는 없습니다.
 
-이 경계는 `front/tests/unit/frontend-boundaries.test.ts`에서 일부 강제합니다. 테스트는 shared-to-app/page/feature import, feature 간 직접 import, feature `model/route/ui` layer import, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import를 확인합니다.
+이 경계는 `front/tests/unit/frontend-boundaries.test.ts`에서 일부 강제합니다 (ADR-0003). 테스트는 shared-to-app/page/feature import, feature 간 직접 import, feature `model/route/ui` layer import, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import를 확인합니다.
 
 ## 요청 흐름
+
+(ADR-0001: Cloudflare Pages Functions BFF 채택 이유와 보안 경계는 [adr/0001-cloudflare-pages-functions-bff.md](adr/0001-cloudflare-pages-functions-bff.md)를 참고합니다.)
 
 ```text
 Browser
@@ -141,7 +143,7 @@ notification
 
 Application package는 Spring Web/HTTP type, HTTP client, adapter 구현체에 의존하지 않습니다. Application service는 feature application error를 던지고, HTTP status와 response mapping은 `adapter.in.web`의 controller 또는 error handler가 맡습니다. 외부 HTTP가 필요한 기능은 application outbound port를 정의하고 `adapter.out.http` 구현으로 분리합니다.
 
-아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다. 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth`/`notification`/`club` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
+아키텍처 경계는 `ServerArchitectureBoundaryTest`에서 강제합니다 (ADR-0002). 이 테스트는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence/Redis adapter, Spring Data Redis에 직접 의존하지 않는지, `session`/`publication`/`archive`/`feedback`/`note`/`auth`/`notification`/`club` application package가 adapter, Spring JDBC, Spring DAO, Spring Data Redis, Spring Web/HTTP 세부사항에 의존하지 않는지, domain package가 web/JDBC/persistence 세부사항에 의존하지 않는지 확인합니다.
 
 ## 인증과 세션
 
