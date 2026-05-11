@@ -198,21 +198,17 @@ class AuthMeControllerTest(
     }
 
     @Test
-    fun `auth me does not fall back to another club when requested club slug is unresolved`() {
+    fun `auth me returns 404 when requested club slug is unresolved`() {
         val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
 
         mockMvc.get("/api/auth/me") {
             header("X-Readmates-Club-Slug", "missing-club")
             cookie(cookie)
         }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
-            jsonPath("$.currentMembership") { value(null) }
-            jsonPath("$.joinedClubs.length()") { value(1) }
-            jsonPath("$.joinedClubs[0].clubSlug") { value("reading-sai") }
-            jsonPath("$.clubId") { value(null) }
-            jsonPath("$.role") { value(null) }
+            status { isNotFound() }
+            jsonPath("$.code") { value("CLUB_NOT_FOUND") }
+            jsonPath("$.message") { value("클럽을 찾을 수 없습니다.") }
+            jsonPath("$.status") { value(404) }
         }
     }
 

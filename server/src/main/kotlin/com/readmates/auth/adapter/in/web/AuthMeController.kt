@@ -1,6 +1,9 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.application.AuthApplicationError
+import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
+import com.readmates.club.adapter.`in`.web.ClubContextSource
 import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
@@ -27,6 +30,29 @@ class AuthMeController(
         if (sessionProfileMember != null) {
             val joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(sessionProfileMember.userId)
             val platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(sessionProfileMember.userId)
+
+            // Explicit slug supplied but the club is not registered → 404.
+            if (requestedClubContext.source == ClubContextSource.SLUG &&
+                requestedClubContext.context == null
+            ) {
+                throw AuthApplicationException(
+                    error = AuthApplicationError.CLUB_NOT_FOUND,
+                    message = "Requested club slug is not registered",
+                )
+            }
+
+            // BFF host header supplied but the host is not a registered club domain.
+            // Treat as unscoped (matches dev where the host header is stripped).
+            if (requestedClubContext.source == ClubContextSource.HOST_FALLBACK &&
+                requestedClubContext.context == null
+            ) {
+                return AuthMemberResponse.from(
+                    sessionProfileMember,
+                    joinedClubs = joinedClubs,
+                    platformAdmin = platformAdmin,
+                )
+            }
+
             val requestedMember = requestedClubContext.context
                 ?.let { context -> resolveCurrentMemberUseCase.resolveByUserAndClub(sessionProfileMember.userId, context.clubId) }
             if (requestedClubContext.supplied && requestedMember == null) {
