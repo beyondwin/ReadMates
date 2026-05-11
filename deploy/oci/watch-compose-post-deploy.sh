@@ -7,14 +7,29 @@ SSH_KEY="${SSH_KEY:-$HOME/.ssh/readmates_oci}"
 REMOTE_USER="${REMOTE_USER:-ubuntu}"
 REMOTE_DIR="${READMATES_REMOTE_DIR:-/opt/readmates}"
 APP_BASE_URL="${READMATES_SMOKE_BASE_URL:-https://readmates.pages.dev}"
+APP_BASE_URL="${APP_BASE_URL%/}"
 AUTH_BASE_URL="${READMATES_SMOKE_AUTH_BASE_URL:-$APP_BASE_URL}"
+AUTH_BASE_URL="${AUTH_BASE_URL%/}"
 SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-accept-new}"
-SSH_OPTIONS=(-i "$SSH_KEY" -o "StrictHostKeyChecking=${SSH_STRICT_HOST_KEY_CHECKING}")
+SSH_OPTIONS=(
+  -i "$SSH_KEY"
+  -o "StrictHostKeyChecking=${SSH_STRICT_HOST_KEY_CHECKING}"
+  -o "BatchMode=yes"
+  -o "ConnectTimeout=10"
+  -o "ServerAliveInterval=10"
+  -o "ServerAliveCountMax=3"
+)
+
+shell_quote() {
+  printf "%q" "$1"
+}
 
 echo "==> [watch] VM compose health"
-ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
+ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+  "sudo bash -s -- $(shell_quote "$REMOTE_DIR")" <<'EOF'
 set -euo pipefail
-cd "${REMOTE_DIR}"
+remote_dir="$1"
+cd "$remote_dir"
 sudo systemctl status readmates-stack --no-pager -l >/dev/null
 sudo docker compose -f compose.yml ps
 sudo docker compose -f compose.yml exec -T readmates-api curl -fsS --max-time 5 http://127.0.0.1:8080/internal/health >/dev/null
@@ -30,12 +45,12 @@ READMATES_SMOKE_CLUB_HOST="${READMATES_SMOKE_CLUB_HOST:-}" \
 ./scripts/smoke-production-integrations.sh
 
 echo "==> [watch] recent backend errors"
-ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
+ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+  "sudo bash -s -- $(shell_quote "$REMOTE_DIR")" <<'EOF'
 set -euo pipefail
-cd "${REMOTE_DIR}"
-error_lines="\$(sudo docker compose -f compose.yml logs --since 10m readmates-api 2>/dev/null | grep -E 'ERROR|Exception|Caused by' || true)"
-if [ -n "\$error_lines" ]; then
-  echo "\$error_lines" | tail -120
+remote_dir="$1"
+cd "$remote_dir"
+if sudo docker compose -f compose.yml logs --since 10m readmates-api 2>/dev/null | grep -E 'ERROR|Exception|Caused by' | tail -120; then
   exit 1
 fi
 EOF
