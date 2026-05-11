@@ -1,8 +1,8 @@
-# BFF Host Header Policy — Implementation Plan (ADR-0011)
+# BFF Host Header Policy — Implementation Plan (ADR-0013)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** server-side `ClubContextResolver` + `AuthMeController` 분기 보강 + ADR-0011 본문 작성. Frontend / BFF / Vite proxy / DB schema 변경 없음. host fallback에서 lookup 실패한 경우를 *unscoped*로 처리해 dev/prod parity 확보.
+**Goal:** server-side `ClubContextResolver` + `AuthMeController` 분기 보강 + ADR-0013 본문 작성. Frontend / BFF / Vite proxy / DB schema 변경 없음. host fallback에서 lookup 실패한 경우를 *unscoped*로 처리해 dev/prod parity 확보.
 
 **Architecture:** 
 - `RequestedClubContext`에 `source: ClubContextSource` enum 추가 (SLUG / HOST_FALLBACK / NONE).
@@ -33,7 +33,7 @@
 - `server/src/test/kotlin/com/readmates/.../FrontendZodSchemaContractTest.kt` (response shape 변경 검증)
 
 신규 (docs):
-- `docs/development/adr/0011-bff-host-header-policy.md` (ADR 본문)
+- `docs/development/adr/0013-bff-host-header-policy.md` (ADR 본문)
 - (수정) `docs/development/adr/README.md` — 인덱스 행 추가
 
 수정 금지:
@@ -415,9 +415,9 @@ pnpm --dir front test:e2e
 
 ---
 
-## Task 7: ADR-0011 본문 작성
+## Task 7: ADR-0013 본문 작성
 
-**Files:** 신규 `docs/development/adr/0011-bff-host-header-policy.md`
+**Files:** 신규 `docs/development/adr/0013-bff-host-header-policy.md`
 
 - [ ] **Step 1: ADR 번호 확인**
 
@@ -482,7 +482,7 @@ ADR 템플릿(`docs/development/adr/template.md`) 그대로 사용. 섹션:
 `docs/operations/postmortems/2026-05-11-current-session-refresh-club-context.md`의 *Follow-up 갱신 이력* 표에 행 추가:
 
 ```markdown
-| 2026-05-11 | Action item #2 → Closed (ADR-0011 머지 완료) | `docs/development/adr/0011-bff-host-header-policy.md` |
+| 2026-05-11 | Action item #2 → Closed (ADR-0013 머지 완료) | `docs/development/adr/0013-bff-host-header-policy.md` |
 ```
 
 (post-mortem-followup-consolidation plan에서 이 이력 표를 먼저 만들었음을 가정. 없으면 그 plan 먼저 실행.)
@@ -537,7 +537,7 @@ pnpm --dir front lint && pnpm --dir front test && pnpm --dir front build && pnpm
 권고 commit 분리:
 
 1. **server 코드 + 테스트** — `feat(auth): differentiate slug vs host-fallback club context source` 또는 `fix(auth): treat host-only club lookup miss as unscoped`.
-2. **ADR-0011 + 인덱스 + post-mortem 갱신** — `docs(adr): add ADR-0011 BFF host header policy`.
+2. **ADR-0013 + 인덱스 + post-mortem 갱신** — `docs(adr): add ADR-0013 BFF host header policy`.
 3. **본 spec/plan** — `docs(superpowers): add 2026-05-11 BFF host header policy spec/plan`.
 
 각 commit은 *독립적으로 build/test 통과*해야 함. spec/plan만 별도 push 가능.
@@ -552,7 +552,7 @@ pnpm --dir front lint && pnpm --dir front test && pnpm --dir front build && pnpm
 |------|------|
 | 다른 controller의 `RequestedClubContext` 사용처가 컴파일 fail | Task 1 Step 5에서 사전 grep. Task 2 Step 3에서 모두 source 인자 추가 (default 없음). |
 | `resolveByUserUnscoped` 메서드가 기존에 없음 | Task 4 Step 2에서 옵션 X/Y 결정. 기존 dev 동작과 일치. |
-| ADR-0011 번호 충돌 (병행 ADR 세션이 0011~0012 reserved) | Task 7 Step 1에서 last 번호 확인 후 다음 빈 번호 재할당. spec/plan/post-mortem cross-link도 동기화. |
+| ADR-0013 번호 충돌 (병행 ADR 세션이 0011~0012 reserved) | Task 7 Step 1에서 last 번호 확인 후 다음 빈 번호 재할당. spec/plan/post-mortem cross-link도 동기화. |
 | Frontend Zod schema fixture가 변경 (membershipStatus가 더 자주 채워짐) | Task 6 Step 1에서 diff 검토. *추가만*은 schema optional이라 안전. |
 | Production 배포 후 *기존 dev에서 못 본 edge case* 발견 | Step 3 manual repro에서 한 번 더. e2e가 club-scoped path mount를 커버하므로 1차 안전망. |
 | `ClubNotFoundException`이 기존에 없거나 다른 의미로 사용됨 | Task 4 Step 3에서 grep으로 확인. 신규면 추가, 기존이면 의미 일치 여부 확인. |
@@ -563,6 +563,6 @@ pnpm --dir front lint && pnpm --dir front test && pnpm --dir front build && pnpm
 
 - [ ] Task 1~9 모두 완료.
 - [ ] Server / front 전체 테스트 통과.
-- [ ] ADR-0011 본문 작성 + 인덱스 갱신 + post-mortem 이력 추가.
+- [ ] ADR-0013 본문 작성 + 인덱스 갱신 + post-mortem 이력 추가.
 - [ ] Public release 게이트 green.
 - [ ] (선택) Production 배포 후 manual repro로 incident 재발 없음 확인.

@@ -52,7 +52,7 @@ grep -n "^## Action items\|^## Lessons" docs/operations/postmortems/2026-05-11-c
 | # | 항목 | 우선순위 | 오너 | 상태 | 트래킹 |
 |---|------|---------|------|------|-------|
 | 1 | dev/prod BFF 헤더 parity test 추가 (Vite proxy와 Pages function이 동일 입력에 동일 헤더를 생성함을 검증) | P1 | front | Deferred | 본 라운드 R2 재평가에서 잠복 incident 거의 없음 확인 (`docs/superpowers/specs/2026-05-11-postmortem-followup-consolidation-design.md`). 미래 BFF 헤더 의존 코드 추가 시 재평가. |
-| 2 | BFF host 헤더 정책 ADR 후속 — shared fallback domain일 때 host 헤더 미전송 | P2 | docs / front | In progress | `docs/superpowers/specs/2026-05-11-bff-host-header-policy-design.md` (ADR-0011 후보) |
+| 2 | BFF host 헤더 정책 ADR 후속 — shared fallback domain일 때 host 헤더 미전송 | P2 | docs / front | In progress | `docs/superpowers/specs/2026-05-11-bff-host-header-policy-design.md` (ADR-0013) |
 | 3 | 다른 라우트의 refresh path가 동일 패턴을 사용하는지 grep audit | P3 | front | Closed (2026-05-11) | `READMATES_ROUTE_REFRESH_EVENT`의 production 사용처는 `front/features/current-session/route/current-session-route.tsx` 단 1개임을 grep으로 확인. 다른 라우트의 `loadMemberAppAuth(args)`는 args forward로 초기 loader가 안전. |
 ```
 
@@ -67,7 +67,7 @@ grep -n "^## Action items\|^## Lessons" docs/operations/postmortems/2026-05-11-c
 
 | 일자 | 변경 | 출처 |
 |------|------|------|
-| 2026-05-11 | Action item #3 → Closed (grep audit 완료), #2 → In progress (ADR-0011 spec link), #1 → Deferred (시급성 재평가) | `docs/superpowers/specs/2026-05-11-postmortem-followup-consolidation-design.md` |
+| 2026-05-11 | Action item #3 → Closed (grep audit 완료), #2 → In progress (ADR-0013 spec link), #1 → Deferred (시급성 재평가) | `docs/superpowers/specs/2026-05-11-postmortem-followup-consolidation-design.md` |
 
 ```
 
@@ -256,7 +256,7 @@ done
 (B) **누락 ADR이 *오랜 기간 미작성* 상태** → case study에서 해당 link를 *임시 deferred 표기*로 변경:
 
 ```markdown
-- ADR-0011 (BFF host 헤더 정책) — *작성 예정, 본 라운드 후속*
+- ADR-0013 (BFF host 헤더 정책) — *작성 예정, 본 라운드 후속*
 ```
 
 또는 link를 제거하고 본문에 inline으로 결정 요지만 유지.
@@ -298,7 +298,7 @@ docs(ops): consolidate 2026-05-11 post-mortem follow-up
     READMATES_ROUTE_REFRESH_EVENT call site in current-session.
   * #2 (BFF host header ADR) → In progress; tracked by
     docs/superpowers/specs/2026-05-11-bff-host-header-policy-design.md
-    (ADR-0011 candidate).
+    (ADR-0013).
   * #1 (parity test) → Deferred; risk re-evaluation found low
     likelihood of latent incidents.
 - Add Follow-up 갱신 이력 section to record this round of updates.
@@ -345,7 +345,7 @@ git log --oneline --all --since="2026-05-11" -- docs/superpowers/specs docs/supe
 git status --short
 ```
 
-기대: 비어있음 (또는 ADR-0011 작업이 동시 진행 중이면 그 파일들만 untracked).
+기대: 비어있음 (또는 ADR-0013 작업이 동시 진행 중이면 그 파일들만 untracked).
 
 ---
 

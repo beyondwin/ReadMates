@@ -1,4 +1,4 @@
-# BFF Host Header Policy 설계 (ADR-0011 후보)
+# BFF Host Header Policy 설계 (ADR-0013)
 
 상태: draft (작성자 검토 대기)
 작성일: 2026-05-11
@@ -12,7 +12,7 @@
 
 본 spec은 두 가지 산출물을 만든다:
 
-1. **ADR-0011** — 결정의 영구 기록 (Accepted, 코드 변경 함께 머지).
+1. **ADR-0013** — 결정의 영구 기록 (Accepted, 코드 변경 함께 머지).
 2. **코드 변경** — server-side `AuthMeController` + `ClubContextResolver` 분기 보강 (선택지 B 채택). BFF는 변경 없음.
 
 ## 현재 맥락
@@ -202,7 +202,7 @@ return when {
 - `club_domains` 테이블 schema 변경.
 - 다른 controller (`SessionsController` 등)의 `requestedClubContext` 사용 패턴 일제 audit. 본 spec은 `AuthMeController`만 다룸. 다른 controller가 `supplied && context==null`을 어떻게 다루는지는 후속 audit.
 - Parity test (incident action item P1). 본 spec이 *server-side 정책*으로 그 클래스를 잠그면 P1 시급성 더 낮아짐.
-- ADR-0011 본문이 다루는 결정 외의 모든 follow-up.
+- ADR-0013 본문이 다루는 결정 외의 모든 follow-up.
 
 ## 영향 범위
 
@@ -236,7 +236,7 @@ return when {
 | `supplied`/`source` 추가가 다른 controller의 `requestedClubContext` 사용처에 영향 | 사용처 grep 후 *모두 같은 분기 패턴 적용 여부 결정*. 본 spec은 `AuthMeController`만, 다른 controller는 *기존 분기 그대로 유지 + 별도 audit*. ServerArchitectureBoundaryTest 통과 필수. |
 | host fallback에서 `resolveByUserUnscoped(userId)` 같은 새 메서드 도입이 도메인 모델 변경 | 실제로는 이미 dev에서 동등 동작 (header 없음 → unscoped). 새 코드가 아니라 *기존 unscoped path 재사용*. 메서드명/위치는 plan에서 정확히 정함. |
 | slug supplied + lookup 실패가 4xx로 변경되면서 *기존 클라이언트가 fallback 의존* | grep으로 client-side에서 명시적으로 잘못된 slug를 보내는 곳 확인. 0건이면 영향 없음. >0이면 별도 spec. |
-| ADR-0011이 ADR plan 0001~0010과 *동시 작성* — 번호 충돌 | 0011 번호는 ADR plan의 next-number 룰에 따라 reserved. plan 머지 순서에 따라 0011 또는 0012 재할당 가능. 본 spec은 *임시 ADR-0011 후보*로 표기. |
+| ADR-0013이 ADR plan 0001~0010과 *동시 작성* — 번호 충돌 | ADR README가 0011(jOOQ) / 0012(Redis)를 예약하고 있어 본 ADR은 0013으로 최종 할당됨. 본 spec은 ADR-0013으로 표기. |
 | Contract test가 `AuthMeResponse` shape 변경을 잡음 (false positive) | shape 변경이 *추가만* (membershipStatus가 더 자주 채워짐, optional은 여전 optional)이면 안전. *제거*는 없음. |
 | dev에서 미재현 클래스의 *다른* incident가 잠복 | 본 spec은 host header 정책에 한정. 다른 클래스는 별도 spec/parity test (post-mortem action item P1, 시급성 낮음 — Deferred). |
 
@@ -245,6 +245,6 @@ return when {
 - `ClubContextSource`를 `RequestedClubContext` 사용처 전체로 전파 — 다른 controller에서도 *명시적 vs implicit* 분기 활용. 별도 spec.
 - Parity test (incident P1) 재평가 — 본 ADR이 server-side에서 잠그면 시급성 더욱 낮아짐.
 - `club_domains` 테이블에 `is_shared_fallback` 컬럼 추가 검토 — host가 *명시적으로 fallback*인지 표기. 본 spec과 직교.
-- ADR-0011 본문 작성 후 ADR 인덱스(`docs/development/adr/README.md`) 갱신.
-- post-mortem 본문의 follow-up 갱신 이력에 한 줄 추가 — `Action item #2 → Closed (ADR-0011 머지 완료)`.
+- ADR-0013 본문 작성 후 ADR 인덱스(`docs/development/adr/README.md`) 갱신.
+- post-mortem 본문의 follow-up 갱신 이력에 한 줄 추가 — `Action item #2 → Closed (ADR-0013 머지 완료)`.
 - BFF host 헤더를 *디버그/로깅 전용*으로 명시 (응답 헤더에 echo 등) — 운영 가시성 보강. 별도 spec.
