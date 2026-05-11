@@ -6,7 +6,7 @@ ReadMates backend 배포는 한 번의 명시적 attempt로 기록합니다. Att
 
 | 상태 | 의미 | 다음 행동 |
 | --- | --- | --- |
-| `SUCCESS` | image pull/load, compose start, container health, BFF smoke, post-deploy watch가 통과 | release note 또는 운영 기록에 sanitized summary만 남김 |
+| `SUCCESS` | image pull/load, compose start, container health, BFF smoke가 통과하고, post-deploy watch가 통과했거나 명시적으로 skip됨 | release note 또는 운영 기록에 sanitized summary만 남김 |
 | `FAILED_PREFLIGHT` | env file, Docker/Compose, backup, registry 준비 부족 | 배포를 시작하지 않고 준비 조건 복구 |
 | `FAILED_DEPLOY` | runtime file install, image pull/load, compose config/up 실패 | compose 상태와 ledger 확인 후 rollback 판단 |
 | `FAILED_HEALTH` | `/internal/health`, BFF smoke, OAuth smoke, post-deploy watch 실패 | running image/env/log 조사 또는 이전 image 수동 rollback |
@@ -34,7 +34,7 @@ sudo chmod 0640 /var/log/readmates/deploy-attempts.jsonl
 | 필드 | 설명 | 민감도 |
 | --- | --- | --- |
 | `attemptId` | 배포 script가 생성한 UTC timestamp 기반 id | 낮음 |
-| `event` | `STARTED`, `PREFLIGHT_PASSED`, `IMAGE_ID_RESOLVED`, `IMAGE_RESOLVED`, `IMAGE_VERIFIED`, `STACK_STARTED`, `HEALTH_PASSED`, `BFF_SMOKE_PASSED`, `SUCCESS`, `FAILED` | 낮음 |
+| `event` | `STARTED`, `PREFLIGHT_PASSED`, `IMAGE_ID_RESOLVED`, `IMAGE_RESOLVED`, `IMAGE_VERIFIED`, `STACK_STARTED`, `HEALTH_PASSED`, `BFF_SMOKE_PASSED`, `POST_DEPLOY_WATCH_PASSED`, `POST_DEPLOY_WATCH_SKIPPED`, `SUCCESS`, `FAILED` | 낮음 |
 | `stage` | 실패 또는 진행 중 stage | 낮음 |
 | `at` | UTC ISO-8601 timestamp | 낮음 |
 | `image` | `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z` 같은 image reference | 낮음. private repo name이면 외부 공유 금지 |

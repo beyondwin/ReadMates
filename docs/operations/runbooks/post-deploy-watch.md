@@ -16,6 +16,15 @@ CADDY_SITE=api.example.com \
 
 watch를 끈 경우 같은 release 작업 안에서 `deploy/oci/watch-compose-post-deploy.sh`를 수동 실행합니다.
 
+```bash
+READMATES_SMOKE_BASE_URL=https://readmates.pages.dev \
+READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
+VM_PUBLIC_IP='<vm-public-ip>' \
+SSH_KEY='<path-to-ssh-key>' \
+REMOTE_USER='<remote-user>' \
+./deploy/oci/watch-compose-post-deploy.sh
+```
+
 ## 기본 실행
 
 ```bash

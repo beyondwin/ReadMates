@@ -229,8 +229,8 @@ mark_stage "bff-smoke"
 curl -fsS "${APP_BASE_URL}/api/bff/api/auth/me" >/dev/null
 remote_ledger_append "BFF_SMOKE_PASSED" "RUNNING" "path=/api/bff/api/auth/me"
 
+mark_stage "post-deploy-watch"
 if [ "$READMATES_RUN_POST_DEPLOY_WATCH" = "true" ]; then
-  mark_stage "post-deploy-watch"
   READMATES_SMOKE_BASE_URL="$APP_BASE_URL" \
   READMATES_SMOKE_AUTH_BASE_URL="${READMATES_SMOKE_AUTH_BASE_URL:-$APP_BASE_URL}" \
   VM_PUBLIC_IP="$VM_PUBLIC_IP" \
@@ -239,10 +239,12 @@ if [ "$READMATES_RUN_POST_DEPLOY_WATCH" = "true" ]; then
   SSH_STRICT_HOST_KEY_CHECKING="$SSH_STRICT_HOST_KEY_CHECKING" \
   ./deploy/oci/watch-compose-post-deploy.sh
   remote_ledger_append "POST_DEPLOY_WATCH_PASSED" "RUNNING" "watch=true"
+else
+  remote_ledger_append "POST_DEPLOY_WATCH_SKIPPED" "RUNNING" "watch=${READMATES_RUN_POST_DEPLOY_WATCH}"
 fi
 
 mark_stage "complete"
-remote_ledger_append "SUCCESS" "SUCCESS" "image=${IMAGE_TAG}"
+remote_ledger_append "SUCCESS" "SUCCESS" "image=${IMAGE_TAG} watch=${READMATES_RUN_POST_DEPLOY_WATCH}"
 trap - ERR
 
 echo ""
