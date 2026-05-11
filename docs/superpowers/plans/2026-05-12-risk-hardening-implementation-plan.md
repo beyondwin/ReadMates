@@ -44,7 +44,7 @@
 **Files:**
 - Read only: repository status and target files.
 
-- [ ] **Step 1: Confirm branch state and unrelated edits**
+- [x] **Step 1: Confirm branch state and unrelated edits**
 
 Run:
 
@@ -54,7 +54,7 @@ git status --short --branch
 
 Expected: the branch may be ahead of `origin/main`; unrelated existing edits such as `.gitignore` must be preserved.
 
-- [ ] **Step 2: Confirm the current risk facts**
+- [x] **Step 2: Confirm the current risk facts**
 
 Run:
 
@@ -73,7 +73,7 @@ Expected: `RateLimitFilter` still only trusts legacy BFF secret, `BffSecretFilte
 - Modify: `server/src/test/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilterTest.kt`
 - Modify: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/RateLimitFilter.kt`
 
-- [ ] **Step 1: Add failing tests for configured BFF secret list**
+- [x] **Step 1: Add failing tests for configured BFF secret list**
 
 Append these tests to `RateLimitFilterTest` before the helper methods:
 
@@ -163,7 +163,7 @@ fun `configured bff secret list takes priority over legacy bff secret`() {
 }
 ```
 
-- [ ] **Step 2: Run the targeted test and confirm failure**
+- [x] **Step 2: Run the targeted test and confirm failure**
 
 Run:
 
@@ -173,7 +173,7 @@ Run:
 
 Expected: compilation fails because `RateLimitFilter` does not yet expose `configuredBffSecretsRaw`.
 
-- [ ] **Step 3: Update RateLimitFilter constructor and trusted secret parsing**
+- [x] **Step 3: Update RateLimitFilter constructor and trusted secret parsing**
 
 In `RateLimitFilter.kt`, replace the constructor secret fields with:
 
@@ -230,7 +230,7 @@ private fun secretMatchesAny(provided: String, expectedSecrets: List<String>): B
 }
 ```
 
-- [ ] **Step 4: Run the targeted test and confirm pass**
+- [x] **Step 4: Run the targeted test and confirm pass**
 
 Run:
 
@@ -240,7 +240,7 @@ Run:
 
 Expected: all `RateLimitFilterTest` tests pass.
 
-- [ ] **Step 5: Commit the rate limit slice**
+- [x] **Step 5: Commit the rate limit slice**
 
 Run:
 
@@ -260,7 +260,7 @@ Expected: one focused commit. If this work is being batched intentionally, recor
 - Modify: `server/src/test/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilterAuditTest.kt`
 - Modify: `docs/deploy/oci-backend.md`
 
-- [ ] **Step 1: Replace the primary audit expectation with default rotation-only behavior**
+- [x] **Step 1: Replace the primary audit expectation with default rotation-only behavior**
 
 In `BffSecretFilterAuditTest.kt`, replace `primary secret records primary alias` with:
 
@@ -288,7 +288,7 @@ fun `default audit mode skips primary secret`() {
 }
 ```
 
-- [ ] **Step 2: Add tests for all and off audit modes**
+- [x] **Step 2: Add tests for all and off audit modes**
 
 Add these tests to `BffSecretFilterAuditTest.kt`:
 
@@ -340,7 +340,7 @@ fun `off audit mode skips secondary secret`() {
 }
 ```
 
-- [ ] **Step 3: Run the audit test and confirm failure**
+- [x] **Step 3: Run the audit test and confirm failure**
 
 Run:
 
@@ -350,7 +350,7 @@ Run:
 
 Expected: compilation fails because `auditModeRaw` does not exist, or the default primary behavior still records.
 
-- [ ] **Step 4: Create BffSecretAuditMode**
+- [x] **Step 4: Create BffSecretAuditMode**
 
 Create `BffSecretAuditMode.kt`:
 
@@ -383,7 +383,7 @@ enum class BffSecretAuditMode {
 }
 ```
 
-- [ ] **Step 5: Create the bounded executor bean**
+- [x] **Step 5: Create the bounded executor bean**
 
 Create `BffSecretAuditExecutorConfig.kt`:
 
@@ -409,7 +409,7 @@ class BffSecretAuditExecutorConfig {
 }
 ```
 
-- [ ] **Step 6: Update BffSecretFilter constructor imports and fields**
+- [x] **Step 6: Update BffSecretFilter constructor imports and fields**
 
 In `BffSecretFilter.kt`, remove:
 
@@ -441,7 +441,7 @@ Add this field near `secrets`:
 private val auditMode = BffSecretAuditMode.from(auditModeRaw)
 ```
 
-- [ ] **Step 7: Replace auditAsync**
+- [x] **Step 7: Replace auditAsync**
 
 Replace `auditAsync` in `BffSecretFilter.kt` with:
 
@@ -470,7 +470,7 @@ private fun auditAsync(alias: String, request: HttpServletRequest) {
 }
 ```
 
-- [ ] **Step 8: Add executor rejection coverage**
+- [x] **Step 8: Add executor rejection coverage**
 
 Add this test to `BffSecretFilterAuditTest.kt`:
 
@@ -500,7 +500,7 @@ fun `audit executor rejection does not affect response`() {
 }
 ```
 
-- [ ] **Step 9: Run the audit tests**
+- [x] **Step 9: Run the audit tests**
 
 Run:
 
@@ -510,7 +510,7 @@ Run:
 
 Expected: all audit tests pass.
 
-- [ ] **Step 10: Document audit mode and retention**
+- [x] **Step 10: Document audit mode and retention**
 
 In `docs/deploy/oci-backend.md`, add a short operational note near existing BFF secret rotation guidance:
 
@@ -529,7 +529,7 @@ where used_at < utc_timestamp() - interval 30 day;
 ```
 ````
 
-- [ ] **Step 11: Commit the audit slice**
+- [x] **Step 11: Commit the audit slice**
 
 Run:
 
@@ -547,7 +547,7 @@ Expected: one focused commit. If the implementation is batched, note these files
 - Modify: `scripts/public-release-check.sh`
 - Modify: `scripts/verify-public-release-fixtures.sh`
 
-- [ ] **Step 1: Add a failing fixture for frontend artifact paths**
+- [x] **Step 1: Add a failing fixture for frontend artifact paths**
 
 In `scripts/verify-public-release-fixtures.sh`, add a fixture block after the existing forbidden-path fixture checks:
 
@@ -562,7 +562,7 @@ fi
 assert_file_contains "$artifact_fixture.out" "forbidden candidate path: front/test-results/.last-run.json"
 ```
 
-- [ ] **Step 2: Run the fixture script and confirm failure**
+- [x] **Step 2: Run the fixture script and confirm failure**
 
 Run:
 
@@ -572,7 +572,7 @@ Run:
 
 Expected: the new fixture fails because `front/test-results` is not yet forbidden.
 
-- [ ] **Step 3: Exclude generated frontend artifacts from candidate copy**
+- [x] **Step 3: Exclude generated frontend artifacts from candidate copy**
 
 In `scripts/build-public-release-candidate.sh`, update the `copy_dir "front"` call:
 
@@ -587,7 +587,7 @@ copy_dir "front" \
   --exclude='/.nyc_output/'
 ```
 
-- [ ] **Step 4: Reject generated frontend artifacts in public-release-check**
+- [x] **Step 4: Reject generated frontend artifacts in public-release-check**
 
 In `scripts/public-release-check.sh`, add these cases inside `is_forbidden_path` near the existing `front/dist` checks:
 
@@ -598,7 +598,7 @@ front/coverage|front/coverage/*) return 0 ;;
 front/.nyc_output|front/.nyc_output/*) return 0 ;;
 ```
 
-- [ ] **Step 5: Run script syntax checks**
+- [x] **Step 5: Run script syntax checks**
 
 Run:
 
@@ -608,7 +608,7 @@ bash -n scripts/build-public-release-candidate.sh scripts/public-release-check.s
 
 Expected: no syntax output and exit code 0.
 
-- [ ] **Step 6: Run fixture verification**
+- [x] **Step 6: Run fixture verification**
 
 Run:
 
@@ -618,7 +618,7 @@ Run:
 
 Expected: fixture verification passes, including the new frontend artifact path case.
 
-- [ ] **Step 7: Build and scan the public release candidate**
+- [x] **Step 7: Build and scan the public release candidate**
 
 Run:
 
@@ -629,7 +629,7 @@ Run:
 
 Expected: candidate builds and public-release check passes.
 
-- [ ] **Step 8: Confirm excluded paths are absent from the candidate**
+- [x] **Step 8: Confirm excluded paths are absent from the candidate**
 
 Run:
 
@@ -639,7 +639,7 @@ find .tmp/public-release-candidate/front \( -path '*/test-results*' -o -path '*/
 
 Expected: no output.
 
-- [ ] **Step 9: Commit the release safety slice**
+- [x] **Step 9: Commit the release safety slice**
 
 Run:
 
@@ -659,7 +659,7 @@ Expected: one focused commit.
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminAdapter.kt`
 - Test: `server/src/test/kotlin/com/readmates/club/api/PlatformAdminControllerTest.kt`
 
-- [ ] **Step 1: Add an architecture test for persistence Web/HTTP imports**
+- [x] **Step 1: Add an architecture test for persistence Web/HTTP imports**
 
 In `ServerArchitectureBoundaryTest.kt`, add this test after `persistence adapters require jdbc template directly`:
 
@@ -689,7 +689,7 @@ fun `persistence adapters do not depend on spring web http types`() {
 }
 ```
 
-- [ ] **Step 2: Run architecture test and confirm failure**
+- [x] **Step 2: Run architecture test and confirm failure**
 
 Run:
 
@@ -699,7 +699,7 @@ Run:
 
 Expected: fails with `JdbcPlatformAdminAdapter.kt` importing `org.springframework.http.HttpStatus` and `org.springframework.web.server.ResponseStatusException`.
 
-- [ ] **Step 3: Add port result type**
+- [x] **Step 3: Add port result type**
 
 In `PlatformAdminPorts.kt`, add:
 
@@ -723,7 +723,7 @@ Change `UpdateClubDomainProvisioningPort.updateClubDomainProvisioning` return ty
 ): PlatformAdminClubDomain?
 ```
 
-- [ ] **Step 4: Map create port outcomes in PlatformAdminService**
+- [x] **Step 4: Map create port outcomes in PlatformAdminService**
 
 Add import:
 
@@ -754,7 +754,7 @@ return when (
 }
 ```
 
-- [ ] **Step 5: Map nullable update outcome in PlatformAdminService**
+- [x] **Step 5: Map nullable update outcome in PlatformAdminService**
 
 Replace the return of `updateClubDomainProvisioningPort.updateClubDomainProvisioning(...)` with:
 
@@ -768,7 +768,7 @@ return updateClubDomainProvisioningPort.updateClubDomainProvisioning(
 ) ?: throw PlatformAdminException(PlatformAdminError.CLUB_DOMAIN_NOT_FOUND, "Club domain not found")
 ```
 
-- [ ] **Step 6: Update JdbcPlatformAdminAdapter imports**
+- [x] **Step 6: Update JdbcPlatformAdminAdapter imports**
 
 In `JdbcPlatformAdminAdapter.kt`, add:
 
@@ -783,7 +783,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 ```
 
-- [ ] **Step 7: Return port results from createClubDomain**
+- [x] **Step 7: Return port results from createClubDomain**
 
 Change the method return type to:
 
@@ -825,7 +825,7 @@ return CreateClubDomainResult.Created(
 )
 ```
 
-- [ ] **Step 8: Return nullable from updateClubDomainProvisioning**
+- [x] **Step 8: Return nullable from updateClubDomainProvisioning**
 
 Change the method return type to:
 
@@ -847,7 +847,7 @@ Replace the final return:
 return loadClubDomain(domainId)
 ```
 
-- [ ] **Step 9: Run compile-focused platform admin tests**
+- [x] **Step 9: Run compile-focused platform admin tests**
 
 Run:
 
@@ -857,7 +857,7 @@ Run:
 
 Expected: architecture and platform admin controller tests pass. If controller coverage reveals a changed status, adjust `PlatformAdminService` mapping, not the expected public API status.
 
-- [ ] **Step 10: Search for forbidden persistence imports**
+- [x] **Step 10: Search for forbidden persistence imports**
 
 Run:
 
@@ -867,7 +867,7 @@ rg -n "ResponseStatusException|org\\.springframework\\.http" server/src/main/kot
 
 Expected: no output.
 
-- [ ] **Step 11: Commit the platform admin boundary slice**
+- [x] **Step 11: Commit the platform admin boundary slice**
 
 Run:
 
@@ -883,7 +883,7 @@ Expected: one focused commit.
 **Files:**
 - Verify all modified files.
 
-- [ ] **Step 1: Run server tests**
+- [x] **Step 1: Run server tests**
 
 Run:
 
@@ -893,7 +893,7 @@ Run:
 
 Expected: server tests pass.
 
-- [ ] **Step 2: Run frontend checks because BFF behavior and release checks touch frontend-adjacent surfaces**
+- [x] **Step 2: Run frontend checks because BFF behavior and release checks touch frontend-adjacent surfaces**
 
 Run:
 
@@ -905,7 +905,7 @@ pnpm --dir front build
 
 Expected: lint, tests, and build pass.
 
-- [ ] **Step 3: Run E2E because auth/BFF trust behavior changed**
+- [x] **Step 3: Run E2E because auth/BFF trust behavior changed**
 
 Run:
 
@@ -915,7 +915,7 @@ pnpm --dir front test:e2e
 
 Expected: E2E tests pass.
 
-- [ ] **Step 4: Run public release checks**
+- [x] **Step 4: Run public release checks**
 
 Run:
 
@@ -927,7 +927,7 @@ Run:
 
 Expected: candidate build, candidate scan, and fixture verification pass.
 
-- [ ] **Step 5: Run docs whitespace check**
+- [x] **Step 5: Run docs whitespace check**
 
 Run:
 
@@ -937,7 +937,7 @@ git diff --check -- docs/deploy/oci-backend.md docs/superpowers/specs/2026-05-12
 
 Expected: no whitespace errors.
 
-- [ ] **Step 6: Run targeted public-safety scans for changed docs**
+- [x] **Step 6: Run targeted public-safety scans for changed docs**
 
 Run:
 
@@ -947,7 +947,7 @@ rg -n '(/)Users/|readmates[.]kr|ocid1[.]|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_
 
 Expected: no output.
 
-- [ ] **Step 7: Review git diff**
+- [x] **Step 7: Review git diff**
 
 Run:
 
@@ -964,7 +964,7 @@ Expected: diff is limited to the risk-hardening files listed in this plan plus e
 - No required code files.
 - Optional PR body or handoff note.
 
-- [ ] **Step 1: Capture remaining validation limits**
+- [x] **Step 1: Capture remaining validation limits**
 
 If a local tool is missing, record the exact command and reason. Example:
 
@@ -974,7 +974,7 @@ Skipped: shellcheck, because it is not installed in the local environment.
 
 Expected: no skipped check is described as passing.
 
-- [ ] **Step 2: Confirm unrelated work remains untouched**
+- [x] **Step 2: Confirm unrelated work remains untouched**
 
 Run:
 
@@ -984,7 +984,7 @@ git status --short --branch
 
 Expected: existing unrelated files are still present if they were present before implementation, and no unrelated file was reverted.
 
-- [ ] **Step 3: Prepare PR summary**
+- [x] **Step 3: Prepare PR summary**
 
 Use this summary format:
 
