@@ -35,13 +35,13 @@ sudo chmod 0640 /var/log/readmates/deploy-attempts.jsonl
 | --- | --- | --- |
 | `attemptId` | 배포 script가 생성한 UTC timestamp 기반 id | 낮음 |
 | `event` | `STARTED`, `PREFLIGHT_PASSED`, `IMAGE_ID_RESOLVED`, `IMAGE_RESOLVED`, `IMAGE_VERIFIED`, `STACK_STARTED`, `HEALTH_PASSED`, `BFF_SMOKE_PASSED`, `POST_DEPLOY_WATCH_PASSED`, `POST_DEPLOY_WATCH_SKIPPED`, `SUCCESS`, `FAILED` | 낮음 |
+| `status` | `RUNNING`, `SUCCESS`, `FAILED` 중 하나 | 낮음 |
 | `stage` | 실패 또는 진행 중 stage | 낮음 |
 | `at` | UTC ISO-8601 timestamp | 낮음 |
-| `image` | `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z` 같은 image reference | 낮음. private repo name이면 외부 공유 금지 |
-| `repoDigest` | registry digest. 없으면 생략 | 낮음 |
-| `imageId` | Docker image id | 낮음 |
-| `exitCode` | 실패 exit code | 낮음 |
 | `durationSeconds` | attempt 소요 시간 | 낮음 |
+| `detail` | 선택 필드. `image=...`, `imageSource=...`, `imageId=...`, `expectedImageId=... runningImageId=...`, `services=compose`, `endpoint=...`, `path=...`, `watch=true/false`, `exitCode=...` 같은 짧은 문자열 | 낮음. operator가 제공한 image 이름이나 detail 값이 public-safe일 때만 외부 공유 가능 |
+
+현재 ledger는 registry digest를 별도 필드로 기록하지 않습니다. `image`, `imageId`, `exitCode`도 top-level field가 아니라 필요한 event의 `detail` 문자열 안에만 기록합니다.
 
 ## Image verification
 
