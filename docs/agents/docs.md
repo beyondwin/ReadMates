@@ -9,7 +9,7 @@ Current source-of-truth order:
 - Current code, config, tests, migrations, and scripts: factual source of truth for behavior and commands.
 - `docs/development/architecture.md`: current product and technical boundaries when architecture or API behavior is unclear.
 
-- `README.md`: portfolio-facing overview, concise product and architecture summary, and links to detailed docs.
+- `README.md`: entry-point overview, concise product and architecture summary, and links to detailed docs.
 - `docs/development/`: local setup, testing, architecture, and contributor-facing technical guidance.
 - `docs/deploy/`: public-safe deployment runbooks and release-safety policy.
 - `scripts/README.md`: public release helper behavior and scanner expectations.

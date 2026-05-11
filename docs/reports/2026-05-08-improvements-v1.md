@@ -8,7 +8,7 @@
 
 ## 프로젝트 개요
 
-ReadMates는 멀티 클럽 정기 독서모임의 운영 워크플로우(공개 사이트, 멤버 앱, 호스트 운영, 공개 기록, 참석자 전용 피드백 문서)를 하나의 멤버십 풀스택 웹 서비스로 묶은 오픈소스 친화 SaaS 형태의 사이드 프로젝트입니다. React 19 + Vite SPA가 Cloudflare Pages에 배포되고, Pages Functions가 BFF/OAuth 프록시 역할을 하며, Kotlin/Spring Boot 4 API가 OCI Compute에서 MySQL 8을 source of truth로 운영합니다. 옵션 계층으로 Redis(rate limit/cache), Redpanda/Kafka(notification outbox→relay→consumer), Micrometer/Prometheus, OCI Email Delivery, OCI Object Storage backup, Caddy reverse proxy를 포함합니다.
+ReadMates는 멀티 클럽 정기 독서모임의 운영 워크플로우(공개 사이트, 멤버 앱, 호스트 운영, 공개 기록, 참석자 전용 피드백 문서)를 하나의 멤버십 풀스택 웹 서비스로 묶은 오픈소스 친화 SaaS 형태의 운영형 프로젝트입니다. React 19 + Vite SPA가 Cloudflare Pages에 배포되고, Pages Functions가 BFF/OAuth 프록시 역할을 하며, Kotlin/Spring Boot 4 API가 OCI Compute에서 MySQL 8을 source of truth로 운영합니다. 옵션 계층으로 Redis(rate limit/cache), Redpanda/Kafka(notification outbox→relay→consumer), Micrometer/Prometheus, OCI Email Delivery, OCI Object Storage backup, Caddy reverse proxy를 포함합니다.
 
 코드는 클린 아키텍처 경계(`adapter.in.web → application.port.in → application.service → application.port.out → adapter.out.persistence`)를 ArchUnit 기반 `ServerArchitectureBoundaryTest`와 frontend `frontend-boundaries.test.ts`로 강제하며, 공개 저장소 안전성을 `gitleaks`/release candidate scanner로 가드합니다. 인증은 Google OAuth + 서버측 `readmates_session` 쿠키, BFF는 `X-Readmates-Bff-Secret` + Origin/Referer 검증으로 신뢰 경계를 명시합니다.
 
@@ -148,7 +148,7 @@ ReadMates는 멀티 클럽 정기 독서모임의 운영 워크플로우(공개 
 - **(P1: BFF secret rotation)** `BffSecretFilter`는 단일 secret만 받는다. rotation 중 양쪽 secret을 동시에 받기 위해 `READMATES_BFF_SECRETS=secret-a,secret-b` 형태로 multi-secret allowlist 지원을 검토(rotation window를 0초로 줄이지 않아도 zero-downtime rotation 가능).
 - **(P1: 1xx/3xx redirect 처리)** Cloudflare Pages Functions BFF가 `redirect: "manual"`로 upstream redirect를 그대로 패스하지만, 그 redirect Location의 host가 BFF host가 아닐 수 있다(`functions/api/bff/[[path]].ts:158`). Spring API가 의도적으로 redirect를 보내지 않더라도 `Location` host allowlist 또는 redirect 자체를 reject하는 가드를 BFF에 추가하면 SSRF/open-redirect 가능성을 줄일 수 있다.
 - **(P2: rate limit fail-open 명시)** `application.yml`의 `readmates.rate-limit.fail-closed-sensitive: false`가 기본이다. invitation accept(`sensitive = true`)와 feedback upload는 fail-closed로 두고, 그 외 read flow는 fail-open으로 명시한 정책 표를 `docs/development/architecture.md` "Optional Redis 계층"에 추가.
-- **(P2: feedback 문서 multipart MIME 검사)** 현재 size/UTF-8/filename은 검사하지만 multipart `Content-Disposition`의 `filename*` UTF-8 encoded 변형, RTL override 문자, zero-width 문자 등 화이트리스트 outside 확장자를 우회하는 입력은 추가로 normalize 후 검사. (현실 위험은 낮으나 portfolio-level safe-by-default 향상.)
+- **(P2: feedback 문서 multipart MIME 검사)** 현재 size/UTF-8/filename은 검사하지만 multipart `Content-Disposition`의 `filename*` UTF-8 encoded 변형, RTL override 문자, zero-width 문자 등 화이트리스트 outside 확장자를 우회하는 입력은 추가로 normalize 후 검사. (현실 위험은 낮으나 공개 기본값의 안전성 향상.)
 - **(P2: log redaction)** `BffSecretFilter`/`RateLimitFilter`가 `request.remoteAddr`를 그대로 로깅한다(`BffSecretFilter.kt:46-50`). production에서 ALB/Cloudflare 통과 후 `remoteAddr`이 PII가 아닐 가능성이 높지만, IP는 hash 후 로그하는 `RateLimitFilter`의 패턴을 BFF rejection log에도 적용해 일관성 유지.
 - **(P2: secrets in env)** `.env.example`이 `<oci-smtp-username>`, `<google-oauth-client-secret>` placeholder를 두지만 운영자가 실제 값을 root `.env`에 두는 흐름이다. `docs/deploy/security-public-repo.md` 또는 `compose.yml` 위에 "운영 secret은 GHCR/Cloudflare secret store/OCI vault에 두고 root `.env`는 development 전용" 1문 명시.
 
@@ -186,7 +186,7 @@ ReadMates는 멀티 클럽 정기 독서모임의 운영 워크플로우(공개 
 
 - README, AGENTS.md, `docs/agents/{front, server, design, docs}.md`, `docs/development/{architecture, local-setup, technical-decisions, test-guide, versioning, release-management}.md`, `docs/deploy/{cloudflare-pages, multi-club-domains, oci-backend, oci-mysql-heatwave, security-public-repo, compose-stack}.md`까지 풍부한 문서 구조.
 - `pnpm --dir front <cmd>`/`./server/gradlew -p server <cmd>` 패턴을 읽기 쉽게 정리.
-- `.gitleaks.toml`, public release candidate scanner, smoke production integration script 등 portfolio 공개 안전성을 자동화.
+- `.gitleaks.toml`, public release candidate scanner, smoke production integration script 등 공개 저장소 안전성을 자동화.
 
 ### 개선사항
 

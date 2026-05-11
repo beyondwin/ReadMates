@@ -15,12 +15,12 @@
 
 ReadMates는 React 19 + Vite SPA(Cloudflare Pages) → Cloudflare Pages Functions BFF →
 Spring Boot 4 + Kotlin 2.2 API → MySQL 8 / Redis(opt) / Redpanda(opt) 흐름의 멀티 클럽
-독서모임 SaaS 형태 사이드 프로젝트입니다. 코드 베이스는 hexagonal/clean 아키텍처
+독서모임 SaaS 형태의 운영형 프로젝트입니다. 코드 베이스는 hexagonal/clean 아키텍처
 경계를 ArchUnit + frontend boundary 테스트로 강제하고, public-safe API 오류 계약,
 multi-club context resolve, BFF 이중 가드, 알림 outbox→Kafka relay→consumer→delivery
 파이프라인까지 한 monorepo 안에 자급적으로 구현되어 있습니다. 서버 251개 / 28.6k LOC,
 프런트 259개 / 28.4k LOC, Flyway 마이그레이션 16개, 서버 테스트 107개라는 규모에 비해
-"개인이 portfolio-grade로 끌어올리려는" 의지가 코드 곳곳에 보입니다.
+단일 운영자가 운영 수준으로 끌어올리려는 의도가 코드 곳곳에 보입니다.
 
 다만 v1이 이미 도출한 거대 파일 분해/보안 history 정리/CI 가드 추가의 **다음 단계**
 로서, 도메인 모델·트랜잭션·관측성 측면의 의도되지 않은 결합과, 프런트엔드 단일
@@ -315,7 +315,7 @@ Frontend는 이미 archive route loader를 통해 single fetch이므로, server 
 
 `docs/development/architecture.md:174` "Redis는 선택 계층이며 기본 설정에서는 꺼져 있다."
 public 사이트는 cache 없이 매번 MySQL hit이다. 운영 cost가 작은 동안은 OK이지만,
-포트폴리오로 공개되어 inbound traffic이 늘어나면 **public-only cache(Cloudflare cache
+외부 트래픽이 늘어나면 **public-only cache(Cloudflare cache
 header)**가 더 합리적이다. Spring `/api/public/**` 응답에 `Cache-Control:
 public, s-maxage=120, stale-while-revalidate=600`을 붙이면 Cloudflare CDN이 그대로
 캐싱한다(Pages Functions가 `Cache-Control`을 forward 하는지 확인 필요). Redis 활성화
@@ -651,10 +651,10 @@ KakaoTalk 추가 시 check constraint 변경이 필요. **enum 확장은 V23 mig
 V21 club_domains/platform_admins/audit_events 도입으로 멀티 클럽 인프라가 schema에는
 있지만, **UI상 클럽 생성 → 호스트 초대 → 첫 세션 → 도메인 alias activation까지의
 end-to-end 흐름**이 한 화면에서 진행되지 않는 것으로 보인다(`PlatformAdminRoute`만
-있음). "클럽 셋업 wizard"(5분 안에 club 운영 시작)는 portfolio 방문자가 즉시 가치를
+있음). "클럽 셋업 wizard"(5분 안에 club 운영 시작)는 신규 운영자가 즉시 가치를
 체험하게 하는 PR로서 매우 효과적이다.
 
-#### 8.5 한국어/영어 i18n 부재가 곧 portfolio 진입 장벽이 됨
+#### 8.5 한국어/영어 i18n 부재가 곧 운영 사이트 진입 장벽이 됨
 
 `globals.css`/`mobile.css` 안의 한국어 string, server `defaultApiErrorMessage()`의 한국어
 copy 모두 hard-coded. 현재 audience가 한국어 사용자 위주라면 적절하지만, 영어 i18n
@@ -697,7 +697,7 @@ placeholder가 `<google-oauth-client-secret>` 같은 angle bracket이다. 실제
 
 | 우선순위 | 항목 | 영역 | 난이도 | 임팩트 | 이유 |
 |---------|------|------|--------|--------|------|
-| P0 | 보안 history scrub 또는 fresh public repo (v1 TASK-001) | 보안 | M | High | 공개 차단 해소가 모든 portfolio 가치의 전제 |
+| P0 | 보안 history scrub 또는 fresh public repo (v1 TASK-001) | 보안 | M | High | 공개 차단 해소가 모든 공개 저장소 전환의 전제 |
 | P0 | Backlog Gauge → cached snapshot (3.1) | 관측성 | S | High | Prometheus scrape마다 DB 4쿼리 즉시 감소 |
 | P1 | dynamic allowed origins resolver (2.1) | 보안/멀티클럽 | M | High | 새 클럽 alias 활성화 시 backend 재시작 불필요 |
 | P1 | UseCase 인터페이스 + service split (1.1) | 아키텍처 | M | Medium | 향후 controller가 lifecycle/draft/read 의존 명시 |
@@ -715,7 +715,7 @@ placeholder가 `<google-oauth-client-secret>` 같은 angle bracket이다. 실제
 | P2 | BFF rotation audit table (2.2) | 보안 | M | Low | 운영 procedure 명시 |
 | P2 | IP hash salt 회전 (2.5) | 보안 | S | Low | tracking surface 감소 |
 | P3 | Web Push/Slack/Kakao 채널 확장 design (8.2) | 제품 | L | Medium | 첫 채널 확장 PR과 동시 |
-| P3 | 클럽 셋업 wizard (8.4) | 제품 | L | High | portfolio first-impression 극대화 |
+| P3 | 클럽 셋업 wizard (8.4) | 제품 | L | High | 운영 사이트 첫 사용 경험 개선 |
 | P3 | i18n 영어 1단계 (8.5) | 제품 | L | Medium | reach 확장 |
 | P3 | server multi-module split (v1 TASK-074) | 아키텍처 | XL | Medium | 5에서 결정 후 |
 

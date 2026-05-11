@@ -2,7 +2,7 @@
 
 Cloudflare Pages는 Vite SPA와 같은 origin에서 동작하는 BFF/OAuth proxy 함수를 배포합니다.
 
-상위 배포 허브는 [README.md](README.md)입니다. 승인된 포트폴리오 데모 URL은 `https://readmates.pages.dev`입니다. 멀티 클럽 도메인 운영 절차는 [multi-club-domains.md](multi-club-domains.md)를 함께 확인합니다.
+상위 배포 허브는 [README.md](README.md)입니다. 운영 사이트 URL은 `https://readmates.pages.dev`입니다. 멀티 클럽 도메인 운영 절차는 [multi-club-domains.md](multi-club-domains.md)를 함께 확인합니다.
 
 이 runbook은 Pages project 설정, Functions routing, Spring origin 설정, OAuth redirect URI가 서로 맞을 때 완료입니다. 배포 후에는 SPA deep route, `/api/bff/api/auth/me`, OAuth start redirect, domain marker, club-scoped public API를 확인합니다.
 
@@ -23,7 +23,7 @@ Cloudflare 계정 ID, API token, custom domain 목록, production secret 값은 
 
 Cloudflare 프로젝트 root가 `front`이므로 Pages Functions는 `front/functions`에서 배포됩니다.
 
-`https://readmates.pages.dev`는 무료 플랜에서도 항상 유지하는 fallback과 preview origin입니다. 클럽 공개 사이트는 기본적으로 `https://readmates.pages.dev/clubs/<club-slug>`로 접근할 수 있어야 하며, primary domain이나 등록된 club host를 추가해도 이 fallback을 제거하지 않습니다.
+`https://readmates.pages.dev`는 무료 플랜에서도 항상 유지하는 운영 origin이자 path fallback입니다. 클럽 공개 사이트는 기본적으로 `https://readmates.pages.dev/clubs/<club-slug>`로 접근할 수 있어야 하며, primary domain이나 등록된 club host를 추가해도 이 fallback을 제거하지 않습니다.
 
 ## 현재 함수 라우트
 

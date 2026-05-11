@@ -12,7 +12,7 @@
 
 ## 컨텍스트
 
-ReadMates는 운영 중인 서비스의 코드베이스를 포트폴리오 목적으로 GitHub public repository로 공개한다. 운영 코드를 그대로 공개할 때 발생할 수 있는 위험은 세 가지다:
+ReadMates는 운영 중인 서비스의 코드베이스를 공개 저장소로 배포 가능한 형태로 정리한다. 운영 코드를 그대로 공개할 때 발생할 수 있는 위험은 세 가지다:
 
 ### 1. Secret 누출
 
@@ -168,9 +168,9 @@ placeholder와 테스트 전용 값이 scanner를 트리거하지 않도록 `.gi
 
 1단계에서 생성한 clean manifest만 scanner가 검사한다. `node_modules`, `server/build`, `design/`, `.gstack/` 같은 내부 경로가 scanner 대상에서 미리 제외된다. scanner가 더 빠르고 false positive가 줄어든다.
 
-### 스크립트가 공개되므로 패턴 자체가 포트폴리오
+### 스크립트가 공개되므로 패턴 자체를 재사용할 수 있다
 
-세 스크립트가 `scripts/` 아래 공개된다. 같은 문제를 가진 다른 팀이 이 패턴을 fork해서 사용할 수 있다. ReadMates의 공개 repo 운영 모델이 스스로 포트폴리오의 일부가 된다.
+세 스크립트가 `scripts/` 아래 공개된다. 같은 문제를 가진 다른 팀이 이 패턴을 fork해서 사용할 수 있다. ReadMates의 공개 repo 운영 모델은 재사용 가능한 운영 패턴으로 남는다.
 
 ## 대안
 
