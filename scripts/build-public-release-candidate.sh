@@ -180,6 +180,7 @@ preflight_envrc_loaders() {
     "deploy/oci"
     "docs/development"
     "docs/deploy"
+    "docs/operations"
     "docs/superpowers"
     "scripts"
   )
@@ -217,6 +218,7 @@ preflight_source_symlinks() {
     "deploy/oci"
     "docs/development"
     "docs/deploy"
+    "docs/operations"
     "docs/superpowers"
     "scripts"
   )
@@ -376,6 +378,7 @@ copy_manifest() {
 
   copy_dir "docs/deploy"
   copy_dir "docs/development"
+  copy_dir "docs/operations"
   copy_dir "docs/superpowers"
 
   copy_required_file "scripts/build-public-release-candidate.sh"
@@ -394,7 +397,7 @@ is_approved_manifest_path() {
     front|front/*) return 0 ;;
     server|server/*) return 0 ;;
     deploy|deploy/oci|deploy/oci/*) return 0 ;;
-    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*|docs/superpowers|docs/superpowers/*) return 0 ;;
+    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*|docs/operations|docs/operations/*|docs/superpowers|docs/superpowers/*) return 0 ;;
     scripts|scripts/README.md|scripts/build-public-release-candidate.sh|scripts/public-release-check.sh|scripts/smoke-production-integrations.sh|scripts/verify-public-release-fixtures.sh) return 0 ;;
     *) return 1 ;;
   esac
