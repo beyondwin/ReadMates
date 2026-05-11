@@ -181,6 +181,7 @@ preflight_envrc_loaders() {
     "docs/development"
     "docs/deploy"
     "docs/operations"
+    "docs/operations/runbooks"
     "docs/superpowers"
     "scripts"
   )
@@ -192,11 +193,14 @@ preflight_envrc_loaders() {
     reject_symlink_components "$root"
     new_temp_file
     results="$new_temp_file_path"
-    if [[ "$root" == "." ]]; then
-      capture_find "$results" "$root" -maxdepth 1 -name '.envrc*'
-    else
-      capture_find "$results" "$root" -name '.envrc*'
-    fi
+    case "$root" in
+      .|docs/operations)
+        capture_find "$results" "$root" -maxdepth 1 -name '.envrc*'
+        ;;
+      *)
+        capture_find "$results" "$root" -name '.envrc*'
+        ;;
+    esac
 
     while IFS= read -r -d '' path; do
       matches+=("${path#./}")
@@ -219,6 +223,7 @@ preflight_source_symlinks() {
     "docs/development"
     "docs/deploy"
     "docs/operations"
+    "docs/operations/runbooks"
     "docs/superpowers"
     "scripts"
   )
@@ -267,6 +272,21 @@ preflight_source_symlinks() {
           -path "$root/screenshots"
           ")"
           -prune -o -type l
+        )
+        ;;
+      docs/operations)
+        find_args+=(
+          "("
+          -path "$root/.wrangler" -o
+          -path "$root/.cloudflare" -o
+          -path "$root/.vercel" -o
+          -path "$root/.terraform" -o
+          -path "$root/.pulumi" -o
+          -path "$root/private" -o
+          -path "$root/screenshot" -o
+          -path "$root/screenshots"
+          ")"
+          -prune -o -maxdepth 1 -type l
         )
         ;;
       *)
@@ -378,7 +398,8 @@ copy_manifest() {
 
   copy_dir "docs/deploy"
   copy_dir "docs/development"
-  copy_dir "docs/operations"
+  copy_required_file "docs/operations/README.md"
+  copy_dir "docs/operations/runbooks"
   copy_dir "docs/superpowers"
 
   copy_required_file "scripts/build-public-release-candidate.sh"
@@ -397,7 +418,7 @@ is_approved_manifest_path() {
     front|front/*) return 0 ;;
     server|server/*) return 0 ;;
     deploy|deploy/oci|deploy/oci/*) return 0 ;;
-    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*|docs/operations|docs/operations/*|docs/superpowers|docs/superpowers/*) return 0 ;;
+    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*|docs/operations|docs/operations/README.md|docs/operations/runbooks|docs/operations/runbooks/*|docs/superpowers|docs/superpowers/*) return 0 ;;
     scripts|scripts/README.md|scripts/build-public-release-candidate.sh|scripts/public-release-check.sh|scripts/smoke-production-integrations.sh|scripts/verify-public-release-fixtures.sh) return 0 ;;
     *) return 1 ;;
   esac
