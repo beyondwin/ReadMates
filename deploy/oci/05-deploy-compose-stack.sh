@@ -42,9 +42,12 @@ uses_registry_image() {
 
 json_escape() {
   local value="$1"
+  value="${value//$'\t'/ }"
+  value="${value//$'\r'/ }"
+  value="${value//$'\n'/ }"
+  value="$(printf '%s' "$value" | LC_ALL=C tr '\001-\010\013\014\016-\037' ' ')"
   value="${value//\\/\\\\}"
   value="${value//\"/\\\"}"
-  value="${value//$'\n'/ }"
   printf '%s' "$value"
 }
 
@@ -88,28 +91,33 @@ on_deploy_error() {
 mark_stage "preflight"
 remote_ledger_append "STARTED" "RUNNING" "image=${IMAGE_TAG}"
 
-echo "==> [1/10] 필수 파일 확인"
+echo "==> [1/11] 필수 파일 확인"
 require_file "$COMPOSE_FILE"
 require_file "$CADDYFILE"
 require_file "$SERVICE_FILE"
 
 if uses_registry_image; then
   IMAGE_SOURCE="registry"
-  echo "==> [2/10] Docker image pull on VM: ${IMAGE_TAG}"
+  echo "==> [2/11] Docker image pull on VM: ${IMAGE_TAG}"
 else
   IMAGE_SOURCE="local"
-  echo "==> [2/10] Docker image build: ${IMAGE_TAG}"
+  echo "==> [2/11] Docker image build: ${IMAGE_TAG}"
   docker build -t "${IMAGE_TAG}" server
   docker save "${IMAGE_TAG}" -o "${IMAGE_ARCHIVE}"
 fi
 
-remote_ledger_append "PREFLIGHT_PASSED" "RUNNING" "imageSource=${IMAGE_SOURCE}"
-
-echo "==> [3/10] VM Docker/Compose 확인"
+echo "==> [3/11] VM Docker/Compose 확인"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "sudo docker version >/dev/null && sudo docker compose version >/dev/null"
 
-echo "==> [4/10] runtime files 전송"
+echo "==> [4/11] DB backup 확인"
+ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+  "sudo test -d /var/backups/readmates/mysql && sudo find /var/backups/readmates/mysql -type f -name '*.sql.gz' -mtime -2 | grep -q ."
+
+remote_ledger_append "PREFLIGHT_PASSED" "RUNNING" "imageSource=${IMAGE_SOURCE}"
+
+mark_stage "install"
+echo "==> [5/11] runtime files 전송"
 if ! uses_registry_image; then
   scp "${SSH_OPTIONS[@]}" "$IMAGE_ARCHIVE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-server-image.tar"
 fi
@@ -117,15 +125,13 @@ scp "${SSH_OPTIONS[@]}" "$COMPOSE_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/rea
 scp "${SSH_OPTIONS[@]}" "$CADDYFILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-Caddyfile"
 scp "${SSH_OPTIONS[@]}" "$SERVICE_FILE" "${REMOTE_USER}@${VM_PUBLIC_IP}:/tmp/readmates-stack.service"
 
-mark_stage "install"
-echo "==> [5/10] VM runtime files 설치"
+echo "==> [6/11] VM runtime files 설치"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-  "sudo bash -s -- $(shell_quote "$REMOTE_DIR") $(shell_quote "$CADDY_SITE") $(shell_quote "$IMAGE_TAG") $(shell_quote "$IMAGE_SOURCE")" <<'EOF'
+  "sudo bash -s -- $(shell_quote "$REMOTE_DIR") $(shell_quote "$CADDY_SITE") $(shell_quote "$IMAGE_TAG")" <<'EOF'
 set -euo pipefail
 remote_dir="$1"
 caddy_site="$2"
 image_tag="$3"
-image_source="$4"
 sudo mkdir -p "$remote_dir" /etc/readmates
 sudo mv /tmp/readmates-compose.yml "$remote_dir/compose.yml"
 sudo mv /tmp/readmates-Caddyfile "$remote_dir/Caddyfile"
@@ -136,6 +142,15 @@ printf 'READMATES_SERVER_IMAGE=%s\n' "$image_tag" | sudo tee "$remote_dir/.env" 
 sudo chmod 600 "$remote_dir/.env"
 sudo chown -R readmates:readmates "$remote_dir"
 sudo systemctl daemon-reload
+EOF
+
+mark_stage "image"
+echo "==> [7/11] Docker image 확인"
+ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+  "sudo bash -s -- $(shell_quote "$IMAGE_TAG") $(shell_quote "$IMAGE_SOURCE")" <<'EOF'
+set -euo pipefail
+image_tag="$1"
+image_source="$2"
 if [ "$image_source" = "registry" ]; then
   sudo docker pull "$image_tag"
 else
@@ -144,19 +159,14 @@ else
 fi
 EOF
 
-mark_stage "image"
 remote_ledger_append "IMAGE_RESOLVED" "RUNNING" "image=${IMAGE_TAG}"
 
 mark_stage "compose-config"
-echo "==> [6/10] compose 설정 검증"
+echo "==> [8/11] compose 설정 검증"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "cd ${REMOTE_DIR} && sudo docker compose -f compose.yml config >/dev/null"
 
-echo "==> [7/10] DB backup 확인"
-ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-  "sudo test -d /var/backups/readmates/mysql && sudo find /var/backups/readmates/mysql -type f -name '*.sql.gz' -mtime -2 | grep -q ."
-
-echo "==> [8/10] 기존 host Caddy/Spring 서비스 정지"
+echo "==> [9/11] 기존 host Caddy/Spring 서비스 정지"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<'EOF'
 set -euo pipefail
 if systemctl list-unit-files readmates-server.service >/dev/null 2>&1; then
@@ -170,7 +180,7 @@ fi
 EOF
 
 mark_stage "compose-up"
-echo "==> [9/10] compose stack 시작"
+echo "==> [10/11] compose stack 시작"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
 set -euo pipefail
 sudo systemctl enable readmates-stack
@@ -182,7 +192,7 @@ EOF
 remote_ledger_append "STACK_STARTED" "RUNNING" "services=compose"
 
 mark_stage "health"
-echo "==> [10/10] health smoke"
+echo "==> [11/11] health smoke"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" "sudo bash -s" <<EOF
 set -euo pipefail
 cd ${REMOTE_DIR}
