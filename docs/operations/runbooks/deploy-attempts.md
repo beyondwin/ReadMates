@@ -34,7 +34,7 @@ sudo chmod 0640 /var/log/readmates/deploy-attempts.jsonl
 | 필드 | 설명 | 민감도 |
 | --- | --- | --- |
 | `attemptId` | 배포 script가 생성한 UTC timestamp 기반 id | 낮음 |
-| `event` | `STARTED`, `PREFLIGHT_PASSED`, `IMAGE_RESOLVED`, `STACK_STARTED`, `HEALTH_PASSED`, `BFF_SMOKE_PASSED`, `SUCCESS`, `FAILED` | 낮음 |
+| `event` | `STARTED`, `PREFLIGHT_PASSED`, `IMAGE_ID_RESOLVED`, `IMAGE_RESOLVED`, `IMAGE_VERIFIED`, `STACK_STARTED`, `HEALTH_PASSED`, `BFF_SMOKE_PASSED`, `SUCCESS`, `FAILED` | 낮음 |
 | `stage` | 실패 또는 진행 중 stage | 낮음 |
 | `at` | UTC ISO-8601 timestamp | 낮음 |
 | `image` | `ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z` 같은 image reference | 낮음. private repo name이면 외부 공유 금지 |
@@ -42,6 +42,15 @@ sudo chmod 0640 /var/log/readmates/deploy-attempts.jsonl
 | `imageId` | Docker image id | 낮음 |
 | `exitCode` | 실패 exit code | 낮음 |
 | `durationSeconds` | attempt 소요 시간 | 낮음 |
+
+## Image verification
+
+릴리즈 배포는 tag 문자열만 믿지 않고 Docker image id를 확인합니다.
+
+1. VM에서 `sudo docker image inspect "$READMATES_SERVER_IMAGE" --format '{{.Id}}'`로 expected image id를 얻습니다.
+2. Compose start 후 `readmates-api` container id를 얻습니다.
+3. `sudo docker inspect "$container" --format '{{.Image}}'` 값이 expected image id와 같은지 확인합니다.
+4. 값이 다르면 배포를 실패로 처리하고 자동 rollback하지 않습니다.
 
 ## 금지 필드
 

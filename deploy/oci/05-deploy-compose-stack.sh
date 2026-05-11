@@ -159,6 +159,11 @@ else
 fi
 EOF
 
+EXPECTED_IMAGE_ID="$(
+  ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+    "sudo docker image inspect $(shell_quote "$IMAGE_TAG") --format '{{.Id}}'"
+)"
+remote_ledger_append "IMAGE_ID_RESOLVED" "RUNNING" "imageId=${EXPECTED_IMAGE_ID}"
 remote_ledger_append "IMAGE_RESOLVED" "RUNNING" "image=${IMAGE_TAG}"
 
 mark_stage "compose-config"
@@ -190,6 +195,15 @@ sudo docker compose -f compose.yml up -d --remove-orphans
 sudo docker compose -f compose.yml ps
 EOF
 
+RUNNING_IMAGE_ID="$(
+  ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+    "cd $(shell_quote "$REMOTE_DIR") && container=\$(sudo docker compose -f compose.yml ps -q readmates-api) && sudo docker inspect \"\$container\" --format '{{.Image}}'"
+)"
+if [ "$RUNNING_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]; then
+  echo "Running readmates-api image mismatch: expected ${EXPECTED_IMAGE_ID}, got ${RUNNING_IMAGE_ID}" >&2
+  exit 1
+fi
+remote_ledger_append "IMAGE_VERIFIED" "RUNNING" "imageId=${RUNNING_IMAGE_ID}"
 remote_ledger_append "STACK_STARTED" "RUNNING" "services=compose"
 
 mark_stage "health"
