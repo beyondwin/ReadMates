@@ -113,6 +113,90 @@ class RateLimitFilterTest {
         assertFalse(keys.any { it.contains("198.51.100.10") })
     }
 
+    @Test
+    fun `uses configured primary bff secret for trusted client ip header`() {
+        val port = RecordingRateLimitPort(RateLimitDecision.allowed())
+        val filter = RateLimitFilter(
+            rateLimitPort = port,
+            properties = RateLimitProperties(enabled = true),
+            legacyExpectedBffSecret = "",
+            configuredBffSecretsRaw = "primary-bff-test,secondary-bff-test",
+        )
+        val firstRequest = invitationPreviewRequest("raw-token").apply {
+            remoteAddr = "198.51.100.10"
+            addHeader("X-Readmates-Bff-Secret", "primary-bff-test")
+            addHeader("X-Readmates-Client-IP", "203.0.113.10")
+        }
+        val secondRequest = invitationPreviewRequest("raw-token").apply {
+            remoteAddr = "198.51.100.10"
+            addHeader("X-Readmates-Bff-Secret", "primary-bff-test")
+            addHeader("X-Readmates-Client-IP", "203.0.113.20")
+        }
+
+        filter.doFilter(firstRequest, MockHttpServletResponse(), MockFilterChain())
+        filter.doFilter(secondRequest, MockHttpServletResponse(), MockFilterChain())
+
+        val keys = port.checks.map { it.key }
+        assertEquals(2, keys.distinct().size)
+        assertFalse(keys.any { it.contains("203.0.113") })
+    }
+
+    @Test
+    fun `uses configured secondary bff secret for trusted client ip header`() {
+        val port = RecordingRateLimitPort(RateLimitDecision.allowed())
+        val filter = RateLimitFilter(
+            rateLimitPort = port,
+            properties = RateLimitProperties(enabled = true),
+            legacyExpectedBffSecret = "",
+            configuredBffSecretsRaw = "primary-bff-test,secondary-bff-test",
+        )
+        val firstRequest = invitationPreviewRequest("raw-token").apply {
+            remoteAddr = "198.51.100.10"
+            addHeader("X-Readmates-Bff-Secret", "secondary-bff-test")
+            addHeader("X-Readmates-Client-IP", "203.0.113.10")
+        }
+        val secondRequest = invitationPreviewRequest("raw-token").apply {
+            remoteAddr = "198.51.100.10"
+            addHeader("X-Readmates-Bff-Secret", "secondary-bff-test")
+            addHeader("X-Readmates-Client-IP", "203.0.113.20")
+        }
+
+        filter.doFilter(firstRequest, MockHttpServletResponse(), MockFilterChain())
+        filter.doFilter(secondRequest, MockHttpServletResponse(), MockFilterChain())
+
+        val keys = port.checks.map { it.key }
+        assertEquals(2, keys.distinct().size)
+        assertFalse(keys.any { it.contains("203.0.113") })
+    }
+
+    @Test
+    fun `configured bff secret list takes priority over legacy bff secret`() {
+        val port = RecordingRateLimitPort(RateLimitDecision.allowed())
+        val filter = RateLimitFilter(
+            rateLimitPort = port,
+            properties = RateLimitProperties(enabled = true),
+            legacyExpectedBffSecret = "legacy-bff-test",
+            configuredBffSecretsRaw = "primary-bff-test",
+        )
+        val firstRequest = invitationPreviewRequest("raw-token").apply {
+            remoteAddr = "198.51.100.10"
+            addHeader("X-Readmates-Bff-Secret", "legacy-bff-test")
+            addHeader("X-Readmates-Client-IP", "203.0.113.10")
+        }
+        val secondRequest = invitationPreviewRequest("raw-token").apply {
+            remoteAddr = "198.51.100.10"
+            addHeader("X-Readmates-Bff-Secret", "legacy-bff-test")
+            addHeader("X-Readmates-Client-IP", "203.0.113.20")
+        }
+
+        filter.doFilter(firstRequest, MockHttpServletResponse(), MockFilterChain())
+        filter.doFilter(secondRequest, MockHttpServletResponse(), MockFilterChain())
+
+        val keys = port.checks.map { it.key }
+        assertEquals(1, keys.distinct().size)
+        assertFalse(keys.any { it.contains("203.0.113") })
+    }
+
     private fun invitationPreviewRequest(token: String) =
         MockHttpServletRequest("GET", "/api/invitations/$token")
 

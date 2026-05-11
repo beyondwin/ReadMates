@@ -23,11 +23,25 @@ class RateLimitFilter(
     private val rateLimitPort: RateLimitPort,
     private val properties: RateLimitProperties,
     @param:Value("\${readmates.bff-secret:}")
-    private val expectedBffSecret: String = "",
+    private val legacyExpectedBffSecret: String = "",
     @param:Value("\${READMATES_IP_HASH_BASE_SECRET:}")
     private val ipHashBaseSecret: String = "",
+    @param:Value("\${readmates.security.bff.secrets:}")
+    private val configuredBffSecretsRaw: String = "",
 ) : OncePerRequestFilter() {
     private val log = LoggerFactory.getLogger(javaClass)
+    private val trustedBffSecrets: List<String> =
+        configuredBffSecretsRaw
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .ifEmpty {
+                legacyExpectedBffSecret
+                    .trim()
+                    .takeIf { it.isNotEmpty() }
+                    ?.let(::listOf)
+                    ?: emptyList()
+            }
 
     init {
         if (ipHashBaseSecret.isBlank()) {
@@ -140,24 +154,30 @@ class RateLimitFilter(
             ?: "unknown"
 
     private fun HttpServletRequest.trustedClientIp(): String? {
-        val expected = expectedBffSecret.trim()
-        if (expected.isBlank()) {
+        if (trustedBffSecrets.isEmpty()) {
             return null
         }
 
         val provided = getHeader(BFF_SECRET_HEADER) ?: return null
-        if (!secretMatches(provided, expected)) {
+        if (!secretMatchesAny(provided)) {
             return null
         }
 
         return getHeader(CLIENT_IP_HEADER).trimmedIdentifier()
     }
 
-    private fun secretMatches(provided: String, expected: String): Boolean =
-        MessageDigest.isEqual(
-            provided.toByteArray(StandardCharsets.UTF_8),
-            expected.toByteArray(StandardCharsets.UTF_8),
-        )
+    private fun secretMatchesAny(provided: String): Boolean {
+        val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
+        var matches = false
+        for (expected in trustedBffSecrets) {
+            val expectedMatches = MessageDigest.isEqual(
+                providedBytes,
+                expected.toByteArray(StandardCharsets.UTF_8),
+            )
+            matches = expectedMatches || matches
+        }
+        return matches
+    }
 
     private fun String?.trimmedIdentifier(): String? =
         this
