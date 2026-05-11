@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 외부 운영 자동화 도구에서 확인한 운영 패턴을 ReadMates의 OCI Compose 배포 체계에 맞게 반영해 runbook, read-only diagnostics, deploy attempt ledger, image verification, post-deploy watch, script CI gate를 추가한다.
+**Goal:** 외부 운영 자동화 도구에서 확인한 운영 패턴을 ReadMates의 OCI Compose 배포 체계에 맞게 반영해 runbook, read-only diagnostics, deploy attempt ledger, image verification, post-deploy watch, script CI gate, public release safety CI, release tag workflow 검증을 추가한다.
 
-**Architecture:** 기존 Cloudflare Pages + GHCR + OCI Docker Compose 구조는 유지한다. 새 작업은 docs, deploy shell scripts, GitHub Actions CI만 건드리며 frontend/server application code와 DB schema는 변경하지 않는다. 배포 상태는 VM의 sanitized JSONL ledger에 남기고, public repo에는 절차와 placeholder-safe script만 둔다.
+**Architecture:** 기존 Cloudflare Pages + GHCR + OCI Docker Compose 구조는 유지한다. 새 작업은 docs, deploy shell scripts, GitHub Actions CI/CD workflow만 건드리며 frontend/server application code와 DB schema는 변경하지 않는다. 배포 상태는 VM의 sanitized JSONL ledger에 남기고, public repo에는 절차와 placeholder-safe script만 둔다. Backend production VM 반영은 GitHub Actions SSH 배포로 자동화하지 않고 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 수동 실행하는 구조를 유지한다.
 
 **Tech Stack:** Bash, Docker Compose, systemd, GitHub Actions, Markdown, existing public-release scanner.
 
@@ -33,6 +33,9 @@ Modify:
 - `scripts/build-public-release-candidate.sh` — ensure new `deploy/oci/*.sh` files are copied by the existing `deploy/oci` manifest and no new forbidden paths are required.
 - `scripts/public-release-check.sh` — update only if the new runbook paths need allowlist coverage.
 - `.github/workflows/ci.yml` — add shell script syntax/lint job.
+- `.github/workflows/ci.yml` — add public release safety job and failure artifact upload for test reports.
+- `.github/workflows/deploy-front.yml` — add release fixture drift check and production environment boundary.
+- `.github/workflows/deploy-server.yml` — add release server test gate, SBOM/provenance, image scan, and production environment boundary.
 - `deploy/oci/05-deploy-compose-stack.sh` — add attempt ledger, stage tracking, image verification, post-deploy watch call.
 
 Do not modify:
@@ -1029,6 +1032,210 @@ git commit -m "ci: validate shell scripts"
 
 ---
 
+## Task 11A: Add Public Release Safety CI and Failure Artifacts
+
+**Files:**
+
+- Modify: `.github/workflows/ci.yml`
+
+- [ ] **Step 1: Add `public-release` job**
+
+Insert this job under `jobs:` after the `scripts` job:
+
+```yaml
+  public-release:
+    name: Public release safety
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build public release candidate
+        run: ./scripts/build-public-release-candidate.sh
+
+      - name: Run public release check
+        run: ./scripts/public-release-check.sh .tmp/public-release-candidate
+```
+
+Do not upload `.tmp/public-release-candidate` as an artifact. If the scanner ever fails because of an active-secret-looking value, artifact upload could create a second exposure path.
+
+- [ ] **Step 2: Add failure-only test report artifacts**
+
+Use `actions/upload-artifact` pinned to a full commit SHA, not a floating `@v*` tag. Resolve the current SHA at implementation time and add `if-no-files-found: ignore`.
+
+Frontend job failure artifact paths:
+
+```yaml
+front/test-results
+front/playwright-report
+front/coverage
+```
+
+Backend job failure artifact paths:
+
+```yaml
+server/build/reports/tests
+server/build/test-results
+```
+
+E2E job failure artifact paths:
+
+```yaml
+front/test-results
+front/playwright-report
+```
+
+Artifact rules:
+
+- `if: failure()`
+- no `.env`, `.wrangler`, `.tmp/public-release-candidate`, provider state, smoke output 전문, private host 목록
+- artifact names include the job and shard where relevant, for example `e2e-${{ matrix.shard }}-reports`
+
+- [ ] **Step 3: Validate workflow text**
+
+Run:
+
+```bash
+git diff --check -- .github/workflows/ci.yml
+rg -n "public-release|build-public-release-candidate|public-release-check|upload-artifact" .github/workflows/ci.yml
+```
+
+Expected: diff check passes and `rg` prints the new job plus artifact upload steps.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .github/workflows/ci.yml
+git commit -m "ci: add public release safety checks"
+```
+
+---
+
+## Task 11B: Harden Release Tag Workflows
+
+**Files:**
+
+- Modify: `.github/workflows/deploy-front.yml`
+- Modify: `.github/workflows/deploy-server.yml`
+
+- [ ] **Step 1: Add production environment boundary**
+
+Add a production environment to both deploy jobs.
+
+For `deploy-front.yml`:
+
+```yaml
+    environment:
+      name: production
+      url: https://readmates.pages.dev
+```
+
+For `deploy-server.yml`:
+
+```yaml
+    environment:
+      name: production
+```
+
+GitHub repository settings must separately configure required reviewers and environment secrets. This YAML change creates the workflow boundary; it does not add backend VM SSH deploy credentials.
+
+- [ ] **Step 2: Add frontend release fixture drift check**
+
+In `deploy-front.yml`, after the `Build` step and before `Deploy to Cloudflare Pages`, add:
+
+```yaml
+      - name: Check zod fixtures are up to date
+        run: |
+          pnpm zod:export-fixtures
+          git diff --exit-code tests/unit/__fixtures__/zod-schemas/
+```
+
+Expected behavior: a release tag cannot deploy the frontend if generated API contract fixtures are stale.
+
+- [ ] **Step 3: Add server test gate before image publish**
+
+In `deploy-server.yml`, replace:
+
+```yaml
+      - name: Build server jar
+        run: ./server/gradlew -p server bootJar
+```
+
+with:
+
+```yaml
+      - name: Test and build server jar
+        run: ./server/gradlew -p server clean test bootJar
+```
+
+Expected behavior: a release tag cannot publish a GHCR server image unless the server test suite passes in the release workflow itself.
+
+- [ ] **Step 4: Add image SBOM and provenance metadata**
+
+In the `docker/build-push-action` step, add:
+
+```yaml
+          sbom: true
+          provenance: true
+```
+
+Keep the existing `platforms: linux/arm64`, `push: true`, and tag calculation.
+
+- [ ] **Step 5: Add image vulnerability scan**
+
+Add an image scan after the build-and-push step. Use a scanner action pinned to a full commit SHA. The scan target is:
+
+```yaml
+${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
+```
+
+Initial rollout options:
+
+- If the first scan has no HIGH/CRITICAL baseline issues, set the scanner to fail on `HIGH,CRITICAL`.
+- If the base image has existing HIGH findings, run report-only in the first PR, document the baseline in the PR body, then switch to fail-on-new HIGH/CRITICAL in a follow-up.
+
+Do not print secrets, environment files, or private host lists in scanner output.
+
+- [ ] **Step 6: Add release workflow failure artifacts**
+
+Use the same pinned `actions/upload-artifact` SHA selected in Task 11A.
+
+`deploy-front.yml` failure artifact paths:
+
+```yaml
+front/test-results
+front/dist
+```
+
+`deploy-server.yml` failure artifact paths:
+
+```yaml
+server/build/reports/tests
+server/build/test-results
+```
+
+Do not upload Docker credentials, `.docker/config.json`, `.env`, Cloudflare state, or release smoke output.
+
+- [ ] **Step 7: Validate workflow text**
+
+Run:
+
+```bash
+git diff --check -- .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml
+rg -n "environment:|zod:export-fixtures|clean test bootJar|sbom:|provenance:|upload-artifact" .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml
+```
+
+Expected: diff check passes and `rg` prints all new release hardening points.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml
+git commit -m "ci: harden release deploy workflows"
+```
+
+---
+
 ## Task 12: Update Deploy and Script Documentation
 
 **Files:**
@@ -1163,7 +1370,7 @@ If Step 4 changed nothing, do not create a commit.
 Run:
 
 ```bash
-git diff --check -- .github/workflows/ci.yml docs/operations docs/deploy scripts deploy/oci
+git diff --check -- .github/workflows/ci.yml .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml docs/operations docs/deploy scripts deploy/oci
 ```
 
 Expected: no whitespace errors.
@@ -1199,7 +1406,17 @@ Run:
 
 Expected: both pass.
 
-- [ ] **Step 5: Review changed docs for forbidden operational values**
+- [ ] **Step 5: Review release workflow hardening**
+
+Run:
+
+```bash
+rg -n "public-release|zod:export-fixtures|clean test bootJar|environment:|sbom:|provenance:" .github/workflows/ci.yml .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml
+```
+
+Expected: matches for public release CI, frontend fixture drift, server release test gate, production environment boundary, and image metadata.
+
+- [ ] **Step 6: Review changed docs for forbidden operational values**
 
 Run:
 
@@ -1209,12 +1426,12 @@ rg -n "BEGIN .*PRIVATE KEY|ocid1\\.|/(Users|home)/[A-Za-z0-9._-]+|SPRING_DATASOU
 
 Expected: no output for newly added content. Existing placeholder lines with `<db-password>` or `<shared-bff-secret>` are acceptable.
 
-- [ ] **Step 6: Final commit**
+- [ ] **Step 7: Final commit**
 
 If previous tasks were committed task-by-task, create no extra commit. If the work was batched, commit all remaining changes:
 
 ```bash
-git add .github/workflows/ci.yml docs/operations docs/deploy scripts deploy/oci
+git add .github/workflows/ci.yml .github/workflows/deploy-front.yml .github/workflows/deploy-server.yml docs/operations docs/deploy scripts deploy/oci
 git commit -m "ops: adopt safer deployment diagnostics workflow"
 ```
 
@@ -1228,6 +1445,8 @@ git commit -m "ops: adopt safer deployment diagnostics workflow"
 - [ ] Spec requirement "image digest/id verification" maps to Task 9.
 - [ ] Spec requirement "post-deploy watch" maps to Tasks 4, 7, and 10.
 - [ ] Spec requirement "shell script CI gate" maps to Task 11.
+- [ ] Spec requirement "public release safety CI" maps to Task 11A.
+- [ ] Spec requirement "release tag workflow hardening" maps to Task 11B.
 - [ ] Spec requirement "public release safety" maps to Tasks 12-14.
 - [ ] No frontend/server application code is modified.
 - [ ] No real operational values are introduced.
