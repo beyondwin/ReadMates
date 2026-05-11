@@ -24,6 +24,8 @@ jobs:
     name: Build and push GHCR image
     if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
+    environment:
+      name: production
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -60,8 +62,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Build server jar
-        run: ./server/gradlew -p server bootJar
+      - name: Test and build server jar
+        run: ./server/gradlew -p server clean test bootJar
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
@@ -79,3 +81,25 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
+          sbom: true
+          provenance: true
+
+      - name: Scan image vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
+          scanners: vuln
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Upload server failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: deploy-server-failure-diagnostics
+          path: |
+            server/build/reports/tests
+            server/build/test-results
+          if-no-files-found: ignore
