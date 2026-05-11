@@ -6,16 +6,64 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+(없음)
+
+## v1.7.0 - 2026-05-11
+
+### Highlights
+
+2026-05-11 production incident(current-session refresh 빈 화면)의 한 줄 fix와 server-side 후속 안전망(ADR-0013)을 함께 묶고, 그간의 portfolio polish — Architecture Decision Records 백필(0001~0010, 0013), Engineering Highlights와 case study deep-dive 3건, observability runbook(메트릭/대시보드/알람/SLO), incident post-mortem 실천(템플릿 + 1차 incident)을 한 릴리즈로 정착시킵니다. 사용자에게 보이는 변화는 (1) 빈 화면 incident 재발 차단, (2) `/api/auth/me`의 잘못된 club slug 명시 시 새 404 `CLUB_NOT_FOUND` 응답입니다. DB migration 없음.
+
+### Fixed
+
+- **2026-05-11 production incident — current-session refresh blank screen**: `clubSlug`가 route refresh event에서 누락되어 일부 라우트의 refresh path에서 빈 화면이 발생하던 회귀를 수정합니다. `front/features/current-session/route/current-session-route.tsx`가 `useParams()`의 값을 refresh handler에 명시적으로 forward하도록 조정했습니다. (post-mortem: `docs/operations/postmortems/2026-05-11-current-session-refresh-club-context.md`)
+- **AuthMeController: slug 명시 누락 vs host fallback unknown 분리** (ADR-0013): BFF는 모든 요청에 `X-Readmates-Club-Host`를 첨부하지만 server가 host lookup miss를 supplied-with-no-context로 처리해 degraded `authenticatedUser` 응답을 내던 잠복 경로를 닫았습니다. 이제 `RequestedClubContext.source`로 분기:
+  - `SLUG` 명시 + `club_domains`에 미등록 → 404 `CLUB_NOT_FOUND` (real client bug 명시).
+  - `HOST_FALLBACK` + 미등록 host → unscoped 응답 (dev에서 host 헤더가 strip되어 동작하던 unscoped 경로와 일치).
+  - "club 존재 + 사용자 미가입" 케이스는 기존 degraded UX 보존 (의도된 동작).
+
 ### Added
 
-- Observability runbook 문서 모음 (`docs/operations/observability/`): 진입 README, 19개 custom 메트릭 카탈로그(근원 코드 인용), 22개 권장 dashboard panel(PromQL), 11개 alertmanager rule candidate, 3개 SLO 정의(API availability, read latency, notification delivery latency). `docs/operations/README.md` 진입점도 함께 추가했습니다. 코드 변경 없음 — 현재 배포된 메트릭과 권장 구성만 정리.
-- `docs/case-studies/` 디렉토리에 3개 deep-dive 문서를 추가했습니다 (BFF 보안과 secret rotation, notification outbox pipeline, multi-club domain platform). 각 case는 문제 → 접근 → 구현 → 검증 → trade-off → 다시 한다면 흐름을 따르며, case 03은 2026-05-11 current-session refresh incident의 root cause와 영구 수정 서사를 포함합니다.
-- README 최상단에 **Engineering Highlights** 섹션을 추가해 운영 중 풀어낸 비자명한 문제 3건을 case study deep-dive로 연결합니다.
+- **Architecture Decision Records 셋**: `docs/development/adr/`에 backfill 10개(`0001`~`0010`)와 신규 `0013-bff-host-header-policy.md`를 함께 정착. 인덱스(`README.md`), 작성 규약, 템플릿, 상태 라벨, 후보 ADR 목록을 포함합니다. ADR-0011(jOOQ migration)과 0012(Redis adoption)는 follow-up 후보로 등록.
+- **Engineering Highlights + Case studies**: README 최상단에 **Engineering Highlights** 섹션을 추가해 운영 중 풀어낸 비자명한 문제 3건을 case study deep-dive로 연결합니다. `docs/case-studies/`에 BFF 보안과 secret rotation, notification outbox pipeline, multi-club domain platform 3건의 deep-dive를 추가 — 각 case는 문제 → 접근 → 구현 → 검증 → trade-off → 다시 한다면 흐름을 따르며, case 03은 2026-05-11 incident의 root cause와 영구 수정 서사를 담습니다.
+- **Observability runbook** (`docs/operations/observability/`): 진입 README, 19개 custom 메트릭 카탈로그(근원 코드 인용), 22개 권장 dashboard panel(PromQL), 11개 alertmanager rule candidate, 3개 SLO 정의(API availability, read latency, notification delivery latency). `docs/operations/README.md` 진입점도 함께. 코드 변경 없음 — 현재 배포된 메트릭과 권장 구성만 정리.
+- **Incident post-mortem 실천** (`docs/operations/postmortems/`): 디렉토리, 템플릿, severity 정의(SEV1~SEV4), 첫 incident(2026-05-11 current-session refresh club context degradation, SEV2)를 함께 등록. Post-mortem follow-up 갱신 이력 섹션으로 후속 변경 추적을 영구 보존합니다.
+- **서버 코드**: `com.readmates.club.adapter.in.web.ClubContextSource` enum(SLUG / HOST_FALLBACK / NONE)과 `RequestedClubContext.source` 필드. 현재 `AuthMeController`만 분기에 사용; 다른 컨슈머(`CurrentMemberArgumentResolver`, `MemberAuthoritiesFilter`, `SessionCookieAuthenticationFilter`)는 후속 audit 대상으로 ADR-0013 후속 섹션에 명시.
+- **테스트**: `ResolveClubContextRequestExtensionTest` (6 시나리오 — slug/host/neither/both × hit/miss)와 `AuthMeControllerTest`의 HOST_FALLBACK 시나리오 2건.
 
 ### Changed
 
+- 2026-05-11 post-mortem의 Action items 표가 라운드 후속 평가 결과를 반영합니다 — #3 Closed (`READMATES_ROUTE_REFRESH_EVENT` grep audit 단일 사용처 확인), #2 Closed (ADR-0013 머지), #1 Deferred (parity test 시급성 재평가).
 - 공개 저장소 위생 기준을 정리해 `.orchestrator/**`와 `.claude/settings.json`을 Git 추적 대상에서 제거하고, `.gitignore`에 `.claude/`와 `.orchestrator/`를 명시했습니다.
 - `docs/improvements.md`의 workstation 절대경로를 repo-relative path로 바꾸고, release/public-safety 문서에 GitHub Release 누락 복구와 ignored 파일 제외 검증 기준을 보강했습니다.
+
+### Deployment Notes
+
+- **DB migration**: 없음. Flyway 버전 변경 없음.
+- **배포 순서**: 서버 먼저(auth contract에 새 404 응답 경로 추가). 프론트는 새 응답을 만들지 않으므로 영향 없음 — 단 안전을 위해 server → frontend 순서를 권장합니다. release tag push가 `deploy-server.yml`(GHCR image publish)과 `deploy-front.yml`(Cloudflare Pages production deploy) workflow를 함께 시작합니다. OCI compose stack 배포는 `Deploy Server Image` workflow가 GHCR에 같은 tag image를 게시한 후 `./deploy/oci/05-deploy-compose-stack.sh`로 수동 실행합니다.
+- **새 환경 변수**: 없음.
+- **운영 smoke check 기대값**:
+
+```text
+GET /api/bff/api/auth/me                      (anonymous)              -> 200 (authenticated:false)
+GET /api/bff/api/auth/me                      (logged-in, valid slug)  -> 200 (currentMembership present)
+GET /api/bff/api/auth/me                      (logged-in, unknown slug) -> 404 {"code":"CLUB_NOT_FOUND"}   # 신규
+GET /api/bff/api/auth/me                      (logged-in, no headers)   -> 200 (unscoped)
+GET /api/bff/api/public/club                  (anonymous)              -> 200
+GET /api/bff/api/sessions/upcoming            (anonymous)              -> 401
+```
+
+- **Production manual repro**: `https://readmates.pages.dev/clubs/reading-sai/app/session/current` 접근 → 멤버 로그인 → reading progress 조정 + 저장 → 빈 화면 미재발 확인.
+
+### Verification
+
+- `./server/gradlew -p server clean test` — BUILD SUCCESSFUL (707+ tests passing, no regression).
+- `pnpm --dir front lint` — exit 0
+- `pnpm --dir front test` — 706 passing / 53 files
+- `pnpm --dir front build` — exit 0
+- `./scripts/public-release-check.sh` — passed (gitleaks + 7 targeted content rules clean)
+- `./scripts/verify-public-release-fixtures.sh` — passed
+- **Skipped**: `pnpm --dir front test:e2e` — 이번 릴리즈 준비 환경에 e2e용 MySQL(:3306) + Spring + Vite dev 서버 오케스트레이션이 활성화되어 있지 않아 실행하지 못했습니다. 잔여 리스크: 새 404 응답이 프론트엔드에서 어떻게 표시되는지 e2e로 검증하지 못함. 단 (1) 현재 client 코드는 의도적으로 잘못된 slug를 보내지 않으며 grep audit으로 0건 확인, (2) Zod schema fixture는 변경 없음, (3) 서버 단위 + 통합 테스트가 새 분기를 cover합니다. 배포 후 위 production manual repro로 보완 권장.
 
 ## v1.6.0 - 2026-05-09
 
