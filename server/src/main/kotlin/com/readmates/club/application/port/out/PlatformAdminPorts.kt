@@ -7,6 +7,12 @@ import com.readmates.club.domain.ClubDomainStatus
 import java.time.OffsetDateTime
 import java.util.UUID
 
+sealed interface CreateClubDomainResult {
+    data class Created(val domain: PlatformAdminClubDomain) : CreateClubDomainResult
+    data object ClubNotFound : CreateClubDomainResult
+    data object DuplicateHostname : CreateClubDomainResult
+}
+
 interface LoadPlatformAdminSummaryPort {
     fun countActiveClubs(): Long
     fun countDomainsRequiringAction(): Long
@@ -20,7 +26,7 @@ interface CreateClubDomainPort {
         hostname: String,
         kind: ClubDomainKind,
         isPrimary: Boolean,
-    ): PlatformAdminClubDomain
+    ): CreateClubDomainResult
 }
 
 interface LoadClubDomainProvisioningPort {
@@ -34,7 +40,7 @@ interface UpdateClubDomainProvisioningPort {
         verifiedAt: OffsetDateTime?,
         lastCheckedAt: OffsetDateTime,
         errorCode: String?,
-    ): PlatformAdminClubDomain
+    ): PlatformAdminClubDomain?
 }
 
 interface CheckClubDomainActualStatePort {

@@ -9,6 +9,7 @@ import com.readmates.club.application.port.`in`.CheckClubDomainProvisioningUseCa
 import com.readmates.club.application.port.`in`.CreateClubDomainUseCase
 import com.readmates.club.application.port.`in`.PlatformAdminSummaryUseCase
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
+import com.readmates.club.application.port.out.CreateClubDomainResult
 import com.readmates.club.application.port.out.CreateClubDomainPort
 import com.readmates.club.application.port.out.LoadClubDomainProvisioningPort
 import com.readmates.club.application.port.out.LoadPlatformAdminSummaryPort
@@ -59,12 +60,24 @@ class PlatformAdminService(
             )
         }
 
-        return createClubDomainPort.createClubDomain(
-            clubId = clubId,
-            hostname = hostname,
-            kind = command.kind,
-            isPrimary = command.isPrimary,
-        )
+        return when (
+            val result = createClubDomainPort.createClubDomain(
+                clubId = clubId,
+                hostname = hostname,
+                kind = command.kind,
+                isPrimary = command.isPrimary,
+            )
+        ) {
+            is CreateClubDomainResult.Created -> result.domain
+            CreateClubDomainResult.ClubNotFound -> throw PlatformAdminException(
+                PlatformAdminError.CLUB_DOMAIN_NOT_FOUND,
+                "Club not found",
+            )
+            CreateClubDomainResult.DuplicateHostname -> throw PlatformAdminException(
+                PlatformAdminError.CLUB_DOMAIN_CONFLICT,
+                "Club domain hostname already exists",
+            )
+        }
     }
 
     override fun checkClubDomainProvisioning(
@@ -98,7 +111,7 @@ class PlatformAdminService(
             verifiedAt = now.takeIf { status == ClubDomainStatus.ACTIVE },
             lastCheckedAt = now,
             errorCode = result.errorCode.takeIf { status == ClubDomainStatus.FAILED },
-        )
+        ) ?: throw PlatformAdminException(PlatformAdminError.CLUB_DOMAIN_NOT_FOUND, "Club domain not found")
     }
 
     private fun normalizeHostname(hostname: String): String =

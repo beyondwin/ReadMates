@@ -122,6 +122,67 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `persistence adapters do not depend on spring web http types outside baseline exceptions`() {
+        val forbiddenPrefixes = listOf(
+            "org.springframework.http.",
+            "org.springframework.web.",
+        )
+        val baselineExceptionClasses = setOf(
+            "com.readmates.auth.adapter.out.persistence.JdbcMemberApprovalStoreAdapter",
+            "com.readmates.auth.adapter.out.persistence.JdbcMemberLifecycleStoreAdapter",
+            "com.readmates.auth.adapter.out.persistence.JdbcMemberProfileStoreAdapter",
+            "com.readmates.auth.adapter.out.persistence.JdbcPendingApprovalStoreAdapter",
+            "com.readmates.feedback.adapter.out.persistence.JdbcFeedbackDocumentStoreAdapter",
+        )
+        val baselineExceptionImports = setOf(
+            "com/readmates/auth/adapter/out/persistence/JdbcMemberApprovalStoreAdapter.kt: import org.springframework.http.HttpStatus",
+            "com/readmates/auth/adapter/out/persistence/JdbcMemberApprovalStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
+            "com/readmates/auth/adapter/out/persistence/JdbcMemberLifecycleStoreAdapter.kt: import org.springframework.http.HttpStatus",
+            "com/readmates/auth/adapter/out/persistence/JdbcMemberLifecycleStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
+            "com/readmates/auth/adapter/out/persistence/JdbcMemberProfileStoreAdapter.kt: import org.springframework.http.HttpStatus",
+            "com/readmates/auth/adapter/out/persistence/JdbcMemberProfileStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
+            "com/readmates/auth/adapter/out/persistence/JdbcPendingApprovalStoreAdapter.kt: import org.springframework.http.HttpStatus",
+            "com/readmates/auth/adapter/out/persistence/JdbcPendingApprovalStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
+            "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.http.HttpStatus",
+            "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
+        )
+        val bytecodeViolations = importedClasses
+            .filter { javaClass -> javaClass.packageName.contains(".adapter.out.persistence") }
+            .filterNot { javaClass -> javaClass.name in baselineExceptionClasses }
+            .flatMap { javaClass ->
+                javaClass.directDependenciesFromSelf
+                    .filter { dependency ->
+                        forbiddenPrefixes.any { forbiddenPrefix ->
+                            dependency.targetClass.name.startsWith(forbiddenPrefix)
+                        }
+                    }
+                    .map { dependency -> "${javaClass.name} -> ${dependency.targetClass.name}" }
+            }
+            .distinct()
+            .sorted()
+        val sourceViolations = persistenceAdapterSourceFiles()
+            .flatMap { sourceFile ->
+                val relativePath = sourceFile.relativeTo(sourceRoot()).toString()
+                sourceFile.readLines()
+                    .filter { line ->
+                        val importName = line.trim().removePrefix("import ").trim()
+                        forbiddenPrefixes.any { forbiddenPrefix -> importName.startsWith(forbiddenPrefix) }
+                    }
+                    .map { line -> "$relativePath: ${line.trim()}" }
+            }
+            .distinct()
+            .sorted()
+            .filterNot { violation -> violation in baselineExceptionImports }
+        val violations = (bytecodeViolations + sourceViolations).distinct().sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Persistence adapters must not depend on Spring HTTP/Web types outside explicit baseline exceptions:\n" +
+                violations.joinToString("\n"),
+        )
+    }
+
+    @Test
     fun `member profile application service does not depend on web status types`() {
         noClasses()
             .that()

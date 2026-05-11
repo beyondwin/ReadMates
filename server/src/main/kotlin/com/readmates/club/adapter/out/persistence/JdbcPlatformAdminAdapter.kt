@@ -2,6 +2,7 @@ package com.readmates.club.adapter.out.persistence
 
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.port.out.CreateClubDomainPort
+import com.readmates.club.application.port.out.CreateClubDomainResult
 import com.readmates.club.application.port.out.LoadClubDomainProvisioningPort
 import com.readmates.club.application.port.out.LoadPlatformAdminSummaryPort
 import com.readmates.club.application.port.out.UpdateClubDomainProvisioningPort
@@ -11,11 +12,9 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
 import org.springframework.dao.DuplicateKeyException
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.time.OffsetDateTime
@@ -71,7 +70,7 @@ class JdbcPlatformAdminAdapter(
         hostname: String,
         kind: ClubDomainKind,
         @Suppress("UNUSED_PARAMETER") isPrimary: Boolean,
-    ): PlatformAdminClubDomain {
+    ): CreateClubDomainResult {
 
         val clubExists = jdbcTemplate.queryForObject(
             "select count(*) from clubs where id = ?",
@@ -79,7 +78,7 @@ class JdbcPlatformAdminAdapter(
             clubId.dbString(),
         ) ?: 0
         if (clubExists == 0L) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club not found")
+            return CreateClubDomainResult.ClubNotFound
         }
 
         val domainId = UUID.randomUUID()
@@ -98,19 +97,21 @@ class JdbcPlatformAdminAdapter(
                 primary,
             )
         } catch (_: DuplicateKeyException) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Club domain hostname already exists")
+            return CreateClubDomainResult.DuplicateHostname
         }
 
-        return PlatformAdminClubDomain(
-            id = domainId,
-            clubId = clubId,
-            hostname = hostname,
-            kind = kind,
-            status = ClubDomainStatus.ACTION_REQUIRED,
-            isPrimary = primary,
-            verifiedAt = null,
-            lastCheckedAt = null,
-            errorCode = null,
+        return CreateClubDomainResult.Created(
+            PlatformAdminClubDomain(
+                id = domainId,
+                clubId = clubId,
+                hostname = hostname,
+                kind = kind,
+                status = ClubDomainStatus.ACTION_REQUIRED,
+                isPrimary = primary,
+                verifiedAt = null,
+                lastCheckedAt = null,
+                errorCode = null,
+            ),
         )
     }
 
@@ -133,7 +134,7 @@ class JdbcPlatformAdminAdapter(
         verifiedAt: OffsetDateTime?,
         lastCheckedAt: OffsetDateTime,
         errorCode: String?,
-    ): PlatformAdminClubDomain {
+    ): PlatformAdminClubDomain? {
 
         val updatedRows = jdbcTemplate.update(
             """
@@ -151,11 +152,10 @@ class JdbcPlatformAdminAdapter(
             domainId.dbString(),
         )
         if (updatedRows == 0) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club domain not found")
+            return null
         }
 
         return loadClubDomain(domainId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Club domain not found")
     }
 
     private fun mapDomain(resultSet: ResultSet, @Suppress("UNUSED_PARAMETER") rowNumber: Int): PlatformAdminClubDomain =
