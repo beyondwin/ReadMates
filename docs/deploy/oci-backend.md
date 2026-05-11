@@ -8,6 +8,8 @@
 
 백엔드 배포는 compose stack이 새 image로 실행되고, Flyway 결과와 `/internal/health`, Cloudflare BFF smoke, OAuth start smoke가 변경 범위에 맞게 확인됐을 때 완료입니다. DB migration, notification pipeline, mail delivery, Object Storage backup을 건드린 경우에는 해당 섹션의 targeted smoke도 함께 확인합니다.
 
+운영 진단이 필요하면 read-only diagnostics collector를 먼저 사용합니다. Collector 설치, 진단 전용 SSH key의 ForceCommand 제한, 출력 보관 규칙은 [Read-only Diagnostics](../operations/runbooks/read-only-diagnostics.md)를 기준으로 합니다. Collector 출력 전문은 Git에 저장하지 않고, post-mortem이나 release note에는 health/log/error count 같은 sanitized summary만 남깁니다.
+
 VM IP, SSH key path, private DB host, SMTP credential, OCI resource identifiers, 운영 smoke 결과 전문은 Git에 남기지 않습니다. 실제 provider 설정이나 비용 관련 판단은 현재 OCI/Cloudflare/Google 콘솔을 확인한 뒤 실행합니다.
 
 ## Health check contract

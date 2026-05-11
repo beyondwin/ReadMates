@@ -50,6 +50,12 @@ READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLI
 
 완료 기준은 script가 끝까지 성공하고, compose `readmates-api` health, Cloudflare BFF auth smoke, production integration smoke가 모두 통과하는 것입니다. Redis/Kafka 기능 flag는 별도 rollout 전에는 켜지지 않은 상태로 둡니다.
 
+## Deploy Attempt Ledger
+
+`05-deploy-compose-stack.sh`는 운영 VM의 `/var/log/readmates/deploy-attempts.jsonl`에 배포 attempt를 JSONL로 기록합니다. 이 ledger는 자동 rollback이나 재시도 트리거가 아니라, 실패 stage와 근거를 남겨 운영자가 rollback, 재시도, 조사를 판단하기 위한 기록입니다. 상태 모델과 stage별 대응은 [Deploy Attempts](../operations/runbooks/deploy-attempts.md)를 기준으로 합니다.
+
+Ledger에는 `attemptId`, `event`, `stage`, `at`, sanitized image reference, registry digest, Docker image id, exit code, duration 같은 낮은 민감도 field만 남깁니다. `/etc/readmates/readmates.env` 내용, DB host 실제 값, password, OAuth secret, BFF secret, SMTP credential, cookie, Authorization header, OAuth code, token, request/response body 전문, 운영 smoke 결과 전문, 실제 멤버/club 운영 데이터는 기록하지 않습니다.
+
 ## Smoke
 
 ```bash
@@ -57,6 +63,12 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'cd /opt/readmates && sudo docke
 curl -fsS https://readmates.pages.dev/api/bff/api/auth/me
 READMATES_SMOKE_BASE_URL=https://readmates.pages.dev READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev ./scripts/smoke-production-integrations.sh
 ```
+
+## Post-deploy Watch
+
+`05-deploy-compose-stack.sh`는 BFF auth smoke가 통과한 뒤 기본적으로 post-deploy watch helper를 실행합니다. Watch는 VM의 `readmates-stack`/compose health, Cloudflare BFF auth smoke, OAuth redirect smoke, 최근 backend log의 `ERROR`/exception 패턴을 묶어 확인합니다.
+
+Watch 실패는 배포 실패로 기록하지만 자동 rollback은 수행하지 않습니다. 운영자는 ledger stage와 recent log를 보고 이전 image rollback 또는 runtime env 조사를 선택합니다. 상세 절차와 수동 실행 방법은 [Post-deploy Watch](../operations/runbooks/post-deploy-watch.md)를 기준으로 합니다.
 
 ## Rollback
 

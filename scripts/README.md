@@ -35,7 +35,7 @@
 - `compose.yml`
 - `front/`
 - `server/`
-- `deploy/oci/`
+- `deploy/oci/`: compose 배포 script, read-only diagnostics collector, post-deploy watch helper를 포함합니다. 공개 후보 scanner 대상이므로 운영 출력, deploy state, secret-bearing env, provider state를 넣지 않습니다.
 - `docs/development/`
 - `docs/deploy/`
 - `docs/superpowers/`의 sanitized historical design and implementation records
