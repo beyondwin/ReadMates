@@ -409,7 +409,7 @@ done
 - [ ] **Step 4: Sanitization manual scan**
 
 ```bash
-grep -iE "(@gmail\.com|@naver\.com|@daum\.net|ocid1\.|192\.168\.|10\.0\.0\.|/Users/|/home/)" docs/operations/postmortems/2026-05-11-current-session-refresh-club-context.md
+grep -iE "(@gmail\.com|@naver\.com|@daum\.net|ocid1\.|192\.168\.|10\.0\.0\.|[/]Users[/]|[/]home[/])" docs/operations/postmortems/2026-05-11-current-session-refresh-club-context.md
 ```
 
 기대: no match. 매치 시 placeholder로 교체.
