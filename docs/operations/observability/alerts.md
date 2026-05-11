@@ -1,0 +1,191 @@
+# 알림 룰 후보
+
+본 문서는 Prometheus alertmanager rule 정의를 정리합니다. 실 배포는 후속 plan에서 별도 환경(`docs/deploy/observability-stack.md`)에 따라.
+
+## 룰 작성 규약
+
+- severity: `critical` | `warning` | `info`.
+- `for:`로 일시적 spike 무시.
+- annotations에 runbook 링크 (runbook 미작성 시 `TBD`).
+- prod-only로 적용 가정. dev/staging은 룰 별도 set.
+- 메트릭 이름은 Prometheus exposition 형식 (Micrometer의 dot → underscore, counter에 `_total` 접미).
+
+## 알림 목록 (anchors)
+
+<a id="notificationoutboxbackloghigh"></a>
+<a id="notificationdeadletters"></a>
+<a id="notificationfailratehigh"></a>
+<a id="httperrorratehigh"></a>
+<a id="httplatencyp95high"></a>
+<a id="hikariconnectionpoolpending"></a>
+<a id="jvmheaphigh"></a>
+<a id="ratelimitdenied"></a>
+<a id="redisfallbackshigh"></a>
+<a id="redisoperationerrors"></a>
+
+## 룰
+
+```yaml
+groups:
+  - name: readmates.notification
+    interval: 30s
+    rules:
+      - alert: NotificationOutboxBacklogHigh
+        expr: max(readmates_notifications_outbox_backlog{status="pending"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Notification pending backlog over 100 for 10 minutes"
+          description: "Consumer가 처리 속도를 따라가지 못하거나 죽었을 가능성. consumer 로그 확인."
+          runbook: "TBD - docs/operations/runbooks/notification-backlog.md"
+
+      - alert: NotificationOutboxBacklogCritical
+        expr: max(readmates_notifications_outbox_backlog{status="pending"}) > 1000
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Notification pending backlog over 1000"
+          description: "Consumer가 죽었거나 의존 인프라가 unreachable. 즉시 조사."
+          runbook: "TBD"
+
+      - alert: NotificationFailRateHigh
+        expr: |
+          sum(rate(readmates_notifications_failed_total[5m]))
+            / clamp_min(sum(rate(readmates_notifications_sent_total[5m]))
+                       + sum(rate(readmates_notifications_failed_total[5m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Notification 실패율 5% 초과 (10분)"
+          description: "발송 실패가 지속. 외부 채널(예: FCM) 장애 또는 payload 변경 의심."
+          runbook: "TBD"
+
+      - alert: NotificationDeadLetters
+        expr: increase(readmates_notifications_dead_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Notification dead-letter 발생 (1시간 내)"
+          description: "발송이 최종 포기된 알림이 있습니다. notification_deliveries.status='DEAD' 로우 조사."
+          runbook: "TBD"
+
+  - name: readmates.http
+    interval: 30s
+    rules:
+      - alert: HttpErrorRateHigh
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "HTTP 5xx ratio over 1% for 5 minutes"
+          description: "에러 폭증. 최근 배포 / 외부 의존 의심."
+          runbook: "TBD"
+
+      - alert: HttpLatencyP95High
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, uri) (rate(http_server_requests_seconds_bucket{uri=~"/api/.*"}[5m])))
+            > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "p95 latency over 500ms for 10 minutes"
+          description: "DB slow query, GC pause, Hikari 부족 등 의심. Service Health dashboard 확인."
+
+  - name: readmates.jvm
+    interval: 30s
+    rules:
+      - alert: HikariConnectionPoolPending
+        expr: hikaricp_connections_pending > 0
+        for: 2m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Hikari connection pool에 대기 요청 누적 (2분)"
+          description: "Pool size 부족 또는 long-running query. slow query log 확인."
+
+      - alert: JvmHeapHigh
+        expr: |
+          jvm_memory_used_bytes{area="heap"}
+            / jvm_memory_max_bytes{area="heap"} > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "JVM heap 사용률 85% 초과 (10분)"
+          description: "Memory leak 또는 GC 비효율. heap dump 검토 후보."
+
+  - name: readmates.security
+    interval: 30s
+    rules:
+      - alert: RateLimitDenied
+        expr: sum(rate(readmates_rate_limit_denied_total{sensitive="true"}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "민감 엔드포인트 rate-limit 차단 발생 (5m 평균 > 0.1/s)"
+          description: "지속적인 abuse 시도 가능. IP/계정 패턴 조사."
+          runbook: "TBD"
+
+  - name: readmates.redis
+    interval: 30s
+    rules:
+      - alert: RedisFallbacksHigh
+        expr: sum(rate(readmates_redis_fallbacks_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Redis fallback 발생률 > 0.1/s (5분)"
+          description: "Redis 불안정 또는 연결 문제. Redis 자체 로그 + 노드 상태 확인."
+          runbook: "TBD"
+
+      - alert: RedisOperationErrors
+        expr: sum(rate(readmates_redis_operation_errors_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Redis 명령 실행 오류율 > 0.05/s (5분)"
+          description: "특정 어댑터/명령에서 오류 지속. 영향 범위 파악."
+          runbook: "TBD"
+```
+
+## DB 기반 알림 (Prometheus 외)
+
+DEAD state notification delivery 외 별도 무결성 검증이 필요한 경우 cron + 쿼리로 감시:
+
+```sql
+SELECT count(*) FROM notification_deliveries
+WHERE status = 'DEAD' AND updated_at > NOW() - INTERVAL 24 HOUR;
+```
+
+count > 0이면 운영자에게 알림 (이메일 또는 in-app).
+
+> 참고: `notification_deliveries.status` 컬럼명을 사용 (메트릭 카탈로그와 동일). `notification_deliveries.state` 컬럼은 존재하지 않는다.
+
+## 후속
+
+- 위 룰을 `prometheus/rules/`에 yaml로 commit + alertmanager 설정 plan.
+- 알림 채널 (이메일, Slack, Telegram 등) 설정.
+- Runbook 작성 (각 alert별 대응 절차).
