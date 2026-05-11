@@ -107,11 +107,17 @@ production BFF (`front/functions/api/bff/[[path]].ts`)는 `X-Readmates-Club-Host
 
 | # | 항목 | 우선순위 | 오너 | 상태 | 트래킹 |
 |---|------|---------|------|------|-------|
-| 1 | dev/prod BFF 헤더 parity test 추가 (Vite proxy와 Pages function이 동일 입력에 동일 헤더를 생성함을 검증) | P1 | front | Open | TBD |
-| 2 | BFF host 헤더 정책 ADR 후속 작성 — shared fallback domain일 때 host 헤더 미전송 | P2 | docs | Open | TBD |
-| 3 | 다른 라우트의 refresh path가 동일 패턴을 사용하는지 grep audit | P3 | front | Open | TBD |
+| 1 | dev/prod BFF 헤더 parity test 추가 (Vite proxy와 Pages function이 동일 입력에 동일 헤더를 생성함을 검증) | P1 | front | Deferred | 본 라운드 R2 재평가에서 잠복 incident 거의 없음 확인 (`docs/superpowers/specs/2026-05-11-postmortem-followup-consolidation-design.md`). 미래 BFF 헤더 의존 코드 추가 시 재평가. |
+| 2 | BFF host 헤더 정책 ADR 후속 — shared fallback domain일 때 host 헤더 미전송 | P2 | docs / front | In progress | `docs/superpowers/specs/2026-05-11-bff-host-header-policy-design.md` (ADR-0011 후보) |
+| 3 | 다른 라우트의 refresh path가 동일 패턴을 사용하는지 grep audit | P3 | front | Closed (2026-05-11) | `READMATES_ROUTE_REFRESH_EVENT`의 production 사용처는 `front/features/current-session/route/current-session-route.tsx` 단 1개임을 grep으로 확인. 다른 라우트의 `loadMemberAppAuth(args)`는 args forward로 초기 loader가 안전. |
 
 (트래킹은 issue/PR이 생기면 갱신.)
+
+## Follow-up 갱신 이력
+
+| 일자 | 변경 | 출처 |
+|------|------|------|
+| 2026-05-11 | Action item #3 → Closed (grep audit 완료), #2 → In progress (ADR-0011 spec link), #1 → Deferred (시급성 재평가) | `docs/superpowers/specs/2026-05-11-postmortem-followup-consolidation-design.md` |
 
 ## Severity rationale
 
