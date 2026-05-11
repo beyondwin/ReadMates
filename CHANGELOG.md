@@ -6,6 +6,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Added
+
+- `docs/case-studies/` 디렉토리에 3개 deep-dive 문서를 추가했습니다 (BFF 보안과 secret rotation, notification outbox pipeline, multi-club domain platform). 각 case는 문제 → 접근 → 구현 → 검증 → trade-off → 다시 한다면 흐름을 따르며, case 03은 2026-05-11 current-session refresh incident의 root cause와 영구 수정 서사를 포함합니다.
+- README 최상단에 **Engineering Highlights** 섹션을 추가해 운영 중 풀어낸 비자명한 문제 3건을 case study deep-dive로 연결합니다.
+
 ### Changed
 
 - 공개 저장소 위생 기준을 정리해 `.orchestrator/**`와 `.claude/settings.json`을 Git 추적 대상에서 제거하고, `.gitignore`에 `.claude/`와 `.orchestrator/`를 명시했습니다.
