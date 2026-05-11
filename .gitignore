@@ -27,3 +27,4 @@ docs/private/
 .server-config/
 .claude/
 .orchestrator/
+.codex-orchestrator/
