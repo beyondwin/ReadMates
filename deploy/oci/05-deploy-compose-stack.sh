@@ -200,8 +200,9 @@ RUNNING_IMAGE_ID="$(
     "cd $(shell_quote "$REMOTE_DIR") && container=\$(sudo docker compose -f compose.yml ps -q readmates-api) && sudo docker inspect \"\$container\" --format '{{.Image}}'"
 )"
 if [ "$RUNNING_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]; then
+  remote_ledger_append "IMAGE_VERIFIED" "FAILED" "expectedImageId=${EXPECTED_IMAGE_ID} runningImageId=${RUNNING_IMAGE_ID}"
   echo "Running readmates-api image mismatch: expected ${EXPECTED_IMAGE_ID}, got ${RUNNING_IMAGE_ID}" >&2
-  exit 1
+  false
 fi
 remote_ledger_append "IMAGE_VERIFIED" "RUNNING" "imageId=${RUNNING_IMAGE_ID}"
 remote_ledger_append "STACK_STARTED" "RUNNING" "services=compose"
