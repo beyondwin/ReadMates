@@ -14,9 +14,10 @@
 import { cleanup } from "@testing-library/react";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { AuthContext, AuthActionsContext } from "@/src/app/auth-state";
 import { RequireMemberApp, RequireHost } from "@/src/app/route-guards";
+import type { AuthState } from "@/src/app/auth-state";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 const noopActions = { markLoggedOut: () => {}, refreshAuth: async () => {} };
@@ -72,14 +73,14 @@ const nonHostMemberAuth: AuthMeResponse = {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function renderWithAuth(auth: AuthMeResponse, path: string, children: React.ReactNode) {
+function renderWithState(state: AuthState, path: string, children: React.ReactNode) {
   return render(
     <AuthActionsContext.Provider value={noopActions}>
-      <AuthContext.Provider value={{ status: "ready", auth }}>
+      <AuthContext.Provider value={state}>
         <MemoryRouter initialEntries={[path]}>
           <Routes>
             <Route path="/clubs/:clubSlug/app/*" element={children} />
-            <Route path="/login" element={<div>login</div>} />
+            <Route path="/login" element={<LoginRouteProbe />} />
             {/* RequireHost redirects non-host to scopedAppPath(clubSlug) = /clubs/<slug>/app */}
             <Route path="/clubs/:clubSlug/app" element={<div>scoped-app-root</div>} />
             <Route path="/app" element={<div>app-root</div>} />
@@ -88,6 +89,25 @@ function renderWithAuth(auth: AuthMeResponse, path: string, children: React.Reac
       </AuthContext.Provider>
     </AuthActionsContext.Provider>,
   );
+}
+
+function renderWithAuth(auth: AuthMeResponse, path: string, children: React.ReactNode) {
+  return renderWithState({ status: "ready", auth }, path, children);
+}
+
+function LoginRouteProbe() {
+  const location = useLocation();
+
+  return (
+    <div>
+      login
+      <span data-testid="login-url">{`${location.pathname}${location.search}${location.hash}`}</span>
+    </div>
+  );
+}
+
+function expectLoginReturnTo(returnTo: string) {
+  expect(screen.getByTestId("login-url").textContent).toContain(`returnTo=${encodeURIComponent(returnTo)}`);
 }
 
 afterEach(() => {
@@ -135,6 +155,21 @@ describe("RequireMemberApp", () => {
     expect(screen.getByText("login")).toBeInTheDocument();
     expect(screen.queryByText("member content")).not.toBeInTheDocument();
   });
+
+  it("redirects expired sessions to login instead of rendering loading", () => {
+    renderWithState(
+      { status: "session_expired" },
+      "/clubs/test-slug/app/home",
+      <RequireMemberApp>
+        <div>member content</div>
+      </RequireMemberApp>,
+    );
+
+    expect(screen.getByText("login")).toBeInTheDocument();
+    expectLoginReturnTo("/clubs/test-slug/app/home");
+    expect(screen.queryByText("멤버 화면을 확인하는 중")).not.toBeInTheDocument();
+    expect(screen.queryByText("member content")).not.toBeInTheDocument();
+  });
 });
 
 // ── RequireHost ──────────────────────────────────────────────────────────────
@@ -176,6 +211,21 @@ describe("RequireHost", () => {
     );
 
     expect(screen.getByText("login")).toBeInTheDocument();
+    expect(screen.queryByText("host content")).not.toBeInTheDocument();
+  });
+
+  it("redirects expired sessions to login instead of rendering loading", () => {
+    renderWithState(
+      { status: "session_expired" },
+      "/clubs/test-slug/app/host/sessions",
+      <RequireHost>
+        <div>host content</div>
+      </RequireHost>,
+    );
+
+    expect(screen.getByText("login")).toBeInTheDocument();
+    expectLoginReturnTo("/clubs/test-slug/app/host/sessions");
+    expect(screen.queryByText("호스트 권한을 확인하는 중")).not.toBeInTheDocument();
     expect(screen.queryByText("host content")).not.toBeInTheDocument();
   });
 });

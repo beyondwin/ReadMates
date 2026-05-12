@@ -1,8 +1,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import PendingApprovalPage from "@/src/pages/pending-approval";
 import { AuthContext } from "@/src/app/auth-state";
+import { PendingApprovalRoute } from "@/features/auth/route/pending-approval-route";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
 const viewerAuth: AuthMeResponse = {
@@ -74,5 +75,21 @@ describe("PendingApprovalPage", () => {
     expect(screen.getByRole("link", { name: "공개 기록 보기" })).toHaveAttribute("href", "/records");
     expect(screen.getByRole("link", { name: "공개 홈으로" })).toHaveAttribute("href", "/");
     expect(screen.queryByRole("link", { name: "이번 세션 보기" })).not.toBeInTheDocument();
+  });
+});
+
+describe("PendingApprovalRoute", () => {
+  it("redirects expired sessions to login instead of rendering loading", () => {
+    render(
+      <MemoryRouter initialEntries={["/app/pending"]}>
+        <Routes>
+          <Route path="/app/pending" element={<PendingApprovalRoute state={{ status: "session_expired" }} />} />
+          <Route path="/login" element={<div>login</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("login")).toBeInTheDocument();
+    expect(screen.queryByText("계정 승인 상태를 확인하는 중")).not.toBeInTheDocument();
   });
 });
