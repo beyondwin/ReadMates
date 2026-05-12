@@ -198,8 +198,14 @@ EOF
 
 RUNNING_IMAGE_ID="$(
   ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
-    "cd $(shell_quote "$REMOTE_DIR") && container=\$(sudo docker compose -f compose.yml ps -q readmates-api) && sudo docker inspect \"\$container\" --format '{{.Image}}'"
+    "cd $(shell_quote "$REMOTE_DIR") && container=\$(sudo docker compose -f compose.yml ps -q readmates-api) && sudo docker inspect \"\$container\" --format '{{.Image}}'" \
+    || true
 )"
+if [ -z "$RUNNING_IMAGE_ID" ]; then
+  remote_ledger_append "IMAGE_VERIFIED" "FAILED" "reason=running-image-id-empty expectedImageId=${EXPECTED_IMAGE_ID}"
+  echo "Failed to resolve running readmates-api image id via docker inspect" >&2
+  false
+fi
 if [ "$RUNNING_IMAGE_ID" != "$EXPECTED_IMAGE_ID" ]; then
   remote_ledger_append "IMAGE_VERIFIED" "FAILED" "expectedImageId=${EXPECTED_IMAGE_ID} runningImageId=${RUNNING_IMAGE_ID}"
   echo "Running readmates-api image mismatch: expected ${EXPECTED_IMAGE_ID}, got ${RUNNING_IMAGE_ID}" >&2
