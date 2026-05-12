@@ -2,6 +2,7 @@ package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.application.port.out.AllowedOriginPort
 import com.readmates.auth.application.port.out.BffSecretRotationAuditPort
+import com.readmates.shared.security.ClientIpHashingProperties
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -41,7 +42,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "test-base-secret",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "test-base-secret"),
             auditPort = capturingAuditPort(capturedAlias),
             auditExecutor = directAuditExecutor(),
         )
@@ -65,7 +66,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = capturingAuditPort(capturedAlias),
             auditExecutor = directAuditExecutor(),
         )
@@ -88,7 +89,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = capturingAuditPort(capturedAlias),
             auditModeRaw = "all",
             auditExecutor = directAuditExecutor(),
@@ -112,7 +113,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = capturingAuditPort(capturedAlias),
             auditModeRaw = "off",
             auditExecutor = directAuditExecutor(),
@@ -136,7 +137,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = auditPort,
         )
         val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
@@ -165,7 +166,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = auditPort,
             auditExecutor = directAuditExecutor(),
         )
@@ -187,7 +188,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = capturingAuditPort(AtomicReference()),
             auditExecutor = org.springframework.core.task.TaskExecutor {
                 throw org.springframework.core.task.TaskRejectedException("queue full")
@@ -212,7 +213,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = capturingAuditPort(capturedAlias),
         )
         val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
@@ -235,7 +236,7 @@ class BffSecretFilterAuditTest {
             legacyExpectedSecret = "",
             bffSecretRequired = true,
             allowedOriginPort = noopAllowedOriginPort(),
-            ipHashBaseSecret = "",
+            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
             auditPort = null,
         )
         val request = MockHttpServletRequest("GET", "/api/auth/me").apply {

@@ -4,11 +4,11 @@ import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitPort
 import com.readmates.shared.cache.RateLimitProperties
 import com.readmates.shared.security.ClientIpHashing
+import com.readmates.shared.security.ClientIpHashingProperties
 import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
@@ -24,12 +24,10 @@ class RateLimitFilter(
     private val properties: RateLimitProperties,
     @param:Value("\${readmates.bff-secret:}")
     private val legacyExpectedBffSecret: String = "",
-    @param:Value("\${READMATES_IP_HASH_BASE_SECRET:}")
-    private val ipHashBaseSecret: String = "",
+    private val ipHashingProperties: ClientIpHashingProperties = ClientIpHashingProperties(),
     @param:Value("\${readmates.security.bff.secrets:}")
     private val configuredBffSecretsRaw: String = "",
 ) : OncePerRequestFilter() {
-    private val log = LoggerFactory.getLogger(javaClass)
     private val trustedBffSecrets: List<String> =
         configuredBffSecretsRaw
             .split(',')
@@ -42,15 +40,6 @@ class RateLimitFilter(
                     ?.let(::listOf)
                     ?: emptyList()
             }
-
-    init {
-        if (ipHashBaseSecret.isBlank()) {
-            log.warn(
-                "READMATES_IP_HASH_BASE_SECRET is empty; weekly IP-hash salt rotation " +
-                "is degraded. Set this env var in production."
-            )
-        }
-    }
 
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -74,7 +63,11 @@ class RateLimitFilter(
 
     private fun HttpServletRequest.toRateLimitCheck(): RateLimitCheck? {
         val path = requestURI
-        val ipHash = ClientIpHashing.hashClientIp(rateLimitIdentifier(), ipHashBaseSecret)
+        val ipHash = ClientIpHashing.hashClientIp(
+            raw = rateLimitIdentifier(),
+            baseSecret = ipHashingProperties.baseSecret,
+            requireNonBlankSecret = false,
+        )
 
         return when {
             method == "GET" && path.startsWith("/oauth2/authorization/") ->

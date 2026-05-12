@@ -3,6 +3,7 @@ package com.readmates.auth.infrastructure.security
 import com.readmates.auth.application.port.out.AllowedOriginPort
 import com.readmates.auth.application.port.out.BffSecretRotationAuditPort
 import com.readmates.shared.security.ClientIpHashing
+import com.readmates.shared.security.ClientIpHashingProperties
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -27,8 +28,7 @@ class BffSecretFilter(
     @param:Value("\${readmates.bff-secret-required:true}")
     private val bffSecretRequired: Boolean,
     private val allowedOriginPort: AllowedOriginPort,
-    @param:Value("\${READMATES_IP_HASH_BASE_SECRET:}")
-    private val ipHashBaseSecret: String = "",
+    private val ipHashingProperties: ClientIpHashingProperties = ClientIpHashingProperties(),
     @param:Autowired(required = false)
     private val auditPort: BffSecretRotationAuditPort? = null,
     @param:Value("\${readmates.security.bff.audit-mode:rotation-only}")
@@ -106,7 +106,11 @@ class BffSecretFilter(
             return
         }
 
-        val clientIpHash = ClientIpHashing.hashClientIp(request.remoteAddr, ipHashBaseSecret)
+        val clientIpHash = ClientIpHashing.hashClientIp(
+            raw = request.remoteAddr,
+            baseSecret = ipHashingProperties.baseSecret,
+            requireNonBlankSecret = false,
+        )
         val path = request.requestURI
         val task = Runnable {
             try {
