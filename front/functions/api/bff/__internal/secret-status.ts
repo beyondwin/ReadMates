@@ -19,6 +19,9 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
     primarySecretFingerprint: primary ? await secretFingerprint(primary) : null,
   };
   return new Response(JSON.stringify(body), {
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    },
   });
 };

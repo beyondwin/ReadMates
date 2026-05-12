@@ -27,6 +27,7 @@ describe("GET /api/bff/__internal/secret-status", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("cache-control")).toBe("no-store");
 
     const body = await response.json() as {
       configuredSecretCount: number;
@@ -41,7 +42,7 @@ describe("GET /api/bff/__internal/secret-status", () => {
   it("returns configuredSecretCount=1 for legacy single-secret env", async () => {
     const response = await onRequestGet(
       context({
-        READMATES_BFF_SECRET: "single-legacy-secret",
+        READMATES_BFF_SECRET: "test-bff-secret",
       }),
     );
 
@@ -55,7 +56,7 @@ describe("GET /api/bff/__internal/secret-status", () => {
   });
 
   it("does not expose the raw secret value anywhere in the response body", async () => {
-    const rawSecret = "super-sensitive-bff-secret-value";
+    const rawSecret = "test-bff-secret";
     const response = await onRequestGet(
       context({
         READMATES_BFF_SECRETS: rawSecret,
