@@ -89,6 +89,8 @@ class OAuthReturnState(
             return null
         }
         val expectedSignature = signature(returnTo, expiresAtEpochSeconds)
+        // Not delegated to SecretComparator: this is HMAC signature verification (two computed digests),
+        // not multi-candidate secret matching. Timing-safe comparison is still preserved via MessageDigest.isEqual.
         if (!MessageDigest.isEqual(expectedSignature.toByteArray(Charsets.UTF_8), parts[2].toByteArray(Charsets.UTF_8))) {
             return null
         }

@@ -4,6 +4,7 @@ import com.readmates.auth.application.port.out.AllowedOriginPort
 import com.readmates.auth.application.port.out.BffSecretRotationAuditPort
 import com.readmates.shared.security.ClientIpHashing
 import com.readmates.shared.security.ClientIpHashingProperties
+import com.readmates.shared.security.SecretComparator
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -16,8 +17,6 @@ import org.springframework.core.task.TaskRejectedException
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 import java.net.URI
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 
 @Component
 class BffSecretFilter(
@@ -127,20 +126,8 @@ class BffSecretFilter(
         }
     }
 
-    private fun findMatchingSecretIndex(provided: String): Int {
-        val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
-        var matchedIndex = -1
-        secrets.forEachIndexed { idx, candidate ->
-            val candidateBytes = candidate.toByteArray(StandardCharsets.UTF_8)
-            if (MessageDigest.isEqual(providedBytes, candidateBytes)) {
-                matchedIndex = idx
-            }
-        }
-        return matchedIndex
-    }
-
     internal fun aliasFor(provided: String): String? =
-        when (val idx = findMatchingSecretIndex(provided)) {
+        when (val idx = SecretComparator.firstMatchingIndex(provided, secrets)) {
             -1 -> null
             0 -> "primary"
             1 -> "secondary"

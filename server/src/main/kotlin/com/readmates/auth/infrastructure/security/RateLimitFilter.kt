@@ -5,6 +5,7 @@ import com.readmates.auth.application.port.out.RateLimitPort
 import com.readmates.shared.cache.RateLimitProperties
 import com.readmates.shared.security.ClientIpHashing
 import com.readmates.shared.security.ClientIpHashingProperties
+import com.readmates.shared.security.SecretComparator
 import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -13,7 +14,6 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
-import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.time.Duration
 import java.util.HexFormat
@@ -152,24 +152,11 @@ class RateLimitFilter(
         }
 
         val provided = getHeader(BFF_SECRET_HEADER) ?: return null
-        if (!secretMatchesAny(provided)) {
+        if (!SecretComparator.matches(provided, trustedBffSecrets)) {
             return null
         }
 
         return getHeader(CLIENT_IP_HEADER).trimmedIdentifier()
-    }
-
-    private fun secretMatchesAny(provided: String): Boolean {
-        val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
-        var matches = false
-        for (expected in trustedBffSecrets) {
-            val expectedMatches = MessageDigest.isEqual(
-                providedBytes,
-                expected.toByteArray(StandardCharsets.UTF_8),
-            )
-            matches = expectedMatches || matches
-        }
-        return matches
     }
 
     private fun String?.trimmedIdentifier(): String? =
