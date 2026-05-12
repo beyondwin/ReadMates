@@ -48,6 +48,9 @@ data class NotificationEventMessage(
 fun clubScopedAppPath(clubSlug: String, path: String): String =
     "/clubs/$clubSlug/app/${path.trimStart('/')}"
 
+fun clubScopedAppHomePath(clubSlug: String): String =
+    "/clubs/$clubSlug/app"
+
 data class NotificationDeliveryItem(
     val id: UUID,
     val eventId: UUID,

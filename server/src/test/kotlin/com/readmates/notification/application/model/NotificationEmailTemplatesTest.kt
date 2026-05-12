@@ -24,7 +24,7 @@ class NotificationEmailTemplatesTest {
 
         assertThat(copy.title).isEqualTo("8회차 책이 공개되었습니다")
         assertThat(copy.body).isEqualTo("8회차 Distributed Systems 책이 공개되었습니다.")
-        assertThat(copy.deepLinkPath).isEqualTo("/clubs/reading-sai/app/sessions/$sessionId")
+        assertThat(copy.deepLinkPath).isEqualTo("/clubs/reading-sai/app")
         assertThat(copy.emailSubject).isEqualTo("8회차 책이 공개되었습니다")
         assertThat(copy.emailBodyText).contains(
             "읽는사이",
@@ -34,7 +34,7 @@ class NotificationEmailTemplatesTest {
             "회차: 8회차",
             "책: Distributed Systems",
             "확인할 일: 일정과 준비 메모",
-            "확인 링크: https://app.readmates.example/clubs/reading-sai/app/sessions/$sessionId",
+            "확인 링크: https://app.readmates.example/clubs/reading-sai/app",
             "읽는사이 알림 설정에 따라 발송된 메일입니다.",
         )
         assertThat(copy.emailBodyHtml).contains(
@@ -51,7 +51,7 @@ class NotificationEmailTemplatesTest {
             "확인",
             "일정과 준비 메모",
             "회차 확인하기",
-            "https://app.readmates.example/clubs/reading-sai/app/sessions/$sessionId",
+            "https://app.readmates.example/clubs/reading-sai/app",
             "다음 모임과 읽기 흐름에 맞춰 소식을 전합니다.",
             "알림 설정",
         )
@@ -67,7 +67,7 @@ class NotificationEmailTemplatesTest {
                 contextLabel = "준비",
                 context = "질문, 읽은 분량, 참석 상태",
                 cta = "모임 준비 확인하기",
-                path = "/clubs/reading-sai/app/sessions/$sessionId",
+                path = "/clubs/reading-sai/app/session/current",
             ),
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to ExpectedEmail(
                 subject = "8회차 피드백 문서가 올라왔습니다",
@@ -146,9 +146,9 @@ class NotificationEmailTemplatesTest {
         )
 
         assertThat(copy.emailBodyText)
-            .contains("확인 링크: http://localhost:3000/clubs/reading-sai/app/sessions/$sessionId")
+            .contains("확인 링크: http://localhost:3000/clubs/reading-sai/app")
         assertThat(copy.emailBodyHtml)
-            .contains("http://localhost:3000/clubs/reading-sai/app/sessions/$sessionId")
+            .contains("http://localhost:3000/clubs/reading-sai/app")
     }
 
     @Test

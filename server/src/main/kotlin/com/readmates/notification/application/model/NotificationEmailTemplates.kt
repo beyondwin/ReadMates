@@ -120,7 +120,7 @@ object NotificationEmailTemplates {
                 contextLabel = "확인",
                 context = "일정과 준비 메모",
                 ctaLabel = "회차 확인하기",
-                deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
+                deepLinkPath = clubScopedAppHomePath(clubSlug),
                 inAppBody = "${sessionNumber}회차 $bookTitle 책이 공개되었습니다.",
             )
 
@@ -132,7 +132,7 @@ object NotificationEmailTemplates {
                 contextLabel = "준비",
                 context = "질문, 읽은 분량, 참석 상태",
                 ctaLabel = "모임 준비 확인하기",
-                deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
+                deepLinkPath = clubScopedAppPath(clubSlug, "/session/current"),
                 inAppBody = "내일 ${sessionNumber}회차 $bookTitle 모임이 있습니다.",
             )
 
