@@ -95,6 +95,10 @@ function AuthProbe() {
     return <div data-testid="auth-state">loading</div>;
   }
 
+  if (state.status === "session_expired") {
+    return <div data-testid="auth-state">session_expired</div>;
+  }
+
   return <div data-testid="auth-state">{state.auth.approvalState}</div>;
 }
 
@@ -110,6 +114,17 @@ function AuthRefreshProbe() {
 
   if (state.status === "loading") {
     return <div data-testid="short-name">loading</div>;
+  }
+
+  if (state.status === "session_expired") {
+    return (
+      <>
+        <div data-testid="short-name">session_expired</div>
+        <button type="button" onClick={() => void refreshAuth()}>
+          refresh auth
+        </button>
+      </>
+    );
   }
 
   return (
@@ -132,6 +147,10 @@ function ImmediateRefreshProbe() {
 
   if (state.status === "loading") {
     return <div data-testid="short-name">loading</div>;
+  }
+
+  if (state.status === "session_expired") {
+    return <div data-testid="short-name">session_expired</div>;
   }
 
   return <div data-testid="short-name">{state.auth.displayName}</div>;
@@ -190,6 +209,34 @@ describe("AuthProvider", () => {
 
   it("fetches the auth payload without cache and falls back to anonymous on failure", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network failure"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
+  });
+
+  it("transitions to session_expired when /auth/me returns 401", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByTestId("auth-state")).toHaveTextContent("session_expired");
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
+  });
+
+  it("falls back to ready with anonymous auth when /auth/me returns a 500 error", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 500 }));
     vi.stubGlobal("fetch", fetchMock);
 
     render(

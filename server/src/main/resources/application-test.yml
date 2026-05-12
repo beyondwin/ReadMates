@@ -1,0 +1,5 @@
+readmates:
+  security:
+    ip-hash:
+      base-secret: test-ip-hash-base-secret
+      allow-empty-secret: false

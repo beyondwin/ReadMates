@@ -12,7 +12,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const state = useAuth();
   const loginPath = useLoginPathForCurrentRoute();
 
-  if (state.status === "loading") return <ReadmatesRouteLoading label="로그인 상태를 확인하는 중" variant="auth" />;
+  if (state.status !== "ready") return <ReadmatesRouteLoading label="로그인 상태를 확인하는 중" variant="auth" />;
   if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
 
   return <>{children}</>;
@@ -22,7 +22,7 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
   const state = useAuth();
   const loginPath = useLoginPathForCurrentRoute();
 
-  if (state.status === "loading") return <ReadmatesRouteLoading label="플랫폼 권한을 확인하는 중" variant="auth" />;
+  if (state.status !== "ready") return <ReadmatesRouteLoading label="플랫폼 권한을 확인하는 중" variant="auth" />;
   if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
   if (!canUsePlatformAdmin(state.auth)) return <BlockedPlatformAdmin />;
 
@@ -31,14 +31,10 @@ export function RequirePlatformAdmin({ children }: { children: ReactNode }) {
 
 export function RequireMemberApp({ children }: { children: ReactNode }) {
   const state = useAuth();
-  const { clubSlug } = useParams();
   const loginPath = useLoginPathForCurrentRoute();
 
-  if (state.status === "loading") return <ReadmatesRouteLoading label="멤버 화면을 확인하는 중" variant="member" />;
+  if (state.status !== "ready") return <ReadmatesRouteLoading label="멤버 화면을 확인하는 중" variant="member" />;
   if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
-  if (clubSlug) {
-    return <>{children}</>;
-  }
   if (!canUseMemberApp(state.auth)) {
     return <BlockedMemberApp />;
   }
@@ -53,11 +49,8 @@ export function RequireHost({ children }: { children: ReactNode }) {
   const { clubSlug } = useParams();
   const loginPath = useLoginPathForCurrentRoute();
 
-  if (state.status === "loading") return <ReadmatesRouteLoading label="호스트 권한을 확인하는 중" variant="host" />;
+  if (state.status !== "ready") return <ReadmatesRouteLoading label="호스트 권한을 확인하는 중" variant="host" />;
   if (!state.auth.authenticated) return <Navigate to={loginPath} replace />;
-  if (clubSlug) {
-    return <>{children}</>;
-  }
   if (!canUseHostApp(state.auth)) return <Navigate to={scopedAppPath(clubSlug)} replace />;
 
   return <>{children}</>;

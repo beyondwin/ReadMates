@@ -4,6 +4,7 @@ import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitDecision
 import com.readmates.auth.application.port.out.RateLimitPort
 import com.readmates.shared.cache.RateLimitProperties
+import com.readmates.shared.security.ClientIpHashingProperties
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -13,6 +14,8 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 
 class RateLimitFilterTest {
+    private val testIpHashingProperties = ClientIpHashingProperties(baseSecret = "test-ip-hash-secret")
+
     @Test
     fun `does not rate limit when disabled`() {
         val port = RecordingRateLimitPort(RateLimitDecision.allowed())
@@ -29,7 +32,11 @@ class RateLimitFilterTest {
     @Test
     fun `returns 429 when invitation preview is denied`() {
         val port = RecordingRateLimitPort(RateLimitDecision.denied(retryAfterSeconds = 60))
-        val filter = RateLimitFilter(port, RateLimitProperties(enabled = true))
+        val filter = RateLimitFilter(
+            rateLimitPort = port,
+            properties = RateLimitProperties(enabled = true),
+            ipHashingProperties = testIpHashingProperties,
+        )
         val request = MockHttpServletRequest("GET", "/api/invitations/raw-token")
         val response = MockHttpServletResponse()
 
@@ -47,7 +54,11 @@ class RateLimitFilterTest {
     @Test
     fun `rate limits club scoped invitation endpoints without leaking slug or token`() {
         val port = RecordingRateLimitPort(RateLimitDecision.allowed())
-        val filter = RateLimitFilter(port, RateLimitProperties(enabled = true))
+        val filter = RateLimitFilter(
+            rateLimitPort = port,
+            properties = RateLimitProperties(enabled = true),
+            ipHashingProperties = testIpHashingProperties,
+        )
 
         filter.doFilter(
             MockHttpServletRequest("GET", "/api/clubs/reading-sai/invitations/raw-token"),
@@ -70,7 +81,12 @@ class RateLimitFilterTest {
     @Test
     fun `uses trusted bff client ip header for anonymous rate limit key`() {
         val port = RecordingRateLimitPort(RateLimitDecision.allowed())
-        val filter = RateLimitFilter(port, RateLimitProperties(enabled = true), "test-bff-secret")
+        val filter = RateLimitFilter(
+            rateLimitPort = port,
+            properties = RateLimitProperties(enabled = true),
+            legacyExpectedBffSecret = "test-bff-secret",
+            ipHashingProperties = testIpHashingProperties,
+        )
         val firstRequest = invitationPreviewRequest("raw-token").apply {
             remoteAddr = "198.51.100.10"
             addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
@@ -93,7 +109,12 @@ class RateLimitFilterTest {
     @Test
     fun `ignores client ip header when bff secret is missing or wrong`() {
         val port = RecordingRateLimitPort(RateLimitDecision.allowed())
-        val filter = RateLimitFilter(port, RateLimitProperties(enabled = true), "test-bff-secret")
+        val filter = RateLimitFilter(
+            rateLimitPort = port,
+            properties = RateLimitProperties(enabled = true),
+            legacyExpectedBffSecret = "test-bff-secret",
+            ipHashingProperties = testIpHashingProperties,
+        )
         val missingSecretRequest = invitationPreviewRequest("raw-token").apply {
             remoteAddr = "198.51.100.10"
             addHeader("X-Readmates-Client-IP", "203.0.113.10")
@@ -120,6 +141,7 @@ class RateLimitFilterTest {
             rateLimitPort = port,
             properties = RateLimitProperties(enabled = true),
             legacyExpectedBffSecret = "",
+            ipHashingProperties = testIpHashingProperties,
             configuredBffSecretsRaw = "primary-bff-test,secondary-bff-test",
         )
         val firstRequest = invitationPreviewRequest("raw-token").apply {
@@ -148,6 +170,7 @@ class RateLimitFilterTest {
             rateLimitPort = port,
             properties = RateLimitProperties(enabled = true),
             legacyExpectedBffSecret = "",
+            ipHashingProperties = testIpHashingProperties,
             configuredBffSecretsRaw = "primary-bff-test,secondary-bff-test",
         )
         val firstRequest = invitationPreviewRequest("raw-token").apply {
@@ -176,6 +199,7 @@ class RateLimitFilterTest {
             rateLimitPort = port,
             properties = RateLimitProperties(enabled = true),
             legacyExpectedBffSecret = "legacy-bff-test",
+            ipHashingProperties = testIpHashingProperties,
             configuredBffSecretsRaw = "primary-bff-test",
         )
         val firstRequest = invitationPreviewRequest("raw-token").apply {

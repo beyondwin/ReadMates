@@ -48,6 +48,9 @@ readmates:
   security:
     bff:
       secrets: ${READMATES_BFF_SECRETS:}
+    ip-hash:
+      base-secret: ${READMATES_IP_HASH_BASE_SECRET:}
+      allow-empty-secret: false
   notifications:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
     sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:ReadMates}

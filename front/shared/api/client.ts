@@ -2,6 +2,20 @@ import { apiErrorFromResponse } from "@/shared/api/errors";
 import { parseReadmatesResponse } from "@/shared/api/response";
 import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
 
+export class ReadMatesSessionExpiredError extends Error {
+  constructor() {
+    super("ReadMatesSessionExpiredError");
+    this.name = "ReadMatesSessionExpiredError";
+  }
+}
+
+let lastLoginRedirectAt = 0;
+const REDIRECT_COOL_OFF_MS = 1500;
+
+export function __resetRedirectGuardForTest() {
+  lastLoginRedirectAt = 0;
+}
+
 export type ReadmatesApiContext = {
   clubSlug?: string;
 };
@@ -47,10 +61,13 @@ export async function readmatesFetchResponse(path: string, init?: RequestInit, c
   });
 
   if (response.status === 401) {
-    if (typeof window !== "undefined") {
+    const now = Date.now();
+    const inCoolOff = now - lastLoginRedirectAt < REDIRECT_COOL_OFF_MS;
+    if (typeof window !== "undefined" && !inCoolOff) {
+      lastLoginRedirectAt = now;
       window.location.assign(loginPathForReturnTo(currentRelativeReturnTo()));
     }
-    throw new Error("ReadMates session expired");
+    throw new ReadMatesSessionExpiredError();
   }
 
   return response;

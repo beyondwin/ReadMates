@@ -1,7 +1,10 @@
 import { createContext, useContext } from "react";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 
-export type AuthState = { status: "loading" } | { status: "ready"; auth: AuthMeResponse };
+export type AuthState =
+  | { status: "loading" }
+  | { status: "ready"; auth: AuthMeResponse }
+  | { status: "session_expired"; lastAuth?: AuthMeResponse };
 
 export type AuthActions = {
   markLoggedOut: () => void;

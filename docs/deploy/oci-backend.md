@@ -441,4 +441,4 @@ where used_at < utc_timestamp() - interval 30 day;
 
 `READMATES_IP_HASH_BASE_SECRET` 환경변수는 client IP hash의 주간 salt rotation에서 base secret 역할을 한다. 한 번 생성한 후 manual rotation 대상이 아니다.
 생성: `openssl rand -base64 32`. 값은 `/etc/readmates/readmates.env`에 추가하고 1Password에 저장한다.
-누락 시 rate limit 자체는 동작하지만, cross-week linking 방지 효과가 사라지고 Spring startup log에 WARN이 출력된다.
+운영 프로파일(`spring.profiles.active`가 비어 있거나 `production` 포함)에서 비어 있으면 startup이 명시적 메시지와 함께 실패한다(DEF-002). test 프로파일에서는 빈 값을 허용하되 WARN이 출력된다.

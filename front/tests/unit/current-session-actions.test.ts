@@ -12,8 +12,10 @@ import { saveQuestion, saveQuestions } from "@/features/current-session/actions/
 import { saveLongReview, saveOneLineReview } from "@/features/current-session/actions/save-review";
 import { updateRsvp } from "@/features/current-session/actions/update-rsvp";
 import { currentSessionAction } from "@/features/current-session/route/current-session-data";
+import { ReadMatesSessionExpiredError, __resetRedirectGuardForTest } from "@/shared/api/client";
 
 afterEach(() => {
+  __resetRedirectGuardForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -157,7 +159,7 @@ describe("current session actions", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", { assign: assignMock });
 
-    await expect(saveCheckin(10)).rejects.toThrow("ReadMates session expired");
+    await expect(saveCheckin(10)).rejects.toThrow(ReadMatesSessionExpiredError);
 
     expect(assignMock).toHaveBeenCalledWith("/login");
   });

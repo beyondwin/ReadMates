@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInvitation, listInvitations, revokeInvitation } from "@/features/host/actions/invitations";
+import { ReadMatesSessionExpiredError, __resetRedirectGuardForTest } from "@/shared/api/client";
 
 afterEach(() => {
+  __resetRedirectGuardForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -49,7 +51,7 @@ describe("host invitation actions", () => {
     vi.stubGlobal("fetch", fetchMock);
     vi.stubGlobal("location", { assign: assignMock });
 
-    await expect(listInvitations()).rejects.toThrow("ReadMates session expired");
+    await expect(listInvitations()).rejects.toThrow(ReadMatesSessionExpiredError);
 
     expect(assignMock).toHaveBeenCalledWith("/login");
   });

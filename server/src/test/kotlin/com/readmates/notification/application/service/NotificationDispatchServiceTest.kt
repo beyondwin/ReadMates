@@ -397,12 +397,43 @@ class NotificationDispatchServiceTest {
         assertThat(deliveryPort.dead).isEmpty()
     }
 
+    @Test
+    fun `unknown delivery status is treated as retryable and counter increments`() {
+        val registry = SimpleMeterRegistry()
+        val deliveryPort = FakeDeliveryPort(
+            deliveries = listOf(emailDelivery()),
+            claimable = false,
+            findDeliveryStatusOverride = { null },
+        )
+        val mailPort = RecordingMailPort()
+        val service = NotificationDispatchService(
+            deliveryPort = deliveryPort,
+            deliveryEngine = NotificationDeliveryEngine(
+                deliveryPort = deliveryPort,
+                mailDeliveryPort = mailPort,
+                metrics = dispatchTestMetrics(),
+                maxAttempts = 5,
+                retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+            ),
+            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            meterRegistry = registry,
+        )
+
+        assertThatThrownBy { service.dispatch(message()) }
+            .isInstanceOf(NotificationDeliveryRetryableException::class.java)
+            .hasMessageContaining("UNKNOWN")
+
+        assertThat(registry.get("notification.dispatch.unknown_status").counter().count())
+            .isGreaterThanOrEqualTo(1.0)
+    }
+
     private fun notificationDispatchService(
         deliveryPort: NotificationDeliveryPort,
         mailPort: MailDeliveryPort,
         metrics: ReadmatesOperationalMetrics = dispatchTestMetrics(),
         maxAttempts: Int = 5,
         retryDelayMinutesConfig: List<Long> = listOf(5L, 15L, 60L, 240L),
+        meterRegistry: io.micrometer.core.instrument.MeterRegistry = SimpleMeterRegistry(),
     ): NotificationDispatchService =
         NotificationDispatchService(
             deliveryPort = deliveryPort,
@@ -414,6 +445,7 @@ class NotificationDispatchServiceTest {
                 retryDelayMinutesConfig = retryDelayMinutesConfig,
             ),
             transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            meterRegistry = meterRegistry,
         )
 
     private fun message(): NotificationEventMessage =
@@ -503,6 +535,7 @@ class NotificationDispatchServiceTest {
         private val markFailedResult: Boolean = true,
         private val markDeadResult: Boolean = true,
         private val eventType: NotificationEventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+        private val findDeliveryStatusOverride: ((UUID) -> NotificationDeliveryStatus?)? = null,
     ) : NotificationDeliveryPort {
         val persistedMessages = mutableListOf<NotificationEventMessage>()
         val claimedIds = mutableListOf<UUID>()
@@ -556,7 +589,11 @@ class NotificationDispatchServiceTest {
                 ?.let { claimEmailDelivery(it.id) }
 
         override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
-            deliveries.firstOrNull { it.id == id }?.status
+            if (findDeliveryStatusOverride != null) {
+                findDeliveryStatusOverride.invoke(id)
+            } else {
+                deliveries.firstOrNull { it.id == id }?.status
+            }
 
         override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean {
             sent += id to lockedAt

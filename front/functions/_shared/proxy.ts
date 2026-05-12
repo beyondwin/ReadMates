@@ -70,6 +70,37 @@ export function bffSecretFromEnv(env: {
   return null;
 }
 
+export function getConfiguredBffSecrets(env: {
+  READMATES_BFF_SECRETS?: string;
+  READMATES_BFF_SECRET?: string;
+}): string[] {
+  const list = env.READMATES_BFF_SECRETS?.trim();
+  if (list) {
+    return list
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+  }
+  const legacy = env.READMATES_BFF_SECRET?.trim();
+  return legacy ? [legacy] : [];
+}
+
+export function getRotationStage(env: {
+  BFF_SECRET_ROTATION_STAGE?: string;
+}): "stable" | "staging" {
+  const raw = env.BFF_SECRET_ROTATION_STAGE?.trim().toLowerCase();
+  return raw === "staging" ? "staging" : "stable";
+}
+
+export async function secretFingerprint(secret: string): Promise<string> {
+  const data = new TextEncoder().encode(secret);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  const hex = Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hex.slice(0, 6);
+}
+
 export function forwardedOAuthRequestHeaders(
   request: Request,
   env: { READMATES_BFF_SECRETS?: string; READMATES_BFF_SECRET?: string },

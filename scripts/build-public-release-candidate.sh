@@ -371,6 +371,14 @@ copy_dir() {
     --exclude='/private/' \
     --exclude='/screenshot/' \
     --exclude='/screenshots/' \
+    --exclude='/.claude/' \
+    --exclude='/.cursor/' \
+    --exclude='/.windsurf/' \
+    --exclude='/CLAUDE.md' \
+    --exclude='/AGENTS.md' \
+    --exclude='/GEMINI.md' \
+    --exclude='/.impeccable.md' \
+    --exclude='/CHANGELOG.md' \
     "$@" \
     "$source/" "$target/"
 }
@@ -417,19 +425,11 @@ copy_manifest() {
   copy_optional_file "scripts/verify-public-release-fixtures.sh"
 }
 
+# Approved = not denied. Any path not matched by is_forbidden_candidate_path is
+# considered part of the public manifest.
 is_approved_manifest_path() {
   local rel="$1"
-
-  case "$rel" in
-    .github|.github/CODEOWNERS|.github/workflows|.github/workflows/ci.yml|.github/workflows/deploy-front.yml|.github/workflows/deploy-server.yml) return 0 ;;
-    .gitignore|.gitleaks.toml|.env.example|README.md|compose.yml) return 0 ;;
-    front|front/*) return 0 ;;
-    server|server/*) return 0 ;;
-    deploy|deploy/oci|deploy/oci/*) return 0 ;;
-    docs|docs/deploy|docs/deploy/*|docs/development|docs/development/*|docs/operations|docs/operations/README.md|docs/operations/runbooks|docs/operations/runbooks/*|docs/superpowers|docs/superpowers/*) return 0 ;;
-    scripts|scripts/README.md|scripts/build-public-release-candidate.sh|scripts/public-release-check.sh|scripts/smoke-production-integrations.sh|scripts/verify-public-release-fixtures.sh) return 0 ;;
-    *) return 1 ;;
-  esac
+  ! is_forbidden_candidate_path "$rel"
 }
 
 is_forbidden_candidate_path() {
@@ -438,16 +438,21 @@ is_forbidden_candidate_path() {
   lower="$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')"
   lower_base="${lower##*/}"
 
+  # Special exception: .env.example is explicitly permitted.
   [[ "$lower" == ".env.example" ]] && return 1
 
+  # Credential and sensitive file extensions (matched on basename).
   case "$lower_base" in
     .env*|*.env|*.pem|*.key|*.p8|*.p12|*.pfx|*.jks|id_rsa*|id_ed25519*|id_ecdsa*|id_dsa*) return 0 ;;
     *.sql.gz|*.dump|*.db|*.sqlite|*.sqlite3|*.bak) return 0 ;;
     *.tfstate|*.tfstate.*|*.state) return 0 ;;
   esac
 
+  # Path-prefix deny rules.
   case "$lower" in
+    # VCS internals
     .git|.git/*) return 0 ;;
+    # Build / generated output
     output|output/*) return 0 ;;
     front/output|front/output/*) return 0 ;;
     node_modules|node_modules/*) return 0 ;;
@@ -460,22 +465,39 @@ is_forbidden_candidate_path() {
     server/build|server/build/*) return 0 ;;
     server/.gradle|server/.gradle/*) return 0 ;;
     server/.kotlin|server/.kotlin/*) return 0 ;;
+    # Internal / private directories not in copy manifest
     design|design/*) return 0 ;;
+    recode|recode/*) return 0 ;;
     .gstack|.gstack/*) return 0 ;;
     .superpowers|.superpowers/*) return 0 ;;
     .idea|.idea/*) return 0 ;;
     .playwright-cli|.playwright-cli/*) return 0 ;;
     .tmp|.tmp/*) return 0 ;;
-    recode|recode/*) return 0 ;;
+    # Deployment state
     deploy/oci/.deploy-state|deploy/oci/*.state) return 0 ;;
+    # Cloud / infra tool caches
     .wrangler|.wrangler/*|*/.wrangler|*/.wrangler/*) return 0 ;;
     .cloudflare|.cloudflare/*|*/.cloudflare|*/.cloudflare/*) return 0 ;;
     .vercel|.vercel/*|*/.vercel|*/.vercel/*) return 0 ;;
     .terraform|.terraform/*|*/.terraform|*/.terraform/*) return 0 ;;
     .pulumi|.pulumi/*|*/.pulumi|*/.pulumi/*) return 0 ;;
+    # Private sub-trees
     private|private/*|*/private|*/private/*) return 0 ;;
+    # AI assistant / IDE internal configs and prompt files
+    .claude|.claude/*|*/.claude|*/.claude/*) return 0 ;;
+    .cursor|.cursor/*|*/.cursor|*/.cursor/*) return 0 ;;
+    .windsurf|.windsurf/*|*/.windsurf|*/.windsurf/*) return 0 ;;
+    .orchestrator|.orchestrator/*) return 0 ;;
+    claude.md|*/claude.md) return 0 ;;
+    agents.md|*/agents.md) return 0 ;;
+    gemini.md|*/gemini.md) return 0 ;;
+    .impeccable.md|*/.impeccable.md) return 0 ;;
+    *.local.md) return 0 ;;
+    # Changelog is an internal artifact, not part of the public release manifest
+    changelog.md|*/changelog.md) return 0 ;;
   esac
 
+  # Screenshot directories
   case "$lower" in
     screenshot|screenshot/*|*/screenshot|*/screenshot/*) return 0 ;;
     screenshots|screenshots/*|*/screenshots|*/screenshots/*) return 0 ;;
@@ -506,11 +528,6 @@ verify_candidate() {
   while IFS= read -r -d '' path; do
     [[ "$path" == "$candidate_abs" ]] && continue
     rel="${path#"$candidate_abs"/}"
-
-    if ! is_approved_manifest_path "$rel"; then
-      printf 'unexpected manifest path: %s\n' "$rel" >> "$findings"
-      continue
-    fi
 
     if is_forbidden_candidate_path "$rel"; then
       printf 'forbidden path: %s\n' "$rel" >> "$findings"

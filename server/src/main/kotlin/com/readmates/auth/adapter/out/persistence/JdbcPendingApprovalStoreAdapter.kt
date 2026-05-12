@@ -4,10 +4,8 @@ import com.readmates.auth.application.port.out.PendingApprovalRow
 import com.readmates.auth.application.port.out.PendingApprovalStorePort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
-import org.springframework.web.server.ResponseStatusException
 import java.time.LocalDate
 import java.util.UUID
 

@@ -21,6 +21,7 @@ ATTEMPT_ID="${READMATES_DEPLOY_ATTEMPT_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$RANDOM}"
 ATTEMPT_STARTED_EPOCH="$(date -u +%s)"
 ATTEMPT_STAGE="init"
 REMOTE_LEDGER="${READMATES_DEPLOY_LEDGER:-/var/log/readmates/deploy-attempts.jsonl}"
+LEDGER_FORMAT="${READMATES_LEDGER_FORMAT:-both}"
 
 SSH_OPTIONS=(-i "$SSH_KEY" -o "StrictHostKeyChecking=${SSH_STRICT_HOST_KEY_CHECKING}")
 trap on_deploy_error ERR
@@ -62,21 +63,57 @@ duration_seconds() {
   echo $((now - ATTEMPT_STARTED_EPOCH))
 }
 
-remote_ledger_append() {
-  local event="$1"
-  local status="$2"
-  local detail="${3:-}"
-  local at duration payload
-  at="$(utc_now)"
-  duration="$(duration_seconds)"
-  payload="{\"attemptId\":\"$(json_escape "$ATTEMPT_ID")\",\"event\":\"$(json_escape "$event")\",\"status\":\"$(json_escape "$status")\",\"stage\":\"$(json_escape "$ATTEMPT_STAGE")\",\"at\":\"$at\",\"durationSeconds\":$duration"
-  if [ -n "$detail" ]; then
-    payload="${payload},\"detail\":\"$(json_escape "$detail")\""
-  fi
-  payload="${payload}}"
+_ledger_remote_emit() {
+  local payload="$1"
   ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
     "sudo install -d -o root -g readmates -m 0750 /var/log/readmates && sudo touch $(shell_quote "$REMOTE_LEDGER") && sudo chown root:readmates $(shell_quote "$REMOTE_LEDGER") && sudo chmod 0640 $(shell_quote "$REMOTE_LEDGER") && printf '%s\n' $(shell_quote "$payload") | sudo tee -a $(shell_quote "$REMOTE_LEDGER") >/dev/null" \
     || true
+}
+
+remote_ledger_append() {
+  local event="$1"
+  local status="$2"
+  local detail_string="${3:-}"
+  local at duration legacy_payload json_payload
+  at="$(utc_now)"
+  duration="$(duration_seconds)"
+
+  # Always build legacy payload (no jq needed)
+  legacy_payload="{\"attemptId\":\"$(json_escape "$ATTEMPT_ID")\",\"event\":\"$(json_escape "$event")\",\"status\":\"$(json_escape "$status")\",\"stage\":\"$(json_escape "$ATTEMPT_STAGE")\",\"at\":\"$at\",\"durationSeconds\":$duration"
+  if [ -n "$detail_string" ]; then
+    legacy_payload="${legacy_payload},\"detail\":\"$(json_escape "$detail_string")\""
+  fi
+  legacy_payload="${legacy_payload}}"
+
+  # Only build JSON payload if it will be emitted (jq not needed in legacy mode)
+  if [ "$LEDGER_FORMAT" != "legacy" ]; then
+    local detail_object json_payload_inner
+    if [ -n "$detail_string" ]; then
+      detail_object="$(printf '%s' "$detail_string" | jq -Rn \
+        '[inputs | split(" ")[] | select(length > 0) | capture("^(?<k>[^=]+)=(?<v>.*)$") // {k: ., v: ""}] | map({(.k): .v}) | add // {}' 2>/dev/null || echo '{}')"
+    else
+      detail_object='{}'
+    fi
+    json_payload_inner="$(jq -nc \
+      --arg ts "$at" \
+      --arg stage "$ATTEMPT_STAGE" \
+      --arg event "$event" \
+      --arg status "$status" \
+      --argjson detail "$detail_object" \
+      --arg attemptId "$ATTEMPT_ID" \
+      --argjson durationSeconds "$duration" \
+      '{ts:$ts, stage:$stage, event:$event, status:$status, detail:$detail, attemptId:$attemptId, durationSeconds:$durationSeconds}' 2>/dev/null || echo '')"
+    json_payload="$json_payload_inner"
+  else
+    json_payload=""
+  fi
+
+  if [ "$LEDGER_FORMAT" != "json" ]; then
+    _ledger_remote_emit "$legacy_payload"
+  fi
+  if [ "$LEDGER_FORMAT" != "legacy" ] && [ -n "$json_payload" ]; then
+    _ledger_remote_emit "$json_payload"
+  fi
 }
 
 mark_stage() {

@@ -3,6 +3,8 @@ package com.readmates.auth.adapter.out.persistence
 import com.readmates.auth.application.port.out.HostMemberListRow
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
+import com.readmates.auth.domain.IllegalMemberStateTransitionException
+import com.readmates.auth.domain.MemberLifecycleStatus
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.session.domain.SessionParticipationStatus
@@ -13,10 +15,8 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
-import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
 import java.util.UUID
 
@@ -120,8 +120,9 @@ class JdbcMemberLifecycleStoreAdapter(
         return pageFromRows(rows, pageRequest.limit, ::hostMemberCursor)
     }
 
-    override fun suspendActiveMember(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate.update(
+    override fun suspendActiveMember(clubId: UUID, membershipId: UUID): Boolean {
+        validateTransition(clubId, membershipId, MemberLifecycleStatus.SUSPENDED)
+        return jdbcTemplate.update(
             """
             update memberships
             set status = 'SUSPENDED',
@@ -134,9 +135,11 @@ class JdbcMemberLifecycleStoreAdapter(
             membershipId.dbString(),
             clubId.dbString(),
         ) == 1
+    }
 
-    override fun restoreSuspendedMember(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate.update(
+    override fun restoreSuspendedMember(clubId: UUID, membershipId: UUID): Boolean {
+        validateTransition(clubId, membershipId, MemberLifecycleStatus.ACTIVE)
+        return jdbcTemplate.update(
             """
             update memberships
             set status = 'ACTIVE',
@@ -150,9 +153,11 @@ class JdbcMemberLifecycleStoreAdapter(
             membershipId.dbString(),
             clubId.dbString(),
         ) == 1
+    }
 
-    override fun markMemberLeftByHost(clubId: UUID, membershipId: UUID): Boolean =
-        jdbcTemplate.update(
+    override fun markMemberLeftByHost(clubId: UUID, membershipId: UUID): Boolean {
+        validateTransition(clubId, membershipId, MemberLifecycleStatus.LEFT)
+        return jdbcTemplate.update(
             """
             update memberships
             set status = 'LEFT',
@@ -165,6 +170,7 @@ class JdbcMemberLifecycleStoreAdapter(
             membershipId.dbString(),
             clubId.dbString(),
         ) == 1
+    }
 
     override fun markMembershipLeft(clubId: UUID, membershipId: UUID): Boolean =
         jdbcTemplate.update(
@@ -333,6 +339,24 @@ class JdbcMemberLifecycleStoreAdapter(
             membershipId.dbString(),
             clubId.dbString(),
         ).firstOrNull()
+
+    private fun validateTransition(clubId: UUID, membershipId: UUID, next: MemberLifecycleStatus) {
+        val currentStatusValue = jdbcTemplate.queryForObject(
+            """
+            select status
+            from memberships
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            String::class.java,
+            membershipId.dbString(),
+            clubId.dbString(),
+        ) ?: return
+        val current = MemberLifecycleStatus.fromStorage(currentStatusValue)
+        if (!current.allowsTransitionTo(next)) {
+            throw IllegalMemberStateTransitionException(current, next)
+        }
+    }
 
     private fun ResultSet.toLifecycleMembershipRow(): LifecycleMembershipRow =
         LifecycleMembershipRow(

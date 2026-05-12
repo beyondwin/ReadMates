@@ -133,4 +133,24 @@ if ./scripts/public-release-check.sh "$artifact_fixture" > "$artifact_fixture.ou
 fi
 assert_file_contains "$artifact_fixture.err" "forbidden candidate path: front/test-results/.last-run.json"
 
+candidate_dir="$repo_abs/.tmp/public-release-candidate"
+coverage_fixture="$repo_abs/scripts/fixtures/public-release-candidate-coverage.txt"
+
+if [[ ! -d "$candidate_dir" ]]; then
+  fail "public-release candidate not found at $candidate_dir; run scripts/build-public-release-candidate.sh first"
+fi
+
+if [[ ! -f "$coverage_fixture" ]]; then
+  fail "coverage fixture not found at $coverage_fixture"
+fi
+
+candidate_top="$(ls -a "$candidate_dir" | sort | grep -v '^[.]$' | grep -v '^[.][.]$')"
+expected_top="$(cat "$coverage_fixture" | sort)"
+
+if [ "$candidate_top" != "$expected_top" ]; then
+  printf 'public release candidate top-level mismatch:\n' >&2
+  diff <(printf '%s\n' "$expected_top") <(printf '%s\n' "$candidate_top") >&2 || true
+  fail "public release candidate top-level does not match scripts/fixtures/public-release-candidate-coverage.txt"
+fi
+
 printf 'Public-release fixture checks passed.\n'

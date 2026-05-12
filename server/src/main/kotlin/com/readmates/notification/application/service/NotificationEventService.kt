@@ -14,6 +14,10 @@ private const val SESSION_AGGREGATE_TYPE = "SESSION"
 class NotificationEventService(
     private val eventOutboxPort: NotificationEventOutboxPort,
 ) : RecordNotificationEventUseCase {
+    /**
+     * Dedupe policy: feedback-document keys include the document version so each revision
+     * triggers exactly one notification. See ADR-0015.
+     */
     override fun recordFeedbackDocumentPublished(
         clubId: UUID,
         sessionId: UUID,
@@ -36,6 +40,10 @@ class NotificationEventService(
         )
     }
 
+    /**
+     * Dedupe policy: one notification per session; the same book is not announced twice.
+     * See ADR-0015.
+     */
     override fun recordNextBookPublished(
         clubId: UUID,
         sessionId: UUID,
@@ -56,6 +64,9 @@ class NotificationEventService(
         )
     }
 
+    /**
+     * Dedupe policy: one notification per (session, author) pair. See ADR-0015.
+     */
     override fun recordReviewPublished(
         clubId: UUID,
         sessionId: UUID,

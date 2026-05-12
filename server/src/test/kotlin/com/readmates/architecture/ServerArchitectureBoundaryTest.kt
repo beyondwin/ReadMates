@@ -127,25 +127,8 @@ class ServerArchitectureBoundaryTest {
             "org.springframework.http.",
             "org.springframework.web.",
         )
-        val baselineExceptionClasses = setOf(
-            "com.readmates.auth.adapter.out.persistence.JdbcMemberApprovalStoreAdapter",
-            "com.readmates.auth.adapter.out.persistence.JdbcMemberLifecycleStoreAdapter",
-            "com.readmates.auth.adapter.out.persistence.JdbcMemberProfileStoreAdapter",
-            "com.readmates.auth.adapter.out.persistence.JdbcPendingApprovalStoreAdapter",
-            "com.readmates.feedback.adapter.out.persistence.JdbcFeedbackDocumentStoreAdapter",
-        )
-        val baselineExceptionImports = setOf(
-            "com/readmates/auth/adapter/out/persistence/JdbcMemberApprovalStoreAdapter.kt: import org.springframework.http.HttpStatus",
-            "com/readmates/auth/adapter/out/persistence/JdbcMemberApprovalStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
-            "com/readmates/auth/adapter/out/persistence/JdbcMemberLifecycleStoreAdapter.kt: import org.springframework.http.HttpStatus",
-            "com/readmates/auth/adapter/out/persistence/JdbcMemberLifecycleStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
-            "com/readmates/auth/adapter/out/persistence/JdbcMemberProfileStoreAdapter.kt: import org.springframework.http.HttpStatus",
-            "com/readmates/auth/adapter/out/persistence/JdbcMemberProfileStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
-            "com/readmates/auth/adapter/out/persistence/JdbcPendingApprovalStoreAdapter.kt: import org.springframework.http.HttpStatus",
-            "com/readmates/auth/adapter/out/persistence/JdbcPendingApprovalStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
-            "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.http.HttpStatus",
-            "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
-        )
+        val baselineExceptionClasses = emptySet<String>()
+        val baselineExceptionImports = emptySet<String>()
         val bytecodeViolations = importedClasses
             .filter { javaClass -> javaClass.packageName.contains(".adapter.out.persistence") }
             .filterNot { javaClass -> javaClass.name in baselineExceptionClasses }
