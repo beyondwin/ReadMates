@@ -123,32 +123,25 @@ class BffSecretFilter(
         }
     }
 
-    private fun matchesAny(provided: String, candidates: List<String>): Boolean {
+    private fun findMatchingSecretIndex(provided: String): Int {
         val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
-        var matched = false
-        for (candidate in candidates) {
+        var matchedIndex = -1
+        secrets.forEachIndexed { idx, candidate ->
             val candidateBytes = candidate.toByteArray(StandardCharsets.UTF_8)
             if (MessageDigest.isEqual(providedBytes, candidateBytes)) {
-                matched = true
-                // no early return — iterate all for timing uniformity
+                matchedIndex = idx
             }
         }
-        return matched
+        return matchedIndex
     }
 
-    internal fun aliasFor(provided: String): String? {
-        val providedBytes = provided.toByteArray(StandardCharsets.UTF_8)
-        secrets.forEachIndexed { idx, candidate ->
-            if (MessageDigest.isEqual(providedBytes, candidate.toByteArray(StandardCharsets.UTF_8))) {
-                return when (idx) {
-                    0 -> "primary"
-                    1 -> "secondary"
-                    else -> "index_$idx"
-                }
-            }
+    internal fun aliasFor(provided: String): String? =
+        when (val idx = findMatchingSecretIndex(provided)) {
+            -1 -> null
+            0 -> "primary"
+            1 -> "secondary"
+            else -> "index_$idx"
         }
-        return null
-    }
 
     private fun hasAllowedOrigin(request: HttpServletRequest): Boolean {
         val origin = request.getHeader("Origin")?.toOrigin()
