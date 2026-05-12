@@ -16,6 +16,18 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
+/**
+ * Resolves authorities for the current principal.
+ *
+ * Branching rules:
+ * - When [RequestedClubContext.source] is SLUG and the slug is registered, lookup the member and synthesize
+ *   role + host + platform admin authorities.
+ * - When [RequestedClubContext.source] is SLUG and the slug is NOT registered (`supplied=true && context=null`),
+ *   the member lookup is intentionally skipped (`member=null`). Authorities are then composed entirely from
+ *   platform admin + host support grants. Do NOT add a `member==null` short-circuit guard above this branch;
+ *   doing so would silently strip support-grant authorities. See ADR-0013 for context.
+ * - When [RequestedClubContext.source] is HOST_FALLBACK or NONE, return an unscoped principal.
+ */
 @Component
 class MemberAuthoritiesFilter(
     private val authenticatedMemberResolver: AuthenticatedMemberResolver,
