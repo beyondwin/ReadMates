@@ -47,10 +47,14 @@ READMATES_SMOKE_CLUB_HOST="${READMATES_SMOKE_CLUB_HOST:-}" \
 echo "==> [watch] recent backend errors"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "sudo bash -s -- $(shell_quote "$REMOTE_DIR")" <<'EOF'
-set -euo pipefail
+set -uo pipefail
 remote_dir="$1"
 cd "$remote_dir"
-if sudo docker compose -f compose.yml logs --since 10m readmates-api 2>/dev/null | grep -E 'ERROR|Exception|Caused by' | tail -120; then
+matches="$(sudo docker compose -f compose.yml logs --since 10m readmates-api 2>/dev/null \
+  | grep -E '[[:space:]]ERROR[[:space:]]' \
+  | tail -120 || true)"
+if [ -n "$matches" ]; then
+  printf '%s\n' "$matches"
   exit 1
 fi
 EOF
