@@ -10,10 +10,8 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
-import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
 import java.time.OffsetDateTime
 import java.util.UUID
