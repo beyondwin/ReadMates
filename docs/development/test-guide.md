@@ -60,7 +60,7 @@ pnpm --dir front test:e2e
 - 기본 backend origin은 `READMATES_API_BASE_URL`이 없으면 `http://127.0.0.1:18080`입니다.
 - `READMATES_E2E_DB_NAME`이 없으면 E2E database 이름은 현재 운영 migration과 dev seed SQL 내용의 fingerprint를 붙인 `readmates_e2e_<hash>` 형태로 정합니다. migration 파일이 바뀌면 기본 schema 이름도 바뀌므로 오래된 로컬 `readmates_e2e` schema의 Flyway checksum history가 기본 명령을 막지 않습니다.
 - E2E backend의 Actuator management port는 `READMATES_MANAGEMENT_PORT=0`으로 실행해 로컬 `8081` 점유 상태와 충돌하지 않게 합니다. Playwright readiness는 여전히 backend API origin의 `/internal/health`를 기준으로 확인하므로 backend startup failure는 숨기지 않습니다.
-- E2E backend는 `SPRING_PROFILES_ACTIVE=dev`, `READMATES_FLYWAY_LOCATIONS=classpath:db/mysql/migration,classpath:db/mysql/dev`, BFF secret placeholder로 실행됩니다.
+- E2E backend는 `SPRING_PROFILES_ACTIVE=dev`, `READMATES_FLYWAY_LOCATIONS=classpath:db/mysql/migration,classpath:db/mysql/dev`, BFF secret placeholder, IP hash base secret placeholder로 실행됩니다. 이는 non-production blank IP hash secret도 명시 opt-in 없이는 실패하는 server validation과 맞춥니다.
 - 테스트에서 운영 migration 경로를 지정할 때도 `classpath:db/mysql/migration`을 사용합니다. `dev` profile 또는 E2E seed가 필요한 경우에만 `classpath:db/mysql/dev`를 뒤에 추가합니다.
 - E2E database 연결은 `READMATES_E2E_DB_HOST`, `READMATES_E2E_DB_PORT`, `READMATES_E2E_DB_USER`, `READMATES_E2E_DB_PASSWORD`, `READMATES_E2E_DB_NAME`으로 조정할 수 있습니다. 공개 문서에서는 정확한 로컬 DB 이름 대신 placeholder를 사용합니다.
 - Playwright config는 `mysql` CLI로 E2E database를 생성하므로 로컬 MySQL server와 MySQL client가 필요합니다. E2E user에 `CREATE DATABASE` 권한이 없다면 admin 계정으로 별도 E2E schema를 미리 만들고 해당 schema에만 E2E user 권한을 부여한 뒤 `READMATES_E2E_DB_NAME`으로 지정합니다. 직접 지정한 기존 schema에서 Flyway checksum mismatch가 나면 `repair`나 drop 대신 `READMATES_E2E_DB_NAME`을 비우거나 새 schema 이름을 지정하는 편이 안전합니다.

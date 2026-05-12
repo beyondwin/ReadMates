@@ -53,10 +53,12 @@ Cloudflare Pages 운영 환경에는 아래 값을 설정합니다.
 | `VITE_PUBLIC_PRIMARY_DOMAIN` | Public canonical URL을 만들 primary domain입니다. Primary domain이 없으면 비워두고, `readmates.pages.dev`는 `noindex` fallback으로만 사용합니다. |
 | `READMATES_API_BASE_URL` | OCI Spring API의 공개 HTTPS origin, 예: `https://api.example.com` |
 | `READMATES_BFF_SECRET` | Spring `READMATES_BFF_SECRET`과 같은 공유 secret |
+| `READMATES_BFF_SECRETS` | 무중단 rotation 중에 쓰는 comma-separated secret list입니다. 첫 non-blank 값이 Spring으로 전달되는 primary secret이며, 설정되면 `READMATES_BFF_SECRET`보다 우선합니다. |
+| `BFF_SECRET_ROTATION_STAGE` | 진단 라우트에 노출되는 rotation 단계입니다. 허용 값은 `stable` 또는 `staging`이며 기본값은 `stable`입니다. |
 
 `READMATES_API_BASE_URL`에는 origin만 넣고 query string이나 fragment를 붙이지 않습니다. BFF secret은 URL에 포함하지 말고 `READMATES_BFF_SECRET`으로만 전달합니다.
 
-`READMATES_BFF_SECRET`은 브라우저 번들에 들어가면 안 됩니다. `VITE_` 접두사를 붙이지 말고 Pages Functions 환경 변수 또는 secret으로만 설정합니다.
+`READMATES_BFF_SECRET`과 `READMATES_BFF_SECRETS`는 브라우저 번들에 들어가면 안 됩니다. `VITE_` 접두사를 붙이지 말고 Pages Functions 환경 변수 또는 secret으로만 설정합니다.
 
 `VITE_PUBLIC_PRIMARY_DOMAIN`은 Vite build-time public setting입니다. Secret이 아니며, `https://<club-slug>.<primary-domain>/...` canonical link를 Pages fallback route에서도 렌더링하려면 production build 환경에 설정해야 합니다. 실제 운영 primary domain은 공개 문서에 기록하지 않습니다.
 
@@ -104,7 +106,10 @@ READMATES_AUTH_BASE_URL=https://readmates.pages.dev
 READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
 READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev,https://<primary-domain>,https://<registered-club-host>
 READMATES_BFF_SECRET=<shared-bff-secret>
+# 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
+READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_BFF_SECRET_REQUIRED=true
+READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 ```
 

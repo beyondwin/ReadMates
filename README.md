@@ -175,6 +175,7 @@ READMATES_AUTH_BASE_URL=http://localhost:5173 \
 READMATES_AUTH_RETURN_STATE_SECRET='<local-return-state-signing-secret>' \
 READMATES_ALLOWED_ORIGINS=http://localhost:5173 \
 READMATES_BFF_SECRET='<local-bff-secret>' \
+READMATES_IP_HASH_BASE_SECRET='<local-ip-hash-base-secret>' \
 ./server/gradlew -p server bootRun
 ```
 

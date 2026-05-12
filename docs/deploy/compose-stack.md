@@ -41,7 +41,7 @@ ssh -i ~/.ssh/readmates_oci ubuntu@VM_PUBLIC_IP 'bash -s' < deploy/oci/04-instal
 
 ## Deploy
 
-`05-deploy-compose-stack.sh`는 `/opt/readmates/.env`에 `READMATES_SERVER_IMAGE`를 저장합니다. 릴리즈 배포에서는 `ghcr.io/<owner>/<repo>/readmates-server:vMAJOR.MINOR.PATCH` 이미지를 VM에서 pull하며, script를 실행하기 전에 같은 tag의 `Deploy Server Image` workflow가 성공했는지 확인합니다. `READMATES_SERVER_IMAGE`가 `ghcr.io/`로 시작하지 않는 로컬 전환 검증에서는 script가 서버 이미지를 로컬에서 빌드해 VM으로 전송합니다.
+`05-deploy-compose-stack.sh`는 `/opt/readmates/.env`에 `READMATES_SERVER_IMAGE`를 저장합니다. 릴리즈 배포에서는 `ghcr.io/<owner>/<repo>/readmates-server:vMAJOR.MINOR.PATCH` 이미지를 VM에서 pull하며, script를 실행하기 전에 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인합니다. `READMATES_SERVER_IMAGE`가 `ghcr.io/`로 시작하지 않는 로컬 전환 검증에서는 script가 서버 이미지를 로컬에서 빌드해 VM으로 전송합니다.
 
 ```bash
 ./server/gradlew -p server clean test

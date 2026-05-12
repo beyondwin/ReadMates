@@ -129,6 +129,7 @@ READMATES_AUTH_BASE_URL=http://localhost:5173 \
 READMATES_AUTH_RETURN_STATE_SECRET='<local-return-state-signing-secret>' \
 READMATES_ALLOWED_ORIGINS=http://localhost:5173 \
 READMATES_BFF_SECRET='<local-bff-secret>' \
+READMATES_IP_HASH_BASE_SECRET='<local-ip-hash-base-secret>' \
 READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 ./server/gradlew -p server bootRun
 ```
@@ -147,6 +148,7 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 | `READMATES_ALLOWED_ORIGINS` | mutating API 요청의 `Origin` 또는 `Referer` 허용 origin입니다. 쉼표로 여러 값을 줄 수 있습니다. |
 | `READMATES_BFF_SECRET` | BFF가 Spring API로 전달하는 공유 secret입니다. 로컬에서도 frontend proxy와 같은 값을 쓰면 production boundary를 비슷하게 테스트할 수 있습니다. |
 | `READMATES_BFF_SECRET_REQUIRED` | 기본 `true`입니다. `application-dev.yml`에서는 `false`로 완화되어 있지만, `READMATES_BFF_SECRET`을 설정하면 `/api/**` 요청은 `X-Readmates-Bff-Secret`이 필요합니다. |
+| `READMATES_IP_HASH_BASE_SECRET` | rate limit/client IP hash salt의 base secret입니다. `dev` 같은 비운영 profile에서도 빈 값은 기본 실패이므로 로컬 bootRun에는 placeholder-safe 값을 명시합니다. 빈 값을 허용해야 하는 특수 로컬 실행만 `readmates.security.ip-hash.allow-empty-secret=true`를 별도로 사용합니다. |
 | `READMATES_AUTH_SESSION_COOKIE_SECURE` | 로컬 HTTP에서 `readmates_session` cookie를 테스트하려면 `false`로 둡니다. |
 | `READMATES_FLYWAY_LOCATIONS` | Flyway migration 위치입니다. 기본은 `classpath:db/mysql/migration`이고, `dev` profile은 `classpath:db/mysql/dev`를 추가합니다. |
 | `READMATES_NOTIFICATIONS_ENABLED` | 알림 relay/consumer bean을 켜는 상위 flag입니다. 기본은 `false`입니다. |

@@ -168,11 +168,11 @@ Git history까지 검사하는 `gitleaks detect --source .`는 이미 공개된 
 
 아래 값이 로컬 배포 상태 파일, 공유 메모, screenshot, terminal output에 노출된 적이 있으면 공개 전 또는 공개 직후 순서대로 교체합니다.
 
-1. 새 `READMATES_BFF_SECRET`을 생성합니다.
-2. Cloudflare Pages 운영 secret을 교체합니다.
-3. OCI VM `/etc/readmates/readmates.env`를 교체합니다.
-4. Spring을 재시작합니다.
-5. `/api/bff/api/auth/me`를 smoke test합니다.
+1. 새 BFF secret을 생성합니다.
+2. OCI VM `/etc/readmates/readmates.env`에 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 Spring을 재시작합니다.
+3. Cloudflare Pages 운영 secret에도 같은 `READMATES_BFF_SECRETS` 목록을 설정하고 배포합니다.
+4. `/api/bff/api/auth/me`를 smoke test합니다.
+5. `/api/bff/__internal/secret-status`와 `bff_secret_rotation_audit`에서 old-secret alias 트래픽이 0으로 떨어졌는지 확인한 뒤 old secret을 제거합니다.
 6. MySQL application user password를 교체합니다.
 7. Google OAuth client secret을 교체합니다.
 8. 새 OCI API key로 CLI 접근을 확인한 뒤 old key를 revoke합니다.

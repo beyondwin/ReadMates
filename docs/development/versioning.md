@@ -33,8 +33,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 4. 릴리즈 문서 변경을 `main`에 커밋하고 push합니다.
 5. 서버 변경이 있으면 같은 release tag로 GHCR image와 OCI compose 배포를 진행할 계획을 deployment notes에 확정합니다.
 6. `git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"`를 만들고 push합니다.
-7. Tag push가 `.github/workflows/deploy-front.yml`을 통해 Cloudflare Pages frontend와 Pages Functions를 배포하고, `.github/workflows/deploy-server.yml`을 통해 같은 tag의 GHCR server image를 게시합니다.
-8. 서버 변경이 있으면 `Deploy Server Image` workflow 성공 뒤 OCI backend를 같은 GHCR image tag로 배포합니다.
+7. Tag push가 `.github/workflows/deploy-front.yml`을 통해 Cloudflare Pages frontend와 Pages Functions를 배포하고, `.github/workflows/deploy-server.yml`을 통해 GHCR scan-candidate image를 만든 뒤 Trivy가 통과한 같은 digest를 release tag로 promote합니다.
+8. 서버 변경이 있으면 `Deploy Server Image` workflow 성공 뒤 OCI backend를 promote된 GHCR release image tag로 배포합니다.
 9. GitHub Release를 생성하거나 갱신하고, body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
 10. `gh release view vX.Y.Z --json tagName,name,url,publishedAt`로 GitHub Release 객체가 실제로 존재하는지 확인합니다. tag만 있고 release가 없으면 GitHub의 릴리즈 노트 화면에는 아무것도 보이지 않습니다.
 
@@ -42,7 +42,7 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 
 ## Server Image Tags
 
-OCI compose 배포 script는 `READMATES_SERVER_IMAGE`가 없으면 `readmates-server:local`을 사용해 로컬 빌드 이미지를 VM으로 전송합니다. 릴리즈 배포에서는 먼저 `Deploy Server Image` workflow가 같은 tag의 GHCR 이미지를 게시했는지 확인하고, 아래처럼 제품 tag와 같은 image tag를 명시합니다.
+OCI compose 배포 script는 `READMATES_SERVER_IMAGE`가 없으면 `readmates-server:local`을 사용해 로컬 빌드 이미지를 VM으로 전송합니다. 릴리즈 배포에서는 먼저 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인하고, 아래처럼 제품 tag와 같은 image tag를 명시합니다.
 
 ```bash
 READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
