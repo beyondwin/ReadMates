@@ -120,7 +120,7 @@ Ledger에 아래 값을 넣지 않습니다.
 | `compose-config` | `sudo docker compose -f /opt/readmates/compose.yml config` |
 | `compose-up` | `sudo docker compose -f /opt/readmates/compose.yml ps` |
 | `health` | `readmates-api` container logs, `/internal/health`, Flyway migration logs |
-| `bff-smoke` | Cloudflare Pages secret, `READMATES_API_BASE_URL`, BFF secret rotation state |
+| `bff-smoke` | Cloudflare Pages secret, `READMATES_API_BASE_URL`, BFF secret rotation state. Rotation 의심 시 진단 라우트 `GET /api/bff/__internal/secret-status`로 configured secret count + rotation stage + primary fingerprint(SHA-256 첫 6자) 확인 (raw secret 미노출) |
 | `post-deploy-watch` | recent `ERROR`, OAuth redirect smoke, public API smoke |
 
 ## 수동 rollback 기준

@@ -46,7 +46,7 @@ READMATES_SMOKE_CLUB_HOST=https://<registered-club-host>
 1. VM에서 `readmates-stack` systemd 상태 확인.
 2. `/opt/readmates/compose.yml` 기준 `docker compose ps` 확인.
 3. `readmates-api` container 내부 `/internal/health` 확인.
-4. Cloudflare BFF `/api/bff/api/auth/me` smoke 확인.
+4. Cloudflare BFF `/api/bff/api/auth/me` smoke 확인. BFF 시크릿 rotation 의심 시 `GET /api/bff/__internal/secret-status`로 configured secret count, rotation stage, primary fingerprint(SHA-256 첫 6자)를 확인합니다(raw secret 미노출).
 5. `scripts/smoke-production-integrations.sh`로 Pages marker와 OAuth redirect URI 확인.
 6. 최근 로그에서 `ERROR`, `Exception`, `Caused by` 패턴 확인.
 
