@@ -62,6 +62,38 @@ class ClientIpHashingPropertiesTest {
     }
 
     @Test
+    fun `production profile with allowEmptySecret=true and blank secret still throws`() {
+        val env = MockEnvironment().apply {
+            setActiveProfiles("production")
+        }
+        val props = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true)
+
+        val ex = assertThrows(IllegalStateException::class.java) {
+            props.validate(env)
+        }
+        assertTrue(
+            ex.message?.contains("READMATES_IP_HASH_BASE_SECRET") == true,
+            "Expected message to contain READMATES_IP_HASH_BASE_SECRET but was: ${ex.message}",
+        )
+    }
+
+    @Test
+    fun `non-production profile with blank secret and allowEmptySecret=false throws`() {
+        val env = MockEnvironment().apply {
+            setActiveProfiles("dev")
+        }
+        val props = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = false)
+
+        val ex = assertThrows(IllegalStateException::class.java) {
+            props.validate(env)
+        }
+        assertTrue(
+            ex.message?.contains("readmates.security.ip-hash.allow-empty-secret") == true,
+            "Expected message to mention allow-empty-secret but was: ${ex.message}",
+        )
+    }
+
+    @Test
     fun `test profile with allowEmptySecret=true and blank secret does not throw and emits single warn`() {
         val env = MockEnvironment().apply {
             setActiveProfiles("test")

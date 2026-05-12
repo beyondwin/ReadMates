@@ -22,26 +22,39 @@ data class ClientIpHashingProperties(
      * [allowEmptySecret] is explicitly set to true, in which case a single WARN-level log line
      * is emitted as a safety signal so operators cannot silently ship this configuration.
      *
-     * @throws IllegalStateException when production-like AND baseSecret is blank AND
-     *   [allowEmptySecret] is false.
+     * @throws IllegalStateException when [baseSecret] is blank in production-like profiles,
+     *   regardless of [allowEmptySecret], or when [baseSecret] is blank in non-production
+     *   profiles unless [allowEmptySecret] is true.
      */
     fun validate(environment: Environment) {
         val activeProfiles = environment.activeProfiles
         val isProductionLike = activeProfiles.isEmpty() ||
             activeProfiles.any { it.contains("production", ignoreCase = true) }
 
-        if (isProductionLike && baseSecret.isBlank() && !allowEmptySecret) {
+        if (baseSecret.isNotBlank()) {
+            return
+        }
+
+        if (isProductionLike) {
             throw IllegalStateException(
                 "readmates.security.ip-hash.base-secret must not be blank in production. " +
                     "Set the READMATES_IP_HASH_BASE_SECRET environment variable or configure " +
                     "readmates.security.ip-hash.base-secret in your application properties.",
             )
-        } else if (!isProductionLike && baseSecret.isBlank() && allowEmptySecret) {
-            log.warn(
-                "IP-hash secret is empty by explicit configuration " +
-                    "(readmates.security.ip-hash.allow-empty-secret=true). " +
-                    "Do NOT enable this in production.",
+        }
+
+        if (!allowEmptySecret) {
+            throw IllegalStateException(
+                "readmates.security.ip-hash.base-secret is blank. " +
+                    "Set READMATES_IP_HASH_BASE_SECRET or explicitly set " +
+                    "readmates.security.ip-hash.allow-empty-secret=true for local/test-only runs.",
             )
         }
+
+        log.warn(
+            "IP-hash secret is empty by explicit configuration " +
+                "(readmates.security.ip-hash.allow-empty-secret=true). " +
+                "Do NOT enable this in production.",
+        )
     }
 }
