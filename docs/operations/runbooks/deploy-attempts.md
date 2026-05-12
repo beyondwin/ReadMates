@@ -29,19 +29,66 @@ sudo chown root:readmates /var/log/readmates/deploy-attempts.jsonl
 sudo chmod 0640 /var/log/readmates/deploy-attempts.jsonl
 ```
 
+## Ledger 포맷 및 스키마
+
+`05-deploy-compose-stack.sh`는 `READMATES_LEDGER_FORMAT` 환경 변수로 기록 포맷을 제어합니다.
+
+| 값 | 동작 |
+| --- | --- |
+| `both` (기본값) | legacy 라인 + 새 NDJSON 라인 모두 기록 |
+| `json` | 새 NDJSON 스키마 라인만 기록 |
+| `legacy` | 기존 flat-string detail 라인만 기록 |
+
+### Legacy 스키마 (기존)
+
+```json
+{"attemptId":"20260512T100000Z-12345","event":"IMAGE_VERIFIED","status":"FAILED","stage":"compose-up","at":"2026-05-12T10:00:00Z","durationSeconds":42,"detail":"reason=running-image-id-empty expectedImageId=sha256:abc"}
+```
+
+### 새 NDJSON 스키마 (ADR-0016, v1.7+)
+
+```json
+{"ts":"2026-05-12T10:00:00Z","stage":"compose-up","event":"IMAGE_VERIFIED","status":"FAILED","detail":{"reason":"running-image-id-empty","expectedImageId":"sha256:abc"},"attemptId":"20260512T100000Z-12345","durationSeconds":42}
+```
+
+`detail` 필드가 flat string에서 JSON 오브젝트로 변경되어 jq로 직접 필드 접근이 가능합니다.
+
+### jq 쿼리 예시
+
+```bash
+# 모든 FAILED 이벤트 출력 (새 스키마)
+jq -r 'select(.status=="FAILED")' /var/log/readmates/deploy-attempts.jsonl
+
+# 특정 이벤트 필터 (새 스키마)
+jq -r 'select(.event=="IMAGE_VERIFIED" and .status=="FAILED")' /var/log/readmates/deploy-attempts.jsonl
+
+# imageId 추출 (새 스키마)
+jq -r 'select(.event=="IMAGE_ID_RESOLVED") | .detail.imageId' /var/log/readmates/deploy-attempts.jsonl
+
+# 특정 attemptId의 전체 이벤트 타임라인 (새 스키마)
+jq -r 'select(.attemptId=="20260512T100000Z-12345") | [.ts, .stage, .event, .status] | @tsv' /var/log/readmates/deploy-attempts.jsonl
+
+# 실패한 배포의 exitCode 확인 (새 스키마)
+jq -r 'select(.event=="FAILED") | .detail.exitCode' /var/log/readmates/deploy-attempts.jsonl
+
+# READMATES_LEDGER_FORMAT=both 시 legacy 라인 제외하고 새 스키마만 필터
+jq -r 'select(.ts != null)' /var/log/readmates/deploy-attempts.jsonl
+```
+
 ## 이벤트 필드
 
 | 필드 | 설명 | 민감도 |
 | --- | --- | --- |
+| `ts` | UTC ISO-8601 timestamp (새 스키마. legacy 스키마에서는 `at`) | 낮음 |
 | `attemptId` | 배포 script가 생성한 UTC timestamp 기반 id | 낮음 |
-| `event` | `STARTED`, `PREFLIGHT_PASSED`, `IMAGE_ID_RESOLVED`, `IMAGE_RESOLVED`, `IMAGE_VERIFIED`, `STACK_STARTED`, `HEALTH_PASSED`, `BFF_SMOKE_PASSED`, `POST_DEPLOY_WATCH_PASSED`, `POST_DEPLOY_WATCH_SKIPPED`, `SUCCESS`, `FAILED` | 낮음 |
+| `event` | `STARTED`, `PREFLIGHT_PASSED`, `IMAGE_ID_RESOLVED`, `IMAGE_RESOLVED`, `IMAGE_VERIFIED`, `STACK_STARTED`, `HEALTH_PASSED`, `BFF_SMOKE_PASSED`, `POST_DEPLOY_WATCH_PASSED`, `POST_DEPLOY_WATCH_SKIPPED`, `SUCCESS`, `FAILED`. watch 스크립트 추가 이벤트: `STAGE_STARTED`, `VM_HEALTH_PASSED`, `BFF_AUTH_SMOKE_PASSED`, `INTEGRATION_SMOKE_PASSED`, `ERROR_LOG_CHECK_PASSED`, `WATCH_PASSED` | 낮음 |
 | `status` | `RUNNING`, `SUCCESS`, `FAILED` 중 하나 | 낮음 |
 | `stage` | 실패 또는 진행 중 stage | 낮음 |
-| `at` | UTC ISO-8601 timestamp | 낮음 |
+| `at` | UTC ISO-8601 timestamp (legacy 스키마) | 낮음 |
 | `durationSeconds` | attempt 소요 시간 | 낮음 |
-| `detail` | 선택 필드. `image=...`, `imageSource=...`, `imageId=...`, `expectedImageId=... runningImageId=...`, `services=compose`, `endpoint=...`, `path=...`, `watch=true/false`, `exitCode=...` 같은 짧은 문자열 | 낮음. operator가 제공한 image 이름이나 detail 값이 public-safe일 때만 외부 공유 가능 |
+| `detail` | 새 스키마: JSON 오브젝트 (`{"image":"..."}` 등). legacy 스키마: flat string (`"image=..."` 등). `image`, `imageSource`, `imageId`, `expectedImageId`, `runningImageId`, `services`, `endpoint`, `path`, `watch`, `exitCode`, `reason` 등 이벤트별 세부 정보 | 낮음. operator가 제공한 image 이름이나 detail 값이 public-safe일 때만 외부 공유 가능 |
 
-현재 ledger는 registry digest를 별도 필드로 기록하지 않습니다. `image`, `imageId`, `exitCode`도 top-level field가 아니라 필요한 event의 `detail` 문자열 안에만 기록합니다.
+현재 ledger는 registry digest를 별도 필드로 기록하지 않습니다. `image`, `imageId`, `exitCode`도 top-level field가 아니라 필요한 event의 `detail` 안에만 기록합니다. 관련: [ADR-0016](../../development/adr/0016-deploy-ledger-event-schema.md)
 
 ## Image verification
 

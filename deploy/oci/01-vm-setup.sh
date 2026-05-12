@@ -7,8 +7,8 @@ echo "==> [1/4] 시스템 업데이트"
 sudo apt-get update -y
 sudo apt-get upgrade -y
 
-echo "==> [2/4] Java 21 설치"
-sudo apt-get install -y openjdk-21-jre-headless
+echo "==> [2/4] Java 21 + 운영 도구 설치"
+sudo apt-get install -y openjdk-21-jre-headless jq
 java -version
 
 echo "==> [3/4] Caddy 설치"
