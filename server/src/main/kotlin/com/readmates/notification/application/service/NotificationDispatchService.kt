@@ -6,7 +6,9 @@ import com.readmates.notification.application.port.`in`.DispatchNotificationEven
 import com.readmates.notification.application.port.out.NotificationDeliveryPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
+import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -17,8 +19,8 @@ class NotificationDispatchService(
     private val transactionalOps: NotificationDeliveryTransactionalOperations,
     private val meterRegistry: MeterRegistry,
 ) : DispatchNotificationEventUseCase {
-    private val operationalLogger = org.slf4j.LoggerFactory.getLogger(javaClass)
-    private val unknownStatusCounter = io.micrometer.core.instrument.Counter
+    private val operationalLogger = LoggerFactory.getLogger(javaClass)
+    private val unknownStatusCounter = Counter
         .builder("notification.dispatch.unknown_status")
         .description("Email deliveries whose status was UNKNOWN at claim time")
         .register(meterRegistry)
