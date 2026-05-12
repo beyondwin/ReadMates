@@ -66,29 +66,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
 
-      - name: Build image for vulnerability scan
-        id: scan-build
-        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
-        with:
-          context: server
-          file: server/Dockerfile.release
-          platforms: linux/arm64
-          push: false
-          load: true
-          tags: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan image vulnerabilities
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
-          scanners: vuln
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
-
       - name: Log in to GHCR
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4.1.0
         with:
@@ -96,26 +73,43 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
-        id: push
+      - name: Build and push scan candidate
+        id: build
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
           context: server
           file: server/Dockerfile.release
           platforms: linux/arm64
           push: true
-          tags: ${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}
+          tags: ${{ steps.image.outputs.name }}:scan-${{ github.run_id }}-${{ github.run_attempt }}
           sbom: true
           provenance: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Record pushed digest
-        if: ${{ steps.push.outputs.digest != '' }}
+      - name: Scan image vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_PLATFORM: linux/arm64
+        with:
+          image-ref: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          scanners: vuln
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Promote scanned digest to release tag
+        run: |
+          docker buildx imagetools create \
+            --tag "${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}" \
+            "${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}"
+
+      - name: Record promoted digest
         run: |
           {
             echo "image=${{ steps.image.outputs.name }}:${{ steps.image.outputs.tag }}"
-            echo "digest=${{ steps.push.outputs.digest }}"
+            echo "digest=${{ steps.build.outputs.digest }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload server failure diagnostics
