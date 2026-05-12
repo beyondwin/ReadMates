@@ -278,7 +278,7 @@ class RedisAuthSessionCacheAdapterTest(
             sessionTokenHash = tokenHash,
             createdAt = OffsetDateTime.of(2026, 4, 28, 0, 0, 0, 0, ZoneOffset.UTC),
             lastSeenAt = OffsetDateTime.of(2026, 4, 28, 0, 0, 0, 0, ZoneOffset.UTC),
-            expiresAt = OffsetDateTime.of(2026, 5, 12, 0, 0, 0, 0, ZoneOffset.UTC),
+            expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(7).withNano(0),
             userAgent = "agent",
             ipHash = "ip-hash",
         )
