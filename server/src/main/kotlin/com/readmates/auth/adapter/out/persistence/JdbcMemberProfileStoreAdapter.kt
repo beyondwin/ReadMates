@@ -10,10 +10,8 @@ import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
-import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
-import org.springframework.web.server.ResponseStatusException
 import java.sql.ResultSet
 import java.util.Locale
 import java.util.UUID
