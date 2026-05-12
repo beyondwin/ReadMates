@@ -1,0 +1,11 @@
+.env.example
+.github
+.gitignore
+.gitleaks.toml
+compose.yml
+deploy
+docs
+front
+README.md
+scripts
+server
