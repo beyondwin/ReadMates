@@ -60,41 +60,56 @@ watch_ledger_emit() {
   local event="$1"
   local status="$2"
   local detail_string="${3:-}"
-  local at duration legacy_payload detail_object json_payload
+  local at duration legacy_payload json_payload
   at="$(utc_now)"
   duration="$(watch_duration_seconds)"
 
-  # legacy format
+  # Always build legacy payload (no jq needed)
   legacy_payload="{\"attemptId\":\"$(json_escape "$WATCH_ATTEMPT_ID")\",\"event\":\"$(json_escape "$event")\",\"status\":\"$(json_escape "$status")\",\"stage\":\"post-deploy-watch\",\"at\":\"$at\",\"durationSeconds\":$duration"
   if [ -n "$detail_string" ]; then
     legacy_payload="${legacy_payload},\"detail\":\"$(json_escape "$detail_string")\""
   fi
   legacy_payload="${legacy_payload}}"
 
-  # new json format
-  if [ -n "$detail_string" ]; then
-    detail_object="$(printf '%s' "$detail_string" | jq -Rn \
-      '[inputs | split(" ")[] | select(length > 0) | capture("^(?<k>[^=]+)=(?<v>.*)$") // {k: ., v: ""}] | map({(.k): .v}) | add // {}')"
+  # Only build JSON payload if it will be emitted (jq not needed in legacy mode)
+  if [ "$WATCH_LEDGER_FORMAT" != "legacy" ]; then
+    local detail_object json_payload_inner
+    if [ -n "$detail_string" ]; then
+      detail_object="$(printf '%s' "$detail_string" | jq -Rn \
+        '[inputs | split(" ")[] | select(length > 0) | capture("^(?<k>[^=]+)=(?<v>.*)$") // {k: ., v: ""}] | map({(.k): .v}) | add // {}' 2>/dev/null || echo '{}')"
+    else
+      detail_object='{}'
+    fi
+    json_payload_inner="$(jq -nc \
+      --arg ts "$at" \
+      --arg stage "post-deploy-watch" \
+      --arg event "$event" \
+      --arg status "$status" \
+      --argjson detail "$detail_object" \
+      --arg attemptId "$WATCH_ATTEMPT_ID" \
+      --argjson durationSeconds "$duration" \
+      '{ts:$ts, stage:$stage, event:$event, status:$status, detail:$detail, attemptId:$attemptId, durationSeconds:$durationSeconds}' 2>/dev/null || echo '')"
+    json_payload="$json_payload_inner"
   else
-    detail_object='{}'
+    json_payload=""
   fi
-  json_payload="$(jq -nc \
-    --arg ts "$at" \
-    --arg stage "post-deploy-watch" \
-    --arg event "$event" \
-    --arg status "$status" \
-    --argjson detail "$detail_object" \
-    --arg attemptId "$WATCH_ATTEMPT_ID" \
-    --argjson durationSeconds "$duration" \
-    '{ts:$ts, stage:$stage, event:$event, status:$status, detail:$detail, attemptId:$attemptId, durationSeconds:$durationSeconds}')"
 
   if [ "$WATCH_LEDGER_FORMAT" != "json" ]; then
     _watch_ledger_remote_emit "$legacy_payload"
   fi
-  if [ "$WATCH_LEDGER_FORMAT" != "legacy" ]; then
+  if [ "$WATCH_LEDGER_FORMAT" != "legacy" ] && [ -n "$json_payload" ]; then
     _watch_ledger_remote_emit "$json_payload"
   fi
 }
+
+# Canonical helper definitions are in 05-deploy-compose-stack.sh; this is the
+# watch-script parallel. Consolidate into a shared lib in a future refactor.
+watch_on_error() {
+  local exit_code="$?"
+  watch_ledger_emit "WATCH_FAILED" "FAILED" "exitCode=${exit_code}"
+  exit "$exit_code"
+}
+trap watch_on_error ERR
 
 watch_ledger_emit "STAGE_STARTED" "RUNNING" "stage=post-deploy-watch"
 
@@ -122,19 +137,22 @@ READMATES_SMOKE_CLUB_HOST="${READMATES_SMOKE_CLUB_HOST:-}" \
 watch_ledger_emit "INTEGRATION_SMOKE_PASSED" "RUNNING" "smoke=oauth-pages"
 
 echo "==> [watch] recent backend errors"
-ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
+matches="$(ssh "${SSH_OPTIONS[@]}" "${REMOTE_USER}@${VM_PUBLIC_IP}" \
   "sudo bash -s -- $(shell_quote "$REMOTE_DIR")" <<'EOF'
 set -uo pipefail
 remote_dir="$1"
 cd "$remote_dir"
-matches="$(sudo docker compose -f compose.yml logs --since 10m readmates-api 2>/dev/null \
+sudo docker compose -f compose.yml logs --since 10m readmates-api 2>/dev/null \
   | grep -E '[[:space:]]ERROR[[:space:]]' \
-  | tail -120 || true)"
+  | tail -120 || true
+EOF
+)"
 if [ -n "$matches" ]; then
+  match_count="$(printf '%s\n' "$matches" | wc -l | tr -d ' ')"
+  watch_ledger_emit "CHECK_FAILED" "FAILED" "reason=error-grep matches=${match_count}"
   printf '%s\n' "$matches"
   exit 1
 fi
-EOF
 watch_ledger_emit "ERROR_LOG_CHECK_PASSED" "RUNNING" "window=10m"
 
 watch_ledger_emit "WATCH_PASSED" "SUCCESS"

@@ -74,38 +74,44 @@ remote_ledger_append() {
   local event="$1"
   local status="$2"
   local detail_string="${3:-}"
-  local at duration legacy_payload detail_object json_payload
+  local at duration legacy_payload json_payload
   at="$(utc_now)"
   duration="$(duration_seconds)"
 
-  # legacy format: flat detail string (existing schema)
+  # Always build legacy payload (no jq needed)
   legacy_payload="{\"attemptId\":\"$(json_escape "$ATTEMPT_ID")\",\"event\":\"$(json_escape "$event")\",\"status\":\"$(json_escape "$status")\",\"stage\":\"$(json_escape "$ATTEMPT_STAGE")\",\"at\":\"$at\",\"durationSeconds\":$duration"
   if [ -n "$detail_string" ]; then
     legacy_payload="${legacy_payload},\"detail\":\"$(json_escape "$detail_string")\""
   fi
   legacy_payload="${legacy_payload}}"
 
-  # new json format: detail as structured object
-  if [ -n "$detail_string" ]; then
-    detail_object="$(printf '%s' "$detail_string" | jq -Rn \
-      '[inputs | split(" ")[] | select(length > 0) | capture("^(?<k>[^=]+)=(?<v>.*)$") // {k: ., v: ""}] | map({(.k): .v}) | add // {}')"
+  # Only build JSON payload if it will be emitted (jq not needed in legacy mode)
+  if [ "$LEDGER_FORMAT" != "legacy" ]; then
+    local detail_object json_payload_inner
+    if [ -n "$detail_string" ]; then
+      detail_object="$(printf '%s' "$detail_string" | jq -Rn \
+        '[inputs | split(" ")[] | select(length > 0) | capture("^(?<k>[^=]+)=(?<v>.*)$") // {k: ., v: ""}] | map({(.k): .v}) | add // {}' 2>/dev/null || echo '{}')"
+    else
+      detail_object='{}'
+    fi
+    json_payload_inner="$(jq -nc \
+      --arg ts "$at" \
+      --arg stage "$ATTEMPT_STAGE" \
+      --arg event "$event" \
+      --arg status "$status" \
+      --argjson detail "$detail_object" \
+      --arg attemptId "$ATTEMPT_ID" \
+      --argjson durationSeconds "$duration" \
+      '{ts:$ts, stage:$stage, event:$event, status:$status, detail:$detail, attemptId:$attemptId, durationSeconds:$durationSeconds}' 2>/dev/null || echo '')"
+    json_payload="$json_payload_inner"
   else
-    detail_object='{}'
+    json_payload=""
   fi
-  json_payload="$(jq -nc \
-    --arg ts "$at" \
-    --arg stage "$ATTEMPT_STAGE" \
-    --arg event "$event" \
-    --arg status "$status" \
-    --argjson detail "$detail_object" \
-    --arg attemptId "$ATTEMPT_ID" \
-    --argjson durationSeconds "$duration" \
-    '{ts:$ts, stage:$stage, event:$event, status:$status, detail:$detail, attemptId:$attemptId, durationSeconds:$durationSeconds}')"
 
   if [ "$LEDGER_FORMAT" != "json" ]; then
     _ledger_remote_emit "$legacy_payload"
   fi
-  if [ "$LEDGER_FORMAT" != "legacy" ]; then
+  if [ "$LEDGER_FORMAT" != "legacy" ] && [ -n "$json_payload" ]; then
     _ledger_remote_emit "$json_payload"
   fi
 }

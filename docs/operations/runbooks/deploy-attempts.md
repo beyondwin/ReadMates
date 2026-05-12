@@ -31,7 +31,7 @@ sudo chmod 0640 /var/log/readmates/deploy-attempts.jsonl
 
 ## Ledger 포맷 및 스키마
 
-`05-deploy-compose-stack.sh`는 `READMATES_LEDGER_FORMAT` 환경 변수로 기록 포맷을 제어합니다.
+`READMATES_LEDGER_FORMAT` 환경 변수는 `05-deploy-compose-stack.sh`와 `watch-compose-post-deploy.sh` 양쪽에서 기록 포맷을 제어합니다.
 
 | 값 | 동작 |
 | --- | --- |
