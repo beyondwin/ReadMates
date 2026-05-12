@@ -3,6 +3,7 @@ package com.readmates.auth.infrastructure.security
 import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.auth.application.service.AuthenticatedMemberResolver
+import com.readmates.auth.application.service.DefaultAuthoritySynthesisService
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.adapter.`in`.web.ClubContextHeader
 import com.readmates.club.application.model.JoinedClubSummary
@@ -203,6 +204,7 @@ class MemberAuthoritiesFilterTest {
             ): SupportMemberSynthesis? = synthesize(userId)
         }
         return MemberAuthoritiesFilter(
+            authoritySynthesisService = DefaultAuthoritySynthesisService(),
             authenticatedMemberResolver = fakeAuthenticatedMemberResolver,
             resolveClubContextUseCase = fakeClubContextUseCase,
             checkSupportAccessGrantUseCase = fakeSupportGrantUseCase,

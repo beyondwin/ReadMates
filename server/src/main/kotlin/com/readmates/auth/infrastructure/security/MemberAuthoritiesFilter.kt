@@ -1,5 +1,8 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.application.service.AuthoritySynthesisRequest
+import com.readmates.auth.application.service.AuthoritySynthesisService
+import com.readmates.auth.application.service.ClubContextInput
 import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
@@ -19,7 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 /**
  * Resolves authorities for the current principal.
  *
- * Branching rules:
+ * Branching rules (delegated to [AuthoritySynthesisService]):
  * - When [RequestedClubContext.source] is SLUG and the slug is registered, lookup the member and synthesize
  *   role + host + platform admin authorities.
  * - When [RequestedClubContext.source] is SLUG and the slug is NOT registered (`supplied=true && context=null`),
@@ -27,9 +30,13 @@ import org.springframework.web.filter.OncePerRequestFilter
  *   platform admin + host support grants. Do NOT add a `member==null` short-circuit guard above this branch;
  *   doing so would silently strip support-grant authorities. See ADR-0013 for context.
  * - When [RequestedClubContext.source] is HOST_FALLBACK or NONE, return an unscoped principal.
+ *
+ * This filter is in the infrastructure layer: it is allowed to use Spring Security types and
+ * adapter types. It maps result authority strings → [SimpleGrantedAuthority] at this boundary.
  */
 @Component
 class MemberAuthoritiesFilter(
+    private val authoritySynthesisService: AuthoritySynthesisService,
     private val authenticatedMemberResolver: AuthenticatedMemberResolver,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
     private val checkSupportAccessGrantUseCase: CheckSupportAccessGrantUseCase,
@@ -44,64 +51,72 @@ class MemberAuthoritiesFilter(
 
         if (authentication != null && email != null) {
             val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
-            val member = if (requestedClubContext.supplied && requestedClubContext.context == null) {
+            val resolvedClubContext = requestedClubContext.context
+
+            val member = if (requestedClubContext.supplied && resolvedClubContext == null) {
                 null
             } else {
-                authenticatedMemberResolver.resolveByEmail(email, requestedClubContext.context)
+                authenticatedMemberResolver.resolveByEmail(email, resolvedClubContext)
             }
-            val authorities = authentication.authorities
-                .filterNot { it.authority in MEMBER_ROLE_AUTHORITIES }
-                .toMutableList()
 
-            if (member != null) {
-                val roleAuthority = if (member.isViewer) {
-                    "ROLE_VIEWER"
-                } else {
-                    "ROLE_${member.role}"
-                }
-                authorities += SimpleGrantedAuthority(roleAuthority)
-            } else if (
-                authentication.authorities.any { it.authority == PLATFORM_ADMIN_AUTHORITY } &&
-                requestedClubContext.supplied &&
-                requestedClubContext.context != null
-            ) {
-                // Platform admin with no club membership — check for an active HOST_SUPPORT_READ grant
-                val clubContext = requestedClubContext.context
-                val userId = when (val principal = authentication.principal) {
-                    is CurrentMember -> principal.userId
-                    is CurrentUser -> principal.userId
-                    else -> null
-                }
-                if (userId != null) {
-                    val synthesis = checkSupportAccessGrantUseCase.synthesizeHostCurrentMember(
-                        userId = userId,
-                        email = email,
-                        clubId = clubContext.clubId,
-                        clubSlug = clubContext.slug,
-                        clubName = clubContext.name,
-                    )
-                    if (synthesis != null) {
-                        // Store in request attribute so CurrentMemberArgumentResolver can reuse it
-                        request.setAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR, synthesis)
-                        authorities += SimpleGrantedAuthority("ROLE_HOST")
-                    }
-                }
+            val userId = when (val principal = authentication.principal) {
+                is CurrentMember -> principal.userId
+                is CurrentUser -> principal.userId
+                else -> null
             }
+
+            // Pre-fetch the support synthesis only when the preconditions could be satisfied.
+            // This avoids an unnecessary DB round-trip in the common (non-admin) case.
+            val supportSynthesis = if (
+                userId != null &&
+                resolvedClubContext != null &&
+                requestedClubContext.supplied &&
+                member == null
+            ) {
+                checkSupportAccessGrantUseCase.synthesizeHostCurrentMember(
+                    userId = userId,
+                    email = email,
+                    clubId = resolvedClubContext.clubId,
+                    clubSlug = resolvedClubContext.slug,
+                    clubName = resolvedClubContext.name,
+                )
+            } else {
+                null
+            }
+
+            val synthesisRequest = AuthoritySynthesisRequest(
+                incomingAuthorities = authentication.authorities.mapNotNull { it.authority }.toSet(),
+                email = email,
+                userId = userId,
+                clubContext = ClubContextInput(
+                    supplied = requestedClubContext.supplied,
+                    clubId = resolvedClubContext?.clubId,
+                    clubSlug = resolvedClubContext?.slug,
+                    clubName = resolvedClubContext?.name,
+                ),
+                member = member,
+                supportSynthesis = supportSynthesis,
+            )
+
+            val result = authoritySynthesisService.synthesize(synthesisRequest)
+
+            // Attach synthesis to request attribute so CurrentMemberArgumentResolver can reuse it
+            result.supportSynthesisToAttach?.let { synthesis ->
+                request.setAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR, synthesis)
+            }
+
+            // Map authority strings → SimpleGrantedAuthority at this infrastructure boundary
+            val grantedAuthorities = result.authorities.map { SimpleGrantedAuthority(it) }
 
             val mappedAuthentication = UsernamePasswordAuthenticationToken(
                 authentication.principal ?: authentication.name,
                 authentication.credentials,
-                authorities,
+                grantedAuthorities,
             )
             mappedAuthentication.details = authentication.details
             SecurityContextHolder.getContext().authentication = mappedAuthentication
         }
 
         filterChain.doFilter(request, response)
-    }
-
-    private companion object {
-        val MEMBER_ROLE_AUTHORITIES = setOf("ROLE_HOST", "ROLE_MEMBER", "ROLE_VIEWER")
-        const val PLATFORM_ADMIN_AUTHORITY = "ROLE_PLATFORM_ADMIN"
     }
 }
