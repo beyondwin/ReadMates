@@ -4,10 +4,11 @@ import { PendingApprovalPage } from "@/features/auth/ui/pending-approval-page";
 
 export type PendingApprovalAuthState =
   | { status: "loading" }
-  | { status: "ready"; auth: AuthMeResponse };
+  | { status: "ready"; auth: AuthMeResponse }
+  | { status: "session_expired"; lastAuth?: AuthMeResponse };
 
 export function PendingApprovalRoute({ state }: { state: PendingApprovalAuthState }) {
-  if (state.status === "loading") {
+  if (state.status === "loading" || state.status === "session_expired") {
     return <AuthRouteLoading label="계정 승인 상태를 확인하는 중" />;
   }
 
