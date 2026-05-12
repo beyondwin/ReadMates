@@ -6,7 +6,44 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-(없음)
+### Highlights
+
+v1.7.0 이후 누적된 운영자/사용자 가시 변경을 한 묶음으로 정리합니다. 핵심은 (1) OCI compose 배포가 attempt-stage ledger와 이미지 verification, post-deploy watch를 자동으로 실행하도록 굳어진 운영 워크플로 채택, (2) read-only 진단/수집 스크립트와 새 운영 런북 셋, (3) 셸 스크립트 syntax/shellcheck·공개 release 안전·release 이미지 Trivy 스캔을 묶은 CI 강화, (4) 공개 저장소에 프론트 테스트 산출물이 흘러 들어가지 않도록 빌더 manifest를 좁히는 위생 강화, (5) BFF 시크릿 감사 적재량을 평상시 0에 수렴시키는 audit-mode 도입과 rate-limit 필터의 다중 시크릿 신뢰 정렬, (6) 플랫폼 관리자 영속 어댑터의 Web/HTTP 의존 제거로 인한 아키텍처 경계 정리입니다. DB migration 없음.
+
+### Fixed
+
+- **공개 release 안전 — 프론트 테스트 산출물 누출 차단**: 공개 release 후보 빌더가 `front/test-results`, `front/playwright-report`, `front/coverage`, `front/.nyc_output` 디렉토리를 후보 tree에서 제외합니다. 같은 회귀를 막기 위한 fixture를 함께 추가했습니다.
+- **rate-limit 필터의 BFF 시크릿 신뢰 정렬**: `RateLimitFilter`가 BFF 인증과 동일한 다중 시크릿 설정(`READMATES_BFF_SECRETS` + 단일 `READMATES_BFF_SECRET` fallback)을 신뢰하도록 맞췄습니다. rotation 중인 환경에서 정상 BFF 트래픽이 rate-limit 단에서 떨어질 가능성을 닫았습니다.
+- **플랫폼 관리자 영속 어댑터의 Web/HTTP 의존 제거**: `JdbcPlatformAdminAdapter`가 더 이상 `HttpStatus`/`ResponseStatusException`을 던지지 않습니다. HTTP 매핑은 `PlatformAdminErrorHandler`로 이동했고, 영속 어댑터는 도메인 예외만 던집니다.
+
+### Added
+
+- **OCI compose 배포 attempt ledger**: `deploy/oci/05-deploy-compose-stack.sh`가 시도/스테이지/결과를 ledger 행으로 기록합니다. 각 행의 필드 의미는 `docs/operations/runbooks/deploy-attempts.md`에 정리되어 있습니다.
+- **이미지 verification + post-deploy watch 자동 실행**: 배포 스크립트가 게시된 server image와 실제 실행 중 image의 mismatch를 검출해 ledger에 기록하고, 배포 직후 post-deploy watch 스크립트(`deploy/oci/watch-compose-post-deploy.sh`)를 자동으로 실행합니다. 환경 제약으로 watch가 생략된 경우에도 그 사실이 ledger에 남습니다.
+- **운영 진단 스크립트**: read-only compose 진단 수집기(`deploy/oci/readmates-collect.sh`), 해당 수집기를 호스트에 설치하는 installer(`deploy/oci/install-readmates-collector.sh`), 강화된 post-deploy watch 스크립트(`deploy/oci/watch-compose-post-deploy.sh`)를 추가했습니다.
+- **운영 런북 셋**: `docs/operations/runbooks/deploy-attempts.md`, `docs/operations/runbooks/post-deploy-watch.md`, `docs/operations/runbooks/read-only-diagnostics.md`와 인덱스 페이지를 추가했습니다. 공개 release 후보 manifest가 이 운영 런북을 포함하도록 함께 갱신했습니다.
+- **CI 강화 잡**: 모든 셸 스크립트에 대한 `bash -n` syntax 검증과 `shellcheck` 잡, 공개 release 안전 검사 잡, release 이미지 Trivy 스캔 잡을 추가했습니다.
+- **BFF 시크릿 감사 audit-mode**: `BffSecretFilter`가 `readmates.security.bff.audit-mode` 설정을 따르도록 변경됐고, 기본값은 `rotation-only`입니다. 감사 기록은 bounded `ThreadPoolTaskExecutor`로 비동기 처리됩니다.
+
+### Changed
+
+- **공개 release 후보 manifest 정리**: 운영 런북을 포함하도록 manifest를 넓히는 한편, 프론트 테스트 산출물 같은 비공개 후보 디렉토리는 명시적으로 좁혔습니다.
+- **BFF 시크릿 감사 기본 동작**: `bff_secret_rotation_audit` 테이블에 매 성공 요청을 적재하던 기존 동작 대신, 기본 모드 `rotation-only`에서는 rotation 확인용 비-primary alias(`secondary`, `index_N`)가 사용된 요청만 기록합니다. 모든 요청을 적재하던 기존 행동은 `audit-mode=full`로 명시 설정해야 활성화됩니다.
+- **배포 ledger 필드 문서화**: deploy attempt 모델과 ledger 필드 정의를 운영 런북과 공개 문서에서 일치시켰습니다.
+
+### Deployment Notes
+
+- **DB migration**: 없음.
+- **새 환경 변수/설정 후보**: `readmates.security.bff.audit-mode` (기본 `rotation-only`, 명시값 `full`로 모든 요청 감사 적재 복원 가능).
+- 운영 가시성: BFF 시크릿 감사(audit-mode 기본 `rotation-only`)는 rotation 확인용 비-primary alias 사용만 기록합니다. 평상시 `bff_secret_rotation_audit` 적재량은 0에 수렴하므로 기존 알람 임계값을 점검하세요.
+- **후속 권장**: 30일 이상 행을 정리하는 retention job 예시는 `docs/deploy/oci-backend.md`를 참고하세요.
+- **배포 순서**: 서버 먼저, 그다음 프론트엔드. OCI compose stack 배포는 `Deploy Server Image` workflow가 release tag image를 GHCR에 게시한 후 `./deploy/oci/05-deploy-compose-stack.sh`로 실행합니다. 이번부터는 attempt ledger 행과 이미지 verification 결과, post-deploy watch 실행 여부를 함께 확인하세요.
+- **CI 동작 변화**: PR/main push에서 셸 스크립트 syntax/shellcheck, 공개 release 안전 검사, release 이미지 Trivy 스캔이 새 실패 신호로 등장할 수 있습니다.
+
+### Verification
+
+- `git diff --check -- CHANGELOG.md` — 출력 없음.
+- 공개 시크릿/호스트/개인 경로 스캔(`rg` 정규식) — 출력 없음.
 
 ## v1.7.0 - 2026-05-11
 

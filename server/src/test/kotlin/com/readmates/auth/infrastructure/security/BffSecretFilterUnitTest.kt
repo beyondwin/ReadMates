@@ -331,6 +331,50 @@ class BffSecretFilterUnitTest {
         assertEquals(401, responseLegacy.status)
     }
 
+    @Test
+    fun `aliasFor returns primary for first configured secret`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test,tertiary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        assertEquals("primary", filter.aliasFor("primary-bff-test"))
+    }
+
+    @Test
+    fun `aliasFor returns secondary for second configured secret`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test,tertiary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        assertEquals("secondary", filter.aliasFor("secondary-bff-test"))
+    }
+
+    @Test
+    fun `aliasFor returns indexed alias for third or later configured secret`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test,tertiary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        assertEquals("index_2", filter.aliasFor("tertiary-bff-test"))
+    }
+
+    @Test
+    fun `aliasFor returns null for unknown secret`() {
+        val filter = BffSecretFilter(
+            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+            legacyExpectedSecret = "",
+            bffSecretRequired = true,
+            allowedOriginPort = noopAllowedOriginPort(),
+        )
+        assertEquals(null, filter.aliasFor("nope"))
+    }
+
     private fun noopAllowedOriginPort(): AllowedOriginPort = object : AllowedOriginPort {
         override fun isAllowed(origin: String) = false
     }
