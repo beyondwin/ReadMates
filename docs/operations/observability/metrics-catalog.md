@@ -31,6 +31,7 @@
 | `readmates.rate_limit.denied` | counter | `sensitive` (`true` / `false`) | 건수 | Rate limit 차단 건수. | `server/.../RedisRateLimitAdapter.kt` | — | alerts.md#ratelimitdenied |
 | `readmates.redis.fallbacks` | counter | `feature` (`notes-cache` / `public-cache` / `auth-session` / `rate-limit` / `read-cache-invalidation`) | 건수 | Redis 오류 발생 시 graceful fallback 처리된 횟수. 증가 지속 시 Redis 불안정 신호. | `server/.../RedisCacheMetrics.kt` (다수 어댑터에서 호출) | dashboards.md#redis-cache | alerts.md#redisfallbackshigh |
 | `readmates.redis.operation.errors` | counter | `feature`, `operation` | 건수 | Redis 명령 실행 오류 횟수. `feature`는 어댑터별 식별자, `operation`은 명령 유형(예: `check`). | `server/.../RedisCacheMetrics.kt` (다수 어댑터에서 호출) | dashboards.md#redis-cache | alerts.md#redisoperationerrors |
+| `bff.audit.shutdown.dropped` | counter | (없음) | 건수 | BFF audit 태스크가 executor 종료 또는 큐 포화로 폐기된 횟수. graceful shutdown 시 0이 정상. 지속 증가 시 audit 손실 신호. | `server/.../security/BffSecretAuditExecutorConfig.kt` | — | — |
 
 > **태그 정책**: enum/low-cardinality 값만 허용. `club_id`, `user_id`, `membership_id`, `email`, `delivery_id` 등 고유 식별자는 절대 태그로 사용하지 않는다. 행 단위 감사는 `notification_deliveries` 테이블을 사용한다. 근거: `server/.../ReadmatesOperationalMetrics.kt` KDoc 참조.
 

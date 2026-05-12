@@ -3,6 +3,7 @@ package com.readmates.auth.infrastructure.security
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.test.util.ReflectionTestUtils
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -39,5 +40,15 @@ class BffSecretAuditExecutorConfigTest {
 
         val dropped = registry.get("bff.audit.shutdown.dropped").counter().count()
         assertThat(dropped).isGreaterThanOrEqualTo(1.0)
+    }
+
+    @Test
+    fun `awaitTerminationSeconds is 5`() {
+        val registry = SimpleMeterRegistry()
+        val config = BffSecretAuditExecutorConfig(registry)
+        val executor = config.bffSecretAuditExecutor()
+
+        val awaitTerminationMillis = ReflectionTestUtils.getField(executor, "awaitTerminationMillis") as Long
+        assertThat(awaitTerminationMillis).isEqualTo(5_000L)
     }
 }
