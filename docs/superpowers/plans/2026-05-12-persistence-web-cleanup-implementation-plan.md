@@ -80,7 +80,7 @@ Skipped: <check>, because <reason>.
 
 ---
 
-## Task 1: jdbc-member-approval-store (JdbcMemberApprovalStoreAdapter)
+### Task 1: jdbc-member-approval-store (JdbcMemberApprovalStoreAdapter)
 
 **Files:**
 - Create: `server/src/main/kotlin/com/readmates/auth/application/port/out/MemberApprovalStoreOutcome.kt`
@@ -136,7 +136,7 @@ git add server/src/main/kotlin/com/readmates/auth/application/port/out/MemberApp
 git commit -m "refactor: lift member approval store http mapping into web layer"
 ```
 
-## Task 2: jdbc-member-lifecycle-store (JdbcMemberLifecycleStoreAdapter)
+### Task 2: jdbc-member-lifecycle-store (JdbcMemberLifecycleStoreAdapter)
 
 **Files:**
 - Create: `server/src/main/kotlin/com/readmates/auth/application/port/out/MemberLifecycleStoreOutcome.kt`
@@ -179,7 +179,7 @@ rg -n 'ResponseStatusException|org\.springframework\.http\.HttpStatus' \
 git commit -m "refactor: lift member lifecycle store http mapping into web layer"
 ```
 
-## Task 3: jdbc-member-profile-store (JdbcMemberProfileStoreAdapter)
+### Task 3: jdbc-member-profile-store (JdbcMemberProfileStoreAdapter)
 
 **Files:**
 - Create: `server/src/main/kotlin/com/readmates/auth/application/port/out/MemberProfileStoreOutcome.kt`
@@ -220,7 +220,7 @@ rg -n 'ResponseStatusException|org\.springframework\.http\.HttpStatus' \
 git commit -m "refactor: lift member profile store http mapping into web layer"
 ```
 
-## Task 4: jdbc-pending-approval-store (JdbcPendingApprovalStoreAdapter)
+### Task 4: jdbc-pending-approval-store (JdbcPendingApprovalStoreAdapter)
 
 **Files:**
 - Create: `server/src/main/kotlin/com/readmates/auth/application/port/out/PendingApprovalStoreOutcome.kt`
@@ -261,7 +261,7 @@ rg -n 'ResponseStatusException|org\.springframework\.http\.HttpStatus' \
 git commit -m "refactor: lift pending approval store http mapping into web layer"
 ```
 
-## Task 5: jdbc-feedback-document-store (JdbcFeedbackDocumentStoreAdapter)
+### Task 5: jdbc-feedback-document-store (JdbcFeedbackDocumentStoreAdapter)
 
 **Files:**
 - Create: `server/src/main/kotlin/com/readmates/feedback/application/port/out/FeedbackDocumentStoreOutcome.kt`
@@ -304,7 +304,7 @@ rg -n 'ResponseStatusException|org\.springframework\.http\.HttpStatus' \
 git commit -m "refactor: lift feedback document store http mapping into web layer"
 ```
 
-## Task 6: 최종 검증 및 baseline 빈 상태 잠금
+### Task 6: 최종 검증 및 baseline 빈 상태 잠금
 
 **Files:**
 - Verify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`, 영향 어댑터/서비스/advice.
