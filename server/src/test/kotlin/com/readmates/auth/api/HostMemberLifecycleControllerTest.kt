@@ -201,6 +201,26 @@ class HostMemberLifecycleControllerTest(
     }
 
     @Test
+    fun `host deactivates viewer member to left`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        val membershipId = insertLifecycleMember("deactivate.viewer", "VIEWER")
+
+        mockMvc.post("/api/host/members/$membershipId/deactivate") {
+            cookie(hostCookie)
+            header("X-Readmates-Bff-Secret", "test-bff-secret")
+            header("Origin", "http://localhost:3000")
+            with(csrf())
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.member.status") { value("LEFT") }
+        }
+
+        assertEquals("LEFT", membershipStatus(membershipId))
+    }
+
+    @Test
     fun `current session add is idempotent for active members`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
         val sessionId = createOpenSession()

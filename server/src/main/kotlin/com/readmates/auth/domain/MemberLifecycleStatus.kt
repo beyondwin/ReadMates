@@ -1,6 +1,8 @@
 package com.readmates.auth.domain
 
 enum class MemberLifecycleStatus(val storageValue: String) {
+    INVITED("INVITED"),
+    VIEWER("VIEWER"),
     ACTIVE("ACTIVE"),
     SUSPENDED("SUSPENDED"),
     LEFT("LEFT"),
@@ -11,8 +13,10 @@ enum class MemberLifecycleStatus(val storageValue: String) {
 
     companion object {
         private val TRANSITIONS: Map<MemberLifecycleStatus, Set<MemberLifecycleStatus>> = mapOf(
-            ACTIVE to setOf(SUSPENDED, LEFT, INACTIVE),
-            SUSPENDED to setOf(ACTIVE, LEFT, INACTIVE),
+            INVITED to setOf(VIEWER, ACTIVE, INACTIVE, LEFT),
+            VIEWER to setOf(ACTIVE, INACTIVE, LEFT),
+            ACTIVE to setOf(SUSPENDED, INACTIVE, LEFT),
+            SUSPENDED to setOf(ACTIVE, INACTIVE, LEFT),
             LEFT to emptySet(),
             INACTIVE to emptySet(),
         )

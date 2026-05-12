@@ -165,7 +165,7 @@ class JdbcMemberLifecycleStoreAdapter(
             where id = ?
               and club_id = ?
               and role = 'MEMBER'
-              and status in ('ACTIVE', 'SUSPENDED')
+              and status in ('INVITED', 'VIEWER', 'ACTIVE', 'SUSPENDED')
             """.trimIndent(),
             membershipId.dbString(),
             clubId.dbString(),

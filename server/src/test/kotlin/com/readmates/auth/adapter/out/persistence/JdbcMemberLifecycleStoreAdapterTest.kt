@@ -147,6 +147,26 @@ class JdbcMemberLifecycleStoreAdapterTest(
         assertThat(fetchStatus(membershipId)).isEqualTo("LEFT")
     }
 
+    @Test
+    fun `markMemberLeftByHost transitions VIEWER to LEFT`() {
+        val membershipId = insertMember(status = "VIEWER")
+
+        val result = adapter.markMemberLeftByHost(clubId, membershipId)
+
+        assertThat(result).isTrue()
+        assertThat(fetchStatus(membershipId)).isEqualTo("LEFT")
+    }
+
+    @Test
+    fun `markMemberLeftByHost transitions INVITED to LEFT`() {
+        val membershipId = insertMember(status = "INVITED")
+
+        val result = adapter.markMemberLeftByHost(clubId, membershipId)
+
+        assertThat(result).isTrue()
+        assertThat(fetchStatus(membershipId)).isEqualTo("LEFT")
+    }
+
     private fun insertMember(status: String): UUID {
         val idSuffix = UUID.randomUUID().toString()
         val userId = UUID.randomUUID()

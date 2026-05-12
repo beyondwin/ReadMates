@@ -19,6 +19,12 @@ class MemberLifecycleStatusTest {
     }
 
     @Test
+    fun `viewer and invited can transition to left`() {
+        assertThat(MemberLifecycleStatus.VIEWER.allowsTransitionTo(MemberLifecycleStatus.LEFT)).isTrue
+        assertThat(MemberLifecycleStatus.INVITED.allowsTransitionTo(MemberLifecycleStatus.LEFT)).isTrue
+    }
+
+    @Test
     fun `LEFT is terminal`() {
         MemberLifecycleStatus.values()
             .filter { it != MemberLifecycleStatus.LEFT }
@@ -31,6 +37,20 @@ class MemberLifecycleStatusTest {
     fun `fromStorage round-trips known values`() {
         MemberLifecycleStatus.values().forEach { value ->
             assertThat(MemberLifecycleStatus.fromStorage(value.storageValue)).isEqualTo(value)
+        }
+    }
+
+    @Test
+    fun `fromStorage accepts all membership storage statuses`() {
+        mapOf(
+            "INVITED" to MemberLifecycleStatus.INVITED,
+            "VIEWER" to MemberLifecycleStatus.VIEWER,
+            "ACTIVE" to MemberLifecycleStatus.ACTIVE,
+            "SUSPENDED" to MemberLifecycleStatus.SUSPENDED,
+            "LEFT" to MemberLifecycleStatus.LEFT,
+            "INACTIVE" to MemberLifecycleStatus.INACTIVE,
+        ).forEach { (storageValue, expected) ->
+            assertThat(MemberLifecycleStatus.fromStorage(storageValue)).isEqualTo(expected)
         }
     }
 }
