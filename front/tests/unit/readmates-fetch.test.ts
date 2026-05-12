@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readmatesApiPath, readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
+import { readmatesApiPath, readmatesFetch, readmatesFetchResponse, ReadMatesSessionExpiredError, __resetRedirectGuardForTest } from "@/shared/api/client";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { normalizedClubSlug } from "@/shared/security/club-slug";
 
 afterEach(() => {
+  __resetRedirectGuardForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   window.history.pushState({}, "", "/");
@@ -29,7 +30,7 @@ describe("readmatesFetchResponse", () => {
     });
 
     await expect(readmatesFetchResponse("/api/app/me", undefined, { clubSlug: undefined })).rejects.toThrow(
-      "ReadMates session expired",
+      ReadMatesSessionExpiredError,
     );
 
     expect(fetch).toHaveBeenCalledWith(
