@@ -127,13 +127,8 @@ class ServerArchitectureBoundaryTest {
             "org.springframework.http.",
             "org.springframework.web.",
         )
-        val baselineExceptionClasses = setOf(
-            "com.readmates.feedback.adapter.out.persistence.JdbcFeedbackDocumentStoreAdapter",
-        )
-        val baselineExceptionImports = setOf(
-            "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.http.HttpStatus",
-            "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
-        )
+        val baselineExceptionClasses = emptySet<String>()
+        val baselineExceptionImports = emptySet<String>()
         val bytecodeViolations = importedClasses
             .filter { javaClass -> javaClass.packageName.contains(".adapter.out.persistence") }
             .filterNot { javaClass -> javaClass.name in baselineExceptionClasses }
