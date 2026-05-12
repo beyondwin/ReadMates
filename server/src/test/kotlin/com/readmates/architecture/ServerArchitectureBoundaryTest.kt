@@ -128,12 +128,9 @@ class ServerArchitectureBoundaryTest {
             "org.springframework.web.",
         )
         val baselineExceptionClasses = setOf(
-            "com.readmates.auth.adapter.out.persistence.JdbcPendingApprovalStoreAdapter",
             "com.readmates.feedback.adapter.out.persistence.JdbcFeedbackDocumentStoreAdapter",
         )
         val baselineExceptionImports = setOf(
-            "com/readmates/auth/adapter/out/persistence/JdbcPendingApprovalStoreAdapter.kt: import org.springframework.http.HttpStatus",
-            "com/readmates/auth/adapter/out/persistence/JdbcPendingApprovalStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
             "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.http.HttpStatus",
             "com/readmates/feedback/adapter/out/persistence/JdbcFeedbackDocumentStoreAdapter.kt: import org.springframework.web.server.ResponseStatusException",
         )
