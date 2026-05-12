@@ -118,7 +118,7 @@ boot 시 Kafka listener bean이 등록되지 않는지 log 확인.
 
 ### IP hash salt를 ISO 주 단위로 회전한다
 
-**결정:** `RateLimitFilter`의 IP 해시는 `ClientIpHashing.hashClientIp`를 통해 `${READMATES_IP_HASH_BASE_SECRET}::${year}-W${week}` 형식의 salt로 생성합니다. salt는 ISO 주차가 바뀔 때마다 자동으로 변경되며, base secret은 환경 변수 `READMATES_IP_HASH_BASE_SECRET`으로 주입합니다. 미설정 시 빈 문자열 fallback을 사용해 filter는 동작하지만, 운영 환경에서는 반드시 설정해야 합니다.
+**결정:** `RateLimitFilter`의 IP 해시는 `ClientIpHashing.hashClientIp`를 통해 `${READMATES_IP_HASH_BASE_SECRET}::${year}-W${week}` 형식의 salt로 생성합니다. salt는 ISO 주차가 바뀔 때마다 자동으로 변경되며, base secret은 환경 변수 `READMATES_IP_HASH_BASE_SECRET`으로 주입합니다. production-like 환경(`spring.profiles.active`가 비어 있거나 `production`을 포함)에서 base secret이 비어 있으면 startup은 실패합니다. local/test 같은 비운영 환경에서도 빈 값은 `readmates.security.ip-hash.allow-empty-secret=true`를 명시한 경우에만 허용되며, 이 경우 WARN을 출력합니다.
 
 **이유:** salt가 정적이면 같은 IP의 요청 패턴이 장기간 누적되어 교차 분석 가능성이 생깁니다. 주 단위 salt 회전으로 cross-week linking을 차단해 IP 해시 공간이 week 경계에서 분리됩니다.
 
