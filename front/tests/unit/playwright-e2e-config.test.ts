@@ -7,6 +7,16 @@ import { describe, expect, it } from "vitest";
 
 import { resolveE2eDatabaseName } from "../e2e/readmates-e2e-config";
 
+async function backendWebServerCommand() {
+  const { default: playwrightConfig } = await import("../../playwright.config");
+  const webServer = playwrightConfig.webServer;
+  const servers = Array.isArray(webServer) ? webServer : webServer ? [webServer] : [];
+  const backend = servers.find((server) => server.command.includes("bootRun"));
+
+  expect(backend).toBeDefined();
+  return backend?.command ?? "";
+}
+
 describe("Playwright E2E database config", () => {
   it("uses an explicit E2E database name unchanged", () => {
     expect(resolveE2eDatabaseName("readmates_e2e_manual")).toBe("readmates_e2e_manual");
@@ -35,5 +45,13 @@ describe("Playwright E2E database config", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("Playwright E2E backend web server config", () => {
+  it("provides an explicit public-safe IP hash base secret", async () => {
+    await expect(backendWebServerCommand()).resolves.toContain(
+      "READMATES_IP_HASH_BASE_SECRET='test-secret'",
+    );
   });
 });
