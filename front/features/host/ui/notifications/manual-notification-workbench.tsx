@@ -154,7 +154,7 @@ export function ManualNotificationWorkbench({
       <div className="stack" style={{ "--stack": "18px", marginTop: 18 } as CSSProperties}>
         <section aria-labelledby="manual-step-template">
           <h3 id="manual-step-template" className="label" style={{ margin: 0 }}>템플릿</h3>
-          <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
+          <div className="row wrap" style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             {options.templates.map((template) => (
               <button
                 key={template.eventType}
@@ -215,7 +215,7 @@ export function ManualNotificationWorkbench({
                 gap: 4,
               }}
             >
-              <strong className="row wrap" style={{ gap: 6 }}>
+              <strong className="row wrap" style={{ gap: 6, flexWrap: "wrap" }}>
                 <span>{`${selectedSession.sessionNumber}회차`}</span>
                 <span>{selectedSession.bookTitle}</span>
               </strong>
@@ -234,7 +234,7 @@ export function ManualNotificationWorkbench({
         {currentTemplate ? (
           <section aria-labelledby="manual-step-audience">
             <h3 id="manual-step-audience" className="label" style={{ margin: 0 }}>대상 그룹</h3>
-            <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
+            <div className="row wrap" style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}>
               {currentTemplate.allowedAudiences.map((audience) => (
                 <button
                   key={audience}
@@ -252,7 +252,7 @@ export function ManualNotificationWorkbench({
 
         <section aria-labelledby="manual-step-channel">
           <h3 id="manual-step-channel" className="label" style={{ margin: 0 }}>채널</h3>
-          <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
+          <div className="row wrap" style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             {[
               ["BOTH", "앱+이메일"],
               ["IN_APP", "앱 알림"],
