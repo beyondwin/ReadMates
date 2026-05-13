@@ -18,5 +18,10 @@ class NotificationErrorHandler {
             NotificationApplicationError.NOTIFICATION_NOT_FOUND -> HttpStatus.NOT_FOUND
             NotificationApplicationError.INVALID_TEST_MAIL_EMAIL -> HttpStatus.BAD_REQUEST
             NotificationApplicationError.TEST_MAIL_COOLDOWN -> HttpStatus.TOO_MANY_REQUESTS
+            NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE -> HttpStatus.CONFLICT
+            NotificationApplicationError.MANUAL_NOTIFICATION_AUDIENCE_EMPTY -> HttpStatus.UNPROCESSABLE_ENTITY
+            NotificationApplicationError.DUPLICATE_NOTIFICATION_DISPATCH -> HttpStatus.CONFLICT
+            NotificationApplicationError.MANUAL_NOTIFICATION_PREVIEW_EXPIRED -> HttpStatus.CONFLICT
+            NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED -> HttpStatus.FORBIDDEN
         }
 }

@@ -147,6 +147,21 @@ describe("MemberNotificationsPage", () => {
     expect(screen.getByText("읽지 않은 알림 1개")).toBeInTheDocument();
   });
 
+  it("uses product labels and row-level navigation affordance", () => {
+    render(
+      <MemberNotificationsPage
+        unreadCount={1}
+        items={[{ ...unreadNotification, eventType: "SESSION_REMINDER_DUE", title: "내일 모임이 있습니다" }]}
+        onMarkRead={() => undefined}
+        onMarkAllRead={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("모임 전날")).toBeInTheDocument();
+    expect(screen.getByText("읽지 않음")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /내일 모임이 있습니다/ })).toBeInTheDocument();
+  });
+
   it("keeps notification deep links inside the scoped app route", () => {
     render(
       <MemoryRouter initialEntries={["/clubs/reading-sai/app/notifications"]}>
@@ -159,7 +174,7 @@ describe("MemberNotificationsPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "다음 책이 공개되었습니다" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /다음 책이 공개되었습니다/ })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000002",
     );
@@ -177,7 +192,7 @@ describe("MemberNotificationsPage", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "다음 책이 공개되었습니다" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /다음 책이 공개되었습니다/ })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/sessions/00000000-0000-0000-0000-000000000002",
     );
@@ -207,7 +222,7 @@ describe("MemberNotificationsPage", () => {
 
     renderMemberNotificationsRoute();
 
-    await user.click(await screen.findByRole("link", { name: "다음 책이 공개되었습니다" }));
+    await user.click(await screen.findByRole("link", { name: /다음 책이 공개되었습니다/ }));
 
     expect(markRead).toHaveBeenCalledWith(unreadNotification.id);
     expect(await screen.findByText("destination /app/sessions/00000000-0000-0000-0000-000000000002")).toBeInTheDocument();

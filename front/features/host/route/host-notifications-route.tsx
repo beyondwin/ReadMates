@@ -86,6 +86,8 @@ export function HostNotificationsRoute() {
       events={events.items}
       deliveries={deliveries.items}
       audit={audit.items}
+      manualOptions={data.manualOptions}
+      initialManualSelection={data.initialManualSelection}
       hasMoreEvents={Boolean(events.nextCursor)}
       hasMoreDeliveries={Boolean(deliveries.nextCursor)}
       hasMoreAudit={Boolean(audit.nextCursor)}
@@ -100,6 +102,8 @@ export function HostNotificationsRoute() {
       onRetry={(id) => refreshAfter(() => hostNotificationsActions.retry(id))}
       onRestore={(id) => refreshAfter(() => hostNotificationsActions.restore(id))}
       onSendTestMail={(request) => refreshAfter(() => hostNotificationsActions.sendTestMail(request))}
+      onPreviewManual={(request) => hostNotificationsActions.previewManual(request)}
+      onConfirmManual={(request) => refreshAfter(() => hostNotificationsActions.confirmManual(request))}
     />
   );
 }

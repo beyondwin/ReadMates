@@ -4,6 +4,7 @@ import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.SendNotificationTestMailCommand
 import com.readmates.notification.application.port.`in`.GetHostNotificationSummaryUseCase
 import com.readmates.notification.application.port.`in`.ManageHostNotificationsUseCase
+import com.readmates.notification.application.port.`in`.ManageManualHostNotificationsUseCase
 import com.readmates.notification.application.port.`in`.ProcessNotificationDeliveriesUseCase
 import com.readmates.notification.application.port.`in`.SendNotificationTestMailUseCase
 import com.readmates.notification.domain.NotificationChannel
@@ -29,6 +30,7 @@ class HostNotificationController(
     private val getHostNotificationSummaryUseCase: GetHostNotificationSummaryUseCase,
     private val processNotificationDeliveriesUseCase: ProcessNotificationDeliveriesUseCase,
     private val manageHostNotificationsUseCase: ManageHostNotificationsUseCase,
+    private val manageManualHostNotificationsUseCase: ManageManualHostNotificationsUseCase,
     private val sendNotificationTestMailUseCase: SendNotificationTestMailUseCase,
 ) {
     @GetMapping("/summary")
@@ -74,6 +76,31 @@ class HostNotificationController(
         manageHostNotificationsUseCase
             .listDeliveries(host, status, channel, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
             .toResponse()
+
+    @GetMapping("/manual/options")
+    fun manualOptions(
+        host: CurrentMember,
+        @RequestParam(required = false) sessionId: UUID?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ManualNotificationOptionsResponse =
+        manageManualHostNotificationsUseCase
+            .options(host, sessionId, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+            .toResponse()
+
+    @PostMapping("/manual/preview")
+    fun previewManual(
+        host: CurrentMember,
+        @RequestBody request: ManualNotificationPreviewRequest,
+    ): ManualNotificationPreviewResponse =
+        manageManualHostNotificationsUseCase.preview(host, request.toCommand()).toResponse()
+
+    @PostMapping("/manual")
+    fun confirmManual(
+        host: CurrentMember,
+        @RequestBody request: ManualNotificationConfirmRequest,
+    ): ManualNotificationConfirmResponse =
+        manageManualHostNotificationsUseCase.confirm(host, request.toCommand()).toResponse()
 
     @PostMapping("/test-mail")
     fun sendTestMail(

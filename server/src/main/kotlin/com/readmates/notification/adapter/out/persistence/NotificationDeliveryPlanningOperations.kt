@@ -3,6 +3,8 @@ package com.readmates.notification.adapter.out.persistence
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.notificationDeliveryDedupeKey
+import com.readmates.notification.application.model.ManualNotificationAudience
+import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -34,26 +36,7 @@ internal class NotificationDeliveryPlanningOperations(
         }
 
         val rows = recipients.flatMap { recipient ->
-            listOf(
-                DeliveryInsertRow(
-                    id = UUID.randomUUID(),
-                    recipient = recipient,
-                    channel = NotificationChannel.IN_APP,
-                    status = NotificationDeliveryStatus.SENT,
-                    skipReason = null,
-                ),
-                DeliveryInsertRow(
-                    id = UUID.randomUUID(),
-                    recipient = recipient,
-                    channel = NotificationChannel.EMAIL,
-                    status = if (recipient.emailAllowed) {
-                        NotificationDeliveryStatus.PENDING
-                    } else {
-                        NotificationDeliveryStatus.SKIPPED
-                    },
-                    skipReason = if (recipient.emailAllowed) null else SKIP_REASON_EMAIL_DISABLED,
-                ),
-            )
+            deliveryRowsForRecipient(persistedMessage, recipient)
         }
 
         insertDeliveryRows(jdbcTemplate, persistedMessage, rows)
@@ -85,7 +68,7 @@ internal class NotificationDeliveryPlanningOperations(
             )
 
     private fun recipientsFor(jdbcTemplate: JdbcTemplate, message: NotificationEventMessage): List<DeliveryRecipient> =
-        when (message.eventType) {
+        message.payload.manualDispatch?.let { manualRecipients(jdbcTemplate, message) } ?: when (message.eventType) {
             NotificationEventType.NEXT_BOOK_PUBLISHED ->
                 sessionViewerRecipients(jdbcTemplate, message, "next_book_published_enabled", "sessions.state = 'DRAFT'")
             NotificationEventType.SESSION_REMINDER_DUE ->
@@ -95,6 +78,47 @@ internal class NotificationDeliveryPlanningOperations(
             NotificationEventType.REVIEW_PUBLISHED ->
                 reviewRecipients(jdbcTemplate, message)
         }
+
+    private fun deliveryRowsForRecipient(
+        message: NotificationEventMessage,
+        recipient: DeliveryRecipient,
+    ): List<DeliveryInsertRow> {
+        val requested = message.payload.manualDispatch?.requestedChannels
+        val includeInApp = requested == null ||
+            requested == ManualNotificationRequestedChannels.IN_APP ||
+            requested == ManualNotificationRequestedChannels.BOTH
+        val includeEmail = requested == null ||
+            requested == ManualNotificationRequestedChannels.EMAIL ||
+            requested == ManualNotificationRequestedChannels.BOTH
+        return buildList {
+            if (includeInApp) {
+                add(
+                    DeliveryInsertRow(
+                        id = UUID.randomUUID(),
+                        recipient = recipient,
+                        channel = NotificationChannel.IN_APP,
+                        status = NotificationDeliveryStatus.SENT,
+                        skipReason = null,
+                    ),
+                )
+            }
+            if (includeEmail) {
+                add(
+                    DeliveryInsertRow(
+                        id = UUID.randomUUID(),
+                        recipient = recipient,
+                        channel = NotificationChannel.EMAIL,
+                        status = if (recipient.emailAllowed) {
+                            NotificationDeliveryStatus.PENDING
+                        } else {
+                            NotificationDeliveryStatus.SKIPPED
+                        },
+                        skipReason = if (recipient.emailAllowed) null else SKIP_REASON_EMAIL_DISABLED,
+                    ),
+                )
+            }
+        }
+    }
 
     private fun sessionViewerRecipients(
         jdbcTemplate: JdbcTemplate,
@@ -198,6 +222,104 @@ internal class NotificationDeliveryPlanningOperations(
             rowMappers.sessionId(message).dbString(),
             (message.payload.authorMembershipId ?: UUID(0, 0)).dbString(),
         )
+
+    private fun manualRecipients(
+        jdbcTemplate: JdbcTemplate,
+        message: NotificationEventMessage,
+    ): List<DeliveryRecipient> {
+        val manual = requireNotNull(message.payload.manualDispatch)
+        val baseIds = manualBaseMembershipIds(jdbcTemplate, message)
+        val includedIds = activeMembershipIds(jdbcTemplate, message.clubId, manual.includedMembershipIds)
+        val finalIds = (baseIds - manual.excludedMembershipIds.toSet() + includedIds).toList()
+        if (finalIds.isEmpty()) {
+            return emptyList()
+        }
+        val placeholders = finalIds.joinToString(",") { "?" }
+        val preferenceColumn = when (message.eventType) {
+            NotificationEventType.NEXT_BOOK_PUBLISHED -> "next_book_published_enabled"
+            NotificationEventType.SESSION_REMINDER_DUE -> "session_reminder_due_enabled"
+            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "feedback_document_published_enabled"
+            NotificationEventType.REVIEW_PUBLISHED -> "review_published_enabled"
+        }
+        return jdbcTemplate.query(
+            """
+            select
+              memberships.id as recipient_membership_id,
+              coalesce(memberships.short_name, users.name) as display_name,
+              (
+                users.email is not null
+                and users.email <> ''
+                and coalesce(notification_preferences.email_enabled, true)
+                and coalesce(notification_preferences.$preferenceColumn, true)
+              ) as email_allowed
+            from memberships
+            join users on users.id = memberships.user_id
+            left join notification_preferences on notification_preferences.membership_id = memberships.id
+              and notification_preferences.club_id = memberships.club_id
+            where memberships.club_id = ?
+              and memberships.status = 'ACTIVE'
+              and memberships.id in ($placeholders)
+            """.trimIndent(),
+            { resultSet, _ -> with(rowMappers) { resultSet.toDeliveryRecipient() } },
+            *(listOf(message.clubId.dbString() as Any) + finalIds.map { it.dbString() as Any }).toTypedArray(),
+        )
+    }
+
+    private fun manualBaseMembershipIds(jdbcTemplate: JdbcTemplate, message: NotificationEventMessage): Set<UUID> {
+        val manual = requireNotNull(message.payload.manualDispatch)
+        val sessionId = rowMappers.sessionId(message)
+        val sql = when (manual.audience) {
+            ManualNotificationAudience.ALL_ACTIVE_MEMBERS -> """
+                select memberships.id
+                from memberships
+                where memberships.club_id = ?
+                  and memberships.status = 'ACTIVE'
+            """
+            ManualNotificationAudience.SESSION_PARTICIPANTS -> """
+                select memberships.id
+                from memberships
+                join session_participants on session_participants.membership_id = memberships.id
+                  and session_participants.club_id = memberships.club_id
+                  and session_participants.session_id = ?
+                  and session_participants.participation_status = 'ACTIVE'
+                where memberships.club_id = ?
+                  and memberships.status = 'ACTIVE'
+            """
+            ManualNotificationAudience.CONFIRMED_ATTENDEES -> """
+                select memberships.id
+                from memberships
+                join session_participants on session_participants.membership_id = memberships.id
+                  and session_participants.club_id = memberships.club_id
+                  and session_participants.session_id = ?
+                  and session_participants.participation_status = 'ACTIVE'
+                  and session_participants.attendance_status = 'ATTENDED'
+                where memberships.club_id = ?
+                  and memberships.status = 'ACTIVE'
+            """
+        }.trimIndent()
+        val args = if (manual.audience == ManualNotificationAudience.ALL_ACTIVE_MEMBERS) {
+            arrayOf(message.clubId.dbString())
+        } else {
+            arrayOf(sessionId.dbString(), message.clubId.dbString())
+        }
+        return jdbcTemplate.query(sql, { rs, _ -> rs.uuid("id") }, *args).toSet()
+    }
+
+    private fun activeMembershipIds(jdbcTemplate: JdbcTemplate, clubId: UUID, membershipIds: List<UUID>): Set<UUID> {
+        if (membershipIds.isEmpty()) return emptySet()
+        val placeholders = membershipIds.joinToString(",") { "?" }
+        return jdbcTemplate.query(
+            """
+            select id
+            from memberships
+            where club_id = ?
+              and status = 'ACTIVE'
+              and id in ($placeholders)
+            """.trimIndent(),
+            { rs, _ -> rs.uuid("id") },
+            *(listOf(clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any }).toTypedArray(),
+        ).toSet()
+    }
 
     private fun insertDeliveryRows(
         jdbcTemplate: JdbcTemplate,

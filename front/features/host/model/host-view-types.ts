@@ -173,6 +173,105 @@ export type HostNotificationSummary = {
   }>;
 };
 
+export type ManualNotificationAudience = "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES";
+export type ManualNotificationRequestedChannels = "IN_APP" | "EMAIL" | "BOTH";
+export type ManualNotificationSendMode = "NOW";
+export type ManualNotificationEligibility = "ELIGIBLE" | "INELIGIBLE" | "EMAIL_DISABLED" | "EMAIL_MISSING";
+
+export type ManualNotificationTemplateOption = {
+  eventType: HostNotificationEventType;
+  label: string;
+  enabled: boolean;
+  disabledReason: string | null;
+  defaultAudience: ManualNotificationAudience;
+  allowedAudiences: ManualNotificationAudience[];
+  defaultChannels: ManualNotificationRequestedChannels;
+};
+
+export type ManualNotificationMemberOption = {
+  membershipId: string;
+  displayName: string;
+  maskedEmail: string;
+  role: MemberRole;
+  membershipStatus: MembershipStatus;
+  sessionParticipationStatus: SessionParticipationStatus | null;
+  attendanceStatus: AttendanceStatus | null;
+  emailEligibility: ManualNotificationEligibility;
+  inAppEligibility: ManualNotificationEligibility;
+};
+
+export type ManualNotificationOptionsResponse = {
+  templates: ManualNotificationTemplateOption[];
+  members: PagedResponse<ManualNotificationMemberOption>;
+};
+
+export type ManualNotificationSelectionRequest = {
+  sessionId: string;
+  eventType: HostNotificationEventType;
+  audience: ManualNotificationAudience;
+  requestedChannels: ManualNotificationRequestedChannels;
+  excludedMembershipIds: string[];
+  includedMembershipIds: string[];
+  sendMode: ManualNotificationSendMode;
+};
+
+export type ManualNotificationPreviewRequest = ManualNotificationSelectionRequest;
+
+export type ManualNotificationPreviewResponse = {
+  previewId: string;
+  expiresAt: string;
+  template: {
+    eventType: HostNotificationEventType;
+    label: string;
+    subject: string;
+    bodyPreview: string;
+  };
+  audience: {
+    baseGroup: ManualNotificationAudience;
+    baseCount: number;
+    excludedCount: number;
+    includedCount: number;
+    finalTargetCount: number;
+  };
+  channels: {
+    requested: ManualNotificationRequestedChannels;
+    inAppEligibleCount: number;
+    emailEligibleCount: number;
+    emailSkippedByPreferenceCount: number;
+    emailMissingCount: number;
+  };
+  duplicates: {
+    requiresResendConfirmation: boolean;
+    recentDispatches: Array<{
+      manualDispatchId: string;
+      eventType: HostNotificationEventType;
+      requestedChannels: ManualNotificationRequestedChannels;
+      createdAt: string;
+      requestedBy: string;
+      targetCount: number;
+    }>;
+  };
+  warnings: Array<{ code: string; message: string }>;
+};
+
+export type ManualNotificationConfirmRequest = ManualNotificationSelectionRequest & {
+  previewId: string;
+  resendConfirmed: boolean;
+};
+
+export type ManualNotificationConfirmResponse = {
+  manualDispatchId: string;
+  eventId: string;
+  status: "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
+  createdAt: string;
+  summary: {
+    targetCount: number;
+    requestedChannels: ManualNotificationRequestedChannels;
+    expectedInAppCount: number;
+    expectedEmailCount: number;
+  };
+};
+
 export type HostSessionListItem = {
   sessionId: string;
   sessionNumber: number;

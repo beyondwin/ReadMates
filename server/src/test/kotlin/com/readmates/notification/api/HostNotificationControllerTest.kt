@@ -37,12 +37,17 @@ import java.util.Properties
 import java.util.UUID
 
 private const val CLEANUP_HOST_NOTIFICATIONS_SQL = """
+    delete from notification_manual_dispatches
+    where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_manual_dispatch_previews
+    where club_id = '00000000-0000-0000-0000-000000000001';
     delete from notification_test_mail_audit
     where club_id = '00000000-0000-0000-0000-000000000001';
     delete from notification_deliveries
     where dedupe_key like 'host-notification-controller-test-%';
     delete from notification_event_outbox
-    where dedupe_key like 'host-notification-controller-test-%';
+    where dedupe_key like 'host-notification-controller-test-%'
+       or dedupe_key like 'manual:%';
     delete from memberships
     where club_id = '00000000-0000-0000-0000-000000000902';
     delete from users
@@ -499,6 +504,79 @@ class HostNotificationControllerTest(
     }
 
     @Test
+    fun `host previews manual reminder without exposing raw email`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val response = mockMvc.post("/api/host/notifications/manual/preview") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                  {
+                    "sessionId": "00000000-0000-0000-0000-000000000301",
+                    "eventType": "SESSION_REMINDER_DUE",
+                    "audience": "ALL_ACTIVE_MEMBERS",
+                    "requestedChannels": "BOTH",
+                    "excludedMembershipIds": [],
+                    "includedMembershipIds": [],
+                    "sendMode": "NOW"
+                  }
+                """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.template.eventType") { value("SESSION_REMINDER_DUE") }
+                jsonPath("$.audience.finalTargetCount") { exists() }
+                jsonPath("$.channels.requested") { value("BOTH") }
+            }.andReturn().response.contentAsString
+
+            assertThat(response).doesNotContain("member@example.com")
+            assertThat(response).doesNotContain("host@example.com")
+        }
+    }
+
+    @Test
+    fun `host confirms manual reminder after preview`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val previewId = mockMvc.post("/api/host/notifications/manual/preview") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                  {
+                    "sessionId": "00000000-0000-0000-0000-000000000301",
+                    "eventType": "SESSION_REMINDER_DUE",
+                    "audience": "ALL_ACTIVE_MEMBERS",
+                    "requestedChannels": "IN_APP",
+                    "excludedMembershipIds": [],
+                    "includedMembershipIds": [],
+                    "sendMode": "NOW"
+                  }
+                """.trimIndent()
+            }.andReturn().response.contentAsString
+                .let { tools.jackson.databind.ObjectMapper().readTree(it).get("previewId").asText() }
+
+            mockMvc.post("/api/host/notifications/manual") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """
+                  {
+                    "previewId": "$previewId",
+                    "sessionId": "00000000-0000-0000-0000-000000000301",
+                    "eventType": "SESSION_REMINDER_DUE",
+                    "audience": "ALL_ACTIVE_MEMBERS",
+                    "requestedChannels": "IN_APP",
+                    "excludedMembershipIds": [],
+                    "includedMembershipIds": [],
+                    "sendMode": "NOW",
+                    "resendConfirmed": false
+                  }
+                """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("PENDING") }
+                jsonPath("$.summary.requestedChannels") { value("IN_APP") }
+            }
+        }
+    }
+
+    @Test
     fun `nearby notification post path without csrf remains protected`() {
         mockMvc.post("/api/host/notifications/process/extra") {
             with(user("host@example.com"))
@@ -509,6 +587,41 @@ class HostNotificationControllerTest(
 
     private fun insertPendingNotification(id: String, clubId: String, dedupeKey: String) {
         insertNotification(id = id, clubId = clubId, status = NotificationOutboxStatus.PENDING, dedupeKey = dedupeKey)
+    }
+
+    private fun <T> withTemporarySessionState(state: String, visibility: String, block: () -> T): T {
+        val original = jdbcTemplate.queryForMap(
+            """
+            select state, visibility
+            from sessions
+            where id = '00000000-0000-0000-0000-000000000301'
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+        )
+        return try {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = ?, visibility = ?
+                where id = '00000000-0000-0000-0000-000000000301'
+                  and club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+                state,
+                visibility,
+            )
+            block()
+        } finally {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = ?, visibility = ?
+                where id = '00000000-0000-0000-0000-000000000301'
+                  and club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+                original["state"].toString(),
+                original["visibility"].toString(),
+            )
+        }
     }
 
     private fun insertOtherClub() {

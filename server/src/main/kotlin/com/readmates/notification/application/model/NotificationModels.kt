@@ -16,7 +16,67 @@ data class NotificationEventPayload(
     val documentVersion: Int? = null,
     val authorMembershipId: UUID? = null,
     val targetDate: LocalDate? = null,
+    val manualDispatch: NotificationManualDispatchPayload? = null,
 )
+
+enum class NotificationDispatchSource {
+    AUTOMATIC,
+    MANUAL,
+}
+
+enum class ManualNotificationAudience {
+    ALL_ACTIVE_MEMBERS,
+    SESSION_PARTICIPANTS,
+    CONFIRMED_ATTENDEES,
+}
+
+enum class ManualNotificationRequestedChannels {
+    IN_APP,
+    EMAIL,
+    BOTH,
+}
+
+enum class ManualNotificationSendMode {
+    NOW,
+}
+
+enum class ManualNotificationEligibility {
+    ELIGIBLE,
+    INELIGIBLE,
+    EMAIL_DISABLED,
+    EMAIL_MISSING,
+}
+
+data class NotificationManualDispatchPayload(
+    val id: UUID,
+    val source: NotificationDispatchSource = NotificationDispatchSource.MANUAL,
+    val requestedByMembershipId: UUID,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val audience: ManualNotificationAudience,
+    val excludedMembershipIds: List<UUID> = emptyList(),
+    val includedMembershipIds: List<UUID> = emptyList(),
+    val resend: Boolean = false,
+    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+)
+
+fun defaultManualAudience(eventType: NotificationEventType): ManualNotificationAudience =
+    when (eventType) {
+        NotificationEventType.NEXT_BOOK_PUBLISHED,
+        NotificationEventType.SESSION_REMINDER_DUE,
+        -> ManualNotificationAudience.ALL_ACTIVE_MEMBERS
+        NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> ManualNotificationAudience.CONFIRMED_ATTENDEES
+        NotificationEventType.REVIEW_PUBLISHED -> ManualNotificationAudience.SESSION_PARTICIPANTS
+    }
+
+fun allowedManualAudiences(eventType: NotificationEventType): Set<ManualNotificationAudience> =
+    when (eventType) {
+        NotificationEventType.NEXT_BOOK_PUBLISHED,
+        NotificationEventType.SESSION_REMINDER_DUE,
+        -> setOf(ManualNotificationAudience.ALL_ACTIVE_MEMBERS, ManualNotificationAudience.SESSION_PARTICIPANTS)
+        NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
+            setOf(ManualNotificationAudience.CONFIRMED_ATTENDEES, ManualNotificationAudience.SESSION_PARTICIPANTS)
+        NotificationEventType.REVIEW_PUBLISHED -> emptySet()
+    }
 
 data class NotificationEventOutboxItem(
     val id: UUID,
@@ -164,6 +224,121 @@ data class HostNotificationDelivery(
 data class HostNotificationDeliveryList(
     val items: List<HostNotificationDelivery>,
     val nextCursor: String? = null,
+)
+
+data class ManualNotificationOptions(
+    val templates: List<ManualNotificationTemplateOption>,
+    val members: List<ManualNotificationMemberOption>,
+    val nextCursor: String?,
+)
+
+data class ManualNotificationTemplateOption(
+    val eventType: NotificationEventType,
+    val label: String,
+    val enabled: Boolean,
+    val disabledReason: String?,
+    val defaultAudience: ManualNotificationAudience,
+    val allowedAudiences: Set<ManualNotificationAudience>,
+    val defaultChannels: ManualNotificationRequestedChannels = ManualNotificationRequestedChannels.BOTH,
+)
+
+data class ManualNotificationMemberOption(
+    val membershipId: UUID,
+    val displayName: String,
+    val maskedEmail: String,
+    val role: String,
+    val membershipStatus: String,
+    val sessionParticipationStatus: String?,
+    val attendanceStatus: String?,
+    val emailEligibility: ManualNotificationEligibility,
+    val inAppEligibility: ManualNotificationEligibility,
+)
+
+data class ManualNotificationSelection(
+    val sessionId: UUID,
+    val eventType: NotificationEventType,
+    val audience: ManualNotificationAudience,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val excludedMembershipIds: List<UUID>,
+    val includedMembershipIds: List<UUID>,
+    val sendMode: ManualNotificationSendMode,
+)
+
+data class ManualNotificationPreviewCommand(
+    val selection: ManualNotificationSelection,
+)
+
+data class ManualNotificationConfirmCommand(
+    val previewId: UUID,
+    val selection: ManualNotificationSelection,
+    val resendConfirmed: Boolean,
+)
+
+data class ManualNotificationPreview(
+    val previewId: UUID,
+    val expiresAt: OffsetDateTime,
+    val template: ManualNotificationTemplatePreview,
+    val audience: ManualNotificationAudiencePreview,
+    val channels: ManualNotificationChannelPreview,
+    val duplicates: ManualNotificationDuplicatePreview,
+    val warnings: List<ManualNotificationWarning>,
+)
+
+data class ManualNotificationTemplatePreview(
+    val eventType: NotificationEventType,
+    val label: String,
+    val subject: String,
+    val bodyPreview: String,
+)
+
+data class ManualNotificationAudiencePreview(
+    val baseGroup: ManualNotificationAudience,
+    val baseCount: Int,
+    val excludedCount: Int,
+    val includedCount: Int,
+    val finalTargetCount: Int,
+)
+
+data class ManualNotificationChannelPreview(
+    val requested: ManualNotificationRequestedChannels,
+    val inAppEligibleCount: Int,
+    val emailEligibleCount: Int,
+    val emailSkippedByPreferenceCount: Int,
+    val emailMissingCount: Int,
+)
+
+data class ManualNotificationDuplicatePreview(
+    val requiresResendConfirmation: Boolean,
+    val recentDispatches: List<ManualNotificationRecentDispatch>,
+)
+
+data class ManualNotificationRecentDispatch(
+    val manualDispatchId: UUID,
+    val eventType: NotificationEventType,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val createdAt: OffsetDateTime,
+    val requestedBy: String,
+    val targetCount: Int,
+)
+
+data class ManualNotificationWarning(
+    val code: String,
+    val message: String,
+)
+
+data class ManualNotificationConfirmResult(
+    val manualDispatchId: UUID,
+    val eventId: UUID,
+    val status: NotificationEventOutboxStatus,
+    val createdAt: OffsetDateTime,
+    val summary: ManualNotificationConfirmSummary,
+)
+
+data class ManualNotificationConfirmSummary(
+    val targetCount: Int,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
 )
 
 enum class NotificationTestMailStatus {

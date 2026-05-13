@@ -23,6 +23,11 @@ import type {
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionVisibilityRequest,
+  ManualNotificationConfirmRequest,
+  ManualNotificationConfirmResponse,
+  ManualNotificationOptionsResponse,
+  ManualNotificationPreviewRequest,
+  ManualNotificationPreviewResponse,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
   NotificationTestMailAuditItem,
@@ -80,6 +85,43 @@ export function fetchHostNotificationEvents(context?: ReadmatesApiContext, page?
 
 export function fetchHostNotificationDeliveries(context?: ReadmatesApiContext, page?: PageRequest) {
   return readmatesFetch<HostNotificationDeliveryListResponse>(`/api/host/notifications/deliveries${pagingSearchParams(page)}`, undefined, context).then(parseHostNotificationDeliveryListResponse);
+}
+
+export function fetchManualNotificationOptions(
+  context?: ReadmatesApiContext,
+  request?: { sessionId?: string; page?: PageRequest },
+) {
+  const params = new URLSearchParams();
+  if (request?.sessionId) {
+    params.set("sessionId", request.sessionId);
+  }
+  const pageParams = pagingSearchParams(request?.page);
+  const pageSearch = pageParams.startsWith("?") ? pageParams.slice(1) : "";
+  if (pageSearch) {
+    new URLSearchParams(pageSearch).forEach((value, key) => params.set(key, value));
+  }
+  const search = params.toString();
+  return readmatesFetch<ManualNotificationOptionsResponse>(
+    `/api/host/notifications/manual/options${search ? `?${search}` : ""}`,
+    undefined,
+    context,
+  );
+}
+
+export function previewManualNotification(request: ManualNotificationPreviewRequest) {
+  return readmatesFetch<ManualNotificationPreviewResponse>("/api/host/notifications/manual/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+}
+
+export function confirmManualNotification(request: ManualNotificationConfirmRequest) {
+  return readmatesFetch<ManualNotificationConfirmResponse>("/api/host/notifications/manual", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
 }
 
 export function fetchHostNotificationDetail(id: string, context?: ReadmatesApiContext) {

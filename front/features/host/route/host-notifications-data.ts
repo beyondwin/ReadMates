@@ -1,8 +1,11 @@
 import {
+  confirmManualNotification,
   fetchHostNotificationDeliveries,
   fetchHostNotificationEvents,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
+  fetchManualNotificationOptions,
+  previewManualNotification,
   processHostNotifications,
   restoreHostNotification,
   retryHostNotification,
@@ -10,8 +13,10 @@ import {
 } from "@/features/host/api/host-api";
 import type {
   HostNotificationDeliveryListResponse,
+  HostNotificationEventType,
   HostNotificationEventListResponse,
   HostNotificationSummary,
+  ManualNotificationOptionsResponse,
   NotificationTestMailAuditPage,
 } from "@/features/host/api/host-contracts";
 import type { PageRequest } from "@/shared/model/paging";
@@ -24,20 +29,36 @@ export type HostNotificationsRouteData = {
   events: HostNotificationEventListResponse;
   deliveries: HostNotificationDeliveryListResponse;
   audit: NotificationTestMailAuditPage;
+  manualOptions: ManualNotificationOptionsResponse;
+  initialManualSelection: {
+    sessionId: string | null;
+    eventType: HostNotificationEventType | null;
+  };
 };
 
 export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promise<HostNotificationsRouteData> {
   await requireHostLoaderAuth(args);
   const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+  const url = args?.request ? new URL(args.request.url) : null;
+  const sessionId = url?.searchParams.get("sessionId") ?? null;
+  const eventType = (url?.searchParams.get("eventType") as HostNotificationEventType | null) ?? null;
 
-  const [summary, events, deliveries, audit] = await Promise.all([
+  const [summary, events, deliveries, audit, manualOptions] = await Promise.all([
     fetchHostNotificationSummary(context),
     fetchHostNotificationEvents(context, { limit: 50 }),
     fetchHostNotificationDeliveries(context, { limit: 50 }),
     fetchHostNotificationTestMailAudit(context, { limit: 50 }),
+    fetchManualNotificationOptions(context, { sessionId: sessionId ?? undefined }),
   ]);
 
-  return { summary, events, deliveries, audit };
+  return {
+    summary,
+    events,
+    deliveries,
+    audit,
+    manualOptions,
+    initialManualSelection: { sessionId, eventType },
+  };
 }
 
 export const hostNotificationsActions = {
@@ -50,6 +71,9 @@ export const hostNotificationsActions = {
   retry: retryHostNotification,
   restore: restoreHostNotification,
   sendTestMail: sendHostNotificationTestMail,
+  previewManual: previewManualNotification,
+  confirmManual: confirmManualNotification,
+  loadManualOptions: (sessionId?: string, page?: PageRequest) => fetchManualNotificationOptions(undefined, { sessionId, page }),
   loadEvents: (page?: PageRequest) => fetchHostNotificationEvents(undefined, page),
   loadDeliveries: (page?: PageRequest) => fetchHostNotificationDeliveries(undefined, page),
   loadAudit: (page?: PageRequest) => fetchHostNotificationTestMailAudit(undefined, page),

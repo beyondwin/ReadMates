@@ -223,6 +223,28 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     @Test
+    fun `manual dispatch planning respects requested channels and target edits`() {
+        val manualEventId = UUID.nameUUIDFromBytes("manual-event".toByteArray())
+        val member1 = membershipIdForEmail("member1@example.com")
+        val member2 = membershipIdForEmail("member2@example.com")
+        insertManualEventOutboxRow(
+            eventId = manualEventId,
+            requestedChannels = "IN_APP",
+            audience = "ALL_ACTIVE_MEMBERS",
+            excludedMembershipIds = listOf(member2),
+        )
+
+        val deliveries = deliveryAdapter.persistPlannedDeliveries(
+            message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
+        )
+
+        assertThat(deliveries).allSatisfy { assertThat(it.channel).isEqualTo(NotificationChannel.IN_APP) }
+        assertThat(deliveries.map { it.recipientMembershipId }).contains(member1)
+        assertThat(deliveries.map { it.recipientMembershipId }).doesNotContain(member2)
+        assertThat(memberNotificationRows(manualEventId)).isEqualTo(deliveries.size)
+    }
+
+    @Test
     fun `claimEmailDelivery leases only due email rows and mark sent requires active lease`() {
         insertEventOutboxRow()
         deliveryAdapter.persistPlannedDeliveries(message())
@@ -358,6 +380,51 @@ class JdbcNotificationDeliveryAdapterTest(
             """.trimIndent(),
             clubId.toString(),
             "delivery-adapter-test-$eventId",
+        )
+    }
+
+    private fun insertManualEventOutboxRow(
+        eventId: UUID,
+        requestedChannels: String,
+        audience: String,
+        excludedMembershipIds: List<UUID> = emptyList(),
+        includedMembershipIds: List<UUID> = emptyList(),
+    ) {
+        val manualDispatchId = UUID.nameUUIDFromBytes("manual-dispatch-$eventId".toByteArray())
+        val excludedJson = excludedMembershipIds.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+        val includedJson = includedMembershipIds.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+        jdbcTemplate.update(
+            """
+            insert into notification_event_outbox (
+              id, club_id, event_type, aggregate_type, aggregate_id, payload_json, status, kafka_topic, kafka_key, dedupe_key
+            ) values (?, ?, 'SESSION_REMINDER_DUE', 'SESSION', ?, json_object(
+              'sessionId', ?,
+              'sessionNumber', 1,
+              'bookTitle', '팩트풀니스',
+              'manualDispatch', json_object(
+                'id', ?,
+                'source', 'MANUAL',
+                'requestedByMembershipId', '00000000-0000-0000-0000-000000000201',
+                'requestedChannels', ?,
+                'audience', ?,
+                'excludedMembershipIds', cast(? as json),
+                'includedMembershipIds', cast(? as json),
+                'resend', false,
+                'sendMode', 'NOW'
+              )
+            ), 'PUBLISHED', 'readmates.notification.events.v1', ?, ?)
+            """.trimIndent(),
+            eventId.toString(),
+            clubId.toString(),
+            sessionId.toString(),
+            sessionId.toString(),
+            manualDispatchId.toString(),
+            requestedChannels,
+            audience,
+            excludedJson,
+            includedJson,
+            clubId.toString(),
+            "delivery-adapter-test-manual-$eventId",
         )
     }
 

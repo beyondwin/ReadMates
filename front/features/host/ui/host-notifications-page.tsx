@@ -6,7 +6,15 @@ import {
 } from "react";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { HostNotificationsSummary } from "./notifications/host-notifications-summary";
+import { ManualNotificationWorkbench } from "./notifications/manual-notification-workbench";
 import { NotificationLedgerTabs } from "./notifications/notification-ledger-tabs";
+import type {
+  HostNotificationEventType,
+  ManualNotificationConfirmRequest,
+  ManualNotificationOptionsResponse,
+  ManualNotificationPreviewRequest,
+  ManualNotificationPreviewResponse,
+} from "@/features/host/model/host-view-types";
 import {
   type HostNotificationDeliveryItem,
   type HostNotificationEventItem,
@@ -23,6 +31,11 @@ type HostNotificationsPageProps = {
   events: HostNotificationEventItem[];
   deliveries: HostNotificationDeliveryItem[];
   audit: NotificationTestMailAuditItem[];
+  manualOptions: ManualNotificationOptionsResponse;
+  initialManualSelection: {
+    sessionId: string | null;
+    eventType: HostNotificationEventType | null;
+  };
   hasMoreEvents?: boolean;
   hasMoreDeliveries?: boolean;
   hasMoreAudit?: boolean;
@@ -33,6 +46,8 @@ type HostNotificationsPageProps = {
   onRetry: (id: string) => Promise<unknown>;
   onRestore: (id: string) => Promise<unknown>;
   onSendTestMail: (request: SendNotificationTestMailRequest) => Promise<unknown>;
+  onPreviewManual: (request: ManualNotificationPreviewRequest) => Promise<ManualNotificationPreviewResponse>;
+  onConfirmManual: (request: ManualNotificationConfirmRequest) => Promise<unknown>;
   onLoadMoreEvents?: () => Promise<unknown>;
   onLoadMoreDeliveries?: () => Promise<unknown>;
   onLoadMoreAudit?: () => Promise<unknown>;
@@ -55,6 +70,8 @@ export function HostNotificationsPage({
   events,
   deliveries,
   audit,
+  manualOptions,
+  initialManualSelection,
   hasMoreEvents = false,
   hasMoreDeliveries = false,
   hasMoreAudit = false,
@@ -65,6 +82,8 @@ export function HostNotificationsPage({
   onRetry,
   onRestore,
   onSendTestMail,
+  onPreviewManual,
+  onConfirmManual,
   onLoadMoreEvents,
   onLoadMoreDeliveries,
   onLoadMoreAudit,
@@ -75,13 +94,16 @@ export function HostNotificationsPage({
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [testEmail, setTestEmail] = useState("");
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
+  const [manualPreview, setManualPreview] = useState<ManualNotificationPreviewResponse | null>(null);
+  const [manualError, setManualError] = useState<string | null>(null);
+  const [manualBusy, setManualBusy] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const processableNotificationCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
   const hasVisibleProcessableNotifications = deliveries.some(
     (delivery) => delivery.channel === "EMAIL" && (delivery.status === "PENDING" || delivery.status === "FAILED"),
   );
   const hasProcessableNotifications = processableNotificationCount > 0 || hasVisibleProcessableNotifications;
-  const isBusy = pendingAction !== null || isRefreshing;
+  const isBusy = pendingAction !== null || manualBusy || isRefreshing;
 
   const isPending = (kind: PendingAction["kind"], id?: string) => {
     if (!pendingAction || pendingAction.kind !== kind) {
@@ -157,6 +179,42 @@ export function HostNotificationsPage({
     }, "테스트 메일 발송을 요청했습니다.");
   };
 
+  const handleManualPreview = async (request: ManualNotificationPreviewRequest) => {
+    if (isBusy) {
+      return;
+    }
+
+    setManualBusy(true);
+    setManualError(null);
+    setManualPreview(null);
+    try {
+      const preview = await onPreviewManual(request);
+      setManualPreview(preview);
+    } catch {
+      setManualError("미리보기를 만들지 못했습니다. 세션과 대상 조건을 확인해 주세요.");
+    } finally {
+      setManualBusy(false);
+    }
+  };
+
+  const handleManualConfirm = async (request: ManualNotificationConfirmRequest) => {
+    if (isBusy) {
+      return;
+    }
+
+    setManualBusy(true);
+    setManualError(null);
+    try {
+      await onConfirmManual(request);
+      setManualPreview(null);
+      setMessage({ kind: "status", text: "수동 알림 발송을 요청했습니다." });
+    } catch {
+      setManualError("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요.");
+    } finally {
+      setManualBusy(false);
+    }
+  };
+
   return (
     <main className="rm-host-notifications-page">
       <section className="page-header-compact">
@@ -202,6 +260,17 @@ export function HostNotificationsPage({
             {message.text}
           </p>
         ) : null}
+
+        <ManualNotificationWorkbench
+          options={manualOptions}
+          initialSessionId={initialManualSelection.sessionId}
+          initialEventType={initialManualSelection.eventType}
+          preview={manualPreview}
+          busy={manualBusy || isRefreshing}
+          error={manualError}
+          onPreview={handleManualPreview}
+          onConfirm={handleManualConfirm}
+        />
 
         <HostNotificationsSummary summary={summary} />
 

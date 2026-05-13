@@ -36,9 +36,9 @@ const EMPTY_PENDING_READ_IDS = new Set<string>();
 
 const eventLabels: Record<NotificationEventType, string> = {
   NEXT_BOOK_PUBLISHED: "다음 책",
-  SESSION_REMINDER_DUE: "모임 리마인더",
+  SESSION_REMINDER_DUE: "모임 전날",
   FEEDBACK_DOCUMENT_PUBLISHED: "피드백 문서",
-  REVIEW_PUBLISHED: "리뷰",
+  REVIEW_PUBLISHED: "서평",
 };
 
 function notificationHref(deepLinkPath: string) {
@@ -178,7 +178,7 @@ function MemberNotificationsPageContent({
                     data-unread={unread ? "true" : "false"}
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "minmax(0, 1fr) auto",
+                      gridTemplateColumns: "4px minmax(0, 1fr) auto",
                       alignItems: "center",
                       gap: 16,
                       padding: "18px 20px",
@@ -186,6 +186,15 @@ function MemberNotificationsPageContent({
                       background: unread ? "var(--bg)" : undefined,
                     }}
                   >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 4,
+                        alignSelf: "stretch",
+                        background: unread ? "var(--accent)" : "transparent",
+                        borderRadius: 999,
+                      }}
+                    />
                     <div style={{ minWidth: 0 }}>
                       <div className="row wrap" style={{ gap: 8, marginBottom: 8 }}>
                         <span className="tiny mono">{eventLabels[item.eventType]}</span>
@@ -199,6 +208,7 @@ function MemberNotificationsPageContent({
                       <a
                         href={href}
                         className="h3 editorial"
+                        aria-label={`${item.title} 열기`}
                         style={{ display: "inline-block", margin: 0, textDecoration: "none" }}
                         onClick={
                           unread && onOpenNotification

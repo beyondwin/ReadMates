@@ -1,0 +1,177 @@
+package com.readmates.notification.adapter.out.persistence
+
+import com.readmates.notification.application.model.ManualNotificationAudience
+import com.readmates.notification.application.model.ManualNotificationRequestedChannels
+import com.readmates.notification.application.model.ManualNotificationSelection
+import com.readmates.notification.application.model.ManualNotificationSendMode
+import com.readmates.notification.application.model.NotificationDispatchSource
+import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationManualDispatchPayload
+import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
+import com.readmates.notification.domain.NotificationEventType
+import com.readmates.support.MySqlTestContainer
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.DynamicPropertyRegistry
+import org.springframework.test.context.DynamicPropertySource
+import org.springframework.test.context.jdbc.Sql
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.util.UUID
+
+private const val CLEANUP_MANUAL_DISPATCH_SQL = """
+    delete from notification_manual_dispatches where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_manual_dispatch_previews where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_deliveries where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from member_notifications where club_id = '00000000-0000-0000-0000-000000000001';
+    delete from notification_event_outbox
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and (dedupe_key like 'manual:%' or dedupe_key like 'manual-dispatch-test-%');
+"""
+
+@SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
+@Sql(statements = [CLEANUP_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(statements = [CLEANUP_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+class JdbcManualNotificationDispatchAdapterTest(
+    @param:Autowired private val adapter: JdbcManualNotificationDispatchAdapter,
+    @param:Autowired private val jdbcTemplate: JdbcTemplate,
+) {
+    private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+    private val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
+    private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+
+    @Test
+    fun `findSessionContext returns session metadata and feedback document state`() {
+        val context = adapter.findSessionContext(clubId, sessionId)
+
+        assertThat(context).isNotNull
+        assertThat(context!!.sessionNumber).isGreaterThan(0)
+        assertThat(context.bookTitle).isNotBlank()
+        assertThat(context.feedbackDocumentUploaded).isTrue()
+    }
+
+    @Test
+    fun `previewTargets applies audience edits and email preference counts`() {
+        disablePreference("member1@example.com")
+        val selection = selection(
+            excludedMembershipIds = listOf(membershipId("member2@example.com")),
+            includedMembershipIds = emptyList(),
+        )
+
+        val snapshot = adapter.previewTargets(clubId, selection)
+
+        assertThat(snapshot.finalTargetCount).isGreaterThan(0)
+        assertThat(snapshot.excludedCount).isEqualTo(1)
+        assertThat(snapshot.emailSkippedByPreferenceCount).isGreaterThanOrEqualTo(1)
+    }
+
+    @Test
+    fun `insertPreview and findPreview round trip host scoped preview`() {
+        val expiresAt = OffsetDateTime.of(2026, 5, 13, 9, 10, 0, 0, ZoneOffset.UTC)
+
+        val id = adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), expiresAt)
+        val record = adapter.findPreview(id, clubId, hostMembershipId)
+
+        assertThat(record!!.selectionHash).isEqualTo("a".repeat(64))
+        assertThat(record.expiresAt).isEqualTo(expiresAt)
+    }
+
+    @Test
+    fun `insertManualDispatch writes event outbox and audit row`() {
+        val dispatchId = UUID.nameUUIDFromBytes("manual-dispatch".toByteArray())
+        val payload = NotificationEventPayload(
+            sessionId = sessionId,
+            sessionNumber = 7,
+            bookTitle = "Example Book",
+            manualDispatch = NotificationManualDispatchPayload(
+                id = dispatchId,
+                source = NotificationDispatchSource.MANUAL,
+                requestedByMembershipId = hostMembershipId,
+                requestedChannels = ManualNotificationRequestedChannels.BOTH,
+                audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                resend = true,
+                sendMode = ManualNotificationSendMode.NOW,
+            ),
+        )
+
+        val stored = adapter.insertManualDispatch(
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            selection = selection(),
+            payload = payload,
+            targetSnapshot = ManualNotificationTargetSnapshot(3, 0, 0, 3, 3, 2, 1, 0),
+            resend = true,
+        )
+
+        assertThat(stored.manualDispatchId).isEqualTo(dispatchId)
+        assertThat(eventCount(stored.eventId)).isEqualTo(1)
+        assertThat(manualDispatchCount(dispatchId)).isEqualTo(1)
+    }
+
+    private fun selection(
+        excludedMembershipIds: List<UUID> = emptyList(),
+        includedMembershipIds: List<UUID> = emptyList(),
+    ) = ManualNotificationSelection(
+        sessionId = sessionId,
+        eventType = NotificationEventType.SESSION_REMINDER_DUE,
+        audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+        requestedChannels = ManualNotificationRequestedChannels.BOTH,
+        excludedMembershipIds = excludedMembershipIds,
+        includedMembershipIds = includedMembershipIds,
+        sendMode = ManualNotificationSendMode.NOW,
+    )
+
+    private fun disablePreference(email: String) {
+        val membershipId = membershipId(email)
+        jdbcTemplate.update(
+            """
+            insert into notification_preferences (membership_id, club_id, email_enabled, session_reminder_due_enabled)
+            values (?, ?, false, false)
+            on duplicate key update email_enabled = false, session_reminder_due_enabled = false
+            """.trimIndent(),
+            membershipId.toString(),
+            clubId.toString(),
+        )
+    }
+
+    private fun membershipId(email: String): UUID =
+        UUID.fromString(
+            jdbcTemplate.queryForObject(
+                """
+                select memberships.id
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.club_id = ?
+                  and users.email = ?
+                """.trimIndent(),
+                String::class.java,
+                clubId.toString(),
+                email,
+            )!!,
+        )
+
+    private fun eventCount(eventId: UUID): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from notification_event_outbox where id = ?",
+            Int::class.java,
+            eventId.toString(),
+        ) ?: 0
+
+    private fun manualDispatchCount(dispatchId: UUID): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from notification_manual_dispatches where id = ?",
+            Int::class.java,
+            dispatchId.toString(),
+        ) ?: 0
+
+    companion object {
+        @JvmStatic
+        @DynamicPropertySource
+        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
+            MySqlTestContainer.registerDatasourceProperties(registry)
+        }
+    }
+}

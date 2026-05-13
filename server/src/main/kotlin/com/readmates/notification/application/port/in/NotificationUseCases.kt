@@ -6,6 +6,11 @@ import com.readmates.notification.application.model.HostNotificationEventList
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.ManualNotificationConfirmCommand
+import com.readmates.notification.application.model.ManualNotificationConfirmResult
+import com.readmates.notification.application.model.ManualNotificationOptions
+import com.readmates.notification.application.model.ManualNotificationPreview
+import com.readmates.notification.application.model.ManualNotificationPreviewCommand
 import com.readmates.notification.application.model.MemberNotificationList
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
@@ -72,6 +77,12 @@ interface ManageHostNotificationsUseCase {
     fun detail(host: CurrentMember, id: UUID): HostNotificationDetail
     fun retry(host: CurrentMember, id: UUID): HostNotificationDetail
     fun restore(host: CurrentMember, id: UUID): HostNotificationDetail
+}
+
+interface ManageManualHostNotificationsUseCase {
+    fun options(host: CurrentMember, sessionId: UUID?, pageRequest: PageRequest): ManualNotificationOptions
+    fun preview(host: CurrentMember, command: ManualNotificationPreviewCommand): ManualNotificationPreview
+    fun confirm(host: CurrentMember, command: ManualNotificationConfirmCommand): ManualNotificationConfirmResult
 }
 
 interface SendNotificationTestMailUseCase {

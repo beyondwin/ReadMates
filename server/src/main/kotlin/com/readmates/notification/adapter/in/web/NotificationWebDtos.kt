@@ -9,6 +9,23 @@ import com.readmates.notification.application.model.HostNotificationFailure
 import com.readmates.notification.application.model.HostNotificationItem
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationSummary
+import com.readmates.notification.application.model.ManualNotificationAudience
+import com.readmates.notification.application.model.ManualNotificationAudiencePreview
+import com.readmates.notification.application.model.ManualNotificationChannelPreview
+import com.readmates.notification.application.model.ManualNotificationConfirmCommand
+import com.readmates.notification.application.model.ManualNotificationConfirmResult
+import com.readmates.notification.application.model.ManualNotificationConfirmSummary
+import com.readmates.notification.application.model.ManualNotificationDuplicatePreview
+import com.readmates.notification.application.model.ManualNotificationEligibility
+import com.readmates.notification.application.model.ManualNotificationMemberOption
+import com.readmates.notification.application.model.ManualNotificationOptions
+import com.readmates.notification.application.model.ManualNotificationPreview
+import com.readmates.notification.application.model.ManualNotificationPreviewCommand
+import com.readmates.notification.application.model.ManualNotificationRequestedChannels
+import com.readmates.notification.application.model.ManualNotificationSelection
+import com.readmates.notification.application.model.ManualNotificationSendMode
+import com.readmates.notification.application.model.ManualNotificationTemplatePreview
+import com.readmates.notification.application.model.ManualNotificationWarning
 import com.readmates.notification.application.model.MemberNotificationItem
 import com.readmates.notification.application.model.MemberNotificationList
 import com.readmates.notification.application.model.NotificationPreferences
@@ -108,6 +125,77 @@ data class SendNotificationTestMailRequest(
     val recipientEmail: String,
 )
 
+data class ManualNotificationSelectionRequest(
+    val sessionId: UUID,
+    val eventType: NotificationEventType,
+    val audience: ManualNotificationAudience,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val excludedMembershipIds: List<UUID> = emptyList(),
+    val includedMembershipIds: List<UUID> = emptyList(),
+    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+) {
+    fun toSelection(): ManualNotificationSelection =
+        ManualNotificationSelection(
+            sessionId = sessionId,
+            eventType = eventType,
+            audience = audience,
+            requestedChannels = requestedChannels,
+            excludedMembershipIds = excludedMembershipIds,
+            includedMembershipIds = includedMembershipIds,
+            sendMode = sendMode,
+        )
+}
+
+data class ManualNotificationPreviewRequest(
+    val sessionId: UUID,
+    val eventType: NotificationEventType,
+    val audience: ManualNotificationAudience,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val excludedMembershipIds: List<UUID> = emptyList(),
+    val includedMembershipIds: List<UUID> = emptyList(),
+    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+) {
+    fun toCommand(): ManualNotificationPreviewCommand =
+        ManualNotificationPreviewCommand(
+            ManualNotificationSelectionRequest(
+                sessionId = sessionId,
+                eventType = eventType,
+                audience = audience,
+                requestedChannels = requestedChannels,
+                excludedMembershipIds = excludedMembershipIds,
+                includedMembershipIds = includedMembershipIds,
+                sendMode = sendMode,
+            ).toSelection(),
+        )
+}
+
+data class ManualNotificationConfirmRequest(
+    val previewId: UUID,
+    val sessionId: UUID,
+    val eventType: NotificationEventType,
+    val audience: ManualNotificationAudience,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val excludedMembershipIds: List<UUID> = emptyList(),
+    val includedMembershipIds: List<UUID> = emptyList(),
+    val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
+    val resendConfirmed: Boolean = false,
+) {
+    fun toCommand(): ManualNotificationConfirmCommand =
+        ManualNotificationConfirmCommand(
+            previewId = previewId,
+            selection = ManualNotificationSelectionRequest(
+                sessionId = sessionId,
+                eventType = eventType,
+                audience = audience,
+                requestedChannels = requestedChannels,
+                excludedMembershipIds = excludedMembershipIds,
+                includedMembershipIds = includedMembershipIds,
+                sendMode = sendMode,
+            ).toSelection(),
+            resendConfirmed = resendConfirmed,
+        )
+}
+
 data class NotificationTestMailAuditResponse(
     val id: UUID,
     val recipientEmail: String,
@@ -148,6 +236,51 @@ data class MemberNotificationResponse(
     val deepLinkPath: String,
     val readAt: String?,
     val createdAt: String,
+)
+
+data class ManualNotificationOptionsResponse(
+    val templates: List<ManualNotificationTemplateOptionResponse>,
+    val members: CursorPageResponse<ManualNotificationMemberOptionResponse>,
+)
+
+data class ManualNotificationTemplateOptionResponse(
+    val eventType: NotificationEventType,
+    val label: String,
+    val enabled: Boolean,
+    val disabledReason: String?,
+    val defaultAudience: ManualNotificationAudience,
+    val allowedAudiences: List<ManualNotificationAudience>,
+    val defaultChannels: ManualNotificationRequestedChannels,
+)
+
+data class ManualNotificationMemberOptionResponse(
+    val membershipId: UUID,
+    val displayName: String,
+    val maskedEmail: String,
+    val role: String,
+    val membershipStatus: String,
+    val sessionParticipationStatus: String?,
+    val attendanceStatus: String?,
+    val emailEligibility: ManualNotificationEligibility,
+    val inAppEligibility: ManualNotificationEligibility,
+)
+
+data class ManualNotificationPreviewResponse(
+    val previewId: UUID,
+    val expiresAt: String,
+    val template: ManualNotificationTemplatePreview,
+    val audience: ManualNotificationAudiencePreview,
+    val channels: ManualNotificationChannelPreview,
+    val duplicates: ManualNotificationDuplicatePreview,
+    val warnings: List<ManualNotificationWarning>,
+)
+
+data class ManualNotificationConfirmResponse(
+    val manualDispatchId: UUID,
+    val eventId: UUID,
+    val status: NotificationEventOutboxStatus,
+    val createdAt: String,
+    val summary: ManualNotificationConfirmSummary,
 )
 
 fun NotificationPreferences.toResponse(): NotificationPreferencesResponse =
@@ -218,6 +351,55 @@ fun HostNotificationDeliveryList.toResponse(): HostNotificationDeliveryListRespo
     HostNotificationDeliveryListResponse(
         items = items.map { it.toResponse() },
         nextCursor = nextCursor,
+    )
+
+fun ManualNotificationOptions.toResponse(): ManualNotificationOptionsResponse =
+    ManualNotificationOptionsResponse(
+        templates = templates.map {
+            ManualNotificationTemplateOptionResponse(
+                eventType = it.eventType,
+                label = it.label,
+                enabled = it.enabled,
+                disabledReason = it.disabledReason,
+                defaultAudience = it.defaultAudience,
+                allowedAudiences = it.allowedAudiences.toList(),
+                defaultChannels = it.defaultChannels,
+            )
+        },
+        members = CursorPageResponse(members.map { it.toResponse() }, nextCursor),
+    )
+
+private fun ManualNotificationMemberOption.toResponse(): ManualNotificationMemberOptionResponse =
+    ManualNotificationMemberOptionResponse(
+        membershipId = membershipId,
+        displayName = displayName,
+        maskedEmail = maskedEmail,
+        role = role,
+        membershipStatus = membershipStatus,
+        sessionParticipationStatus = sessionParticipationStatus,
+        attendanceStatus = attendanceStatus,
+        emailEligibility = emailEligibility,
+        inAppEligibility = inAppEligibility,
+    )
+
+fun ManualNotificationPreview.toResponse(): ManualNotificationPreviewResponse =
+    ManualNotificationPreviewResponse(
+        previewId = previewId,
+        expiresAt = expiresAt.toString(),
+        template = template,
+        audience = audience,
+        channels = channels,
+        duplicates = duplicates,
+        warnings = warnings,
+    )
+
+fun ManualNotificationConfirmResult.toResponse(): ManualNotificationConfirmResponse =
+    ManualNotificationConfirmResponse(
+        manualDispatchId = manualDispatchId,
+        eventId = eventId,
+        status = status,
+        createdAt = createdAt.toString(),
+        summary = summary,
     )
 
 private fun HostNotificationDelivery.toResponse(): HostNotificationDeliveryResponse =

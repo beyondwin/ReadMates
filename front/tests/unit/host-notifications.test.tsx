@@ -6,6 +6,10 @@ import type {
   HostNotificationDeliveryItem,
   HostNotificationEventItem,
   HostNotificationSummary,
+  ManualNotificationConfirmRequest,
+  ManualNotificationOptionsResponse,
+  ManualNotificationPreviewRequest,
+  ManualNotificationPreviewResponse,
   NotificationTestMailAuditItem,
 } from "@/features/host/api/host-contracts";
 
@@ -46,24 +50,54 @@ const deadDelivery: HostNotificationDeliveryItem = {
   updatedAt: "2026-04-29T00:00:00Z",
 };
 
+const manualOptionsFixture: ManualNotificationOptionsResponse = {
+  templates: [
+    {
+      eventType: "SESSION_REMINDER_DUE",
+      label: "모임 전날 리마인더",
+      enabled: true,
+      disabledReason: null,
+      defaultAudience: "ALL_ACTIVE_MEMBERS",
+      allowedAudiences: ["ALL_ACTIVE_MEMBERS", "SESSION_PARTICIPANTS"],
+      defaultChannels: "BOTH",
+    },
+    {
+      eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
+      label: "피드백 문서 등록",
+      enabled: false,
+      disabledReason: "피드백 문서를 먼저 등록해야 합니다.",
+      defaultAudience: "CONFIRMED_ATTENDEES",
+      allowedAudiences: ["CONFIRMED_ATTENDEES", "SESSION_PARTICIPANTS"],
+      defaultChannels: "BOTH",
+    },
+  ],
+  members: { items: [], nextCursor: null },
+};
+
 type ActionMock = ReturnType<typeof vi.fn>;
 
 function renderPage({
   events = [pendingEvent],
   deliveries = [deadDelivery],
   auditItems = [],
+  manualOptions = manualOptionsFixture,
   onProcess = vi.fn().mockResolvedValue(undefined),
   onRetry = vi.fn().mockResolvedValue(undefined),
   onRestore = vi.fn().mockResolvedValue(undefined),
   onSendTestMail = vi.fn().mockResolvedValue(undefined),
+  onPreviewManual = vi.fn().mockResolvedValue(undefined),
+  onConfirmManual = vi.fn().mockResolvedValue(undefined),
 }: {
   events?: HostNotificationEventItem[];
   deliveries?: HostNotificationDeliveryItem[];
   auditItems?: NotificationTestMailAuditItem[];
+  manualOptions?: ManualNotificationOptionsResponse;
   onProcess?: ActionMock;
   onRetry?: ActionMock;
   onRestore?: ActionMock;
   onSendTestMail?: ActionMock;
+  onPreviewManual?: (request: ManualNotificationPreviewRequest) => Promise<unknown>;
+  onConfirmManual?: (request: ManualNotificationConfirmRequest) => Promise<unknown>;
 } = {}) {
   render(
     <HostNotificationsPage
@@ -71,14 +105,18 @@ function renderPage({
       events={events}
       deliveries={deliveries}
       audit={auditItems}
+      manualOptions={manualOptions}
+      initialManualSelection={{ sessionId: "session-1", eventType: null }}
       onProcess={onProcess}
       onRetry={onRetry}
       onRestore={onRestore}
       onSendTestMail={onSendTestMail}
+      onPreviewManual={onPreviewManual}
+      onConfirmManual={onConfirmManual}
     />,
   );
 
-  return { onProcess, onRetry, onRestore, onSendTestMail };
+  return { onProcess, onRetry, onRestore, onSendTestMail, onPreviewManual, onConfirmManual };
 }
 
 afterEach(() => {
@@ -87,6 +125,88 @@ afterEach(() => {
 });
 
 describe("HostNotificationsPage", () => {
+  it("renders manual notification workbench before ledgers", () => {
+    renderPage({
+      manualOptions: {
+        templates: [
+          {
+            eventType: "SESSION_REMINDER_DUE",
+            label: "모임 전날 리마인더",
+            enabled: true,
+            disabledReason: null,
+            defaultAudience: "ALL_ACTIVE_MEMBERS",
+            allowedAudiences: ["ALL_ACTIVE_MEMBERS", "SESSION_PARTICIPANTS"],
+            defaultChannels: "BOTH",
+          },
+        ],
+        members: { items: [], nextCursor: null },
+      },
+    });
+
+    expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
+    expect(screen.getByText("모임 전날 리마인더")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "운영 장부" })).toBeInTheDocument();
+  });
+
+  it("previews and confirms a manual notification with resend confirmation", async () => {
+    const user = userEvent.setup();
+    const onPreviewManual = vi.fn<[ManualNotificationPreviewRequest], Promise<ManualNotificationPreviewResponse>>().mockResolvedValue({
+      previewId: "preview-1",
+      expiresAt: "2026-05-13T09:10:00Z",
+      template: {
+        eventType: "SESSION_REMINDER_DUE",
+        label: "모임 전날 리마인더",
+        subject: "모임 전날 리마인더",
+        bodyPreview: "모임 전 준비를 확인해 주세요.",
+      },
+      audience: {
+        baseGroup: "ALL_ACTIVE_MEMBERS",
+        baseCount: 3,
+        excludedCount: 0,
+        includedCount: 0,
+        finalTargetCount: 3,
+      },
+      channels: {
+        requested: "BOTH",
+        inAppEligibleCount: 3,
+        emailEligibleCount: 2,
+        emailSkippedByPreferenceCount: 1,
+        emailMissingCount: 0,
+      },
+      duplicates: {
+        requiresResendConfirmation: true,
+        recentDispatches: [
+          {
+            manualDispatchId: "dispatch-1",
+            eventType: "SESSION_REMINDER_DUE",
+            requestedChannels: "BOTH",
+            createdAt: "2026-05-12T09:00:00Z",
+            requestedBy: "h***@example.com",
+            targetCount: 3,
+          },
+        ],
+      },
+      warnings: [{ code: "EMAIL_PREFERENCE_SKIPS", message: "이메일 알림 설정 때문에 1명에게는 이메일이 가지 않습니다." }],
+    });
+    const onConfirmManual = vi.fn<[ManualNotificationConfirmRequest], Promise<void>>().mockResolvedValue(undefined);
+
+    renderPage({ onPreviewManual, onConfirmManual, manualOptions: manualOptionsFixture });
+
+    await user.click(screen.getByRole("button", { name: "모임 전날 리마인더" }));
+    await user.click(screen.getByRole("button", { name: "미리보기" }));
+
+    expect(await screen.findByText("앱 알림 3명")).toBeInTheDocument();
+    expect(screen.getByText("이메일 2명")).toBeInTheDocument();
+    expect(screen.getByText("이미 발송된 알림입니다.")).toBeInTheDocument();
+
+    const confirm = screen.getByRole("button", { name: "발송 확인" });
+    expect(confirm).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: "재발송을 확인했습니다" }));
+    await user.click(confirm);
+
+    expect(onConfirmManual).toHaveBeenCalledWith(expect.objectContaining({ previewId: "preview-1", resendConfirmed: true }));
+  });
+
   it("renders event and delivery operation ledgers", async () => {
     const user = userEvent.setup();
 
@@ -154,10 +274,14 @@ describe("HostNotificationsPage", () => {
         events={[]}
         deliveries={[]}
         audit={[]}
+        manualOptions={manualOptionsFixture}
+        initialManualSelection={{ sessionId: "session-1", eventType: null }}
         onProcess={onProcess}
         onRetry={vi.fn()}
         onRestore={vi.fn()}
         onSendTestMail={vi.fn()}
+        onPreviewManual={vi.fn().mockResolvedValue(undefined)}
+        onConfirmManual={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
@@ -180,10 +304,14 @@ describe("HostNotificationsPage", () => {
         events={[]}
         deliveries={[pendingItem]}
         audit={[]}
+        manualOptions={manualOptionsFixture}
+        initialManualSelection={{ sessionId: "session-1", eventType: null }}
         onProcess={onProcess}
         onRetry={vi.fn()}
         onRestore={vi.fn()}
         onSendTestMail={vi.fn()}
+        onPreviewManual={vi.fn().mockResolvedValue(undefined)}
+        onConfirmManual={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
@@ -203,11 +331,15 @@ describe("HostNotificationsPage", () => {
         events={[pendingEvent]}
         deliveries={[pendingItem]}
         audit={[]}
+        manualOptions={manualOptionsFixture}
+        initialManualSelection={{ sessionId: "session-1", eventType: null }}
         isRefreshing
         onProcess={vi.fn()}
         onRetry={onRetry}
         onRestore={vi.fn()}
         onSendTestMail={vi.fn()}
+        onPreviewManual={vi.fn().mockResolvedValue(undefined)}
+        onConfirmManual={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 

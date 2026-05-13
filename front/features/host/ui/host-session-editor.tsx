@@ -48,6 +48,7 @@ import {
   DefaultLinkComponent,
   type HostSessionEditorLinkComponent,
 } from "./session-editor/session-editor-links";
+import { HostSessionNotificationActions } from "./session-editor/session-editor-notifications";
 import {
   handleMobileEditorSectionKeyDown,
   mobileEditorSections,
@@ -813,6 +814,16 @@ export default function HostSessionEditor({
                 hasPublicationRecord={hasPublicationRecord}
                 feedbackDocumentUploaded={feedbackDocument.uploaded}
               />
+
+              {displaySession ? (
+                <HostSessionNotificationActions
+                  sessionId={displaySession.sessionId}
+                  state={displaySession.state}
+                  visibility={displaySession.visibility}
+                  feedbackDocumentUploaded={displaySession.feedbackDocument.uploaded}
+                  LinkComponent={LinkComponent}
+                />
+              ) : null}
 
               <div className="surface" style={{ padding: "22px" }}>
                 <div className="eyebrow" style={{ marginBottom: "10px" }}>
