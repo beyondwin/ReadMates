@@ -9,7 +9,11 @@ import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.HostNotificationDeliveryLedgerPort
+import com.readmates.notification.application.port.out.NotificationDeliveryBacklogPort
+import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
+import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.shared.paging.CursorPage
@@ -26,7 +30,11 @@ class JdbcNotificationDeliveryAdapter(
     private val jdbcTemplate: JdbcTemplate,
     objectMapper: ObjectMapper,
     @Value("\${readmates.app-base-url:http://localhost:3000}") appBaseUrl: String,
-) : NotificationDeliveryPort {
+) : NotificationDeliveryPlanningPort,
+    NotificationDeliveryClaimPort,
+    NotificationDeliveryStatusPort,
+    NotificationDeliveryBacklogPort,
+    HostNotificationDeliveryLedgerPort {
     private val rowMappers = NotificationDeliveryRowMappers(objectMapper, appBaseUrl)
     private val queries = NotificationDeliveryQueries(rowMappers)
     private val writeOperations = NotificationDeliveryWriteOperations(queries, rowMappers)

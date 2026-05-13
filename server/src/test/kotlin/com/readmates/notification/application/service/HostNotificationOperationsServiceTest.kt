@@ -9,14 +9,16 @@ import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
-import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.HostNotificationDeliveryLedgerPort
+import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
+import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.application.port.out.NotificationEventOutboxPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
@@ -24,6 +26,8 @@ import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -43,20 +47,21 @@ class HostNotificationOperationsServiceTest {
         val mailPort = RecordingMailPort()
         val processingService = NotificationDeliveryProcessingService(
             deliveryEngine = NotificationDeliveryEngine(
-                deliveryPort = deliveryPort,
+                deliveryStatusPort = deliveryPort,
                 mailDeliveryPort = mailPort,
                 metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
                 maxAttempts = 5,
                 retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
             ),
-            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryPlanningPort, deliveryPort),
             deliveryEnabled = false,
         )
         val service = HostNotificationOperationsService(
             notificationEventOutboxPort = EmptyEventOutboxPort,
-            notificationDeliveryPort = deliveryPort,
+            notificationDeliveryLedgerPort = deliveryPort,
+            notificationDeliveryStatusPort = deliveryPort,
             notificationDeliveryProcessingService = processingService,
-            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryPlanningPort, deliveryPort),
             deliveryEnabled = false,
         )
 
@@ -127,20 +132,23 @@ private object EmptyEventOutboxPort : NotificationEventOutboxPort {
     override fun listHostEvents(
         clubId: UUID,
         status: NotificationEventOutboxStatus?,
-        limit: Int,
-    ): List<HostNotificationEvent> = emptyList()
+        pageRequest: PageRequest,
+    ): CursorPage<HostNotificationEvent> = CursorPage(emptyList(), null)
+}
+
+private object NoopDeliveryPlanningPort : NotificationDeliveryPlanningPort {
+    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
+        error("unused")
 }
 
 private class RecordingDeliveryPort(
     private val claimedDelivery: ClaimedNotificationDeliveryItem? = null,
     private val details: Map<UUID, HostNotificationDetail> = emptyMap(),
-) : NotificationDeliveryPort {
+) : NotificationDeliveryClaimPort, NotificationDeliveryStatusPort, HostNotificationDeliveryLedgerPort {
     val claimHostRequests = mutableListOf<Pair<UUID, UUID>>()
     val sent = mutableListOf<Pair<UUID, OffsetDateTime>>()
     val failed = mutableListOf<UUID>()
     val dead = mutableListOf<UUID>()
-
-    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> = error("unused")
 
     override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
 
@@ -177,14 +185,13 @@ private class RecordingDeliveryPort(
 
     override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = error("unused")
 
-    override fun deliveryBacklog(): NotificationDeliveryBacklog =
-        NotificationDeliveryBacklog(pending = 0, failed = 0, dead = 0, sending = 0)
-
-    override fun countByStatus(clubId: UUID, channel: NotificationChannel?, status: NotificationDeliveryStatus): Int = 0
-
     override fun hostSummary(clubId: UUID): HostNotificationSummary = error("unused")
 
-    override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
+    override fun listHostEmailItems(
+        clubId: UUID,
+        query: HostNotificationItemQuery,
+        pageRequest: PageRequest,
+    ): HostNotificationItemList =
         error("unused")
 
     override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
@@ -194,8 +201,8 @@ private class RecordingDeliveryPort(
         clubId: UUID,
         status: NotificationDeliveryStatus?,
         channel: NotificationChannel?,
-        limit: Int,
-    ): List<HostNotificationDelivery> = error("unused")
+        pageRequest: PageRequest,
+    ): CursorPage<HostNotificationDelivery> = error("unused")
 }
 
 private class RecordingMailPort : MailDeliveryPort {

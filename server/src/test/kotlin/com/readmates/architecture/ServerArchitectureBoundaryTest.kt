@@ -195,6 +195,43 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `outbound ports do not provide default runtime failure implementations`() {
+        val violations = Files.walk(sourceRoot())
+            .use { paths ->
+                paths
+                    .filter { it.name.endsWith("Port.kt") }
+                    .flatMap { sourceFile ->
+                        val lines = sourceFile.readLines()
+                        lines.mapIndexedNotNull { index, line ->
+                            val lineText = line.trim()
+                            if (lineText.isRuntimeFailureDefault()) {
+                                "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: $lineText"
+                            } else {
+                                null
+                            }
+                        }.stream()
+                    }
+                    .toList()
+            }
+            .sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Outbound ports must not hide unsupported behavior behind default runtime failures:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    private fun String.isRuntimeFailureDefault(): Boolean =
+        !startsWith("//") && listOf(
+            "= error(",
+            "= throw",
+            "= TODO(",
+            "error(",
+            "throw ",
+            "TODO(",
+        ).any { marker -> marker in this }
+
+    @Test
     fun `persistence adapters do not depend on spring web http types outside baseline exceptions`() {
         val forbiddenPrefixes = listOf(
             "org.springframework.http.",

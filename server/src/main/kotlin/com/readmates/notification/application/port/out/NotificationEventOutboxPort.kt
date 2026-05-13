@@ -31,12 +31,5 @@ interface NotificationEventOutboxPort {
         clubId: UUID,
         status: NotificationEventOutboxStatus?,
         pageRequest: PageRequest,
-    ): CursorPage<HostNotificationEvent> =
-        CursorPage(listHostEvents(clubId, status, pageRequest.limit), null)
-    fun listHostEvents(
-        clubId: UUID,
-        status: NotificationEventOutboxStatus?,
-        limit: Int,
-    ): List<HostNotificationEvent> =
-        error("Host notification event listing is unavailable")
+    ): CursorPage<HostNotificationEvent>
 }

@@ -1,17 +1,9 @@
 package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
-import com.readmates.notification.application.model.HostNotificationDelivery
-import com.readmates.notification.application.model.HostNotificationDetail
-import com.readmates.notification.application.model.HostNotificationItemList
-import com.readmates.notification.application.model.HostNotificationItemQuery
-import com.readmates.notification.application.model.HostNotificationSummary
-import com.readmates.notification.application.model.NotificationDeliveryBacklog
-import com.readmates.notification.application.model.NotificationDeliveryItem
-import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -47,7 +39,7 @@ class NotificationDeliveryEngineTest {
         val mailPort = EngineRecordingMailPort()
         val registry = SimpleMeterRegistry()
         val engine = notificationDeliveryEngine(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = mailPort,
             metrics = ReadmatesOperationalMetrics(registry),
         )
@@ -72,7 +64,7 @@ class NotificationDeliveryEngineTest {
         val deliveryPort = EngineRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
         val engine = notificationDeliveryEngine(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = EngineFailingMailPort("smtp rejected"),
             metrics = ReadmatesOperationalMetrics(registry),
         )
@@ -94,7 +86,7 @@ class NotificationDeliveryEngineTest {
         val deliveryPort = EngineRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
         val engine = notificationDeliveryEngine(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = EngineFailingMailPort("provider token=raw-secret failed for member@example.com"),
             metrics = ReadmatesOperationalMetrics(registry),
         )
@@ -128,7 +120,7 @@ class NotificationDeliveryEngineTest {
     fun `sendClaimed uses configured retry delays when marking retryable failure`() {
         val deliveryPort = EngineRecordingDeliveryPort()
         val engine = notificationDeliveryEngine(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = EngineFailingMailPort("smtp rejected"),
             retryDelayMinutesConfig = listOf(2L, 4L, 8L),
         )
@@ -140,14 +132,14 @@ class NotificationDeliveryEngineTest {
     }
 
     private fun notificationDeliveryEngine(
-        deliveryPort: NotificationDeliveryPort,
+        deliveryStatusPort: NotificationDeliveryStatusPort,
         mailPort: MailDeliveryPort,
         metrics: ReadmatesOperationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
         maxAttempts: Int = 5,
         retryDelayMinutesConfig: List<Long> = listOf(5L, 15L, 60L, 240L),
     ): NotificationDeliveryEngine =
         NotificationDeliveryEngine(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryStatusPort,
             mailDeliveryPort = mailPort,
             metrics = metrics,
             maxAttempts = maxAttempts,
@@ -193,22 +185,10 @@ private class EngineRecordingDeliveryPort(
     private val markSentResult: Boolean = true,
     private val markFailedResult: Boolean = true,
     private val markDeadResult: Boolean = true,
-) : NotificationDeliveryPort {
+) : NotificationDeliveryStatusPort {
     val sent = mutableListOf<Pair<UUID, OffsetDateTime>>()
     val failed = mutableListOf<EngineFailedMark>()
     val dead = mutableListOf<EngineDeadMark>()
-
-    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
-        error("unused")
-
-    override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
-
-    override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = error("unused")
-
-    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
-        error("unused")
-
-    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
 
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = error("unused")
 
@@ -233,26 +213,6 @@ private class EngineRecordingDeliveryPort(
     }
 
     override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = error("unused")
-
-    override fun deliveryBacklog(): NotificationDeliveryBacklog =
-        NotificationDeliveryBacklog(pending = 0, failed = 0, dead = 0, sending = 0)
-
-    override fun countByStatus(clubId: UUID, channel: NotificationChannel?, status: NotificationDeliveryStatus): Int =
-        0
-
-    override fun hostSummary(clubId: UUID): HostNotificationSummary = error("unused")
-
-    override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
-        error("unused")
-
-    override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? = error("unused")
-
-    override fun listHostDeliveries(
-        clubId: UUID,
-        status: NotificationDeliveryStatus?,
-        channel: NotificationChannel?,
-        limit: Int,
-    ): List<HostNotificationDelivery> = error("unused")
 }
 
 private fun engineClaimedDelivery(

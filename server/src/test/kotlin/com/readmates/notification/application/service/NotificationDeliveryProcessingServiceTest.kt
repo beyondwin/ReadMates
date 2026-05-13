@@ -5,17 +5,12 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
-import com.readmates.notification.application.model.HostNotificationDelivery
-import com.readmates.notification.application.model.HostNotificationDetail
-import com.readmates.notification.application.model.HostNotificationItemList
-import com.readmates.notification.application.model.HostNotificationItemQuery
-import com.readmates.notification.application.model.HostNotificationSummary
-import com.readmates.notification.application.model.NotificationDeliveryBacklog
-import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
+import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -34,7 +29,7 @@ class NotificationDeliveryProcessingServiceTest {
         val mailPort = ProcessingRecordingMailPort()
         val registry = SimpleMeterRegistry()
         val service = notificationDeliveryProcessingService(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = mailPort,
             metrics = ReadmatesOperationalMetrics(registry),
         )
@@ -63,7 +58,7 @@ class NotificationDeliveryProcessingServiceTest {
         val deliveryPort = ProcessingRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
         val service = notificationDeliveryProcessingService(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = FailingMailPort("smtp rejected"),
             metrics = ReadmatesOperationalMetrics(registry),
         )
@@ -91,7 +86,7 @@ class NotificationDeliveryProcessingServiceTest {
     fun `processClaimed uses configured retry delay when marking retryable failure`() {
         val deliveryPort = ProcessingRecordingDeliveryPort()
         val service = notificationDeliveryProcessingService(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = FailingMailPort("smtp rejected"),
             retryDelayMinutesConfig = listOf(2L, 4L, 8L),
         )
@@ -106,7 +101,7 @@ class NotificationDeliveryProcessingServiceTest {
         val deliveryPort = ProcessingRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
         val service = notificationDeliveryProcessingService(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             mailPort = FailingMailPort("smtp rejected"),
             metrics = ReadmatesOperationalMetrics(registry),
         )
@@ -138,7 +133,7 @@ class NotificationDeliveryProcessingServiceTest {
             ?: 0.0
 
     private fun notificationDeliveryProcessingService(
-        deliveryPort: NotificationDeliveryPort,
+        deliveryStatusPort: NotificationDeliveryStatusPort,
         mailPort: MailDeliveryPort,
         metrics: ReadmatesOperationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
         maxAttempts: Int = 5,
@@ -146,15 +141,24 @@ class NotificationDeliveryProcessingServiceTest {
     ): NotificationDeliveryProcessingService =
         NotificationDeliveryProcessingService(
             deliveryEngine = NotificationDeliveryEngine(
-                deliveryPort = deliveryPort,
+                deliveryStatusPort = deliveryStatusPort,
                 mailDeliveryPort = mailPort,
                 metrics = metrics,
                 maxAttempts = maxAttempts,
                 retryDelayMinutesConfig = retryDelayMinutesConfig,
             ),
-            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryTransactionPort, NoopDeliveryTransactionPort),
             deliveryEnabled = true,
         )
+}
+
+private object NoopDeliveryTransactionPort : NotificationDeliveryPlanningPort, NotificationDeliveryClaimPort {
+    override fun persistPlannedDeliveries(message: NotificationEventMessage) = error("unused")
+    override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
+    override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = error("unused")
+    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
+        error("unused")
+    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
 }
 
 private class FailingMailPort(private val message: String) : MailDeliveryPort {
@@ -178,19 +182,8 @@ private data class ProcessingFailedMark(
     val delayMinutes: Long,
 )
 
-private class ProcessingRecordingDeliveryPort : NotificationDeliveryPort {
+private class ProcessingRecordingDeliveryPort : NotificationDeliveryStatusPort {
     val failed = mutableListOf<ProcessingFailedMark>()
-
-    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> = error("unused")
-
-    override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
-
-    override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = error("unused")
-
-    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
-        error("unused")
-
-    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? = error("unused")
 
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = error("unused")
 
@@ -209,25 +202,6 @@ private class ProcessingRecordingDeliveryPort : NotificationDeliveryPort {
     override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = true
 
     override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = error("unused")
-
-    override fun deliveryBacklog(): NotificationDeliveryBacklog =
-        NotificationDeliveryBacklog(pending = 0, failed = 0, dead = 0, sending = 0)
-
-    override fun countByStatus(clubId: UUID, channel: NotificationChannel?, status: NotificationDeliveryStatus): Int = 0
-
-    override fun hostSummary(clubId: UUID): HostNotificationSummary = error("unused")
-
-    override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
-        error("unused")
-
-    override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? = error("unused")
-
-    override fun listHostDeliveries(
-        clubId: UUID,
-        status: NotificationDeliveryStatus?,
-        channel: NotificationChannel?,
-        limit: Int,
-    ): List<HostNotificationDelivery> = error("unused")
 }
 
 private fun processingClaimedDelivery(
