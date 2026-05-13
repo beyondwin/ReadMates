@@ -1,13 +1,14 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import MemberHome from "@/features/member-home/components/member-home";
+import MemberHome from "@/features/member-home/ui/member-home";
 import { memberHomeLoader } from "@/features/member-home/route/member-home-data";
 import type {
   MemberHomeAuth as AuthMeResponse,
-  MemberHomeCurrentSessionResponse as CurrentSessionResponse,
-  MemberHomeNoteFeedItem as NoteFeedItem,
-  MemberHomeUpcomingSession,
-} from "@/features/member-home/api/member-home-contracts";
+  MemberHomeCurrentSessionView as CurrentSessionResponse,
+  MemberHomeNoteFeedItemView as NoteFeedItem,
+  MemberHomeUpcomingSessionView as MemberHomeUpcomingSession,
+} from "@/features/member-home/model/member-home-view-model";
+import type { MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
 import type { PagedResponse } from "@/shared/model/paging";
 
 afterEach(cleanup);
@@ -124,6 +125,12 @@ function pageOf<T>(items: T[], nextCursor: string | null = null): PagedResponse<
   return { items, nextCursor };
 }
 
+const TrackingLink: MemberHomeLinkComponent = ({ to, children, ...props }) => (
+  <a {...props} href={`/tracked${to}`} data-link-to={to}>
+    {children}
+  </a>
+);
+
 describe("MemberHome", () => {
   it("loads upcoming sessions for member home", async () => {
     const fetchMock = vi.fn((url: string) => {
@@ -219,6 +226,30 @@ describe("MemberHome", () => {
     expect(mobileView.getByRole("link", { name: /안내문/ })).toHaveAttribute("href", "/about");
     expect(mobileView.queryByRole("link", { name: /아카이브/ })).not.toBeInTheDocument();
     expect(mobileView.getByRole("link", { name: "전체 보기" })).toHaveAttribute("href", "/app/notes");
+  });
+
+  it("renders internal app links through the supplied route link component", () => {
+    const { container } = render(
+      <MemberHome
+        auth={auth}
+        current={current}
+        noteFeedItems={noteFeedItems}
+        upcomingSessions={[]}
+        LinkComponent={TrackingLink}
+      />,
+    );
+
+    expect(screen.getAllByRole("link", { name: "세션 열기" })[0]).toHaveAttribute(
+      "data-link-to",
+      "/app/session/current",
+    );
+    expect(screen.getAllByRole("link", { name: "전체 보기" })[0]).toHaveAttribute("data-link-to", "/app/notes");
+    expect(
+      within(container.querySelector(".rm-member-home-mobile") as HTMLElement).getByRole("link", { name: /RSVP/ }),
+    ).toHaveAttribute("href", "/tracked/app/session/current");
+    for (const meetingLink of screen.getAllByRole("link", { name: /모임 링크 열기/ })) {
+      expect(meetingLink).not.toHaveAttribute("data-link-to");
+    }
   });
 
   it("renders the mobile session number before the days-until label", () => {

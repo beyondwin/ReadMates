@@ -9,7 +9,7 @@ import type {
   MemberLifecycleRequest,
   MemberLifecycleResponse,
   ViewerMember,
-} from "@/features/host/ui/host-ui-types";
+} from "@/features/host/model/host-view-types";
 import type { PageRequest } from "@/shared/model/paging";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";

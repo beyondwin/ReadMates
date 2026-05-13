@@ -1,5 +1,5 @@
 import { type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from "react";
-import type { CurrentSessionPolicy } from "@/features/host/ui/host-ui-types";
+import type { CurrentSessionPolicy } from "@/features/host/model/host-view-types";
 import type { LifecycleDialog } from "./types";
 
 export function LifecyclePolicyDialog({

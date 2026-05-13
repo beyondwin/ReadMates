@@ -1,23 +1,23 @@
-import { Link } from "@/src/app/router-link";
 import { type CSSProperties } from "react";
 import {
   MobileCurrentSessionCard,
   MobileIcon,
   type MobileIconName,
   MobileTodayActions,
-} from "@/features/member-home/components/member-home-current-session";
+} from "@/features/member-home/ui/member-home-current-session";
+import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
 import {
   ClubPulse,
   MobileMemberActivity,
   RosterSummary,
-} from "@/features/member-home/components/member-home-records";
-import { PrepCard } from "@/features/member-home/components/prep-card";
+} from "@/features/member-home/ui/member-home-records";
+import { PrepCard } from "@/features/member-home/ui/prep-card";
 import type {
   MemberHomeAuth as AuthMeResponse,
-  MemberHomeCurrentSessionResponse as CurrentSessionResponse,
-  MemberHomeNoteFeedItem as NoteFeedItem,
-  MemberHomeUpcomingSession,
-} from "@/features/member-home/api/member-home-contracts";
+  MemberHomeCurrentSessionView as CurrentSessionResponse,
+  MemberHomeNoteFeedItemView as NoteFeedItem,
+  MemberHomeUpcomingSessionView as MemberHomeUpcomingSession,
+} from "@/features/member-home/model/member-home-view-model";
 import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
@@ -36,11 +36,13 @@ export default function MemberHome({
   current,
   noteFeedItems,
   upcomingSessions,
+  LinkComponent = PlainMemberHomeLink,
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
   noteFeedItems: NoteFeedItem[];
   upcomingSessions: MemberHomeUpcomingSession[];
+  LinkComponent?: MemberHomeLinkComponent;
 }) {
   const currentSession = current.currentSession;
   const memberName = auth.displayName ?? "멤버";
@@ -78,7 +80,12 @@ export default function MemberHome({
 
             <HomeAnswerStrip session={currentSession} noteFeedItems={noteFeedItems} isViewer={isViewer} />
 
-            <PrepCard session={currentSession} isHost={auth.role === "HOST"} isViewer={isViewer} />
+            <PrepCard
+              session={currentSession}
+              isHost={auth.role === "HOST"}
+              isViewer={isViewer}
+              LinkComponent={LinkComponent}
+            />
           </div>
         </section>
 
@@ -86,12 +93,12 @@ export default function MemberHome({
           <div className="container">
             <div className="home-grid">
               <div className="stack" style={{ "--stack": "40px" } as CSSProperties}>
-                <ClubPulse items={noteFeedItems.slice(0, 3)} />
+                <ClubPulse items={noteFeedItems.slice(0, 3)} LinkComponent={LinkComponent} />
               </div>
               <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
                 <RosterSummary current={current} />
                 <NextBookHint upcomingSessions={upcomingSessions} />
-                <QuickLinks />
+                <QuickLinks LinkComponent={LinkComponent} />
               </div>
             </div>
           </div>
@@ -105,6 +112,7 @@ export default function MemberHome({
         upcomingSessions={upcomingSessions}
         memberName={memberName}
         isViewer={isViewer}
+        LinkComponent={LinkComponent}
       />
     </main>
   );
@@ -182,6 +190,7 @@ function MobileMemberHome({
   upcomingSessions,
   memberName,
   isViewer,
+  LinkComponent,
 }: {
   auth: AuthMeResponse;
   current: CurrentSessionResponse;
@@ -189,6 +198,7 @@ function MobileMemberHome({
   upcomingSessions: MemberHomeUpcomingSession[];
   memberName: string;
   isViewer: boolean;
+  LinkComponent: MemberHomeLinkComponent;
 }) {
   const session = current.currentSession;
 
@@ -211,13 +221,18 @@ function MobileMemberHome({
         <div className="m-eyebrow-row">
           <span className="eyebrow">이번 세션</span>
         </div>
-        <MobileCurrentSessionCard session={session} isHost={auth.role === "HOST"} isViewer={isViewer} />
+        <MobileCurrentSessionCard
+          session={session}
+          isHost={auth.role === "HOST"}
+          isViewer={isViewer}
+          LinkComponent={LinkComponent}
+        />
       </section>
 
-      <MobileTodayActions session={session} isViewer={isViewer} />
+      <MobileTodayActions session={session} isViewer={isViewer} LinkComponent={LinkComponent} />
       <MobileUpcomingSessions upcomingSessions={upcomingSessions} />
-      <MobileMemberActivity items={noteFeedItems.slice(0, 4)} />
-      <MobileQuickLinks />
+      <MobileMemberActivity items={noteFeedItems.slice(0, 4)} LinkComponent={LinkComponent} />
+      <MobileQuickLinks LinkComponent={LinkComponent} />
     </div>
   );
 }
@@ -248,7 +263,7 @@ function MobileViewerMemberHomeNotice() {
   );
 }
 
-function MobileQuickLinks() {
+function MobileQuickLinks({ LinkComponent }: { LinkComponent: MemberHomeLinkComponent }) {
   return (
     <section className="m-sec">
       <div className="eyebrow" style={{ marginBottom: 12 }}>
@@ -256,7 +271,7 @@ function MobileQuickLinks() {
       </div>
       <div className="rm-mobile-shortcuts">
         {quickLinks.map((item) => (
-          <Link key={item.label} to={item.href} className="m-card-quiet">
+          <Link key={item.label} to={item.href} className="m-card-quiet" LinkComponent={LinkComponent}>
             <span className="rm-mobile-shortcuts__icon" aria-hidden>
               <MobileIcon name={item.icon} size={18} />
             </span>
@@ -331,7 +346,7 @@ function NextBookHint({ upcomingSessions }: { upcomingSessions: MemberHomeUpcomi
   );
 }
 
-function QuickLinks() {
+function QuickLinks({ LinkComponent }: { LinkComponent: MemberHomeLinkComponent }) {
   return (
     <section>
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
@@ -342,6 +357,7 @@ function QuickLinks() {
           <Link
             key={item.label}
             to={item.href}
+            LinkComponent={LinkComponent}
             style={{
               display: "flex",
               alignItems: "center",

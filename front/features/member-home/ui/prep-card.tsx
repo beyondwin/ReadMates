@@ -1,5 +1,5 @@
-import { Link } from "@/src/app/router-link";
-import type { MemberHomeCurrentSessionResponse as CurrentSessionResponse } from "@/features/member-home/api/member-home-contracts";
+import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
+import type { MemberHomeCurrentSessionView as CurrentSessionResponse } from "@/features/member-home/model/member-home-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
@@ -44,10 +44,12 @@ export function PrepCard({
   session,
   isHost = false,
   isViewer = false,
+  LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
   isHost?: boolean;
   isViewer?: boolean;
+  LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (session === null) {
     return (
@@ -62,7 +64,12 @@ export function PrepCard({
           다음 책이 등록되면 이곳에 책, 일정, 질문 마감, 준비 상태가 한 번에 표시됩니다.
         </p>
         {isHost ? (
-          <Link to="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "22px" }}>
+          <Link
+            to="/app/host/sessions/new"
+            className="btn btn-primary"
+            style={{ marginTop: "22px" }}
+            LinkComponent={LinkComponent}
+          >
             세션 문서 만들기
           </Link>
         ) : null}
@@ -143,7 +150,11 @@ export function PrepCard({
       </div>
 
       <div className="rm-prep-card__actions">
-        <Link to="/app/session/current" className="btn btn-primary rm-prep-card__primary">
+        <Link
+          to="/app/session/current"
+          className="btn btn-primary rm-prep-card__primary"
+          LinkComponent={LinkComponent}
+        >
           세션 열기
         </Link>
         {meetingUrl ? (

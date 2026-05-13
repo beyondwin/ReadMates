@@ -1,5 +1,5 @@
 import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import type { HostMemberListItem, MembershipStatus } from "@/features/host/ui/host-ui-types";
+import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
 import { isMembershipPending, memberActionPendingReason } from "./member-action-rules";
 import type { HostMemberLifecyclePath } from "./types";
 

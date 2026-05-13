@@ -4,7 +4,7 @@ import type {
   HostDashboardResponse,
   HostSessionListPage,
   SessionRecordVisibility,
-} from "@/features/host/ui/host-ui-types";
+} from "@/features/host/model/host-view-types";
 import type { PageRequest } from "@/shared/model/paging";
 
 export type HostDashboardLinkProps = {

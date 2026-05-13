@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
-import type { HostDashboardResponse } from "@/features/host/ui/host-ui-types";
+import type { HostDashboardResponse } from "@/features/host/model/host-view-types";
 import {
   getHostDashboardPublicationFeedbackRows,
   type HostChecklistState as ChecklistState,

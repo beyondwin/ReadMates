@@ -16,7 +16,7 @@ import type {
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
-} from "@/features/host/ui/host-ui-types";
+} from "@/features/host/model/host-view-types";
 import {
   buildHostSessionRequest,
   buildPublicationRequest,

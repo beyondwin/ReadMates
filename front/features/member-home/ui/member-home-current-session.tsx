@@ -1,6 +1,6 @@
-import { Link } from "@/src/app/router-link";
 import { type CSSProperties } from "react";
-import type { MemberHomeCurrentSessionResponse as CurrentSessionResponse } from "@/features/member-home/api/member-home-contracts";
+import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
+import type { MemberHomeCurrentSessionView as CurrentSessionResponse } from "@/features/member-home/model/member-home-view-model";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
 import { BookCover } from "@/shared/ui/book-cover";
 import { displayText, formatDateLabel, formatDeadlineLabel, rsvpLabel } from "@/shared/ui/readmates-display";
@@ -137,10 +137,12 @@ export function MobileCurrentSessionCard({
   session,
   isHost,
   isViewer = false,
+  LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
   isHost: boolean;
   isViewer?: boolean;
+  LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (!session) {
     return (
@@ -153,7 +155,12 @@ export function MobileCurrentSessionCard({
           호스트가 다음 세션을 등록하면 RSVP와 질문 작성이 열립니다.
         </p>
         {isHost ? (
-          <Link to="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: 16, width: "100%" }}>
+          <Link
+            to="/app/host/sessions/new"
+            className="btn btn-primary"
+            style={{ marginTop: 16, width: "100%" }}
+            LinkComponent={LinkComponent}
+          >
             세션 문서 만들기
           </Link>
         ) : null}
@@ -223,7 +230,11 @@ export function MobileCurrentSessionCard({
             </p>
           </div>
         ) : null}
-        <Link to="/app/session/current" className="btn btn-primary rm-member-session-card__primary">
+        <Link
+          to="/app/session/current"
+          className="btn btn-primary rm-member-session-card__primary"
+          LinkComponent={LinkComponent}
+        >
           세션 열기 <MobileIcon name="arrow-right" size={14} />
         </Link>
         {meetingUrl ? (
@@ -247,9 +258,11 @@ export function MobileCurrentSessionCard({
 export function MobileTodayActions({
   session,
   isViewer = false,
+  LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
   isViewer?: boolean;
+  LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (!session) {
     return (
@@ -289,14 +302,27 @@ export function MobileTodayActions({
           </p>
         </div>
         <div className="m-action-grid">
-          <MobileActionTile label="세션 읽기" sub="준비 보드 보기" href="/app/session/current" icon="01" />
-          <MobileActionTile label="공동 보드 보기" sub={`${session.board.questions.length}개 질문`} href="/app/session/current" icon="02" />
+          <MobileActionTile
+            label="세션 읽기"
+            sub="준비 보드 보기"
+            href="/app/session/current"
+            icon="01"
+            LinkComponent={LinkComponent}
+          />
+          <MobileActionTile
+            label="공동 보드 보기"
+            sub={`${session.board.questions.length}개 질문`}
+            href="/app/session/current"
+            icon="02"
+            LinkComponent={LinkComponent}
+          />
           <MobileActionTile
             label="모임 정보"
             sub={meetingSub}
             href={meetingHref}
             icon="03"
             external={Boolean(meetingUrl)}
+            LinkComponent={LinkComponent}
           />
         </div>
       </section>
@@ -312,9 +338,27 @@ export function MobileTodayActions({
         </span>
       </div>
       <div className="m-action-grid">
-        <MobileActionTile label="RSVP" sub={rsvpLabel(session.myRsvpStatus)} href="/app/session/current" icon="01" />
-        <MobileActionTile label="읽기 진행률" sub={`${readingProgress}%`} href="/app/session/current" icon="02" />
-        <MobileActionTile label="질문 쓰기" sub={`${session.myQuestions.length}/5 작성`} href="/app/session/current" icon="03" />
+        <MobileActionTile
+          label="RSVP"
+          sub={rsvpLabel(session.myRsvpStatus)}
+          href="/app/session/current"
+          icon="01"
+          LinkComponent={LinkComponent}
+        />
+        <MobileActionTile
+          label="읽기 진행률"
+          sub={`${readingProgress}%`}
+          href="/app/session/current"
+          icon="02"
+          LinkComponent={LinkComponent}
+        />
+        <MobileActionTile
+          label="질문 쓰기"
+          sub={`${session.myQuestions.length}/5 작성`}
+          href="/app/session/current"
+          icon="03"
+          LinkComponent={LinkComponent}
+        />
       </div>
     </section>
   );
@@ -326,12 +370,14 @@ function MobileActionTile({
   href,
   icon,
   external = false,
+  LinkComponent,
 }: {
   label: string;
   sub: string;
   href: string;
   icon: string;
   external?: boolean;
+  LinkComponent: MemberHomeLinkComponent;
 }) {
   const content = (
     <>
@@ -358,7 +404,7 @@ function MobileActionTile({
   }
 
   return (
-    <Link className="m-action-tile" to={href} aria-label={`${label} ${sub}`}>
+    <Link className="m-action-tile" to={href} aria-label={`${label} ${sub}`} LinkComponent={LinkComponent}>
       {content}
     </Link>
   );

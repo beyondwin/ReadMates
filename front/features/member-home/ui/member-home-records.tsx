@@ -1,9 +1,9 @@
-import { Link } from "@/src/app/router-link";
 import { type CSSProperties, type ReactNode } from "react";
+import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
 import type {
-  MemberHomeCurrentSessionResponse as CurrentSessionResponse,
-  MemberHomeNoteFeedItem as NoteFeedItem,
-} from "@/features/member-home/api/member-home-contracts";
+  MemberHomeCurrentSessionView as CurrentSessionResponse,
+  MemberHomeNoteFeedItemView as NoteFeedItem,
+} from "@/features/member-home/model/member-home-view-model";
 import { AvatarChip } from "@/shared/ui/avatar-chip";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
 
@@ -45,14 +45,20 @@ function SectionHeader({
   );
 }
 
-export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
+export function ClubPulse({
+  items,
+  LinkComponent = PlainMemberHomeLink,
+}: {
+  items: NoteFeedItem[];
+  LinkComponent?: MemberHomeLinkComponent;
+}) {
   return (
     <section>
       <SectionHeader
         eyebrow="클럽 흐름"
         title="최근 클럽 흐름"
         action={
-          <Link to="/app/notes" className="btn btn-quiet btn-sm">
+          <Link to="/app/notes" className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
             전체 보기
           </Link>
         }
@@ -100,14 +106,20 @@ export function ClubPulse({ items }: { items: NoteFeedItem[] }) {
   );
 }
 
-export function MobileMemberActivity({ items }: { items: NoteFeedItem[] }) {
+export function MobileMemberActivity({
+  items,
+  LinkComponent = PlainMemberHomeLink,
+}: {
+  items: NoteFeedItem[];
+  LinkComponent?: MemberHomeLinkComponent;
+}) {
   return (
     <section className="m-sec">
       <div className="m-row-between rm-member-activity__header" style={{ alignItems: "center" }}>
         <div className="m-row" style={{ gap: 8, minWidth: 0 }}>
           <div className="eyebrow">멤버 활동</div>
         </div>
-        <Link to="/app/notes" className="btn btn-quiet btn-sm">
+        <Link to="/app/notes" className="btn btn-quiet btn-sm" LinkComponent={LinkComponent}>
           전체 보기
         </Link>
       </div>

@@ -1,5 +1,5 @@
 import { memo, type CSSProperties } from "react";
-import type { HostSessionDetailResponse } from "@/features/host/ui/host-ui-types";
+import type { HostSessionDetailResponse } from "@/features/host/model/host-view-types";
 import {
   hostSessionStateLabel,
   recordVisibilityLabel,

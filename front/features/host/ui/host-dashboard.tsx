@@ -6,7 +6,7 @@ import type {
   HostSessionListPage,
   HostSessionListItem,
   SessionRecordVisibility,
-} from "@/features/host/ui/host-ui-types";
+} from "@/features/host/model/host-view-types";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   getHostDashboardChecklist,

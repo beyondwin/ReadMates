@@ -4,19 +4,19 @@ import {
   fetchMemberHomeUpcomingSessions,
 } from "@/features/member-home/api/member-home-api";
 import type {
-  MemberHomeCurrentSessionResponse,
-  MemberHomeNoteFeedItem,
-  MemberHomeUpcomingSession,
-} from "@/features/member-home/api/member-home-contracts";
+  MemberHomeCurrentSessionView,
+  MemberHomeNoteFeedItemView,
+  MemberHomeUpcomingSessionView,
+} from "@/features/member-home/model/member-home-view-model";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { clubSlugFromLoaderArgs, loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 
 const MEMBER_HOME_NOTE_FEED_LIMIT = 60;
 
 export type MemberHomeRouteData = {
-  current: MemberHomeCurrentSessionResponse;
-  noteFeedItems: MemberHomeNoteFeedItem[];
-  upcomingSessions: MemberHomeUpcomingSession[];
+  current: MemberHomeCurrentSessionView;
+  noteFeedItems: MemberHomeNoteFeedItemView[];
+  upcomingSessions: MemberHomeUpcomingSessionView[];
 };
 
 export async function memberHomeLoader(args?: LoaderFunctionArgs): Promise<MemberHomeRouteData> {

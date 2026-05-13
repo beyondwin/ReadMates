@@ -1,7 +1,7 @@
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
-} from "@/features/host/ui/host-ui-types";
+} from "@/features/host/model/host-view-types";
 import type {
   HostChecklistState as ChecklistState,
   HostDashboardAlertTone as HostAlertTone,

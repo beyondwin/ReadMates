@@ -1,4 +1,4 @@
-import type { HostNotificationSummary } from "@/features/host/ui/host-ui-types";
+import type { HostNotificationSummary } from "@/features/host/model/host-view-types";
 import type { HostDashboardAlertTone as HostAlertTone } from "@/features/host/model/host-dashboard-model";
 import { nonNegativeCount } from "@/shared/ui/readmates-display";
 import type { HostDashboardLinkComponent } from "./types";
