@@ -4,8 +4,13 @@ import com.readmates.notification.adapter.`in`.kafka.NotificationEventKafkaListe
 import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaProperties
+import com.readmates.notification.application.model.ManualNotificationAudience
+import com.readmates.notification.application.model.ManualNotificationRequestedChannels
+import com.readmates.notification.application.model.ManualNotificationSendMode
+import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationManualDispatchPayload
 import com.readmates.notification.application.port.`in`.DispatchNotificationEventUseCase
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.domain.NotificationEventType
@@ -76,6 +81,23 @@ class NotificationKafkaPipelineIntegrationTest(
             }
     }
 
+    @Test
+    fun `published manual notification event preserves dispatch metadata through Kafka`() {
+        val message = manualNotificationEventMessage()
+        waitForListenerAssignment()
+
+        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString())
+
+        await()
+            .atMost(Duration.ofSeconds(20))
+            .untilAsserted {
+                val received = recordingDispatchUseCase.receivedMessages()
+                assertThat(received).containsExactly(message)
+                assertThat(received.single().payload.manualDispatch)
+                    .isEqualTo(message.payload.manualDispatch)
+            }
+    }
+
     private fun waitForListenerAssignment() {
         val listenerContainers = kafkaListenerEndpointRegistry.listenerContainers
         assertThat(listenerContainers).hasSize(1)
@@ -142,6 +164,33 @@ class NotificationKafkaPipelineIntegrationTest(
                     sessionNumber = 6,
                     bookTitle = "Example Book",
                     targetDate = LocalDate.of(2026, 5, 1),
+                ),
+            )
+
+        private fun manualNotificationEventMessage(): NotificationEventMessage =
+            NotificationEventMessage(
+                eventId = UUID.fromString("11111111-1111-4111-8111-111111111112"),
+                clubId = UUID.fromString("22222222-2222-4222-8222-222222222222"),
+                eventType = NotificationEventType.SESSION_REMINDER_DUE,
+                aggregateType = "SESSION",
+                aggregateId = UUID.fromString("33333333-3333-4333-8333-333333333333"),
+                occurredAt = OffsetDateTime.of(2026, 4, 29, 12, 5, 0, 0, ZoneOffset.UTC),
+                payload = NotificationEventPayload(
+                    sessionId = UUID.fromString("33333333-3333-4333-8333-333333333333"),
+                    sessionNumber = 6,
+                    bookTitle = "Example Book",
+                    targetDate = LocalDate.of(2026, 5, 1),
+                    manualDispatch = NotificationManualDispatchPayload(
+                        id = UUID.fromString("44444444-4444-4444-8444-444444444444"),
+                        source = NotificationDispatchSource.MANUAL,
+                        requestedByMembershipId = UUID.fromString("55555555-5555-4555-8555-555555555555"),
+                        requestedChannels = ManualNotificationRequestedChannels.IN_APP,
+                        audience = ManualNotificationAudience.SESSION_PARTICIPANTS,
+                        excludedMembershipIds = listOf(UUID.fromString("66666666-6666-4666-8666-666666666666")),
+                        includedMembershipIds = listOf(UUID.fromString("77777777-7777-4777-8777-777777777777")),
+                        resend = true,
+                        sendMode = ManualNotificationSendMode.NOW,
+                    ),
                 ),
             )
     }
