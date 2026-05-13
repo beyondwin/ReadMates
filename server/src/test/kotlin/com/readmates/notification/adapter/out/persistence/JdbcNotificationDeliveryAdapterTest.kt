@@ -251,7 +251,7 @@ class JdbcNotificationDeliveryAdapterTest(
         val mailPort = RecordingMailPort()
         val service = NotificationDeliveryProcessingService(
             deliveryEngine = NotificationDeliveryEngine(
-                deliveryPort = deliveryAdapter,
+                deliveryStatusPort = deliveryAdapter,
                 mailDeliveryPort = mailPort,
                 metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
                 maxAttempts = 5,

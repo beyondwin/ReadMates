@@ -1,4 +1,4 @@
-import type { HostMemberListItem } from "@/features/host/ui/host-ui-types";
+import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 
 export const memberActionPendingReason = "멤버 상태 업데이트를 처리하는 중입니다.";
 

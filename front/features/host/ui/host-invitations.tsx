@@ -6,7 +6,7 @@ import type {
   HostInvitationListItem,
   HostInvitationResponse,
   InvitationStatus,
-} from "@/features/host/ui/host-ui-types";
+} from "@/features/host/model/host-view-types";
 import type { PageRequest } from "@/shared/model/paging";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 

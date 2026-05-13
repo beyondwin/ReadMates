@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { HostSessionListItem, SessionRecordVisibility } from "@/features/host/ui/host-ui-types";
+import type { HostSessionListItem, SessionRecordVisibility } from "@/features/host/model/host-view-types";
 import { hostSessionEditHref } from "@/features/host/model/host-dashboard-model";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";

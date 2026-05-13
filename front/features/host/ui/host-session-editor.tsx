@@ -1,29 +1,24 @@
 import {
   type ChangeEvent,
-  type ComponentType,
   type CSSProperties,
   type FormEvent,
-  type ReactNode,
   useCallback,
   useMemo,
   useReducer,
   useRef,
   useState,
 } from "react";
-import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   AttendanceStatus,
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
-} from "@/features/host/ui/host-ui-types";
+} from "@/features/host/model/host-view-types";
 import {
   buildHostSessionRequest,
   buildPublicationRequest,
   getDestructiveActionAvailability,
   questionDeadlineLabelForForm,
-  type HostSessionPublicationRequest,
-  type HostSessionRequest,
 } from "@/features/host/model/host-session-editor-model";
 import {
   hostSessionEditorReducer,
@@ -40,12 +35,28 @@ import { AttendancePanel } from "./session-editor/attendance-panel";
 import { BasicSessionPanel } from "./session-editor/basic-session-panel";
 import { DocumentStatePanel } from "./session-editor/document-state-panel";
 import {
+  type AttendanceWriteState,
+  type HostSessionEditorActions,
+  type PublicationFeedback,
+  type SaveState,
+} from "./session-editor/session-editor-actions";
+import {
+  feedbackDocumentUploadStatus,
+  feedbackPreviewStateForSession,
+} from "./session-editor/session-editor-feedback";
+import {
+  DefaultLinkComponent,
+  type HostSessionEditorLinkComponent,
+} from "./session-editor/session-editor-links";
+import {
   handleMobileEditorSectionKeyDown,
   mobileEditorSections,
   type MobileEditorSection,
 } from "./session-editor/mobile-editor-tabs";
 import { PublicationPanel } from "./session-editor/publication-panel";
 import { Panel } from "./session-editor/session-editor-panel";
+
+export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
 
 const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
 
@@ -56,79 +67,13 @@ const operationOrder = [
   "회차 피드백 문서 등록",
 ];
 
-type SaveState = "idle" | "saving" | "saved" | "error";
-
-type PublicationFeedback = {
-  tone: "success" | "error";
-  message: string;
-};
-
-function scopedHostRedirectHref(href: string) {
-  return scopedAppLinkTarget(globalThis.location.pathname, href);
-}
-
-type AttendanceWriteState = {
-  inFlight: boolean;
-  inFlightStatus: AttendanceStatus | null;
-  queuedStatus: AttendanceStatus | null;
-};
-
-type JsonResponse<T> = Response & { json(): Promise<T> };
-
-type HostSessionEditorLinkProps = {
-  to: string;
-  state?: ReadmatesReturnState;
-  className?: string;
-  children: ReactNode;
-  style?: CSSProperties;
-};
-export type HostSessionEditorLinkComponent = ComponentType<HostSessionEditorLinkProps>;
-
-type HostSessionEditorActions = {
-  loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
-  deleteSession: (sessionId: string) => Promise<Response>;
-  closeSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
-  publishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
-  saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
-  savePublication: (sessionId: string, request: HostSessionPublicationRequest) => Promise<Response>;
-  updateAttendance: (
-    sessionId: string,
-    attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
-  ) => Promise<Response>;
-  uploadFeedbackDocument: (sessionId: string, formData: FormData) => Promise<JsonResponse<FeedbackDocumentResponse>>;
-};
-
 const defaultHostDashboardReturnTarget: ReadmatesReturnTarget = {
   href: "/app/host",
   label: "운영으로",
 };
 
-function RouterScopedDefaultLink({ to, state: _state, children, ...props }: HostSessionEditorLinkProps) {
-  void _state;
-  const location = useLocation();
-
-  return (
-    <a {...props} href={scopedAppLinkTarget(location.pathname, to)}>
-      {children}
-    </a>
-  );
-}
-
-function DefaultLinkComponent(props: HostSessionEditorLinkProps) {
-  const inRouter = useInRouterContext();
-
-  if (inRouter) {
-    return <RouterScopedDefaultLink {...props} />;
-  }
-
-  const { to, state: _state, children, ...anchorProps } = props;
-  void _state;
-
-  return (
-    <a {...anchorProps} href={scopedAppLinkTarget(globalThis.location.pathname, to)}>
-      {children}
-    </a>
-  );
+function scopedHostRedirectHref(href: string) {
+  return scopedAppLinkTarget(globalThis.location.pathname, href);
 }
 
 export default function HostSessionEditor({
@@ -216,13 +161,7 @@ export default function HostSessionEditor({
     : "세션 기본 정보는 변경 사항 저장 버튼으로 저장하고, 기록 공개 범위와 피드백 문서는 각 섹션에서 따로 저장합니다.";
   const showReturnLink =
     returnTarget.href !== hostDashboardReturnTarget.href || returnTarget.label !== hostDashboardReturnTarget.label;
-  const feedbackPreviewState = session
-    ? readmatesReturnState({
-        href: `/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`,
-        label: "세션 문서로",
-        state: readmatesReturnState(returnTarget),
-      })
-    : undefined;
+  const feedbackPreviewState = feedbackPreviewStateForSession(session, returnTarget, readmatesReturnState);
   const displaySession = useMemo(
     () => displaySessionSnapshot ?? (session ? { ...session, state: sessionState } : session),
     [displaySessionSnapshot, session, sessionState],
@@ -676,13 +615,7 @@ export default function HostSessionEditor({
     [session, actions, flash],
   );
 
-  // ---------------------------------------------------------------------------
-  // Stable memoized props for panels
-  // ---------------------------------------------------------------------------
-  const feedbackDocumentForPanel = useMemo(
-    () => ({ uploaded: feedbackDocument.uploaded, fileName: feedbackDocument.fileName }),
-    [feedbackDocument.uploaded, feedbackDocument.fileName],
-  );
+  const feedbackDocumentForPanel = feedbackDocumentUploadStatus(feedbackDocument);
 
   return (
     <main className="rm-host-session-editor">

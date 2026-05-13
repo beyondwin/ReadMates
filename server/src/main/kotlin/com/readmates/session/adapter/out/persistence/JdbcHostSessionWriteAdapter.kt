@@ -9,8 +9,13 @@ import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostSessionAttendancePort
+import com.readmates.session.application.port.out.HostSessionDeletionPort
+import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.session.application.port.out.HostSessionLifecyclePort
+import com.readmates.session.application.port.out.HostSessionPublicationPort
+import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
-import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
@@ -22,7 +27,12 @@ import org.springframework.transaction.annotation.Transactional
 class JdbcHostSessionWriteAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val deletionQueries: HostSessionDeletionQueries,
-) : HostSessionWritePort {
+) : HostSessionQueryPort,
+    HostSessionDraftPort,
+    HostSessionLifecyclePort,
+    HostSessionDeletionPort,
+    HostSessionAttendancePort,
+    HostSessionPublicationPort {
     private val queries = HostSessionQueries()
     private val writeOperations = HostSessionWriteOperations(queries)
 

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { AttendanceStatus, HostSessionDetailResponse } from "@/features/host/ui/host-ui-types";
+import type { AttendanceStatus, HostSessionDetailResponse } from "@/features/host/model/host-view-types";
 import { HostSessionAttendanceEditor } from "../host-session-attendance-editor";
 import { Panel } from "./session-editor-panel";
 import type { MobileEditorSection } from "./mobile-editor-tabs";

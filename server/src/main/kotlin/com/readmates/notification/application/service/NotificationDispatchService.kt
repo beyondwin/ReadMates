@@ -3,7 +3,7 @@ package com.readmates.notification.application.service
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.`in`.DispatchNotificationEventUseCase
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import io.micrometer.core.instrument.Counter
@@ -14,7 +14,7 @@ import java.util.UUID
 
 @Service
 class NotificationDispatchService(
-    private val deliveryPort: NotificationDeliveryPort,
+    private val deliveryStatusPort: NotificationDeliveryStatusPort,
     private val deliveryEngine: NotificationDeliveryEngine,
     private val transactionalOps: NotificationDeliveryTransactionalOperations,
     private val meterRegistry: MeterRegistry,
@@ -50,7 +50,7 @@ class NotificationDispatchService(
     }
 
     private fun handleUnclaimedEmailDelivery(deliveryId: UUID): NotificationDeliveryRetryableException? {
-        val status = deliveryPort.findDeliveryStatus(deliveryId)
+        val status = deliveryStatusPort.findDeliveryStatus(deliveryId)
         when (status) {
             NotificationDeliveryStatus.SENT,
             NotificationDeliveryStatus.SKIPPED,

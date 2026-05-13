@@ -1,15 +1,7 @@
 package com.readmates.notification.application.service
 
-import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
-import com.readmates.notification.application.model.HostNotificationDelivery
-import com.readmates.notification.application.model.HostNotificationDetail
-import com.readmates.notification.application.model.HostNotificationItemList
-import com.readmates.notification.application.model.HostNotificationItemQuery
-import com.readmates.notification.application.model.HostNotificationSummary
-import com.readmates.notification.application.model.NotificationDeliveryItem
-import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.NotificationDeliveryBacklogPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -17,7 +9,6 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.time.OffsetDateTime
 import java.util.UUID
 
 class ReadmatesOperationalMetricsTest {
@@ -105,7 +96,7 @@ class ReadmatesOperationalMetricsTest {
     @Test
     fun `notification delivery backlog gauges expose only status counts`() {
         val registry = SimpleMeterRegistry()
-        val deliveryPort = FixedBacklogNotificationDeliveryPort(
+        val deliveryPort = FixedDeliveryBacklogPort(
             NotificationDeliveryBacklog(
                 pending = 2,
                 failed = 3,
@@ -130,46 +121,9 @@ class ReadmatesOperationalMetricsTest {
     }
 }
 
-private class FixedBacklogNotificationDeliveryPort(
+private class FixedDeliveryBacklogPort(
     private val backlog: NotificationDeliveryBacklog,
-) : NotificationDeliveryPort {
-    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
-        emptyList()
-
-    override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = null
-
-    override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = emptyList()
-
-    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
-        emptyList()
-
-    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? = null
-
-    override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = null
-
-    override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean = false
-
-    override fun markDeliveryFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean =
-        false
-
-    override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = false
-
-    override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = false
-
-    override fun hostSummary(clubId: UUID): HostNotificationSummary =
-        HostNotificationSummary(
-            pending = 0,
-            failed = 0,
-            dead = 0,
-            sentLast24h = 0,
-            latestFailures = emptyList(),
-        )
-
-    override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
-        HostNotificationItemList(emptyList())
-
-    override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? = null
-
+) : NotificationDeliveryBacklogPort {
     override fun deliveryBacklog(): NotificationDeliveryBacklog = backlog
 
     override fun countByStatus(
@@ -178,10 +132,4 @@ private class FixedBacklogNotificationDeliveryPort(
         status: NotificationDeliveryStatus,
     ): Int = 0
 
-    override fun listHostDeliveries(
-        clubId: UUID,
-        status: NotificationDeliveryStatus?,
-        channel: NotificationChannel?,
-        limit: Int,
-    ): List<HostNotificationDelivery> = emptyList()
 }

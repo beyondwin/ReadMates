@@ -9,7 +9,11 @@ import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.HostNotificationDeliveryLedgerPort
+import com.readmates.notification.application.port.out.NotificationDeliveryBacklogPort
+import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
+import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.shared.paging.CursorPage
@@ -26,31 +30,38 @@ class JdbcNotificationDeliveryAdapter(
     private val jdbcTemplate: JdbcTemplate,
     objectMapper: ObjectMapper,
     @Value("\${readmates.app-base-url:http://localhost:3000}") appBaseUrl: String,
-) : NotificationDeliveryPort {
+) : NotificationDeliveryPlanningPort,
+    NotificationDeliveryClaimPort,
+    NotificationDeliveryStatusPort,
+    NotificationDeliveryBacklogPort,
+    HostNotificationDeliveryLedgerPort {
     private val rowMappers = NotificationDeliveryRowMappers(objectMapper, appBaseUrl)
-    private val queries = NotificationDeliveryQueries(rowMappers)
-    private val writeOperations = NotificationDeliveryWriteOperations(queries, rowMappers)
+    private val backlogQueries = NotificationDeliveryBacklogQueries()
+    private val ledgerQueries = HostNotificationLedgerQueries(rowMappers, backlogQueries)
+    private val planningOperations = NotificationDeliveryPlanningOperations(rowMappers)
+    private val claimOperations = NotificationDeliveryClaimOperations(rowMappers)
+    private val statusOperations = NotificationDeliveryStatusOperations()
 
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
-        writeOperations.persistPlannedDeliveries(jdbcTemplate, message)
+        planningOperations.persistPlannedDeliveries(jdbcTemplate, message)
 
     override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? =
-        writeOperations.claimEmailDelivery(jdbcTemplate, id)
+        claimOperations.claimEmailDelivery(jdbcTemplate, id)
 
     override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> =
-        writeOperations.claimEmailDeliveries(jdbcTemplate, limit)
+        claimOperations.claimEmailDeliveries(jdbcTemplate, limit)
 
     override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
-        writeOperations.claimEmailDeliveriesForClub(jdbcTemplate, clubId, limit)
+        claimOperations.claimEmailDeliveriesForClub(jdbcTemplate, clubId, limit)
 
     override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? =
-        writeOperations.claimHostEmailDelivery(jdbcTemplate, clubId, id)
+        claimOperations.claimHostEmailDelivery(jdbcTemplate, clubId, id)
 
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
-        queries.findDeliveryStatus(jdbcTemplate, id)
+        statusOperations.findDeliveryStatus(jdbcTemplate, id)
 
     override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean =
-        writeOperations.markDeliverySent(jdbcTemplate, id, lockedAt)
+        statusOperations.markDeliverySent(jdbcTemplate, id, lockedAt)
 
     override fun markDeliveryFailed(
         id: UUID,
@@ -58,36 +69,36 @@ class JdbcNotificationDeliveryAdapter(
         error: String,
         nextAttemptDelayMinutes: Long,
     ): Boolean =
-        writeOperations.markDeliveryFailed(jdbcTemplate, id, lockedAt, error, nextAttemptDelayMinutes)
+        statusOperations.markDeliveryFailed(jdbcTemplate, id, lockedAt, error, nextAttemptDelayMinutes)
 
     override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean =
-        writeOperations.markDeliveryDead(jdbcTemplate, id, lockedAt, error)
+        statusOperations.markDeliveryDead(jdbcTemplate, id, lockedAt, error)
 
     override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean =
-        writeOperations.restoreDeadEmailDeliveryForClub(jdbcTemplate, clubId, id)
+        statusOperations.restoreDeadEmailDeliveryForClub(jdbcTemplate, clubId, id)
 
     override fun deliveryBacklog(): NotificationDeliveryBacklog =
-        queries.deliveryBacklog(jdbcTemplate)
+        backlogQueries.deliveryBacklog(jdbcTemplate)
 
     override fun countByStatus(
         clubId: UUID,
         channel: NotificationChannel?,
         status: NotificationDeliveryStatus,
     ): Int =
-        queries.countByStatus(jdbcTemplate, clubId, channel, status)
+        backlogQueries.countByStatus(jdbcTemplate, clubId, channel, status)
 
     override fun hostSummary(clubId: UUID): HostNotificationSummary =
-        queries.hostSummary(jdbcTemplate, clubId)
+        ledgerQueries.hostSummary(jdbcTemplate, clubId)
 
     override fun listHostEmailItems(
         clubId: UUID,
         query: HostNotificationItemQuery,
         pageRequest: PageRequest,
     ): HostNotificationItemList =
-        queries.listHostEmailItems(jdbcTemplate, clubId, query, pageRequest)
+        ledgerQueries.listHostEmailItems(jdbcTemplate, clubId, query, pageRequest)
 
     override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
-        queries.hostEmailDetail(jdbcTemplate, clubId, id)
+        ledgerQueries.hostEmailDetail(jdbcTemplate, clubId, id)
 
     override fun listHostDeliveries(
         clubId: UUID,
@@ -95,10 +106,6 @@ class JdbcNotificationDeliveryAdapter(
         channel: NotificationChannel?,
         pageRequest: PageRequest,
     ): CursorPage<HostNotificationDelivery> =
-        queries.listHostDeliveries(jdbcTemplate, clubId, status, channel, pageRequest)
+        ledgerQueries.listHostDeliveries(jdbcTemplate, clubId, status, channel, pageRequest)
 
 }
-
-class MissingNotificationEventOutboxException(
-    message: String,
-) : RuntimeException(message)

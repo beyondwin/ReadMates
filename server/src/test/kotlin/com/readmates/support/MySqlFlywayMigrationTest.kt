@@ -19,7 +19,6 @@ import java.util.UUID
 @TestPropertySource(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
-        "spring.jpa.hibernate.ddl-auto=validate",
     ],
 )
 class MySqlFlywayMigrationTest(

@@ -12,6 +12,8 @@ import com.readmates.notification.application.port.out.NotificationEventOutboxPo
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -168,8 +170,8 @@ private class FakeEventOutbox(
     override fun listHostEvents(
         clubId: UUID,
         status: NotificationEventOutboxStatus?,
-        limit: Int,
-    ): List<HostNotificationEvent> = error("unused")
+        pageRequest: PageRequest,
+    ): CursorPage<HostNotificationEvent> = error("unused")
 }
 
 private class RecordingPublisher(

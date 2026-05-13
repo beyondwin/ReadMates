@@ -4,7 +4,7 @@ import com.readmates.notification.application.model.ClaimedNotificationDeliveryI
 import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
@@ -22,7 +22,7 @@ sealed interface DeliveryEngineResult {
 
 @Service
 class NotificationDeliveryEngine(
-    private val deliveryPort: NotificationDeliveryPort,
+    private val deliveryStatusPort: NotificationDeliveryStatusPort,
     private val mailDeliveryPort: MailDeliveryPort,
     private val metrics: ReadmatesOperationalMetrics,
     @param:Value("\${readmates.notifications.kafka.max-delivery-attempts:5}") private val maxAttempts: Int,
@@ -43,7 +43,7 @@ class NotificationDeliveryEngine(
             return markFailure(item, exception)
         }
 
-        if (!deliveryPort.markDeliverySent(item.id, item.lockedAt)) {
+        if (!deliveryStatusPort.markDeliverySent(item.id, item.lockedAt)) {
             throw staleDeliveryLeaseException(item.id, NotificationDeliveryStatus.SENT)
         }
         metrics.sent(item.eventType)
@@ -61,7 +61,7 @@ class NotificationDeliveryEngine(
     ): DeliveryEngineResult {
         val error = exception.toStorageError()
         if (item.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
-            if (!deliveryPort.markDeliveryDead(item.id, item.lockedAt, error)) {
+            if (!deliveryStatusPort.markDeliveryDead(item.id, item.lockedAt, error)) {
                 throw staleDeliveryLeaseException(item.id, NotificationDeliveryStatus.DEAD)
             }
             metrics.dead(item.eventType)
@@ -75,7 +75,7 @@ class NotificationDeliveryEngine(
             return DeliveryEngineResult.Dead
         }
 
-        val marked = deliveryPort.markDeliveryFailed(
+        val marked = deliveryStatusPort.markDeliveryFailed(
             id = item.id,
             lockedAt = item.lockedAt,
             error = error,

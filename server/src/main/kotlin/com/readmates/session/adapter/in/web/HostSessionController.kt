@@ -6,6 +6,7 @@ import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
+import com.readmates.session.application.port.`in`.HostSessionQueryUseCase
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
@@ -34,6 +35,7 @@ data class HostSessionVisibilityRequest(
 @RequestMapping("/api/host/sessions")
 class HostSessionController(
     private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
+    private val hostSessionQueryUseCase: HostSessionQueryUseCase,
     private val hostSessionDraftUseCase: HostSessionDraftUseCase,
 ) {
     @PostMapping
@@ -48,13 +50,13 @@ class HostSessionController(
         member: CurrentMember,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
-    ) = hostSessionDraftUseCase.list(member, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+    ) = hostSessionQueryUseCase.list(member, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
 
     @GetMapping("/{sessionId}")
     fun detail(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = hostSessionDraftUseCase.detail(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+    ) = hostSessionQueryUseCase.detail(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
     @PatchMapping("/{sessionId}")
     fun update(

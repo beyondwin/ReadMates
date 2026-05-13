@@ -5,19 +5,15 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
-import com.readmates.notification.application.model.HostNotificationDelivery
-import com.readmates.notification.application.model.HostNotificationDetail
-import com.readmates.notification.application.model.HostNotificationItemList
-import com.readmates.notification.application.model.HostNotificationItemQuery
-import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
-import com.readmates.notification.application.model.NotificationDeliveryBacklog
 import com.readmates.notification.application.model.clubScopedAppPath
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
-import com.readmates.notification.application.port.out.NotificationDeliveryPort
+import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
+import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
+import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -407,15 +403,15 @@ class NotificationDispatchServiceTest {
         )
         val mailPort = RecordingMailPort()
         val service = NotificationDispatchService(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             deliveryEngine = NotificationDeliveryEngine(
-                deliveryPort = deliveryPort,
+                deliveryStatusPort = deliveryPort,
                 mailDeliveryPort = mailPort,
                 metrics = dispatchTestMetrics(),
                 maxAttempts = 5,
                 retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
             ),
-            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort, deliveryPort),
             meterRegistry = registry,
         )
 
@@ -428,7 +424,7 @@ class NotificationDispatchServiceTest {
     }
 
     private fun notificationDispatchService(
-        deliveryPort: NotificationDeliveryPort,
+        deliveryPort: FakeDeliveryPort,
         mailPort: MailDeliveryPort,
         metrics: ReadmatesOperationalMetrics = dispatchTestMetrics(),
         maxAttempts: Int = 5,
@@ -436,15 +432,15 @@ class NotificationDispatchServiceTest {
         meterRegistry: io.micrometer.core.instrument.MeterRegistry = SimpleMeterRegistry(),
     ): NotificationDispatchService =
         NotificationDispatchService(
-            deliveryPort = deliveryPort,
+            deliveryStatusPort = deliveryPort,
             deliveryEngine = NotificationDeliveryEngine(
-                deliveryPort = deliveryPort,
+                deliveryStatusPort = deliveryPort,
                 mailDeliveryPort = mailPort,
                 metrics = metrics,
                 maxAttempts = maxAttempts,
                 retryDelayMinutesConfig = retryDelayMinutesConfig,
             ),
-            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort),
+            transactionalOps = NotificationDeliveryTransactionalOperations(deliveryPort, deliveryPort),
             meterRegistry = meterRegistry,
         )
 
@@ -536,7 +532,7 @@ class NotificationDispatchServiceTest {
         private val markDeadResult: Boolean = true,
         private val eventType: NotificationEventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
         private val findDeliveryStatusOverride: ((UUID) -> NotificationDeliveryStatus?)? = null,
-    ) : NotificationDeliveryPort {
+    ) : NotificationDeliveryPlanningPort, NotificationDeliveryClaimPort, NotificationDeliveryStatusPort {
         val persistedMessages = mutableListOf<NotificationEventMessage>()
         val claimedIds = mutableListOf<UUID>()
         val sent = mutableListOf<Pair<UUID, OffsetDateTime>>()
@@ -617,28 +613,6 @@ class NotificationDispatchServiceTest {
 
         override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = false
 
-        override fun deliveryBacklog(): NotificationDeliveryBacklog =
-            NotificationDeliveryBacklog(pending = 0, failed = 0, dead = 0, sending = 0)
-
-        override fun countByStatus(
-            clubId: UUID,
-            channel: NotificationChannel?,
-            status: NotificationDeliveryStatus,
-        ): Int = 0
-
-        override fun hostSummary(clubId: UUID): HostNotificationSummary = error("unused")
-
-        override fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery): HostNotificationItemList =
-            error("unused")
-
-        override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? = error("unused")
-
-        override fun listHostDeliveries(
-            clubId: UUID,
-            status: NotificationDeliveryStatus?,
-            channel: NotificationChannel?,
-            limit: Int,
-        ): List<HostNotificationDelivery> = error("unused")
     }
 
     private class RecordingMailPort : MailDeliveryPort {

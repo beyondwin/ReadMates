@@ -1,6 +1,6 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.auth.application.port.out.MemberAccountStorePort
+import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.auth.application.service.DefaultAuthoritySynthesisService
@@ -12,7 +12,6 @@ import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
 import com.readmates.shared.security.CurrentMember
-import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.CurrentUser
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -191,7 +190,7 @@ class MemberAuthoritiesFilterTest {
             override fun resolveByHost(host: String?): ResolvedClubContext? = null
         }
         val fakeAuthenticatedMemberResolver = AuthenticatedMemberResolver(
-            memberAccountStore = NoOpMemberAccountStorePort(),
+            memberIdentityLookup = NoOpMemberIdentityLookupPort(),
             memberProfileStore = NoOpMemberProfileStorePort(),
         )
         val fakeSupportGrantUseCase = object : CheckSupportAccessGrantUseCase {
@@ -239,40 +238,16 @@ class MemberAuthoritiesFilterTest {
      * A no-op account store that never finds any membership.
      * Used to ensure the filter's member-lookup step returns null.
      */
-    private class NoOpMemberAccountStorePort : MemberAccountStorePort {
+    private class NoOpMemberIdentityLookupPort : MemberIdentityLookupPort {
         override fun findActiveMemberByEmail(email: String): CurrentMember? = null
-        override fun findDevSeedActiveMemberByEmail(email: String): CurrentMember? = null
         override fun findActiveMemberByUserId(userId: String): CurrentMember? = null
         override fun findMemberByUserIdAndClubId(userId: UUID, clubId: UUID): CurrentMember? = null
         override fun findMemberByEmailAndClubId(email: String, clubId: UUID): CurrentMember? = null
-        override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
-        override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
-        override fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember? = null
+        override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? = null
         override fun findAnyUserIdByEmail(email: String): UUID? = null
         override fun findUserById(userId: UUID): CurrentUser? = null
         override fun findMembershipStatusByUserId(userId: UUID): MembershipStatus? = null
-        override fun connectGoogleSubject(userId: UUID, googleSubjectId: String, profileImageUrl: String?): Boolean = false
-        override fun createGoogleUser(
-            googleSubjectId: String,
-            email: String,
-            displayName: String?,
-            profileImageUrl: String?,
-        ): UUID = error("Not expected in MemberAuthoritiesFilterTest")
-        override fun createViewerGoogleMember(
-            googleSubjectId: String,
-            email: String,
-            displayName: String?,
-            profileImageUrl: String?,
-        ): CurrentMember = error("Not expected in MemberAuthoritiesFilterTest")
-        override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? = null
-        override fun googleSubjectOwnerEmail(googleSubjectId: String): String? = null
-        override fun recordLastLogin(userId: UUID) = Unit
-        override fun createDevGoogleMember(
-            googleSubjectId: String,
-            email: String,
-            displayName: String?,
-            profileImageUrl: String?,
-        ): CurrentMember? = null
+        override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
     }
 
     /**

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { HostMemberListItem } from "@/features/host/ui/host-ui-types";
+import type { HostMemberListItem } from "@/features/host/model/host-view-types";
 import {
   disabledDeactivateReason,
   disabledRestoreReason,

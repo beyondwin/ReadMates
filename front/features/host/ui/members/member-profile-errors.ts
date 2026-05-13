@@ -1,4 +1,4 @@
-import type { HostMemberProfileErrorCode } from "@/features/host/ui/host-ui-types";
+import type { HostMemberProfileErrorCode } from "@/features/host/model/host-view-types";
 
 const hostProfileNotEditableMessage = "수정할 수 없는 멤버입니다.";
 const hostProfileUnknownErrorMessage = "이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";

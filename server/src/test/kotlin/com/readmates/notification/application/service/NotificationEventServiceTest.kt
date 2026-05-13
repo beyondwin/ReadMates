@@ -7,6 +7,8 @@ import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventOutboxPort
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.LocalDate
@@ -165,6 +167,6 @@ private class RecordingEventOutbox : NotificationEventOutboxPort {
     override fun listHostEvents(
         clubId: UUID,
         status: NotificationEventOutboxStatus?,
-        limit: Int,
-    ): List<HostNotificationEvent> = error("unused")
+        pageRequest: PageRequest,
+    ): CursorPage<HostNotificationEvent> = error("unused")
 }

@@ -107,6 +107,79 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `session application does not depend on removed host session write port`() {
+        val forbiddenTypeName = "HostSessionWritePort"
+        val bytecodeViolations = importedClasses
+            .filter { javaClass ->
+                javaClass.packageName == "com.readmates.session.application" ||
+                    javaClass.packageName.startsWith("com.readmates.session.application.")
+            }
+            .flatMap { javaClass ->
+                val classViolation = if (javaClass.simpleName == forbiddenTypeName) listOf(javaClass.name) else emptyList()
+                val dependencyViolations = javaClass.directDependenciesFromSelf
+                    .filter { dependency -> dependency.targetClass.simpleName == forbiddenTypeName }
+                    .map { dependency -> "${javaClass.name} -> ${dependency.targetClass.name}" }
+                classViolation + dependencyViolations
+            }
+            .distinct()
+            .sorted()
+        val sourceViolations = sessionApplicationSourceFiles()
+            .flatMap { sourceFile ->
+                sourceFile.readLines()
+                    .mapIndexedNotNull { index, line ->
+                        if (forbiddenTypeName in line) {
+                            "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: ${line.trim()}"
+                        } else {
+                            null
+                        }
+                    }
+            }
+            .distinct()
+            .sorted()
+        val violations = (bytecodeViolations + sourceViolations).distinct().sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Session application code must not reference removed $forbiddenTypeName:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    @Test
+    fun `auth production code does not reference legacy member account store port`() {
+        val forbiddenTypeName = "MemberAccountStorePort"
+        val bytecodeViolations = importedClasses
+            .filter { javaClass -> javaClass.packageName == "com.readmates.auth" || javaClass.packageName.startsWith("com.readmates.auth.") }
+            .flatMap { javaClass ->
+                val classViolation = if (javaClass.simpleName == forbiddenTypeName) listOf(javaClass.name) else emptyList()
+                val dependencyViolations = javaClass.directDependenciesFromSelf
+                    .filter { dependency -> dependency.targetClass.simpleName == forbiddenTypeName }
+                    .map { dependency -> "${javaClass.name} -> ${dependency.targetClass.name}" }
+                classViolation + dependencyViolations
+            }
+            .distinct()
+            .sorted()
+        val sourceViolations = authProductionSourceFiles()
+            .flatMap { sourceFile ->
+                sourceFile.readLines()
+                    .mapIndexedNotNull { index, line ->
+                        if (forbiddenTypeName in line) {
+                            "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: ${line.trim()}"
+                        } else {
+                            null
+                        }
+                    }
+            }
+            .distinct()
+            .sorted()
+        val violations = (bytecodeViolations + sourceViolations).distinct().sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Auth production code must not reference legacy $forbiddenTypeName:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    @Test
     fun `persistence adapters require jdbc template directly`() {
         val violations = persistenceAdapterSourceFiles()
             .filter { sourceFile ->
@@ -120,6 +193,43 @@ class ServerArchitectureBoundaryTest {
             "Persistence adapters must inject JdbcTemplate directly:\n${violations.joinToString("\n")}",
         )
     }
+
+    @Test
+    fun `outbound ports do not provide default runtime failure implementations`() {
+        val violations = Files.walk(sourceRoot())
+            .use { paths ->
+                paths
+                    .filter { it.name.endsWith("Port.kt") }
+                    .flatMap { sourceFile ->
+                        val lines = sourceFile.readLines()
+                        lines.mapIndexedNotNull { index, line ->
+                            val lineText = line.trim()
+                            if (lineText.isRuntimeFailureDefault()) {
+                                "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: $lineText"
+                            } else {
+                                null
+                            }
+                        }.stream()
+                    }
+                    .toList()
+            }
+            .sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Outbound ports must not hide unsupported behavior behind default runtime failures:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    private fun String.isRuntimeFailureDefault(): Boolean =
+        !startsWith("//") && listOf(
+            "= error(",
+            "= throw",
+            "= TODO(",
+            "error(",
+            "throw ",
+            "TODO(",
+        ).any { marker -> marker in this }
 
     @Test
     fun `persistence adapters do not depend on spring web http types outside baseline exceptions`() {
@@ -234,6 +344,24 @@ class ServerArchitectureBoundaryTest {
                 Files.walk(packageRoot)
                     .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
             }
+
+    private fun authProductionSourceFiles(): List<Path> {
+        val authRoot = sourceRoot().resolve("com/readmates/auth")
+        if (!Files.exists(authRoot)) {
+            return emptyList()
+        }
+        return Files.walk(authRoot)
+            .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
+    }
+
+    private fun sessionApplicationSourceFiles(): List<Path> {
+        val sessionApplicationRoot = sourceRoot().resolve("com/readmates/session/application")
+        if (!Files.exists(sessionApplicationRoot)) {
+            return emptyList()
+        }
+        return Files.walk(sessionApplicationRoot)
+            .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
+    }
 
     private fun persistenceAdapterSourceFiles(): List<Path> =
         Files.walk(sourceRoot())

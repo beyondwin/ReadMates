@@ -1,4 +1,4 @@
-import type { HostDashboardResponse, HostNotificationSummary, HostSessionListItem } from "@/features/host/ui/host-ui-types";
+import type { HostDashboardResponse, HostNotificationSummary, HostSessionListItem } from "@/features/host/model/host-view-types";
 import {
   getHostDashboardSessionMetrics,
   type HostChecklistItem,

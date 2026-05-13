@@ -232,6 +232,10 @@ function isFeatureModelFile(relativePath: string) {
   return /^features\/[^/]+\/model\//.test(relativePath);
 }
 
+function isFeatureComponentsFile(relativePath: string) {
+  return /^features\/[^/]+\/components\//.test(relativePath);
+}
+
 function isFeatureUiFile(relativePath: string) {
   return /^features\/[^/]+\/ui\//.test(relativePath);
 }
@@ -334,7 +338,14 @@ function isFeatureModelBoundaryImport(sourceFile: SourceFile, importSpecifier: I
     return false;
   }
 
-  return isSharedApiImport(importSpecifier.projectPath) || isFeatureLayerImport(importSpecifier.projectPath, "api");
+  return (
+    isSharedApiImport(importSpecifier.projectPath) ||
+    isFeatureLayerImport(importSpecifier.projectPath, "api") ||
+    isFeatureLayerImport(importSpecifier.projectPath, "route") ||
+    isFeatureLayerImport(importSpecifier.projectPath, "ui") ||
+    importSpecifier.projectPath.startsWith("src/pages/") ||
+    importSpecifier.projectPath.startsWith("src/app/")
+  );
 }
 
 function isFeatureUiBoundaryImport(sourceFile: SourceFile, projectPath: string | null) {
@@ -449,6 +460,20 @@ describe("frontend architecture boundaries", () => {
     expect(isSharedToFeaturePageOrAppImport(sourceFile, importSpecifier.projectPath)).toBe(true);
   });
 
+  it("rejects feature model imports from app and page modules", () => {
+    const sourceFile: SourceFile = {
+      absolutePath: "/unused/features/member-home/model/member-home-view-model.ts",
+      displayPath: "front/features/member-home/model/member-home-view-model.ts",
+      relativePath: "features/member-home/model/member-home-view-model.ts",
+    };
+
+    const appImport = normalizeImportSpecifier(sourceFile, "@/src/app/auth-state");
+    const pageImport = normalizeImportSpecifier(sourceFile, "@/src/pages/readmates-page");
+
+    expect(isFeatureModelBoundaryImport(sourceFile, appImport)).toBe(true);
+    expect(isFeatureModelBoundaryImport(sourceFile, pageImport)).toBe(true);
+  });
+
   it("detects route-owned action type exports from host UI modules", () => {
     const invalidExports = [
       "export type HostDashboardActions = {};",
@@ -550,6 +575,12 @@ describe("frontend architecture boundaries", () => {
       if (isFeatureUiFile(sourceFile.relativePath) && /\bfetch\s*\(/.test(source)) {
         violations.push(
           `${sourceFile.displayPath} contains direct fetch(...): feature UI files must call through the route/API boundary.`,
+        );
+      }
+
+      if (isFeatureComponentsFile(sourceFile.relativePath)) {
+        violations.push(
+          `${sourceFile.displayPath} is under a legacy components directory; migrated features must use api/model/route/ui.`,
         );
       }
     }

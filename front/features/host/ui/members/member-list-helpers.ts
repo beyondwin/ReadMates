@@ -1,4 +1,4 @@
-import type { HostMemberListItem, MembershipStatus } from "@/features/host/ui/host-ui-types";
+import type { HostMemberListItem, MembershipStatus } from "@/features/host/model/host-view-types";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 const statusLabels: Record<MembershipStatus, string> = {

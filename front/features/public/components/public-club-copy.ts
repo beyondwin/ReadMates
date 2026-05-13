@@ -1,6 +1,0 @@
-export {
-  PUBLIC_INTRODUCTION_FALLBACK,
-  PUBLIC_MEMBERSHIP_NOTE,
-  PUBLIC_TAGLINE_FALLBACK,
-  STATIC_OPERATION_INTRO,
-} from "@/features/public/model/public-copy";
