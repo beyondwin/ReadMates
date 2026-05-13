@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "2.2.0"
     kotlin("plugin.spring") version "2.2.0"
-    id("org.springframework.boot") version "4.0.0"
+    id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.flywaydb.flyway") version "11.7.2"
 }
@@ -20,6 +20,21 @@ repositories {
 }
 
 dependencies {
+    constraints {
+        implementation("org.lz4:lz4-java:1.8.1") {
+            because("Trivy flags CVE-2025-12183 in lz4-java 1.8.0.")
+        }
+        implementation("org.springframework.security:spring-security-config:7.0.5") {
+            because("Trivy flags servlet path matching vulnerabilities before Spring Security 7.0.5.")
+        }
+        implementation("org.springframework.security:spring-security-web:7.0.5") {
+            because("Trivy flags servlet path matching vulnerabilities before Spring Security web 7.0.4.")
+        }
+        implementation("tools.jackson.core:jackson-core:3.1.2") {
+            because("Trivy flags jackson-core 3.0.2 for high severity parser issues.")
+        }
+    }
+
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")

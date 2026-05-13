@@ -6,9 +6,38 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+릴리즈 대기 항목 없음.
+
+## v1.8.1 - 2026-05-13
+
+### Highlights
+
+ReadMates v1.8.1은 v1.8.0 태그의 서버 이미지가 Trivy 취약점 스캔에서 중단된 문제를 해소하는 패치 릴리스입니다. DB migration 없음. 사용자 기능 변경 없음. 서버 런타임 의존성, 스크립트 CI 호환성, 공개 release fixture 안전성만 정리했습니다.
+
 ### Fixed
 
+- **서버 이미지 Trivy 스캔 복구**: Spring Boot를 4.0.6으로 올리고, Trivy가 지적한 Spring Security, Jackson 3, Tomcat, lz4 계열 취약 런타임 의존성이 고정/교체되도록 빌드 설정을 조정했습니다. 확인된 런타임 클래스패스는 Spring Boot 4.0.6, Spring Security web 7.0.5, Jackson 3.1.2, Tomcat 11.0.21, `at.yawk.lz4:lz4-java` 1.10.1입니다.
 - **Scripts CI ShellCheck 복구**: 새 ShellCheck CI가 의도적인 SSH client-side expansion과 fixture literal을 실패로 처리하지 않도록 명시하고, `mkdir -p -m` 사용을 정리했습니다.
+- **공개 release fixture 안전성 보강**: public release fixture 검증 스크립트가 정적 secret-shaped literal을 저장소에 남기지 않도록 테스트 값을 런타임에 조립합니다.
+
+### Deployment Notes
+
+- **DB migration**: 없음.
+- **배포 순서**: 서버 이미지 스캔이 통과한 v1.8.1 태그 이미지를 먼저 OCI compose stack에 반영한 뒤, 같은 태그의 Cloudflare Pages 프론트엔드 배포 상태를 확인합니다.
+- **v1.8.0 주의**: v1.8.0 GitHub Release와 프론트엔드 tag deploy는 생성됐지만, 서버 이미지 promotion은 Trivy 스캔 실패로 완료되지 않았습니다. 운영 서버에는 v1.8.1 이미지를 사용하세요.
+
+### Verification
+
+- `./server/gradlew -p server clean test bootJar` — BUILD SUCCESSFUL.
+- `./server/gradlew -p server dependencyInsight --dependency org.springframework.boot:spring-boot --configuration runtimeClasspath` — Spring Boot 4.0.6 확인.
+- `./server/gradlew -p server dependencyInsight --dependency spring-security-web --configuration runtimeClasspath` — Spring Security web 7.0.5 확인.
+- `./server/gradlew -p server dependencyInsight --dependency jackson-core --configuration runtimeClasspath` — Jackson 3.1.2 확인.
+- `./server/gradlew -p server dependencyInsight --dependency lz4-java --configuration runtimeClasspath` — `at.yawk.lz4:lz4-java` 1.10.1 확인.
+- `./server/gradlew -p server dependencyInsight --dependency tomcat-embed-core --configuration runtimeClasspath` — Tomcat 11.0.21 확인.
+- `for f in scripts/*.sh deploy/oci/*.sh; do bash -n "$f"; done && shellcheck scripts/*.sh deploy/oci/*.sh` — exit 0.
+- `./scripts/build-public-release-candidate.sh` — public release candidate built at `.tmp/public-release-candidate`.
+- `./scripts/public-release-check.sh .tmp/public-release-candidate` — passed, gitleaks found no leaks.
+- `git diff --check` — 출력 없음.
 
 ## v1.8.0 - 2026-05-13
 
