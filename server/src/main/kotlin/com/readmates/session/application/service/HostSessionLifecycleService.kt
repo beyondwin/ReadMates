@@ -3,22 +3,13 @@ package com.readmates.session.application.service
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.session.application.model.ConfirmAttendanceCommand
-import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
-import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
-import com.readmates.session.application.model.UpsertPublicationCommand
-import com.readmates.session.application.port.`in`.ConfirmAttendanceUseCase
-import com.readmates.session.application.port.`in`.GetHostDashboardUseCase
-import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
-import com.readmates.session.application.port.`in`.ListUpcomingSessionsUseCase
-import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
-import com.readmates.session.application.port.out.HostSessionWritePort
+import com.readmates.session.application.port.out.HostSessionDeletionPort
+import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
-import com.readmates.shared.paging.PageRequest
-import com.readmates.shared.security.CurrentMember
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -26,31 +17,16 @@ import java.time.LocalDate
 import java.util.UUID
 
 @Service
-class HostSessionCommandService(
-    private val port: HostSessionWritePort,
+class HostSessionLifecycleService(
+    private val lifecyclePort: HostSessionLifecyclePort,
+    private val deletionPort: HostSessionDeletionPort,
+    private val draftPort: HostSessionDraftPort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val recordNotificationEventUseCase: RecordNotificationEventUseCase = NoopRecordNotificationEventUseCase,
-) : HostSessionLifecycleUseCase,
-    HostSessionDraftUseCase,
-    ConfirmAttendanceUseCase,
-    UpsertPublicationUseCase,
-    ListUpcomingSessionsUseCase,
-    GetHostDashboardUseCase {
-    override fun list(host: CurrentMember, pageRequest: PageRequest) = port.list(host, pageRequest)
-
-    @Transactional
-    override fun create(command: HostSessionCommand) =
-        port.create(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
-
-    override fun detail(command: HostSessionIdCommand) = port.detail(command)
-
-    @Transactional
-    override fun update(command: UpdateHostSessionCommand) =
-        port.update(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
-
+) : HostSessionLifecycleUseCase {
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
-        val detail = port.updateVisibility(command)
+        val detail = draftPort.updateVisibility(command)
         if (detail.state == "DRAFT" && detail.visibility != SessionRecordVisibility.HOST_ONLY) {
             recordNotificationEventUseCase.recordNextBookPublished(
                 clubId = command.host.clubId,
@@ -65,7 +41,7 @@ class HostSessionCommandService(
 
     @Transactional
     override fun open(command: HostSessionIdCommand) =
-        port.open(command).also { result ->
+        lifecyclePort.open(command).also { result ->
             if (result.changed) {
                 logger.info(
                     "Session state changed clubId={} sessionId={} oldState={} newState={}",
@@ -80,7 +56,7 @@ class HostSessionCommandService(
 
     @Transactional
     override fun close(command: HostSessionIdCommand) =
-        port.close(command).also { result ->
+        lifecyclePort.close(command).also { result ->
             if (result.changed) {
                 logger.info(
                     "Session state changed clubId={} sessionId={} oldState={} newState={}",
@@ -95,7 +71,7 @@ class HostSessionCommandService(
 
     @Transactional
     override fun publish(command: HostSessionIdCommand) =
-        port.publish(command).also { result ->
+        lifecyclePort.publish(command).also { result ->
             if (result.changed) {
                 logger.info(
                     "Session state changed clubId={} sessionId={} oldState={} newState={}",
@@ -108,26 +84,14 @@ class HostSessionCommandService(
             }
         }.detail
 
-    override fun deletionPreview(command: HostSessionIdCommand) = port.deletionPreview(command)
+    override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.deletionPreview(command)
 
     @Transactional
     override fun delete(command: HostSessionIdCommand) =
-        port.delete(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
-
-    @Transactional
-    override fun confirmAttendance(command: ConfirmAttendanceCommand) =
-        port.confirmAttendance(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
-
-    @Transactional
-    override fun upsertPublication(command: UpsertPublicationCommand) =
-        port.upsertPublication(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
-
-    override fun dashboard(host: CurrentMember) = port.dashboard(host)
-
-    override fun upcoming(member: CurrentMember) = port.upcoming(member)
+        deletionPort.delete(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
 
     private companion object {
-        private val logger = LoggerFactory.getLogger(HostSessionCommandService::class.java)
+        private val logger = LoggerFactory.getLogger(HostSessionLifecycleService::class.java)
     }
 }
 

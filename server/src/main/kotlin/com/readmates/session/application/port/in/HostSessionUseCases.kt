@@ -28,19 +28,23 @@ interface HostSessionLifecycleUseCase {
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse
 }
 
-interface HostSessionDraftUseCase {
+interface HostSessionQueryUseCase {
     fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem>
-    fun create(command: HostSessionCommand): CreatedSessionResponse
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
+}
+
+interface HostSessionDraftUseCase {
+    fun create(command: HostSessionCommand): CreatedSessionResponse
     fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
 }
 
 @Deprecated(
-    "split into HostSessionLifecycleUseCase + HostSessionDraftUseCase",
+    "split into HostSessionLifecycleUseCase + HostSessionQueryUseCase + HostSessionDraftUseCase",
     level = DeprecationLevel.WARNING,
 )
 interface ManageHostSessionUseCase :
     HostSessionLifecycleUseCase,
+    HostSessionQueryUseCase,
     HostSessionDraftUseCase
 
 interface ListUpcomingSessionsUseCase {

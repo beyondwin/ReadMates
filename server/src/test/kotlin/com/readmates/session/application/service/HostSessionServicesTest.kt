@@ -25,8 +25,13 @@ import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostSessionAttendancePort
+import com.readmates.session.application.port.out.HostSessionDeletionPort
+import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.session.application.port.out.HostSessionLifecyclePort
+import com.readmates.session.application.port.out.HostSessionPublicationPort
+import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
-import com.readmates.session.application.port.out.HostSessionWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
@@ -40,7 +45,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.UUID
 
-class HostSessionCommandServiceTest {
+class HostSessionServicesTest {
     private val host = CurrentMember(
         userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
         membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
@@ -55,9 +60,9 @@ class HostSessionCommandServiceTest {
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
 
     @Test
-    fun `delegates create to host write port`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+    fun `delegates create to host draft port`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionDraftCommandService(port)
         val command = hostSessionCommand()
 
         val result = service.create(command)
@@ -68,8 +73,8 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `service delegates host session list`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionQueryService(port)
 
         service.list(host, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
 
@@ -78,8 +83,8 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `service delegates visibility update`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionLifecycleService(port, port, port)
         val command = UpdateHostSessionVisibilityCommand(host, UUID.randomUUID(), SessionRecordVisibility.MEMBER)
 
         service.updateVisibility(command)
@@ -89,8 +94,8 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `service delegates open transition`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionLifecycleService(port, port, port)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.open(command)
@@ -100,8 +105,8 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `service delegates close transition`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionLifecycleService(port, port, port)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.close(command)
@@ -111,8 +116,8 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `service delegates publish transition`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionLifecycleService(port, port, port)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.publish(command)
@@ -122,8 +127,8 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `service delegates upcoming sessions`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionQueryService(port)
 
         service.upcoming(host)
 
@@ -131,9 +136,9 @@ class HostSessionCommandServiceTest {
     }
 
     @Test
-    fun `delegates attendance confirmation to host write port`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+    fun `delegates attendance confirmation to host attendance port`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionAttendanceService(port)
         val command = ConfirmAttendanceCommand(
             host = host,
             sessionId = sessionId,
@@ -147,9 +152,9 @@ class HostSessionCommandServiceTest {
     }
 
     @Test
-    fun `delegates dashboard query to host write port`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+    fun `delegates dashboard query to host query port`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionQueryService(port)
 
         val result = service.dashboard(host)
 
@@ -159,9 +164,9 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `evicts club content after publication update`() {
-        val port = RecordingHostSessionWritePort()
+        val port = RecordingHostSessionPorts()
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionCommandService(port, invalidation)
+        val service = HostSessionPublicationService(port, invalidation)
         val command = UpsertPublicationCommand(
             host = host,
             sessionId = sessionId,
@@ -176,9 +181,9 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `evicts host mutation after commit when transaction synchronization is active`() {
-        val port = RecordingHostSessionWritePort()
+        val port = RecordingHostSessionPorts()
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionCommandService(port, invalidation)
+        val service = HostSessionPublicationService(port, invalidation)
         val command = UpsertPublicationCommand(
             host = host,
             sessionId = sessionId,
@@ -204,9 +209,9 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `invalidation failure does not fail host mutation`() {
-        val port = RecordingHostSessionWritePort()
+        val port = RecordingHostSessionPorts()
         val invalidation = ThrowingReadCacheInvalidationPort()
-        val service = HostSessionCommandService(port, invalidation)
+        val service = HostSessionPublicationService(port, invalidation)
         val command = UpsertPublicationCommand(
             host = host,
             sessionId = sessionId,
@@ -226,11 +231,11 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `does not evict when host write port throws`() {
-        val port = RecordingHostSessionWritePort().apply {
+        val port = RecordingHostSessionPorts().apply {
             throwOnUpsertPublication = true
         }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionCommandService(port, invalidation)
+        val service = HostSessionPublicationService(port, invalidation)
         val command = UpsertPublicationCommand(
             host = host,
             sessionId = sessionId,
@@ -247,13 +252,13 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `does not evict when current session transitions are no-ops`() {
-        val port = RecordingHostSessionWritePort().apply {
+        val port = RecordingHostSessionPorts().apply {
             openChanged = false
             closeChanged = false
             publishChanged = false
         }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionCommandService(port, invalidation)
+        val service = HostSessionLifecycleService(port, port, port, invalidation)
         val command = HostSessionIdCommand(host, sessionId)
 
         service.open(command)
@@ -265,8 +270,8 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `changed lifecycle transitions log club session and states only`() {
-        val port = RecordingHostSessionWritePort()
-        val service = HostSessionCommandService(port)
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionLifecycleService(port, port, port)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -293,12 +298,12 @@ class HostSessionCommandServiceTest {
 
     @Test
     fun `no-op lifecycle transitions do not log state changes`() {
-        val port = RecordingHostSessionWritePort().apply {
+        val port = RecordingHostSessionPorts().apply {
             openChanged = false
             closeChanged = false
             publishChanged = false
         }
-        val service = HostSessionCommandService(port)
+        val service = HostSessionLifecycleService(port, port, port)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -326,7 +331,13 @@ class HostSessionCommandServiceTest {
         meetingPasscode = "readmates",
     )
 
-    private class RecordingHostSessionWritePort : HostSessionWritePort {
+    private class RecordingHostSessionPorts :
+        HostSessionQueryPort,
+        HostSessionDraftPort,
+        HostSessionLifecyclePort,
+        HostSessionDeletionPort,
+        HostSessionAttendancePort,
+        HostSessionPublicationPort {
         val calls = mutableListOf<String>()
         var listHost: CurrentMember? = null
         var visibilityCommand: UpdateHostSessionVisibilityCommand? = null
@@ -519,7 +530,7 @@ private class HostSessionLogCapture(
 }
 
 private fun captureHostSessionLogs(): HostSessionLogCapture {
-    val logger = LoggerFactory.getLogger(HostSessionCommandService::class.java) as Logger
+    val logger = LoggerFactory.getLogger(HostSessionLifecycleService::class.java) as Logger
     val appender = ListAppender<ILoggingEvent>().apply { start() }
     logger.addAppender(appender)
     return HostSessionLogCapture(logger, appender)

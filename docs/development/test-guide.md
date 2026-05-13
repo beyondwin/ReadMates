@@ -163,7 +163,7 @@ Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함
 
 ```bash
 ./server/gradlew -p server test \
-  --tests com.readmates.session.application.service.HostSessionCommandServiceTest \
+  --tests com.readmates.session.application.service.HostSessionServicesTest \
   --tests com.readmates.session.api.HostSessionControllerDbTest \
   --tests com.readmates.session.api.HostSessionBffSecurityTest \
   --tests com.readmates.session.api.HostDashboardControllerTest \

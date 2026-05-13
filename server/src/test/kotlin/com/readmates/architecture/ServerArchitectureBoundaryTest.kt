@@ -107,6 +107,44 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `session application does not depend on removed host session write port`() {
+        val forbiddenTypeName = "HostSessionWritePort"
+        val bytecodeViolations = importedClasses
+            .filter { javaClass ->
+                javaClass.packageName == "com.readmates.session.application" ||
+                    javaClass.packageName.startsWith("com.readmates.session.application.")
+            }
+            .flatMap { javaClass ->
+                val classViolation = if (javaClass.simpleName == forbiddenTypeName) listOf(javaClass.name) else emptyList()
+                val dependencyViolations = javaClass.directDependenciesFromSelf
+                    .filter { dependency -> dependency.targetClass.simpleName == forbiddenTypeName }
+                    .map { dependency -> "${javaClass.name} -> ${dependency.targetClass.name}" }
+                classViolation + dependencyViolations
+            }
+            .distinct()
+            .sorted()
+        val sourceViolations = sessionApplicationSourceFiles()
+            .flatMap { sourceFile ->
+                sourceFile.readLines()
+                    .mapIndexedNotNull { index, line ->
+                        if (forbiddenTypeName in line) {
+                            "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: ${line.trim()}"
+                        } else {
+                            null
+                        }
+                    }
+            }
+            .distinct()
+            .sorted()
+        val violations = (bytecodeViolations + sourceViolations).distinct().sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Session application code must not reference removed $forbiddenTypeName:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    @Test
     fun `auth production code does not reference legacy member account store port`() {
         val forbiddenTypeName = "MemberAccountStorePort"
         val bytecodeViolations = importedClasses
@@ -276,6 +314,15 @@ class ServerArchitectureBoundaryTest {
             return emptyList()
         }
         return Files.walk(authRoot)
+            .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
+    }
+
+    private fun sessionApplicationSourceFiles(): List<Path> {
+        val sessionApplicationRoot = sourceRoot().resolve("com/readmates/session/application")
+        if (!Files.exists(sessionApplicationRoot)) {
+            return emptyList()
+        }
+        return Files.walk(sessionApplicationRoot)
             .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
     }
 
