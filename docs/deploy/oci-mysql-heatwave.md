@@ -70,6 +70,7 @@ SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE=openid,email,profile
 ## 논리 export
 
 `deploy/oci/export-mysql.sh`는 `mysqldump` 결과를 gzip으로 압축해 `readmates-YYYYMMDDTHHMMSSZ.sql.gz` 파일을 만듭니다. MySQL credential은 권한 `0600`인 defaults file로만 읽습니다.
+GTID가 켜진 OCI MySQL에서도 일반 앱 계정으로 transaction-consistent export를 만들 수 있도록 `--single-transaction`, `--set-gtid-purged=OFF`, `--no-tablespaces` 조합을 사용합니다.
 
 VM에 백업 디렉터리와 defaults file을 준비합니다.
 

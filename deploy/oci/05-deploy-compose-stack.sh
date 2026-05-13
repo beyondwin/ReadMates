@@ -231,6 +231,7 @@ set -euo pipefail
 sudo systemctl enable readmates-stack
 cd ${REMOTE_DIR}
 sudo docker compose -f compose.yml up -d --remove-orphans
+sudo systemctl start readmates-stack
 sudo docker compose -f compose.yml ps
 EOF
 

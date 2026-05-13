@@ -40,6 +40,8 @@ mysqldump \
   --host="$READMATES_DB_HOST" \
   --user="$READMATES_DB_USER" \
   --single-transaction \
+  --set-gtid-purged=OFF \
+  --no-tablespaces \
   --routines \
   --triggers \
   "$READMATES_DB_NAME" | gzip > "$tmp_output"
