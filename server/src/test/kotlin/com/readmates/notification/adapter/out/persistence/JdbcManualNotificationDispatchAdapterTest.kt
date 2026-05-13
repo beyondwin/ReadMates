@@ -9,6 +9,7 @@ import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.NotificationManualDispatchPayload
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.paging.PageRequest
 import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -69,6 +70,39 @@ class JdbcManualNotificationDispatchAdapterTest(
     }
 
     @Test
+    fun `listMembers filters by display name or email with stable cursor`() {
+        val page = adapter.listMembers(clubId, sessionId, "member", PageRequest.cursor(1, null, defaultLimit = 50, maxLimit = 100))
+
+        assertThat(page.items).hasSize(1)
+        assertThat(page.nextCursor).isNotBlank()
+
+        val next = adapter.listMembers(clubId, sessionId, "member", PageRequest.cursor(10, page.nextCursor, defaultLimit = 50, maxLimit = 100))
+        assertThat(next.items.map { it.membershipId }).doesNotContain(page.items.single().membershipId)
+    }
+
+    @Test
+    fun `validateMembershipEdits rejects out of club ids`() {
+        val otherClubMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000901")
+
+        assertThat(adapter.validateMembershipEdits(clubId, setOf(otherClubMembershipId))).isFalse()
+    }
+
+    @Test
+    fun `listDispatches returns masked audit rows`() {
+        val stored = insertManualDispatchFixture()
+
+        val page = adapter.listDispatches(
+            clubId,
+            sessionId,
+            NotificationEventType.SESSION_REMINDER_DUE,
+            PageRequest.cursor(10, null, defaultLimit = 50, maxLimit = 100),
+        )
+
+        assertThat(page.items.map { it.manualDispatchId }).contains(stored.manualDispatchId)
+        assertThat(page.items.single { it.manualDispatchId == stored.manualDispatchId }.requestedBy).contains("***@")
+    }
+
+    @Test
     fun `insertPreview and findPreview round trip host scoped preview`() {
         val expiresAt = OffsetDateTime.of(2026, 5, 13, 9, 10, 0, 0, ZoneOffset.UTC)
 
@@ -110,6 +144,29 @@ class JdbcManualNotificationDispatchAdapterTest(
         assertThat(eventCount(stored.eventId)).isEqualTo(1)
         assertThat(manualDispatchCount(dispatchId)).isEqualTo(1)
     }
+
+    private fun insertManualDispatchFixture() =
+        adapter.insertManualDispatch(
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            selection = selection(),
+            payload = NotificationEventPayload(
+                sessionId = sessionId,
+                sessionNumber = 7,
+                bookTitle = "Example Book",
+                manualDispatch = NotificationManualDispatchPayload(
+                    id = UUID.nameUUIDFromBytes("manual-dispatch-list".toByteArray()),
+                    source = NotificationDispatchSource.MANUAL,
+                    requestedByMembershipId = hostMembershipId,
+                    requestedChannels = ManualNotificationRequestedChannels.BOTH,
+                    audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                    resend = true,
+                    sendMode = ManualNotificationSendMode.NOW,
+                ),
+            ),
+            targetSnapshot = ManualNotificationTargetSnapshot(3, 0, 0, 3, 3, 2, 1, 0),
+            resend = true,
+        )
 
     private fun selection(
         excludedMembershipIds: List<UUID> = emptyList(),

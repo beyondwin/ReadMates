@@ -5,14 +5,28 @@ export function ManualNotificationMemberPicker({
   members,
   excludedIds,
   includedIds,
+  search,
+  hasMore,
+  loading,
   disabled,
+  onSearchChange,
+  onSearchSubmit,
+  onSearchClear,
+  onLoadMore,
   onExcludedIdsChange,
   onIncludedIdsChange,
 }: {
   members: ManualNotificationMemberOption[];
   excludedIds: string[];
   includedIds: string[];
+  search: string;
+  hasMore: boolean;
+  loading: boolean;
   disabled: boolean;
+  onSearchChange: (value: string) => void;
+  onSearchSubmit: () => Promise<unknown>;
+  onSearchClear: () => Promise<unknown>;
+  onLoadMore: () => Promise<unknown>;
   onExcludedIdsChange: (ids: string[]) => void;
   onIncludedIdsChange: (ids: string[]) => void;
 }) {
@@ -28,6 +42,34 @@ export function ManualNotificationMemberPicker({
           제외 {excludedIds.length}명 · 추가 {includedIds.length}명
         </span>
       </div>
+      <form
+        className="row wrap"
+        style={{ gap: 8, marginBottom: 12 }}
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSearchSubmit();
+        }}
+      >
+        <input
+          type="search"
+          className="input"
+          aria-label="멤버 검색"
+          placeholder="이름 또는 이메일 검색"
+          value={search}
+          disabled={disabled || loading}
+          onChange={(event) => onSearchChange(event.currentTarget.value)}
+          style={{ minWidth: 220, flex: "1 1 220px" }}
+        />
+        <button type="submit" className="btn btn-quiet btn-sm" disabled={disabled || loading}>
+          검색
+        </button>
+        {search.trim() ? (
+          <button type="button" className="btn btn-quiet btn-sm" disabled={disabled || loading} onClick={() => void onSearchClear()}>
+            초기화
+          </button>
+        ) : null}
+        {loading ? <span className="tiny muted">멤버를 불러오는 중</span> : null}
+      </form>
       {members.length === 0 ? (
         <p className="small muted" style={{ margin: 0 }}>
           표시할 멤버가 없습니다.
@@ -74,6 +116,17 @@ export function ManualNotificationMemberPicker({
           ))}
         </div>
       )}
+      {hasMore ? (
+        <button
+          type="button"
+          className="btn btn-quiet btn-sm"
+          disabled={disabled || loading}
+          style={{ marginTop: 12 }}
+          onClick={() => void onLoadMore()}
+        >
+          {loading ? "불러오는 중" : "멤버 더 보기"}
+        </button>
+      ) : null}
     </section>
   );
 }

@@ -81,11 +81,24 @@ class HostNotificationController(
     fun manualOptions(
         host: CurrentMember,
         @RequestParam(required = false) sessionId: UUID?,
+        @RequestParam(required = false) search: String?,
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
     ): ManualNotificationOptionsResponse =
         manageManualHostNotificationsUseCase
-            .options(host, sessionId, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+            .options(host, sessionId, search, PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100))
+            .toResponse()
+
+    @GetMapping("/manual/dispatches")
+    fun manualDispatches(
+        host: CurrentMember,
+        @RequestParam(required = false) sessionId: UUID?,
+        @RequestParam(required = false) eventType: NotificationEventType?,
+        @RequestParam(required = false) limit: Int?,
+        @RequestParam(required = false) cursor: String?,
+    ): ManualNotificationDispatchListResponse =
+        manageManualHostNotificationsUseCase
+            .listDispatches(host, sessionId, eventType, PageRequest.cursor(limit, cursor, defaultLimit = 20, maxLimit = 100))
             .toResponse()
 
     @PostMapping("/manual/preview")

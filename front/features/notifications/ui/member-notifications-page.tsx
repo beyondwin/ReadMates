@@ -84,6 +84,10 @@ function isPrimaryLinkActivation(event: MouseEvent<HTMLAnchorElement>) {
   return event.button === 0 && !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.currentTarget.target !== "_blank";
 }
 
+function isInteractiveTarget(target: EventTarget | null) {
+  return target instanceof HTMLElement && Boolean(target.closest("a,button,input,select,textarea"));
+}
+
 export function MemberNotificationsPage({
   ...props
 }: MemberNotificationsPageProps) {
@@ -195,7 +199,19 @@ function MemberNotificationsPageContent({
                         borderRadius: 999,
                       }}
                     />
-                    <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{ minWidth: 0, cursor: unread && onOpenNotification ? "pointer" : undefined }}
+                      onClick={
+                        unread && onOpenNotification
+                          ? (event) => {
+                              if (isInteractiveTarget(event.target)) {
+                                return;
+                              }
+                              onOpenNotification(item.id, href);
+                            }
+                          : undefined
+                      }
+                    >
                       <div className="row wrap" style={{ gap: 8, marginBottom: 8 }}>
                         <span className="tiny mono">{eventLabels[item.eventType]}</span>
                         <span className="tiny muted">{formatNotificationDate(item.createdAt)}</span>
@@ -233,7 +249,10 @@ function MemberNotificationsPageContent({
                       <button
                         type="button"
                         className="btn btn-quiet btn-sm"
-                        onClick={() => onMarkRead(item.id)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onMarkRead(item.id);
+                        }}
                         disabled={readPending}
                       >
                         {readPending ? "읽음 처리 중" : "읽음"}

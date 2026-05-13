@@ -7,11 +7,13 @@ import com.readmates.notification.application.model.ManualNotificationChannelPre
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
 import com.readmates.notification.application.model.ManualNotificationConfirmResult
 import com.readmates.notification.application.model.ManualNotificationConfirmSummary
+import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationDuplicatePreview
 import com.readmates.notification.application.model.ManualNotificationOptions
 import com.readmates.notification.application.model.ManualNotificationPreview
 import com.readmates.notification.application.model.ManualNotificationPreviewCommand
 import com.readmates.notification.application.model.ManualNotificationSelection
+import com.readmates.notification.application.model.ManualNotificationSessionSummary
 import com.readmates.notification.application.model.ManualNotificationTemplateOption
 import com.readmates.notification.application.model.ManualNotificationTemplatePreview
 import com.readmates.notification.application.model.ManualNotificationWarning
@@ -41,7 +43,7 @@ class HostManualNotificationService(
     private val manualDispatchPort: ManualNotificationDispatchPort,
     private val clock: () -> OffsetDateTime = { OffsetDateTime.now(ZoneOffset.UTC) },
 ) : ManageManualHostNotificationsUseCase {
-    override fun options(host: CurrentMember, sessionId: UUID?, pageRequest: PageRequest): ManualNotificationOptions {
+    override fun options(host: CurrentMember, sessionId: UUID?, search: String?, pageRequest: PageRequest): ManualNotificationOptions {
         val currentHost = requireHost(host)
         val session = sessionId?.let {
             manualDispatchPort.findSessionContext(currentHost.clubId, it) ?: throw notFound()
@@ -57,12 +59,30 @@ class HostManualNotificationService(
                 allowedAudiences = allowedManualAudiences(eventType),
             )
         }
-        val members = manualDispatchPort.listMembers(currentHost.clubId, sessionId, pageRequest)
+        val members = manualDispatchPort.listMembers(currentHost.clubId, sessionId, search, pageRequest)
+        val recentDispatches = manualDispatchPort.listDispatches(
+            clubId = currentHost.clubId,
+            sessionId = sessionId,
+            eventType = null,
+            pageRequest = PageRequest.cursor(5, null, defaultLimit = 5, maxLimit = 5),
+        )
         return ManualNotificationOptions(
+            session = session?.toSummary(),
             templates = templates,
             members = members.items,
             nextCursor = members.nextCursor,
+            recentDispatches = recentDispatches.items,
         )
+    }
+
+    override fun listDispatches(
+        host: CurrentMember,
+        sessionId: UUID?,
+        eventType: NotificationEventType?,
+        pageRequest: PageRequest,
+    ): ManualNotificationDispatchList {
+        val currentHost = requireHost(host)
+        return manualDispatchPort.listDispatches(currentHost.clubId, sessionId, eventType, pageRequest)
     }
 
     override fun preview(host: CurrentMember, command: ManualNotificationPreviewCommand): ManualNotificationPreview {
@@ -180,7 +200,25 @@ class HostManualNotificationService(
         disabledReason(selection.eventType, session)?.let {
             throw NotificationApplicationException(NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE, it)
         }
+        val editedIds = (selection.includedMembershipIds + selection.excludedMembershipIds).toSet()
+        if (!manualDispatchPort.validateMembershipEdits(host.clubId, editedIds)) {
+            throw NotificationApplicationException(
+                NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED,
+                "Manual notification membership selection is not allowed",
+            )
+        }
     }
+
+    private fun ManualNotificationSessionContext.toSummary(): ManualNotificationSessionSummary =
+        ManualNotificationSessionSummary(
+            sessionId = sessionId,
+            sessionNumber = sessionNumber,
+            bookTitle = bookTitle,
+            date = date,
+            state = state,
+            visibility = visibility,
+            feedbackDocumentUploaded = feedbackDocumentUploaded,
+        )
 
     private fun disabledReason(eventType: NotificationEventType, session: ManualNotificationSessionContext): String? =
         when (eventType) {

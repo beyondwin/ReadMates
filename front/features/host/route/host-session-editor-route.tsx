@@ -1,5 +1,5 @@
 import { useLoaderData } from "react-router-dom";
-import type { HostSessionDetailResponse } from "@/features/host/api/host-contracts";
+import type { HostSessionDetailResponse, ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
 import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { hostSessionEditorActions } from "./host-session-editor-data";
@@ -34,11 +34,17 @@ export function EditHostSessionRoute({
   hostDashboardReturnTarget,
   readmatesReturnState,
 }: HostSessionEditorRouteProps) {
-  const session = useLoaderData() as HostSessionDetailResponse;
+  const loaderData = useLoaderData() as HostSessionDetailResponse | {
+    session: HostSessionDetailResponse;
+    notificationDispatches: ManualNotificationDispatchListResponse;
+  };
+  const session = "session" in loaderData ? loaderData.session : loaderData;
+  const notificationDispatches = "session" in loaderData ? loaderData.notificationDispatches.items : [];
 
   return (
     <HostSessionEditor
       session={session}
+      notificationDispatches={notificationDispatches}
       returnTarget={returnTarget}
       actions={hostSessionEditorActions}
       LinkComponent={LinkComponent}

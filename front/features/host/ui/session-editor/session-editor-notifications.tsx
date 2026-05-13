@@ -1,9 +1,11 @@
 import type { CSSProperties } from "react";
 import type {
   HostNotificationEventType,
+  ManualNotificationDispatchListItem,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
 import type { SessionState } from "@/shared/model/readmates-types";
+import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 import {
   DefaultLinkComponent,
   type HostSessionEditorLinkComponent,
@@ -33,12 +35,14 @@ export function HostSessionNotificationActions({
   state,
   visibility,
   feedbackDocumentUploaded,
+  dispatches = [],
   LinkComponent = DefaultLinkComponent,
 }: {
   sessionId: string;
   state: SessionState;
   visibility: SessionRecordVisibility;
   feedbackDocumentUploaded: boolean;
+  dispatches?: ManualNotificationDispatchListItem[];
   LinkComponent?: HostSessionEditorLinkComponent;
 }) {
   const actions: NotificationAction[] = [
@@ -68,40 +72,60 @@ export function HostSessionNotificationActions({
         알림 발송
       </div>
       <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
-        {actions.map((action, index) => (
-          <div
-            key={action.eventType}
-            className="row-between"
-            style={{
-              gap: 12,
-              padding: "12px 0",
-              borderTop: index === 0 ? undefined : "1px solid var(--line-soft)",
-              flexWrap: "wrap",
-            }}
-          >
-            <span className="body" style={{ fontSize: "13.5px", fontWeight: 600 }}>
-              {action.label}
-            </span>
-            {action.enabled ? (
-              <LinkComponent
-                className="btn btn-quiet btn-sm"
-                to={notificationHref(sessionId, action.eventType)}
-              >
-                {action.label}
-              </LinkComponent>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-quiet btn-sm"
-                disabled
-                aria-label={`${action.label}: ${action.disabledReason}`}
-              >
-                준비 필요
-              </button>
-            )}
-          </div>
-        ))}
+        {actions.map((action, index) => {
+          const latestDispatch = latestDispatchFor(dispatches, action.eventType);
+          return (
+            <div
+              key={action.eventType}
+              className="row-between"
+              style={{
+                gap: 12,
+                padding: "12px 0",
+                borderTop: index === 0 ? undefined : "1px solid var(--line-soft)",
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ minWidth: 0 }}>
+                <span className="body" style={{ display: "block", fontSize: "13.5px", fontWeight: 600 }}>
+                  {action.label}
+                </span>
+                {latestDispatch ? (
+                  <span className="row wrap" style={{ gap: 6, marginTop: 6 }}>
+                    <span className="badge badge-ok badge-dot">이미 발송됨</span>
+                    <span className="tiny muted">{formatDateOnlyLabel(latestDispatch.createdAt)}</span>
+                  </span>
+                ) : null}
+              </span>
+              {action.enabled ? (
+                <LinkComponent
+                  className="btn btn-quiet btn-sm"
+                  to={notificationHref(sessionId, action.eventType)}
+                >
+                  {latestDispatch ? `재발송 검토 · ${action.label}` : action.label}
+                </LinkComponent>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-sm"
+                  disabled
+                  aria-label={`${action.label}: ${action.disabledReason}`}
+                >
+                  준비 필요
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
+}
+
+function latestDispatchFor(
+  dispatches: ManualNotificationDispatchListItem[],
+  eventType: HostNotificationEventType,
+) {
+  return dispatches
+    .filter((dispatch) => dispatch.eventType === eventType)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
 }

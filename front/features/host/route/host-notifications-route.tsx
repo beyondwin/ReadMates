@@ -11,8 +11,10 @@ export function HostNotificationsRoute() {
     events: data.events,
     deliveries: data.deliveries,
     audit: data.audit,
+    manualOptions: data.manualOptions,
+    manualDispatches: data.manualDispatches,
   }));
-  const [loadingMore, setLoadingMore] = useState<null | "events" | "deliveries" | "audit">(null);
+  const [loadingMore, setLoadingMore] = useState<null | "events" | "deliveries" | "audit" | "manualDispatches">(null);
 
   if (pages.source !== data) {
     setPages({
@@ -20,6 +22,8 @@ export function HostNotificationsRoute() {
       events: data.events,
       deliveries: data.deliveries,
       audit: data.audit,
+      manualOptions: data.manualOptions,
+      manualDispatches: data.manualDispatches,
     });
   }
 
@@ -30,8 +34,10 @@ export function HostNotificationsRoute() {
         events: data.events,
         deliveries: data.deliveries,
         audit: data.audit,
+        manualOptions: data.manualOptions,
+        manualDispatches: data.manualDispatches,
       };
-  const { events, deliveries, audit } = activePages;
+  const { events, deliveries, audit, manualOptions, manualDispatches } = activePages;
 
   const refreshAfter = async (action: () => Promise<unknown>) => {
     await action();
@@ -80,30 +86,75 @@ export function HostNotificationsRoute() {
     }
   };
 
+  const searchManualMembers = async (sessionId?: string, search?: string) => {
+    const nextOptions = await hostNotificationsActions.loadManualOptions(sessionId, search, { limit: 50 });
+    setPages((current) => ({ ...current, manualOptions: nextOptions }));
+    return nextOptions;
+  };
+
+  const loadMoreManualMembers = async (sessionId?: string, search?: string, cursor?: string) => {
+    if (!cursor) return manualOptions;
+    const nextOptions = await hostNotificationsActions.loadManualOptions(sessionId, search, { limit: 50, cursor });
+    setPages((current) => ({
+      ...current,
+      manualOptions: {
+        ...nextOptions,
+        members: {
+          items: [...current.manualOptions.members.items, ...nextOptions.members.items],
+          nextCursor: nextOptions.members.nextCursor,
+        },
+      },
+    }));
+    return nextOptions;
+  };
+
+  const loadMoreManualDispatches = async () => {
+    if (!manualDispatches.nextCursor || loadingMore) return;
+    setLoadingMore("manualDispatches");
+    try {
+      const nextPage = await hostNotificationsActions.loadManualDispatches({ limit: 20, cursor: manualDispatches.nextCursor });
+      setPages((current) => ({
+        ...current,
+        manualDispatches: {
+          items: [...current.manualDispatches.items, ...nextPage.items],
+          nextCursor: nextPage.nextCursor,
+        },
+      }));
+    } finally {
+      setLoadingMore(null);
+    }
+  };
+
   return (
     <HostNotificationsPage
       summary={data.summary}
       events={events.items}
       deliveries={deliveries.items}
       audit={audit.items}
-      manualOptions={data.manualOptions}
+      manualOptions={manualOptions}
+      manualDispatches={manualDispatches.items}
       initialManualSelection={data.initialManualSelection}
       hasMoreEvents={Boolean(events.nextCursor)}
       hasMoreDeliveries={Boolean(deliveries.nextCursor)}
       hasMoreAudit={Boolean(audit.nextCursor)}
+      hasMoreManualDispatches={Boolean(manualDispatches.nextCursor)}
       isLoadingMoreEvents={loadingMore === "events"}
       isLoadingMoreDeliveries={loadingMore === "deliveries"}
       isLoadingMoreAudit={loadingMore === "audit"}
+      isLoadingMoreManualDispatches={loadingMore === "manualDispatches"}
       isRefreshing={revalidator.state !== "idle"}
       onLoadMoreEvents={loadMoreEvents}
       onLoadMoreDeliveries={loadMoreDeliveries}
       onLoadMoreAudit={loadMoreAudit}
+      onLoadMoreManualDispatches={loadMoreManualDispatches}
       onProcess={() => refreshAfter(hostNotificationsActions.process)}
       onRetry={(id) => refreshAfter(() => hostNotificationsActions.retry(id))}
       onRestore={(id) => refreshAfter(() => hostNotificationsActions.restore(id))}
       onSendTestMail={(request) => refreshAfter(() => hostNotificationsActions.sendTestMail(request))}
       onPreviewManual={(request) => hostNotificationsActions.previewManual(request)}
       onConfirmManual={(request) => refreshAfter(() => hostNotificationsActions.confirmManual(request))}
+      onLoadManualOptions={searchManualMembers}
+      onLoadMoreManualMembers={loadMoreManualMembers}
     />
   );
 }

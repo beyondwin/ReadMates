@@ -360,6 +360,40 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
   });
 
+  it("renders manual notification sent badges from route data", () => {
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        notificationDispatches={[
+          {
+            manualDispatchId: "dispatch-1",
+            eventId: "event-1",
+            source: "MANUAL",
+            eventType: "SESSION_REMINDER_DUE",
+            sessionId: openSession.sessionId,
+            sessionNumber: openSession.sessionNumber,
+            bookTitle: openSession.bookTitle,
+            requestedChannels: "BOTH",
+            audience: "ALL_ACTIVE_MEMBERS",
+            resend: false,
+            requestedBy: "h***@example.com",
+            targetCount: 17,
+            expectedInAppCount: 17,
+            expectedEmailCount: 14,
+            eventStatus: "PUBLISHED",
+            createdAt: "2026-05-13T10:10:00Z",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("이미 발송됨")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /재발송 검토/ })).toHaveAttribute(
+      "href",
+      expect.stringContaining("eventType=SESSION_REMINDER_DUE"),
+    );
+  });
+
   it("shows persisted book and neutral meeting fields", () => {
     render(<HostSessionEditorForTest session={session} />);
 

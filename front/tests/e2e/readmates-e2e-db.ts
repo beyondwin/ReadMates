@@ -621,6 +621,116 @@ where club_id = ${sqlString(clubId)}
   }
 }
 
+export function cleanupManualNotificationArtifacts() {
+  runMysql(`
+delete from notification_manual_dispatches
+where club_id = ${sqlString(clubId)}
+  and session_id in (
+    select id from sessions
+    where club_id = ${sqlString(clubId)}
+      and number >= 7
+  );
+
+delete from member_notifications
+where club_id = ${sqlString(clubId)}
+  and event_id in (
+    select id from notification_event_outbox
+    where club_id = ${sqlString(clubId)}
+      and dedupe_key like 'manual:%'
+  );
+
+delete from notification_deliveries
+where club_id = ${sqlString(clubId)}
+  and event_id in (
+    select id from notification_event_outbox
+    where club_id = ${sqlString(clubId)}
+      and dedupe_key like 'manual:%'
+  );
+
+delete from notification_event_outbox
+where club_id = ${sqlString(clubId)}
+  and dedupe_key like 'manual:%';
+
+delete from notification_manual_dispatch_previews
+where club_id = ${sqlString(clubId)};
+`);
+}
+
+export function materializeManualReminderInAppNotifications() {
+  runMysql(`
+insert ignore into notification_deliveries (
+  id,
+  event_id,
+  club_id,
+  recipient_membership_id,
+  channel,
+  status,
+  dedupe_key,
+  attempt_count,
+  next_attempt_at,
+  sent_at
+)
+select
+  uuid(),
+  notification_event_outbox.id,
+  notification_event_outbox.club_id,
+  memberships.id,
+  'IN_APP',
+  'SENT',
+  concat(notification_event_outbox.dedupe_key, ':in-app:', memberships.id),
+  0,
+  utc_timestamp(6),
+  utc_timestamp(6)
+from notification_event_outbox
+join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id
+  and notification_manual_dispatches.club_id = notification_event_outbox.club_id
+join sessions on sessions.id = notification_manual_dispatches.session_id
+  and sessions.club_id = notification_manual_dispatches.club_id
+join memberships on memberships.club_id = notification_event_outbox.club_id
+  and memberships.status = 'ACTIVE'
+where notification_event_outbox.club_id = ${sqlString(clubId)}
+  and notification_event_outbox.event_type = 'SESSION_REMINDER_DUE'
+  and notification_event_outbox.dedupe_key like 'manual:%'
+  and notification_manual_dispatches.requested_channels in ('IN_APP', 'BOTH')
+  and notification_manual_dispatches.audience = 'ALL_ACTIVE_MEMBERS'
+  and sessions.number >= 7;
+
+insert ignore into member_notifications (
+  id,
+  event_id,
+  delivery_id,
+  club_id,
+  recipient_membership_id,
+  event_type,
+  title,
+  body,
+  deep_link_path
+)
+select
+  uuid(),
+  notification_event_outbox.id,
+  notification_deliveries.id,
+  notification_event_outbox.club_id,
+  notification_deliveries.recipient_membership_id,
+  notification_event_outbox.event_type,
+  concat('내일 ', sessions.number, '회차 모임이 있습니다'),
+  concat('내일 ', sessions.number, '회차 ', sessions.book_title, ' 모임이 있습니다.'),
+  '/clubs/reading-sai/app/session/current'
+from notification_deliveries
+join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id
+  and notification_event_outbox.club_id = notification_deliveries.club_id
+join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id
+  and notification_manual_dispatches.club_id = notification_event_outbox.club_id
+join sessions on sessions.id = notification_manual_dispatches.session_id
+  and sessions.club_id = notification_manual_dispatches.club_id
+where notification_event_outbox.club_id = ${sqlString(clubId)}
+  and notification_event_outbox.event_type = 'SESSION_REMINDER_DUE'
+  and notification_event_outbox.dedupe_key like 'manual:%'
+  and notification_deliveries.channel = 'IN_APP'
+  and sessions.number >= 7;
+`);
+}
+
 export function createOpenSessionFixture() {
   const sessionId = randomUUID();
 
@@ -664,6 +774,8 @@ values (
   'OPEN'
 );
 `);
+
+  return sessionId;
 }
 
 export function createViewerGoogleUserFixture(email: string) {

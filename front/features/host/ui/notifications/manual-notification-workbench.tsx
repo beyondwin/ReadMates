@@ -40,6 +40,8 @@ export function ManualNotificationWorkbench({
   error,
   onPreview,
   onConfirm,
+  onLoadManualOptions,
+  onLoadMoreManualMembers,
 }: {
   options: ManualNotificationOptionsResponse;
   initialSessionId: string | null;
@@ -49,6 +51,8 @@ export function ManualNotificationWorkbench({
   error: string | null;
   onPreview: (request: ManualNotificationPreviewRequest) => Promise<void>;
   onConfirm: (request: ManualNotificationConfirmRequest) => Promise<void>;
+  onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
+  onLoadMoreManualMembers?: (sessionId?: string, search?: string, cursor?: string) => Promise<ManualNotificationOptionsResponse>;
 }) {
   const firstEnabledTemplate = options.templates.find((template) => template.enabled);
   const initialTemplate = options.templates.find((template) => template.eventType === initialEventType && template.enabled) ?? firstEnabledTemplate;
@@ -62,6 +66,8 @@ export function ManualNotificationWorkbench({
     sendMode: "NOW",
   }));
   const [resendConfirmed, setResendConfirmed] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
+  const [membersLoading, setMembersLoading] = useState(false);
   const currentTemplate = useMemo(
     () => options.templates.find((template) => template.eventType === selection.eventType),
     [options.templates, selection.eventType],
@@ -69,6 +75,40 @@ export function ManualNotificationWorkbench({
   const canPreview = Boolean(selection.sessionId && currentTemplate?.enabled && !busy);
   const requiresResend = Boolean(preview?.duplicates.requiresResendConfirmation);
   const canConfirm = Boolean(preview && !busy && (!requiresResend || resendConfirmed));
+  const sessionHint = options.session?.date && selection.eventType === "SESSION_REMINDER_DUE"
+    ? reminderDateHint(options.session.date)
+    : null;
+
+  const submitMemberSearch = async () => {
+    if (!onLoadManualOptions || membersLoading) return;
+    setMembersLoading(true);
+    try {
+      await onLoadManualOptions(selection.sessionId || undefined, memberSearch.trim() || undefined);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const clearMemberSearch = async () => {
+    setMemberSearch("");
+    if (!onLoadManualOptions || membersLoading) return;
+    setMembersLoading(true);
+    try {
+      await onLoadManualOptions(selection.sessionId || undefined, undefined);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const loadMoreMembers = async () => {
+    if (!onLoadMoreManualMembers || membersLoading || !options.members.nextCursor) return;
+    setMembersLoading(true);
+    try {
+      await onLoadMoreManualMembers(selection.sessionId || undefined, memberSearch.trim() || undefined, options.members.nextCursor);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
 
   return (
     <section className="rm-document-panel" aria-labelledby="manual-notification-title" style={{ padding: "22px 24px", marginBottom: 20 }}>
@@ -86,8 +126,8 @@ export function ManualNotificationWorkbench({
         </p>
       ) : null}
       <div className="stack" style={{ "--stack": "18px", marginTop: 18 } as CSSProperties}>
-        <div>
-          <div className="label">템플릿</div>
+        <section aria-labelledby="manual-step-template">
+          <h3 id="manual-step-template" className="label" style={{ margin: 0 }}>템플릿</h3>
           <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
             {options.templates.map((template) => (
               <button
@@ -115,10 +155,10 @@ export function ManualNotificationWorkbench({
               {currentTemplate.disabledReason}
             </p>
           ) : null}
-        </div>
+        </section>
 
-        <div>
-          <label className="label" htmlFor="manual-notification-session">
+        <section aria-labelledby="manual-step-session">
+          <label id="manual-step-session" className="label" htmlFor="manual-notification-session">
             세션 ID
           </label>
           <input
@@ -128,11 +168,16 @@ export function ManualNotificationWorkbench({
             onChange={(event) => setSelection((current) => ({ ...current, sessionId: event.currentTarget.value }))}
             placeholder="세션을 선택하거나 세션 화면에서 진입하세요"
           />
-        </div>
+          {sessionHint ? (
+            <p className="tiny muted" style={{ margin: "8px 0 0" }}>
+              {sessionHint}
+            </p>
+          ) : null}
+        </section>
 
         {currentTemplate ? (
-          <div>
-            <div className="label">대상 그룹</div>
+          <section aria-labelledby="manual-step-audience">
+            <h3 id="manual-step-audience" className="label" style={{ margin: 0 }}>대상 그룹</h3>
             <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
               {currentTemplate.allowedAudiences.map((audience) => (
                 <button
@@ -146,11 +191,11 @@ export function ManualNotificationWorkbench({
                 </button>
               ))}
             </div>
-          </div>
+          </section>
         ) : null}
 
-        <div>
-          <div className="label">채널</div>
+        <section aria-labelledby="manual-step-channel">
+          <h3 id="manual-step-channel" className="label" style={{ margin: 0 }}>채널</h3>
           <div className="row wrap" style={{ gap: 8, marginTop: 8 }}>
             {[
               ["BOTH", "앱+이메일"],
@@ -168,13 +213,20 @@ export function ManualNotificationWorkbench({
               </button>
             ))}
           </div>
-        </div>
+        </section>
 
         <ManualNotificationMemberPicker
           members={options.members.items}
           excludedIds={selection.excludedMembershipIds}
           includedIds={selection.includedMembershipIds}
+          search={memberSearch}
+          hasMore={Boolean(options.members.nextCursor)}
+          loading={membersLoading}
           disabled={busy}
+          onSearchChange={setMemberSearch}
+          onSearchSubmit={submitMemberSearch}
+          onSearchClear={clearMemberSearch}
+          onLoadMore={loadMoreMembers}
           onExcludedIdsChange={(excludedMembershipIds) => setSelection((current) => ({ ...current, excludedMembershipIds }))}
           onIncludedIdsChange={(includedMembershipIds) => setSelection((current) => ({ ...current, includedMembershipIds }))}
         />
@@ -196,4 +248,14 @@ export function ManualNotificationWorkbench({
       </div>
     </section>
   );
+}
+
+function reminderDateHint(sessionDate: string, now = new Date()) {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const [year, month, day] = sessionDate.split("-").map(Number);
+  const sessionDay = new Date(year, month - 1, day).getTime();
+  const days = Math.round((sessionDay - startOfToday) / 86_400_000);
+  if (days === 0) return "오늘 모임";
+  if (days > 0) return `D-${days}`;
+  return `지난 모임 D+${Math.abs(days)}`;
 }

@@ -8,6 +8,7 @@ import com.readmates.notification.application.model.HostNotificationEventList
 import com.readmates.notification.application.model.HostNotificationFailure
 import com.readmates.notification.application.model.HostNotificationItem
 import com.readmates.notification.application.model.HostNotificationItemList
+import com.readmates.notification.application.model.HostNotificationManualDispatchMetadata
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationAudiencePreview
@@ -15,6 +16,8 @@ import com.readmates.notification.application.model.ManualNotificationChannelPre
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
 import com.readmates.notification.application.model.ManualNotificationConfirmResult
 import com.readmates.notification.application.model.ManualNotificationConfirmSummary
+import com.readmates.notification.application.model.ManualNotificationDispatchList
+import com.readmates.notification.application.model.ManualNotificationDispatchListItem
 import com.readmates.notification.application.model.ManualNotificationDuplicatePreview
 import com.readmates.notification.application.model.ManualNotificationEligibility
 import com.readmates.notification.application.model.ManualNotificationMemberOption
@@ -24,10 +27,12 @@ import com.readmates.notification.application.model.ManualNotificationPreviewCom
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSelection
 import com.readmates.notification.application.model.ManualNotificationSendMode
+import com.readmates.notification.application.model.ManualNotificationSessionSummary
 import com.readmates.notification.application.model.ManualNotificationTemplatePreview
 import com.readmates.notification.application.model.ManualNotificationWarning
 import com.readmates.notification.application.model.MemberNotificationItem
 import com.readmates.notification.application.model.MemberNotificationList
+import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationPreferences
 import com.readmates.notification.application.model.NotificationTestMailAuditItem
 import com.readmates.notification.application.model.NotificationTestMailStatus
@@ -78,8 +83,21 @@ data class HostNotificationEventResponse(
     val eventType: NotificationEventType,
     val status: NotificationEventOutboxStatus,
     val attemptCount: Int,
+    val source: NotificationDispatchSource,
+    val manualDispatch: HostNotificationManualDispatchMetadataResponse?,
     val createdAt: String,
     val updatedAt: String,
+)
+
+data class HostNotificationManualDispatchMetadataResponse(
+    val manualDispatchId: UUID,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val audience: ManualNotificationAudience,
+    val resend: Boolean,
+    val requestedBy: String,
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
 )
 
 data class HostNotificationDeliveryListResponse(
@@ -239,8 +257,20 @@ data class MemberNotificationResponse(
 )
 
 data class ManualNotificationOptionsResponse(
+    val session: ManualNotificationSessionSummaryResponse?,
     val templates: List<ManualNotificationTemplateOptionResponse>,
     val members: CursorPageResponse<ManualNotificationMemberOptionResponse>,
+    val recentDispatches: List<ManualNotificationDispatchListItemResponse>,
+)
+
+data class ManualNotificationSessionSummaryResponse(
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val date: String?,
+    val state: String,
+    val visibility: String,
+    val feedbackDocumentUploaded: Boolean,
 )
 
 data class ManualNotificationTemplateOptionResponse(
@@ -263,6 +293,30 @@ data class ManualNotificationMemberOptionResponse(
     val attendanceStatus: String?,
     val emailEligibility: ManualNotificationEligibility,
     val inAppEligibility: ManualNotificationEligibility,
+)
+
+data class ManualNotificationDispatchListResponse(
+    val items: List<ManualNotificationDispatchListItemResponse>,
+    val nextCursor: String?,
+)
+
+data class ManualNotificationDispatchListItemResponse(
+    val manualDispatchId: UUID,
+    val eventId: UUID,
+    val source: NotificationDispatchSource,
+    val eventType: NotificationEventType,
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val audience: ManualNotificationAudience,
+    val resend: Boolean,
+    val requestedBy: String,
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
+    val eventStatus: NotificationEventOutboxStatus,
+    val createdAt: String,
 )
 
 data class ManualNotificationPreviewResponse(
@@ -343,8 +397,22 @@ private fun HostNotificationEvent.toResponse(): HostNotificationEventResponse =
         eventType = eventType,
         status = status,
         attemptCount = attemptCount,
+        source = source,
+        manualDispatch = manualDispatch?.toResponse(),
         createdAt = createdAt.toString(),
         updatedAt = updatedAt.toString(),
+    )
+
+private fun HostNotificationManualDispatchMetadata.toResponse(): HostNotificationManualDispatchMetadataResponse =
+    HostNotificationManualDispatchMetadataResponse(
+        manualDispatchId = manualDispatchId,
+        requestedChannels = requestedChannels,
+        audience = audience,
+        resend = resend,
+        requestedBy = requestedBy,
+        targetCount = targetCount,
+        expectedInAppCount = expectedInAppCount,
+        expectedEmailCount = expectedEmailCount,
     )
 
 fun HostNotificationDeliveryList.toResponse(): HostNotificationDeliveryListResponse =
@@ -355,6 +423,7 @@ fun HostNotificationDeliveryList.toResponse(): HostNotificationDeliveryListRespo
 
 fun ManualNotificationOptions.toResponse(): ManualNotificationOptionsResponse =
     ManualNotificationOptionsResponse(
+        session = session?.toResponse(),
         templates = templates.map {
             ManualNotificationTemplateOptionResponse(
                 eventType = it.eventType,
@@ -367,6 +436,18 @@ fun ManualNotificationOptions.toResponse(): ManualNotificationOptionsResponse =
             )
         },
         members = CursorPageResponse(members.map { it.toResponse() }, nextCursor),
+        recentDispatches = recentDispatches.map { it.toResponse() },
+    )
+
+private fun ManualNotificationSessionSummary.toResponse(): ManualNotificationSessionSummaryResponse =
+    ManualNotificationSessionSummaryResponse(
+        sessionId = sessionId,
+        sessionNumber = sessionNumber,
+        bookTitle = bookTitle,
+        date = date?.toString(),
+        state = state,
+        visibility = visibility,
+        feedbackDocumentUploaded = feedbackDocumentUploaded,
     )
 
 private fun ManualNotificationMemberOption.toResponse(): ManualNotificationMemberOptionResponse =
@@ -380,6 +461,32 @@ private fun ManualNotificationMemberOption.toResponse(): ManualNotificationMembe
         attendanceStatus = attendanceStatus,
         emailEligibility = emailEligibility,
         inAppEligibility = inAppEligibility,
+    )
+
+fun ManualNotificationDispatchList.toResponse(): ManualNotificationDispatchListResponse =
+    ManualNotificationDispatchListResponse(
+        items = items.map { it.toResponse() },
+        nextCursor = nextCursor,
+    )
+
+private fun ManualNotificationDispatchListItem.toResponse(): ManualNotificationDispatchListItemResponse =
+    ManualNotificationDispatchListItemResponse(
+        manualDispatchId = manualDispatchId,
+        eventId = eventId,
+        source = source,
+        eventType = eventType,
+        sessionId = sessionId,
+        sessionNumber = sessionNumber,
+        bookTitle = bookTitle,
+        requestedChannels = requestedChannels,
+        audience = audience,
+        resend = resend,
+        requestedBy = requestedBy,
+        targetCount = targetCount,
+        expectedInAppCount = expectedInAppCount,
+        expectedEmailCount = expectedEmailCount,
+        eventStatus = eventStatus,
+        createdAt = createdAt.toString(),
     )
 
 fun ManualNotificationPreview.toResponse(): ManualNotificationPreviewResponse =

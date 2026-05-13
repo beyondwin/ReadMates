@@ -11,6 +11,7 @@ import { NotificationLedgerTabs } from "./notifications/notification-ledger-tabs
 import type {
   HostNotificationEventType,
   ManualNotificationConfirmRequest,
+  ManualNotificationDispatchListItem,
   ManualNotificationOptionsResponse,
   ManualNotificationPreviewRequest,
   ManualNotificationPreviewResponse,
@@ -25,6 +26,7 @@ import {
   type SendNotificationTestMailRequest,
 } from "./notifications/notification-formatters";
 import { RestoreNotificationDialog } from "./notifications/restore-notification-dialog";
+import { ManualNotificationDispatchLedger } from "./notifications/manual-notification-dispatch-ledger";
 
 type HostNotificationsPageProps = {
   summary: HostNotificationSummary;
@@ -32,6 +34,7 @@ type HostNotificationsPageProps = {
   deliveries: HostNotificationDeliveryItem[];
   audit: NotificationTestMailAuditItem[];
   manualOptions: ManualNotificationOptionsResponse;
+  manualDispatches?: ManualNotificationDispatchListItem[];
   initialManualSelection: {
     sessionId: string | null;
     eventType: HostNotificationEventType | null;
@@ -39,9 +42,11 @@ type HostNotificationsPageProps = {
   hasMoreEvents?: boolean;
   hasMoreDeliveries?: boolean;
   hasMoreAudit?: boolean;
+  hasMoreManualDispatches?: boolean;
   isLoadingMoreEvents?: boolean;
   isLoadingMoreDeliveries?: boolean;
   isLoadingMoreAudit?: boolean;
+  isLoadingMoreManualDispatches?: boolean;
   onProcess: () => Promise<unknown>;
   onRetry: (id: string) => Promise<unknown>;
   onRestore: (id: string) => Promise<unknown>;
@@ -51,6 +56,9 @@ type HostNotificationsPageProps = {
   onLoadMoreEvents?: () => Promise<unknown>;
   onLoadMoreDeliveries?: () => Promise<unknown>;
   onLoadMoreAudit?: () => Promise<unknown>;
+  onLoadMoreManualDispatches?: () => Promise<unknown>;
+  onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
+  onLoadMoreManualMembers?: (sessionId?: string, search?: string, cursor?: string) => Promise<ManualNotificationOptionsResponse>;
   isRefreshing?: boolean;
 };
 
@@ -71,13 +79,16 @@ export function HostNotificationsPage({
   deliveries,
   audit,
   manualOptions,
+  manualDispatches,
   initialManualSelection,
   hasMoreEvents = false,
   hasMoreDeliveries = false,
   hasMoreAudit = false,
+  hasMoreManualDispatches = false,
   isLoadingMoreEvents = false,
   isLoadingMoreDeliveries = false,
   isLoadingMoreAudit = false,
+  isLoadingMoreManualDispatches = false,
   onProcess,
   onRetry,
   onRestore,
@@ -87,6 +98,9 @@ export function HostNotificationsPage({
   onLoadMoreEvents,
   onLoadMoreDeliveries,
   onLoadMoreAudit,
+  onLoadMoreManualDispatches,
+  onLoadManualOptions,
+  onLoadMoreManualMembers,
   isRefreshing = false,
 }: HostNotificationsPageProps) {
   const [activeLedgerTab, setActiveLedgerTab] = useState<NotificationLedgerTab>("events");
@@ -95,15 +109,28 @@ export function HostNotificationsPage({
   const [testEmail, setTestEmail] = useState("");
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
   const [manualPreview, setManualPreview] = useState<ManualNotificationPreviewResponse | null>(null);
+  const [manualOptionsState, setManualOptionsState] = useState(() => ({
+    source: manualOptions,
+    value: manualOptions,
+  }));
   const [manualError, setManualError] = useState<string | null>(null);
   const [manualBusy, setManualBusy] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const processableNotificationCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
-  const hasVisibleProcessableNotifications = deliveries.some(
+  const hasVisibleProcessableDelivery = deliveries.some(
     (delivery) => delivery.channel === "EMAIL" && (delivery.status === "PENDING" || delivery.status === "FAILED"),
   );
-  const hasProcessableNotifications = processableNotificationCount > 0 || hasVisibleProcessableNotifications;
+  const hasVisibleProcessableEvent = events.some((event) => event.status === "PENDING" || event.status === "FAILED");
+  const hasProcessableNotifications = processableNotificationCount > 0 || hasVisibleProcessableDelivery || hasVisibleProcessableEvent;
   const isBusy = pendingAction !== null || manualBusy || isRefreshing;
+  if (manualOptionsState.source !== manualOptions) {
+    setManualOptionsState({
+      source: manualOptions,
+      value: manualOptions,
+    });
+  }
+  const visibleManualOptions = manualOptionsState.source === manualOptions ? manualOptionsState.value : manualOptions;
+  const visibleManualDispatches = manualDispatches ?? visibleManualOptions.recentDispatches;
 
   const isPending = (kind: PendingAction["kind"], id?: string) => {
     if (!pendingAction || pendingAction.kind !== kind) {
@@ -215,6 +242,32 @@ export function HostNotificationsPage({
     }
   };
 
+  const handleLoadManualOptions = async (sessionId?: string, search?: string) => {
+    if (!onLoadManualOptions) return visibleManualOptions;
+    const nextOptions = await onLoadManualOptions(sessionId, search);
+    setManualOptionsState((current) => ({
+      ...current,
+      value: nextOptions,
+    }));
+    return nextOptions;
+  };
+
+  const handleLoadMoreManualMembers = async (sessionId?: string, search?: string, cursor?: string) => {
+    if (!onLoadMoreManualMembers || !cursor) return visibleManualOptions;
+    const nextOptions = await onLoadMoreManualMembers(sessionId, search, cursor);
+    setManualOptionsState((current) => ({
+      ...current,
+      value: {
+        ...nextOptions,
+        members: {
+          items: [...current.value.members.items, ...nextOptions.members.items],
+          nextCursor: nextOptions.members.nextCursor,
+        },
+      },
+    }));
+    return nextOptions;
+  };
+
   return (
     <main className="rm-host-notifications-page">
       <section className="page-header-compact">
@@ -262,7 +315,7 @@ export function HostNotificationsPage({
         ) : null}
 
         <ManualNotificationWorkbench
-          options={manualOptions}
+          options={visibleManualOptions}
           initialSessionId={initialManualSelection.sessionId}
           initialEventType={initialManualSelection.eventType}
           preview={manualPreview}
@@ -270,6 +323,15 @@ export function HostNotificationsPage({
           error={manualError}
           onPreview={handleManualPreview}
           onConfirm={handleManualConfirm}
+          onLoadManualOptions={handleLoadManualOptions}
+          onLoadMoreManualMembers={handleLoadMoreManualMembers}
+        />
+
+        <ManualNotificationDispatchLedger
+          dispatches={visibleManualDispatches}
+          hasMore={hasMoreManualDispatches}
+          loading={isLoadingMoreManualDispatches}
+          onLoadMore={onLoadMoreManualDispatches}
         />
 
         <HostNotificationsSummary summary={summary} />

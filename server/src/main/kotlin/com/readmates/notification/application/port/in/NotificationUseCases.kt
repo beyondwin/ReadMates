@@ -8,6 +8,7 @@ import com.readmates.notification.application.model.HostNotificationItemQuery
 import com.readmates.notification.application.model.HostNotificationSummary
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
 import com.readmates.notification.application.model.ManualNotificationConfirmResult
+import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationOptions
 import com.readmates.notification.application.model.ManualNotificationPreview
 import com.readmates.notification.application.model.ManualNotificationPreviewCommand
@@ -19,6 +20,7 @@ import com.readmates.notification.application.model.SendNotificationTestMailComm
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
+import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
@@ -80,7 +82,13 @@ interface ManageHostNotificationsUseCase {
 }
 
 interface ManageManualHostNotificationsUseCase {
-    fun options(host: CurrentMember, sessionId: UUID?, pageRequest: PageRequest): ManualNotificationOptions
+    fun options(host: CurrentMember, sessionId: UUID?, search: String?, pageRequest: PageRequest): ManualNotificationOptions
+    fun listDispatches(
+        host: CurrentMember,
+        sessionId: UUID?,
+        eventType: NotificationEventType?,
+        pageRequest: PageRequest,
+    ): ManualNotificationDispatchList
     fun preview(host: CurrentMember, command: ManualNotificationPreviewCommand): ManualNotificationPreview
     fun confirm(host: CurrentMember, command: ManualNotificationConfirmCommand): ManualNotificationConfirmResult
 }

@@ -201,6 +201,8 @@ data class HostNotificationEvent(
     val eventType: NotificationEventType,
     val status: NotificationEventOutboxStatus,
     val attemptCount: Int,
+    val source: NotificationDispatchSource = NotificationDispatchSource.AUTOMATIC,
+    val manualDispatch: HostNotificationManualDispatchMetadata? = null,
     val createdAt: OffsetDateTime,
     val updatedAt: OffsetDateTime,
 )
@@ -227,9 +229,56 @@ data class HostNotificationDeliveryList(
 )
 
 data class ManualNotificationOptions(
+    val session: ManualNotificationSessionSummary?,
     val templates: List<ManualNotificationTemplateOption>,
     val members: List<ManualNotificationMemberOption>,
     val nextCursor: String?,
+    val recentDispatches: List<ManualNotificationDispatchListItem>,
+)
+
+data class ManualNotificationSessionSummary(
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val date: LocalDate?,
+    val state: String,
+    val visibility: String,
+    val feedbackDocumentUploaded: Boolean,
+)
+
+data class ManualNotificationDispatchListItem(
+    val manualDispatchId: UUID,
+    val eventId: UUID,
+    val source: NotificationDispatchSource,
+    val eventType: NotificationEventType,
+    val sessionId: UUID,
+    val sessionNumber: Int,
+    val bookTitle: String,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val audience: ManualNotificationAudience,
+    val resend: Boolean,
+    val requestedBy: String,
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
+    val eventStatus: NotificationEventOutboxStatus,
+    val createdAt: OffsetDateTime,
+)
+
+data class ManualNotificationDispatchList(
+    val items: List<ManualNotificationDispatchListItem>,
+    val nextCursor: String?,
+)
+
+data class HostNotificationManualDispatchMetadata(
+    val manualDispatchId: UUID,
+    val requestedChannels: ManualNotificationRequestedChannels,
+    val audience: ManualNotificationAudience,
+    val resend: Boolean,
+    val requestedBy: String,
+    val targetCount: Int,
+    val expectedInAppCount: Int,
+    val expectedEmailCount: Int,
 )
 
 data class ManualNotificationTemplateOption(

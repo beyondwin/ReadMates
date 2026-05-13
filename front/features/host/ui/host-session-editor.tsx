@@ -13,6 +13,7 @@ import type {
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
+  ManualNotificationDispatchListItem,
 } from "@/features/host/model/host-view-types";
 import {
   buildHostSessionRequest,
@@ -79,6 +80,7 @@ function scopedHostRedirectHref(href: string) {
 
 export default function HostSessionEditor({
   session,
+  notificationDispatches = [],
   returnTarget = defaultHostDashboardReturnTarget,
   actions,
   LinkComponent = DefaultLinkComponent,
@@ -86,6 +88,7 @@ export default function HostSessionEditor({
   readmatesReturnState = defaultReadmatesReturnState,
 }: {
   session?: HostSessionDetailResponse | null;
+  notificationDispatches?: ManualNotificationDispatchListItem[];
   returnTarget?: ReadmatesReturnTarget;
   actions: HostSessionEditorActions;
   LinkComponent?: HostSessionEditorLinkComponent;
@@ -821,6 +824,7 @@ export default function HostSessionEditor({
                   state={displaySession.state}
                   visibility={displaySession.visibility}
                   feedbackDocumentUploaded={displaySession.feedbackDocument.uploaded}
+                  dispatches={notificationDispatches}
                   LinkComponent={LinkComponent}
                 />
               ) : null}

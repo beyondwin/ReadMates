@@ -1,6 +1,10 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.HostNotificationEvent
+import com.readmates.notification.application.model.HostNotificationManualDispatchMetadata
+import com.readmates.notification.application.model.ManualNotificationAudience
+import com.readmates.notification.application.model.ManualNotificationRequestedChannels
+import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
@@ -259,15 +263,19 @@ class JdbcNotificationEventOutboxAdapter(
         pageRequest: PageRequest,
     ): CursorPage<HostNotificationEvent> {
         val cursor = NotificationEventUpdatedAtDescCursor.from(pageRequest.cursor)
-        val statusPredicate = if (status == null) "" else "and status = ?"
+        val statusPredicate = if (status == null) "" else "and notification_event_outbox.status = ?"
         val cursorPredicate = if (cursor == null) {
             ""
         } else {
             """
             and (
-              updated_at < ?
-              or (updated_at = ? and created_at < ?)
-              or (updated_at = ? and created_at = ? and id < ?)
+              notification_event_outbox.updated_at < ?
+              or (notification_event_outbox.updated_at = ? and notification_event_outbox.created_at < ?)
+              or (
+                notification_event_outbox.updated_at = ?
+                and notification_event_outbox.created_at = ?
+                and notification_event_outbox.id < ?
+              )
             )
             """.trimIndent()
         }
@@ -284,12 +292,32 @@ class JdbcNotificationEventOutboxAdapter(
         args += pageRequest.limit + 1
         val rows = jdbcTemplate.query(
             """
-            select id, event_type, status, attempt_count, created_at, updated_at
+            select
+              notification_event_outbox.id,
+              notification_event_outbox.event_type,
+              notification_event_outbox.status,
+              notification_event_outbox.attempt_count,
+              case when notification_manual_dispatches.id is null then 'AUTOMATIC' else 'MANUAL' end as source,
+              notification_manual_dispatches.id as manual_dispatch_id,
+              notification_manual_dispatches.requested_channels,
+              notification_manual_dispatches.audience,
+              notification_manual_dispatches.resend,
+              notification_manual_dispatches.target_count,
+              notification_manual_dispatches.expected_in_app_count,
+              notification_manual_dispatches.expected_email_count,
+              users.email as requested_by_email,
+              notification_event_outbox.created_at,
+              notification_event_outbox.updated_at
             from notification_event_outbox
-            where club_id = ?
+            left join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id
+              and notification_manual_dispatches.club_id = notification_event_outbox.club_id
+            left join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id
+              and memberships.club_id = notification_manual_dispatches.club_id
+            left join users on users.id = memberships.user_id
+            where notification_event_outbox.club_id = ?
               $statusPredicate
               $cursorPredicate
-            order by updated_at desc, created_at desc, id desc
+            order by notification_event_outbox.updated_at desc, notification_event_outbox.created_at desc, notification_event_outbox.id desc
             limit ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostNotificationEvent() },
@@ -334,9 +362,25 @@ class JdbcNotificationEventOutboxAdapter(
             eventType = NotificationEventType.valueOf(getString("event_type")),
             status = NotificationEventOutboxStatus.valueOf(getString("status")),
             attemptCount = getInt("attempt_count"),
+            source = NotificationDispatchSource.valueOf(getString("source")),
+            manualDispatch = toHostManualDispatchMetadata(),
             createdAt = utcOffsetDateTime("created_at"),
             updatedAt = utcOffsetDateTime("updated_at"),
         )
+
+    private fun ResultSet.toHostManualDispatchMetadata(): HostNotificationManualDispatchMetadata? {
+        val manualDispatchId = getString("manual_dispatch_id") ?: return null
+        return HostNotificationManualDispatchMetadata(
+            manualDispatchId = UUID.fromString(manualDispatchId),
+            requestedChannels = ManualNotificationRequestedChannels.valueOf(getString("requested_channels")),
+            audience = ManualNotificationAudience.valueOf(getString("audience")),
+            resend = getBoolean("resend"),
+            requestedBy = maskEmail(getString("requested_by_email")),
+            targetCount = getInt("target_count"),
+            expectedInAppCount = getInt("expected_in_app_count"),
+            expectedEmailCount = getInt("expected_email_count"),
+        )
+    }
 
     private fun parsePayload(rawPayload: String): NotificationEventPayload =
         objectMapper.readValue(rawPayload, payloadType)
@@ -354,6 +398,15 @@ class JdbcNotificationEventOutboxAdapter(
             """.trimIndent(),
             -PUBLISHING_LEASE_TIMEOUT_MINUTES,
         )
+    }
+
+    private fun maskEmail(email: String?): String {
+        val value = email?.trim().orEmpty()
+        val at = value.indexOf('@')
+        if (at <= 0 || at == value.lastIndex) return "숨김"
+        val domain = value.substring(at + 1)
+        if (domain.isBlank()) return "숨김"
+        return "${value.first()}***@$domain"
     }
 
 }

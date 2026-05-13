@@ -1,16 +1,20 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.ManualNotificationAudience
+import com.readmates.notification.application.model.ManualNotificationDispatchList
+import com.readmates.notification.application.model.ManualNotificationDispatchListItem
 import com.readmates.notification.application.model.ManualNotificationEligibility
 import com.readmates.notification.application.model.ManualNotificationMemberOption
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSelection
+import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.ManualNotificationDispatchPort
 import com.readmates.notification.application.port.out.ManualNotificationPreviewRecord
 import com.readmates.notification.application.port.out.ManualNotificationSessionContext
 import com.readmates.notification.application.port.out.ManualNotificationStoredDispatch
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
+import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
@@ -42,6 +46,7 @@ class JdbcManualNotificationDispatchAdapter(
               sessions.club_id,
               sessions.number,
               sessions.book_title,
+              sessions.session_date,
               sessions.state,
               sessions.visibility,
               exists(
@@ -59,8 +64,15 @@ class JdbcManualNotificationDispatchAdapter(
             sessionId.dbString(),
         ).firstOrNull()
 
-    override fun listMembers(clubId: UUID, sessionId: UUID?, pageRequest: PageRequest): CursorPage<ManualNotificationMemberOption> {
-        val cursor = pageRequest.cursor["displayName"]
+    override fun listMembers(
+        clubId: UUID,
+        sessionId: UUID?,
+        search: String?,
+        pageRequest: PageRequest,
+    ): CursorPage<ManualNotificationMemberOption> {
+        val cursor = ManualMemberCursor.from(pageRequest.cursor)
+        val normalizedSearch = search?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+        val likeSearch = normalizedSearch?.let { "%$it%" }
         val args = mutableListOf<Any>()
         val sessionJoin = if (sessionId == null) {
             "left join session_participants on false"
@@ -73,11 +85,32 @@ class JdbcManualNotificationDispatchAdapter(
             """.trimIndent()
         }
         args += clubId.dbString()
-        val cursorPredicate = if (cursor.isNullOrBlank()) {
+        val searchPredicate = if (likeSearch == null) {
             ""
         } else {
-            args += cursor
-            "and coalesce(memberships.short_name, users.name) > ?"
+            args += likeSearch
+            args += likeSearch
+            args += likeSearch
+            """
+            and (
+              lower(coalesce(memberships.short_name, users.name)) like ?
+              or lower(users.name) like ?
+              or lower(users.email) like ?
+            )
+            """.trimIndent()
+        }
+        val cursorPredicate = if (cursor == null) {
+            ""
+        } else {
+            args += cursor.displayName
+            args += cursor.displayName
+            args += cursor.membershipId
+            """
+            and (
+              coalesce(memberships.short_name, users.name) > ?
+              or (coalesce(memberships.short_name, users.name) = ? and memberships.id > ?)
+            )
+            """.trimIndent()
         }
         args += pageRequest.limit + 1
         val rows = jdbcTemplate.query(
@@ -98,6 +131,7 @@ class JdbcManualNotificationDispatchAdapter(
               and notification_preferences.club_id = memberships.club_id
             where memberships.club_id = ?
               and memberships.status = 'ACTIVE'
+              $searchPredicate
               $cursorPredicate
             order by display_name, memberships.id
             limit ?
@@ -109,11 +143,116 @@ class JdbcManualNotificationDispatchAdapter(
         return CursorPage(
             items = visible,
             nextCursor = if (rows.size > pageRequest.limit) {
-                CursorCodec.encode(mapOf("displayName" to visible.last().displayName))
+                visible.lastOrNull()?.let {
+                    CursorCodec.encode(
+                        mapOf(
+                            "displayName" to it.displayName,
+                            "membershipId" to it.membershipId.toString(),
+                        ),
+                    )
+                }
             } else {
                 null
             },
         )
+    }
+
+    override fun listDispatches(
+        clubId: UUID,
+        sessionId: UUID?,
+        eventType: NotificationEventType?,
+        pageRequest: PageRequest,
+    ): ManualNotificationDispatchList {
+        val cursor = ManualDispatchCursor.from(pageRequest.cursor)
+        val predicates = mutableListOf("notification_manual_dispatches.club_id = ?")
+        val args = mutableListOf<Any>(clubId.dbString())
+        sessionId?.let {
+            predicates += "notification_manual_dispatches.session_id = ?"
+            args += it.dbString()
+        }
+        eventType?.let {
+            predicates += "notification_manual_dispatches.event_type = ?"
+            args += it.name
+        }
+        if (cursor != null) {
+            predicates += """
+                (
+                  notification_manual_dispatches.created_at < ?
+                  or (notification_manual_dispatches.created_at = ? and notification_manual_dispatches.id < ?)
+                )
+            """.trimIndent()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.createdAt.toUtcLocalDateTime()
+            args += cursor.id
+        }
+        args += pageRequest.limit + 1
+
+        val rows = jdbcTemplate.query(
+            """
+            select
+              notification_manual_dispatches.id as manual_dispatch_id,
+              notification_manual_dispatches.event_id,
+              notification_manual_dispatches.event_type,
+              notification_manual_dispatches.session_id,
+              sessions.number as session_number,
+              sessions.book_title,
+              notification_manual_dispatches.requested_channels,
+              notification_manual_dispatches.audience,
+              notification_manual_dispatches.resend,
+              users.email as requested_by_email,
+              notification_manual_dispatches.target_count,
+              notification_manual_dispatches.expected_in_app_count,
+              notification_manual_dispatches.expected_email_count,
+              notification_event_outbox.status as event_status,
+              notification_manual_dispatches.created_at
+            from notification_manual_dispatches
+            join notification_event_outbox on notification_event_outbox.id = notification_manual_dispatches.event_id
+              and notification_event_outbox.club_id = notification_manual_dispatches.club_id
+            join sessions on sessions.id = notification_manual_dispatches.session_id
+              and sessions.club_id = notification_manual_dispatches.club_id
+            join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id
+              and memberships.club_id = notification_manual_dispatches.club_id
+            join users on users.id = memberships.user_id
+            where ${predicates.joinToString(" and ")}
+            order by notification_manual_dispatches.created_at desc, notification_manual_dispatches.id desc
+            limit ?
+            """.trimIndent(),
+            { rs, _ -> rs.toDispatchListItem() },
+            *args.toTypedArray(),
+        )
+        val visible = rows.take(pageRequest.limit)
+        return ManualNotificationDispatchList(
+            items = visible,
+            nextCursor = if (rows.size > pageRequest.limit) {
+                visible.lastOrNull()?.let {
+                    CursorCodec.encode(
+                        mapOf(
+                            "createdAt" to it.createdAt.toString(),
+                            "id" to it.manualDispatchId.toString(),
+                        ),
+                    )
+                }
+            } else {
+                null
+            },
+        )
+    }
+
+    override fun validateMembershipEdits(clubId: UUID, membershipIds: Set<UUID>): Boolean {
+        if (membershipIds.isEmpty()) return true
+        val placeholders = membershipIds.joinToString(",") { "?" }
+        val count = jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from memberships
+            where club_id = ?
+              and status = 'ACTIVE'
+              and id in ($placeholders)
+            """.trimIndent(),
+            Int::class.java,
+            *(listOf(clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any }).toTypedArray(),
+        ) ?: 0
+        return count == membershipIds.size
     }
 
     override fun previewTargets(clubId: UUID, selection: ManualNotificationSelection): ManualNotificationTargetSnapshot {
@@ -352,6 +491,7 @@ class JdbcManualNotificationDispatchAdapter(
             clubId = uuid("club_id"),
             sessionNumber = getInt("number"),
             bookTitle = getString("book_title"),
+            date = getDate("session_date")?.toLocalDate(),
             state = getString("state"),
             visibility = getString("visibility"),
             feedbackDocumentUploaded = getBoolean("feedback_document_uploaded"),
@@ -387,6 +527,26 @@ class JdbcManualNotificationDispatchAdapter(
             targetCount = getInt("target_count"),
         )
 
+    private fun ResultSet.toDispatchListItem() =
+        ManualNotificationDispatchListItem(
+            manualDispatchId = uuid("manual_dispatch_id"),
+            eventId = uuid("event_id"),
+            source = NotificationDispatchSource.MANUAL,
+            eventType = NotificationEventType.valueOf(getString("event_type")),
+            sessionId = uuid("session_id"),
+            sessionNumber = getInt("session_number"),
+            bookTitle = getString("book_title"),
+            requestedChannels = ManualNotificationRequestedChannels.valueOf(getString("requested_channels")),
+            audience = ManualNotificationAudience.valueOf(getString("audience")),
+            resend = getBoolean("resend"),
+            requestedBy = maskEmail(getString("requested_by_email")),
+            targetCount = getInt("target_count"),
+            expectedInAppCount = getInt("expected_in_app_count"),
+            expectedEmailCount = getInt("expected_email_count"),
+            eventStatus = NotificationEventOutboxStatus.valueOf(getString("event_status")),
+            createdAt = utcOffsetDateTime("created_at"),
+        )
+
     private fun maskEmail(email: String?): String {
         val value = email?.trim().orEmpty()
         val at = value.indexOf('@')
@@ -397,4 +557,25 @@ class JdbcManualNotificationDispatchAdapter(
     }
 
     private data class EmailCounts(val eligible: Int, val preferenceSkipped: Int, val missing: Int)
+
+    private data class ManualMemberCursor(val displayName: String, val membershipId: String) {
+        companion object {
+            fun from(cursor: Map<String, String>): ManualMemberCursor? {
+                val displayName = cursor["displayName"]?.takeIf { it.isNotBlank() } ?: return null
+                val membershipId = cursor["membershipId"]?.takeIf { it.isNotBlank() } ?: return null
+                return ManualMemberCursor(displayName, membershipId)
+            }
+        }
+    }
+
+    private data class ManualDispatchCursor(val createdAt: OffsetDateTime, val id: String) {
+        companion object {
+            fun from(cursor: Map<String, String>): ManualDispatchCursor? {
+                val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
+                val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
+                return ManualDispatchCursor(createdAt, id)
+            }
+        }
+    }
 }

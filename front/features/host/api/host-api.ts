@@ -13,6 +13,7 @@ import type {
   HostNotificationEventListResponse,
   HostMemberProfileResponse,
   HostNotificationDetailResponse,
+  HostNotificationEventType,
   HostNotificationItemListResponse,
   HostNotificationSummary,
   HostNotificationStatus,
@@ -25,6 +26,7 @@ import type {
   HostSessionVisibilityRequest,
   ManualNotificationConfirmRequest,
   ManualNotificationConfirmResponse,
+  ManualNotificationDispatchListResponse,
   ManualNotificationOptionsResponse,
   ManualNotificationPreviewRequest,
   ManualNotificationPreviewResponse,
@@ -89,11 +91,14 @@ export function fetchHostNotificationDeliveries(context?: ReadmatesApiContext, p
 
 export function fetchManualNotificationOptions(
   context?: ReadmatesApiContext,
-  request?: { sessionId?: string; page?: PageRequest },
+  request?: { sessionId?: string; search?: string; page?: PageRequest },
 ) {
   const params = new URLSearchParams();
   if (request?.sessionId) {
     params.set("sessionId", request.sessionId);
+  }
+  if (request?.search) {
+    params.set("search", request.search);
   }
   const pageParams = pagingSearchParams(request?.page);
   const pageSearch = pageParams.startsWith("?") ? pageParams.slice(1) : "";
@@ -103,6 +108,30 @@ export function fetchManualNotificationOptions(
   const search = params.toString();
   return readmatesFetch<ManualNotificationOptionsResponse>(
     `/api/host/notifications/manual/options${search ? `?${search}` : ""}`,
+    undefined,
+    context,
+  );
+}
+
+export function fetchManualNotificationDispatches(
+  context?: ReadmatesApiContext,
+  request?: { sessionId?: string; eventType?: HostNotificationEventType; page?: PageRequest },
+) {
+  const params = new URLSearchParams();
+  if (request?.sessionId) {
+    params.set("sessionId", request.sessionId);
+  }
+  if (request?.eventType) {
+    params.set("eventType", request.eventType);
+  }
+  const pageParams = pagingSearchParams(request?.page);
+  const pageSearch = pageParams.startsWith("?") ? pageParams.slice(1) : "";
+  if (pageSearch) {
+    new URLSearchParams(pageSearch).forEach((value, key) => params.set(key, value));
+  }
+  const search = params.toString();
+  return readmatesFetch<ManualNotificationDispatchListResponse>(
+    `/api/host/notifications/manual/dispatches${search ? `?${search}` : ""}`,
     undefined,
     context,
   );

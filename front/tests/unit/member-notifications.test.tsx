@@ -162,6 +162,39 @@ describe("MemberNotificationsPage", () => {
     expect(screen.getByRole("link", { name: /내일 모임이 있습니다/ })).toBeInTheDocument();
   });
 
+  it("opens unread notification from the row body without triggering read button clicks", async () => {
+    const user = userEvent.setup();
+    const onOpenNotification = vi.fn();
+    const onMarkRead = vi.fn();
+    window.history.pushState({}, "", "/clubs/reading-sai/app/notifications");
+
+    render(
+      <MemberNotificationsPage
+        unreadCount={1}
+        items={[
+          {
+            ...unreadNotification,
+            id: "notification-1",
+            body: "알림 본문",
+          },
+        ]}
+        onOpenNotification={onOpenNotification}
+        onMarkRead={onMarkRead}
+        onMarkAllRead={() => undefined}
+      />,
+    );
+
+    await user.click(screen.getByText("알림 본문"));
+    expect(onOpenNotification).toHaveBeenCalledWith(
+      "notification-1",
+      expect.stringContaining("/clubs/reading-sai/app"),
+    );
+
+    await user.click(screen.getByRole("button", { name: "읽음" }));
+    expect(onMarkRead).toHaveBeenCalledWith("notification-1");
+    expect(onOpenNotification).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps notification deep links inside the scoped app route", () => {
     render(
       <MemoryRouter initialEntries={["/clubs/reading-sai/app/notifications"]}>

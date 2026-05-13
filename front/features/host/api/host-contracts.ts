@@ -220,6 +220,7 @@ export type HostNotificationStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" |
 export type NotificationEventOutboxStatus = "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
 export type NotificationDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD" | "SKIPPED";
 export type NotificationChannel = "EMAIL" | "IN_APP";
+export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL";
 export type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
@@ -264,8 +265,21 @@ export type HostNotificationEventItem = {
   eventType: HostNotificationEventType;
   status: NotificationEventOutboxStatus;
   attemptCount: number;
+  source?: NotificationDispatchSource;
+  manualDispatch?: HostNotificationManualDispatchMetadata | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type HostNotificationManualDispatchMetadata = {
+  manualDispatchId: string;
+  requestedChannels: ManualNotificationRequestedChannels;
+  audience: ManualNotificationAudience;
+  resend: boolean;
+  requestedBy: string;
+  targetCount: number;
+  expectedInAppCount: number;
+  expectedEmailCount: number;
 };
 
 export type HostNotificationEventListResponse = {
@@ -311,9 +325,42 @@ export type ManualNotificationMemberOption = {
 };
 
 export type ManualNotificationOptionsResponse = {
+  session: ManualNotificationSessionSummary | null;
   templates: ManualNotificationTemplateOption[];
   members: PagedResponse<ManualNotificationMemberOption>;
+  recentDispatches: ManualNotificationDispatchListItem[];
 };
+
+export type ManualNotificationSessionSummary = {
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  date: string | null;
+  state: string;
+  visibility: string;
+  feedbackDocumentUploaded: boolean;
+};
+
+export type ManualNotificationDispatchListItem = {
+  manualDispatchId: string;
+  eventId: string;
+  source: "MANUAL";
+  eventType: HostNotificationEventType;
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  requestedChannels: ManualNotificationRequestedChannels;
+  audience: ManualNotificationAudience;
+  resend: boolean;
+  requestedBy: string;
+  targetCount: number;
+  expectedInAppCount: number;
+  expectedEmailCount: number;
+  eventStatus: NotificationEventOutboxStatus;
+  createdAt: string;
+};
+
+export type ManualNotificationDispatchListResponse = PagedResponse<ManualNotificationDispatchListItem>;
 
 export type ManualNotificationSelectionRequest = {
   sessionId: string;

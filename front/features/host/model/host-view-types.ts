@@ -158,6 +158,7 @@ export type HostNotificationEventType =
   | "SESSION_REMINDER_DUE"
   | "FEEDBACK_DOCUMENT_PUBLISHED"
   | "REVIEW_PUBLISHED";
+export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL";
 
 export type HostNotificationSummary = {
   pending: number;
@@ -201,8 +202,39 @@ export type ManualNotificationMemberOption = {
 };
 
 export type ManualNotificationOptionsResponse = {
+  session: ManualNotificationSessionSummary | null;
   templates: ManualNotificationTemplateOption[];
   members: PagedResponse<ManualNotificationMemberOption>;
+  recentDispatches: ManualNotificationDispatchListItem[];
+};
+
+export type ManualNotificationSessionSummary = {
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  date: string | null;
+  state: string;
+  visibility: string;
+  feedbackDocumentUploaded: boolean;
+};
+
+export type ManualNotificationDispatchListItem = {
+  manualDispatchId: string;
+  eventId: string;
+  source: "MANUAL";
+  eventType: HostNotificationEventType;
+  sessionId: string;
+  sessionNumber: number;
+  bookTitle: string;
+  requestedChannels: ManualNotificationRequestedChannels;
+  audience: ManualNotificationAudience;
+  resend: boolean;
+  requestedBy: string;
+  targetCount: number;
+  expectedInAppCount: number;
+  expectedEmailCount: number;
+  eventStatus: "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
+  createdAt: string;
 };
 
 export type ManualNotificationSelectionRequest = {

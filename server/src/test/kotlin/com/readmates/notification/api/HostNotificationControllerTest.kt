@@ -10,6 +10,7 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
 import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers.containsString
 import jakarta.mail.Session
 import jakarta.mail.internet.MimeMessage
 import org.junit.jupiter.api.BeforeEach
@@ -577,6 +578,40 @@ class HostNotificationControllerTest(
     }
 
     @Test
+    fun `host lists manual dispatch audit rows`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val previewId = createManualPreview()
+            confirmManualDispatch(previewId, resendConfirmed = true)
+
+            mockMvc.get("/api/host/notifications/manual/dispatches") {
+                with(user("host@example.com"))
+                param("sessionId", "00000000-0000-0000-0000-000000000301")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].source") { value("MANUAL") }
+                jsonPath("$.items[0].requestedChannels") { value("BOTH") }
+                jsonPath("$.items[0].requestedBy") { value(containsString("***@")) }
+            }
+        }
+    }
+
+    @Test
+    fun `host event ledger exposes manual source metadata`() {
+        withTemporarySessionState("OPEN", "MEMBER") {
+            val previewId = createManualPreview()
+            val eventId = confirmManualDispatch(previewId, resendConfirmed = true)
+
+            mockMvc.get("/api/host/notifications/events") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[?(@.id == '$eventId')].source") { value("MANUAL") }
+                jsonPath("$.items[?(@.id == '$eventId')].manualDispatch.requestedChannels") { value("BOTH") }
+            }
+        }
+    }
+
+    @Test
     fun `nearby notification post path without csrf remains protected`() {
         mockMvc.post("/api/host/notifications/process/extra") {
             with(user("host@example.com"))
@@ -623,6 +658,46 @@ class HostNotificationControllerTest(
             )
         }
     }
+
+    private fun createManualPreview(): String =
+        mockMvc.post("/api/host/notifications/manual/preview") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+              {
+                "sessionId": "00000000-0000-0000-0000-000000000301",
+                "eventType": "SESSION_REMINDER_DUE",
+                "audience": "ALL_ACTIVE_MEMBERS",
+                "requestedChannels": "BOTH",
+                "excludedMembershipIds": [],
+                "includedMembershipIds": [],
+                "sendMode": "NOW"
+              }
+            """.trimIndent()
+        }.andReturn().response.contentAsString
+            .let { tools.jackson.databind.ObjectMapper().readTree(it).get("previewId").asText() }
+
+    private fun confirmManualDispatch(previewId: String, resendConfirmed: Boolean): String =
+        mockMvc.post("/api/host/notifications/manual") {
+            with(user("host@example.com"))
+            contentType = MediaType.APPLICATION_JSON
+            content = """
+              {
+                "previewId": "$previewId",
+                "sessionId": "00000000-0000-0000-0000-000000000301",
+                "eventType": "SESSION_REMINDER_DUE",
+                "audience": "ALL_ACTIVE_MEMBERS",
+                "requestedChannels": "BOTH",
+                "excludedMembershipIds": [],
+                "includedMembershipIds": [],
+                "sendMode": "NOW",
+                "resendConfirmed": $resendConfirmed
+              }
+            """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+            .let { tools.jackson.databind.ObjectMapper().readTree(it).get("eventId").asText() }
 
     private fun insertOtherClub() {
         jdbcTemplate.update(

@@ -1,6 +1,7 @@
 export type NotificationEventOutboxStatus = "PENDING" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "DEAD";
 export type NotificationDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED" | "DEAD" | "SKIPPED";
 export type NotificationChannel = "EMAIL" | "IN_APP";
+export type NotificationDispatchSource = "AUTOMATIC" | "MANUAL";
 export type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"
@@ -19,6 +20,17 @@ export type HostNotificationEventItem = {
   eventType: HostNotificationEventType;
   status: NotificationEventOutboxStatus;
   attemptCount: number;
+  source?: NotificationDispatchSource;
+  manualDispatch?: {
+    manualDispatchId: string;
+    requestedChannels: "IN_APP" | "EMAIL" | "BOTH";
+    audience: "ALL_ACTIVE_MEMBERS" | "SESSION_PARTICIPANTS" | "CONFIRMED_ATTENDEES";
+    resend: boolean;
+    requestedBy: string;
+    targetCount: number;
+    expectedInAppCount: number;
+    expectedEmailCount: number;
+  } | null;
   createdAt: string;
   updatedAt: string;
 };

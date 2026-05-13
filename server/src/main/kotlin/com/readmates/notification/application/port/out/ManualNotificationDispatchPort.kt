@@ -1,5 +1,6 @@
 package com.readmates.notification.application.port.out
 
+import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationMemberOption
 import com.readmates.notification.application.model.ManualNotificationRecentDispatch
 import com.readmates.notification.application.model.ManualNotificationSelection
@@ -7,6 +8,7 @@ import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -15,6 +17,7 @@ data class ManualNotificationSessionContext(
     val clubId: UUID,
     val sessionNumber: Int,
     val bookTitle: String,
+    val date: LocalDate?,
     val state: String,
     val visibility: String,
     val feedbackDocumentUploaded: Boolean,
@@ -47,7 +50,19 @@ data class ManualNotificationStoredDispatch(
 
 interface ManualNotificationDispatchPort {
     fun findSessionContext(clubId: UUID, sessionId: UUID): ManualNotificationSessionContext?
-    fun listMembers(clubId: UUID, sessionId: UUID?, pageRequest: PageRequest): CursorPage<ManualNotificationMemberOption>
+    fun listMembers(
+        clubId: UUID,
+        sessionId: UUID?,
+        search: String?,
+        pageRequest: PageRequest,
+    ): CursorPage<ManualNotificationMemberOption>
+    fun listDispatches(
+        clubId: UUID,
+        sessionId: UUID?,
+        eventType: NotificationEventType?,
+        pageRequest: PageRequest,
+    ): ManualNotificationDispatchList
+    fun validateMembershipEdits(clubId: UUID, membershipIds: Set<UUID>): Boolean
     fun previewTargets(clubId: UUID, selection: ManualNotificationSelection): ManualNotificationTargetSnapshot
     fun recentDispatches(clubId: UUID, sessionId: UUID, eventType: NotificationEventType): List<ManualNotificationRecentDispatch>
     fun insertPreview(clubId: UUID, hostMembershipId: UUID, selectionHash: String, expiresAt: OffsetDateTime): UUID

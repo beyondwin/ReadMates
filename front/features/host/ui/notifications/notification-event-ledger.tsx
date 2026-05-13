@@ -6,6 +6,7 @@ import {
   eventOutboxStatusLabels,
   type HostNotificationEventItem,
 } from "./notification-formatters";
+import { manualAudienceLabels, manualChannelLabels } from "./manual-notification-labels";
 
 export function NotificationEventLedger({ events }: { events: HostNotificationEventItem[] }) {
   if (events.length === 0) {
@@ -41,12 +42,23 @@ function NotificationEventRow({ event, isFirst }: { event: HostNotificationEvent
           <strong className="body" style={{ minWidth: 0 }}>
             {eventLabels[event.eventType]}
           </strong>
+          <span className={event.source === "MANUAL" ? "badge badge-accent badge-dot" : "badge"}>
+            {event.source === "MANUAL" ? "수동" : "자동"}
+          </span>
           <span className={eventOutboxStatusBadgeClass(event.status)}>{event.status}</span>
         </div>
         <div className="tiny" style={{ color: "var(--text-2)", marginTop: 5 }}>
           <span>{eventOutboxStatusLabels[event.status]}</span>
           <span> · {Math.max(0, event.attemptCount)}회 시도</span>
         </div>
+        {event.manualDispatch ? (
+          <div className="tiny" style={{ color: "var(--text-2)", marginTop: 3 }}>
+            <span>{manualChannelLabels[event.manualDispatch.requestedChannels]}</span>
+            <span> · {manualAudienceLabels[event.manualDispatch.audience]}</span>
+            <span> · {event.manualDispatch.targetCount}명</span>
+            <span> · 요청 {event.manualDispatch.requestedBy}</span>
+          </div>
+        ) : null}
         <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
           생성 {formatDateOnlyLabel(event.createdAt)} · 업데이트 {formatDateOnlyLabel(event.updatedAt)}
         </div>

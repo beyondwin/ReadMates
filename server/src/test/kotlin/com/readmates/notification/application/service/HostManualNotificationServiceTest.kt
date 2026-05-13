@@ -6,6 +6,7 @@ import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationConfirmCommand
+import com.readmates.notification.application.model.ManualNotificationDispatchList
 import com.readmates.notification.application.model.ManualNotificationMemberOption
 import com.readmates.notification.application.model.ManualNotificationPreviewCommand
 import com.readmates.notification.application.model.ManualNotificationRecentDispatch
@@ -26,6 +27,7 @@ import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -40,7 +42,7 @@ class HostManualNotificationServiceTest {
         )
         val service = service(port)
 
-        val options = service.options(host(), SESSION_ID, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
+        val options = service.options(host(), SESSION_ID, null, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
 
         val feedback = options.templates.single { it.eventType == NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED }
         assertThat(feedback.enabled).isFalse()
@@ -90,6 +92,23 @@ class HostManualNotificationServiceTest {
             .isEqualTo(ManualNotificationRequestedChannels.BOTH)
     }
 
+    @Test
+    fun `preview rejects membership edits outside current club`() {
+        val invalidId = UUID.nameUUIDFromBytes("invalid".toByteArray())
+        val port = FakeManualPort(membershipEditsAllowed = false)
+        val service = service(port)
+
+        assertThatThrownBy {
+            service.preview(
+                host(),
+                ManualNotificationPreviewCommand(selection(includedMembershipIds = listOf(invalidId))),
+            )
+        }
+            .isInstanceOf(NotificationApplicationException::class.java)
+            .extracting("error")
+            .isEqualTo(NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED)
+    }
+
     private fun service(port: ManualNotificationDispatchPort) =
         HostManualNotificationService(port, clock = { now })
 
@@ -105,13 +124,16 @@ class HostManualNotificationServiceTest {
         membershipStatus = MembershipStatus.ACTIVE,
     )
 
-    private fun selection() = ManualNotificationSelection(
+    private fun selection(
+        includedMembershipIds: List<UUID> = emptyList(),
+        excludedMembershipIds: List<UUID> = emptyList(),
+    ) = ManualNotificationSelection(
         sessionId = SESSION_ID,
         eventType = NotificationEventType.SESSION_REMINDER_DUE,
         audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
         requestedChannels = ManualNotificationRequestedChannels.BOTH,
-        excludedMembershipIds = emptyList(),
-        includedMembershipIds = emptyList(),
+        excludedMembershipIds = excludedMembershipIds,
+        includedMembershipIds = includedMembershipIds,
         sendMode = ManualNotificationSendMode.NOW,
     )
 
@@ -120,6 +142,7 @@ class HostManualNotificationServiceTest {
         clubId = CLUB_ID,
         sessionNumber = 7,
         bookTitle = "Example Book",
+        date = LocalDate.parse("2026-05-20"),
         state = "OPEN",
         visibility = "MEMBER",
         feedbackDocumentUploaded = feedbackDocumentUploaded,
@@ -131,11 +154,13 @@ class HostManualNotificationServiceTest {
             clubId = CLUB_ID,
             sessionNumber = 7,
             bookTitle = "Example Book",
+            date = LocalDate.parse("2026-05-20"),
             state = "OPEN",
             visibility = "MEMBER",
             feedbackDocumentUploaded = true,
         ),
         private val recentDispatchCount: Int = 0,
+        private val membershipEditsAllowed: Boolean = true,
     ) : ManualNotificationDispatchPort {
         val insertedPreviewHashes = mutableListOf<String>()
         val insertedDispatches = mutableListOf<NotificationEventPayload>()
@@ -143,8 +168,17 @@ class HostManualNotificationServiceTest {
 
         override fun findSessionContext(clubId: UUID, sessionId: UUID) = sessionContext
 
-        override fun listMembers(clubId: UUID, sessionId: UUID?, pageRequest: PageRequest) =
+        override fun listMembers(clubId: UUID, sessionId: UUID?, search: String?, pageRequest: PageRequest) =
             CursorPage<ManualNotificationMemberOption>(emptyList(), null)
+
+        override fun listDispatches(
+            clubId: UUID,
+            sessionId: UUID?,
+            eventType: NotificationEventType?,
+            pageRequest: PageRequest,
+        ) = ManualNotificationDispatchList(emptyList(), null)
+
+        override fun validateMembershipEdits(clubId: UUID, membershipIds: Set<UUID>) = membershipEditsAllowed
 
         override fun previewTargets(clubId: UUID, selection: ManualNotificationSelection) =
             ManualNotificationTargetSnapshot(

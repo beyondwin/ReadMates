@@ -4,6 +4,7 @@ import {
   fetchHostNotificationEvents,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
+  fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
   previewManualNotification,
   processHostNotifications,
@@ -17,6 +18,7 @@ import type {
   HostNotificationEventListResponse,
   HostNotificationSummary,
   ManualNotificationOptionsResponse,
+  ManualNotificationDispatchListResponse,
   NotificationTestMailAuditPage,
 } from "@/features/host/api/host-contracts";
 import type { PageRequest } from "@/shared/model/paging";
@@ -30,6 +32,7 @@ export type HostNotificationsRouteData = {
   deliveries: HostNotificationDeliveryListResponse;
   audit: NotificationTestMailAuditPage;
   manualOptions: ManualNotificationOptionsResponse;
+  manualDispatches: ManualNotificationDispatchListResponse;
   initialManualSelection: {
     sessionId: string | null;
     eventType: HostNotificationEventType | null;
@@ -43,12 +46,13 @@ export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promis
   const sessionId = url?.searchParams.get("sessionId") ?? null;
   const eventType = (url?.searchParams.get("eventType") as HostNotificationEventType | null) ?? null;
 
-  const [summary, events, deliveries, audit, manualOptions] = await Promise.all([
+  const [summary, events, deliveries, audit, manualOptions, manualDispatches] = await Promise.all([
     fetchHostNotificationSummary(context),
     fetchHostNotificationEvents(context, { limit: 50 }),
     fetchHostNotificationDeliveries(context, { limit: 50 }),
     fetchHostNotificationTestMailAudit(context, { limit: 50 }),
     fetchManualNotificationOptions(context, { sessionId: sessionId ?? undefined }),
+    fetchManualNotificationDispatches(context, { page: { limit: 20 } }),
   ]);
 
   return {
@@ -57,6 +61,7 @@ export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promis
     deliveries,
     audit,
     manualOptions,
+    manualDispatches,
     initialManualSelection: { sessionId, eventType },
   };
 }
@@ -73,7 +78,8 @@ export const hostNotificationsActions = {
   sendTestMail: sendHostNotificationTestMail,
   previewManual: previewManualNotification,
   confirmManual: confirmManualNotification,
-  loadManualOptions: (sessionId?: string, page?: PageRequest) => fetchManualNotificationOptions(undefined, { sessionId, page }),
+  loadManualOptions: (sessionId?: string, search?: string, page?: PageRequest) => fetchManualNotificationOptions(undefined, { sessionId, search, page }),
+  loadManualDispatches: (page?: PageRequest) => fetchManualNotificationDispatches(undefined, { page }),
   loadEvents: (page?: PageRequest) => fetchHostNotificationEvents(undefined, page),
   loadDeliveries: (page?: PageRequest) => fetchHostNotificationDeliveries(undefined, page),
   loadAudit: (page?: PageRequest) => fetchHostNotificationTestMailAudit(undefined, page),

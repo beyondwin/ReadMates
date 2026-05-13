@@ -51,6 +51,15 @@ const deadDelivery: HostNotificationDeliveryItem = {
 };
 
 const manualOptionsFixture: ManualNotificationOptionsResponse = {
+  session: {
+    sessionId: "session-1",
+    sessionNumber: 8,
+    bookTitle: "Example Book",
+    date: "2026-05-20",
+    state: "OPEN",
+    visibility: "MEMBER",
+    feedbackDocumentUploaded: true,
+  },
   templates: [
     {
       eventType: "SESSION_REMINDER_DUE",
@@ -72,7 +81,27 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
     },
   ],
   members: { items: [], nextCursor: null },
+  recentDispatches: [],
 };
+
+const manualDispatch = {
+  manualDispatchId: "dispatch-1",
+  eventId: "event-manual",
+  source: "MANUAL",
+  eventType: "SESSION_REMINDER_DUE",
+  sessionId: "session-1",
+  sessionNumber: 8,
+  bookTitle: "Example Book",
+  requestedChannels: "BOTH",
+  audience: "ALL_ACTIVE_MEMBERS",
+  resend: true,
+  requestedBy: "h***@example.com",
+  targetCount: 17,
+  expectedInAppCount: 17,
+  expectedEmailCount: 14,
+  eventStatus: "PUBLISHED",
+  createdAt: "2026-05-13T10:10:00Z",
+} as const;
 
 type ActionMock = ReturnType<typeof vi.fn>;
 
@@ -87,6 +116,8 @@ function renderPage({
   onSendTestMail = vi.fn().mockResolvedValue(undefined),
   onPreviewManual = vi.fn().mockResolvedValue(undefined),
   onConfirmManual = vi.fn().mockResolvedValue(undefined),
+  onLoadManualOptions = vi.fn().mockResolvedValue(manualOptions),
+  onLoadMoreManualMembers = vi.fn().mockResolvedValue(manualOptions),
 }: {
   events?: HostNotificationEventItem[];
   deliveries?: HostNotificationDeliveryItem[];
@@ -98,6 +129,8 @@ function renderPage({
   onSendTestMail?: ActionMock;
   onPreviewManual?: (request: ManualNotificationPreviewRequest) => Promise<unknown>;
   onConfirmManual?: (request: ManualNotificationConfirmRequest) => Promise<unknown>;
+  onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
+  onLoadMoreManualMembers?: () => Promise<ManualNotificationOptionsResponse>;
 } = {}) {
   render(
     <HostNotificationsPage
@@ -113,6 +146,8 @@ function renderPage({
       onSendTestMail={onSendTestMail}
       onPreviewManual={onPreviewManual}
       onConfirmManual={onConfirmManual}
+      onLoadManualOptions={onLoadManualOptions}
+      onLoadMoreManualMembers={onLoadMoreManualMembers}
     />,
   );
 
@@ -140,12 +175,94 @@ describe("HostNotificationsPage", () => {
           },
         ],
         members: { items: [], nextCursor: null },
+        session: null,
+        recentDispatches: [],
       },
     });
 
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
     expect(screen.getByText("모임 전날 리마인더")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "운영 장부" })).toBeInTheDocument();
+  });
+
+  it("renders recent manual dispatches and source metadata", () => {
+    renderPage({
+      manualOptions: {
+        ...manualOptionsFixture,
+        recentDispatches: [manualDispatch],
+      } as ManualNotificationOptionsResponse,
+      events: [
+        {
+          ...pendingEvent,
+          id: "event-manual",
+          eventType: "SESSION_REMINDER_DUE",
+          source: "MANUAL",
+          manualDispatch: {
+            manualDispatchId: "dispatch-1",
+            requestedChannels: "BOTH",
+            audience: "ALL_ACTIVE_MEMBERS",
+            resend: true,
+            requestedBy: "h***@example.com",
+            targetCount: 17,
+            expectedInAppCount: 17,
+            expectedEmailCount: 14,
+          },
+        } as HostNotificationEventItem,
+      ],
+    });
+
+    expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
+    expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("수동").length).toBeGreaterThan(0);
+  });
+
+  it("searches manual notification members and loads more", async () => {
+    const user = userEvent.setup();
+    const searchedOptions = {
+      ...manualOptionsFixture,
+      members: {
+        items: [],
+        nextCursor: "cursor-2",
+      },
+    } as ManualNotificationOptionsResponse;
+    const nextOptions = {
+      ...manualOptionsFixture,
+      members: {
+        items: [
+          {
+            membershipId: "member-2",
+            displayName: "추가 멤버 이름",
+            maskedEmail: "m***@example.com",
+            role: "MEMBER",
+            membershipStatus: "ACTIVE",
+            sessionParticipationStatus: "ACTIVE",
+            attendanceStatus: null,
+            emailEligibility: "ELIGIBLE",
+            inAppEligibility: "ELIGIBLE",
+          },
+        ],
+        nextCursor: null,
+      },
+    } as ManualNotificationOptionsResponse;
+    const onLoadManualOptions = vi.fn().mockResolvedValue(searchedOptions);
+    const onLoadMoreManualMembers = vi.fn().mockResolvedValue(nextOptions);
+
+    renderPage({
+      manualOptions: {
+        ...manualOptionsFixture,
+        members: { items: [], nextCursor: "cursor-1" },
+      },
+      onLoadManualOptions,
+      onLoadMoreManualMembers,
+    });
+
+    await user.type(screen.getByRole("searchbox", { name: "멤버 검색" }), "김");
+    await user.click(screen.getByRole("button", { name: "검색" }));
+    expect(onLoadManualOptions).toHaveBeenCalledWith("session-1", "김");
+
+    await user.click(screen.getByRole("button", { name: "멤버 더 보기" }));
+    expect(onLoadMoreManualMembers).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText("추가 멤버 이름")).toBeInTheDocument();
   });
 
   it("previews and confirms a manual notification with resend confirmation", async () => {
@@ -314,6 +431,22 @@ describe("HostNotificationsPage", () => {
         onConfirmManual={vi.fn().mockResolvedValue(undefined)}
       />,
     );
+
+    await user.click(screen.getByRole("button", { name: "대기/실패 처리" }));
+
+    expect(onProcess).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps processing available when a pending event is visible even if the summary is stale", async () => {
+    const user = userEvent.setup();
+    const onProcess = vi.fn().mockResolvedValue(undefined);
+
+    renderPage({
+      summary: { ...summary, pending: 0, failed: 0 },
+      events: [pendingEvent],
+      deliveries: [],
+      onProcess,
+    });
 
     await user.click(screen.getByRole("button", { name: "대기/실패 처리" }));
 

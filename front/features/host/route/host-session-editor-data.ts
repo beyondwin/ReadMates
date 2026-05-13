@@ -3,6 +3,7 @@ import {
   closeHostSession,
   createHostSession,
   deleteHostSession,
+  fetchManualNotificationDispatches,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
   publishHostSession,
@@ -24,7 +25,12 @@ export async function hostSessionEditorLoader(args: LoaderFunctionArgs) {
     throw new Error("Missing host session id");
   }
 
-  return fetchHostSessionDetail(params.sessionId, context);
+  const [session, notificationDispatches] = await Promise.all([
+    fetchHostSessionDetail(params.sessionId, context),
+    fetchManualNotificationDispatches(context, { sessionId: params.sessionId, page: { limit: 20 } }),
+  ]);
+
+  return { session, notificationDispatches };
 }
 
 export const hostSessionEditorActions = {
