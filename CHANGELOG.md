@@ -8,6 +8,28 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 릴리즈 대기 항목 없음.
 
+## v1.8.2 - 2026-05-13
+
+### Highlights
+
+ReadMates v1.8.2는 GitHub Actions의 ShellCheck 0.9.0 기준에서 v1.8.1 main CI Scripts 잡이 실패한 문제를 해소하는 패치 릴리스입니다. DB migration 없음. 사용자 기능 변경 없음.
+
+### Fixed
+
+- **Scripts CI ShellCheck 0.9.0 호환성 복구**: public release fixture 검증 스크립트의 `cat | sort` 파이프를 직접 `sort "$file"` 호출로 바꿔 CI ShellCheck 경고를 제거했습니다.
+
+### Deployment Notes
+
+- **DB migration**: 없음.
+- **배포 순서**: v1.8.2 태그 이미지의 서버 스캔/promotion이 성공한 뒤 OCI compose stack에 반영하고, 같은 태그의 Cloudflare Pages 프론트엔드 배포 상태를 확인합니다.
+
+### Verification
+
+- `shellcheck scripts/*.sh deploy/oci/*.sh` — exit 0.
+- `./scripts/build-public-release-candidate.sh && ./scripts/public-release-check.sh .tmp/public-release-candidate` — passed, gitleaks found no leaks.
+- `./server/gradlew -p server clean test bootJar` — v1.8.1 서버 의존성 패치 후 BUILD SUCCESSFUL.
+- GitHub Actions main CI에서 v1.8.1 Scripts 잡이 ShellCheck 0.9.0 SC2002로 실패한 로그 확인 후 반영.
+
 ## v1.8.1 - 2026-05-13
 
 ### Highlights

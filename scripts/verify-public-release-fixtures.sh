@@ -146,7 +146,7 @@ if [[ ! -f "$coverage_fixture" ]]; then
 fi
 
 candidate_top="$(find "$candidate_dir" -mindepth 1 -maxdepth 1 -exec basename {} \; | sort)"
-expected_top="$(cat "$coverage_fixture" | sort)"
+expected_top="$(sort "$coverage_fixture")"
 
 if [ "$candidate_top" != "$expected_top" ]; then
   printf 'public release candidate top-level mismatch:\n' >&2
