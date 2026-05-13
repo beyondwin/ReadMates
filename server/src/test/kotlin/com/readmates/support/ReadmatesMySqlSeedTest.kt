@@ -14,7 +14,6 @@ import org.springframework.test.context.TestPropertySource
 @TestPropertySource(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
-        "spring.jpa.hibernate.ddl-auto=validate",
     ],
 )
 class ReadmatesMySqlSeedTest(
