@@ -8,6 +8,29 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 릴리즈 대기 항목 없음.
 
+## v1.8.3 - 2026-05-13
+
+### Highlights
+
+ReadMates v1.8.3은 v1.8.2 서버 이미지 Trivy 스캔에서 남은 Netty DNS codec 취약점 한 건을 해소하는 패치 릴리스입니다. DB migration 없음. 사용자 기능 변경 없음.
+
+### Fixed
+
+- **서버 이미지 Trivy 스캔 Netty 잔여 항목 복구**: `io.netty:netty-codec-dns`를 4.2.13.Final로 고정해 CVE-2026-42579가 포함된 4.2.12.Final 런타임 jar가 이미지에 들어가지 않도록 했습니다.
+
+### Deployment Notes
+
+- **DB migration**: 없음.
+- **배포 순서**: v1.8.3 태그 이미지의 Trivy 스캔과 release tag promotion이 성공한 뒤 OCI compose stack에 반영하고, 같은 태그의 Cloudflare Pages 프론트엔드 배포 상태를 확인합니다.
+- **v1.8.2 주의**: v1.8.2 main CI와 프론트엔드 배포는 통과했지만, 서버 이미지 promotion은 Netty DNS codec 스캔 실패로 완료되지 않았습니다. 운영 서버에는 v1.8.3 이미지를 사용하세요.
+
+### Verification
+
+- `./server/gradlew -p server dependencyInsight --dependency netty-codec-dns --configuration runtimeClasspath` — Netty DNS codec 4.2.13.Final 확인.
+- `./server/gradlew -p server clean test bootJar` — BUILD SUCCESSFUL.
+- `./scripts/build-public-release-candidate.sh && ./scripts/public-release-check.sh .tmp/public-release-candidate` — passed, gitleaks found no leaks.
+- v1.8.2 `Deploy Server Image` workflow의 Trivy 로그에서 CVE-2026-42579 단일 HIGH 실패 원인 확인 후 반영.
+
 ## v1.8.2 - 2026-05-13
 
 ### Highlights

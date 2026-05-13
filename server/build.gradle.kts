@@ -9,6 +9,8 @@ plugins {
 group = "com.readmates"
 version = "0.0.1-SNAPSHOT"
 
+extra["netty.version"] = "4.2.13.Final"
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(21))
@@ -32,6 +34,9 @@ dependencies {
         }
         implementation("tools.jackson.core:jackson-core:3.1.2") {
             because("Trivy flags jackson-core 3.0.2 for high severity parser issues.")
+        }
+        implementation("io.netty:netty-codec-dns:4.2.13.Final") {
+            because("Trivy flags CVE-2026-42579 in netty-codec-dns 4.2.12.Final.")
         }
     }
 
