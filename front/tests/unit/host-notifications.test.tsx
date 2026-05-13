@@ -514,6 +514,10 @@ describe("HostNotificationsPage", () => {
 
     expect(await screen.findByText("앱 알림 3명")).toBeInTheDocument();
     expect(screen.getByText("이메일 2명")).toBeInTheDocument();
+    const previewPanel = screen.getByRole("heading", { name: "발송 전 확인" }).closest("section");
+    expect(previewPanel).not.toBeNull();
+    expect(within(previewPanel as HTMLElement).getByText("모임 전날 리마인더")).toBeInTheDocument();
+    expect(within(previewPanel as HTMLElement).getByText("모임 전 준비를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.getByText("이미 발송된 알림입니다.")).toBeInTheDocument();
 
     const confirm = screen.getByRole("button", { name: "발송 확인" });
