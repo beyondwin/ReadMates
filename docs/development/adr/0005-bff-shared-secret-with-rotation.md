@@ -3,7 +3,7 @@
 - 상태: Accepted
 - 결정일: 2026-05-09
 - 작성자: 보안/인프라
-- 관련: ADR-0001 (BFF), ADR-0006 (session cookie),
+- 관련: ADR-0001 (BFF), ADR-0006 (session cookie), ADR-0014 (BFF secret rotation lifecycle),
   `front/functions/_shared/proxy.ts`,
   `server/src/main/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilter.kt`,
   `server/src/main/resources/application.yml`,
@@ -24,7 +24,7 @@ secret을 새 값으로 바꾸려면 Cloudflare Pages와 Spring 서버 양쪽의
 - Cloudflare Pages 환경 변수 갱신 → Pages Functions 재배포 (수십 초)
 - Spring 서버 환경 변수 갱신 → 서버 재시작 (수십 초)
 
-이 두 작업이 원자적으로 발생하지 않는다. 교체 중 짧은 시간에 한쪽은 구 secret, 다른 쪽은 새 secret을 갖게 되어 모든 API 요청이 403으로 실패한다. 이 다운타임은 피크 시간대에는 특히 부담이 된다.
+이 두 작업이 원자적으로 발생하지 않는다. 교체 중 짧은 시간에 한쪽은 구 secret, 다른 쪽은 새 secret을 갖게 되어 모든 API 요청이 401로 실패한다. 이 다운타임은 피크 시간대에는 특히 부담이 된다.
 
 **문제 2: 노출 의심 시 즉각 대응 불가**
 
@@ -84,19 +84,19 @@ private val secrets: List<String> = run {
 
 들어오는 요청의 `X-Readmates-Bff-Secret` 헤더가 list의 어느 값과 일치해도 허용된다.
 
-**Timing-safe 비교**: `BffSecretFilter.kt:103-114`의 `matchesAny()`에서 secret 비교가 `MessageDigest.isEqual()`로 처리된다. 모든 candidate를 순회(early return 없음)해 timing attack을 방지한다:
+**Timing-safe 비교**: secret 비교는 `SecretComparator.firstMatchingIndex()`에서 `MessageDigest.isEqual()`로 처리된다. 모든 candidate를 순회(early return 없음)해 timing attack과 index 위치 노출을 줄이고, `BffSecretFilter`와 `RateLimitFilter`가 같은 comparator를 사용한다:
 
 ```kotlin
-for (candidate in candidates) {
-    val candidateBytes = candidate.toByteArray(StandardCharsets.UTF_8)
-    if (MessageDigest.isEqual(providedBytes, candidateBytes)) {
-        matched = true
-        // no early return — iterate all for timing uniformity
+var matched = -1
+candidates.forEachIndexed { idx, candidate ->
+    if (MessageDigest.isEqual(provided, candidate)) {
+        matched = idx
     }
 }
+return matched
 ```
 
-**Alias 추적**: `BffSecretFilter.kt:116-128`의 `aliasFor()`에서 일치하는 secret의 index를 `"primary"`, `"secondary"`, `"index_N"` alias로 변환한다. audit 기록에 어느 secret이 사용됐는지 기록할 때 raw secret 값 대신 alias를 저장한다.
+**Alias 추적**: `BffSecretFilter.aliasFor()`에서 일치하는 secret의 index를 `"primary"`, `"secondary"`, `"index_N"` alias로 변환한다. audit 기록에 어느 secret이 사용됐는지 기록할 때 raw secret 값 대신 alias를 저장한다.
 
 **Origin/Referer 이중 방어**: `BffSecretFilter.kt:75`에서 mutating request 진입을 차단하고, `:130-136`의 `hasAllowedOrigin()`이 `Origin` 또는 `Referer` 헤더를 허용 목록에서 확인한다. BFF secret 검증 외에도 이중으로 검사한다. BFF secret이 노출된 상태에서도 cross-site mutation을 차단한다.
 
@@ -114,9 +114,11 @@ for (candidate in candidates) {
 
 ### Rotation audit
 
-모든 secret 회전은 `bff_secret_rotation_audit` 테이블에 row로 기록된다:
+성공한 BFF secret 요청은 `readmates.security.bff.audit-mode` 설정에 따라 `bff_secret_rotation_audit` 테이블에 row로 기록된다:
 - `V26__bff_secret_rotation_audit.sql` — 테이블 생성
 - `JdbcBffSecretRotationAuditAdapter.kt:24` — audit row 삽입
+
+기본값 `rotation-only`는 회전 확인에 필요한 non-primary alias(`secondary`, `index_N`) 사용만 기록한다. `all`은 짧은 incident window에서 모든 성공 요청을 기록하고, `off`는 audit table이나 DB 압박 상황에서 임시로 기록을 끈다.
 
 ## 근거
 
@@ -135,7 +137,7 @@ secret 노출이 의심될 때:
 
 ### Audit trail
 
-`bff_secret_rotation_audit` 테이블에 회전 일시, 이유, 실행자 정보가 기록된다. 보안 감사 시 "이 secret이 언제 유효했는가"를 DB에서 조회할 수 있다. 컴플라이언스 요구사항 충족.
+`bff_secret_rotation_audit` 테이블에는 raw secret 대신 alias, 사용 시각, client IP hash, 요청 path가 기록된다. 기본 `rotation-only` 모드에서는 primary 요청이 쌓이지 않으므로 평상시 DB 적재량을 낮추면서도 old-secret alias 트래픽이 남았는지 확인할 수 있다.
 
 ### 단순한 구현
 
@@ -159,7 +161,7 @@ Spring이 여러 secret을 동시에 허용하므로, Kubernetes 또는 Docker S
 
 긍정적:
 - 무중단 secret 회전이 가능하다. 트래픽 중단 없이 secret을 교체할 수 있다.
-- 회전 이력이 `bff_secret_rotation_audit` 테이블에 영구 보존된다.
+- 기본 audit mode에서 non-primary alias 사용이 `bff_secret_rotation_audit` 테이블에 보존되어 회전 완료 여부를 확인할 수 있다.
 - 보안 인시던트 발생 시 분 단위 대응이 가능하다.
 - Spring이 여러 secret을 동시에 허용하므로, rolling update 중에도 모든 요청이 처리된다.
 - 구현이 단순해 실수의 여지가 적다.
@@ -167,7 +169,8 @@ Spring이 여러 secret을 동시에 허용하므로, Kubernetes 또는 Docker S
 부정적/감수한 비용:
 - Cloudflare Pages와 Spring 서버 양쪽의 환경 변수를 동기화할 책임이 운영자에게 있다. 동기화 오류 발생 시 트래픽이 차단된다.
 - 4단계 회전 절차 runbook이 필요하다. 문서화되지 않으면 운영자가 절차를 실수할 수 있다.
-- `READMATES_BFF_SECRETS`가 여러 값을 포함할 때 어느 값이 "현재 primary"인지 명시적으로 알기 어렵다. 운영 상태를 파악하려면 환경 변수와 audit 테이블을 함께 봐야 한다.
+- 기본 `rotation-only` audit mode는 primary alias 요청을 기록하지 않는다. 전체 요청 감사가 필요한 짧은 incident window에서는 `READMATES_SECURITY_BFF_AUDIT_MODE=all`을 명시해야 한다.
+- `READMATES_BFF_SECRETS`가 여러 값을 포함할 때 어느 값이 "현재 primary"인지 운영자가 확인해야 한다. ADR-0014의 `GET /api/bff/__internal/secret-status` 진단 route는 count, stage, primary fingerprint만 노출해 raw secret 없이 상태를 확인한다.
 - 두 환경 변수의 의미와 관계를 이해하지 못한 운영자가 잘못 설정하면 보안 취약점이 생길 수 있다.
 
 ## 검증
@@ -179,22 +182,22 @@ BFF secret 처리 통합 테스트:
 
 수동 인수 테스트:
 - valid secret 헤더로 Spring API 호출 → 200 응답 확인
-- invalid secret 헤더로 Spring API 호출 → 403 응답 확인
+- invalid secret 헤더로 Spring API 호출 → 401 응답 확인
 - `READMATES_BFF_SECRETS`에 두 값이 있을 때 각각으로 요청 → 모두 200 응답 확인
 
 rotation audit 검증:
-- `bff_secret_rotation_audit` 테이블에 row 삽입 후 조회 확인 (`JdbcBffSecretRotationAuditAdapter.kt:24`)
+- 기본 `rotation-only`에서는 secondary/index alias 사용만 `bff_secret_rotation_audit`에 기록되는지 확인
+- `READMATES_SECURITY_BFF_AUDIT_MODE=all`에서는 primary 포함 모든 성공 요청이 기록되는지 확인
 
 public release 검증:
 - ADR 및 문서에 실제 secret 값이 포함되지 않는지 확인: `./scripts/public-release-check.sh`
 
 ## 후속 작업
 
-- secret rotation runbook 별도 문서화 (`docs/deploy/` 하위). 4단계 절차 상세, 각 단계의 검증 방법, rollback 절차, 인시던트 시 긴급 회전 절차 포함.
+- secret rotation runbook 고도화: `docs/deploy/oci-backend.md`와 `docs/deploy/security-public-repo.md`의 절차를 기준으로 rollback, incident window, `audit-mode=all` 사용 시점을 더 명확히 한다.
 - 자동 회전(90일 주기) 도입 검토: GitHub Actions scheduled workflow가 새 secret 생성 → 양쪽 환경 변수 갱신 → audit row 삽입을 자동화.
-- 현재 유효 secret 목록을 운영 dashboard에 노출. secret 값이 아닌 hash/fingerprint로 어느 secret이 active인지 확인 가능하게.
+- 현재 유효 secret 상태 노출은 ADR-0014의 `GET /api/bff/__internal/secret-status`로 1차 해결됐다. 후속으로 동일 정보를 운영 dashboard에 연결할 수 있다.
 - Spring `bff-secret-required=false` 설정의 사용 케이스와 허용 환경 명확화 (로컬 dev에서 항상 false 허용인지).
 - `READMATES_BFF_SECRETS` 최대 허용 개수 정책: 현재 무제한 candidate를 허용한다. 실수로 오래된 secret을 제거하지 않으면 계속 쌓인다. "rotation 완료 후 2개 초과는 경고" 같은 정책 및 startup 시 개수 확인 로직 검토.
-- BFF secret alias 활용 확장: `BffSecretFilter.kt:116-128`의 alias(`primary`, `secondary`, `index_N`)가 현재 audit 기록에만 쓰인다. 메트릭(어느 alias가 얼마나 사용되는지)으로 확장하면 회전 완료 여부를 모니터링할 수 있다.
-- 4단계 rotation 절차 runbook: `docs/deploy/` 하위에 실제 환경 변수 설정 방법, Cloudflare Pages 재배포 확인 방법, Spring 재시작 확인 방법을 포함한 step-by-step runbook 작성.
+- BFF secret alias 활용 확장: alias(`primary`, `secondary`, `index_N`)가 현재 audit 기록에만 쓰인다. low-cardinality 메트릭으로 확장하면 회전 완료 여부를 DB 조회 없이 모니터링할 수 있다.
 - BFF secret 만료 알림: 현재 secret rotation이 수동이다. `bff_secret_rotation_audit`에서 "마지막 rotation이 90일 이상 지났으면 알림" 같은 scheduled check를 GitHub Actions로 자동화 검토.

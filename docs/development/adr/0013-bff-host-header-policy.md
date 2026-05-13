@@ -18,7 +18,7 @@
 
 ### Root cause (코드 차원)
 
-BFF(`front/functions/api/bff/[[path]].ts`, ADR-0001)는 **모든 요청**에 `X-Readmates-Club-Host` 헤더를 첨부한다 — `clubSlug`가 path에서 추출되었을 때만 `X-Readmates-Club-Slug`가 추가로 첨부된다.
+BFF(`front/functions/api/bff/[[path]].ts`, ADR-0001)는 **모든 요청**에 `X-Readmates-Club-Host` 헤더를 첨부한다 — 프런트엔드 API client가 route param을 `clubSlug` query로 붙였을 때만 BFF가 정규화한 `X-Readmates-Club-Slug`를 추가로 첨부한다.
 
 Server `ClubContextResolver` (`server/src/main/kotlin/com/readmates/club/adapter/in/web/ClubContextResolver.kt:19-47`)는 slug → host 순으로 lookup. 본 fix 이전 시그니처는 `RequestedClubContext(supplied: Boolean, context: ResolvedClubContext?)` 2개 필드. host로 supplied된 후 lookup이 실패하면 `supplied=true, context=null`로 반환되었다.
 
@@ -26,7 +26,7 @@ Server `ClubContextResolver` (`server/src/main/kotlin/com/readmates/club/adapter
 
 Dev에서는 Vite proxy(`front/vite.config.ts`)가 `X-Readmates-Club-Host`를 strip하므로 host fallback 자체가 발생하지 않는다 → dev/prod parity 깨짐 → production-only bug class.
 
-Incident의 즉시 fix(commit `422a117`)는 frontend refresh handler에서 `useParams()`로 slug를 명시 전달해 *현장 1건*을 막은 것. 그러나 BFF는 여전히 모든 요청에 host 헤더를 첨부하고, server는 여전히 host로 supplied되었으나 lookup 실패한 모든 응답을 *degraded auth*로 분기한다 — 동일 클래스 bug가 다른 라우트에서 잠복.
+Incident의 즉시 fix(commit `422a117`)는 frontend refresh handler에서 `useParams()`로 slug를 명시 전달해 *현장 1건*을 막은 것. 그 시점에는 BFF가 여전히 모든 요청에 host 헤더를 첨부하고, server가 host supplied + lookup miss를 *degraded auth*로 분기했으므로 동일 클래스 bug가 다른 라우트에서 잠복해 있었다.
 
 ### 결정해야 했던 문제
 

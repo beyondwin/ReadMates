@@ -16,6 +16,7 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 
 - `.github/workflows/ci.yml`
 - `.github/workflows/deploy-front.yml`
+- `.github/workflows/deploy-server.yml`
 - `.github/CODEOWNERS`, 파일이 있을 때만 포함
 - `.gitignore`
 - `.gitleaks.toml`, 파일이 있을 때만 포함
@@ -27,6 +28,7 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `deploy/oci/`
 - `docs/deploy/`
 - `docs/development/`
+- `docs/operations/README.md`와 `docs/operations/runbooks/`
 - `docs/superpowers/`의 sanitized historical design and implementation records
 - 공개 릴리즈 후보 생성, 검사, fixture 검증, 배포 후 공개 연동 smoke용 `scripts/`
 
@@ -42,6 +44,10 @@ Active 또는 active 가능 secret이 발견되면 문서 수정으로 끝내지
 - `output/`
 - `front/output/`
 - `front/dist/`
+- `front/test-results/`
+- `front/playwright-report/`
+- `front/coverage/`
+- `front/.nyc_output/`
 - `.gstack/`
 - `.claude/`
 - `.orchestrator/`

@@ -1,6 +1,6 @@
 # ReadMates 배포 문서
 
-검토일: 2026-05-06
+검토일: 2026-05-13
 
 이 디렉터리는 ReadMates의 공개 안전 배포 문서 허브입니다. 운영 환경의 목표 구조, 신뢰 경계, secret 보관 원칙, 공개 릴리즈 후보 검증 흐름을 설명하되 계정별 값과 private deployment state는 Git에 두지 않습니다.
 
@@ -60,7 +60,7 @@ Cloudflare Pages Functions
 Spring Boot /api/**
 ```
 
-브라우저가 신뢰하는 공개 경계는 직접 Spring API origin이 아니라 Cloudflare Pages입니다. 브라우저는 같은 origin의 `/api/bff/**`를 호출하고, Pages Functions가 Spring으로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. Spring은 API 요청에서 이 header를 검증하며, 운영에서는 `READMATES_BFF_SECRET`이 없으면 시작 실패가 맞습니다.
+브라우저가 신뢰하는 공개 경계는 직접 Spring API origin이 아니라 Cloudflare Pages입니다. 브라우저는 같은 origin의 `/api/bff/**`를 호출하고, Pages Functions가 Spring으로 전달하면서 `X-Readmates-Bff-Secret`을 붙입니다. Spring은 API 요청에서 이 header를 검증하며, 운영에서는 `READMATES_BFF_SECRET`과 `READMATES_BFF_SECRETS`가 모두 비어 있으면 시작 실패가 맞습니다.
 
 BFF secret은 `VITE_*`, `NEXT_PUBLIC_*`, 정적 asset, 브라우저 로그, screenshot, 공개 문서에 노출하면 안 됩니다.
 
@@ -161,7 +161,7 @@ Cloudflare Pages:
 2. Install command를 `pnpm install --frozen-lockfile`로 설정합니다.
 3. Build command를 `pnpm build`로 설정합니다.
 4. Output directory를 `dist`로 설정합니다.
-5. Pages Functions secret으로 `READMATES_API_BASE_URL`과 `READMATES_BFF_SECRET`을 설정합니다.
+5. Pages Functions secret으로 `READMATES_API_BASE_URL`과 `READMATES_BFF_SECRETS` 또는 fallback `READMATES_BFF_SECRET`을 설정합니다.
 
 OCI backend Compose stack:
 
@@ -181,7 +181,7 @@ VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
 
 OCI helper script는 placeholder 기반이며 운영자가 값을 주입하는 전제를 둡니다. script와 문서에는 실제 tenancy ID, API key, database password, private IP, 배포 상태 값을 넣지 않습니다.
 
-백엔드 프로덕션 배포는 현재 수동 운영 기준입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
+백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 여전히 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차이며, VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
 
 ## Smoke Check
 

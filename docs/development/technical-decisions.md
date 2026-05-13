@@ -16,7 +16,7 @@
 
 ## 결정 인덱스
 
-아래 결정들은 `docs/development/adr/`에 개별 ADR로 이관되었습니다. 상세 컨텍스트, 근거, 대안, 결과는 각 ADR을 참고합니다.
+아래 결정들은 `docs/development/adr/`에 개별 ADR로 이관되었습니다. 상세 컨텍스트, 근거, 대안, 결과는 각 ADR을 참고합니다. 번호가 건너뛰는 항목은 아직 후보로 남겨 둔 결정입니다.
 
 | ADR | 제목 | 상태 |
 |-----|------|------|
@@ -30,10 +30,14 @@
 | [ADR-0008](adr/0008-multi-club-domain-with-host-resolution.md) | Multi-club domain with host resolution | Accepted |
 | [ADR-0009](adr/0009-frontend-backend-contract-via-zod.md) | Frontend-backend contract via Zod | Accepted |
 | [ADR-0010](adr/0010-public-repo-safety-automation.md) | Public repo safety automation | Accepted |
+| [ADR-0013](adr/0013-bff-host-header-policy.md) | BFF host header policy | Accepted |
+| [ADR-0014](adr/0014-bff-secret-rotation-lifecycle.md) | BFF secret rotation lifecycle | Accepted |
+| [ADR-0015](adr/0015-notification-outbox-dedupe-policy.md) | Notification outbox dedupe policy | Accepted |
+| [ADR-0016](adr/0016-deploy-ledger-event-schema.md) | Deploy ledger event schema | Accepted |
 
 ## 보완 메모 (ADR 이관 예정/적용 외)
 
-아래 결정들은 현재 ADR 0001~0010에 포함되지 않은 사항입니다. 향후 별도 ADR로 이관 예정이거나 현재 산문 수준의 컨텍스트로 보존됩니다.
+아래 결정들은 현재 ADR에 별도 항목으로 포함되지 않은 사항입니다. 향후 별도 ADR로 이관 예정이거나 현재 산문 수준의 컨텍스트로 보존됩니다.
 
 ---
 

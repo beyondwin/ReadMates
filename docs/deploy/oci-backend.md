@@ -67,6 +67,7 @@ READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}'
 READMATES_ALLOWED_ORIGINS=https://readmates.pages.dev
 READMATES_BFF_SECRET=<shared-bff-secret>
 READMATES_BFF_SECRET_REQUIRED=true
+READMATES_SECURITY_BFF_AUDIT_MODE=rotation-only
 # 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
 READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
@@ -396,16 +397,16 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 
 ## 운영 메모
 
-- Spring `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기본 운영 기준입니다. secret이 비면 시작 실패가 맞습니다.
+- Spring `prod` profile에서는 `READMATES_BFF_SECRET_REQUIRED=true`가 기본 운영 기준입니다. `READMATES_BFF_SECRETS` 후보 목록과 fallback `READMATES_BFF_SECRET`이 모두 비면 시작 실패가 맞습니다.
 - OCI Email Delivery SMTP credential과 sender 값은 `/etc/readmates/readmates.env`에만 둡니다. Git에는 `<oci-region>`, `<oci-smtp-username>`, `<oci-smtp-password>`, `no-reply@example.com` 같은 placeholder만 기록합니다.
 - DB migration은 Spring 시작 시 Flyway가 `db/mysql/migration`을 적용합니다.
 - 서버 시작 중 Flyway가 적용하는 운영 migration 위치는 `classpath:db/mysql/migration`입니다. 배포 전 migration diff를 확인할 때는 `server/src/main/resources/db/mysql/migration`만 기준으로 봅니다.
-- 백엔드 프로덕션 배포는 현재 수동입니다. GitHub Actions 기반 프로덕션 배포 자격 증명이나 runner가 이미 구성되어 있다고 가정하지 않습니다.
+- 백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차입니다. VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
 - Compose Caddy 로그는 container stdout으로 확인합니다. Legacy host Caddy rollback에서는 `/var/log/caddy/readmates.log`를 확인합니다. Caddy access log 설정은 request URI와 `Authorization`, `Cookie`, `X-Readmates-Bff-Secret` request header를 기록하지 않아야 합니다.
 
 ### BFF Secret Rotation
 
-`READMATES_BFF_SECRETS`에 쉼표로 구분된 값을 설정하면 재배포 없이 BFF secret을 교체할 수 있습니다. 서버는 목록의 모든 값을 timing-safe 방식으로 검증합니다.
+`READMATES_BFF_SECRETS`에 쉼표로 구분된 값을 설정하면 트래픽 중단 없이 BFF secret을 교체할 수 있습니다. Spring 후보 목록 갱신에는 서버 재시작이 필요하고, Cloudflare Pages primary 전환에는 Pages 재배포가 필요합니다. 서버는 목록의 모든 값을 timing-safe 방식으로 검증합니다.
 
 무중단 rotation 절차:
 
@@ -428,9 +429,9 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 
 ### BFF Secret Audit Volume
 
-`readmates.security.bff.audit-mode` (`READMATES_SECURITY_BFF_AUDIT_MODE`) controls successful BFF secret audit writes.
-Use `rotation-only` for normal operation so only non-primary aliases are recorded during rotation checks.
-Use `all` only for short incident windows, and use `off` only when the audit table or database is under pressure and request authorization is already covered by other logs.
+`readmates.security.bff.audit-mode` (`READMATES_SECURITY_BFF_AUDIT_MODE`)는 성공한 BFF secret 요청을 audit table에 얼마나 기록할지 제어합니다.
+운영 기본값은 `rotation-only`입니다. 이 모드에서는 rotation 확인에 필요한 non-primary alias(`secondary`, `index_N`) 사용만 기록하므로 평상시 적재량은 0에 수렴합니다.
+`all`은 짧은 incident window에서만 사용하고, `off`는 audit table 또는 DB가 압박받고 요청 authorization은 다른 로그로 확인 가능한 상황에서만 임시로 사용합니다.
 
 Retention can be handled with a scheduled database job:
 

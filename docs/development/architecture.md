@@ -163,13 +163,15 @@ Password login과 password reset endpoint는 현재 운영 경로가 아니며 `
 
 ## BFF 보안 경계
 
-Spring은 `/api/**` 요청에서 `X-Readmates-Bff-Secret`을 검사할 수 있습니다. `READMATES_BFF_SECRET`이 설정되어 있으면 요청 header 값이 일치해야 합니다.
+Spring은 `/api/**` 요청에서 `X-Readmates-Bff-Secret`을 검사할 수 있습니다. 운영 기본값은 `READMATES_BFF_SECRET_REQUIRED=true`이며, `READMATES_BFF_SECRETS`가 있으면 쉼표로 구분된 후보 목록 전체를 허용하고 없을 때만 `READMATES_BFF_SECRET`을 fallback으로 사용합니다. Cloudflare Pages Functions는 같은 목록의 첫 번째 non-empty 값을 primary secret으로 Spring에 전달합니다.
 
 Mutating method인 `POST`, `PUT`, `PATCH`, `DELETE`는 `Origin` 또는 `Referer`가 `READMATES_ALLOWED_ORIGINS` 또는 `READMATES_APP_BASE_URL`에서 파생된 허용 origin에 포함되어야 합니다.
 
 클럽 context header도 BFF 신뢰 경계 안에 있습니다. Spring은 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 browser input으로 취급하지 않고, BFF secret을 통과한 요청에서만 context resolve 입력으로 사용합니다. 허용 origin은 primary auth/app origin, `https://readmates.pages.dev`, 등록된 active club host를 명시적으로 포함해야 하며 wildcard suffix로 넓게 열지 않습니다.
 
-`READMATES_BFF_SECRET`은 Cloudflare Pages Functions와 Spring runtime 설정에만 둡니다. `VITE_` 또는 `NEXT_PUBLIC_` 접두사로 만들어 브라우저 bundle에 노출하지 않습니다.
+BFF secret audit은 `readmates.security.bff.audit-mode`로 조정합니다. 기본값 `rotation-only`는 `secondary`/`index_N`처럼 non-primary alias 사용만 비동기로 기록하므로 평상시 `bff_secret_rotation_audit` 적재량은 0에 수렴합니다. `all`은 짧은 incident window에서만 사용하고, `off`는 audit table이나 DB 압박이 있을 때의 임시 우회로 취급합니다. Cloudflare 진단 라우트 `GET /api/bff/__internal/secret-status`는 configured secret count, rotation stage, primary fingerprint 앞 6자만 반환하고 raw secret은 노출하지 않습니다.
+
+`READMATES_BFF_SECRET`과 `READMATES_BFF_SECRETS`는 Cloudflare Pages Functions와 Spring runtime 설정에만 둡니다. `VITE_` 또는 `NEXT_PUBLIC_` 접두사로 만들어 브라우저 bundle에 노출하지 않습니다.
 
 ## Optional Redis 계층
 

@@ -3,7 +3,7 @@
 - 상태: Accepted
 - 결정일: 2026-04-21
 - 작성자: 아키텍처/인프라
-- 관련: ADR-0005 (BFF shared secret), ADR-0006 (session cookie), ADR-0008 (multi-club domain),
+- 관련: ADR-0005 (BFF shared secret), ADR-0006 (session cookie), ADR-0008 (multi-club domain), ADR-0013 (BFF host header policy), ADR-0014 (BFF secret rotation lifecycle),
   `front/functions/_shared/proxy.ts`, `front/functions/api/bff/[[path]].ts`,
   `front/vite.config.ts`,
   `docs/deploy/cloudflare-pages.md`
@@ -49,11 +49,11 @@ BFF(`front/functions/_shared/proxy.ts:57-68`)는 `READMATES_BFF_SECRETS` (rotati
 
 ### multi-club 헤더 처리
 
-BFF(`front/functions/api/bff/[[path]].ts:151-153`)는 모든 요청에 `X-Readmates-Club-Host`와 (URL에 slug가 있을 때) `X-Readmates-Club-Slug` 헤더를 Spring으로 전달한다. Spring은 이 헤더를 BFF를 통과한 신뢰 가능한 값으로만 처리하므로, 브라우저가 직접 보낸 같은 이름의 헤더는 BFF에서 제거된다.
+BFF(`front/functions/api/bff/[[path]].ts`)는 모든 요청에 `X-Readmates-Club-Host`를 전달하고, API request에 `clubSlug` query가 있을 때 정규화된 `X-Readmates-Club-Slug`도 Spring으로 전달한다. Spring은 이 헤더를 BFF를 통과한 신뢰 가능한 값으로만 처리하므로, 브라우저가 직접 보낸 같은 이름의 헤더는 BFF에서 제거된다.
 
 ### 로컬 dev 설계
 
-로컬 개발에서는 Vite proxy(`front/vite.config.ts:44-48`)가 BFF 없이 동일한 경로 패턴을 Spring으로 포워딩하며, club context 헤더 처리도 동일하게 모사한다. 이로써 개발/운영의 동작 차이가 BFF Pages Function 코드(`front/functions/`) 자체에만 집중되고, 비즈니스 로직은 영향을 받지 않는다.
+로컬 개발에서는 Vite proxy(`front/vite.config.ts`)가 BFF 없이 동일한 경로 패턴을 Spring으로 포워딩한다. 브라우저가 임의로 보낸 club context 헤더는 제거하고, shared fallback 경로의 `clubSlug` query에서 정규화된 `X-Readmates-Club-Slug`만 다시 주입한다. Custom domain의 `X-Readmates-Club-Host` 주입은 production BFF와 서버 테스트가 검증하고, Spring은 ADR-0013에 따라 host fallback miss를 source-aware하게 처리한다.
 
 ### BFF route 구조
 
@@ -151,7 +151,7 @@ Pages Functions 코드가 순수한 TypeScript(Web API 의존)로 작성되어 V
 긍정적:
 - BFF 보안 룰이 `front/functions/_shared/proxy.ts` 한 파일에 응집된다. 신규 엔지니어가 BFF가 무엇을 하는지 단일 파일로 파악할 수 있다.
 - dev/prod 동작 차이가 BFF 코드(`front/functions/`)에만 집중된다. Vite proxy가 동일 경로를 모사하므로 비즈니스 로직 개발 시 BFF 구현 세부사항을 몰라도 된다.
-- secret 회전을 edge-only 환경 변수 변경으로 무중단 처리할 수 있다. Spring 재배포 없이 Cloudflare Pages 환경 변수만 갱신하면 된다.
+- Spring이 새 secret 후보를 먼저 허용한 뒤 BFF primary를 전환하면 secret 회전을 무중단으로 처리할 수 있다. BFF primary 전환은 Cloudflare Pages 환경 변수 변경으로 끝나지만, Spring 후보 목록을 추가하거나 제거할 때는 서버 런타임 설정 갱신이 필요하다.
 - Cloudflare CDN이 정적 자산을 전 세계 edge에서 서빙한다. 추가 CDN 설정 없음.
 - Pages Functions의 배포가 SPA 빌드와 같은 CI 파이프라인에서 처리된다. GitHub Actions `deploy-front.yml`이 단일 파이프라인으로 처리한다.
 - Google OAuth redirect_uri가 단일 BFF origin으로 집중된다. Spring이 공개 노출되지 않는다.
@@ -180,17 +180,18 @@ smoke 테스트:
 운영 BFF 응답 형태(상태 코드, 헤더 구조, cookie strip 여부) 점검.
 
 BFF 보안 경계 검증:
-- `X-Readmates-Bff-Secret` 헤더 없이 Spring `/api/**`를 직접 호출 → 403 반환 확인 (`readmates.bff-secret-required=true` 환경에서)
+- `X-Readmates-Bff-Secret` 헤더 없이 Spring `/api/**`를 직접 호출 → 401 반환 확인 (`readmates.bff-secret-required=true` 환경에서)
 - BFF를 통한 동일 요청 → 200 반환 확인
 - BFF secret rotation 중 구/신 secret 모두 허용되는지 확인
 
 dev/prod 동작 일치 검증:
 - 로컬에서 Vite proxy를 통한 API 호출과 production BFF를 통한 동일 호출이 같은 응답 shape을 반환하는지 확인
-- club context 헤더(`X-Readmates-Club-Slug`, `X-Readmates-Club-Host`)가 로컬과 production에서 동일하게 Spring에 전달되는지 확인
+- shared fallback route의 slug context는 로컬 Vite proxy와 production BFF가 같은 방식으로 정규화되는지 확인
+- custom domain host context는 production BFF의 host 헤더 주입과 Spring의 ADR-0013 fallback-miss 처리가 함께 동작하는지 확인
 
 ## 후속 작업
 
-- BFF host 헤더 정책 재검토: 현재 BFF는 shared fallback 도메인(`readmates.pages.dev`)에서도 항상 `X-Readmates-Club-Host` 헤더를 전송한다. Spring이 fallback domain을 club domain으로 오해하는 엣지 케이스가 발생할 수 있다. `2026-05-11 current-session-refresh-club-context` 인시던트의 out-of-scope 후속으로 별도 ADR 검토 중 (ADR-0013 후보).
+- BFF host 헤더 정책은 ADR-0013에서 server-side safety net으로 확정됐다. BFF는 custom domain host를 Spring에 전달하고, Spring은 shared fallback host miss를 club context supplied 상태로 오해하지 않도록 source-aware하게 해석한다.
 - Cloudflare Workers 기반 별도 BFF 분리: SPA와 BFF 사이의 배포 결합을 해소하고 싶다면 Workers migration 검토. Pages와 Workers를 같은 Cloudflare 프로젝트에서 관리하는 방법도 있다.
 - BFF 요청 로깅: 현재 edge에서 요청 수준 로깅이 없다. Cloudflare Analytics Engine 또는 Logpush를 통해 BFF 요청 메트릭(endpoint별 응답 코드, latency)을 수집하면 운영 가시성이 높아진다.
 - BFF 캐싱 정책 확장: 현재 공개 API 응답(`/api/public/**`)에만 `caches.default`를 사용한다. 다른 endpoint로 캐싱을 확장할 때 cache key 정책(club context 포함 여부 등)을 ADR로 결정한다.

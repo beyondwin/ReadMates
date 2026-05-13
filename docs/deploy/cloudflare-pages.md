@@ -52,11 +52,11 @@ Cloudflare Pages 운영 환경에는 아래 값을 설정합니다.
 | --- | --- |
 | `VITE_PUBLIC_PRIMARY_DOMAIN` | Public canonical URL을 만들 primary domain입니다. Primary domain이 없으면 비워두고, `readmates.pages.dev`는 `noindex` fallback으로만 사용합니다. |
 | `READMATES_API_BASE_URL` | OCI Spring API의 공개 HTTPS origin, 예: `https://api.example.com` |
-| `READMATES_BFF_SECRET` | Spring `READMATES_BFF_SECRET`과 같은 공유 secret |
+| `READMATES_BFF_SECRET` | Legacy fallback 공유 secret. `READMATES_BFF_SECRETS`가 없을 때 Spring으로 전달됩니다. |
 | `READMATES_BFF_SECRETS` | 무중단 rotation 중에 쓰는 comma-separated secret list입니다. 첫 non-blank 값이 Spring으로 전달되는 primary secret이며, 설정되면 `READMATES_BFF_SECRET`보다 우선합니다. |
 | `BFF_SECRET_ROTATION_STAGE` | 진단 라우트에 노출되는 rotation 단계입니다. 허용 값은 `stable` 또는 `staging`이며 기본값은 `stable`입니다. |
 
-`READMATES_API_BASE_URL`에는 origin만 넣고 query string이나 fragment를 붙이지 않습니다. BFF secret은 URL에 포함하지 말고 `READMATES_BFF_SECRET`으로만 전달합니다.
+`READMATES_API_BASE_URL`에는 origin만 넣고 query string이나 fragment를 붙이지 않습니다. BFF secret은 URL에 포함하지 말고 `READMATES_BFF_SECRETS` 또는 fallback `READMATES_BFF_SECRET`으로만 전달합니다.
 
 `READMATES_BFF_SECRET`과 `READMATES_BFF_SECRETS`는 브라우저 번들에 들어가면 안 됩니다. `VITE_` 접두사를 붙이지 말고 Pages Functions 환경 변수 또는 secret으로만 설정합니다.
 
@@ -78,7 +78,7 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 
 `main` push만으로는 production 배포가 실행되지 않습니다. 수동 workflow 실행과 로컬 deploy hook은 장애 대응용입니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
 
-이 절차는 Cloudflare Pages의 프론트엔드 배포 흐름입니다. Spring Boot 백엔드 프로덕션 배포가 GitHub Actions로 이미 구성되어 있다고 가정하지 않습니다.
+이 절차는 Cloudflare Pages의 프론트엔드 배포 흐름입니다. Spring Boot release image는 별도 `Deploy Server Image` workflow가 GHCR에 scan/promote하지만, OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`로 수행하는 별도 절차입니다.
 
 ## Google OAuth 설정
 

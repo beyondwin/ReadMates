@@ -38,11 +38,12 @@
 - `deploy/oci/`: compose 배포 script, read-only diagnostics collector, post-deploy watch helper를 포함합니다. 공개 후보 scanner 대상이므로 운영 출력, deploy state, secret-bearing env, provider state를 넣지 않습니다.
 - `docs/development/`
 - `docs/deploy/`
+- `docs/operations/README.md`와 `docs/operations/runbooks/`
 - `docs/superpowers/`의 sanitized historical design and implementation records
 - 공개 릴리즈 보조 스크립트: `scripts/build-public-release-candidate.sh`, `scripts/README.md`, `scripts/public-release-check.sh`, `scripts/verify-public-release-fixtures.sh`
 - 배포 후 공개 연동 smoke script: `scripts/smoke-production-integrations.sh`
 
-디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `front/output`, `front/node_modules`, `front/dist`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. sanitized `docs/superpowers/` historical docs는 공개 후보에 포함하지만, sanitization을 거치지 않은 private historical planning docs는 공개 후보에 남길 수 없습니다. provider state, screenshot, `design`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
+디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `front/output`, `front/node_modules`, `front/dist`, `front/test-results`, `front/playwright-report`, `front/coverage`, `front/.nyc_output`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. sanitized `docs/superpowers/` historical docs는 공개 후보에 포함하지만, sanitization을 거치지 않은 private historical planning docs는 공개 후보에 남길 수 없습니다. provider state, screenshot, `design`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.
 
 루트 `.env.example`만 의도적으로 포함되는 environment file입니다. 필수 파일과 디렉터리 root는 symlink일 수 없고, 승인된 source root 안에서 발견되는 symlink도 복사 전에 거부합니다. staging 후보 검증 단계에서도 승인된 manifest 밖의 경로, 금지 경로, `.envrc*`, symlink가 남아 있으면 실패합니다.
 
