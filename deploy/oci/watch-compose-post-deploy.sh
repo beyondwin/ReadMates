@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2029
 set -euo pipefail
 
 : "${VM_PUBLIC_IP:?VM_PUBLIC_IP 환경변수를 지정하세요}"

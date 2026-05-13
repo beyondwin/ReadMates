@@ -6,7 +6,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-릴리즈 대기 항목 없음.
+### Fixed
+
+- **Scripts CI ShellCheck 복구**: 새 ShellCheck CI가 의도적인 SSH client-side expansion과 fixture literal을 실패로 처리하지 않도록 명시하고, `mkdir -p -m` 사용을 정리했습니다.
 
 ## v1.8.0 - 2026-05-13
 

@@ -18,7 +18,6 @@ tmp_dir="$repo_abs/.tmp"
 candidate_dir="$tmp_dir/public-release-candidate"
 build_dir=""
 staging_dir=""
-private_plan_dir="docs/super""powers"
 
 temp_files=()
 new_temp_file_path=""

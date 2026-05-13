@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 03-deploy.sh — JAR 배포 및 서비스 재시작 (로컬에서 실행)
 # 사용법: VM_PUBLIC_IP=<IP> ./deploy/oci/03-deploy.sh
+# shellcheck disable=SC2029
 set -euo pipefail
 
 : "${VM_PUBLIC_IP:?VM_PUBLIC_IP 환경변수를 지정하세요 (예: VM_PUBLIC_IP=1.2.3.4 ./03-deploy.sh)}"

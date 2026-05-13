@@ -142,6 +142,7 @@ Subject: ReadMates operations SMTP smoke
 This is a ReadMates operations SMTP smoke message.
 EOF
 
+  # shellcheck disable=SC2153
   curl --silent --show-error --fail \
     --url "smtp://${SPRING_MAIL_HOST}:${SPRING_MAIL_PORT}" \
     --ssl-reqd \

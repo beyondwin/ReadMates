@@ -36,7 +36,6 @@ mode="candidate"
 if [[ "$source_abs" == "$repo_root" ]] && git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   mode="private-tree"
 fi
-private_plan_dir="docs/super""powers"
 
 tmp_files=()
 new_tmp_file_path=""

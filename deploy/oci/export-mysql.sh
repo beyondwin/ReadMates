@@ -25,7 +25,7 @@ if [ "$defaults_file_mode" != "600" ]; then
 fi
 
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p -m 700 "$READMATES_EXPORT_DIR"
+mkdir -p "$READMATES_EXPORT_DIR"
 chmod 700 "$READMATES_EXPORT_DIR"
 output="$READMATES_EXPORT_DIR/readmates-${timestamp}.sql.gz"
 tmp_output="$(mktemp "${output}.tmp.XXXXXX")"

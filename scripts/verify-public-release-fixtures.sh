@@ -83,7 +83,8 @@ fi
 safe_remove_fixture_root
 mkdir -p "$fixture_root/secret-dollar" "$fixture_root/secret-comment" "$fixture_root/placeholders"
 
-printf 'SPRING_DATASOURCE_PASSWORD=%s\n' 'Abc$123Def456Gh!' > "$fixture_root/secret-dollar/.env.example"
+# shellcheck disable=SC2016
+printf '%s\n' 'SPRING_DATASOURCE_PASSWORD=Abc$123Def456Gh!' > "$fixture_root/secret-dollar/.env.example"
 
 if ./scripts/public-release-check.sh "$fixture_root/secret-dollar" > "$fixture_root/secret-dollar.out" 2> "$fixture_root/secret-dollar.err"; then
   fail "dollar-containing secret fixture unexpectedly passed"
@@ -144,7 +145,7 @@ if [[ ! -f "$coverage_fixture" ]]; then
   fail "coverage fixture not found at $coverage_fixture"
 fi
 
-candidate_top="$(ls -a "$candidate_dir" | sort | grep -v '^[.]$' | grep -v '^[.][.]$')"
+candidate_top="$(find "$candidate_dir" -mindepth 1 -maxdepth 1 -exec basename {} \; | sort)"
 expected_top="$(cat "$coverage_fixture" | sort)"
 
 if [ "$candidate_top" != "$expected_top" ]; then

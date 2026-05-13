@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 05-deploy-compose-stack.sh — Caddy 포함 Docker Compose stack 배포
 # 사용법: VM_PUBLIC_IP=1.2.3.4 CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
+# shellcheck disable=SC2029,SC2087
 set -euo pipefail
 
 : "${VM_PUBLIC_IP:?VM_PUBLIC_IP 환경변수를 지정하세요}"
