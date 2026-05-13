@@ -1,6 +1,8 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { hostNotificationsLoader } from "@/features/host/route/host-notifications-data";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
 import type {
   HostNotificationDeliveryItem,
@@ -84,6 +86,31 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
   recentDispatches: [],
 };
 
+const hostSessionOpen = {
+  sessionId: "session-open",
+  sessionNumber: 9,
+  title: "9회차 모임",
+  bookTitle: "돈의 심리학",
+  bookAuthor: "모건 하우절",
+  bookImageUrl: null,
+  date: "2026-07-15",
+  startTime: "20:00",
+  endTime: "22:00",
+  locationLabel: "온라인",
+  state: "OPEN",
+  visibility: "MEMBER",
+} as const;
+
+const hostSessionDraft = {
+  ...hostSessionOpen,
+  sessionId: "session-draft",
+  sessionNumber: 10,
+  title: "10회차 모임",
+  bookTitle: "다음 책",
+  date: "2026-08-19",
+  state: "DRAFT",
+} as const;
+
 const manualDispatch = {
   manualDispatchId: "dispatch-1",
   eventId: "event-manual",
@@ -104,6 +131,13 @@ const manualDispatch = {
 } as const;
 
 type ActionMock = ReturnType<typeof vi.fn>;
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 function renderPage({
   events = [pendingEvent],
@@ -157,6 +191,97 @@ function renderPage({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe("hostNotificationsLoader", () => {
+  it("loads manual options for the first open host session when the URL has no session id", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({
+          authenticated: true,
+          userId: "user-host",
+          membershipId: "membership-host",
+          clubId: "club-1",
+          email: "host@example.com",
+          displayName: "호스트",
+          accountName: "호",
+          role: "HOST",
+          membershipStatus: "ACTIVE",
+          approvalState: "ACTIVE",
+        }));
+      }
+      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") return Promise.resolve(jsonResponse(summary));
+      if (url === "/api/bff/api/host/notifications/events?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/notifications/deliveries?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/notifications/test-mail/audit?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [hostSessionDraft, hostSessionOpen], nextCursor: null }));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ ...manualOptionsFixture, session: { ...manualOptionsFixture.session, sessionId: "session-open" } }));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/dispatches?limit=20&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(hostNotificationsLoader({
+      params: { clubSlug: "reading-sai" },
+      request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications"),
+    } as LoaderFunctionArgs)).resolves.toMatchObject({
+      hostSessions: { items: [hostSessionDraft, hostSessionOpen], nextCursor: null },
+      initialManualSelection: { sessionId: "session-open", eventType: null },
+    });
+  });
+
+  it("falls back from an unknown URL session id before loading manual options", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({
+          authenticated: true,
+          userId: "user-host",
+          membershipId: "membership-host",
+          clubId: "club-1",
+          email: "host@example.com",
+          displayName: "호스트",
+          accountName: "호",
+          role: "HOST",
+          membershipStatus: "ACTIVE",
+          approvalState: "ACTIVE",
+        }));
+      }
+      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") return Promise.resolve(jsonResponse(summary));
+      if (url === "/api/bff/api/host/notifications/events?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/notifications/deliveries?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/notifications/test-mail/audit?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [hostSessionOpen], nextCursor: null }));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ ...manualOptionsFixture, session: { ...manualOptionsFixture.session, sessionId: "session-open" } }));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/dispatches?limit=20&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await hostNotificationsLoader({
+      params: { clubSlug: "reading-sai" },
+      request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications?sessionId=missing"),
+    } as LoaderFunctionArgs);
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("sessionId=missing"),
+      expect.anything(),
+    );
+  });
 });
 
 describe("HostNotificationsPage", () => {

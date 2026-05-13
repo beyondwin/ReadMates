@@ -4,6 +4,7 @@ import {
   fetchHostNotificationEvents,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
+  fetchHostSessions,
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
   previewManualNotification,
@@ -17,6 +18,7 @@ import type {
   HostNotificationEventType,
   HostNotificationEventListResponse,
   HostNotificationSummary,
+  HostSessionListPage,
   ManualNotificationOptionsResponse,
   ManualNotificationDispatchListResponse,
   NotificationTestMailAuditPage,
@@ -31,6 +33,7 @@ export type HostNotificationsRouteData = {
   events: HostNotificationEventListResponse;
   deliveries: HostNotificationDeliveryListResponse;
   audit: NotificationTestMailAuditPage;
+  hostSessions: HostSessionListPage;
   manualOptions: ManualNotificationOptionsResponse;
   manualDispatches: ManualNotificationDispatchListResponse;
   initialManualSelection: {
@@ -39,6 +42,16 @@ export type HostNotificationsRouteData = {
   };
 };
 
+function selectInitialManualSessionId(requestedSessionId: string | null, hostSessions: HostSessionListPage) {
+  if (requestedSessionId && hostSessions.items.some((session) => session.sessionId === requestedSessionId)) {
+    return requestedSessionId;
+  }
+
+  return hostSessions.items.find((session) => session.state === "OPEN")?.sessionId
+    ?? hostSessions.items[0]?.sessionId
+    ?? null;
+}
+
 export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promise<HostNotificationsRouteData> {
   await requireHostLoaderAuth(args);
   const context = { clubSlug: clubSlugFromLoaderArgs(args) };
@@ -46,23 +59,26 @@ export async function hostNotificationsLoader(args?: LoaderFunctionArgs): Promis
   const sessionId = url?.searchParams.get("sessionId") ?? null;
   const eventType = (url?.searchParams.get("eventType") as HostNotificationEventType | null) ?? null;
 
-  const [summary, events, deliveries, audit, manualOptions, manualDispatches] = await Promise.all([
+  const [summary, events, deliveries, audit, hostSessions, manualDispatches] = await Promise.all([
     fetchHostNotificationSummary(context),
     fetchHostNotificationEvents(context, { limit: 50 }),
     fetchHostNotificationDeliveries(context, { limit: 50 }),
     fetchHostNotificationTestMailAudit(context, { limit: 50 }),
-    fetchManualNotificationOptions(context, { sessionId: sessionId ?? undefined }),
+    fetchHostSessions(context),
     fetchManualNotificationDispatches(context, { page: { limit: 20 } }),
   ]);
+  const selectedSessionId = selectInitialManualSessionId(sessionId, hostSessions);
+  const manualOptions = await fetchManualNotificationOptions(context, { sessionId: selectedSessionId ?? undefined });
 
   return {
     summary,
     events,
     deliveries,
     audit,
+    hostSessions,
     manualOptions,
     manualDispatches,
-    initialManualSelection: { sessionId, eventType },
+    initialManualSelection: { sessionId: selectedSessionId, eventType },
   };
 }
 
