@@ -1,7 +1,10 @@
 package com.readmates.auth.adapter.out.persistence
 
+import com.readmates.auth.application.port.out.DevSeedMemberLookupPort
+import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
-import com.readmates.auth.application.port.out.MemberAccountStorePort
+import com.readmates.auth.application.port.out.MemberIdentityLookupPort
+import com.readmates.auth.application.port.out.PlatformAdminLookupPort
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.application.model.JoinedClubSummary
@@ -20,7 +23,7 @@ import java.util.UUID
 @Repository
 class JdbcMemberAccountAdapter(
     private val jdbcTemplate: JdbcTemplate,
-) : MemberAccountStorePort {
+) : MemberIdentityLookupPort, GoogleAccountStorePort, PlatformAdminLookupPort, DevSeedMemberLookupPort {
     private val devSeedEmails = setOf(
         "host@example.com",
         "member1@example.com",
@@ -28,10 +31,6 @@ class JdbcMemberAccountAdapter(
         "member3@example.com",
         "member4@example.com",
         "member5@example.com",
-    )
-
-    private data class UserSubjectRow(
-        val googleSubjectId: String?,
     )
 
     override fun findActiveMemberByEmail(email: String): CurrentMember? {
@@ -444,77 +443,6 @@ class JdbcMemberAccountAdapter(
         )
     }
 
-    override fun createDevGoogleMember(
-        googleSubjectId: String,
-        email: String,
-        displayName: String?,
-        profileImageUrl: String?,
-    ): CurrentMember? {
-        val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() } ?: return null
-        val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
-        val normalizedName = displayName
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: normalizedEmail.substringBefore("@").takeIf { it.isNotEmpty() }
-            ?: "Google User"
-        val memberDisplayName = defaultDisplayNameFor(normalizedName)
-        val normalizedProfileImageUrl = profileImageUrl?.trim()?.takeIf { it.isNotEmpty() }
-        if (googleSubjectBelongsToDifferentEmail(jdbcTemplate, normalizedSubject, normalizedEmail)) {
-            return null
-        }
-
-        jdbcTemplate.update(
-            """
-            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (?, ?, ?, ?, ?, ?, 'GOOGLE')
-            on duplicate key update
-              google_subject_id = if(email = values(email), values(google_subject_id), google_subject_id),
-              name = if(email = values(email), values(name), name),
-              short_name = if(email = values(email), values(short_name), short_name),
-              profile_image_url = if(email = values(email), values(profile_image_url), profile_image_url),
-              auth_provider = if(email = values(email), values(auth_provider), auth_provider),
-              updated_at = if(email = values(email), utc_timestamp(6), updated_at)
-            """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            normalizedSubject,
-            normalizedEmail,
-            normalizedName,
-            memberDisplayName,
-            normalizedProfileImageUrl,
-        )
-        val storedUser = findUserSubjectByEmail(jdbcTemplate, normalizedEmail) ?: return null
-        if (storedUser.googleSubjectId != normalizedSubject) {
-            return null
-        }
-
-        jdbcTemplate.update(
-            """
-            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-            select
-              ?,
-              clubs.id,
-              users.id,
-              'MEMBER',
-              'ACTIVE',
-              utc_timestamp(6),
-              ?
-            from clubs
-            join users on users.email = ?
-            where clubs.slug = 'reading-sai'
-            on duplicate key update
-              role = values(role),
-              status = values(status),
-              joined_at = coalesce(memberships.joined_at, values(joined_at)),
-              updated_at = utc_timestamp(6)
-            """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            memberDisplayName,
-            normalizedEmail,
-        )
-
-        return queryActiveMemberByEmail(normalizedEmail)
-    }
-
     private fun queryActiveMemberByEmail(email: String): CurrentMember? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT)
         if (normalizedEmail.isEmpty()) {
@@ -546,38 +474,6 @@ class JdbcMemberAccountAdapter(
             normalizedEmail,
         ).firstOrNull()
     }
-
-    private fun findUserSubjectByEmail(jdbcTemplate: JdbcTemplate, normalizedEmail: String): UserSubjectRow? =
-        jdbcTemplate.query(
-            """
-            select google_subject_id
-            from users
-            where email = ?
-            """.trimIndent(),
-            { resultSet, _ ->
-                UserSubjectRow(
-                    googleSubjectId = resultSet.getString("google_subject_id"),
-                )
-            },
-            normalizedEmail,
-        ).firstOrNull()
-
-    private fun googleSubjectBelongsToDifferentEmail(
-        jdbcTemplate: JdbcTemplate,
-        googleSubjectId: String,
-        normalizedEmail: String,
-    ): Boolean =
-        jdbcTemplate.query(
-            """
-            select email
-            from users
-            where google_subject_id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("email").lowercase(Locale.ROOT) },
-            googleSubjectId,
-        ).firstOrNull()
-            ?.let { existingEmail -> existingEmail != normalizedEmail }
-            ?: false
 
     private fun java.sql.ResultSet.toCurrentMember(): CurrentMember {
         val displayName = getString("display_name")

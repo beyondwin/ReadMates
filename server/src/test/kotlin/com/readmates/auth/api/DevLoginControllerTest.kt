@@ -1,9 +1,6 @@
 package com.readmates.auth.api
 
-import com.readmates.auth.application.port.out.MemberAccountStorePort
 import com.readmates.support.MySqlTestContainer
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -35,7 +32,6 @@ import org.springframework.test.web.servlet.post
 class DevLoginControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-    @param:Autowired private val memberAccountStore: MemberAccountStorePort,
 ) {
     @Test
     fun `logs in seeded host by email`() {
@@ -152,34 +148,6 @@ class DevLoginControllerTest(
     }
 
     @Test
-    fun `dev Google member creation refuses reused subject for a different email`() {
-        createGoogleSubjectOwner(
-            email = "subject.owner@example.com",
-            googleSubjectId = "readmates-dev-google-subject-owner",
-            displayName = "Subject Owner",
-        )
-
-        val member = memberAccountStore.createDevGoogleMember(
-            googleSubjectId = "readmates-dev-google-subject-owner",
-            email = "subject.new@example.com",
-            displayName = "Subject New",
-            profileImageUrl = null,
-        )
-
-        assertNull(member)
-        val ownerRow = jdbcTemplate.queryForMap(
-            "select email, name from users where google_subject_id = 'readmates-dev-google-subject-owner'",
-        )
-        val newEmailCount = jdbcTemplate.queryForObject(
-            "select count(*) from users where email = 'subject.new@example.com'",
-            Int::class.java,
-        )
-        assertEquals("subject.owner@example.com", ownerRow["email"])
-        assertEquals("Subject Owner", ownerRow["name"])
-        assertEquals(0, newEmailCount)
-    }
-
-    @Test
     fun `persists dev login session for auth me`() {
         val session = mockMvc.post("/api/dev/login") {
             contentType = MediaType.APPLICATION_JSON
@@ -248,17 +216,9 @@ class DevLoginControllerTest(
               select id
               from users
               where email = 'active.nonseed@example.com'
-                or email in (
-                  'subject.owner@example.com',
-                  'subject.new@example.com'
-                )
             );
             delete from users
             where email = 'active.nonseed@example.com'
-               or email in (
-                 'subject.owner@example.com',
-                 'subject.new@example.com'
-               );
         """
 
         @JvmStatic
@@ -268,26 +228,6 @@ class DevLoginControllerTest(
         }
     }
 
-    private fun createGoogleSubjectOwner(email: String, googleSubjectId: String, displayName: String) {
-        jdbcTemplate.update(
-            """
-            insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
-            values (uuid(), ?, ?, ?, ?, null, 'GOOGLE')
-            on duplicate key update
-              google_subject_id = values(google_subject_id),
-              email = values(email),
-              name = values(name),
-              short_name = values(short_name),
-              profile_image_url = values(profile_image_url),
-              auth_provider = values(auth_provider),
-              updated_at = utc_timestamp(6)
-            """.trimIndent(),
-            googleSubjectId,
-            email,
-            displayName,
-            displayName,
-        )
-    }
 }
 
 @SpringBootTest(

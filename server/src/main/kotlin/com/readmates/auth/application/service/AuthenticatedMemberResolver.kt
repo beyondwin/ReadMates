@@ -1,6 +1,6 @@
 package com.readmates.auth.application.service
 
-import com.readmates.auth.application.port.out.MemberAccountStorePort
+import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.application.port.out.MemberProfileRow
 import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.club.application.model.ResolvedClubContext
@@ -12,7 +12,7 @@ import java.util.UUID
 
 @Component
 class AuthenticatedMemberResolver(
-    private val memberAccountStore: MemberAccountStorePort,
+    private val memberIdentityLookup: MemberIdentityLookupPort,
     private val memberProfileStore: MemberProfileStorePort,
 ) {
     fun resolveByEmail(email: String?, clubContext: ResolvedClubContext?): CurrentMember? {
@@ -22,9 +22,9 @@ class AuthenticatedMemberResolver(
             ?.lowercase(Locale.ROOT)
             ?: return null
         return if (clubContext != null) {
-            memberAccountStore.findMemberByEmailAndClubId(normalizedEmail, clubContext.clubId)
+            memberIdentityLookup.findMemberByEmailAndClubId(normalizedEmail, clubContext.clubId)
         } else {
-            memberAccountStore.findActiveMemberByEmail(normalizedEmail)
+            memberIdentityLookup.findActiveMemberByEmail(normalizedEmail)
         }
     }
 
@@ -32,15 +32,15 @@ class AuthenticatedMemberResolver(
         if (clubContext != null) {
             runCatching { UUID.fromString(userId) }
                 .getOrNull()
-                ?.let { memberAccountStore.findMemberByUserIdAndClubId(it, clubContext.clubId) }
+                ?.let { memberIdentityLookup.findMemberByUserIdAndClubId(it, clubContext.clubId) }
         } else {
-            memberAccountStore.findActiveMemberByUserId(userId)
+            memberIdentityLookup.findActiveMemberByUserId(userId)
         }
 
     fun resolveUserById(userId: String): CurrentUser? =
         runCatching { UUID.fromString(userId) }
             .getOrNull()
-            ?.let(memberAccountStore::findUserById)
+            ?.let(memberIdentityLookup::findUserById)
 
     fun resolveProfileByUserId(userId: String): CurrentMember? =
         runCatching { UUID.fromString(userId) }

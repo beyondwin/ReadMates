@@ -1,7 +1,9 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
-import com.readmates.auth.application.port.out.MemberAccountStorePort
+import com.readmates.auth.application.port.out.MemberIdentityLookupPort
+import com.readmates.auth.application.port.out.PlatformAdminLookupPort
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
@@ -22,7 +24,9 @@ class GoogleLoginException(
 
 @Service
 class GoogleLoginService(
-    private val memberAccountStore: MemberAccountStorePort,
+    private val memberIdentityLookup: MemberIdentityLookupPort,
+    private val googleAccountStore: GoogleAccountStorePort,
+    private val platformAdminLookup: PlatformAdminLookupPort,
 ) {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun loginVerifiedGoogleUser(
@@ -61,7 +65,7 @@ class GoogleLoginService(
         displayName: String?,
         profileImageUrl: String?,
     ): GoogleLoginResult {
-        val memberBySubject = memberAccountStore.findMemberByGoogleSubject(googleSubjectId)
+        val memberBySubject = googleAccountStore.findMemberByGoogleSubject(googleSubjectId)
         if (memberBySubject != null) {
             if (memberBySubject.email != normalizedEmail) {
                 throw GoogleLoginException("Google account is already connected")
@@ -81,7 +85,7 @@ class GoogleLoginService(
         profileImageUrl: String?,
     ): CurrentMember {
         return try {
-            memberAccountStore.createViewerGoogleMember(
+            googleAccountStore.createViewerGoogleMember(
                 googleSubjectId = googleSubjectId,
                 email = normalizedEmail,
                 displayName = displayName,
@@ -98,7 +102,7 @@ class GoogleLoginService(
         profileImageUrl: String?,
         exception: MemberAccountDuplicateException,
     ): CurrentMember {
-        val memberBySubject = memberAccountStore.findMemberByGoogleSubject(googleSubjectId)
+        val memberBySubject = googleAccountStore.findMemberByGoogleSubject(googleSubjectId)
         if (memberBySubject != null) {
             if (memberBySubject.email != normalizedEmail) {
                 throw GoogleLoginException("Google account is already connected")
@@ -115,13 +119,13 @@ class GoogleLoginService(
         normalizedEmail: String,
         profileImageUrl: String?,
     ): GoogleLoginResult? {
-        val ownerEmail = memberAccountStore.googleSubjectOwnerEmail(googleSubjectId)
+        val ownerEmail = googleAccountStore.googleSubjectOwnerEmail(googleSubjectId)
         if (ownerEmail != null && ownerEmail != normalizedEmail) {
             throw GoogleLoginException("Google account is already connected")
         }
 
-        val userId = memberAccountStore.findAnyUserIdByEmail(normalizedEmail) ?: return null
-        val connected = memberAccountStore.connectGoogleSubject(
+        val userId = memberIdentityLookup.findAnyUserIdByEmail(normalizedEmail) ?: return null
+        val connected = googleAccountStore.connectGoogleSubject(
             userId = userId,
             googleSubjectId = googleSubjectId,
             profileImageUrl = profileImageUrl,
@@ -129,18 +133,18 @@ class GoogleLoginService(
         if (!connected) {
             throw GoogleLoginException("Existing user is connected to a different Google account")
         }
-        val member = memberAccountStore.findMemberByUserIdIncludingViewer(userId)
+        val member = memberIdentityLookup.findMemberByUserIdIncludingViewer(userId)
         if (member != null) {
             return member.toLoginResult()
         }
-        if (memberAccountStore.findPlatformAdmin(userId) != null) {
+        if (platformAdminLookup.findPlatformAdmin(userId) != null) {
             return GoogleLoginResult(userId = userId, currentMember = null)
         }
         throwBlockedOrMissingMembership(userId)
     }
 
     private fun throwBlockedOrMissingMembership(userId: UUID): Nothing {
-        if (memberAccountStore.findMembershipStatusByUserId(userId) == MembershipStatus.LEFT) {
+        if (memberIdentityLookup.findMembershipStatusByUserId(userId) == MembershipStatus.LEFT) {
             throw GoogleLoginException(
                 message = "Membership has left",
                 redirectError = "membership-left",
