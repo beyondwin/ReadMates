@@ -30,6 +30,39 @@ test("host can open manual notification workbench", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "운영 장부" })).toBeVisible();
 });
 
+test("host can preview a manual reminder from the notifications tab without typing a session id", async ({ page }) => {
+  const sessionId = createOpenSessionFixture();
+
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto("/clubs/reading-sai/app/host/notifications");
+
+  await expect(page.getByLabel("세션 선택")).toBeVisible();
+  await expect(page.getByLabel("세션 선택")).toHaveValue(sessionId);
+  await expect(page.locator("strong").filter({ hasText: "E2E 현재 세션 책" })).toBeVisible();
+
+  await page.getByRole("button", { name: "모임 전날 리마인더" }).click();
+  await page.getByRole("button", { name: "미리보기" }).click();
+
+  await expect(page.getByRole("heading", { name: "발송 전 확인" })).toBeVisible();
+  await expect(page.getByText(/최종 대상/)).toBeVisible();
+});
+
+test("host can change the selected session before previewing a manual reminder", async ({ page }) => {
+  createOpenSessionFixture({ number: 7, bookTitle: "E2E 첫 세션 책" });
+  const secondSessionId = createOpenSessionFixture({ number: 8, bookTitle: "E2E 두 번째 세션 책" });
+
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto("/clubs/reading-sai/app/host/notifications");
+
+  await page.getByLabel("세션 선택").selectOption(secondSessionId);
+  await expect(page.locator("strong").filter({ hasText: "E2E 두 번째 세션 책" })).toBeVisible();
+
+  await page.getByRole("button", { name: "모임 전날 리마인더" }).click();
+  await page.getByRole("button", { name: "미리보기" }).click();
+
+  await expect(page.getByRole("heading", { name: "발송 전 확인" })).toBeVisible();
+});
+
 test("host previews and confirms a manual reminder, then duplicate requires resend confirmation", async ({ page }) => {
   const sessionId = createOpenSessionFixture();
 

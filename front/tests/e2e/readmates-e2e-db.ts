@@ -731,7 +731,10 @@ where notification_event_outbox.club_id = ${sqlString(clubId)}
 `);
 }
 
-export function createOpenSessionFixture() {
+export function createOpenSessionFixture({
+  number = 7,
+  bookTitle = "E2E 현재 세션 책",
+}: { number?: number; bookTitle?: string } = {}) {
   const sessionId = randomUUID();
 
   runMysql(`
@@ -757,9 +760,9 @@ insert into sessions (
 values (
   ${sqlString(sessionId)},
   ${sqlString(clubId)},
-  7,
-  '7회차 모임 · E2E 현재 세션',
-  'E2E 현재 세션 책',
+  ${number},
+  ${sqlString(`${number}회차 모임 · ${bookTitle}`)},
+  ${sqlString(bookTitle)},
   '테스트 저자',
   null,
   null,
