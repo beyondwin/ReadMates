@@ -8,6 +8,7 @@ import type {
   HostNotificationDeliveryItem,
   HostNotificationEventItem,
   HostNotificationSummary,
+  HostSessionListItem,
   ManualNotificationConfirmRequest,
   ManualNotificationOptionsResponse,
   ManualNotificationPreviewRequest,
@@ -111,6 +112,16 @@ const hostSessionDraft = {
   state: "DRAFT",
 } as const;
 
+const hostSessionCurrent: HostSessionListItem = {
+  ...hostSessionOpen,
+  sessionId: "session-1",
+  sessionNumber: 8,
+  title: "8회차 모임",
+  bookTitle: "Example Book",
+  bookAuthor: "Example Author",
+  date: "2026-05-20",
+};
+
 const manualDispatch = {
   manualDispatchId: "dispatch-1",
   eventId: "event-manual",
@@ -140,10 +151,13 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 function renderPage({
+  summaryData = summary,
   events = [pendingEvent],
   deliveries = [deadDelivery],
   auditItems = [],
   manualOptions = manualOptionsFixture,
+  hostSessions = [hostSessionCurrent, hostSessionDraft],
+  initialManualSelection = { sessionId: "session-1", eventType: null },
   onProcess = vi.fn().mockResolvedValue(undefined),
   onRetry = vi.fn().mockResolvedValue(undefined),
   onRestore = vi.fn().mockResolvedValue(undefined),
@@ -153,10 +167,16 @@ function renderPage({
   onLoadManualOptions = vi.fn().mockResolvedValue(manualOptions),
   onLoadMoreManualMembers = vi.fn().mockResolvedValue(manualOptions),
 }: {
+  summaryData?: HostNotificationSummary;
   events?: HostNotificationEventItem[];
   deliveries?: HostNotificationDeliveryItem[];
   auditItems?: NotificationTestMailAuditItem[];
   manualOptions?: ManualNotificationOptionsResponse;
+  hostSessions?: HostSessionListItem[];
+  initialManualSelection?: {
+    sessionId: string | null;
+    eventType: ManualNotificationOptionsResponse["templates"][number]["eventType"] | null;
+  };
   onProcess?: ActionMock;
   onRetry?: ActionMock;
   onRestore?: ActionMock;
@@ -168,12 +188,13 @@ function renderPage({
 } = {}) {
   render(
     <HostNotificationsPage
-      summary={summary}
+      summary={summaryData}
       events={events}
       deliveries={deliveries}
       audit={auditItems}
+      hostSessions={hostSessions}
       manualOptions={manualOptions}
-      initialManualSelection={{ sessionId: "session-1", eventType: null }}
+      initialManualSelection={initialManualSelection}
       onProcess={onProcess}
       onRetry={onRetry}
       onRestore={onRestore}
@@ -339,6 +360,26 @@ describe("HostNotificationsPage", () => {
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
     expect(screen.getAllByText("수동").length).toBeGreaterThan(0);
+  });
+
+  it("renders a session selector instead of a raw session id field", () => {
+    renderPage();
+
+    expect(screen.getByLabelText("세션 선택")).toHaveValue("session-1");
+    expect(screen.queryByLabelText("세션 ID")).not.toBeInTheDocument();
+    expect(screen.getByText("Example Book")).toBeInTheDocument();
+    expect(screen.getByText(/OPEN/)).toBeInTheDocument();
+  });
+
+  it("disables manual preview when there are no host sessions", () => {
+    renderPage({
+      hostSessions: [],
+      manualOptions: { ...manualOptionsFixture, session: null },
+      initialManualSelection: { sessionId: null, eventType: null },
+    });
+
+    expect(screen.getByText("선택 가능한 세션이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "미리보기" })).toBeDisabled();
   });
 
   it("searches manual notification members and loads more", async () => {
@@ -567,7 +608,7 @@ describe("HostNotificationsPage", () => {
     const onProcess = vi.fn().mockResolvedValue(undefined);
 
     renderPage({
-      summary: { ...summary, pending: 0, failed: 0 },
+      summaryData: { ...summary, pending: 0, failed: 0 },
       events: [pendingEvent],
       deliveries: [],
       onProcess,

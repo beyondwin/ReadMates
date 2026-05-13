@@ -9,6 +9,7 @@ import { HostNotificationsSummary } from "./notifications/host-notifications-sum
 import { ManualNotificationWorkbench } from "./notifications/manual-notification-workbench";
 import { NotificationLedgerTabs } from "./notifications/notification-ledger-tabs";
 import type {
+  HostSessionListItem,
   HostNotificationEventType,
   ManualNotificationConfirmRequest,
   ManualNotificationDispatchListItem,
@@ -33,6 +34,7 @@ type HostNotificationsPageProps = {
   events: HostNotificationEventItem[];
   deliveries: HostNotificationDeliveryItem[];
   audit: NotificationTestMailAuditItem[];
+  hostSessions?: HostSessionListItem[];
   manualOptions: ManualNotificationOptionsResponse;
   manualDispatches?: ManualNotificationDispatchListItem[];
   initialManualSelection: {
@@ -78,6 +80,7 @@ export function HostNotificationsPage({
   events,
   deliveries,
   audit,
+  hostSessions = [],
   manualOptions,
   manualDispatches,
   initialManualSelection,
@@ -316,6 +319,7 @@ export function HostNotificationsPage({
 
         <ManualNotificationWorkbench
           options={visibleManualOptions}
+          hostSessions={hostSessions}
           initialSessionId={initialManualSelection.sessionId}
           initialEventType={initialManualSelection.eventType}
           preview={manualPreview}

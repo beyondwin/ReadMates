@@ -4,6 +4,7 @@ import {
   useState,
 } from "react";
 import type {
+  HostSessionListItem,
   HostNotificationEventType,
   ManualNotificationAudience,
   ManualNotificationConfirmRequest,
@@ -33,6 +34,7 @@ const audienceLabels: Record<ManualNotificationAudience, string> = {
 
 export function ManualNotificationWorkbench({
   options,
+  hostSessions,
   initialSessionId,
   initialEventType,
   preview,
@@ -44,6 +46,7 @@ export function ManualNotificationWorkbench({
   onLoadMoreManualMembers,
 }: {
   options: ManualNotificationOptionsResponse;
+  hostSessions: HostSessionListItem[];
   initialSessionId: string | null;
   initialEventType: HostNotificationEventType | null;
   preview: ManualNotificationPreviewResponse | null;
@@ -68,15 +71,19 @@ export function ManualNotificationWorkbench({
   const [resendConfirmed, setResendConfirmed] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(false);
+  const selectedSession = useMemo(
+    () => hostSessions.find((session) => session.sessionId === selection.sessionId) ?? null,
+    [hostSessions, selection.sessionId],
+  );
   const currentTemplate = useMemo(
     () => options.templates.find((template) => template.eventType === selection.eventType),
     [options.templates, selection.eventType],
   );
-  const canPreview = Boolean(selection.sessionId && currentTemplate?.enabled && !busy);
+  const canPreview = Boolean(selectedSession && currentTemplate?.enabled && !busy);
   const requiresResend = Boolean(preview?.duplicates.requiresResendConfirmation);
   const canConfirm = Boolean(preview && !busy && (!requiresResend || resendConfirmed));
-  const sessionHint = options.session?.date && selection.eventType === "SESSION_REMINDER_DUE"
-    ? reminderDateHint(options.session.date)
+  const sessionHint = selectedSession?.date && selection.eventType === "SESSION_REMINDER_DUE"
+    ? reminderDateHint(selectedSession.date)
     : null;
 
   const submitMemberSearch = async () => {
@@ -157,21 +164,54 @@ export function ManualNotificationWorkbench({
           ) : null}
         </section>
 
-        <section aria-labelledby="manual-step-session">
+        <section>
           <label id="manual-step-session" className="label" htmlFor="manual-notification-session">
-            세션 ID
+            세션 선택
           </label>
-          <input
+          <select
             id="manual-notification-session"
             className="input"
             value={selection.sessionId}
-            onChange={(event) => setSelection((current) => ({ ...current, sessionId: event.currentTarget.value }))}
-            placeholder="세션을 선택하거나 세션 화면에서 진입하세요"
-          />
-          {sessionHint ? (
+            onChange={(event) => {
+              setSelection((current) => ({ ...current, sessionId: event.currentTarget.value }));
+              setResendConfirmed(false);
+            }}
+            disabled={busy || hostSessions.length === 0}
+          >
+            {hostSessions.map((session) => (
+              <option key={session.sessionId} value={session.sessionId}>
+                {`${session.sessionNumber}회차 · ${session.bookTitle} · ${session.date}`}
+              </option>
+            ))}
+          </select>
+          {hostSessions.length === 0 ? (
             <p className="tiny muted" style={{ margin: "8px 0 0" }}>
-              {sessionHint}
+              선택 가능한 세션이 없습니다.
             </p>
+          ) : null}
+          {selectedSession ? (
+            <div
+              className="surface-subtle"
+              style={{
+                marginTop: 10,
+                padding: 12,
+                display: "grid",
+                gap: 4,
+              }}
+            >
+              <strong className="row wrap" style={{ gap: 6 }}>
+                <span>{`${selectedSession.sessionNumber}회차`}</span>
+                <span>{selectedSession.bookTitle}</span>
+              </strong>
+              <p className="tiny muted" style={{ margin: 0 }}>
+                {[
+                  selectedSession.date,
+                  selectedSession.state,
+                  selectedSession.visibility,
+                  sessionHint,
+                ].filter(Boolean).join(" · ")}
+              </p>
+            </div>
           ) : null}
         </section>
 
