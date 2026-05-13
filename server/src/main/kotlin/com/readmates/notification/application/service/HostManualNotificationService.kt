@@ -12,6 +12,7 @@ import com.readmates.notification.application.model.ManualNotificationDuplicateP
 import com.readmates.notification.application.model.ManualNotificationOptions
 import com.readmates.notification.application.model.ManualNotificationPreview
 import com.readmates.notification.application.model.ManualNotificationPreviewCommand
+import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSelection
 import com.readmates.notification.application.model.ManualNotificationSessionSummary
 import com.readmates.notification.application.model.ManualNotificationTemplateOption
@@ -23,6 +24,7 @@ import com.readmates.notification.application.model.NotificationManualDispatchPa
 import com.readmates.notification.application.model.allowedManualAudiences
 import com.readmates.notification.application.model.defaultManualAudience
 import com.readmates.notification.application.port.`in`.ManageManualHostNotificationsUseCase
+import com.readmates.notification.application.port.out.ManualNotificationConfirmedDispatch
 import com.readmates.notification.application.port.out.ManualNotificationDispatchPort
 import com.readmates.notification.application.port.out.ManualNotificationSessionContext
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
@@ -131,13 +133,17 @@ class HostManualNotificationService(
     override fun confirm(host: CurrentMember, command: ManualNotificationConfirmCommand): ManualNotificationConfirmResult {
         val currentHost = requireHost(host)
         validateSelection(currentHost, command.selection)
-        val preview = manualDispatchPort.findPreview(command.previewId, currentHost.clubId, currentHost.membershipId)
-            ?: throw previewExpired()
-        if (preview.expiresAt.isBefore(clock()) || preview.selectionHash != selectionHash(command.selection)) {
-            throw previewExpired()
-        }
         val targetSnapshot = manualDispatchPort.previewTargets(currentHost.clubId, command.selection)
         requireNonEmptyAudience(targetSnapshot)
+        manualDispatchPort.findConsumedManualDispatch(
+            previewId = command.previewId,
+            clubId = currentHost.clubId,
+            hostMembershipId = currentHost.membershipId,
+            selectionHash = selectionHash(command.selection),
+            now = clock(),
+        )?.let { stored ->
+            return confirmResult(stored, targetSnapshot, command.selection.requestedChannels)
+        }
         val recent = manualDispatchPort.recentDispatches(
             currentHost.clubId,
             command.selection.sessionId,
@@ -163,31 +169,44 @@ class HostManualNotificationService(
                 audience = command.selection.audience,
                 excludedMembershipIds = command.selection.excludedMembershipIds,
                 includedMembershipIds = command.selection.includedMembershipIds,
+                targetMembershipIds = targetSnapshot.targetMembershipIds,
+                inAppMembershipIds = targetSnapshot.inAppMembershipIds,
+                emailMembershipIds = targetSnapshot.emailMembershipIds,
                 resend = recent.isNotEmpty(),
                 sendMode = command.selection.sendMode,
             ),
         )
-        val stored = manualDispatchPort.insertManualDispatch(
+        val stored = manualDispatchPort.confirmManualDispatch(
+            previewId = command.previewId,
             clubId = currentHost.clubId,
             hostMembershipId = currentHost.membershipId,
+            selectionHash = selectionHash(command.selection),
+            now = clock(),
             selection = command.selection,
             payload = payload,
             targetSnapshot = targetSnapshot,
             resend = recent.isNotEmpty(),
-        )
-        return ManualNotificationConfirmResult(
+        ) ?: throw previewExpired()
+        return confirmResult(stored, targetSnapshot, command.selection.requestedChannels)
+    }
+
+    private fun confirmResult(
+        stored: ManualNotificationConfirmedDispatch,
+        targetSnapshot: ManualNotificationTargetSnapshot,
+        requestedChannels: ManualNotificationRequestedChannels,
+    ): ManualNotificationConfirmResult =
+        ManualNotificationConfirmResult(
             manualDispatchId = stored.manualDispatchId,
             eventId = stored.eventId,
             status = NotificationEventOutboxStatus.PENDING,
             createdAt = stored.createdAt,
             summary = ManualNotificationConfirmSummary(
                 targetCount = targetSnapshot.finalTargetCount,
-                requestedChannels = command.selection.requestedChannels,
+                requestedChannels = requestedChannels,
                 expectedInAppCount = targetSnapshot.inAppEligibleCount,
                 expectedEmailCount = targetSnapshot.emailEligibleCount,
             ),
         )
-    }
 
     private fun validateSelection(host: CurrentMember, selection: ManualNotificationSelection) {
         if (selection.eventType !in manualTemplates || selection.audience !in allowedManualAudiences(selection.eventType)) {
@@ -223,8 +242,8 @@ class HostManualNotificationService(
     private fun disabledReason(eventType: NotificationEventType, session: ManualNotificationSessionContext): String? =
         when (eventType) {
             NotificationEventType.NEXT_BOOK_PUBLISHED ->
-                if (session.visibility !in setOf("MEMBER", "PUBLIC")) {
-                    "멤버에게 보이는 세션만 발송할 수 있습니다."
+                if (session.state != "DRAFT" || session.visibility !in setOf("MEMBER", "PUBLIC")) {
+                    "멤버에게 공개된 예정 세션만 다음 책 알림을 보낼 수 있습니다."
                 } else {
                     null
                 }
@@ -235,8 +254,8 @@ class HostManualNotificationService(
                     null
                 }
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
-                if (!session.feedbackDocumentUploaded) {
-                    "피드백 문서를 먼저 등록해야 합니다."
+                if (session.state !in setOf("CLOSED", "PUBLISHED") || !session.feedbackDocumentUploaded) {
+                    "닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다."
                 } else {
                     null
                 }

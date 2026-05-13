@@ -1,8 +1,8 @@
 # ReadMates 수동 알림 발송 스펙 갭 완료 설계
 
-작성일: 2026-05-13  
-상태: READY FOR IMPLEMENTATION  
-기준 커밋: `272e6a5 feat: add manual notification dispatch`  
+작성일: 2026-05-13
+상태: READY FOR IMPLEMENTATION
+기준 커밋: `272e6a5 feat: add manual notification dispatch`
 대상 표면: notification server slice, 호스트 알림 운영, 세션 편집, 멤버 알림함, E2E 검증
 
 ## 1. 배경

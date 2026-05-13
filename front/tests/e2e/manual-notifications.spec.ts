@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import {
   cleanupGeneratedSessions,
   cleanupManualNotificationArtifacts,
+  countManualNotificationEventsForSession,
+  createFeedbackDocumentFixture,
   createOpenSessionFixture,
   loginWithGoogleFixture,
   materializeManualReminderInAppNotifications,
@@ -88,4 +90,67 @@ test("host previews and confirms a manual reminder, then duplicate requires rese
   await page.goto(`/clubs/reading-sai/app/host/notifications?sessionId=${sessionId}&eventType=SESSION_REMINDER_DUE`);
   await page.getByRole("button", { name: "미리보기" }).click();
   await expect(page.getByText("이미 발송된 알림입니다.")).toBeVisible();
+});
+
+test("manual confirm retry does not create a duplicate dispatch", async ({ page }) => {
+  const sessionId = createOpenSessionFixture();
+
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto(`/clubs/reading-sai/app/host/notifications?sessionId=${sessionId}&eventType=SESSION_REMINDER_DUE`);
+
+  const selection = {
+    sessionId,
+    eventType: "SESSION_REMINDER_DUE",
+    audience: "ALL_ACTIVE_MEMBERS",
+    requestedChannels: "BOTH",
+    excludedMembershipIds: [],
+    includedMembershipIds: [],
+    sendMode: "NOW",
+  };
+  const preview = await page.evaluate(async (request) => {
+    const response = await fetch("/api/bff/api/host/notifications/manual/preview?clubSlug=reading-sai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    return {
+      status: response.status,
+      body: await response.json() as { previewId: string },
+    };
+  }, selection);
+  expect(preview.status).toBe(200);
+
+  const firstStatus = await page.evaluate(async (request) => {
+    const response = await fetch("/api/bff/api/host/notifications/manual?clubSlug=reading-sai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    return response.status;
+  }, { ...selection, previewId: preview.body.previewId, resendConfirmed: false });
+  const retryStatus = await page.evaluate(async (request) => {
+    const response = await fetch("/api/bff/api/host/notifications/manual?clubSlug=reading-sai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    });
+    return response.status;
+  }, { ...selection, previewId: preview.body.previewId, resendConfirmed: false });
+
+  expect(firstStatus).toBe(200);
+  expect(retryStatus).toBe(200);
+  expect(countManualNotificationEventsForSession(sessionId, "SESSION_REMINDER_DUE")).toBe(1);
+});
+
+test("session editor disables manual templates that do not match automatic predicates", async ({ page }) => {
+  const openSessionId = createOpenSessionFixture({ number: 9, bookTitle: "E2E 열림 세션 책" });
+  const feedbackSessionId = createOpenSessionFixture({ number: 10, bookTitle: "E2E 문서 세션 책" });
+  createFeedbackDocumentFixture(feedbackSessionId);
+
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${openSessionId}/edit`);
+  await expect(page.getByRole("button", { name: /다음 책 공개/ })).toBeDisabled();
+
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${feedbackSessionId}/edit`);
+  await expect(page.getByRole("button", { name: /피드백 문서 등록/ })).toBeDisabled();
 });

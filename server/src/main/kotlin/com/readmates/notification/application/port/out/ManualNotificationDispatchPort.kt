@@ -32,6 +32,9 @@ data class ManualNotificationTargetSnapshot(
     val emailEligibleCount: Int,
     val emailSkippedByPreferenceCount: Int,
     val emailMissingCount: Int,
+    val targetMembershipIds: List<UUID> = emptyList(),
+    val inAppMembershipIds: List<UUID> = emptyList(),
+    val emailMembershipIds: List<UUID> = emptyList(),
 )
 
 data class ManualNotificationPreviewRecord(
@@ -46,6 +49,18 @@ data class ManualNotificationStoredDispatch(
     val manualDispatchId: UUID,
     val eventId: UUID,
     val createdAt: OffsetDateTime,
+)
+
+enum class ManualNotificationConfirmInsertStatus {
+    CREATED,
+    ALREADY_CONSUMED,
+}
+
+data class ManualNotificationConfirmedDispatch(
+    val manualDispatchId: UUID,
+    val eventId: UUID,
+    val createdAt: OffsetDateTime,
+    val status: ManualNotificationConfirmInsertStatus,
 )
 
 interface ManualNotificationDispatchPort {
@@ -67,6 +82,24 @@ interface ManualNotificationDispatchPort {
     fun recentDispatches(clubId: UUID, sessionId: UUID, eventType: NotificationEventType): List<ManualNotificationRecentDispatch>
     fun insertPreview(clubId: UUID, hostMembershipId: UUID, selectionHash: String, expiresAt: OffsetDateTime): UUID
     fun findPreview(id: UUID, clubId: UUID, hostMembershipId: UUID): ManualNotificationPreviewRecord?
+    fun findConsumedManualDispatch(
+        previewId: UUID,
+        clubId: UUID,
+        hostMembershipId: UUID,
+        selectionHash: String,
+        now: OffsetDateTime,
+    ): ManualNotificationConfirmedDispatch?
+    fun confirmManualDispatch(
+        previewId: UUID,
+        clubId: UUID,
+        hostMembershipId: UUID,
+        selectionHash: String,
+        now: OffsetDateTime,
+        selection: ManualNotificationSelection,
+        payload: NotificationEventPayload,
+        targetSnapshot: ManualNotificationTargetSnapshot,
+        resend: Boolean,
+    ): ManualNotificationConfirmedDispatch?
     fun insertManualDispatch(
         clubId: UUID,
         hostMembershipId: UUID,

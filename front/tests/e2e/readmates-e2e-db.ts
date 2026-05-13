@@ -647,13 +647,24 @@ where club_id = ${sqlString(clubId)}
       and dedupe_key like 'manual:%'
   );
 
+delete from notification_manual_dispatch_previews
+where club_id = ${sqlString(clubId)};
+
 delete from notification_event_outbox
 where club_id = ${sqlString(clubId)}
   and dedupe_key like 'manual:%';
-
-delete from notification_manual_dispatch_previews
-where club_id = ${sqlString(clubId)};
 `);
+}
+
+export function countManualNotificationEventsForSession(sessionId: string, eventType: string) {
+  const output = runMysql(`
+select count(*) as count
+from notification_manual_dispatches
+where session_id = ${sqlString(sessionId)}
+  and event_type = ${sqlString(eventType)};
+`);
+  const [, count] = output.trim().split(/\s+/);
+  return Number(count ?? 0);
 }
 
 export function materializeManualReminderInAppNotifications() {
@@ -779,6 +790,31 @@ values (
 `);
 
   return sessionId;
+}
+
+export function createFeedbackDocumentFixture(sessionId: string) {
+  runMysql(`
+insert into session_feedback_documents (
+  id,
+  club_id,
+  session_id,
+  version,
+  source_text,
+  file_name,
+  content_type,
+  file_size
+)
+values (
+  ${sqlString(randomUUID())},
+  ${sqlString(clubId)},
+  ${sqlString(sessionId)},
+  1,
+  'E2E feedback document',
+  'e2e-feedback.md',
+  'text/markdown',
+  21
+);
+`);
 }
 
 export function createViewerGoogleUserFixture(email: string) {

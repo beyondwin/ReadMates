@@ -14,6 +14,8 @@ import com.readmates.notification.application.model.ManualNotificationRequestedC
 import com.readmates.notification.application.model.ManualNotificationSelection
 import com.readmates.notification.application.model.ManualNotificationSendMode
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.ManualNotificationConfirmInsertStatus
+import com.readmates.notification.application.port.out.ManualNotificationConfirmedDispatch
 import com.readmates.notification.application.port.out.ManualNotificationDispatchPort
 import com.readmates.notification.application.port.out.ManualNotificationPreviewRecord
 import com.readmates.notification.application.port.out.ManualNotificationSessionContext
@@ -38,7 +40,7 @@ class HostManualNotificationServiceTest {
     @Test
     fun `options disables feedback template until document exists`() {
         val port = FakeManualPort(
-            sessionContext = sessionContext(feedbackDocumentUploaded = false),
+            sessionContext = sessionContext(state = "CLOSED", feedbackDocumentUploaded = false),
         )
         val service = service(port)
 
@@ -46,7 +48,31 @@ class HostManualNotificationServiceTest {
 
         val feedback = options.templates.single { it.eventType == NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED }
         assertThat(feedback.enabled).isFalse()
-        assertThat(feedback.disabledReason).isEqualTo("피드백 문서를 먼저 등록해야 합니다.")
+        assertThat(feedback.disabledReason).isEqualTo("닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.")
+    }
+
+    @Test
+    fun `options disables next book manual notification unless session is draft and member visible`() {
+        val port = FakeManualPort(sessionContext = sessionContext(state = "OPEN", visibility = "MEMBER"))
+        val service = service(port)
+
+        val options = service.options(host(), SESSION_ID, null, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
+
+        val nextBook = options.templates.single { it.eventType == NotificationEventType.NEXT_BOOK_PUBLISHED }
+        assertThat(nextBook.enabled).isFalse()
+        assertThat(nextBook.disabledReason).isEqualTo("멤버에게 공개된 예정 세션만 다음 책 알림을 보낼 수 있습니다.")
+    }
+
+    @Test
+    fun `options enables feedback document manual notification only for closed or published sessions with a document`() {
+        val port = FakeManualPort(sessionContext = sessionContext(state = "OPEN", feedbackDocumentUploaded = true))
+        val service = service(port)
+
+        val options = service.options(host(), SESSION_ID, null, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
+
+        val feedback = options.templates.single { it.eventType == NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED }
+        assertThat(feedback.enabled).isFalse()
+        assertThat(feedback.disabledReason).isEqualTo("닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.")
     }
 
     @Test
@@ -90,6 +116,33 @@ class HostManualNotificationServiceTest {
         assertThat(port.insertedDispatches).hasSize(1)
         assertThat(port.insertedDispatches.single().manualDispatch!!.requestedChannels)
             .isEqualTo(ManualNotificationRequestedChannels.BOTH)
+    }
+
+    @Test
+    fun `confirm includes frozen recipients in manual payload`() {
+        val port = FakeManualPort()
+        val service = service(port)
+        val previewId = service.preview(host(), ManualNotificationPreviewCommand(selection())).previewId
+
+        service.confirm(host(), ManualNotificationConfirmCommand(previewId, selection(), resendConfirmed = false))
+
+        val manual = port.insertedDispatches.single().manualDispatch!!
+        assertThat(manual.targetMembershipIds).isNotEmpty
+        assertThat(manual.inAppMembershipIds).isNotEmpty
+        assertThat(manual.emailMembershipIds).isNotEmpty
+    }
+
+    @Test
+    fun `confirm retry for the same consumed preview returns existing dispatch before duplicate check`() {
+        val port = FakeManualPort()
+        val service = service(port)
+        val previewId = service.preview(host(), ManualNotificationPreviewCommand(selection())).previewId
+
+        val first = service.confirm(host(), ManualNotificationConfirmCommand(previewId, selection(), resendConfirmed = false))
+        val second = service.confirm(host(), ManualNotificationConfirmCommand(previewId, selection(), resendConfirmed = false))
+
+        assertThat(second.eventId).isEqualTo(first.eventId)
+        assertThat(port.insertedDispatches).hasSize(1)
     }
 
     @Test
@@ -137,14 +190,18 @@ class HostManualNotificationServiceTest {
         sendMode = ManualNotificationSendMode.NOW,
     )
 
-    private fun sessionContext(feedbackDocumentUploaded: Boolean = true) = ManualNotificationSessionContext(
+    private fun sessionContext(
+        state: String = "OPEN",
+        visibility: String = "MEMBER",
+        feedbackDocumentUploaded: Boolean = true,
+    ) = ManualNotificationSessionContext(
         sessionId = SESSION_ID,
         clubId = CLUB_ID,
         sessionNumber = 7,
         bookTitle = "Example Book",
         date = LocalDate.parse("2026-05-20"),
-        state = "OPEN",
-        visibility = "MEMBER",
+        state = state,
+        visibility = visibility,
         feedbackDocumentUploaded = feedbackDocumentUploaded,
     )
 
@@ -165,6 +222,7 @@ class HostManualNotificationServiceTest {
         val insertedPreviewHashes = mutableListOf<String>()
         val insertedDispatches = mutableListOf<NotificationEventPayload>()
         private val previews = mutableMapOf<UUID, ManualNotificationPreviewRecord>()
+        private val confirmedByPreview = mutableMapOf<UUID, ManualNotificationConfirmedDispatch>()
 
         override fun findSessionContext(clubId: UUID, sessionId: UUID) = sessionContext
 
@@ -190,10 +248,24 @@ class HostManualNotificationServiceTest {
                 emailEligibleCount = 2,
                 emailSkippedByPreferenceCount = 1,
                 emailMissingCount = 0,
+                targetMembershipIds = listOf(
+                    UUID.nameUUIDFromBytes("target-1".toByteArray()),
+                    UUID.nameUUIDFromBytes("target-2".toByteArray()),
+                    UUID.nameUUIDFromBytes("target-3".toByteArray()),
+                ),
+                inAppMembershipIds = listOf(
+                    UUID.nameUUIDFromBytes("target-1".toByteArray()),
+                    UUID.nameUUIDFromBytes("target-2".toByteArray()),
+                    UUID.nameUUIDFromBytes("target-3".toByteArray()),
+                ),
+                emailMembershipIds = listOf(
+                    UUID.nameUUIDFromBytes("target-1".toByteArray()),
+                    UUID.nameUUIDFromBytes("target-2".toByteArray()),
+                ),
             )
 
         override fun recentDispatches(clubId: UUID, sessionId: UUID, eventType: NotificationEventType) =
-            (1..recentDispatchCount).map {
+            (1..(recentDispatchCount + insertedDispatches.size)).map {
                 ManualNotificationRecentDispatch(
                     manualDispatchId = UUID.nameUUIDFromBytes("recent-$it".toByteArray()),
                     eventType = eventType,
@@ -217,6 +289,42 @@ class HostManualNotificationServiceTest {
         }
 
         override fun findPreview(id: UUID, clubId: UUID, hostMembershipId: UUID) = previews[id]
+
+        override fun findConsumedManualDispatch(
+            previewId: UUID,
+            clubId: UUID,
+            hostMembershipId: UUID,
+            selectionHash: String,
+            now: OffsetDateTime,
+        ): ManualNotificationConfirmedDispatch? {
+            val preview = previews[previewId] ?: return null
+            if (preview.expiresAt.isBefore(now) || preview.selectionHash != selectionHash) return null
+            return confirmedByPreview[previewId]
+                ?.copy(status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
+        }
+
+        override fun confirmManualDispatch(
+            previewId: UUID,
+            clubId: UUID,
+            hostMembershipId: UUID,
+            selectionHash: String,
+            now: OffsetDateTime,
+            selection: ManualNotificationSelection,
+            payload: NotificationEventPayload,
+            targetSnapshot: ManualNotificationTargetSnapshot,
+            resend: Boolean,
+        ): ManualNotificationConfirmedDispatch? {
+            previews[previewId] ?: return null
+            return confirmedByPreview.getOrPut(previewId) {
+                insertedDispatches += payload
+                ManualNotificationConfirmedDispatch(
+                    manualDispatchId = payload.manualDispatch!!.id,
+                    eventId = UUID.nameUUIDFromBytes("event".toByteArray()),
+                    createdAt = OffsetDateTime.of(2026, 5, 13, 9, 1, 0, 0, ZoneOffset.UTC),
+                    status = ManualNotificationConfirmInsertStatus.CREATED,
+                )
+            }
+        }
 
         override fun insertManualDispatch(
             clubId: UUID,

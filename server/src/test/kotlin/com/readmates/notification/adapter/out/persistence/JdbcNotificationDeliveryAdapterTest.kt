@@ -245,6 +245,32 @@ class JdbcNotificationDeliveryAdapterTest(
     }
 
     @Test
+    fun `manual dispatch planning uses frozen recipient snapshot instead of recomputing audience`() {
+        val manualEventId = UUID.nameUUIDFromBytes("manual-event-frozen".toByteArray())
+        val member1 = membershipIdForEmail("member1@example.com")
+        insertManualEventOutboxRow(
+            eventId = manualEventId,
+            requestedChannels = "BOTH",
+            audience = "ALL_ACTIVE_MEMBERS",
+            targetMembershipIds = listOf(member1),
+            inAppMembershipIds = listOf(member1),
+            emailMembershipIds = listOf(member1),
+        )
+        val newlyJoinedMember = insertActiveMember("joined.after.event.manual")
+        try {
+            val deliveries = deliveryAdapter.persistPlannedDeliveries(
+                message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
+            )
+
+            assertThat(deliveries.map { it.recipientMembershipId }).contains(member1)
+            assertThat(deliveries.map { it.recipientMembershipId }).doesNotContain(newlyJoinedMember.membershipId)
+            assertThat(memberNotificationRows(manualEventId)).isEqualTo(1)
+        } finally {
+            deleteInsertedMember(newlyJoinedMember)
+        }
+    }
+
+    @Test
     fun `claimEmailDelivery leases only due email rows and mark sent requires active lease`() {
         insertEventOutboxRow()
         deliveryAdapter.persistPlannedDeliveries(message())
@@ -389,10 +415,16 @@ class JdbcNotificationDeliveryAdapterTest(
         audience: String,
         excludedMembershipIds: List<UUID> = emptyList(),
         includedMembershipIds: List<UUID> = emptyList(),
+        targetMembershipIds: List<UUID> = emptyList(),
+        inAppMembershipIds: List<UUID> = emptyList(),
+        emailMembershipIds: List<UUID> = emptyList(),
     ) {
         val manualDispatchId = UUID.nameUUIDFromBytes("manual-dispatch-$eventId".toByteArray())
-        val excludedJson = excludedMembershipIds.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
-        val includedJson = includedMembershipIds.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+        val excludedJson = uuidListJson(excludedMembershipIds)
+        val includedJson = uuidListJson(includedMembershipIds)
+        val targetJson = uuidListJson(targetMembershipIds)
+        val inAppJson = uuidListJson(inAppMembershipIds)
+        val emailJson = uuidListJson(emailMembershipIds)
         jdbcTemplate.update(
             """
             insert into notification_event_outbox (
@@ -409,6 +441,9 @@ class JdbcNotificationDeliveryAdapterTest(
                 'audience', ?,
                 'excludedMembershipIds', cast(? as json),
                 'includedMembershipIds', cast(? as json),
+                'targetMembershipIds', cast(? as json),
+                'inAppMembershipIds', cast(? as json),
+                'emailMembershipIds', cast(? as json),
                 'resend', false,
                 'sendMode', 'NOW'
               )
@@ -423,10 +458,16 @@ class JdbcNotificationDeliveryAdapterTest(
             audience,
             excludedJson,
             includedJson,
+            targetJson,
+            inAppJson,
+            emailJson,
             clubId.toString(),
             "delivery-adapter-test-manual-$eventId",
         )
     }
+
+    private fun uuidListJson(ids: List<UUID>): String =
+        ids.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
 
     private fun message(
         eventId: UUID = this.eventId,

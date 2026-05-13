@@ -49,8 +49,8 @@ export function HostSessionNotificationActions({
     {
       eventType: "NEXT_BOOK_PUBLISHED",
       label: "다음 책 공개",
-      enabled: visibility === "MEMBER" || visibility === "PUBLIC",
-      disabledReason: "멤버에게 보이는 세션만 발송할 수 있습니다.",
+      enabled: state === "DRAFT" && (visibility === "MEMBER" || visibility === "PUBLIC"),
+      disabledReason: "멤버에게 공개된 예정 세션만 다음 책 알림을 보낼 수 있습니다.",
     },
     {
       eventType: "SESSION_REMINDER_DUE",
@@ -61,8 +61,8 @@ export function HostSessionNotificationActions({
     {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
       label: "피드백 문서 등록",
-      enabled: feedbackDocumentUploaded,
-      disabledReason: "피드백 문서를 먼저 등록해야 합니다.",
+      enabled: (state === "CLOSED" || state === "PUBLISHED") && feedbackDocumentUploaded,
+      disabledReason: "닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
     },
   ];
 

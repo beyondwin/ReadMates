@@ -298,7 +298,10 @@ export function ManualNotificationWorkbench({
             disabled={!canConfirm}
             busy={busy}
             onResendConfirmedChange={setResendConfirmed}
-            onConfirm={() => onConfirm({ ...selection, previewId: preview.previewId, resendConfirmed })}
+            onConfirm={() => {
+              if (!canConfirm) return;
+              void onConfirm({ ...selection, previewId: preview.previewId, resendConfirmed });
+            }}
           />
         ) : null}
       </div>

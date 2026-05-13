@@ -1,7 +1,7 @@
 # ReadMates 수동 알림 발송과 알림 UI 재설계
 
-작성일: 2026-05-13  
-상태: DRAFT DESIGN SPEC  
+작성일: 2026-05-13
+상태: DRAFT DESIGN SPEC
 대상 표면: 호스트 알림 운영, 세션 편집, 멤버 알림함, notification server slice
 
 ## 1. 배경

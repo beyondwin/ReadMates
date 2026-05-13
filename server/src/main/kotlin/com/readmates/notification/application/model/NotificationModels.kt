@@ -55,6 +55,9 @@ data class NotificationManualDispatchPayload(
     val audience: ManualNotificationAudience,
     val excludedMembershipIds: List<UUID> = emptyList(),
     val includedMembershipIds: List<UUID> = emptyList(),
+    val targetMembershipIds: List<UUID> = emptyList(),
+    val inAppMembershipIds: List<UUID> = emptyList(),
+    val emailMembershipIds: List<UUID> = emptyList(),
     val resend: Boolean = false,
     val sendMode: ManualNotificationSendMode = ManualNotificationSendMode.NOW,
 )

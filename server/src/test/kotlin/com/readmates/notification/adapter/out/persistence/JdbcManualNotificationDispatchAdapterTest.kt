@@ -7,6 +7,7 @@ import com.readmates.notification.application.model.ManualNotificationSendMode
 import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.NotificationManualDispatchPayload
+import com.readmates.notification.application.port.out.ManualNotificationConfirmInsertStatus
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.PageRequest
@@ -67,6 +68,23 @@ class JdbcManualNotificationDispatchAdapterTest(
         assertThat(snapshot.finalTargetCount).isGreaterThan(0)
         assertThat(snapshot.excludedCount).isEqualTo(1)
         assertThat(snapshot.emailSkippedByPreferenceCount).isGreaterThanOrEqualTo(1)
+        assertThat(snapshot.targetMembershipIds).hasSize(snapshot.finalTargetCount)
+        assertThat(snapshot.inAppMembershipIds).hasSize(snapshot.inAppEligibleCount)
+        assertThat(snapshot.emailMembershipIds).hasSize(snapshot.emailEligibleCount)
+        assertThat(snapshot.targetMembershipIds).doesNotContain(membershipId("member2@example.com"))
+    }
+
+    @Test
+    fun `previewTargets freezes only email eligible ids for email only requests`() {
+        disablePreference("member1@example.com")
+        val snapshot = adapter.previewTargets(
+            clubId,
+            selection(requestedChannels = ManualNotificationRequestedChannels.EMAIL),
+        )
+
+        assertThat(snapshot.inAppMembershipIds).isEmpty()
+        assertThat(snapshot.emailMembershipIds).hasSize(snapshot.emailEligibleCount)
+        assertThat(snapshot.targetMembershipIds).hasSize(snapshot.finalTargetCount)
     }
 
     @Test
@@ -145,6 +163,65 @@ class JdbcManualNotificationDispatchAdapterTest(
         assertThat(manualDispatchCount(dispatchId)).isEqualTo(1)
     }
 
+    @Test
+    fun `confirmManualDispatch consumes preview once and returns existing dispatch on retry`() {
+        val previewId = adapter.insertPreview(
+            clubId,
+            hostMembershipId,
+            "a".repeat(64),
+            OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(10),
+        )
+        val snapshot = adapter.previewTargets(clubId, selection())
+        val payload = NotificationEventPayload(
+            sessionId = sessionId,
+            sessionNumber = 7,
+            bookTitle = "Example Book",
+            manualDispatch = NotificationManualDispatchPayload(
+                id = UUID.nameUUIDFromBytes("manual-dispatch-idempotent".toByteArray()),
+                source = NotificationDispatchSource.MANUAL,
+                requestedByMembershipId = hostMembershipId,
+                requestedChannels = ManualNotificationRequestedChannels.BOTH,
+                audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+                targetMembershipIds = snapshot.targetMembershipIds,
+                inAppMembershipIds = snapshot.inAppMembershipIds,
+                emailMembershipIds = snapshot.emailMembershipIds,
+                resend = false,
+                sendMode = ManualNotificationSendMode.NOW,
+            ),
+        )
+
+        val first = adapter.confirmManualDispatch(
+            previewId = previewId,
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            selectionHash = "a".repeat(64),
+            now = OffsetDateTime.now(ZoneOffset.UTC),
+            selection = selection(),
+            payload = payload,
+            targetSnapshot = snapshot,
+            resend = false,
+        )
+        val second = adapter.confirmManualDispatch(
+            previewId = previewId,
+            clubId = clubId,
+            hostMembershipId = hostMembershipId,
+            selectionHash = "a".repeat(64),
+            now = OffsetDateTime.now(ZoneOffset.UTC),
+            selection = selection(),
+            payload = payload.copy(
+                manualDispatch = payload.manualDispatch!!.copy(id = UUID.randomUUID()),
+            ),
+            targetSnapshot = snapshot,
+            resend = false,
+        )
+
+        assertThat(first!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.CREATED)
+        assertThat(second!!.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
+        assertThat(first.eventId).isEqualTo(second.eventId)
+        assertThat(eventCount(first.eventId)).isEqualTo(1)
+        assertThat(previewManualDispatchCount(previewId)).isEqualTo(1)
+    }
+
     private fun insertManualDispatchFixture() =
         adapter.insertManualDispatch(
             clubId = clubId,
@@ -169,13 +246,14 @@ class JdbcManualNotificationDispatchAdapterTest(
         )
 
     private fun selection(
+        requestedChannels: ManualNotificationRequestedChannels = ManualNotificationRequestedChannels.BOTH,
         excludedMembershipIds: List<UUID> = emptyList(),
         includedMembershipIds: List<UUID> = emptyList(),
     ) = ManualNotificationSelection(
         sessionId = sessionId,
         eventType = NotificationEventType.SESSION_REMINDER_DUE,
         audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
-        requestedChannels = ManualNotificationRequestedChannels.BOTH,
+        requestedChannels = requestedChannels,
         excludedMembershipIds = excludedMembershipIds,
         includedMembershipIds = includedMembershipIds,
         sendMode = ManualNotificationSendMode.NOW,
@@ -222,6 +300,13 @@ class JdbcManualNotificationDispatchAdapterTest(
             "select count(*) from notification_manual_dispatches where id = ?",
             Int::class.java,
             dispatchId.toString(),
+        ) ?: 0
+
+    private fun previewManualDispatchCount(previewId: UUID): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from notification_manual_dispatches where preview_id = ?",
+            Int::class.java,
+            previewId.toString(),
         ) ?: 0
 
     companion object {

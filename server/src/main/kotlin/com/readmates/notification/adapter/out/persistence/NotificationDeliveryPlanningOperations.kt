@@ -83,13 +83,29 @@ internal class NotificationDeliveryPlanningOperations(
         message: NotificationEventMessage,
         recipient: DeliveryRecipient,
     ): List<DeliveryInsertRow> {
-        val requested = message.payload.manualDispatch?.requestedChannels
-        val includeInApp = requested == null ||
-            requested == ManualNotificationRequestedChannels.IN_APP ||
-            requested == ManualNotificationRequestedChannels.BOTH
-        val includeEmail = requested == null ||
-            requested == ManualNotificationRequestedChannels.EMAIL ||
-            requested == ManualNotificationRequestedChannels.BOTH
+        val manual = message.payload.manualDispatch
+        val requested = manual?.requestedChannels
+        val frozenInAppIds = manual?.inAppMembershipIds?.toSet().orEmpty()
+        val frozenEmailIds = manual?.emailMembershipIds?.toSet().orEmpty()
+        val hasFrozenSnapshot = manual != null && (
+            manual.targetMembershipIds.isNotEmpty() ||
+                manual.inAppMembershipIds.isNotEmpty() ||
+                manual.emailMembershipIds.isNotEmpty()
+            )
+        val includeInApp = if (hasFrozenSnapshot) {
+            recipient.membershipId in frozenInAppIds
+        } else {
+            requested == null ||
+                requested == ManualNotificationRequestedChannels.IN_APP ||
+                requested == ManualNotificationRequestedChannels.BOTH
+        }
+        val includeEmail = if (hasFrozenSnapshot) {
+            recipient.membershipId in frozenEmailIds
+        } else {
+            requested == null ||
+                requested == ManualNotificationRequestedChannels.EMAIL ||
+                requested == ManualNotificationRequestedChannels.BOTH
+        }
         return buildList {
             if (includeInApp) {
                 add(
@@ -228,6 +244,21 @@ internal class NotificationDeliveryPlanningOperations(
         message: NotificationEventMessage,
     ): List<DeliveryRecipient> {
         val manual = requireNotNull(message.payload.manualDispatch)
+        if (
+            manual.targetMembershipIds.isNotEmpty() ||
+            manual.inAppMembershipIds.isNotEmpty() ||
+            manual.emailMembershipIds.isNotEmpty()
+        ) {
+            return frozenManualRecipients(jdbcTemplate, message)
+        }
+        return legacyManualRecipients(jdbcTemplate, message)
+    }
+
+    private fun legacyManualRecipients(
+        jdbcTemplate: JdbcTemplate,
+        message: NotificationEventMessage,
+    ): List<DeliveryRecipient> {
+        val manual = requireNotNull(message.payload.manualDispatch)
         val baseIds = manualBaseMembershipIds(jdbcTemplate, message)
         val includedIds = activeMembershipIds(jdbcTemplate, message.clubId, manual.includedMembershipIds)
         val finalIds = (baseIds - manual.excludedMembershipIds.toSet() + includedIds).toList()
@@ -262,6 +293,48 @@ internal class NotificationDeliveryPlanningOperations(
             """.trimIndent(),
             { resultSet, _ -> with(rowMappers) { resultSet.toDeliveryRecipient() } },
             *(listOf(message.clubId.dbString() as Any) + finalIds.map { it.dbString() as Any }).toTypedArray(),
+        )
+    }
+
+    private fun frozenManualRecipients(
+        jdbcTemplate: JdbcTemplate,
+        message: NotificationEventMessage,
+    ): List<DeliveryRecipient> {
+        val manual = requireNotNull(message.payload.manualDispatch)
+        val finalIds = manual.targetMembershipIds.distinct()
+        if (finalIds.isEmpty()) return emptyList()
+        val placeholders = finalIds.joinToString(",") { "?" }
+        val emailIds = manual.emailMembershipIds.distinct()
+        val emailPredicate = if (emailIds.isEmpty()) {
+            "false"
+        } else {
+            "memberships.id in (${emailIds.joinToString(",") { "?" }})"
+        }
+        val args = if (emailIds.isEmpty()) {
+            listOf(message.clubId.dbString() as Any) + finalIds.map { it.dbString() as Any }
+        } else {
+            emailIds.map { it.dbString() as Any } +
+                listOf(message.clubId.dbString() as Any) +
+                finalIds.map { it.dbString() as Any }
+        }
+        return jdbcTemplate.query(
+            """
+            select
+              memberships.id as recipient_membership_id,
+              coalesce(memberships.short_name, users.name) as display_name,
+              (
+                users.email is not null
+                and users.email <> ''
+                and $emailPredicate
+              ) as email_allowed
+            from memberships
+            join users on users.id = memberships.user_id
+            where memberships.club_id = ?
+              and memberships.status = 'ACTIVE'
+              and memberships.id in ($placeholders)
+            """.trimIndent(),
+            { resultSet, _ -> with(rowMappers) { resultSet.toDeliveryRecipient() } },
+            *args.toTypedArray(),
         )
     }
 

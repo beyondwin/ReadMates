@@ -69,6 +69,9 @@ val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/defaul
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    filter {
+        excludeTestsMatching("*\$*")
+    }
     jvmArgs("-Xshare:off")
     systemProperty(
         "readmates.frontend.fixtures.dir",

@@ -77,7 +77,7 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
       label: "피드백 문서 등록",
       enabled: false,
-      disabledReason: "피드백 문서를 먼저 등록해야 합니다.",
+      disabledReason: "닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
       defaultAudience: "CONFIRMED_ATTENDEES",
       allowedAudiences: ["CONFIRMED_ATTENDEES", "SESSION_PARTICIPANTS"],
       defaultChannels: "BOTH",

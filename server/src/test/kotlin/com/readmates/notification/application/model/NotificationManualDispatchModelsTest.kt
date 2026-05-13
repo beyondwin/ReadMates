@@ -1,5 +1,8 @@
 package com.readmates.notification.application.model
 
+import com.readmates.notification.application.port.out.ManualNotificationConfirmInsertStatus
+import com.readmates.notification.application.port.out.ManualNotificationConfirmedDispatch
+import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import org.assertj.core.api.Assertions.assertThat
@@ -36,6 +39,62 @@ class NotificationManualDispatchModelsTest {
         assertThat(payload.excludedMembershipIds).containsExactly(excluded)
         assertThat(payload.includedMembershipIds).isEmpty()
         assertThat(payload.resend).isTrue()
+    }
+
+    @Test
+    fun `manual dispatch payload carries frozen recipient snapshots`() {
+        val target = UUID.nameUUIDFromBytes("target".toByteArray())
+        val email = UUID.nameUUIDFromBytes("email".toByteArray())
+        val payload = NotificationManualDispatchPayload(
+            id = UUID.nameUUIDFromBytes("dispatch".toByteArray()),
+            requestedByMembershipId = UUID.nameUUIDFromBytes("host".toByteArray()),
+            requestedChannels = ManualNotificationRequestedChannels.BOTH,
+            audience = ManualNotificationAudience.ALL_ACTIVE_MEMBERS,
+            targetMembershipIds = listOf(target),
+            inAppMembershipIds = listOf(target),
+            emailMembershipIds = listOf(email),
+            resend = false,
+            sendMode = ManualNotificationSendMode.NOW,
+        )
+
+        assertThat(payload.targetMembershipIds).containsExactly(target)
+        assertThat(payload.inAppMembershipIds).containsExactly(target)
+        assertThat(payload.emailMembershipIds).containsExactly(email)
+    }
+
+    @Test
+    fun `manual target snapshot carries counts and frozen channel recipients`() {
+        val target = UUID.nameUUIDFromBytes("target".toByteArray())
+        val email = UUID.nameUUIDFromBytes("email".toByteArray())
+        val snapshot = ManualNotificationTargetSnapshot(
+            baseCount = 2,
+            excludedCount = 1,
+            includedCount = 0,
+            finalTargetCount = 1,
+            inAppEligibleCount = 1,
+            emailEligibleCount = 1,
+            emailSkippedByPreferenceCount = 0,
+            emailMissingCount = 0,
+            targetMembershipIds = listOf(target),
+            inAppMembershipIds = listOf(target),
+            emailMembershipIds = listOf(email),
+        )
+
+        assertThat(snapshot.finalTargetCount).isEqualTo(snapshot.targetMembershipIds.size)
+        assertThat(snapshot.inAppEligibleCount).isEqualTo(snapshot.inAppMembershipIds.size)
+        assertThat(snapshot.emailEligibleCount).isEqualTo(snapshot.emailMembershipIds.size)
+    }
+
+    @Test
+    fun `manual confirm result distinguishes created and consumed previews`() {
+        val confirmed = ManualNotificationConfirmedDispatch(
+            manualDispatchId = UUID.nameUUIDFromBytes("dispatch".toByteArray()),
+            eventId = UUID.nameUUIDFromBytes("event".toByteArray()),
+            createdAt = OffsetDateTime.parse("2026-05-13T10:10:00Z"),
+            status = ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED,
+        )
+
+        assertThat(confirmed.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
     }
 
     @Test

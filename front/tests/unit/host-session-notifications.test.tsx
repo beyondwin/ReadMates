@@ -7,19 +7,37 @@ describe("HostSessionNotificationActions", () => {
     render(
       <HostSessionNotificationActions
         sessionId="session-1"
+        state="DRAFT"
+        visibility="MEMBER"
+        feedbackDocumentUploaded={false}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "다음 책 공개" })).toHaveAttribute(
+      "href",
+      "/app/host/notifications?sessionId=session-1&eventType=NEXT_BOOK_PUBLISHED",
+    );
+    expect(screen.getByRole("link", { name: "모임 전날 리마인더" })).toHaveAttribute(
+      "href",
+      "/app/host/notifications?sessionId=session-1&eventType=SESSION_REMINDER_DUE",
+    );
+  });
+
+  it("disables next book and feedback manual notifications for open sessions", () => {
+    render(
+      <HostSessionNotificationActions
+        sessionId="session-1"
         state="OPEN"
         visibility="MEMBER"
         feedbackDocumentUploaded
       />,
     );
 
+    expect(screen.getByRole("button", { name: /다음 책 공개/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /피드백 문서 등록/ })).toBeDisabled();
     expect(screen.getByRole("link", { name: "모임 전날 리마인더" })).toHaveAttribute(
       "href",
       "/app/host/notifications?sessionId=session-1&eventType=SESSION_REMINDER_DUE",
-    );
-    expect(screen.getByRole("link", { name: "피드백 문서 등록" })).toHaveAttribute(
-      "href",
-      "/app/host/notifications?sessionId=session-1&eventType=FEEDBACK_DOCUMENT_PUBLISHED",
     );
   });
 
@@ -27,7 +45,7 @@ describe("HostSessionNotificationActions", () => {
     render(
       <HostSessionNotificationActions
         sessionId="session-1"
-        state="OPEN"
+        state="CLOSED"
         visibility="MEMBER"
         feedbackDocumentUploaded={false}
       />,
