@@ -245,6 +245,26 @@ export function HostNotificationsPage({
     }
   };
 
+  const handleManualSessionChange = async (sessionId: string) => {
+    if (!onLoadManualOptions) return visibleManualOptions;
+    setManualBusy(true);
+    setManualError(null);
+    setManualPreview(null);
+    try {
+      const nextOptions = await onLoadManualOptions(sessionId, undefined);
+      setManualOptionsState((current) => ({
+        ...current,
+        value: nextOptions,
+      }));
+      return nextOptions;
+    } catch (error) {
+      setManualError("세션 정보를 불러오지 못했습니다.");
+      throw error;
+    } finally {
+      setManualBusy(false);
+    }
+  };
+
   const handleLoadManualOptions = async (sessionId?: string, search?: string) => {
     if (!onLoadManualOptions) return visibleManualOptions;
     const nextOptions = await onLoadManualOptions(sessionId, search);
@@ -327,6 +347,7 @@ export function HostNotificationsPage({
           error={manualError}
           onPreview={handleManualPreview}
           onConfirm={handleManualConfirm}
+          onSessionChange={handleManualSessionChange}
           onLoadManualOptions={handleLoadManualOptions}
           onLoadMoreManualMembers={handleLoadMoreManualMembers}
         />

@@ -382,6 +382,40 @@ describe("HostNotificationsPage", () => {
     expect(screen.getByRole("button", { name: "미리보기" })).toBeDisabled();
   });
 
+  it("reloads manual options when the host changes the selected session", async () => {
+    const user = userEvent.setup();
+    const nextOptions = {
+      ...manualOptionsFixture,
+      session: {
+        ...manualOptionsFixture.session!,
+        sessionId: "session-draft",
+        sessionNumber: 10,
+        bookTitle: "다음 책",
+        date: "2026-08-19",
+        state: "DRAFT",
+      },
+    } as ManualNotificationOptionsResponse;
+    const onLoadManualOptions = vi.fn().mockResolvedValue(nextOptions);
+
+    renderPage({ onLoadManualOptions });
+
+    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+
+    expect(onLoadManualOptions).toHaveBeenCalledWith("session-draft", undefined);
+    expect(await screen.findByText("다음 책")).toBeInTheDocument();
+  });
+
+  it("shows an inline error when changing sessions cannot reload manual options", async () => {
+    const user = userEvent.setup();
+    const onLoadManualOptions = vi.fn().mockRejectedValue(new Error("network failed"));
+
+    renderPage({ onLoadManualOptions });
+
+    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("세션 정보를 불러오지 못했습니다.");
+  });
+
   it("searches manual notification members and loads more", async () => {
     const user = userEvent.setup();
     const searchedOptions = {

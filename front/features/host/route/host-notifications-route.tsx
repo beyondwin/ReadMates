@@ -131,6 +131,7 @@ export function HostNotificationsRoute() {
       events={events.items}
       deliveries={deliveries.items}
       audit={audit.items}
+      hostSessions={data.hostSessions.items}
       manualOptions={manualOptions}
       manualDispatches={manualDispatches.items}
       initialManualSelection={data.initialManualSelection}

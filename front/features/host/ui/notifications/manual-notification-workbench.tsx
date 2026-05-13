@@ -42,6 +42,7 @@ export function ManualNotificationWorkbench({
   error,
   onPreview,
   onConfirm,
+  onSessionChange,
   onLoadManualOptions,
   onLoadMoreManualMembers,
 }: {
@@ -54,6 +55,7 @@ export function ManualNotificationWorkbench({
   error: string | null;
   onPreview: (request: ManualNotificationPreviewRequest) => Promise<void>;
   onConfirm: (request: ManualNotificationConfirmRequest) => Promise<void>;
+  onSessionChange?: (sessionId: string) => Promise<ManualNotificationOptionsResponse>;
   onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
   onLoadMoreManualMembers?: (sessionId?: string, search?: string, cursor?: string) => Promise<ManualNotificationOptionsResponse>;
 }) {
@@ -85,6 +87,23 @@ export function ManualNotificationWorkbench({
   const sessionHint = selectedSession?.date && selection.eventType === "SESSION_REMINDER_DUE"
     ? reminderDateHint(selectedSession.date)
     : null;
+
+  const handleSessionChange = async (sessionId: string) => {
+    setSelection((current) => ({
+      ...current,
+      sessionId,
+      excludedMembershipIds: [],
+      includedMembershipIds: [],
+    }));
+    setMemberSearch("");
+    setResendConfirmed(false);
+    if (!onSessionChange) return;
+    try {
+      await onSessionChange(sessionId);
+    } catch {
+      // HostNotificationsPage owns the inline error state.
+    }
+  };
 
   const submitMemberSearch = async () => {
     if (!onLoadManualOptions || membersLoading) return;
@@ -172,10 +191,7 @@ export function ManualNotificationWorkbench({
             id="manual-notification-session"
             className="input"
             value={selection.sessionId}
-            onChange={(event) => {
-              setSelection((current) => ({ ...current, sessionId: event.currentTarget.value }));
-              setResendConfirmed(false);
-            }}
+            onChange={(event) => void handleSessionChange(event.currentTarget.value)}
             disabled={busy || hostSessions.length === 0}
           >
             {hostSessions.map((session) => (
