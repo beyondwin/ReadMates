@@ -83,8 +83,8 @@ fi
 safe_remove_fixture_root
 mkdir -p "$fixture_root/secret-dollar" "$fixture_root/secret-comment" "$fixture_root/placeholders"
 
-# shellcheck disable=SC2016
-printf '%s\n' 'SPRING_DATASOURCE_PASSWORD=Abc$123Def456Gh!' > "$fixture_root/secret-dollar/.env.example"
+secret_dollar_value="$(printf 'Abc\\044123Def456Gh!')"
+printf 'SPRING_DATASOURCE_PASSWORD=%s\n' "$secret_dollar_value" > "$fixture_root/secret-dollar/.env.example"
 
 if ./scripts/public-release-check.sh "$fixture_root/secret-dollar" > "$fixture_root/secret-dollar.out" 2> "$fixture_root/secret-dollar.err"; then
   fail "dollar-containing secret fixture unexpectedly passed"
