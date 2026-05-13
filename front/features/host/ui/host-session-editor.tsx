@@ -316,7 +316,6 @@ export default function HostSessionEditor({
             return;
           }
 
-          globalThis.location.href = returnTarget.href;
           return;
         }
 
@@ -342,7 +341,6 @@ export default function HostSessionEditor({
       session,
       isNewSession,
       actions,
-      returnTarget.href,
       flash,
     ],
   );

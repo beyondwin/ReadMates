@@ -601,6 +601,24 @@ describe("HostSessionEditor", () => {
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.anything());
   });
 
+  it("stays on the scoped edit page after saving an existing session", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    const location = {
+      href: "/clubs/reading-sai/app/host/sessions/session-1/edit",
+      pathname: "/clubs/reading-sai/app/host/sessions/session-1/edit",
+    };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(<HostSessionEditorForTest session={session} />);
+
+    await user.click(screen.getByRole("button", { name: "변경 사항 저장" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1", expect.anything()));
+    expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/session-1/edit");
+  });
+
   it("patches cleared optional book and meeting fields as empty strings", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true });
     const location = { href: "" };

@@ -1,4 +1,5 @@
 import { type CSSProperties, useState } from "react";
+import { scopedPublicLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 export function DangerZone({
   variant = "desktop",
@@ -21,7 +22,7 @@ export function DangerZone({
     try {
       await onLeaveMembership();
       setLeaveMessage("탈퇴 처리되었습니다.");
-      globalThis.location.href = "/about";
+      globalThis.location.href = scopedPublicLinkTarget(globalThis.location.pathname, "/about");
     } catch {
       setLeaveError("탈퇴 처리에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {

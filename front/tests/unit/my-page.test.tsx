@@ -1009,6 +1009,22 @@ describe("MyPage", () => {
     expect(location.href).toBe("/about");
   });
 
+  it("keeps self leave redirect inside the scoped club public route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    const location = { href: "", pathname: "/clubs/reading-sai/app/me" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+    const { container } = renderMyPage();
+    const scoped = desktopScope(container);
+
+    await user.click(scoped.getByRole("button", { name: "탈퇴" }));
+    await user.click(scoped.getByRole("button", { name: "탈퇴 확인" }));
+
+    expect(await scoped.findByRole("status")).toHaveTextContent("탈퇴 처리되었습니다.");
+    expect(location.href).toBe("/clubs/reading-sai/about");
+  });
+
   it("confirms self leave from the mobile my page", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     const location = { href: "" };

@@ -8,6 +8,7 @@ import {
   resetReadmatesNavigationScroll,
   restoreReadmatesListScroll,
 } from "@/src/app/route-continuity";
+import { scopedPublicLinkTarget } from "@/shared/routing/scoped-app-link-target";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
@@ -95,5 +96,11 @@ describe("route continuity", () => {
         fallback,
       ),
     ).toEqual(fallback);
+  });
+
+  it("scopes public links from club app routes", () => {
+    expect(scopedPublicLinkTarget("/clubs/reading-sai/app/me", "/about")).toBe("/clubs/reading-sai/about");
+    expect(scopedPublicLinkTarget("/clubs/reading-sai/app/me", "/records")).toBe("/clubs/reading-sai/records");
+    expect(scopedPublicLinkTarget("/app/me", "/about")).toBe("/about");
   });
 });

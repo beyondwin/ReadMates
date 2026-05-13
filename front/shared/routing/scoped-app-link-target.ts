@@ -3,6 +3,11 @@ function appBasePath(pathname: string) {
   return match ? `/clubs/${encodeURIComponent(match[1])}/app` : "";
 }
 
+function clubBasePath(pathname: string) {
+  const match = /^\/clubs\/([^/]+)(?:\/|$)/.exec(pathname);
+  return match ? `/clubs/${encodeURIComponent(match[1])}` : "";
+}
+
 export function scopedAppLinkTarget(pathname: string, to: string) {
   const basePath = appBasePath(pathname);
 
@@ -11,4 +16,17 @@ export function scopedAppLinkTarget(pathname: string, to: string) {
   }
 
   return `${basePath}${to === "/app" ? "" : to.replace(/^\/app/, "")}`;
+}
+
+export function scopedPublicLinkTarget(pathname: string, to: string) {
+  const basePath = clubBasePath(pathname);
+
+  if (
+    !basePath ||
+    (to !== "/" && to !== "/about" && to !== "/records" && !to.startsWith("/sessions/"))
+  ) {
+    return to;
+  }
+
+  return `${basePath}${to === "/" ? "" : to}`;
 }
