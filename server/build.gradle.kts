@@ -65,6 +65,10 @@ dependencies {
     testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
 }
 
+tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
+    enabled = false
+}
+
 val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
 
 tasks.withType<Test> {

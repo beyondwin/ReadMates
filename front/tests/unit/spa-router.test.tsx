@@ -301,24 +301,26 @@ describe("SPA router", () => {
     expect(await screen.findByRole("heading", { name: "접근할 수 없습니다." })).toBeInTheDocument();
   });
 
-  it("renders the login route", () => {
+  it("renders the login route", async () => {
+    installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/login"] });
 
     render(<RouterProvider router={router} />);
 
-    expect(screen.getByRole("heading", { name: "읽는사이 들어가기" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "읽는사이 들어가기" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
     );
   });
 
-  it("renders the reset password route", () => {
+  it("renders the reset password route", async () => {
+    installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/reset-password/reset-token"] });
 
     render(<RouterProvider router={router} />);
 
-    expect(screen.getByRole("heading", { name: "비밀번호 로그인은 종료되었습니다." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "비밀번호 로그인은 종료되었습니다." })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 계속하기" })).toHaveAttribute(
       "href",
       "/oauth2/authorization/google",
@@ -348,6 +350,7 @@ describe("SPA router", () => {
       return Promise.resolve(jsonResponse({ authenticated: false }));
     });
     vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/invite/raw-token"] });
 
     render(<RouterProvider router={router} />);
@@ -382,6 +385,7 @@ describe("SPA router", () => {
       return Promise.resolve(jsonResponse({ authenticated: false }));
     });
     vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai/invite/raw-token"] });
 
     render(<RouterProvider router={router} />);
@@ -464,6 +468,7 @@ describe("SPA router", () => {
       return Promise.resolve(jsonResponse({ message: "unexpected request" }, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/pending"] });
 
     render(

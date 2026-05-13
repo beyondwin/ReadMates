@@ -1,49 +1,19 @@
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
-import {
-  CurrentSessionRoute,
-  CurrentSessionRouteError,
-  currentSessionAction,
-  currentSessionLoader,
-  type InternalLinkComponent,
-} from "@/features/current-session";
+import type { InternalLinkComponent } from "@/features/current-session";
 import {
   ArchiveRouteError,
   ArchiveRouteLoading,
 } from "@/features/archive/route/archive-route-state";
-import { clubSelectionLoader } from "@/features/club-selection/route/club-selection-data";
-import { ClubSelectionRoute } from "@/features/club-selection/route/club-selection-route";
-import { publicClubLoader, publicSessionLoader } from "@/features/public/route/public-route-data";
 import { PublicRouteError } from "@/features/public/route/public-route-state";
-import { platformAdminLoader } from "@/features/platform-admin/route/platform-admin-data";
-import { PlatformAdminRoute } from "@/features/platform-admin/route/platform-admin-route";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
-import { memberHomeLoader } from "@/features/member-home/route/member-home-data";
-import { memberNotificationsLoader } from "@/features/notifications/route/member-notifications-data";
-import { MemberNotificationsRoute } from "@/features/notifications/route/member-notifications-route";
-import { myPageLoader } from "@/features/archive/route/my-page-data";
-import {
-  notesFeedLoader,
-  notesFeedShouldRevalidate,
-} from "@/features/archive/route/notes-feed-data";
-import { HostRouteError } from "@/features/host";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
+import { HostRouteError } from "@/features/host/route/host-route-error";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireHost, RequireMemberApp, RequirePlatformAdmin } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
-import AboutPage from "@/src/pages/about";
-import AppHomePage from "@/src/pages/app-home";
-import InvitePage from "@/src/pages/invite";
-import LoginPage from "@/src/pages/login";
-import MyRoutePage from "@/src/pages/my-page";
-import NotesPage from "@/src/pages/notes";
-import PendingApprovalPage from "@/src/pages/pending-approval";
-import PublicHomePage from "@/src/pages/public-home";
-import PublicRecordsPage from "@/src/pages/public-records";
-import PublicSessionPage from "@/src/pages/public-session";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
-import ResetPasswordPage from "@/src/pages/reset-password";
 
 const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...props }) => {
   return (
@@ -56,10 +26,15 @@ const currentSessionInternalLink: InternalLinkComponent = ({ href, children, ...
 function memberHomeRoute(): RouteObject {
   return {
     index: true,
-    element: <AppHomePage />,
-    loader: memberHomeLoader,
     errorElement: <ArchiveRouteError />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 홈을 불러오는 중" variant="member" />,
+    lazy: async () => {
+      const [{ default: AppHomePage }, { memberHomeLoader }] = await Promise.all([
+        import("@/src/pages/app-home"),
+        import("@/features/member-home/route/member-home-data"),
+      ]);
+      return { Component: AppHomePage, loader: memberHomeLoader };
+    },
   };
 }
 
@@ -69,19 +44,42 @@ function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[
     ...(includeIndex ? [memberHomeRoute()] : []),
     {
       path: "session/current",
-      element: <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />,
-      loader: currentSessionLoader,
-      action: currentSessionAction,
-      errorElement: <CurrentSessionRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      lazy: async () => {
+        const {
+          CurrentSessionRoute,
+          CurrentSessionRouteError,
+          currentSessionAction,
+          currentSessionLoader,
+        } = await import("@/features/current-session");
+
+        function CurrentSessionRouteElement() {
+          return <CurrentSessionRoute internalLinkComponent={currentSessionInternalLink} />;
+        }
+
+        return {
+          Component: CurrentSessionRouteElement,
+          ErrorBoundary: CurrentSessionRouteError,
+          action: currentSessionAction,
+          loader: currentSessionLoader,
+        };
+      },
     },
     {
       path: "notes",
-      element: <NotesPage />,
-      loader: notesFeedLoader,
-      shouldRevalidate: notesFeedShouldRevalidate,
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="클럽 노트를 불러오는 중" />,
+      lazy: async () => {
+        const [{ default: NotesPage }, { notesFeedLoader, notesFeedShouldRevalidate }] = await Promise.all([
+          import("@/src/pages/notes"),
+          import("@/features/archive/route/notes-feed-data"),
+        ]);
+        return {
+          Component: NotesPage,
+          loader: notesFeedLoader,
+          shouldRevalidate: notesFeedShouldRevalidate,
+        };
+      },
     },
     {
       path: "archive",
@@ -97,17 +95,27 @@ function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[
     },
     {
       path: "me",
-      element: <MyRoutePage />,
-      loader: myPageLoader,
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="내 공간을 불러오는 중" />,
+      lazy: async () => {
+        const [{ default: MyRoutePage }, { myPageLoader }] = await Promise.all([
+          import("@/src/pages/my-page"),
+          import("@/features/archive/route/my-page-data"),
+        ]);
+        return { Component: MyRoutePage, loader: myPageLoader };
+      },
     },
     {
       path: "notifications",
-      element: <MemberNotificationsRoute />,
-      loader: memberNotificationsLoader,
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="알림을 불러오는 중" />,
+      lazy: async () => {
+        const [{ MemberNotificationsRoute }, { memberNotificationsLoader }] = await Promise.all([
+          import("@/features/notifications/route/member-notifications-route"),
+          import("@/features/notifications/route/member-notifications-data"),
+        ]);
+        return { Component: MemberNotificationsRoute, loader: memberNotificationsLoader };
+      },
     },
     {
       path: "sessions/:sessionId",
@@ -161,7 +169,7 @@ function hostAppRoutes(): RouteObject[] {
       lazy: async () => {
         const [{ HostDashboardRouteElement }, { hostDashboardLoader }] = await Promise.all([
           import("@/src/app/host-route-elements"),
-          import("@/features/host"),
+          import("@/features/host/route/host-dashboard-data"),
         ]);
         return { Component: HostDashboardRouteElement, loader: hostDashboardLoader };
       },
@@ -173,7 +181,7 @@ function hostAppRoutes(): RouteObject[] {
       lazy: async () => {
         const [{ HostMembersRouteElement }, { hostMembersLoader }] = await Promise.all([
           import("@/src/app/host-route-elements"),
-          import("@/features/host"),
+          import("@/features/host/route/host-members-data"),
         ]);
         return { Component: HostMembersRouteElement, loader: hostMembersLoader };
       },
@@ -185,7 +193,7 @@ function hostAppRoutes(): RouteObject[] {
       lazy: async () => {
         const [{ HostInvitationsRouteElement }, { hostInvitationsLoader }] = await Promise.all([
           import("@/src/app/host-route-elements"),
-          import("@/features/host"),
+          import("@/features/host/route/host-invitations-data"),
         ]);
         return { Component: HostInvitationsRouteElement, loader: hostInvitationsLoader };
       },
@@ -197,7 +205,7 @@ function hostAppRoutes(): RouteObject[] {
       lazy: async () => {
         const [{ HostNotificationsRouteElement }, { hostNotificationsLoader }] = await Promise.all([
           import("@/src/app/host-route-elements"),
-          import("@/features/host"),
+          import("@/features/host/route/host-notifications-data"),
         ]);
         return { Component: HostNotificationsRouteElement, loader: hostNotificationsLoader };
       },
@@ -218,7 +226,7 @@ function hostAppRoutes(): RouteObject[] {
       lazy: async () => {
         const [{ EditHostSessionRouteElement }, { hostSessionEditorLoader }] = await Promise.all([
           import("@/src/app/host-route-elements"),
-          import("@/features/host"),
+          import("@/features/host/route/host-session-editor-data"),
         ]);
         return { Component: EditHostSessionRouteElement, loader: hostSessionEditorLoader };
       },
@@ -237,93 +245,189 @@ export const routes: RouteObject[] = [
     children: [
       {
         path: "/",
-        element: <PublicHomePage />,
-        loader: publicClubLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="공개 홈을 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: PublicHomePage }, { publicClubLoader }] = await Promise.all([
+            import("@/src/pages/public-home"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: PublicHomePage, loader: publicClubLoader };
+        },
       },
       {
         path: "/about",
-        element: <AboutPage />,
-        loader: publicClubLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="클럽 소개를 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: AboutPage }, { publicClubLoader }] = await Promise.all([
+            import("@/src/pages/about"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: AboutPage, loader: publicClubLoader };
+        },
       },
       {
         path: "/records",
-        element: <PublicRecordsPage />,
-        loader: publicClubLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="공개 기록을 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: PublicRecordsPage }, { publicClubLoader }] = await Promise.all([
+            import("@/src/pages/public-records"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: PublicRecordsPage, loader: publicClubLoader };
+        },
       },
       {
         path: "/sessions/:sessionId",
-        element: <PublicSessionPage />,
-        loader: publicSessionLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: PublicSessionPage }, { publicSessionLoader }] = await Promise.all([
+            import("@/src/pages/public-session"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: PublicSessionPage, loader: publicSessionLoader };
+        },
       },
       {
         path: "/clubs/:clubSlug",
-        element: <PublicHomePage />,
-        loader: publicClubLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="공개 홈을 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: PublicHomePage }, { publicClubLoader }] = await Promise.all([
+            import("@/src/pages/public-home"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: PublicHomePage, loader: publicClubLoader };
+        },
       },
       {
         path: "/clubs/:clubSlug/about",
-        element: <AboutPage />,
-        loader: publicClubLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="클럽 소개를 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: AboutPage }, { publicClubLoader }] = await Promise.all([
+            import("@/src/pages/about"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: AboutPage, loader: publicClubLoader };
+        },
       },
       {
         path: "/clubs/:clubSlug/records",
-        element: <PublicRecordsPage />,
-        loader: publicClubLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="공개 기록을 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: PublicRecordsPage }, { publicClubLoader }] = await Promise.all([
+            import("@/src/pages/public-records"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: PublicRecordsPage, loader: publicClubLoader };
+        },
       },
       {
         path: "/clubs/:clubSlug/sessions/:sessionId",
-        element: <PublicSessionPage />,
-        loader: publicSessionLoader,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const [{ default: PublicSessionPage }, { publicSessionLoader }] = await Promise.all([
+            import("@/src/pages/public-session"),
+            import("@/features/public/route/public-route-data"),
+          ]);
+          return { Component: PublicSessionPage, loader: publicSessionLoader };
+        },
       },
-      { path: "/login", element: <LoginPage /> },
-      { path: "/clubs/:clubSlug/invite/:token", element: <InvitePage /> },
-      { path: "/invite/:token", element: <InvitePage /> },
-      { path: "/reset-password/:token", element: <ResetPasswordPage /> },
+      {
+        path: "/login",
+        hydrateFallbackElement: <ReadmatesRouteLoading label="로그인을 준비하는 중" variant="public" />,
+        lazy: async () => {
+          const { default: LoginPage } = await import("@/src/pages/login");
+          return { Component: LoginPage };
+        },
+      },
+      {
+        path: "/clubs/:clubSlug/invite/:token",
+        hydrateFallbackElement: <ReadmatesRouteLoading label="초대를 확인하는 중" variant="public" />,
+        lazy: async () => {
+          const { default: InvitePage } = await import("@/src/pages/invite");
+          return { Component: InvitePage };
+        },
+      },
+      {
+        path: "/invite/:token",
+        hydrateFallbackElement: <ReadmatesRouteLoading label="초대를 확인하는 중" variant="public" />,
+        lazy: async () => {
+          const { default: InvitePage } = await import("@/src/pages/invite");
+          return { Component: InvitePage };
+        },
+      },
+      {
+        path: "/reset-password/:token",
+        hydrateFallbackElement: <ReadmatesRouteLoading label="로그인 안내를 불러오는 중" variant="public" />,
+        lazy: async () => {
+          const { default: ResetPasswordPage } = await import("@/src/pages/reset-password");
+          return { Component: ResetPasswordPage };
+        },
+      },
       { path: "*", element: <NotFoundRoute variant="public" /> },
     ],
   },
   {
     path: "/admin",
-    element: (
-      <RequirePlatformAdmin>
-        <PlatformAdminRoute />
-      </RequirePlatformAdmin>
-    ),
-    loader: platformAdminLoader,
     errorElement: <RouteErrorBoundary variant="auth" />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="플랫폼 관리를 불러오는 중" variant="member" />,
+    lazy: async () => {
+      const [{ PlatformAdminRoute }, { platformAdminLoader }] = await Promise.all([
+        import("@/features/platform-admin/route/platform-admin-route"),
+        import("@/features/platform-admin/route/platform-admin-data"),
+      ]);
+
+      function PlatformAdminRouteElement() {
+        return (
+          <RequirePlatformAdmin>
+            <PlatformAdminRoute />
+          </RequirePlatformAdmin>
+        );
+      }
+
+      return { Component: PlatformAdminRouteElement, loader: platformAdminLoader };
+    },
   },
   {
     path: "/app/pending",
-    element: (
-      <RequireAuth>
-        <PendingApprovalPage />
-      </RequireAuth>
-    ),
+    hydrateFallbackElement: <ReadmatesRouteLoading label="승인 상태를 확인하는 중" variant="member" />,
+    lazy: async () => {
+      const { default: PendingApprovalPage } = await import("@/src/pages/pending-approval");
+
+      function PendingApprovalRouteElement() {
+        return (
+          <RequireAuth>
+            <PendingApprovalPage />
+          </RequireAuth>
+        );
+      }
+
+      return { Component: PendingApprovalRouteElement };
+    },
   },
   {
     path: "/clubs/:clubSlug/app/pending",
-    element: (
-      <RequireAuth>
-        <PendingApprovalPage />
-      </RequireAuth>
-    ),
+    hydrateFallbackElement: <ReadmatesRouteLoading label="승인 상태를 확인하는 중" variant="member" />,
+    lazy: async () => {
+      const { default: PendingApprovalPage } = await import("@/src/pages/pending-approval");
+
+      function PendingApprovalRouteElement() {
+        return (
+          <RequireAuth>
+            <PendingApprovalPage />
+          </RequireAuth>
+        );
+      }
+
+      return { Component: PendingApprovalRouteElement };
+    },
   },
   {
     path: "/app",
@@ -331,14 +435,24 @@ export const routes: RouteObject[] = [
     children: [
       {
         index: true,
-        element: (
-          <RequireAuth>
-            <ClubSelectionRoute />
-          </RequireAuth>
-        ),
-        loader: clubSelectionLoader,
         errorElement: <ArchiveRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="클럽을 확인하는 중" variant="member" />,
+        lazy: async () => {
+          const [{ ClubSelectionRoute }, { clubSelectionLoader }] = await Promise.all([
+            import("@/features/club-selection/route/club-selection-route"),
+            import("@/features/club-selection/route/club-selection-data"),
+          ]);
+
+          function ClubSelectionRouteElement() {
+            return (
+              <RequireAuth>
+                <ClubSelectionRoute />
+              </RequireAuth>
+            );
+          }
+
+          return { Component: ClubSelectionRouteElement, loader: clubSelectionLoader };
+        },
       },
       {
         id: "app",

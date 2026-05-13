@@ -1,12 +1,12 @@
 import { useLocation } from "react-router-dom";
+import { HostDashboardRoute } from "@/features/host/route/host-dashboard-route";
+import { HostInvitationsRoute } from "@/features/host/route/host-invitations-route";
+import { HostMembersRoute } from "@/features/host/route/host-members-route";
+import { HostNotificationsRoute } from "@/features/host/route/host-notifications-route";
 import {
   EditHostSessionRoute,
-  HostDashboardRoute,
-  HostInvitationsRoute,
-  HostMembersRoute,
-  HostNotificationsRoute,
   NewHostSessionRoute,
-} from "@/features/host";
+} from "@/features/host/route/host-session-editor-route";
 import { useAuth } from "@/src/app/auth-state";
 import { hostDashboardReturnTarget, readmatesReturnState, readReadmatesReturnTarget } from "@/src/app/route-continuity";
 import { Link } from "@/src/app/router-link";
