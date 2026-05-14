@@ -5,12 +5,12 @@ import {
   ArchiveRouteError,
   ArchiveRouteLoading,
 } from "@/features/archive/route/archive-route-state";
-import { PublicRouteError } from "@/features/public/route/public-route-state";
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
-import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
+import { AppRouteLayout } from "@/src/app/layouts";
+import { publicRoutes } from "@/src/app/routes/public";
 import { createReadmatesQueryClient } from "@/src/app/query-client";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireHost, RequireMemberApp, RequirePlatformAdmin } from "@/src/app/route-guards";
@@ -245,141 +245,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
 
 export function buildRoutes(queryClient: QueryClient): RouteObject[] {
   return [
-  {
-    element: <PublicRouteLayout />,
-    errorElement: <RouteErrorBoundary variant="public" />,
-    children: [
-      {
-        path: "/",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 홈을 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: PublicHomePage }, { publicClubLoader }] = await Promise.all([
-            import("@/src/pages/public-home"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: PublicHomePage, loader: publicClubLoader };
-        },
-      },
-      {
-        path: "/about",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="클럽 소개를 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: AboutPage }, { publicClubLoader }] = await Promise.all([
-            import("@/src/pages/about"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: AboutPage, loader: publicClubLoader };
-        },
-      },
-      {
-        path: "/records",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 기록을 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: PublicRecordsPage }, { publicClubLoader }] = await Promise.all([
-            import("@/src/pages/public-records"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: PublicRecordsPage, loader: publicClubLoader };
-        },
-      },
-      {
-        path: "/sessions/:sessionId",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: PublicSessionPage }, { publicSessionLoader }] = await Promise.all([
-            import("@/src/pages/public-session"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: PublicSessionPage, loader: publicSessionLoader };
-        },
-      },
-      {
-        path: "/clubs/:clubSlug",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 홈을 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: PublicHomePage }, { publicClubLoader }] = await Promise.all([
-            import("@/src/pages/public-home"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: PublicHomePage, loader: publicClubLoader };
-        },
-      },
-      {
-        path: "/clubs/:clubSlug/about",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="클럽 소개를 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: AboutPage }, { publicClubLoader }] = await Promise.all([
-            import("@/src/pages/about"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: AboutPage, loader: publicClubLoader };
-        },
-      },
-      {
-        path: "/clubs/:clubSlug/records",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 기록을 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: PublicRecordsPage }, { publicClubLoader }] = await Promise.all([
-            import("@/src/pages/public-records"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: PublicRecordsPage, loader: publicClubLoader };
-        },
-      },
-      {
-        path: "/clubs/:clubSlug/sessions/:sessionId",
-        errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const [{ default: PublicSessionPage }, { publicSessionLoader }] = await Promise.all([
-            import("@/src/pages/public-session"),
-            import("@/features/public/route/public-route-data"),
-          ]);
-          return { Component: PublicSessionPage, loader: publicSessionLoader };
-        },
-      },
-      {
-        path: "/login",
-        hydrateFallbackElement: <ReadmatesRouteLoading label="로그인을 준비하는 중" variant="public" />,
-        lazy: async () => {
-          const { default: LoginPage } = await import("@/src/pages/login");
-          return { Component: LoginPage };
-        },
-      },
-      {
-        path: "/clubs/:clubSlug/invite/:token",
-        hydrateFallbackElement: <ReadmatesRouteLoading label="초대를 확인하는 중" variant="public" />,
-        lazy: async () => {
-          const { default: InvitePage } = await import("@/src/pages/invite");
-          return { Component: InvitePage };
-        },
-      },
-      {
-        path: "/invite/:token",
-        hydrateFallbackElement: <ReadmatesRouteLoading label="초대를 확인하는 중" variant="public" />,
-        lazy: async () => {
-          const { default: InvitePage } = await import("@/src/pages/invite");
-          return { Component: InvitePage };
-        },
-      },
-      {
-        path: "/reset-password/:token",
-        hydrateFallbackElement: <ReadmatesRouteLoading label="로그인 안내를 불러오는 중" variant="public" />,
-        lazy: async () => {
-          const { default: ResetPasswordPage } = await import("@/src/pages/reset-password");
-          return { Component: ResetPasswordPage };
-        },
-      },
-      { path: "*", element: <NotFoundRoute variant="public" /> },
-    ],
-  },
+  publicRoutes(),
   {
     path: "/admin",
     errorElement: <RouteErrorBoundary variant="auth" />,
