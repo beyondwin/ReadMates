@@ -1,5 +1,6 @@
 package com.readmates.architecture
 
+import com.tngtech.archunit.base.DescribedPredicate
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
@@ -412,5 +413,39 @@ class ServerArchitectureBoundaryTest {
                 "org.springframework.web..",
                 "org.springframework.jdbc..",
             ).check(importedClasses)
+    }
+
+    @Test
+    fun `read-only application services must not depend on mutation ports`() {
+        val rule = classes()
+            .that().areAnnotatedWith(
+                "com.readmates.shared.architecture.ReadOnlyApplicationService"
+            )
+            .should().onlyDependOnClassesThat(
+                DescribedPredicate.describe("non-mutation ports") { dep ->
+                    val name = dep.name
+                    val isMutationPort = name.contains(".port.out.")
+                        && (name.endsWith("SavePort")
+                            || name.endsWith("UpdatePort")
+                            || name.endsWith("DeletePort")
+                            || name.endsWith("WriterPort")
+                            || name.endsWith("StorePort")
+                            || name.endsWith("WritePort"))
+                    !isMutationPort
+                }
+            )
+        rule.check(importedClasses)
+    }
+
+    @Test
+    fun `read-only application services must not be Transactional`() {
+        val rule = noClasses()
+            .that().areAnnotatedWith(
+                "com.readmates.shared.architecture.ReadOnlyApplicationService"
+            )
+            .should().beAnnotatedWith(
+                "org.springframework.transaction.annotation.Transactional"
+            )
+        rule.check(importedClasses)
     }
 }
