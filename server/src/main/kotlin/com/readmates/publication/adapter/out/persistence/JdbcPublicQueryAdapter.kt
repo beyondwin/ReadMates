@@ -132,43 +132,45 @@ class JdbcPublicQueryAdapter(
     ): List<PublicSessionSummaryResult> =
         jdbcTemplate.query(
             """
-            select sessions.id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
-                   public_session_publications.public_summary,
-                   (
-                     select count(*)
-                     from highlights
-                     where highlights.club_id = sessions.club_id
-                       and highlights.session_id = sessions.id
-                       and (
-                         highlights.membership_id is null
-                         or exists (
-                           select 1
-                           from session_participants
-                           where session_participants.session_id = highlights.session_id
-                             and session_participants.club_id = highlights.club_id
-                             and session_participants.membership_id = highlights.membership_id
-                             and session_participants.participation_status = 'ACTIVE'
-                         )
-                       )
-                   ) as highlight_count,
-                   (
-                     select count(*)
-                     from one_line_reviews
-                     where one_line_reviews.club_id = sessions.club_id
-                       and one_line_reviews.session_id = sessions.id
-                       and one_line_reviews.visibility = 'PUBLIC'
-                       and exists (
-                         select 1
-                         from session_participants
-                         where session_participants.session_id = one_line_reviews.session_id
-                           and session_participants.club_id = one_line_reviews.club_id
-                           and session_participants.membership_id = one_line_reviews.membership_id
-                           and session_participants.participation_status = 'ACTIVE'
-                       )
-                   ) as one_liner_count
+            with active_participants as (
+              select session_id, club_id, membership_id
+              from session_participants
+              where club_id = ?
+                and participation_status = 'ACTIVE'
+            )
+            select
+              sessions.id,
+              sessions.number,
+              sessions.book_title,
+              sessions.book_author,
+              sessions.book_image_url,
+              sessions.session_date,
+              public_session_publications.public_summary,
+              coalesce(highlight_counts.cnt, 0) as highlight_count,
+              coalesce(one_liner_counts.cnt, 0) as one_liner_count
             from sessions
             join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
+            left join (
+              select highlights.session_id, count(*) as cnt
+              from highlights
+              left join active_participants on active_participants.session_id = highlights.session_id
+                and active_participants.club_id = highlights.club_id
+                and active_participants.membership_id = highlights.membership_id
+              where highlights.club_id = ?
+                and (highlights.membership_id is null or active_participants.membership_id is not null)
+              group by highlights.session_id
+            ) highlight_counts on highlight_counts.session_id = sessions.id
+            left join (
+              select one_line_reviews.session_id, count(*) as cnt
+              from one_line_reviews
+              join active_participants on active_participants.session_id = one_line_reviews.session_id
+                and active_participants.club_id = one_line_reviews.club_id
+                and active_participants.membership_id = one_line_reviews.membership_id
+              where one_line_reviews.club_id = ?
+                and one_line_reviews.visibility = 'PUBLIC'
+              group by one_line_reviews.session_id
+            ) one_liner_counts on one_liner_counts.session_id = sessions.id
             where sessions.club_id = ?
               and sessions.state = 'PUBLISHED'
               and public_session_publications.visibility = 'PUBLIC'
@@ -188,6 +190,9 @@ class JdbcPublicQueryAdapter(
                     oneLinerCount = rs.getInt("one_liner_count"),
                 )
             },
+            clubId.dbString(),
+            clubId.dbString(),
+            clubId.dbString(),
             clubId.dbString(),
         )
 
