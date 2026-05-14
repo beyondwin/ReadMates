@@ -13,6 +13,31 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json-summary", "lcov"],
+      reportsDirectory: "./coverage",
+      include: [
+        "src/**/*.{ts,tsx}",
+        "features/**/*.{ts,tsx}",
+        "shared/**/*.{ts,tsx}",
+        "functions/**/*.{ts,tsx}",
+      ],
+      exclude: [
+        "**/*.test.{ts,tsx}",
+        "**/*.spec.{ts,tsx}",
+        "tests/**",
+        "node_modules/**",
+        "dist/**",
+      ],
+      // baseline. 측정 후 Task 4에서 실측치로 조정.
+      thresholds: {
+        lines: 0,
+        statements: 0,
+        functions: 0,
+        branches: 0,
+      },
+    },
     projects: [
       {
         extends: true,
