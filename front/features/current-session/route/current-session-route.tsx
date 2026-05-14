@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useLoaderData, useParams } from "react-router-dom";
 import { saveCheckin } from "@/features/current-session/actions/save-checkin";
 import { saveQuestions } from "@/features/current-session/actions/save-question";
@@ -48,18 +48,19 @@ export function CurrentSessionRoute({
 }) {
   const loaderData = useLoaderData() as CurrentSessionRouteData;
   const params = useParams();
+  const clubSlug = params.clubSlug;
   const [routeDataState, setRouteDataState] = useState(() => ({
     loaderData,
     routeData: loaderData,
   }));
   const refreshSequence = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const refresh = () => {
       const requestSequence = refreshSequence.current + 1;
       refreshSequence.current = requestSequence;
 
-      void loadCurrentSessionRouteData({ params })
+      void loadCurrentSessionRouteData({ params: clubSlug ? { clubSlug } : {} })
         .then((nextData) => {
           if (refreshSequence.current === requestSequence) {
             setRouteDataState((currentState) => {
@@ -82,7 +83,7 @@ export function CurrentSessionRoute({
       refreshSequence.current += 1;
       window.removeEventListener(READMATES_ROUTE_REFRESH_EVENT, refresh);
     };
-  }, [loaderData, params]);
+  }, [clubSlug, loaderData]);
 
   if (routeDataState.loaderData !== loaderData) {
     setRouteDataState({ loaderData, routeData: loaderData });
