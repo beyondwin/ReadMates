@@ -12,8 +12,10 @@
 
 ## 배경
 
-- `front/features/host/ui/host-invitations.tsx` 등 호스트 화면이 `actions.listInvitations()` 호출 → `useState<HostInvitationListPage>` 보관 → mutation 후 수동 refetch 패턴 사용.
-- `front/features/host/ui/` 만 `useState` 75회 사용.
+- 초기 데이터는 React Router `loader` 에서 prop 으로 hand-off (`host-invitations.tsx:74` — `normalizeInvitationPage(initialInvitations)`). 즉 초기 fetch는 이미 loader 책임.
+- mutation 이후(create / revoke) 수동으로 `actions.listInvitations({ limit, cursor })` 를 다시 호출해 `useState<HostInvitationListPage>` 를 직접 갱신 (`host-invitations.tsx:127, 147`). 페이지네이션 (`load more`) 도 동일하게 수동.
+- 따라서 마이그레이션 가치는 (a) load-more / cursor 페이지 캐싱과 dedup, (b) mutation 후 invalidation 일원화에 있음. "초기 fetch boilerplate 제거" 는 본 화면에서는 해당하지 않음.
+- `front/features/host/ui/` 의 `useState` 사용은 mutation/UI 상태가 다수 — 본 plan은 그 중 server-state 부분(invitations list/cursor)만 대상으로 함.
 - `react-router-dom@7` 의 `loader`는 초기 데이터만 제공. mutation 이후 caching/invalidation 책임 부재.
 - 공식 의존성에 react-query / SWR 없음 (package.json:20-23).
 
@@ -181,7 +183,10 @@ export function invalidateHostInvitations(client: QueryClient) {
 }
 ```
 
-> 주의: `listHostInvitationsResponse` 가 `PageRequest` 인자를 받지 않는다면 (Step 2에서 확인) 시그니처 조정. 현재 `front/features/host/actions/invitations.ts:9` 는 인자 없이 호출 → 해당 시그니처에 맞춰 `page` 파라미터를 옵셔널로 두고 actions 호출도 그대로 유지.
+> 시그니처 사실관계 (검증 결과):
+> - `front/features/host/api/host-api.ts:310` — `listHostInvitationsResponse(context?, page?)` 는 `PageRequest` 를 받음.
+> - `front/features/host/actions/invitations.ts` — `listInvitations()` 래퍼는 인자 없이 underlying 호출. 컴포넌트는 `actions.listInvitations({ limit: 50 })` / `({ limit: 50, cursor })` 형태(host-invitations.tsx:127, 147)로 호출하므로 actions 래퍼 자체에 `page?` 인자가 사실상 필요.
+> - 본 plan은 actions 래퍼 시그니처를 `listInvitations(page?: PageRequest)` 로 명시화하고, query factory도 `page` 를 받아 key 와 fetcher 양쪽에 전달. underlying API 변경 없음.
 
 - [ ] **Step 2: 시그니처 검증**
 
@@ -434,39 +439,58 @@ Expected: invitations route 정의 파일 경로 확인.
 
 - [ ] **Step 2: loader 에서 QueryClient 주입**
 
-router.tsx 또는 query-provider 와 함께 export 되는 client 인스턴스를 사용하도록 변경:
+QueryClient 인스턴스를 module-scoped singleton 으로 두면 HMR/테스트 격리 시 leakage 위험이 있다. 대신 router 생성 시점에 한 번 만들고 loader / provider 가 같은 인스턴스를 명시적으로 공유하는 구조로 변경:
 
 ```ts
-// front/src/app/query-provider.tsx 수정
-let __queryClient: QueryClient | null = null;
-export function getOrCreateAppQueryClient() {
-  if (!__queryClient) __queryClient = createReadmatesQueryClient();
-  return __queryClient;
+// front/src/app/router.tsx 의 createReadmatesRouter 변경
+import { createReadmatesQueryClient } from "./query-client";
+import { hostInvitationsLoader } from "@/features/host/route/host-invitations-loader";
+
+export function createReadmatesRouter() {
+  const queryClient = createReadmatesQueryClient();
+
+  const routes: RouteObject[] = [
+    /* ... */
+    // host invitations route definition 에서:
+    // loader: hostInvitationsLoader(queryClient),
+  ];
+
+  const router = createBrowserRouter(routes);
+  return { router, queryClient };
 }
 ```
 
-loader 에서:
+loader 는 closure 로 client 를 캡처:
 
 ```ts
-import { getOrCreateAppQueryClient } from "@/src/app/query-provider";
+// front/features/host/route/host-invitations-loader.ts
+import type { QueryClient } from "@tanstack/react-query";
 import { hostInvitationListQuery } from "@/features/host/queries/host-invitation-queries";
 
-export async function hostInvitationsLoader() {
-  const client = getOrCreateAppQueryClient();
-  await client.ensureQueryData(hostInvitationListQuery());
-  return null; // 데이터는 cache에서 query가 즉시 hit
+export function hostInvitationsLoader(client: QueryClient) {
+  return async () => {
+    await client.ensureQueryData(hostInvitationListQuery());
+    return null; // 데이터는 cache 에서 query 가 즉시 hit
+  };
 }
 ```
 
 - [ ] **Step 3: provider 가 같은 인스턴스를 사용하도록 수정**
 
 ```tsx
-// query-provider.tsx
-export function ReadmatesQueryProvider({ children }: PropsWithChildren) {
-  const [client] = useState(getOrCreateAppQueryClient);
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
+// front/src/main.tsx
+const { router, queryClient } = createReadmatesRouter();
+
+createRoot(rootEl).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  </StrictMode>,
+);
 ```
+
+> Task 2 에서 만든 `ReadmatesQueryProvider` 는 더 이상 필요하지 않으므로 본 단계에서 제거하거나, useState 캐시 대신 인자로 client 를 받는 형태로 축소. test wrapper(`createTestQueryWrapper`) 는 자체 QueryClient 를 그대로 생성 — 격리 보존.
 
 - [ ] **Step 4: 테스트 및 e2e 재실행**
 

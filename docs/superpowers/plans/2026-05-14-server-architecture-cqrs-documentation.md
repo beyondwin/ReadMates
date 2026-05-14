@@ -154,7 +154,18 @@ git commit -m "refactor(server): mark read-side services with @ReadOnlyApplicati
 **Files:**
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 
-- [ ] **Step 1: 새 ArchUnit 규칙 작성**
+- [ ] **Step 1: mutation port suffix 명명 검증**
+
+본 규칙은 mutation 성격의 outbound port suffix 를 휴리스틱으로 식별. 적용 전에 실제 코드베이스의 명명 규칙과 일치하는지 확인.
+
+```bash
+find server/src/main/kotlin/com/readmates -path '*/port/out/*' -name '*.kt' \
+  | xargs -I{} basename {} .kt | sort -u
+```
+
+Expected: `*Port` suffix 가 우세. mutation 관련 port 의 suffix 패턴(예: `SavePort`, `UpdatePort`, `DeletePort`, `WriterPort`, `StorePort`, `IssuerPort` 등)을 확인해 Step 2 규칙의 suffix 리스트와 정합되도록 조정.
+
+- [ ] **Step 2: 새 ArchUnit 규칙 작성**
 
 `ServerArchitectureBoundaryTest` 클래스에 다음 메서드 추가:
 
@@ -181,22 +192,16 @@ fun `read-only application services must not depend on mutation ports`() {
 }
 
 @Test
-fun `read-only application services must not be Transactional with rollback`() {
+fun `read-only application services must not be Transactional`() {
+    // 본 규칙은 단순화 버전. @Transactional(readOnly=true) 만 허용하려면
+    // 추가 reflection 검사가 필요하므로, 일단 모든 @Transactional 부착 금지로 시작.
+    // (read service는 repository / JdbcTemplate 레벨의 readOnly 로 충분.)
     val rule = noClasses()
         .that().areAnnotatedWith(
             "com.readmates.shared.architecture.ReadOnlyApplicationService"
         )
         .should().beAnnotatedWith(
             "org.springframework.transaction.annotation.Transactional"
-        )
-        .andShould(
-            // 본 규칙은 단순화 버전. @Transactional(readOnly=true) 만 허용하려면
-            // 추가 reflection 검사가 필요하므로, 일단 모든 @Transactional 부착 금지로 시작.
-            object : ArchCondition<JavaClass>("not be @Transactional (read services use repository-level readOnly)") {
-                override fun check(item: JavaClass, events: ConditionEvents) {
-                    // no-op: @Transactional 부착 자체를 금지하는 위 조건으로 충분
-                }
-            }
         )
     rule.check(importedClasses)
 }
@@ -205,12 +210,9 @@ fun `read-only application services must not be Transactional with rollback`() {
 > 필요한 import 추가:
 > ```kotlin
 > import com.tngtech.archunit.base.DescribedPredicate
-> import com.tngtech.archunit.core.domain.JavaClass
-> import com.tngtech.archunit.lang.ArchCondition
-> import com.tngtech.archunit.lang.ConditionEvents
 > ```
 
-- [ ] **Step 2: ArchUnit 테스트 실행**
+- [ ] **Step 3: ArchUnit 테스트 실행**
 
 ```bash
 cd server && ./gradlew architectureTest
@@ -218,7 +220,7 @@ cd server && ./gradlew architectureTest
 
 Expected: BUILD SUCCESSFUL. 새 규칙이 추가되었고 위반 없음.
 
-- [ ] **Step 3: 의도적으로 위반 추가하여 fail 확인 (TDD 검증)**
+- [ ] **Step 4: 의도적으로 위반 추가하여 fail 확인 (TDD 검증)**
 
 `NotesFeedService.kt` 클래스 위에 임시로 `@org.springframework.transaction.annotation.Transactional` 추가 후:
 
@@ -234,7 +236,7 @@ Expected: BUILD FAILED. 위 규칙이 위반을 잡아냄.
 git checkout server/src/main/kotlin/com/readmates/note/application/service/NotesFeedService.kt
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt

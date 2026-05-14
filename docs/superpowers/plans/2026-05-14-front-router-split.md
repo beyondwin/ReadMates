@@ -247,7 +247,7 @@ export function hostRoutes(): RouteObject[] {
 - [ ] **Step 3: router.tsx 최종 모습**
 
 ```tsx
-// router.tsx (≤80줄 목표)
+// router.tsx (≤100줄 목표 — import + 합성 + create 함수 포함)
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { publicRoutes } from "./routes/public";
 import { authRoutes } from "./routes/auth";
@@ -275,7 +275,7 @@ export const router = createReadmatesRouter();
 wc -l front/src/app/router.tsx
 ```
 
-Expected: ≤ 80 줄.
+Expected: ≤ 100 줄. (variant 모듈 4개의 import + 합성 함수 + `createBrowserRouter` 호출까지 여유 포함.)
 
 - [ ] **Step 5: 전체 검증**
 

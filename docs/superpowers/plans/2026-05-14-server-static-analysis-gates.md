@@ -214,15 +214,26 @@ tasks.named("check") {
 
 또한 `Test.configureReadmatesTestRuntime()` 에 jacoco extension은 plugin 적용으로 자동 결합되므로 추가 변경 불필요.
 
-- [ ] **Step 2: 측정**
+> 단, `unitTest` 가 `tasks.register<Test>("unitTest")` 로 생성된 커스텀 Test task 인 경우 jacoco 자동 결합 여부는 plugin 버전에 따라 다를 수 있다. Step 2 의 exec 파일 생성 검증으로 명시 확인.
+
+- [ ] **Step 2: exec 파일 생성 경로 검증 (jacoco binding)**
 
 ```bash
-cd server && ./gradlew clean unitTest jacocoTestReport
+cd server && ./gradlew clean unitTest --rerun-tasks
+find build -name '*.exec' -path '*jacoco*'
+```
+
+Expected: `build/jacoco/unitTest.exec` (또는 동등 경로) 가 존재. 만약 비어있으면 `unitTest` task 에 `extensions.configure<JacocoTaskExtension> { destinationFile = file("$buildDir/jacoco/unitTest.exec") }` 명시 부착 후 재실행.
+
+- [ ] **Step 3: 측정**
+
+```bash
+cd server && ./gradlew jacocoTestReport
 ```
 
 Expected: `server/build/reports/jacoco/test/html/index.html` 생성. LINE 커버리지 % 표시.
 
-- [ ] **Step 3: 측정치 기록**
+- [ ] **Step 4: 측정치 기록**
 
 ```bash
 grep -A 2 "Total" server/build/reports/jacoco/test/jacocoTestReport.csv 2>/dev/null \
@@ -231,13 +242,13 @@ grep -A 2 "Total" server/build/reports/jacoco/test/jacocoTestReport.csv 2>/dev/n
 
 Expected: 전체 LINE 커버리지 출력.
 
-- [ ] **Step 4: baseline -2%p 임계값 적용**
+- [ ] **Step 5: baseline -2%p 임계값 적용**
 
 `jacocoTestCoverageVerification.violationRules.rule.limit.minimum` 을 측정치(소수) -0.02 로 갱신.
 
 예: 측정 0.62 → `minimum = "0.60".toBigDecimal()`.
 
-- [ ] **Step 5: 검증**
+- [ ] **Step 6: 검증**
 
 ```bash
 cd server && ./gradlew check
@@ -245,7 +256,7 @@ cd server && ./gradlew check
 
 Expected: BUILD SUCCESSFUL.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add server/build.gradle.kts
