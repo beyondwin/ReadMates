@@ -1,3 +1,10 @@
 /.gradle/
 /build/
 /.kotlin/
+
+# Local configuration and runtime artifacts
+application-local.*
+application-*.local.*
+*.hprof
+hs_err_pid*
+replay_pid*

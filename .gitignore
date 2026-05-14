@@ -5,6 +5,9 @@ recode
 .env
 .env.*
 !.env.example
+!.env.*.example
+.dev.vars
+.dev.vars.*
 .playwright-cli
 output
 .superpowers/
@@ -28,3 +31,19 @@ docs/private/
 .claude/
 .orchestrator/
 .codex-orchestrator/
+
+# Logs and local runtime artifacts
+*.log
+*.pid
+*.hprof
+hs_err_pid*
+replay_pid*
+
+# Local databases and exports
+*.db
+*.sqlite
+*.sqlite3
+
+# Local-only Spring profiles
+application-local.*
+application-*.local.*
