@@ -201,6 +201,7 @@ pnpm --dir front dev
 | 버저닝 | [docs/development/versioning.md](docs/development/versioning.md) |
 | 릴리즈 관리와 CHANGELOG | [docs/development/release-management.md](docs/development/release-management.md), [CHANGELOG.md](CHANGELOG.md) |
 | 배포 문서 허브 | [docs/deploy/README.md](docs/deploy/README.md) |
+| 새 버전 발행과 운영 배포 | [docs/deploy/release-publish-runbook.md](docs/deploy/release-publish-runbook.md) |
 | Cloudflare Pages, SPA fallback, OAuth proxy | [docs/deploy/cloudflare-pages.md](docs/deploy/cloudflare-pages.md) |
 | Multi-club domains | [docs/deploy/multi-club-domains.md](docs/deploy/multi-club-domains.md) |
 | OCI Compose Stack | [docs/deploy/compose-stack.md](docs/deploy/compose-stack.md) |

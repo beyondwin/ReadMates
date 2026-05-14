@@ -128,6 +128,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push가 Cloudflare Pages 프론트 배포 workflow와 GHCR server image scan/promote workflow를 시작합니다.
 
+   새 버전 발행과 운영 배포를 한 번에 진행할 때는 [새 버전 발행과 운영 배포 Runbook](../deploy/release-publish-runbook.md)을 함께 사용합니다. 이 runbook은 tag push 뒤 `Deploy Front`, `Deploy Server Image`, GitHub Release, OCI Compose promotion, smoke 확인이 같은 제품 tag를 바라보는지 점검하는 순서를 정리합니다.
+
    서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인합니다. 수동 실행할 때는 release tag/ref에서 실행하고 workflow input `image_tag`에도 같은 release tag를 넣습니다. OCI backend는 그 release artifact를 같은 제품 버전 image tag로 배포합니다.
 
    ```bash
