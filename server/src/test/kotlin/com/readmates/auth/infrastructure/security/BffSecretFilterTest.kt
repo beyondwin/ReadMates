@@ -1,12 +1,11 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 
@@ -17,9 +16,10 @@ import org.springframework.test.web.servlet.get
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class BffSecretFilterTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `protected api request without bff secret is rejected`() {
         mockMvc.get("/api/auth/me")
@@ -55,13 +55,5 @@ class BffSecretFilterTest(
                 jsonPath("$.status") { value("UP") }
                 jsonPath("$.kind") { value("liveness") }
             }
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

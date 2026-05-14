@@ -1,5 +1,7 @@
 package com.readmates.notification.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.model.NotificationEmailTemplates
@@ -8,7 +10,6 @@ import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
-import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.containsString
 import jakarta.mail.Session
@@ -27,8 +28,6 @@ import org.springframework.mail.SimpleMailMessage
 import org.springframework.mail.javamail.JavaMailSender
 import org.springframework.mail.javamail.MimeMessagePreparator
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -82,11 +81,12 @@ private const val SENSITIVE_TEST_MAIL_ERROR =
     ],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class HostNotificationControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val testMailDeliveryPort: RecordingTestMailDeliveryPort,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @BeforeEach
     fun resetTestMailDeliveryPort() {
         testMailDeliveryPort.sent.clear()
@@ -929,14 +929,6 @@ class HostNotificationControllerTest(
                 error(SENSITIVE_TEST_MAIL_ERROR)
             }
             sent += command
-        }
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
         }
     }
 }

@@ -124,15 +124,19 @@ function seedGoogleSubjectCase(emails: string[]) {
 }
 
 export function resetSeedGoogleLogins(emails: string[]) {
+  runMysql(resetSeedGoogleLoginsSql(emails));
+}
+
+function resetSeedGoogleLoginsSql(emails: string[]) {
   const emailList = sqlEmailList(emails);
 
-  runMysql(`
+  return `
 update users
 set google_subject_id = ${seedGoogleSubjectCase(emails)},
     auth_provider = 'GOOGLE',
     updated_at = utc_timestamp(6)
 where lower(email) in (${emailList});
-`);
+`;
 }
 
 export function ensureSecondClubFixture() {
@@ -511,9 +515,13 @@ select row_count();
 }
 
 export function cleanupInvitedMembers(emails: string[]) {
+  runMysql(cleanupInvitedMembersSql(emails));
+}
+
+function cleanupInvitedMembersSql(emails: string[]) {
   const emailList = sqlEmailList(emails);
 
-  runMysql(`
+  return `
 delete auth_sessions
 from auth_sessions
 join users on users.id = auth_sessions.user_id
@@ -543,11 +551,19 @@ where lower(email) in (${emailList})
     from memberships
     where memberships.user_id = users.id
   );
-`);
+`;
 }
 
 export function cleanupGeneratedSessions(invitedEmails: string[] = []) {
-  runMysql(`
+  runMysql(cleanupGeneratedSessionsSql());
+
+  if (invitedEmails.length > 0) {
+    cleanupInvitedMembers(invitedEmails);
+  }
+}
+
+function cleanupGeneratedSessionsSql() {
+  return `
 delete from feedback_reports
 where session_id in (
   select id from sessions
@@ -614,15 +630,15 @@ where session_id in (
 delete from sessions
 where club_id = ${sqlString(clubId)}
   and number >= 7;
-`);
-
-  if (invitedEmails.length > 0) {
-    cleanupInvitedMembers(invitedEmails);
-  }
+`;
 }
 
 export function cleanupManualNotificationArtifacts() {
-  runMysql(`
+  runMysql(cleanupManualNotificationArtifactsSql());
+}
+
+function cleanupManualNotificationArtifactsSql() {
+  return `
 delete from notification_manual_dispatches
 where club_id = ${sqlString(clubId)}
   and session_id in (
@@ -653,7 +669,38 @@ where club_id = ${sqlString(clubId)};
 delete from notification_event_outbox
 where club_id = ${sqlString(clubId)}
   and dedupe_key like 'manual:%';
-`);
+`;
+}
+
+type E2eResetOptions = {
+  googleLoginEmails?: string[];
+  invitedEmails?: string[];
+  cleanupGeneratedSessions?: boolean;
+  cleanupManualNotifications?: boolean;
+};
+
+export function resetE2eState(options: E2eResetOptions) {
+  const statements: string[] = [];
+
+  if (options.cleanupManualNotifications) {
+    statements.push(cleanupManualNotificationArtifactsSql());
+  }
+
+  if (options.cleanupGeneratedSessions) {
+    statements.push(cleanupGeneratedSessionsSql());
+  }
+
+  if (options.invitedEmails?.length) {
+    statements.push(cleanupInvitedMembersSql(options.invitedEmails));
+  }
+
+  if (options.googleLoginEmails?.length) {
+    statements.push(resetSeedGoogleLoginsSql(options.googleLoginEmails));
+  }
+
+  if (statements.length > 0) {
+    runMysql(statements.join("\n"));
+  }
 }
 
 export function countManualNotificationEventsForSession(sessionId: string, eventType: string) {

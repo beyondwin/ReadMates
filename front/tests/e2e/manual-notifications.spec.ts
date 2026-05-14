@@ -1,26 +1,24 @@
 import { expect, test } from "@playwright/test";
 import {
-  cleanupGeneratedSessions,
-  cleanupManualNotificationArtifacts,
   countManualNotificationEventsForSession,
   createFeedbackDocumentFixture,
   createOpenSessionFixture,
   loginWithGoogleFixture,
   materializeManualReminderInAppNotifications,
-  resetSeedGoogleLogins,
+  resetE2eState,
 } from "./readmates-e2e-db";
 
-test.beforeEach(() => {
-  cleanupManualNotificationArtifacts();
-  cleanupGeneratedSessions();
-  resetSeedGoogleLogins(["host@example.com", "member1@example.com"]);
-});
+function resetManualNotificationState() {
+  resetE2eState({
+    cleanupManualNotifications: true,
+    cleanupGeneratedSessions: true,
+    googleLoginEmails: ["host@example.com", "member1@example.com"],
+  });
+}
 
-test.afterEach(() => {
-  cleanupManualNotificationArtifacts();
-  cleanupGeneratedSessions();
-  resetSeedGoogleLogins(["host@example.com", "member1@example.com"]);
-});
+test.beforeEach(resetManualNotificationState);
+
+test.afterEach(resetManualNotificationState);
 
 test("host can open manual notification workbench", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");

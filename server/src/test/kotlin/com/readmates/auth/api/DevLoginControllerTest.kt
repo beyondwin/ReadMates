@@ -1,6 +1,7 @@
 package com.readmates.auth.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -9,8 +10,6 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockHttpSession
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -29,10 +28,11 @@ import org.springframework.test.web.servlet.post
     ],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class DevLoginControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `logs in seeded host by email`() {
         mockMvc.post("/api/dev/login") {
@@ -220,12 +220,6 @@ class DevLoginControllerTest(
             delete from users
             where email = 'active.nonseed@example.com'
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 
 }
@@ -237,16 +231,10 @@ class DevLoginControllerTest(
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class DevLoginDisabledControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
-    }
+) : ReadmatesMySqlIntegrationTestSupport() {
 
     @Test
     fun `dev login endpoint is unavailable when disabled`() {
@@ -268,16 +256,10 @@ class DevLoginDisabledControllerTest(
 )
 @AutoConfigureMockMvc
 @ActiveProfiles("prod")
+@Tag("integration")
 class DevLoginProductionProfileControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
-    }
+) : ReadmatesMySqlIntegrationTestSupport() {
 
     @Test
     fun `dev login endpoint is unavailable under prod profile`() {

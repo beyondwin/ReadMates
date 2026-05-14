@@ -1,13 +1,12 @@
 package com.readmates.support
 
+import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
 
 @SpringBootTest
@@ -16,9 +15,10 @@ import org.springframework.test.context.TestPropertySource
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
     ],
 )
+@Tag("integration")
 class ReadmatesMySqlSeedTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `seed has baseline multi club metadata`() {
         val club = jdbcTemplate.queryForMap(
@@ -97,13 +97,5 @@ class ReadmatesMySqlSeedTest(
                 Int::class.java,
             ),
         )
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

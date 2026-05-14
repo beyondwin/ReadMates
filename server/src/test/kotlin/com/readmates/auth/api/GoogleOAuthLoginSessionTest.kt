@@ -1,12 +1,13 @@
 package com.readmates.auth.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.auth.infrastructure.security.OAuthReturnState
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
 import com.readmates.auth.infrastructure.security.readmatesAppOrigin
-import com.readmates.support.MySqlTestContainer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -28,8 +29,6 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken
 import org.springframework.security.oauth2.core.oidc.StandardClaimNames
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.Instant
 
@@ -46,12 +45,13 @@ import java.time.Instant
 )
 @Sql(statements = [GoogleOAuthLoginSessionTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [GoogleOAuthLoginSessionTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Tag("integration")
 class GoogleOAuthLoginSessionTest(
     @param:Autowired private val successHandler: ReadmatesOAuthSuccessHandler,
     @param:Autowired private val oauthReturnState: OAuthReturnState,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val invitationTokenService: InvitationTokenService,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @AfterEach
     fun clearSecurityContext() {
         SecurityContextHolder.clearContext()
@@ -693,12 +693,6 @@ class GoogleOAuthLoginSessionTest(
                  'google-oauth-invite-mismatch'
                );
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 
     private fun createGoogleMember(

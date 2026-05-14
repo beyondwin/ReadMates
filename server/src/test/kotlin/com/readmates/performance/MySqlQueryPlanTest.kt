@@ -1,23 +1,23 @@
 package com.readmates.performance
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.support.assertUsesIndexFor
 import com.readmates.support.explain
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 
 @SpringBootTest(
     properties = [
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
     ],
 )
+@Tag("integration")
 class MySqlQueryPlanTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `archive paged sessions query uses indexed access on sessions`() {
         val member5 = membershipIdFor("member5@example.com")
@@ -350,11 +350,5 @@ class MySqlQueryPlanTest(
 
     companion object {
         private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

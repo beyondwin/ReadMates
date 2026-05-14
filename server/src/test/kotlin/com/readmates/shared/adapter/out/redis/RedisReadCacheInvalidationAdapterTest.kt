@@ -1,8 +1,8 @@
 package com.readmates.shared.adapter.out.redis
 
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.shared.cache.RedisCacheMetrics
-import com.readmates.support.MySqlTestContainer
-import com.readmates.support.RedisTestContainer
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -13,8 +13,6 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import java.util.UUID
 
 @SpringBootTest(
@@ -24,11 +22,13 @@ import java.util.UUID
         "readmates.redis.enabled=true",
     ],
 )
+@Tag("integration")
+@Tag("container")
 class RedisReadCacheInvalidationAdapterTest(
     @param:Autowired private val adapter: RedisReadCacheInvalidationAdapter,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val meterRegistry: MeterRegistry,
-) {
+) : ReadmatesRedisIntegrationTestSupport() {
     @AfterEach
     fun cleanUp() {
         redisTemplate.delete(allKeys)
@@ -164,12 +164,5 @@ class RedisReadCacheInvalidationAdapterTest(
             notesSessionFeedKey(UNRELATED_CLUB_ID, OTHER_SESSION_ID),
         )
         private val allKeys = targetKeys + unrelatedClubKeys
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun testProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-            RedisTestContainer.registerRedisProperties(registry)
-        }
     }
 }

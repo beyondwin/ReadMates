@@ -1,7 +1,8 @@
 package com.readmates.auth.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
-import com.readmates.support.MySqlTestContainer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -9,8 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.web.util.UriComponentsBuilder
@@ -25,9 +24,10 @@ import org.springframework.web.util.UriComponentsBuilder
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class OAuthAuthorizationControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `google authorization endpoint redirects to provider when client registration is configured`() {
         val result = mockMvc.get("/oauth2/authorization/google")
@@ -78,13 +78,5 @@ class OAuthAuthorizationControllerTest(
                 OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE,
             ),
         )
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

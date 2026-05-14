@@ -1,6 +1,7 @@
 package com.readmates.session.domain
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -8,8 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.UncategorizedSQLException
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
 
 @SpringBootTest
@@ -18,9 +17,10 @@ import org.springframework.test.context.TestPropertySource
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
     ],
 )
+@Tag("integration")
 class SessionInvariantConstraintTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionIds = mutableListOf<String>()
 
     @AfterEach
@@ -116,13 +116,5 @@ class SessionInvariantConstraintTest(
     private fun idSuffix(id: String): Int {
         // Use the last 5 characters as a high session number (e.g., 99001) to avoid conflicts with seeded data
         return id.takeLast(5).trimStart('0').ifEmpty { "0" }.toInt()
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

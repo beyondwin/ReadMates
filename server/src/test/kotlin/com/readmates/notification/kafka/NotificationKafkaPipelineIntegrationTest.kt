@@ -1,5 +1,7 @@
 package com.readmates.notification.kafka
 
+import com.readmates.support.ReadmatesKafkaIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.notification.adapter.`in`.kafka.NotificationEventKafkaListener
 import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
@@ -56,12 +58,14 @@ import java.util.concurrent.TimeUnit
         "readmates.notifications.kafka.delivery-retry-max-attempts=0",
     ],
 )
+@Tag("integration")
+@Tag("container")
 class NotificationKafkaPipelineIntegrationTest(
     @param:Autowired
     private val notificationEventPublisherPort: NotificationEventPublisherPort,
     @param:Autowired private val recordingDispatchUseCase: RecordingDispatchNotificationEventUseCase,
     @param:Autowired private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry,
-) {
+) : ReadmatesKafkaIntegrationTestSupport() {
     @BeforeEach
     fun resetDispatchRecorder() {
         recordingDispatchUseCase.clear()

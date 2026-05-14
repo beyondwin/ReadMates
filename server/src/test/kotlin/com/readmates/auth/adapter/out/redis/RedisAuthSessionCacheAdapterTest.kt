@@ -1,12 +1,12 @@
 package com.readmates.auth.adapter.out.redis
 
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.model.StoredAuthSession
 import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.auth.application.port.out.AuthSessionCachePort
 import com.readmates.shared.cache.CacheJsonCodec
 import com.readmates.shared.cache.RedisCacheMetrics
-import com.readmates.support.MySqlTestContainer
-import com.readmates.support.RedisTestContainer
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -24,8 +24,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 import java.time.OffsetDateTime
@@ -40,11 +38,13 @@ import java.util.concurrent.TimeUnit
         "readmates.auth-session-cache.enabled=true",
     ],
 )
+@Tag("integration")
+@Tag("container")
 class RedisAuthSessionCacheAdapterTest(
     @param:Autowired private val adapter: RedisAuthSessionCacheAdapter,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val meterRegistry: MeterRegistry,
-) {
+) : ReadmatesRedisIntegrationTestSupport() {
     private val contextRunner = ApplicationContextRunner()
         .withUserConfiguration(AuthSessionCacheAdapterBeanTestConfiguration::class.java)
 
@@ -318,15 +318,6 @@ class RedisAuthSessionCacheAdapterTest(
                 override fun getIfUnique() = meterRegistry
             },
         )
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun testProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-            RedisTestContainer.registerRedisProperties(registry)
-        }
-    }
 }
 
 private data class AuthSessionCacheAdapterCase(

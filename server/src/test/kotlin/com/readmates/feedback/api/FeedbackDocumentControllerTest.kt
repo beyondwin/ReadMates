@@ -1,6 +1,7 @@
 package com.readmates.feedback.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
 import org.assertj.core.api.Assertions.assertThat
@@ -11,8 +12,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockMultipartFile
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -113,10 +112,11 @@ private const val RESET_SESSION_ONE_PUBLISHED_SQL = """
     ],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class FeedbackDocumentControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `attended member can list seeded session feedback document`() {
         mockMvc.get("/api/feedback-documents/me") {
@@ -763,12 +763,4 @@ class FeedbackDocumentControllerTest(
 
         주석: 이 문장은 판단 기준이 행동으로 이어지는 순간을 보여준다.
         """.trimIndent()
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
-    }
 }

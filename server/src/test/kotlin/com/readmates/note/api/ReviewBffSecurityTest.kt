@@ -1,14 +1,13 @@
 package com.readmates.note.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 
@@ -20,9 +19,10 @@ import org.springframework.test.web.servlet.post
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class ReviewBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `one-line review bff request reaches controller without spring csrf token`() {
         mockMvc.post("/api/sessions/current/one-line-reviews") {
@@ -71,14 +71,6 @@ class ReviewBffSecurityTest(
             content = """{"body":"bad origin"}"""
         }.andExpect {
             status { isForbidden() }
-        }
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
         }
     }
 }

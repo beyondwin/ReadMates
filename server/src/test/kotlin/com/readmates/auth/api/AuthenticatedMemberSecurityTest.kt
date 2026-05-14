@@ -1,13 +1,12 @@
 package com.readmates.auth.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 
@@ -17,9 +16,10 @@ import org.springframework.test.web.servlet.get
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class AuthenticatedMemberSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `rejects authenticated principal without active membership from protected api`() {
         mockMvc.get("/api/sessions/current") {
@@ -58,13 +58,5 @@ class AuthenticatedMemberSecurityTest(
             .andExpect {
                 status { isForbidden() }
             }
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

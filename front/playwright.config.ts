@@ -4,6 +4,7 @@ import { resolveE2eDatabaseName } from "./tests/e2e/readmates-e2e-config";
 delete process.env.NO_COLOR;
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
+const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? 1);
 const baseURL = `http://localhost:${port}`;
 const loopbackBaseURL = `http://127.0.0.1:${port}`;
 const allowedOrigins = `${baseURL},${loopbackBaseURL}`;
@@ -33,7 +34,7 @@ export default defineConfig({
   testDir: ".",
   testMatch: ["tests/e2e/**/*.spec.ts"],
   fullyParallel: true,
-  workers: 1,
+  workers,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
   reporter: "list",

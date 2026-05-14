@@ -65,6 +65,14 @@ pnpm --dir front test:e2e
 - E2E database 연결은 `READMATES_E2E_DB_HOST`, `READMATES_E2E_DB_PORT`, `READMATES_E2E_DB_USER`, `READMATES_E2E_DB_PASSWORD`, `READMATES_E2E_DB_NAME`으로 조정할 수 있습니다. 공개 문서에서는 정확한 로컬 DB 이름 대신 placeholder를 사용합니다.
 - Playwright config는 `mysql` CLI로 E2E database를 생성하므로 로컬 MySQL server와 MySQL client가 필요합니다. E2E user에 `CREATE DATABASE` 권한이 없다면 admin 계정으로 별도 E2E schema를 미리 만들고 해당 schema에만 E2E user 권한을 부여한 뒤 `READMATES_E2E_DB_NAME`으로 지정합니다. 직접 지정한 기존 schema에서 Flyway checksum mismatch가 나면 `repair`나 drop 대신 `READMATES_E2E_DB_NAME`을 비우거나 새 schema 이름을 지정하는 편이 안전합니다.
 
+기본 Playwright worker 수는 seeded database state를 공유하는 현재 E2E 흐름 때문에 1로 유지합니다. state isolation을 확인한 뒤 병렬 실행을 실험할 때만 명시적으로 opt-in합니다.
+
+```bash
+PLAYWRIGHT_WORKERS=2 pnpm --dir front test:e2e
+```
+
+반복 실행에서 database cleanup 충돌이 없다는 증거가 쌓이기 전에는 worker 병렬화를 기본값으로 바꾸지 않습니다.
+
 기본 `compose.yml`의 MySQL을 쓴다면 먼저 실행합니다.
 
 ```bash
@@ -92,11 +100,23 @@ pnpm --dir front test:e2e -- member-profile-permissions
 
 ## Backend
 
+Backend tests are expected to run on JDK 21. `server/build.gradle.kts` pins the Gradle `Test` JVM to the Java 21 toolchain so local shells using a newer current JVM do not change test runtime behavior. If Gradle cannot find a JDK 21 toolchain locally, install one or set `JAVA_HOME` to a JDK 21 installation before running backend tests.
+
 전체 backend test:
 
 ```bash
 ./server/gradlew -p server clean test
 ```
+
+Backend fast lanes:
+
+```bash
+./server/gradlew -p server unitTest
+./server/gradlew -p server integrationTest
+./server/gradlew -p server architectureTest
+```
+
+이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. Backend 변경을 ship하기 전에는 여전히 전체 backend test를 실행합니다.
 
 Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
@@ -258,6 +278,15 @@ pnpm --dir front test:e2e
 ```bash
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
+```
+
+Release baseline:
+
+```bash
+./server/gradlew -p server clean test
+pnpm --dir front lint
+pnpm --dir front test
+pnpm --dir front build
 ```
 
 배포 후 OAuth/domain 연동 점검:

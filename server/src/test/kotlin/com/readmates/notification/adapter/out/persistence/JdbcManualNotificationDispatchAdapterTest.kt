@@ -1,5 +1,7 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSelection
@@ -11,14 +13,11 @@ import com.readmates.notification.application.port.out.ManualNotificationConfirm
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.shared.paging.PageRequest
-import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -37,10 +36,11 @@ private const val CLEANUP_MANUAL_DISPATCH_SQL = """
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Sql(statements = [CLEANUP_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_MANUAL_DISPATCH_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Tag("integration")
 class JdbcManualNotificationDispatchAdapterTest(
     @param:Autowired private val adapter: JdbcManualNotificationDispatchAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val hostMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000201")
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
@@ -308,12 +308,4 @@ class JdbcManualNotificationDispatchAdapterTest(
             Int::class.java,
             previewId.toString(),
         ) ?: 0
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
-    }
 }

@@ -1,8 +1,9 @@
 package com.readmates.auth.application.service
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
-import com.readmates.support.MySqlTestContainer
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -10,8 +11,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -25,11 +24,12 @@ import javax.sql.DataSource
 )
 @Sql(statements = [GoogleLoginServiceTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [GoogleLoginServiceTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Tag("integration")
 class GoogleLoginServiceTest(
     @param:Autowired private val googleLoginService: GoogleLoginService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val dataSource: DataSource,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `connects existing gmail user and preserves active membership`() {
         val member = googleLoginService.loginVerifiedGoogleUser(
@@ -182,11 +182,5 @@ class GoogleLoginServiceTest(
                  'google-race-viewer-user'
                );
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

@@ -1,14 +1,13 @@
 package com.readmates.auth.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin
 import org.springframework.test.context.ActiveProfiles
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -27,9 +26,10 @@ import org.springframework.test.web.servlet.get
     ],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class DevGoogleOAuthAutoMemberTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `does not auto provision unknown Google user into demo club even when old dev flag is enabled`() {
         mockMvc.get("/api/auth/me") {
@@ -64,12 +64,6 @@ class DevGoogleOAuthAutoMemberTest(
             delete from users
             where email in ('local.google.auth@example.com', 'local.google.member@example.com');
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }
 
@@ -87,9 +81,10 @@ class DevGoogleOAuthAutoMemberTest(
     ],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class DevGoogleOAuthAutoMemberProductionProfileTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `does not auto provision Google user under prod profile`() {
         mockMvc.get("/api/auth/me") {
@@ -114,12 +109,6 @@ class DevGoogleOAuthAutoMemberProductionProfileTest(
             delete from users
             where email = 'local.google.prod@example.com';
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }
 

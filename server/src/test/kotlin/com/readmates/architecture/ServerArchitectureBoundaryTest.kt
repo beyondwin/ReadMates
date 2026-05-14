@@ -4,15 +4,17 @@ import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
-import org.springframework.stereotype.Service
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.springframework.stereotype.Service
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
 import kotlin.io.path.relativeTo
 import kotlin.io.path.readLines
 
+@Tag("architecture")
 class ServerArchitectureBoundaryTest {
     private val importedClasses = ClassFileImporter()
         .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)

@@ -1,13 +1,12 @@
 package com.readmates.club.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
-import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 
 @SpringBootTest(
@@ -23,9 +22,10 @@ import org.springframework.test.context.jdbc.Sql
     statements = [DELETE_CLUB_CONTEXT_TEST_DOMAINS_SQL],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class ClubContextResolverTest(
     @param:Autowired private val resolver: ResolveClubContextUseCase,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `resolves active club by slug`() {
         val context = resolver.resolveBySlug("reading-sai")
@@ -58,14 +58,6 @@ class ClubContextResolverTest(
         val context = resolver.resolveBySlug("Admin")
 
         assertThat(context).isNull()
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }
 

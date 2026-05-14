@@ -1,9 +1,10 @@
 package com.readmates.auth.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.infrastructure.security.MemberAuthoritiesFilter
 import com.readmates.auth.infrastructure.security.SessionCookieAuthenticationFilter
-import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -22,8 +23,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
@@ -35,13 +34,14 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class AuthMeControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter,
     @param:Autowired private val memberAuthoritiesFilter: MemberAuthoritiesFilter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
@@ -619,13 +619,5 @@ class AuthMeControllerTest(
             "delete from $tableName where $columnName in ($placeholders)",
             *values.toTypedArray(),
         )
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

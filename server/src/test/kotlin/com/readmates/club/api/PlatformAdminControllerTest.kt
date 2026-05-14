@@ -1,10 +1,11 @@
 package com.readmates.club.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.club.application.model.ClubDomainActualCheckResult
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.domain.ClubDomainStatus
-import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -18,8 +19,6 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.http.MediaType
 import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
@@ -32,12 +31,13 @@ import java.util.UUID
 )
 @AutoConfigureMockMvc
 @Import(PlatformAdminDomainCheckTestConfiguration::class)
+@Tag("integration")
 class PlatformAdminControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val domainActualStateChecker: FakeClubDomainActualStateChecker,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
@@ -392,12 +392,6 @@ class PlatformAdminControllerTest(
 
     companion object {
         private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }
 
