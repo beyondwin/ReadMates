@@ -6,6 +6,7 @@ import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
 import org.springframework.stereotype.Component
+import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
@@ -18,19 +19,19 @@ class NotificationDeliveryTransactionalOperations(
     fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
         planningPort.persistPlannedDeliveries(message)
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = claimPort.claimEmailDelivery(id)
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = claimPort.claimEmailDeliveries(limit)
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     fun claimEmailDeliveriesForClub(
         clubId: UUID,
         limit: Int,
     ): List<ClaimedNotificationDeliveryItem> = claimPort.claimEmailDeliveriesForClub(clubId, limit)
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     fun claimHostEmailDelivery(
         clubId: UUID,
         id: UUID,

@@ -417,35 +417,46 @@ class ServerArchitectureBoundaryTest {
 
     @Test
     fun `read-only application services must not depend on mutation ports`() {
-        val rule = classes()
-            .that().areAnnotatedWith(
-                "com.readmates.shared.architecture.ReadOnlyApplicationService"
+        val mutationPortSuffixes =
+            listOf(
+                "SavePort",
+                "UpdatePort",
+                "DeletePort",
+                "WriterPort",
+                "StorePort",
+                "WritePort",
             )
-            .should().onlyDependOnClassesThat(
-                DescribedPredicate.describe("non-mutation ports") { dep ->
-                    val name = dep.name
-                    val isMutationPort = name.contains(".port.out.")
-                        && (name.endsWith("SavePort")
-                            || name.endsWith("UpdatePort")
-                            || name.endsWith("DeletePort")
-                            || name.endsWith("WriterPort")
-                            || name.endsWith("StorePort")
-                            || name.endsWith("WritePort"))
-                    !isMutationPort
-                }
-            )
+
+        val rule =
+            classes()
+                .that()
+                .areAnnotatedWith(
+                    "com.readmates.shared.architecture.ReadOnlyApplicationService",
+                ).should()
+                .onlyDependOnClassesThat(
+                    DescribedPredicate.describe("non-mutation ports") { dep ->
+                        val name = dep.name
+                        val isMutationPort =
+                            name.contains(".port.out.") &&
+                                mutationPortSuffixes.any(name::endsWith)
+
+                        !isMutationPort
+                    },
+                )
         rule.check(importedClasses)
     }
 
     @Test
     fun `read-only application services must not be Transactional`() {
-        val rule = noClasses()
-            .that().areAnnotatedWith(
-                "com.readmates.shared.architecture.ReadOnlyApplicationService"
-            )
-            .should().beAnnotatedWith(
-                "org.springframework.transaction.annotation.Transactional"
-            )
+        val rule =
+            noClasses()
+                .that()
+                .areAnnotatedWith(
+                    "com.readmates.shared.architecture.ReadOnlyApplicationService",
+                ).should()
+                .beAnnotatedWith(
+                    "org.springframework.transaction.annotation.Transactional",
+                )
         rule.check(importedClasses)
     }
 }
