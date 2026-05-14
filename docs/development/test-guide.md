@@ -2,7 +2,7 @@
 
 ReadMates의 테스트는 frontend lint/unit/build, Playwright E2E, backend Gradle test, 공개 릴리즈 후보 점검, 배포 연동 smoke로 나뉩니다.
 
-GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint/test/build를 실행하고, backend job에서 JDK 21로 `./server/gradlew -p server clean test`를 실행합니다.
+GitHub Actions CI는 frontend job에서 Node.js 24와 `pnpm@10.33.0`을 사용해 lint, coverage 포함 unit test, build, Zod fixture freshness check를 실행하고, backend job에서 JDK 21로 `./server/gradlew -p server check`와 `./server/gradlew -p server architectureTest`를 실행합니다. E2E job은 MySQL service를 띄운 뒤 Playwright suite를 3개 shard로 나눠 실행합니다.
 
 검증은 변경 surface와 위험도에 맞춰 고릅니다. 완료 보고에는 실행한 명령, 실패 또는 스킵한 명령과 이유, 남은 리스크를 함께 남깁니다. 실패한 검증을 무시하고 완료로 표시하지 않습니다.
 
@@ -41,6 +41,13 @@ pnpm --dir front test:coverage
 `@vitest/coverage-v8`로 측정하며, threshold는 현재 baseline에서 정수 -2pp floor로 고정합니다(lines/statements 87, functions 83, branches 84). CI front job은 `pnpm test:coverage`로 게이트를 강제하고 `front-coverage` 아티팩트를 always upload(14일 보존)합니다. Threshold를 올릴 때는 안정적으로 통과하는 측정치 -2pp(정수 floor)를 기준으로 갱신합니다.
 
 Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, `shared/ui`의 `src/app` import 금지, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import 금지, route-owned action type 노출 여부를 확인합니다. Legacy boundary exception 목록은 비어 있어야 합니다.
+
+API contract schema나 fixture를 바꿨다면 export 결과가 최신인지 확인합니다. CI frontend job도 같은 검사를 실행합니다.
+
+```bash
+pnpm --dir front zod:export-fixtures
+git diff --exit-code front/tests/unit/__fixtures__/zod-schemas/
+```
 
 Frontend 경계만 빠르게 확인하려면 Vitest를 직접 실행합니다.
 
@@ -103,6 +110,13 @@ pnpm --dir front test:e2e
 ```
 
 예정 세션 흐름을 확인하는 `front/tests/e2e/dev-login-session-flow.spec.ts`는 호스트가 `DRAFT` 세션을 만들고, `MEMBER` 공개로 바꾼 뒤, 멤버 홈의 `/api/sessions/upcoming` 표시와 `OPEN` 전환을 함께 검증합니다. `CLOSED`/`PUBLISHED` 기록 lifecycle은 현재 backend DB test와 frontend unit test에서 더 촘촘히 검증합니다.
+
+세션 기록 JSON 가져오기 흐름은 frontend model unit test와 backend DB integration test가 1차 검증합니다.
+
+```bash
+pnpm --dir front exec vitest run features/host/model/session-import-model.test.ts
+./server/gradlew -p server test --tests com.readmates.sessionimport.api.HostSessionImportControllerDbTest
+```
 
 멤버 표시 이름과 권한 경계만 빠르게 확인하려면 관련 E2E spec을 직접 지정할 수 있습니다.
 

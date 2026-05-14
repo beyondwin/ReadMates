@@ -13,7 +13,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 | 공개 사이트 | `/clubs/:slug`, `/clubs/:slug/about`, `/clubs/:slug/records`, `/clubs/:slug/sessions/:sessionId`, `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/clubs/:slug/invite/:token`, `/invite/:token`, `/reset-password/:token` | 게스트, 로그인 사용자 | 클럽 소개, 공개 기록, 공개 세션 상세, Google OAuth 시작, 클럽 context가 있는 초대 수락 진입, 종료된 비밀번호 경로 안내. Unscoped public route는 호환성을 위해 baseline club을 사용 |
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/notifications`, 등록된 club host의 `/app/**` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 본인 표시 이름과 알림 설정 변경, 클럽별 멤버 알림함 확인 |
-| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 초대 관리, 멤버 상태와 표시 이름 관리, 피드백 문서 업로드, 알림 발송 운영 |
+| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 세션 기록 JSON 가져오기, 초대 관리, 멤버 상태와 표시 이름 관리, 피드백 문서 업로드, 알림 발송 운영 |
 | 플랫폼 관리 | `/admin` | platform admin | 클럽 생성, 클럽 목록 확인, 등록형 domain alias 요청과 상태 확인. 클럽 호스트/멤버 권한과 별도 권한으로 처리 |
 
 ## 프런트엔드 route-first 경계
@@ -133,12 +133,12 @@ notification
 
 | 영역 | 현재 패키지 | 역할 |
 | --- | --- | --- |
-| Web/scheduler/Kafka adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `notification.adapter.in.kafka`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, Kafka listener dispatch, response mapping; shared health endpoint |
+| Web/scheduler/Kafka adapter | `publication.adapter.in.web`, `archive.adapter.in.web`, `feedback.adapter.in.web`, `session.adapter.in.web`, `sessionimport.adapter.in.web`, `note.adapter.in.web`, `auth.adapter.in.web`, `notification.adapter.in.web`, `notification.adapter.in.scheduler`, `notification.adapter.in.kafka`, `shared.adapter.in.web` | HTTP request validation, `CurrentMember` 주입, use case 호출, scheduler trigger, Kafka listener dispatch, response mapping; shared health endpoint |
 | Security adapter/infrastructure | `auth.adapter.in.security`, `auth.infrastructure.security` | Spring Security `Authentication` 해석, OAuth/session filter, cookie/security wiring |
-| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in`, `club.application.port.in` | controller나 scheduler가 의존하는 use case contract |
-| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service`, `club.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
-| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out`, `club.application.port.out` | application service가 persistence/mail/HTTP 세부사항 없이 호출하는 contract |
-| Persistence/mail/Kafka/HTTP adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `club.adapter.out.persistence`, `club.adapter.out.http`, `notification.adapter.out.persistence`, `notification.adapter.out.mail`, `notification.adapter.out.kafka` | JDBC query와 row mapping, domain marker HTTP check, 외부 mail delivery와 Kafka publish 세부 구현을 소유하는 outbound adapter |
+| Inbound port | `publication.application.port.in`, `archive.application.port.in`, `feedback.application.port.in`, `session.application.port.in`, `sessionimport.application.port.in`, `note.application.port.in`, `auth.application.port.in`, `notification.application.port.in`, `club.application.port.in` | controller나 scheduler가 의존하는 use case contract |
+| Application service | `publication.application.service`, `archive.application.service`, `feedback.application.service`, `session.application.service`, `sessionimport.application.service`, `note.application.service`, `auth.application`/`auth.application.service`, `notification.application.service`, `club.application.service` | command/query orchestration과 권한 확인, retryable side effect 처리 |
+| Outbound port | `publication.application.port.out`, `archive.application.port.out`, `feedback.application.port.out`, `session.application.port.out`, `sessionimport.application.port.out`, `note.application.port.out`, `auth.application.port.out`, `notification.application.port.out`, `club.application.port.out` | application service가 persistence/mail/HTTP 세부사항 없이 호출하는 contract |
+| Persistence/mail/Kafka/HTTP adapter | `publication.adapter.out.persistence`, `archive.adapter.out.persistence`, `feedback.adapter.out.persistence`, `session.adapter.out.persistence`, `sessionimport.adapter.out.persistence`, `note.adapter.out.persistence`, `auth.adapter.out.persistence`, `club.adapter.out.persistence`, `club.adapter.out.http`, `notification.adapter.out.persistence`, `notification.adapter.out.mail`, `notification.adapter.out.kafka` | JDBC query와 row mapping, domain marker HTTP check, 외부 mail delivery와 Kafka publish 세부 구현을 소유하는 outbound adapter |
 | Redis adapter | `auth.adapter.out.redis`, `publication.adapter.out.redis`, `note.adapter.out.redis`, `shared.adapter.out.redis` | 선택적 Redis rate limit/cache/invalidation 구현. application service는 Redis adapter가 아니라 port에만 의존 |
 
 전환된 controller는 legacy repository, `JdbcTemplate`, persistence adapter를 직접 주입받지 않습니다. 인증된 사용자는 controller method에서 `CurrentMember`로 받으며, resolver가 `ResolveCurrentMemberUseCase`를 통해 멤버 정보를 조회합니다.
@@ -167,6 +167,7 @@ ReadMates 서버는 도메인 패키지를 다음 두 형태로 운영합니다.
 
 ### Mixed
 - `feedback` — 문서 업로드 mutation + 조회를 함께 보유. 향후 분리 후보지만 현재 단일 service에 응집.
+- `sessionimport` — 호스트 세션 편집기의 preview는 검증 전용 read path이고 commit은 공개 요약, 하이라이트, 한줄평, 피드백 문서를 같은 트랜잭션에서 교체하는 write path입니다. `domain/` 없이 application model과 write port로 응집합니다.
 
 ### 강제 규칙
 - ArchUnit `ServerArchitectureBoundaryTest` 가 다음을 차단:
@@ -356,6 +357,32 @@ Readable response for host or attended full member
 - 정식 멤버는 본인이 `ATTENDED` 상태인 회차의 피드백 문서만 읽을 수 있습니다.
 - 둘러보기 멤버는 피드백 문서를 읽을 수 없습니다.
 - 문서가 없거나 권한이 없으면 UI는 locked 또는 unavailable state를 보여야 합니다.
+
+## 세션 기록 JSON 가져오기
+
+호스트는 앱 밖에서 정리한 세션 기록 JSON을 `/app/host/sessions/:sessionId/edit`의 세션 기록 가져오기 패널로 불러올 수 있습니다. 이 기능은 production 앱에서 AI API를 호출하지 않습니다. 앱은 최종 JSON만 preview/commit API로 전달합니다.
+
+```text
+External transcript/AI workflow
+  |
+  | readmates-session-import:v1 JSON
+  v
+Host editor preview
+  |
+  | POST /api/host/sessions/{sessionId}/session-import/preview
+  v
+Spring validation
+  |
+  | session metadata, record visibility, attendee author names, feedback parser
+  v
+Host commit
+  |
+  | POST /api/host/sessions/{sessionId}/session-import/commit
+  v
+Replace publication summary, highlights, one-line reviews, feedback document
+```
+
+Commit은 활성 호스트만 사용할 수 있고, `HOST_ONLY` 공개 범위에서는 저장을 거절합니다. JSON의 회차 번호, 책 제목, 모임 날짜는 현재 편집 중인 세션과 일치해야 하며, 하이라이트와 한줄평의 `authorName`은 해당 회차의 활성 참석자 이름과 매칭되어야 합니다. 저장은 기존 공개 요약, 하이라이트, 한줄평, 피드백 문서를 새 JSON 내용으로 교체하고, public/notes cache invalidation을 commit 이후 best-effort로 실행합니다. 파일 형식과 운영 검토 체크는 [session-import-generator.md](session-import-generator.md)를 기준으로 합니다.
 
 ## AI-assisted 콘텐츠 운영
 

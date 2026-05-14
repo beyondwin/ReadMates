@@ -1,6 +1,6 @@
 # ReadMates 배포 문서
 
-검토일: 2026-05-13
+검토일: 2026-05-15
 
 이 디렉터리는 ReadMates의 공개 안전 배포 문서 허브입니다. 운영 환경의 목표 구조, 신뢰 경계, secret 보관 원칙, 공개 릴리즈 후보 검증 흐름을 설명하되 계정별 값과 private deployment state는 Git에 두지 않습니다.
 
@@ -85,6 +85,7 @@ ReadMates는 제품 수준에서 invite-only 흐름을 사용합니다.
 - 초대 없이 Google로 로그인한 사용자는 둘러보기 멤버가 될 수 있고, 멤버 공개 예정 세션 같은 읽기 전용 멤버 화면 일부를 볼 수 있습니다.
 - 호스트는 둘러보기 멤버를 정식 멤버로 전환하거나, 정식 멤버를 현재 세션에서 제외/복구/비활성화/삭제하고 같은 클럽 멤버의 표시 이름을 정리할 수 있습니다.
 - 호스트는 여러 `DRAFT` 예정 세션을 준비하고 `HOST_ONLY`, `MEMBER`, `PUBLIC` 공개 범위를 지정할 수 있지만, 같은 클럽에서 현재 `OPEN` 세션은 하나만 시작할 수 있습니다. 진행이 끝난 세션은 `CLOSED`로 닫고, 공개 요약과 `MEMBER` 또는 `PUBLIC` 범위가 준비된 닫힌 기록만 `PUBLISHED`로 발행합니다.
+- 호스트는 세션 편집기에서 `readmates-session-import:v1` JSON을 preview한 뒤 저장할 수 있습니다. 저장은 기존 공개 요약, 하이라이트, 한줄평, 피드백 문서를 교체하며, `HOST_ONLY` 범위에서는 commit이 거절됩니다.
 - 호스트는 `/app/host/notifications`에서 notification event publication row와 channel delivery row를 보고, pending/failed email delivery 처리, `DEAD` delivery 복구, redesigned template helper 기반 테스트 메일 audit 확인을 수행할 수 있습니다.
 - 이메일 알림은 서버 application model의 템플릿 helper에서 subject, plain text, HTML, CTA/deep link를 함께 렌더링하고, SMTP는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 발송합니다. 호스트 알림 상세 API는 raw plain/HTML body를 노출하지 않습니다.
 - 호스트 API는 활성 `host` role을 요구합니다.

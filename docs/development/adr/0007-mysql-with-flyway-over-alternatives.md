@@ -72,11 +72,11 @@ spring:
 
 테스트 환경에서는 `spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev`로 dev seed migration을 추가 적용한다. dev seed는 테스트 전용 seed data(`V1001__seed_*.sql` 형식)를 포함하며, 운영 DB에는 절대 적용되지 않는다.
 
-**버전 번호 gap 정책**: `V2`~`V8`은 초기 개발 중 통합되거나 삭제된 migration 번호다. gap이 존재해도 `out-of-order=false`가 현재 파일의 버전 순서를 강제한다. 새 migration은 현재 최신 번호(`V26`) 다음인 `V27`부터 시작한다.
+**버전 번호 gap 정책**: `V2`~`V8`은 초기 개발 중 통합되거나 삭제된 migration 번호다. gap이 존재해도 `out-of-order=false`가 현재 파일의 버전 순서를 강제한다. 새 migration은 현재 최신 번호(`V28`) 다음인 `V29`부터 시작한다.
 
 ### 현재 migration 파일 목록
 
-`V1`~`V26` 범위에 총 19개 migration 파일 (버전 번호 gap은 초기 개발 중 통합된 migration에 해당):
+`V1`~`V28` 범위에 총 21개 migration 파일 (버전 번호 gap은 초기 개발 중 통합된 migration에 해당):
 
 | 버전 | 설명 |
 |------|------|
@@ -99,6 +99,8 @@ spring:
 | V24 | legacy password hash rename (reversible pair 1단계) |
 | V25 | legacy password hash drop (reversible pair 2단계) |
 | V26 | BFF secret rotation audit 테이블 |
+| V27 | 수동 알림 발송 preview/dispatch 테이블 |
+| V28 | 수동 알림 발송 preview consumed 상태와 preview-dispatch 1:1 제약 |
 
 ## 근거
 
@@ -191,7 +193,7 @@ migration 통합 테스트:
 ./server/gradlew -p server clean test
 ```
 
-기대: V1~V26 (19개) migration이 순서대로 적용되고 schema constraint 검증 통과.
+기대: V1~V28 (21개) migration이 순서대로 적용되고 schema constraint 검증 통과.
 
 migration 파일 추가 규칙 검증:
 - 새 migration 파일이 `V{N+1}__{설명}.sql` 형식인지 확인

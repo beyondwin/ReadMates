@@ -32,7 +32,7 @@
 }
 ```
 
-`recordVisibility`는 파일에 넣지 않습니다. 호스트 편집기의 현재 공개 범위 선택값이 preview/commit 요청에 붙습니다.
+`recordVisibility`는 파일에 넣지 않습니다. 호스트 편집기의 현재 공개 범위 선택값이 preview/commit 요청에 붙습니다. `HOST_ONLY` 범위는 저장할 수 없으므로, 가져온 기록을 저장하려면 편집기에서 `MEMBER` 또는 `PUBLIC`을 먼저 선택합니다.
 
 ## 생성 입력
 
@@ -53,6 +53,7 @@
 - `oneLineReviews`는 1개 이상이고, 같은 작성자를 중복하지 않습니다.
 - `feedbackDocument.fileName`은 `/` 또는 `\`를 포함하지 않는 `.md` 또는 `.txt` 파일명입니다.
 - `feedbackDocument.markdown`은 기존 `readmates-feedback:v1` 피드백 문서 템플릿을 통과해야 합니다.
+- 서버 preview는 같은 검증을 다시 수행하고, 저장 가능한 경우에만 commit을 허용합니다.
 
 ## 검토 체크
 
@@ -72,6 +73,13 @@
 4. 저장 가능 상태일 때 `가져온 기록 저장`을 누릅니다.
 
 저장은 해당 회차의 요약, 하이라이트, 한줄평, 피드백 문서를 교체합니다. 서버는 저장 직전에 같은 검증을 다시 실행하고, 실패하면 아무 레코드도 일부 저장하지 않습니다.
+
+호스트 편집기는 내부적으로 두 API를 사용합니다.
+
+- `POST /api/host/sessions/{sessionId}/session-import/preview`
+- `POST /api/host/sessions/{sessionId}/session-import/commit`
+
+두 API 모두 현재 club의 active host 권한이 필요합니다.
 
 ## 예시 fixture
 
