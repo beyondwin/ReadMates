@@ -1,11 +1,11 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -31,32 +31,36 @@ class PasswordAuthControllerTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `legacy password login endpoint is gone`() {
-        mockMvc.post("/api/auth/login") {
-            contentType = org.springframework.http.MediaType.APPLICATION_JSON
-            content = """{"email":"member@example.com","password":"correct horse battery staple"}"""
-        }.andExpect {
-            status { isGone() }
-            jsonPath("$.code") { value("GONE") }
-            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
-            jsonPath("$.status") { value(410) }
-        }
+        mockMvc
+            .post("/api/auth/login") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content = """{"email":"member@example.com","password":"correct horse battery staple"}"""
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("GONE") }
+                jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+                jsonPath("$.status") { value(410) }
+            }
     }
 
     @Test
     fun `logout revokes current session and clears cookie`() {
-        val issuedSession = authSessionService.issueSession(
-            userId = SEED_HOST_USER_ID,
-            userAgent = "PasswordAuthControllerTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = SEED_HOST_USER_ID,
+                userAgent = "PasswordAuthControllerTest",
+                ipAddress = "127.0.0.1",
+            )
         val cookie = Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
 
-        val result = mockMvc.post("/api/auth/logout") {
-            cookie(cookie)
-        }.andExpect {
-            status { isNoContent() }
-            cookie { maxAge(AuthSessionService.COOKIE_NAME, 0) }
-        }.andReturn()
+        val result =
+            mockMvc
+                .post("/api/auth/logout") {
+                    cookie(cookie)
+                }.andExpect {
+                    status { isNoContent() }
+                    cookie { maxAge(AuthSessionService.COOKIE_NAME, 0) }
+                }.andReturn()
 
         val setCookieHeaders = result.response.getHeaders("Set-Cookie")
         assertTrue(
@@ -72,11 +76,12 @@ class PasswordAuthControllerTest(
             "Expected JSESSIONID clearing cookie",
         )
 
-        val revokedAt = jdbcTemplate.queryForObject(
-            "select revoked_at from auth_sessions where session_token_hash = ?",
-            Any::class.java,
-            issuedSession.storedTokenHash,
-        )
+        val revokedAt =
+            jdbcTemplate.queryForObject(
+                "select revoked_at from auth_sessions where session_token_hash = ?",
+                Any::class.java,
+                issuedSession.storedTokenHash,
+            )
         assertNotNull(revokedAt)
     }
 

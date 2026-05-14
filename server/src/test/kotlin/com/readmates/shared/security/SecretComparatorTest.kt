@@ -4,7 +4,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class SecretComparatorTest {
-
     @Test
     fun `firstMatchingIndex returns -1 when no candidate matches`() {
         assertThat(SecretComparator.firstMatchingIndex("nope", listOf("a", "b", "c"))).isEqualTo(-1)

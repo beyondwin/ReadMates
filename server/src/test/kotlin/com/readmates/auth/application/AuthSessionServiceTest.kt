@@ -27,13 +27,15 @@ class AuthSessionServiceTest {
     @Test
     fun `updates last seen when a valid session is used`() {
         val issued = service.issueSession("00000000-0000-0000-0000-000000000101", "agent", "127.0.0.1")
-        val beforeLookup = repository.findValidByTokenHash(issued.storedTokenHash)
-            ?: error("Expected stored session")
+        val beforeLookup =
+            repository.findValidByTokenHash(issued.storedTokenHash)
+                ?: error("Expected stored session")
 
         service.findValidSession(issued.rawToken)
 
-        val afterLookup = repository.findValidByTokenHash(issued.storedTokenHash)
-            ?: error("Expected stored session")
+        val afterLookup =
+            repository.findValidByTokenHash(issued.storedTokenHash)
+                ?: error("Expected stored session")
         assertTrue(afterLookup.lastSeenAt.isAfter(beforeLookup.lastSeenAt))
     }
 
@@ -128,11 +130,12 @@ class AuthSessionServiceTest {
 
     @Test
     fun `session cookies can be scoped to a configured shared domain`() {
-        val service = AuthSessionService(
-            authSessionStore = repository,
-            secureCookie = true,
-            sessionCookieDomain = ".readmates.example",
-        )
+        val service =
+            AuthSessionService(
+                authSessionStore = repository,
+                secureCookie = true,
+                sessionCookieDomain = ".readmates.example",
+            )
 
         val cookie = service.sessionCookie("opaque-token")
         val clearedCookie = service.clearedSessionCookie()

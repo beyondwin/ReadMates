@@ -11,16 +11,25 @@ import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface LoadArchiveDataPort {
-    fun loadArchiveSessions(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<ArchiveSessionResult>
+    fun loadArchiveSessions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<ArchiveSessionResult>
 
     fun loadArchiveSessionDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
     ): ArchiveSessionDetailHeader?
 
-    fun loadMyQuestions(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<MyArchiveQuestionResult>
+    fun loadMyQuestions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<MyArchiveQuestionResult>
 
-    fun loadMyReviews(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<MyArchiveReviewResult>
+    fun loadMyReviews(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<MyArchiveReviewResult>
 
     fun loadMyPage(currentMember: CurrentMember): MyPageResult
 }

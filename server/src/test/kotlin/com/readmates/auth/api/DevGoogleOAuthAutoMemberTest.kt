@@ -32,10 +32,10 @@ class DevGoogleOAuthAutoMemberTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `does not auto provision unknown Google user into demo club even when old dev flag is enabled`() {
-        mockMvc.get("/api/auth/me") {
-            with(localGoogleLogin("local.google.auth@example.com", "google-local-auth", "로컬 구글"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/auth/me") {
+                with(localGoogleLogin("local.google.auth@example.com", "google-local-auth", "로컬 구글"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(false) }
                 jsonPath("$.email") { value("local.google.auth@example.com") }
@@ -45,10 +45,10 @@ class DevGoogleOAuthAutoMemberTest(
 
     @Test
     fun `unknown Google user cannot reach protected member api without invitation acceptance`() {
-        mockMvc.get("/api/sessions/current") {
-            with(localGoogleLogin("local.google.member@example.com", "google-local-member", "Local Member"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/sessions/current") {
+                with(localGoogleLogin("local.google.member@example.com", "google-local-member", "Local Member"))
+            }.andExpect {
                 status { isForbidden() }
             }
     }
@@ -87,10 +87,10 @@ class DevGoogleOAuthAutoMemberProductionProfileTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `does not auto provision Google user under prod profile`() {
-        mockMvc.get("/api/auth/me") {
-            with(localGoogleLogin("local.google.prod@example.com", "google-local-prod", "Prod Google"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/auth/me") {
+                with(localGoogleLogin("local.google.prod@example.com", "google-local-prod", "Prod Google"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(false) }
                 jsonPath("$.email") { value("local.google.prod@example.com") }
@@ -112,11 +112,14 @@ class DevGoogleOAuthAutoMemberProductionProfileTest(
     }
 }
 
-private fun localGoogleLogin(email: String, subject: String, name: String) =
-    oidcLogin().idToken { token ->
-        token.subject(subject)
-        token.claim("email", email)
-        token.claim("email_verified", true)
-        token.claim("name", name)
-        token.claim("picture", "https://example.com/avatar.png")
-    }
+private fun localGoogleLogin(
+    email: String,
+    subject: String,
+    name: String,
+) = oidcLogin().idToken { token ->
+    token.subject(subject)
+    token.claim("email", email)
+    token.claim("email_verified", true)
+    token.claim("name", name)
+    token.claim("picture", "https://example.com/avatar.png")
+}

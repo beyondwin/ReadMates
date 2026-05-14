@@ -19,11 +19,17 @@ class NoopPublicReadCacheAdapter : PublicReadCachePort {
 
     override fun getSession(sessionId: UUID): PublicSessionDetailResult? = null
 
-    override fun putSession(sessionId: UUID, result: PublicSessionDetailResult) = Unit
+    override fun putSession(
+        sessionId: UUID,
+        result: PublicSessionDetailResult,
+    ) = Unit
 }
 
 private class NoopPublicReadCacheCondition : Condition {
-    override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata): Boolean {
+    override fun matches(
+        context: ConditionContext,
+        metadata: AnnotatedTypeMetadata,
+    ): Boolean {
         val redisEnabled = context.environment.getProperty("readmates.redis.enabled", Boolean::class.java, false)
         val publicCacheEnabled = context.environment.getProperty("readmates.public-cache.enabled", Boolean::class.java, false)
 

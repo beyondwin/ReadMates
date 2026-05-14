@@ -40,9 +40,7 @@ import java.time.Duration
 @EnableConfigurationProperties(NotificationKafkaProperties::class)
 class NotificationKafkaConfiguration {
     @Bean
-    fun notificationEventProducerFactory(
-        properties: NotificationKafkaProperties,
-    ): ProducerFactory<String, NotificationEventMessage> =
+    fun notificationEventProducerFactory(properties: NotificationKafkaProperties): ProducerFactory<String, NotificationEventMessage> =
         DefaultKafkaProducerFactory(
             notificationProducerConfigs(properties),
             { StringSerializer() },
@@ -53,13 +51,10 @@ class NotificationKafkaConfiguration {
     fun notificationEventKafkaTemplate(
         @Qualifier("notificationEventProducerFactory")
         notificationEventProducerFactory: ProducerFactory<String, NotificationEventMessage>,
-    ): KafkaTemplate<String, NotificationEventMessage> =
-        KafkaTemplate(notificationEventProducerFactory)
+    ): KafkaTemplate<String, NotificationEventMessage> = KafkaTemplate(notificationEventProducerFactory)
 
     @Bean
-    fun notificationEventConsumerFactory(
-        properties: NotificationKafkaProperties,
-    ): ConsumerFactory<String, NotificationEventMessage> =
+    fun notificationEventConsumerFactory(properties: NotificationKafkaProperties): ConsumerFactory<String, NotificationEventMessage> =
         DefaultKafkaConsumerFactory(
             notificationConsumerConfigs(properties),
             { StringDeserializer() },
@@ -148,9 +143,7 @@ class NotificationKafkaConfiguration {
             false,
         )
 
-    private fun notificationEventJsonMapper(): JsonMapper =
-        JacksonMapperUtils.enhancedJsonMapper()
-
+    private fun notificationEventJsonMapper(): JsonMapper = JacksonMapperUtils.enhancedJsonMapper()
 }
 
 @ConfigurationProperties(prefix = "readmates.notifications.kafka")

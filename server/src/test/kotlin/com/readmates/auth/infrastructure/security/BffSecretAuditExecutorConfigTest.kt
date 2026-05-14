@@ -8,7 +8,6 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class BffSecretAuditExecutorConfigTest {
-
     @Test
     fun `executor waits for in-flight tasks on shutdown`() {
         val registry = SimpleMeterRegistry()

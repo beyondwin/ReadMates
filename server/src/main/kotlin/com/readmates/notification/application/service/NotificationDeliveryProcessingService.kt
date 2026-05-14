@@ -22,7 +22,10 @@ class NotificationDeliveryProcessingService(
         return items.size
     }
 
-    override fun processPendingForClub(clubId: UUID, limit: Int): Int {
+    override fun processPendingForClub(
+        clubId: UUID,
+        limit: Int,
+    ): Int {
         if (limit <= 0 || !deliveryEnabled) {
             return 0
         }

@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException
 @ConditionalOnProperty(prefix = "readmates.dev", name = ["login-enabled"], havingValue = "true")
 class DevInvitationController {
     @PostMapping("/{token}/accept")
-    fun accept(@PathVariable("token") _token: String): Nothing =
-        throw ResponseStatusException(HttpStatus.GONE, "Password invitation acceptance has been removed")
+    fun accept(
+        @PathVariable("token") _token: String,
+    ): Nothing = throw ResponseStatusException(HttpStatus.GONE, "Password invitation acceptance has been removed")
 }

@@ -1,12 +1,11 @@
 package com.readmates.auth.adapter.out.redis
 
-import com.readmates.support.ReadmatesRedisIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.model.StoredAuthSession
-import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.auth.application.port.out.AuthSessionCachePort
+import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.shared.cache.CacheJsonCodec
 import com.readmates.shared.cache.RedisCacheMetrics
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -14,6 +13,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.ObjectProvider
@@ -45,33 +45,35 @@ class RedisAuthSessionCacheAdapterTest(
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val meterRegistry: MeterRegistry,
 ) : ReadmatesRedisIntegrationTestSupport() {
-    private val contextRunner = ApplicationContextRunner()
-        .withUserConfiguration(AuthSessionCacheAdapterBeanTestConfiguration::class.java)
+    private val contextRunner =
+        ApplicationContextRunner()
+            .withUserConfiguration(AuthSessionCacheAdapterBeanTestConfiguration::class.java)
 
     @Test
     fun `selects expected auth session cache adapter for redis and auth session cache flags`() {
-        val cases = listOf(
-            AuthSessionCacheAdapterCase(
-                redisEnabled = true,
-                authSessionCacheEnabled = true,
-                expectedAdapter = RedisAuthSessionCacheAdapter::class.java,
-            ),
-            AuthSessionCacheAdapterCase(
-                redisEnabled = true,
-                authSessionCacheEnabled = false,
-                expectedAdapter = NoopAuthSessionCacheAdapter::class.java,
-            ),
-            AuthSessionCacheAdapterCase(
-                redisEnabled = false,
-                authSessionCacheEnabled = true,
-                expectedAdapter = NoopAuthSessionCacheAdapter::class.java,
-            ),
-            AuthSessionCacheAdapterCase(
-                redisEnabled = false,
-                authSessionCacheEnabled = false,
-                expectedAdapter = NoopAuthSessionCacheAdapter::class.java,
-            ),
-        )
+        val cases =
+            listOf(
+                AuthSessionCacheAdapterCase(
+                    redisEnabled = true,
+                    authSessionCacheEnabled = true,
+                    expectedAdapter = RedisAuthSessionCacheAdapter::class.java,
+                ),
+                AuthSessionCacheAdapterCase(
+                    redisEnabled = true,
+                    authSessionCacheEnabled = false,
+                    expectedAdapter = NoopAuthSessionCacheAdapter::class.java,
+                ),
+                AuthSessionCacheAdapterCase(
+                    redisEnabled = false,
+                    authSessionCacheEnabled = true,
+                    expectedAdapter = NoopAuthSessionCacheAdapter::class.java,
+                ),
+                AuthSessionCacheAdapterCase(
+                    redisEnabled = false,
+                    authSessionCacheEnabled = false,
+                    expectedAdapter = NoopAuthSessionCacheAdapter::class.java,
+                ),
+            )
 
         cases.forEach { case ->
             contextRunner
@@ -192,14 +194,16 @@ class RedisAuthSessionCacheAdapterTest(
         val key = "auth:session:$tokenHash"
         redisTemplate.delete(key)
         val failingDeleteRedisTemplate = Mockito.spy(redisTemplate)
-        Mockito.doThrow(IllegalStateException("redis unavailable"))
+        Mockito
+            .doThrow(IllegalStateException("redis unavailable"))
             .`when`(failingDeleteRedisTemplate)
             .delete(Mockito.anyCollection<String>())
-        val adapter = RedisAuthSessionCacheAdapter(
-            redisTemplate = failingDeleteRedisTemplate,
-            codec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build()),
-            metrics = metrics(registry),
-        )
+        val adapter =
+            RedisAuthSessionCacheAdapter(
+                redisTemplate = failingDeleteRedisTemplate,
+                codec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build()),
+                metrics = metrics(registry),
+            )
         val snapshot = snapshot(session)
         adapter.store(tokenHash, snapshot, Duration.ofMinutes(10))
         assertEquals(snapshot, adapter.find(tokenHash))
@@ -248,11 +252,12 @@ class RedisAuthSessionCacheAdapterTest(
     @Test
     fun `redis lookup failure returns cache miss and records operation metrics`() {
         val registry = SimpleMeterRegistry()
-        val adapter = RedisAuthSessionCacheAdapter(
-            redisTemplate = failingRedisTemplate(),
-            codec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build()),
-            metrics = metrics(registry),
-        )
+        val adapter =
+            RedisAuthSessionCacheAdapter(
+                redisTemplate = failingRedisTemplate(),
+                codec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build()),
+                metrics = metrics(registry),
+            )
 
         val session = adapter.find("session-token-hash-fails-open")
 
@@ -271,17 +276,19 @@ class RedisAuthSessionCacheAdapterTest(
         )
     }
 
-    private fun storedSession(tokenHash: String, userId: String) =
-        StoredAuthSession(
-            id = "00000000-0000-0000-0000-000000000301",
-            userId = userId,
-            sessionTokenHash = tokenHash,
-            createdAt = OffsetDateTime.of(2026, 4, 28, 0, 0, 0, 0, ZoneOffset.UTC),
-            lastSeenAt = OffsetDateTime.of(2026, 4, 28, 0, 0, 0, 0, ZoneOffset.UTC),
-            expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(7).withNano(0),
-            userAgent = "agent",
-            ipHash = "ip-hash",
-        )
+    private fun storedSession(
+        tokenHash: String,
+        userId: String,
+    ) = StoredAuthSession(
+        id = "00000000-0000-0000-0000-000000000301",
+        userId = userId,
+        sessionTokenHash = tokenHash,
+        createdAt = OffsetDateTime.of(2026, 4, 28, 0, 0, 0, 0, ZoneOffset.UTC),
+        lastSeenAt = OffsetDateTime.of(2026, 4, 28, 0, 0, 0, 0, ZoneOffset.UTC),
+        expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(7).withNano(0),
+        userAgent = "agent",
+        ipHash = "ip-hash",
+    )
 
     private fun snapshot(session: StoredAuthSession) =
         AuthSessionCacheSnapshot(
@@ -334,10 +341,8 @@ private data class AuthSessionCacheAdapterCase(
 )
 private class AuthSessionCacheAdapterBeanTestConfiguration {
     @Bean
-    fun redisTemplate(): StringRedisTemplate =
-        Mockito.mock(StringRedisTemplate::class.java)
+    fun redisTemplate(): StringRedisTemplate = Mockito.mock(StringRedisTemplate::class.java)
 
     @Bean
-    fun cacheJsonCodec(): CacheJsonCodec =
-        CacheJsonCodec(JsonMapper.builder().findAndAddModules().build())
+    fun cacheJsonCodec(): CacheJsonCodec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build())
 }

@@ -1,10 +1,10 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -51,7 +51,8 @@ class MemberLifecycleAuthTest(
         val suspendedCookie = sessionCookieForLifecycleMember("suspended.auth", "SUSPENDED")
         val leftCookie = sessionCookieForLifecycleMember("left.auth", "LEFT")
 
-        mockMvc.get("/api/auth/me") { cookie(suspendedCookie) }
+        mockMvc
+            .get("/api/auth/me") { cookie(suspendedCookie) }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(true) }
@@ -59,7 +60,8 @@ class MemberLifecycleAuthTest(
                 jsonPath("$.approvalState") { value("SUSPENDED") }
             }
 
-        mockMvc.get("/api/auth/me") { cookie(leftCookie) }
+        mockMvc
+            .get("/api/auth/me") { cookie(leftCookie) }
             .andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(true) }
@@ -68,7 +70,10 @@ class MemberLifecycleAuthTest(
             }
     }
 
-    private fun sessionCookieForLifecycleMember(prefix: String, status: String): Cookie {
+    private fun sessionCookieForLifecycleMember(
+        prefix: String,
+        status: String,
+    ): Cookie {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         val email = "$prefix.${UUID.randomUUID()}@example.com"
@@ -95,16 +100,21 @@ class MemberLifecycleAuthTest(
         )
         createdMembershipIds += membershipId
 
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "MemberLifecycleAuthTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "MemberLifecycleAuthTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

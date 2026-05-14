@@ -1,8 +1,8 @@
 package com.readmates.session.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -54,17 +54,18 @@ class HostSessionBffSecurityTest(
     fun `host delete bff request reaches controller without spring csrf token`() {
         createOpenSession()
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009888") {
-            with(user("host@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
-            jsonPath("$.sessionNumber") { value(88) }
-            jsonPath("$.deleted") { value(true) }
-            jsonPath("$.counts.participants") { value(6) }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009888") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.sessionNumber") { value(88) }
+                jsonPath("$.deleted") { value(true) }
+                jsonPath("$.counts.participants") { value(6) }
+            }
 
         assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009888'"))
         assertEquals(0, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
@@ -74,32 +75,34 @@ class HostSessionBffSecurityTest(
     fun `host visibility bff request reaches controller without spring csrf token`() {
         createDraftSession()
 
-        mockMvc.patch("/api/host/sessions/00000000-0000-0000-0000-000000009888/visibility") {
-            with(user("host@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"visibility":"MEMBER"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
-            jsonPath("$.visibility") { value("MEMBER") }
-        }
+        mockMvc
+            .patch("/api/host/sessions/00000000-0000-0000-0000-000000009888/visibility") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"MEMBER"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.visibility") { value("MEMBER") }
+            }
     }
 
     @Test
     fun `host open bff request reaches controller without spring csrf token`() {
         createDraftSession()
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009888/open") {
-            with(user("host@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
-            jsonPath("$.state") { value("OPEN") }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009888/open") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.state") { value("OPEN") }
+            }
 
         assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
     }
@@ -108,31 +111,33 @@ class HostSessionBffSecurityTest(
     fun `host close bff request reaches controller without spring csrf token`() {
         createOpenSession()
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009888/close") {
-            with(user("host@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
-            jsonPath("$.state") { value("CLOSED") }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009888/close") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.state") { value("CLOSED") }
+            }
     }
 
     @Test
     fun `host publish bff request reaches controller without spring csrf token`() {
         createClosedPublicSession()
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009888/publish") {
-            with(user("host@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
-            jsonPath("$.state") { value("PUBLISHED") }
-            jsonPath("$.publication.visibility") { value("PUBLIC") }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009888/publish") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.state") { value("PUBLISHED") }
+                jsonPath("$.publication.visibility") { value("PUBLIC") }
+            }
     }
 
     private fun createDraftSession() {
@@ -178,7 +183,10 @@ class HostSessionBffSecurityTest(
         )
     }
 
-    private fun createSession(state: String, visibility: String) {
+    private fun createSession(
+        state: String,
+        visibility: String,
+    ) {
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -217,7 +225,10 @@ class HostSessionBffSecurityTest(
         )
     }
 
-    private fun countRows(tableName: String, whereClause: String): Int =
+    private fun countRows(
+        tableName: String,
+        whereClause: String,
+    ): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from $tableName where $whereClause",
             Int::class.java,

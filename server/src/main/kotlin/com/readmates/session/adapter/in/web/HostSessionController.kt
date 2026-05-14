@@ -27,8 +27,10 @@ import java.util.UUID
 data class HostSessionVisibilityRequest(
     val visibility: SessionRecordVisibility,
 ) {
-    fun toCommand(host: CurrentMember, sessionId: UUID): UpdateHostSessionVisibilityCommand =
-        UpdateHostSessionVisibilityCommand(host, sessionId, visibility)
+    fun toCommand(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): UpdateHostSessionVisibilityCommand = UpdateHostSessionVisibilityCommand(host, sessionId, visibility)
 }
 
 @RestController

@@ -28,27 +28,28 @@ class MemberProfileServiceTest {
     }
 
     private inner class RecordingMemberProfileStorePort : MemberProfileStorePort {
-        private var row = MemberProfileRow(
-            membershipId = membershipId,
-            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-            clubId = clubId,
-            clubSlug = "reading-sai",
-            email = "member@example.com",
-            displayName = "멤버",
-            accountName = "계정",
-            profileImageUrl = null,
-            role = MembershipRole.MEMBER,
-            status = MembershipStatus.ACTIVE,
-        )
+        private var row =
+            MemberProfileRow(
+                membershipId = membershipId,
+                userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+                clubId = clubId,
+                clubSlug = "reading-sai",
+                email = "member@example.com",
+                displayName = "멤버",
+                accountName = "계정",
+                profileImageUrl = null,
+                role = MembershipRole.MEMBER,
+                status = MembershipStatus.ACTIVE,
+            )
 
-        override fun findProfileMemberByEmail(email: String) =
-            row.takeIf { it.email == email }
+        override fun findProfileMemberByEmail(email: String) = row.takeIf { it.email == email }
 
-        override fun findProfileMemberByUserId(userId: UUID) =
-            row.takeIf { it.userId == userId }
+        override fun findProfileMemberByUserId(userId: UUID) = row.takeIf { it.userId == userId }
 
-        override fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID) =
-            row.takeIf { it.clubId == clubId && it.membershipId == membershipId }
+        override fun findProfileMemberInClubForUpdate(
+            clubId: UUID,
+            membershipId: UUID,
+        ) = row.takeIf { it.clubId == clubId && it.membershipId == membershipId }
 
         override fun lockClubProfileNames(clubId: UUID) = row.clubId == clubId
 
@@ -58,17 +59,28 @@ class MemberProfileServiceTest {
             excludingMembershipId: UUID,
         ) = false
 
-        override fun updateOwnDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean {
+        override fun updateOwnDisplayName(
+            clubId: UUID,
+            membershipId: UUID,
+            displayName: String,
+        ): Boolean {
             row = row.copy(displayName = displayName)
             return true
         }
 
-        override fun updateDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean {
+        override fun updateDisplayName(
+            clubId: UUID,
+            membershipId: UUID,
+            displayName: String,
+        ): Boolean {
             row = row.copy(displayName = displayName)
             return true
         }
 
-        override fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow? = null
+        override fun findHostMemberListItem(
+            clubId: UUID,
+            membershipId: UUID,
+        ): HostMemberListRow? = null
     }
 
     private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {

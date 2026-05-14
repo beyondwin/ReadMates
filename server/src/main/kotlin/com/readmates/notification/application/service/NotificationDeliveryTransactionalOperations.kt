@@ -19,18 +19,20 @@ class NotificationDeliveryTransactionalOperations(
         planningPort.persistPlannedDeliveries(message)
 
     @Transactional
-    fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? =
-        claimPort.claimEmailDelivery(id)
+    fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = claimPort.claimEmailDelivery(id)
 
     @Transactional
-    fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> =
-        claimPort.claimEmailDeliveries(limit)
+    fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = claimPort.claimEmailDeliveries(limit)
 
     @Transactional
-    fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
-        claimPort.claimEmailDeliveriesForClub(clubId, limit)
+    fun claimEmailDeliveriesForClub(
+        clubId: UUID,
+        limit: Int,
+    ): List<ClaimedNotificationDeliveryItem> = claimPort.claimEmailDeliveriesForClub(clubId, limit)
 
     @Transactional
-    fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? =
-        claimPort.claimHostEmailDelivery(clubId, id)
+    fun claimHostEmailDelivery(
+        clubId: UUID,
+        id: UUID,
+    ): ClaimedNotificationDeliveryItem? = claimPort.claimHostEmailDelivery(clubId, id)
 }

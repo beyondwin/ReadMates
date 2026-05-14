@@ -36,10 +36,11 @@ class FeedbackDocumentUploadValidator {
     }
 
     private fun validatedFileName(originalFilename: String?): String {
-        val fileName = originalFilename
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, UNSUPPORTED_FILE_MESSAGE)
+        val fileName =
+            originalFilename
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, UNSUPPORTED_FILE_MESSAGE)
         if (
             fileName.length > MAX_FILE_NAME_LENGTH ||
             fileName.contains('/') ||
@@ -70,16 +71,17 @@ class FeedbackDocumentUploadValidator {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "피드백 문서는 512KB 이하만 업로드할 수 있습니다.")
         }
 
-        val sourceText = try {
-            StandardCharsets.UTF_8
-                .newDecoder()
-                .onMalformedInput(CodingErrorAction.REPORT)
-                .onUnmappableCharacter(CodingErrorAction.REPORT)
-                .decode(ByteBuffer.wrap(file.bytes))
-                .toString()
-        } catch (ex: CharacterCodingException) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "문서를 UTF-8 텍스트로 읽을 수 없습니다.")
-        }
+        val sourceText =
+            try {
+                StandardCharsets.UTF_8
+                    .newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(file.bytes))
+                    .toString()
+            } catch (ex: CharacterCodingException) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "문서를 UTF-8 텍스트로 읽을 수 없습니다.")
+            }
         if (sourceText.contains(NUL)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "문서를 UTF-8 텍스트로 읽을 수 없습니다.")
         }

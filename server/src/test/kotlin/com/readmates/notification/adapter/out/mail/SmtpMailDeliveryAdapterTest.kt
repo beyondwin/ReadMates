@@ -65,11 +65,9 @@ private class CapturingJavaMailSender : JavaMailSender {
 
     fun singleMessage(): MimeMessage = messages.single()
 
-    override fun createMimeMessage(): MimeMessage =
-        MimeMessage(Session.getInstance(Properties()))
+    override fun createMimeMessage(): MimeMessage = MimeMessage(Session.getInstance(Properties()))
 
-    override fun createMimeMessage(contentStream: InputStream): MimeMessage =
-        MimeMessage(Session.getInstance(Properties()), contentStream)
+    override fun createMimeMessage(contentStream: InputStream): MimeMessage = MimeMessage(Session.getInstance(Properties()), contentStream)
 
     override fun send(mimeMessage: MimeMessage) {
         messages += mimeMessage
@@ -98,24 +96,24 @@ private class CapturingJavaMailSender : JavaMailSender {
     }
 }
 
-private fun MimeMessage.allTextParts(): List<String> =
-    collectTextParts(content)
+private fun MimeMessage.allTextParts(): List<String> = collectTextParts(content)
 
 private fun collectTextParts(content: Any?): List<String> =
     when (content) {
         is String -> listOf(content)
-        is MimeMultipart -> (0 until content.count).flatMap { index ->
-            collectTextParts(content.getBodyPart(index).content)
-        }
+        is MimeMultipart ->
+            (0 until content.count).flatMap { index ->
+                collectTextParts(content.getBodyPart(index).content)
+            }
         else -> emptyList()
     }
 
-private fun MimeMessage.allMultipartTypes(): List<String> =
-    collectMultipartTypes(content)
+private fun MimeMessage.allMultipartTypes(): List<String> = collectMultipartTypes(content)
 
 private fun collectMultipartTypes(content: Any?): List<String> =
     when (content) {
-        is MimeMultipart -> listOf(content.contentType.lowercase()) +
-            (0 until content.count).flatMap { index -> collectMultipartTypes(content.getBodyPart(index).content) }
+        is MimeMultipart ->
+            listOf(content.contentType.lowercase()) +
+                (0 until content.count).flatMap { index -> collectMultipartTypes(content.getBodyPart(index).content) }
         else -> emptyList()
     }

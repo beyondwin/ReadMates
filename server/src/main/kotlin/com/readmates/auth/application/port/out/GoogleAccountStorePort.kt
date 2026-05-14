@@ -5,8 +5,14 @@ import java.util.UUID
 
 interface GoogleAccountStorePort {
     fun findMemberByGoogleSubject(googleSubjectId: String): CurrentMember?
+
     fun googleSubjectOwnerEmail(googleSubjectId: String): String?
-    fun connectGoogleSubject(userId: UUID, googleSubjectId: String, profileImageUrl: String?): Boolean
+
+    fun connectGoogleSubject(
+        userId: UUID,
+        googleSubjectId: String,
+        profileImageUrl: String?,
+    ): Boolean
 
     fun createGoogleUser(
         googleSubjectId: String,

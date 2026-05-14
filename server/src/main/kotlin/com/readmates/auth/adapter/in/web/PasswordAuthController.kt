@@ -16,15 +16,18 @@ class PasswordAuthController(
     private val logoutAuthSessionUseCase: LogoutAuthSessionUseCase,
 ) {
     @PostMapping("/api/auth/login")
-    fun login(): Nothing =
-        throw ResponseStatusException(HttpStatus.GONE, "Password login has been removed")
+    fun login(): Nothing = throw ResponseStatusException(HttpStatus.GONE, "Password login has been removed")
 
     @PostMapping("/api/auth/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun logout(request: HttpServletRequest, response: HttpServletResponse) {
-        val rawToken = request.cookies
-            ?.firstOrNull { it.name == logoutAuthSessionUseCase.sessionCookieName }
-            ?.value
+    fun logout(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+    ) {
+        val rawToken =
+            request.cookies
+                ?.firstOrNull { it.name == logoutAuthSessionUseCase.sessionCookieName }
+                ?.value
 
         request.getSession(false)?.invalidate()
         SecurityContextHolder.clearContext()

@@ -6,7 +6,6 @@ import java.time.Clock
 
 @Configuration(proxyBeanMethods = false)
 class InfrastructureConfig {
-
     @Bean
     fun clock(): Clock = Clock.systemUTC()
 }

@@ -24,9 +24,10 @@ class RequestIdFilterTest {
     @Test
     fun `echoes a valid incoming request id`() {
         val validId = "abc123def456"
-        val request = MockHttpServletRequest().apply {
-            addHeader(RequestIdFilter.HEADER, validId)
-        }
+        val request =
+            MockHttpServletRequest().apply {
+                addHeader(RequestIdFilter.HEADER, validId)
+            }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, FilterChain { _, _ -> })
@@ -37,9 +38,10 @@ class RequestIdFilterTest {
     @Test
     fun `replaces an invalid incoming request id that is too short`() {
         val shortId = "abc"
-        val request = MockHttpServletRequest().apply {
-            addHeader(RequestIdFilter.HEADER, shortId)
-        }
+        val request =
+            MockHttpServletRequest().apply {
+                addHeader(RequestIdFilter.HEADER, shortId)
+            }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, FilterChain { _, _ -> })

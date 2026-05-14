@@ -10,12 +10,10 @@ import org.springframework.stereotype.Service
 class NotificationPreferencesService(
     private val notificationPreferencesPort: NotificationPreferencesPort,
 ) : ManageNotificationPreferencesUseCase {
-    override fun getPreferences(member: CurrentMember): NotificationPreferences =
-        notificationPreferencesPort.getPreferences(member)
+    override fun getPreferences(member: CurrentMember): NotificationPreferences = notificationPreferencesPort.getPreferences(member)
 
     override fun savePreferences(
         member: CurrentMember,
         preferences: NotificationPreferences,
-    ): NotificationPreferences =
-        notificationPreferencesPort.savePreferences(member, preferences)
+    ): NotificationPreferences = notificationPreferencesPort.savePreferences(member, preferences)
 }

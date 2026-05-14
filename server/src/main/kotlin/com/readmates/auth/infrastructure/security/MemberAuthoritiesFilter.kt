@@ -1,9 +1,9 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.auth.application.service.AuthoritySynthesisRequest
 import com.readmates.auth.application.service.AuthoritySynthesisService
 import com.readmates.auth.application.service.ClubContextInput
-import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
@@ -53,50 +53,55 @@ class MemberAuthoritiesFilter(
             val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
             val resolvedClubContext = requestedClubContext.context
 
-            val member = if (requestedClubContext.supplied && resolvedClubContext == null) {
-                null
-            } else {
-                authenticatedMemberResolver.resolveByEmail(email, resolvedClubContext)
-            }
+            val member =
+                if (requestedClubContext.supplied && resolvedClubContext == null) {
+                    null
+                } else {
+                    authenticatedMemberResolver.resolveByEmail(email, resolvedClubContext)
+                }
 
-            val userId = when (val principal = authentication.principal) {
-                is CurrentMember -> principal.userId
-                is CurrentUser -> principal.userId
-                else -> null
-            }
+            val userId =
+                when (val principal = authentication.principal) {
+                    is CurrentMember -> principal.userId
+                    is CurrentUser -> principal.userId
+                    else -> null
+                }
 
             // Pre-fetch the support synthesis only when the preconditions could be satisfied.
             // This avoids an unnecessary DB round-trip in the common (non-admin) case.
-            val supportSynthesis = if (
-                userId != null &&
-                resolvedClubContext != null &&
-                requestedClubContext.supplied &&
-                member == null
-            ) {
-                checkSupportAccessGrantUseCase.synthesizeHostCurrentMember(
-                    userId = userId,
-                    email = email,
-                    clubId = resolvedClubContext.clubId,
-                    clubSlug = resolvedClubContext.slug,
-                    clubName = resolvedClubContext.name,
-                )
-            } else {
-                null
-            }
+            val supportSynthesis =
+                if (
+                    userId != null &&
+                    resolvedClubContext != null &&
+                    requestedClubContext.supplied &&
+                    member == null
+                ) {
+                    checkSupportAccessGrantUseCase.synthesizeHostCurrentMember(
+                        userId = userId,
+                        email = email,
+                        clubId = resolvedClubContext.clubId,
+                        clubSlug = resolvedClubContext.slug,
+                        clubName = resolvedClubContext.name,
+                    )
+                } else {
+                    null
+                }
 
-            val synthesisRequest = AuthoritySynthesisRequest(
-                incomingAuthorities = authentication.authorities.mapNotNull { it.authority }.toSet(),
-                email = email,
-                userId = userId,
-                clubContext = ClubContextInput(
-                    supplied = requestedClubContext.supplied,
-                    clubId = resolvedClubContext?.clubId,
-                    clubSlug = resolvedClubContext?.slug,
-                    clubName = resolvedClubContext?.name,
-                ),
-                member = member,
-                supportSynthesis = supportSynthesis,
-            )
+            val synthesisRequest =
+                AuthoritySynthesisRequest(
+                    incomingAuthorities = authentication.authorities.mapNotNull { it.authority }.toSet(),
+                    email = email,
+                    userId = userId,
+                    clubContext =
+                        ClubContextInput(
+                            supplied = requestedClubContext.supplied,
+                            clubId = resolvedClubContext?.clubId,
+                            clubSlug = resolvedClubContext?.slug,
+                            clubName = resolvedClubContext?.name,
+                        ),
+                    member = member,
+                    supportSynthesis = supportSynthesis,
+                )
 
             val result = authoritySynthesisService.synthesize(synthesisRequest)
 
@@ -108,11 +113,12 @@ class MemberAuthoritiesFilter(
             // Map authority strings → SimpleGrantedAuthority at this infrastructure boundary
             val grantedAuthorities = result.authorities.map { SimpleGrantedAuthority(it) }
 
-            val mappedAuthentication = UsernamePasswordAuthenticationToken(
-                authentication.principal ?: authentication.name,
-                authentication.credentials,
-                grantedAuthorities,
-            )
+            val mappedAuthentication =
+                UsernamePasswordAuthenticationToken(
+                    authentication.principal ?: authentication.name,
+                    authentication.credentials,
+                    grantedAuthorities,
+                )
             mappedAuthentication.details = authentication.details
             SecurityContextHolder.getContext().authentication = mappedAuthentication
         }

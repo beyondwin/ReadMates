@@ -13,11 +13,12 @@ data class MemberProfileResponse(
     val profileImageUrl: String?,
 ) {
     companion object {
-        fun from(profile: MemberProfile) = MemberProfileResponse(
-            membershipId = profile.membershipId.toString(),
-            displayName = profile.displayName,
-            accountName = profile.accountName,
-            profileImageUrl = profile.profileImageUrl,
-        )
+        fun from(profile: MemberProfile) =
+            MemberProfileResponse(
+                membershipId = profile.membershipId.toString(),
+                displayName = profile.displayName,
+                accountName = profile.accountName,
+                profileImageUrl = profile.profileImageUrl,
+            )
     }
 }

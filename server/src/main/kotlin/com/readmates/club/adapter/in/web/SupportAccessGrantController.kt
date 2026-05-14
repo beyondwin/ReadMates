@@ -35,13 +35,14 @@ class SupportAccessGrantController(
         SupportAccessGrantResponse.from(
             createUseCase.createSupportAccessGrant(
                 admin = admin,
-                command = CreateSupportAccessGrantCommand(
-                    clubId = request.clubId,
-                    granteeUserId = request.granteeUserId,
-                    scope = request.scope,
-                    reason = request.reason,
-                    expiresAt = request.expiresAt,
-                ),
+                command =
+                    CreateSupportAccessGrantCommand(
+                        clubId = request.clubId,
+                        granteeUserId = request.granteeUserId,
+                        scope = request.scope,
+                        reason = request.reason,
+                        expiresAt = request.expiresAt,
+                    ),
             ),
         )
 
@@ -59,13 +60,12 @@ class SupportAccessGrantController(
         admin: CurrentPlatformAdmin,
         @RequestParam(required = false) clubId: UUID?,
         @RequestParam(required = false) granteeUserId: UUID?,
-    ): List<SupportAccessGrantResponse> {
-        return when {
+    ): List<SupportAccessGrantResponse> =
+        when {
             clubId != null -> listUseCase.listByClub(admin, clubId)
             granteeUserId != null -> listUseCase.listByGrantee(admin, granteeUserId)
             else -> emptyList()
         }.map(SupportAccessGrantResponse::from)
-    }
 }
 
 data class CreateSupportAccessGrantRequest(

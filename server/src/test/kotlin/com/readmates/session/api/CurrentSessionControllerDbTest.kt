@@ -1,10 +1,10 @@
 package com.readmates.session.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -29,12 +29,13 @@ class CurrentSessionControllerDbTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `returns empty current session when only seeded sessions exist`() {
-        mockMvc.get("/api/sessions/current") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.currentSession") { value(null) }
-        }
+        mockMvc
+            .get("/api/sessions/current") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.currentSession") { value(null) }
+            }
     }
 
     @Test
@@ -53,12 +54,13 @@ class CurrentSessionControllerDbTest(
     fun `draft upcoming sessions do not appear as current session`() {
         insertDraftSession(number = 77, visibility = "MEMBER")
 
-        mockMvc.get("/api/sessions/current") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.currentSession") { value(null) }
-        }
+        mockMvc
+            .get("/api/sessions/current") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.currentSession") { value(null) }
+            }
     }
 
     @Test
@@ -120,60 +122,61 @@ class CurrentSessionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `current session returns my saved notes and shared board`() {
-        mockMvc.get("/api/sessions/current") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.currentSession.sessionId") { value("00000000-0000-0000-0000-000000000777") }
-            jsonPath("$.currentSession.sessionNumber") { value(7) }
-            jsonPath("$.currentSession.title") { value("7회차 · 테스트 책") }
-            jsonPath("$.currentSession.bookTitle") { value("테스트 책") }
-            jsonPath("$.currentSession.bookAuthor") { value("테스트 저자") }
-            jsonPath("$.currentSession.bookLink") { value(null) }
-            jsonPath("$.currentSession.bookImageUrl") { value(null) }
-            jsonPath("$.currentSession.date") { value("2026-05-20") }
-            jsonPath("$.currentSession.startTime") { value("20:00") }
-            jsonPath("$.currentSession.endTime") { value("22:00") }
-            jsonPath("$.currentSession.locationLabel") { value("온라인") }
-            jsonPath("$.currentSession.meetingUrl") { value(null) }
-            jsonPath("$.currentSession.meetingPasscode") { value(null) }
-            jsonPath("$.currentSession.questionDeadlineAt") { value("2026-05-19T14:59Z") }
-            jsonPath("$.currentSession.myRsvpStatus") { value("GOING") }
-            jsonPath("$.currentSession.myCheckin.readingProgress") { value(72) }
-            jsonPath(removedJsonPath("$.currentSession.my", "Checkin.", "note")) { doesNotExist() }
-            jsonPath("$.currentSession.myQuestions[0].priority") { value(1) }
-            jsonPath("$.currentSession.myQuestions[0].text") { value("현재 세션 hydrate 질문") }
-            jsonPath("$.currentSession.myQuestions[0].draftThought") { value("hydrate 초안") }
-            jsonPath("$.currentSession.myQuestions[0].authorName") { value("멤버5") }
-            jsonPath("$.currentSession.myQuestions[0].authorShortName") { value("멤버5") }
-            jsonPath("$.currentSession.myOneLineReview") { value(null) }
-            jsonPath("$.currentSession.myLongReview") { value(null) }
-            jsonPath("$.currentSession.board.questions[0].authorName") { value("멤버5") }
-            jsonPath("$.currentSession.board.questions[0].authorShortName") { value("멤버5") }
-            jsonPath("$.currentSession.board.questions[0].priority") { value(1) }
-            jsonPath("$.currentSession.board.questions[0].text") { value("현재 세션 hydrate 질문") }
-            jsonPath("$.currentSession.board.questions[0].draftThought") { value("hydrate 초안") }
-            jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
-            jsonPath("$.currentSession.board.oneLineReviews") { doesNotExist() }
-            jsonPath("$.currentSession.board.highlights") { doesNotExist() }
-            jsonPath("$.currentSession.board.longReviews.length()") { value(greaterThan(0)) }
-            jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorName") {
-                value(hasItem("멤버1"))
+        mockMvc
+            .get("/api/sessions/current") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.currentSession.sessionId") { value("00000000-0000-0000-0000-000000000777") }
+                jsonPath("$.currentSession.sessionNumber") { value(7) }
+                jsonPath("$.currentSession.title") { value("7회차 · 테스트 책") }
+                jsonPath("$.currentSession.bookTitle") { value("테스트 책") }
+                jsonPath("$.currentSession.bookAuthor") { value("테스트 저자") }
+                jsonPath("$.currentSession.bookLink") { value(null) }
+                jsonPath("$.currentSession.bookImageUrl") { value(null) }
+                jsonPath("$.currentSession.date") { value("2026-05-20") }
+                jsonPath("$.currentSession.startTime") { value("20:00") }
+                jsonPath("$.currentSession.endTime") { value("22:00") }
+                jsonPath("$.currentSession.locationLabel") { value("온라인") }
+                jsonPath("$.currentSession.meetingUrl") { value(null) }
+                jsonPath("$.currentSession.meetingPasscode") { value(null) }
+                jsonPath("$.currentSession.questionDeadlineAt") { value("2026-05-19T14:59Z") }
+                jsonPath("$.currentSession.myRsvpStatus") { value("GOING") }
+                jsonPath("$.currentSession.myCheckin.readingProgress") { value(72) }
+                jsonPath(removedJsonPath("$.currentSession.my", "Checkin.", "note")) { doesNotExist() }
+                jsonPath("$.currentSession.myQuestions[0].priority") { value(1) }
+                jsonPath("$.currentSession.myQuestions[0].text") { value("현재 세션 hydrate 질문") }
+                jsonPath("$.currentSession.myQuestions[0].draftThought") { value("hydrate 초안") }
+                jsonPath("$.currentSession.myQuestions[0].authorName") { value("멤버5") }
+                jsonPath("$.currentSession.myQuestions[0].authorShortName") { value("멤버5") }
+                jsonPath("$.currentSession.myOneLineReview") { value(null) }
+                jsonPath("$.currentSession.myLongReview") { value(null) }
+                jsonPath("$.currentSession.board.questions[0].authorName") { value("멤버5") }
+                jsonPath("$.currentSession.board.questions[0].authorShortName") { value("멤버5") }
+                jsonPath("$.currentSession.board.questions[0].priority") { value(1) }
+                jsonPath("$.currentSession.board.questions[0].text") { value("현재 세션 hydrate 질문") }
+                jsonPath("$.currentSession.board.questions[0].draftThought") { value("hydrate 초안") }
+                jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
+                jsonPath("$.currentSession.board.oneLineReviews") { doesNotExist() }
+                jsonPath("$.currentSession.board.highlights") { doesNotExist() }
+                jsonPath("$.currentSession.board.longReviews.length()") { value(greaterThan(0)) }
+                jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorName") {
+                    value(hasItem("멤버1"))
+                }
+                jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorShortName") {
+                    value(hasItem("멤버1"))
+                }
+                jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].body") {
+                    value(hasItem("현재 세션 hydrate 서평"))
+                }
+                jsonPath("$.currentSession.attendees[0].membershipId") { exists() }
+                jsonPath("$.currentSession.attendees[0].displayName") { value("호스트") }
+                jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트") }
+                jsonPath("$.currentSession.attendees[0].shortName") { doesNotExist() }
+                jsonPath("$.currentSession.attendees[0].role") { value("HOST") }
+                jsonPath("$.currentSession.attendees[0].rsvpStatus") { value("GOING") }
+                jsonPath("$.currentSession.attendees[0].attendanceStatus") { value("UNKNOWN") }
             }
-            jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].authorShortName") {
-                value(hasItem("멤버1"))
-            }
-            jsonPath("$.currentSession.board.longReviews[?(@.body == '현재 세션 hydrate 서평')].body") {
-                value(hasItem("현재 세션 hydrate 서평"))
-            }
-            jsonPath("$.currentSession.attendees[0].membershipId") { exists() }
-            jsonPath("$.currentSession.attendees[0].displayName") { value("호스트") }
-            jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트") }
-            jsonPath("$.currentSession.attendees[0].shortName") { doesNotExist() }
-            jsonPath("$.currentSession.attendees[0].role") { value("HOST") }
-            jsonPath("$.currentSession.attendees[0].rsvpStatus") { value("GOING") }
-            jsonPath("$.currentSession.attendees[0].attendanceStatus") { value("UNKNOWN") }
-        }
     }
 
     @Test
@@ -259,24 +262,25 @@ class CurrentSessionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `removed current-session participant cannot see active board long reviews`() {
-        mockMvc.get("/api/sessions/current") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.currentSession.sessionId") { value("00000000-0000-0000-0000-000000000778") }
-            jsonPath("$.currentSession.myRsvpStatus") { value("NO_RESPONSE") }
-            jsonPath("$.currentSession.myCheckin") { value(null) }
-            jsonPath("$.currentSession.myQuestions.length()") { value(0) }
-            jsonPath("$.currentSession.board.questions.length()") { value(0) }
-            jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
-            jsonPath("$.currentSession.board.longReviews.length()") { value(0) }
-            jsonPath("$.currentSession.board.longReviews[*].authorName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.board.longReviews[*].body") { value(not(hasItem("활성 호스트의 서평"))) }
-            jsonPath("$.currentSession.board.longReviews[*].body") { value(not(hasItem("활성 멤버의 공개 서평"))) }
-            jsonPath("$.currentSession.attendees.length()") { value(2) }
-            jsonPath("$.currentSession.attendees[0].displayName") { value("호스트") }
-            jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트") }
-        }
+        mockMvc
+            .get("/api/sessions/current") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.currentSession.sessionId") { value("00000000-0000-0000-0000-000000000778") }
+                jsonPath("$.currentSession.myRsvpStatus") { value("NO_RESPONSE") }
+                jsonPath("$.currentSession.myCheckin") { value(null) }
+                jsonPath("$.currentSession.myQuestions.length()") { value(0) }
+                jsonPath("$.currentSession.board.questions.length()") { value(0) }
+                jsonPath(removedJsonPath("$.currentSession.board.", "checkins")) { doesNotExist() }
+                jsonPath("$.currentSession.board.longReviews.length()") { value(0) }
+                jsonPath("$.currentSession.board.longReviews[*].authorName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.board.longReviews[*].body") { value(not(hasItem("활성 호스트의 서평"))) }
+                jsonPath("$.currentSession.board.longReviews[*].body") { value(not(hasItem("활성 멤버의 공개 서평"))) }
+                jsonPath("$.currentSession.attendees.length()") { value(2) }
+                jsonPath("$.currentSession.attendees[0].displayName") { value("호스트") }
+                jsonPath("$.currentSession.attendees[0].accountName") { value("김호스트") }
+            }
     }
 
     @Test
@@ -340,36 +344,40 @@ class CurrentSessionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `current session member board anonymizes left member authored records`() {
-        mockMvc.get("/api/sessions/current") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.currentSession.sessionId") { value("00000000-0000-0000-0000-000000000779") }
-            jsonPath("$.currentSession.board.questions[?(@.text == '탈퇴 회원 기존 질문')].authorName") {
-                value(hasItem("탈퇴한 멤버"))
+        mockMvc
+            .get("/api/sessions/current") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.currentSession.sessionId") { value("00000000-0000-0000-0000-000000000779") }
+                jsonPath("$.currentSession.board.questions[?(@.text == '탈퇴 회원 기존 질문')].authorName") {
+                    value(hasItem("탈퇴한 멤버"))
+                }
+                jsonPath("$.currentSession.board.questions[*].authorName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.board.questions[?(@.text == '탈퇴 회원 기존 질문')].authorShortName") {
+                    value(hasItem("탈퇴한 멤버"))
+                }
+                jsonPath("$.currentSession.board.questions[*].authorShortName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorName") {
+                    value(hasItem("탈퇴한 멤버"))
+                }
+                jsonPath("$.currentSession.board.longReviews[*].authorName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorShortName") {
+                    value(hasItem("탈퇴한 멤버"))
+                }
+                jsonPath("$.currentSession.board.longReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.attendees[*].displayName") { value(hasItem("탈퇴한 멤버")) }
+                jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("멤버1"))) }
+                jsonPath("$.currentSession.attendees[*].accountName") { value(hasItem("탈퇴한 멤버")) }
+                jsonPath("$.currentSession.attendees[*].accountName") { value(not(hasItem("안멤버1"))) }
+                jsonPath("$.currentSession.attendees[*].shortName") { doesNotExist() }
             }
-            jsonPath("$.currentSession.board.questions[*].authorName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.board.questions[?(@.text == '탈퇴 회원 기존 질문')].authorShortName") {
-                value(hasItem("탈퇴한 멤버"))
-            }
-            jsonPath("$.currentSession.board.questions[*].authorShortName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorName") {
-                value(hasItem("탈퇴한 멤버"))
-            }
-            jsonPath("$.currentSession.board.longReviews[*].authorName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.board.longReviews[?(@.body == '탈퇴 회원 기존 서평')].authorShortName") {
-                value(hasItem("탈퇴한 멤버"))
-            }
-            jsonPath("$.currentSession.board.longReviews[*].authorShortName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.attendees[*].displayName") { value(hasItem("탈퇴한 멤버")) }
-            jsonPath("$.currentSession.attendees[*].displayName") { value(not(hasItem("멤버1"))) }
-            jsonPath("$.currentSession.attendees[*].accountName") { value(hasItem("탈퇴한 멤버")) }
-            jsonPath("$.currentSession.attendees[*].accountName") { value(not(hasItem("안멤버1"))) }
-            jsonPath("$.currentSession.attendees[*].shortName") { doesNotExist() }
-        }
     }
 
-    private fun insertDraftSession(number: Int, visibility: String) {
+    private fun insertDraftSession(
+        number: Int,
+        visibility: String,
+    ) {
         jdbcTemplate.update(
             """
             insert into sessions (

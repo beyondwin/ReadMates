@@ -52,11 +52,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 class KafkaNotificationEventPublisherAdapterTest {
-    private val contextRunner = ApplicationContextRunner()
-        .withUserConfiguration(
-            NotificationKafkaConfiguration::class.java,
-            KafkaPublisherAdapterTestConfiguration::class.java,
-        )
+    private val contextRunner =
+        ApplicationContextRunner()
+            .withUserConfiguration(
+                NotificationKafkaConfiguration::class.java,
+                KafkaPublisherAdapterTestConfiguration::class.java,
+            )
 
     @AfterEach
     fun clearInterrupt() {
@@ -76,10 +77,11 @@ class KafkaNotificationEventPublisherAdapterTest {
                 assertThat(context).hasBean("notificationEventProducerFactory")
                 assertThat(context).hasBean("notificationEventKafkaTemplate")
 
-                val factory = context.getBean(
-                    "notificationEventProducerFactory",
-                    DefaultKafkaProducerFactory::class.java,
-                )
+                val factory =
+                    context.getBean(
+                        "notificationEventProducerFactory",
+                        DefaultKafkaProducerFactory::class.java,
+                    )
 
                 assertThat(factory.configurationProperties[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG])
                     .isEqualTo(listOf("kafka-a:9092", "kafka-b:9092"))
@@ -121,10 +123,11 @@ class KafkaNotificationEventPublisherAdapterTest {
                 assertThat(context).hasBean("notificationEventDeadLetterPublishingRecoverer")
                 assertThat(context).hasBean("notificationKafkaErrorHandler")
 
-                val consumerFactory = context.getBean(
-                    "notificationEventConsumerFactory",
-                    DefaultKafkaConsumerFactory::class.java,
-                )
+                val consumerFactory =
+                    context.getBean(
+                        "notificationEventConsumerFactory",
+                        DefaultKafkaConsumerFactory::class.java,
+                    )
 
                 assertThat(consumerFactory.configurationProperties[ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG])
                     .isEqualTo(listOf("kafka-a:9092", "kafka-b:9092"))
@@ -163,14 +166,16 @@ class KafkaNotificationEventPublisherAdapterTest {
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
-                val factory = context.getBean(
-                    "notificationKafkaListenerContainerFactory",
-                    ConcurrentKafkaListenerContainerFactory::class.java,
-                ) as ConcurrentKafkaListenerContainerFactory<String, NotificationEventMessage>
-                val errorHandler = context.getBean(
-                    "notificationKafkaErrorHandler",
-                    CommonErrorHandler::class.java,
-                )
+                val factory =
+                    context.getBean(
+                        "notificationKafkaListenerContainerFactory",
+                        ConcurrentKafkaListenerContainerFactory::class.java,
+                    ) as ConcurrentKafkaListenerContainerFactory<String, NotificationEventMessage>
+                val errorHandler =
+                    context.getBean(
+                        "notificationKafkaErrorHandler",
+                        CommonErrorHandler::class.java,
+                    )
 
                 val container = factory.createContainer("readmates.notification.events.v1")
 
@@ -254,48 +259,53 @@ class KafkaNotificationEventPublisherAdapterTest {
         val kafkaOperations =
             Mockito.mock(KafkaOperations::class.java) as KafkaOperations<String, NotificationEventMessage>
         Mockito.`when`(kafkaOperations.isTransactional).thenReturn(false)
-        Mockito.`when`(kafkaOperations.send(Mockito.any<ProducerRecord<String, NotificationEventMessage>>()))
+        Mockito
+            .`when`(kafkaOperations.send(Mockito.any<ProducerRecord<String, NotificationEventMessage>>()))
             .thenReturn(
                 CompletableFuture.completedFuture(
                     Mockito.mock(SendResult::class.java) as SendResult<String, NotificationEventMessage>,
                 ),
             )
-        val recoverer = NotificationKafkaConfiguration().notificationEventDeadLetterPublishingRecoverer(
-            kafkaOperations,
-            NotificationKafkaProperties(
-                bootstrapServers = listOf("kafka-a:9092"),
-                dlqTopic = "custom.notification.dlq.v1",
-            ),
-        )
-        val record = ConsumerRecord(
-            "readmates.notification.events.v1",
-            2,
-            42L,
-            "club-key",
-            notificationEventMessage(),
-        )
-        val consumer = Mockito.mock(Consumer::class.java) as Consumer<String, NotificationEventMessage>
-        Mockito.`when`(
-            consumer.partitionsFor(
-                Mockito.eq("custom.notification.dlq.v1"),
-                Mockito.any(Duration::class.java),
-            ),
-        ).thenReturn(
-            listOf(
-                PartitionInfo(
-                    "custom.notification.dlq.v1",
-                    2,
-                    null,
-                    emptyArray(),
-                    emptyArray(),
+        val recoverer =
+            NotificationKafkaConfiguration().notificationEventDeadLetterPublishingRecoverer(
+                kafkaOperations,
+                NotificationKafkaProperties(
+                    bootstrapServers = listOf("kafka-a:9092"),
+                    dlqTopic = "custom.notification.dlq.v1",
                 ),
-            ),
-        )
+            )
+        val record =
+            ConsumerRecord(
+                "readmates.notification.events.v1",
+                2,
+                42L,
+                "club-key",
+                notificationEventMessage(),
+            )
+        val consumer = Mockito.mock(Consumer::class.java) as Consumer<String, NotificationEventMessage>
+        Mockito
+            .`when`(
+                consumer.partitionsFor(
+                    Mockito.eq("custom.notification.dlq.v1"),
+                    Mockito.any(Duration::class.java),
+                ),
+            ).thenReturn(
+                listOf(
+                    PartitionInfo(
+                        "custom.notification.dlq.v1",
+                        2,
+                        null,
+                        emptyArray(),
+                        emptyArray(),
+                    ),
+                ),
+            )
 
         recoverer.accept(record, consumer, IllegalArgumentException("unsupported schema"))
 
-        val captor = ArgumentCaptor.forClass(ProducerRecord::class.java)
-            as ArgumentCaptor<ProducerRecord<String, NotificationEventMessage>>
+        val captor =
+            ArgumentCaptor.forClass(ProducerRecord::class.java)
+                as ArgumentCaptor<ProducerRecord<String, NotificationEventMessage>>
         Mockito.verify(kafkaOperations).send(captor.capture())
         val partition: Int? = captor.value.partition()
         assertThat(captor.value.topic()).isEqualTo("custom.notification.dlq.v1")
@@ -316,25 +326,28 @@ class KafkaNotificationEventPublisherAdapterTest {
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
-                val factory = context.getBean(
-                    "notificationEventProducerFactory",
-                    DefaultKafkaProducerFactory::class.java,
-                ) as DefaultKafkaProducerFactory<String, NotificationEventMessage>
+                val factory =
+                    context.getBean(
+                        "notificationEventProducerFactory",
+                        DefaultKafkaProducerFactory::class.java,
+                    ) as DefaultKafkaProducerFactory<String, NotificationEventMessage>
                 val valueSerializerSupplier = factory.valueSerializerSupplier
 
                 assertThat(valueSerializerSupplier).isNotNull
-                val json = String(
-                    valueSerializerSupplier!!.get()!!.serialize(
-                        "readmates.notification.events.v1",
-                        notificationEventMessage(
-                            payload = NotificationEventPayload(
-                                sessionId = UUID.fromString("00000000-0000-0000-0000-000000000003"),
-                                targetDate = LocalDate.of(2026, 4, 30),
+                val json =
+                    String(
+                        valueSerializerSupplier!!.get()!!.serialize(
+                            "readmates.notification.events.v1",
+                            notificationEventMessage(
+                                payload =
+                                    NotificationEventPayload(
+                                        sessionId = UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                                        targetDate = LocalDate.of(2026, 4, 30),
+                                    ),
                             ),
                         ),
-                    ),
-                    StandardCharsets.UTF_8,
-                )
+                        StandardCharsets.UTF_8,
+                    )
 
                 assertThat(json).contains(
                     """"schemaVersion":1""",
@@ -363,26 +376,28 @@ class KafkaNotificationEventPublisherAdapterTest {
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
-                val factory = context.getBean(
-                    "notificationEventConsumerFactory",
-                    DefaultKafkaConsumerFactory::class.java,
-                ) as DefaultKafkaConsumerFactory<String, NotificationEventMessage>
+                val factory =
+                    context.getBean(
+                        "notificationEventConsumerFactory",
+                        DefaultKafkaConsumerFactory::class.java,
+                    ) as DefaultKafkaConsumerFactory<String, NotificationEventMessage>
 
-                val result = factory.valueDeserializer!!.deserialize(
-                    "readmates.notification.events.v1",
-                    """
-                    {
-                      "schemaVersion":1,
-                      "eventId":"00000000-0000-0000-0000-000000000001",
-                      "clubId":"00000000-0000-0000-0000-000000000002",
-                      "eventType":"NEXT_BOOK_PUBLISHED",
-                      "aggregateType":"SESSION",
-                      "aggregateId":"00000000-0000-0000-0000-000000000003",
-                      "occurredAt":"2026-04-29T00:00:00Z",
-                      "payload":{"sessionId":"00000000-0000-0000-0000-000000000003"}
-                    }
-                    """.trimIndent().toByteArray(StandardCharsets.UTF_8),
-                )
+                val result =
+                    factory.valueDeserializer!!.deserialize(
+                        "readmates.notification.events.v1",
+                        """
+                        {
+                          "schemaVersion":1,
+                          "eventId":"00000000-0000-0000-0000-000000000001",
+                          "clubId":"00000000-0000-0000-0000-000000000002",
+                          "eventType":"NEXT_BOOK_PUBLISHED",
+                          "aggregateType":"SESSION",
+                          "aggregateId":"00000000-0000-0000-0000-000000000003",
+                          "occurredAt":"2026-04-29T00:00:00Z",
+                          "payload":{"sessionId":"00000000-0000-0000-0000-000000000003"}
+                        }
+                        """.trimIndent().toByteArray(StandardCharsets.UTF_8),
+                    )
 
                 assertThat(result).isNotNull
                 assertThat(result!!.clubSlug).isNull()
@@ -398,18 +413,20 @@ class KafkaNotificationEventPublisherAdapterTest {
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
-                val factory = context.getBean(
-                    "notificationEventConsumerFactory",
-                    DefaultKafkaConsumerFactory::class.java,
-                ) as DefaultKafkaConsumerFactory<String, NotificationEventMessage>
+                val factory =
+                    context.getBean(
+                        "notificationEventConsumerFactory",
+                        DefaultKafkaConsumerFactory::class.java,
+                    ) as DefaultKafkaConsumerFactory<String, NotificationEventMessage>
                 val headers = RecordHeaders()
 
                 val deserializer = factory.valueDeserializer
-                val result = deserializer!!.deserialize(
-                    "readmates.notification.events.v1",
-                    headers,
-                    """{"schemaVersion":""".toByteArray(StandardCharsets.UTF_8),
-                )
+                val result =
+                    deserializer!!.deserialize(
+                        "readmates.notification.events.v1",
+                        headers,
+                        """{"schemaVersion":""".toByteArray(StandardCharsets.UTF_8),
+                    )
 
                 assertThat(deserializer).isInstanceOf(ErrorHandlingDeserializer::class.java)
                 assertThat(result).isNull()
@@ -442,7 +459,8 @@ class KafkaNotificationEventPublisherAdapterTest {
     @Test
     fun `publisher wraps send timeout in meaningful exception`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
-        Mockito.`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
+        Mockito
+            .`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
             .thenReturn(RecordingKafkaSendFuture(timeoutFailure = TimeoutException("timed out")))
         val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(10))
 
@@ -456,7 +474,8 @@ class KafkaNotificationEventPublisherAdapterTest {
     @Test
     fun `publisher wraps synchronous send failure in meaningful exception`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
-        Mockito.`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
+        Mockito
+            .`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
             .thenThrow(IllegalStateException("producer closed"))
         val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(10))
 
@@ -470,7 +489,8 @@ class KafkaNotificationEventPublisherAdapterTest {
     @Test
     fun `publisher preserves interrupt status when interrupted`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
-        Mockito.`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
+        Mockito
+            .`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
             .thenReturn(RecordingKafkaSendFuture(interruptFailure = InterruptedException("interrupted")))
         val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(10))
 
@@ -504,7 +524,10 @@ private class RecordingKafkaSendFuture(
     var unit: TimeUnit? = null
         private set
 
-    override fun get(timeout: Long, unit: TimeUnit): SendResult<String, NotificationEventMessage> {
+    override fun get(
+        timeout: Long,
+        unit: TimeUnit,
+    ): SendResult<String, NotificationEventMessage> {
         this.timeout = timeout
         this.unit = unit
         timeoutFailure?.let { throw it }

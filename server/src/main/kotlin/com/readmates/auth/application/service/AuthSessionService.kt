@@ -2,8 +2,8 @@ package com.readmates.auth.application.service
 
 import com.readmates.auth.application.model.StoredAuthSession
 import com.readmates.auth.application.port.`in`.LogoutAuthSessionUseCase
-import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.auth.application.port.out.AuthSessionCachePort
+import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.auth.application.port.out.AuthSessionStorePort
 import com.readmates.shared.cache.AuthSessionCacheProperties
 import org.springframework.beans.factory.annotation.Value
@@ -38,21 +38,26 @@ class AuthSessionService(
 
     override val sessionCookieName: String = COOKIE_NAME
 
-    fun issueSession(userId: String, userAgent: String?, ipAddress: String?): IssuedAuthSession {
+    fun issueSession(
+        userId: String,
+        userAgent: String?,
+        ipAddress: String?,
+    ): IssuedAuthSession {
         val rawToken = generateToken()
         val tokenHash = hashToken(rawToken)
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val expiresAt = now.plus(SESSION_TTL)
-        val storedSession = StoredAuthSession(
-            id = UUID.randomUUID().toString(),
-            userId = UUID.fromString(userId).toString(),
-            sessionTokenHash = tokenHash,
-            createdAt = now,
-            lastSeenAt = now,
-            expiresAt = expiresAt,
-            userAgent = userAgent?.take(MAX_USER_AGENT_LENGTH),
-            ipHash = ipAddress?.trim()?.takeIf { it.isNotEmpty() }?.let(::hashToken),
-        )
+        val storedSession =
+            StoredAuthSession(
+                id = UUID.randomUUID().toString(),
+                userId = UUID.fromString(userId).toString(),
+                sessionTokenHash = tokenHash,
+                createdAt = now,
+                lastSeenAt = now,
+                expiresAt = expiresAt,
+                userAgent = userAgent?.take(MAX_USER_AGENT_LENGTH),
+                ipHash = ipAddress?.trim()?.takeIf { it.isNotEmpty() }?.let(::hashToken),
+            )
 
         authSessionStore.create(storedSession)
         warmCache(tokenHash, storedSession, now)
@@ -68,15 +73,20 @@ class AuthSessionService(
     fun findValidSession(rawToken: String): StoredAuthSession? {
         val tokenHash = hashToken(rawToken)
         val now = OffsetDateTime.now(ZoneOffset.UTC)
-        val cached = authSessionCache.find(tokenHash)
-            ?.takeIf { it.expiresAt.isAfter(now) }
-        val sourceOfTruth = authSessionStore.findValidByTokenHash(tokenHash)
-            ?.takeIf { !it.revoked && it.expiresAt.isAfter(now) }
-            ?: return null
-        val session = cached
-            ?.takeIf { it.matches(sourceOfTruth) }
-            ?.toStoredAuthSession(tokenHash, now)
-            ?: sourceOfTruth.also { warmCache(tokenHash, it, now) }
+        val cached =
+            authSessionCache
+                .find(tokenHash)
+                ?.takeIf { it.expiresAt.isAfter(now) }
+        val sourceOfTruth =
+            authSessionStore
+                .findValidByTokenHash(tokenHash)
+                ?.takeIf { !it.revoked && it.expiresAt.isAfter(now) }
+                ?: return null
+        val session =
+            cached
+                ?.takeIf { it.matches(sourceOfTruth) }
+                ?.toStoredAuthSession(tokenHash, now)
+                ?: sourceOfTruth.also { warmCache(tokenHash, it, now) }
 
         if (authSessionCache.shouldTouch(tokenHash, cacheProperties.touchThrottleTtl)) {
             authSessionStore.touchByTokenHash(tokenHash)
@@ -103,14 +113,11 @@ class AuthSessionService(
         return clearedSessionCookie()
     }
 
-    fun sessionCookie(rawToken: String): String =
-        buildCookie(COOKIE_NAME, rawToken, SESSION_TTL, includeDomain = true)
+    fun sessionCookie(rawToken: String): String = buildCookie(COOKIE_NAME, rawToken, SESSION_TTL, includeDomain = true)
 
-    fun clearedSessionCookie(): String =
-        buildCookie(COOKIE_NAME, "", Duration.ZERO, includeDomain = true)
+    fun clearedSessionCookie(): String = buildCookie(COOKIE_NAME, "", Duration.ZERO, includeDomain = true)
 
-    override fun clearedServletSessionCookie(): String =
-        buildCookie(SERVLET_SESSION_COOKIE_NAME, "", Duration.ZERO, includeDomain = false)
+    override fun clearedServletSessionCookie(): String = buildCookie(SERVLET_SESSION_COOKIE_NAME, "", Duration.ZERO, includeDomain = false)
 
     fun hashToken(rawToken: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(rawToken.toByteArray(Charsets.UTF_8))
@@ -123,7 +130,11 @@ class AuthSessionService(
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     }
 
-    private fun warmCache(tokenHash: String, session: StoredAuthSession, now: OffsetDateTime) {
+    private fun warmCache(
+        tokenHash: String,
+        session: StoredAuthSession,
+        now: OffsetDateTime,
+    ) {
         val ttl = cacheTtlFor(session.expiresAt, now)
         if (ttl <= Duration.ZERO) {
             return
@@ -158,7 +169,10 @@ class AuthSessionService(
     private fun AuthSessionCacheSnapshot.matches(session: StoredAuthSession) =
         sessionId == session.id && userId == session.userId && expiresAt.isEqual(session.expiresAt)
 
-    private fun cacheTtlFor(expiresAt: OffsetDateTime, now: OffsetDateTime): Duration {
+    private fun cacheTtlFor(
+        expiresAt: OffsetDateTime,
+        now: OffsetDateTime,
+    ): Duration {
         val remaining = Duration.between(now, expiresAt)
         if (remaining <= Duration.ZERO) {
             return Duration.ZERO
@@ -172,11 +186,12 @@ class AuthSessionService(
         maxAge: Duration,
         includeDomain: Boolean,
     ): String {
-        val parts = mutableListOf(
-            "$name=$value",
-            "Path=/",
-            "Max-Age=${maxAge.seconds}",
-        )
+        val parts =
+            mutableListOf(
+                "$name=$value",
+                "Path=/",
+                "Max-Age=${maxAge.seconds}",
+            )
         val normalizedDomain = sessionCookieDomain.trim().takeIf { it.isNotEmpty() }
         if (includeDomain && normalizedDomain != null) {
             parts += "Domain=$normalizedDomain"

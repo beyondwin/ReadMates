@@ -6,7 +6,10 @@ import com.readmates.auth.application.model.UpdateMemberProfileCommand
 import java.util.UUID
 
 interface UpdateOwnMemberProfileUseCase {
-    fun updateOwnProfile(authenticationEmail: String?, command: UpdateMemberProfileCommand): MemberProfile
+    fun updateOwnProfile(
+        authenticationEmail: String?,
+        command: UpdateMemberProfileCommand,
+    ): MemberProfile
 }
 
 interface UpdateHostMemberProfileUseCase {

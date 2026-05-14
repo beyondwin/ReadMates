@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseline version="1.0">
+    <file name="src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveWebMapper.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/archive/adapter/in/web/MemberArchiveReviewController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/archive/adapter/in/web/MyPageController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/archive/application/port/in/ArchiveUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/archive/application/port/in/MemberArchiveReviewUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolver.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberWebConfig.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/security/CurrentPlatformAdminArgumentResolver.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/AuthMeController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/AuthWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/DevInvitationController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/DevLoginController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/HostInvitationController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/HostMemberApprovalController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/InvitationController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/InvitationErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/MemberProfileController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/MemberProfileWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/PasswordAuthController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/PendingApprovalController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/adapter/in/web/SelfMembershipController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/application/model/AuthSessionModels.kt">
+        <error line="1" column="1" source="standard:filename" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/application/port/in/AuthSessionUseCases.kt">
+        <error line="1" column="1" source="standard:filename" />
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/application/port/in/AuthWebUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/application/port/in/MemberProfileUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/auth/application/port/in/ResolveCurrentMemberUseCase.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/adapter/in/web/ClubContextHeader.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/adapter/in/web/ClubContextResolver.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/adapter/in/web/PlatformAdminController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/adapter/in/web/PlatformAdminErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/adapter/in/web/SupportAccessGrantController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/application/port/in/CheckSupportAccessGrantUseCase.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/application/port/in/ClubContextUseCases.kt">
+        <error line="1" column="1" source="standard:filename" />
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/application/port/in/ClubLifecycleUseCase.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/application/port/in/PlatformAdminUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/application/port/in/SupportAccessGrantUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/club/application/port/out/ClubContextPorts.kt">
+        <error line="1" column="1" source="standard:filename" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/feedback/adapter/in/web/FeedbackDocumentController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/feedback/adapter/in/web/FeedbackDocumentErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/feedback/adapter/in/web/FeedbackDocumentUploadValidator.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/feedback/adapter/in/web/FeedbackDocumentWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/feedback/adapter/in/web/FeedbackDocumentWebMapper.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/feedback/application/model/FeedbackDocumentCommands.kt">
+        <error line="1" column="1" source="standard:filename" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/feedback/application/port/in/FeedbackDocumentUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/CheckinController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/NotesFeedController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/NotesFeedWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/QuestionController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/QuestionWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/QuestionWebMapper.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/ReviewController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/adapter/in/web/ReviewWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/note/application/port/in/NotesFeedUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListener.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/adapter/in/scheduler/NotificationEventRelayScheduler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/adapter/in/web/HostNotificationController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/adapter/in/web/MemberNotificationController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/adapter/in/web/NotificationWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/application/model/NotificationEmailTemplates.kt">
+        <error line="246" column="9" source="standard:string-template-indent" />
+        <error line="247" column="9" source="standard:string-template-indent" />
+        <error line="248" column="9" source="standard:string-template-indent" />
+        <error line="249" column="9" source="standard:string-template-indent" />
+        <error line="250" column="9" source="standard:string-template-indent" />
+        <error line="251" column="9" source="standard:string-template-indent" />
+        <error line="252" column="9" source="standard:string-template-indent" />
+        <error line="253" column="9" source="standard:string-template-indent" />
+        <error line="254" column="9" source="standard:string-template-indent" />
+        <error line="255" column="9" source="standard:string-template-indent" />
+        <error line="256" column="9" source="standard:string-template-indent" />
+        <error line="257" column="9" source="standard:string-template-indent" />
+        <error line="258" column="9" source="standard:string-template-indent" />
+        <error line="261" column="9" source="standard:string-template-indent" />
+        <error line="264" column="9" source="standard:string-template-indent" />
+        <error line="265" column="9" source="standard:string-template-indent" />
+        <error line="266" column="9" source="standard:string-template-indent" />
+        <error line="267" column="9" source="standard:string-template-indent" />
+        <error line="270" column="9" source="standard:string-template-indent" />
+        <error line="271" column="9" source="standard:string-template-indent" />
+        <error line="272" column="9" source="standard:string-template-indent" />
+        <error line="275" column="9" source="standard:string-template-indent" />
+        <error line="276" column="9" source="standard:string-template-indent" />
+        <error line="277" column="9" source="standard:string-template-indent" />
+        <error line="278" column="9" source="standard:string-template-indent" />
+        <error line="279" column="9" source="standard:string-template-indent" />
+        <error line="280" column="9" source="standard:string-template-indent" />
+        <error line="281" column="9" source="standard:string-template-indent" />
+        <error line="282" column="9" source="standard:string-template-indent" />
+        <error line="283" column="9" source="standard:string-template-indent" />
+        <error line="284" column="9" source="standard:string-template-indent" />
+        <error line="285" column="9" source="standard:string-template-indent" />
+        <error line="286" column="9" source="standard:string-template-indent" />
+        <error line="287" column="9" source="standard:string-template-indent" />
+        <error line="288" column="9" source="standard:string-template-indent" />
+        <error line="289" column="9" source="standard:string-template-indent" />
+        <error line="292" column="9" source="standard:string-template-indent" />
+        <error line="293" column="9" source="standard:string-template-indent" />
+        <error line="294" column="9" source="standard:string-template-indent" />
+        <error line="297" column="9" source="standard:string-template-indent" />
+        <error line="298" column="9" source="standard:string-template-indent" />
+        <error line="299" column="9" source="standard:string-template-indent" />
+        <error line="300" column="9" source="standard:string-template-indent" />
+        <error line="301" column="9" source="standard:string-template-indent" />
+        <error line="302" column="9" source="standard:string-template-indent" />
+        <error line="303" column="9" source="standard:string-template-indent" />
+        <error line="304" column="9" source="standard:string-template-indent" />
+        <error line="305" column="9" source="standard:string-template-indent" />
+        <error line="306" column="9" source="standard:string-template-indent" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/publication/adapter/in/web/PublicController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/publication/adapter/in/web/PublicWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/publication/application/port/in/PublicUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/AttendanceController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/CurrentSessionController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/HostDashboardController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/HostSessionWebDtos.kt">
+        <error line="1" column="1" source="standard:filename" />
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/PublicationController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/RsvpController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/SessionApplicationErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/adapter/in/web/UpcomingSessionController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/application/port/in/GetCurrentSessionUseCase.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/application/port/in/HostSessionUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/session/application/port/in/SessionMemberWriteUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/shared/adapter/in/web/ApiErrorResponse.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/shared/adapter/in/web/HealthController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/shared/adapter/in/web/SharedApplicationErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/archive/api/ArchiveErrorHandlerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/auth/api/InvitationErrorHandlerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/club/adapter/in/web/ResolveClubContextRequestExtensionTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/note/api/CheckinControllerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/note/api/QuestionControllerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/note/api/ReviewControllerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListenerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/session/api/RsvpControllerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/session/api/SessionApplicationErrorHandlerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/shared/adapter/in/web/ApiErrorResponseTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/shared/adapter/in/web/HealthControllerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+</baseline>

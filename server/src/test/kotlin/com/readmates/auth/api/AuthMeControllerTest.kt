@@ -1,14 +1,14 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.infrastructure.security.MemberAuthoritiesFilter
 import com.readmates.auth.infrastructure.security.SessionCookieAuthenticationFilter
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -67,7 +67,8 @@ class AuthMeControllerTest(
 
     @Test
     fun `returns anonymous payload when no session exists`() {
-        mockMvc.get("/api/auth/me")
+        mockMvc
+            .get("/api/auth/me")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(false) }
@@ -86,10 +87,10 @@ class AuthMeControllerTest(
 
     @Test
     fun `returns seeded member payload when authenticated email has active membership`() {
-        mockMvc.get("/api/auth/me") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/auth/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
@@ -110,21 +111,22 @@ class AuthMeControllerTest(
         val sampleMembershipId = insertSampleClubMembershipForMember5()
         val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
 
-        mockMvc.get("/api/auth/me") {
-            header("X-Readmates-Club-Slug", "sample-book-club")
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.currentMembership.clubSlug") { value("sample-book-club") }
-            jsonPath("$.joinedClubs.length()") { value(2) }
-            jsonPath("$.membershipId") { value(sampleMembershipId) }
-            jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000002") }
-            jsonPath("$.displayName") { value("샘플멤버5") }
-            jsonPath("$.role") { value("MEMBER") }
-            jsonPath("$.membershipStatus") { value("ACTIVE") }
-            jsonPath("$.approvalState") { value("ACTIVE") }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.currentMembership.clubSlug") { value("sample-book-club") }
+                jsonPath("$.joinedClubs.length()") { value(2) }
+                jsonPath("$.membershipId") { value(sampleMembershipId) }
+                jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000002") }
+                jsonPath("$.displayName") { value("샘플멤버5") }
+                jsonPath("$.role") { value("MEMBER") }
+                jsonPath("$.membershipStatus") { value("ACTIVE") }
+                jsonPath("$.approvalState") { value("ACTIVE") }
+            }
     }
 
     @Test
@@ -151,18 +153,19 @@ class AuthMeControllerTest(
 
         val cookie = sessionCookieForUser(userId)
 
-        mockMvc.get("/api/auth/me") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.userId") { value(userId) }
-            jsonPath("$.currentMembership") { value(null) }
-            jsonPath("$.joinedClubs.length()") { value(0) }
-            jsonPath("$.platformAdmin.role") { value("OWNER") }
-            jsonPath("$.platformAdmin.email") { value(email) }
-            jsonPath("$.role") { value(null) }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.userId") { value(userId) }
+                jsonPath("$.currentMembership") { value(null) }
+                jsonPath("$.joinedClubs.length()") { value(0) }
+                jsonPath("$.platformAdmin.role") { value("OWNER") }
+                jsonPath("$.platformAdmin.email") { value(email) }
+                jsonPath("$.role") { value(null) }
+            }
     }
 
     @Test
@@ -170,46 +173,49 @@ class AuthMeControllerTest(
         insertSampleClubMembershipForHost(role = "MEMBER")
         val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000101")
 
-        mockMvc.get("/api/host/dashboard") {
-            header("X-Readmates-Club-Slug", "sample-book-club")
-            cookie(cookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/host/dashboard") {
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                cookie(cookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `auth me does not fall back to another club when requested club has no membership`() {
         val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
 
-        mockMvc.get("/api/auth/me") {
-            header("X-Readmates-Club-Slug", "sample-book-club")
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
-            jsonPath("$.currentMembership") { value(null) }
-            jsonPath("$.joinedClubs.length()") { value(1) }
-            jsonPath("$.joinedClubs[0].clubSlug") { value("reading-sai") }
-            jsonPath("$.clubId") { value(null) }
-            jsonPath("$.role") { value(null) }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
+                jsonPath("$.currentMembership") { value(null) }
+                jsonPath("$.joinedClubs.length()") { value(1) }
+                jsonPath("$.joinedClubs[0].clubSlug") { value("reading-sai") }
+                jsonPath("$.clubId") { value(null) }
+                jsonPath("$.role") { value(null) }
+            }
     }
 
     @Test
     fun `auth me returns 404 when requested club slug is unresolved`() {
         val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
 
-        mockMvc.get("/api/auth/me") {
-            header("X-Readmates-Club-Slug", "missing-club")
-            cookie(cookie)
-        }.andExpect {
-            status { isNotFound() }
-            jsonPath("$.code") { value("CLUB_NOT_FOUND") }
-            jsonPath("$.message") { value("클럽을 찾을 수 없습니다.") }
-            jsonPath("$.status") { value(404) }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                header("X-Readmates-Club-Slug", "missing-club")
+                cookie(cookie)
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("CLUB_NOT_FOUND") }
+                jsonPath("$.message") { value("클럽을 찾을 수 없습니다.") }
+                jsonPath("$.status") { value(404) }
+            }
     }
 
     @Test
@@ -219,19 +225,20 @@ class AuthMeControllerTest(
         // so an unrecognised host must yield the session's own currentMembership.
         val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
 
-        mockMvc.get("/api/auth/me") {
-            header("X-Readmates-Club-Host", "not-a-registered-host.example.test")
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
-            jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000001") }
-            jsonPath("$.currentMembership.clubSlug") { value("reading-sai") }
-            jsonPath("$.currentMembership.membershipStatus") { value("ACTIVE") }
-            jsonPath("$.membershipStatus") { value("ACTIVE") }
-            jsonPath("$.role") { value("MEMBER") }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                header("X-Readmates-Club-Host", "not-a-registered-host.example.test")
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
+                jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000001") }
+                jsonPath("$.currentMembership.clubSlug") { value("reading-sai") }
+                jsonPath("$.currentMembership.membershipStatus") { value("ACTIVE") }
+                jsonPath("$.membershipStatus") { value("ACTIVE") }
+                jsonPath("$.role") { value("MEMBER") }
+            }
     }
 
     @Test
@@ -241,18 +248,19 @@ class AuthMeControllerTest(
         try {
             val cookie = sessionCookieForUser("00000000-0000-0000-0000-000000000106")
 
-            mockMvc.get("/api/auth/me") {
-                header("X-Readmates-Club-Host", "readmates-authme.example.test")
-                cookie(cookie)
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.authenticated") { value(true) }
-                jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
-                jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000001") }
-                jsonPath("$.currentMembership.clubSlug") { value("reading-sai") }
-                jsonPath("$.currentMembership.membershipStatus") { value("ACTIVE") }
-                jsonPath("$.role") { value("MEMBER") }
-            }
+            mockMvc
+                .get("/api/auth/me") {
+                    header("X-Readmates-Club-Host", "readmates-authme.example.test")
+                    cookie(cookie)
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.authenticated") { value(true) }
+                    jsonPath("$.userId") { value("00000000-0000-0000-0000-000000000106") }
+                    jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000001") }
+                    jsonPath("$.currentMembership.clubSlug") { value("reading-sai") }
+                    jsonPath("$.currentMembership.membershipStatus") { value("ACTIVE") }
+                    jsonPath("$.role") { value("MEMBER") }
+                }
         } finally {
             deleteClubDomain(activeDomainId)
         }
@@ -280,16 +288,17 @@ class AuthMeControllerTest(
         val viewerEmail = uniqueViewerEmail()
         val viewerCookie = loginAsGoogleViewerUser(viewerEmail)
 
-        mockMvc.get("/api/auth/me") {
-            cookie(viewerCookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.email") { value(viewerEmail) }
-            jsonPath("$.membershipStatus") { value("VIEWER") }
-            jsonPath("$.approvalState") { value("VIEWER") }
-            jsonPath("$.role") { value("MEMBER") }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(viewerCookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.email") { value(viewerEmail) }
+                jsonPath("$.membershipStatus") { value("VIEWER") }
+                jsonPath("$.approvalState") { value("VIEWER") }
+                jsonPath("$.role") { value("MEMBER") }
+            }
     }
 
     @Test
@@ -304,11 +313,13 @@ class AuthMeControllerTest(
 
             sessionCookieAuthenticationFilter.doFilter(request, response, MockFilterChain())
 
-            val authentication = SecurityContextHolder.getContext().authentication
-                ?: error("Expected viewer member session to authenticate")
-            val authorities = authentication.authorities
-                .map { it.authority }
-                .toSet()
+            val authentication =
+                SecurityContextHolder.getContext().authentication
+                    ?: error("Expected viewer member session to authenticate")
+            val authorities =
+                authentication.authorities
+                    .map { it.authority }
+                    .toSet()
             assertEquals(setOf("ROLE_VIEWER"), authorities)
             assertFalse("ROLE_MEMBER" in authorities)
         } finally {
@@ -328,11 +339,13 @@ class AuthMeControllerTest(
 
             sessionCookieAuthenticationFilter.doFilter(request, response, MockFilterChain())
 
-            val authentication = SecurityContextHolder.getContext().authentication
-                ?: error("Expected suspended member session to authenticate")
-            val authorities = authentication.authorities
-                .map { it.authority }
-                .toSet()
+            val authentication =
+                SecurityContextHolder.getContext().authentication
+                    ?: error("Expected suspended member session to authenticate")
+            val authorities =
+                authentication.authorities
+                    .map { it.authority }
+                    .toSet()
             assertEquals(setOf("ROLE_MEMBER"), authorities)
             assertFalse("ROLE_VIEWER" in authorities)
         } finally {
@@ -346,15 +359,16 @@ class AuthMeControllerTest(
             val email = uniqueLifecycleEmail("blocked.${status.lowercase()}")
             val cookie = loginAsLifecycleUser(email, status)
 
-            mockMvc.get("/api/auth/me") {
-                cookie(cookie)
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.authenticated") { value(true) }
-                jsonPath("$.email") { value(email) }
-                jsonPath("$.membershipStatus") { value(status) }
-                jsonPath("$.approvalState") { value("INACTIVE") }
-            }
+            mockMvc
+                .get("/api/auth/me") {
+                    cookie(cookie)
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.authenticated") { value(true) }
+                    jsonPath("$.email") { value(email) }
+                    jsonPath("$.membershipStatus") { value(status) }
+                    jsonPath("$.approvalState") { value("INACTIVE") }
+                }
 
             SecurityContextHolder.clearContext()
             try {
@@ -364,11 +378,13 @@ class AuthMeControllerTest(
 
                 sessionCookieAuthenticationFilter.doFilter(request, response, MockFilterChain())
 
-                val authentication = SecurityContextHolder.getContext().authentication
-                    ?: error("Expected $status member session to authenticate for auth state")
-                val authorities = authentication.authorities
-                    .map { it.authority }
-                    .toSet()
+                val authentication =
+                    SecurityContextHolder.getContext().authentication
+                        ?: error("Expected $status member session to authenticate for auth state")
+                val authorities =
+                    authentication.authorities
+                        .map { it.authority }
+                        .toSet()
                 assertEquals(emptySet<String>(), authorities)
                 assertFalse("ROLE_MEMBER" in authorities)
                 assertFalse("ROLE_HOST" in authorities)
@@ -386,26 +402,29 @@ class AuthMeControllerTest(
 
         SecurityContextHolder.clearContext()
         try {
-            SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(
-                viewerEmail,
-                null,
-                listOf(
-                    SimpleGrantedAuthority("ROLE_HOST"),
-                    SimpleGrantedAuthority("ROLE_MEMBER"),
-                    SimpleGrantedAuthority("ROLE_VIEWER"),
-                    SimpleGrantedAuthority("ROLE_OTHER"),
-                ),
-            )
+            SecurityContextHolder.getContext().authentication =
+                UsernamePasswordAuthenticationToken(
+                    viewerEmail,
+                    null,
+                    listOf(
+                        SimpleGrantedAuthority("ROLE_HOST"),
+                        SimpleGrantedAuthority("ROLE_MEMBER"),
+                        SimpleGrantedAuthority("ROLE_VIEWER"),
+                        SimpleGrantedAuthority("ROLE_OTHER"),
+                    ),
+                )
             val request = MockHttpServletRequest("GET", "/api/auth/me")
             val response = MockHttpServletResponse()
 
             memberAuthoritiesFilter.doFilter(request, response, MockFilterChain())
 
-            val authentication = SecurityContextHolder.getContext().authentication
-                ?: error("Expected viewer member authority refresh to authenticate")
-            val authorities = authentication.authorities
-                .map { it.authority }
-                .toSet()
+            val authentication =
+                SecurityContextHolder.getContext().authentication
+                    ?: error("Expected viewer member authority refresh to authenticate")
+            val authorities =
+                authentication.authorities
+                    .map { it.authority }
+                    .toSet()
             assertEquals(setOf("ROLE_VIEWER", "ROLE_OTHER"), authorities)
             assertFalse("ROLE_HOST" in authorities)
             assertFalse("ROLE_MEMBER" in authorities)
@@ -421,26 +440,29 @@ class AuthMeControllerTest(
 
         SecurityContextHolder.clearContext()
         try {
-            SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(
-                suspendedEmail,
-                null,
-                listOf(
-                    SimpleGrantedAuthority("ROLE_HOST"),
-                    SimpleGrantedAuthority("ROLE_MEMBER"),
-                    SimpleGrantedAuthority("ROLE_VIEWER"),
-                    SimpleGrantedAuthority("ROLE_OTHER"),
-                ),
-            )
+            SecurityContextHolder.getContext().authentication =
+                UsernamePasswordAuthenticationToken(
+                    suspendedEmail,
+                    null,
+                    listOf(
+                        SimpleGrantedAuthority("ROLE_HOST"),
+                        SimpleGrantedAuthority("ROLE_MEMBER"),
+                        SimpleGrantedAuthority("ROLE_VIEWER"),
+                        SimpleGrantedAuthority("ROLE_OTHER"),
+                    ),
+                )
             val request = MockHttpServletRequest("GET", "/api/auth/me")
             val response = MockHttpServletResponse()
 
             memberAuthoritiesFilter.doFilter(request, response, MockFilterChain())
 
-            val authentication = SecurityContextHolder.getContext().authentication
-                ?: error("Expected suspended member authority refresh to authenticate")
-            val authorities = authentication.authorities
-                .map { it.authority }
-                .toSet()
+            val authentication =
+                SecurityContextHolder.getContext().authentication
+                    ?: error("Expected suspended member authority refresh to authenticate")
+            val authorities =
+                authentication.authorities
+                    .map { it.authority }
+                    .toSet()
             assertEquals(setOf("ROLE_MEMBER", "ROLE_OTHER"), authorities)
             assertFalse("ROLE_HOST" in authorities)
             assertFalse("ROLE_VIEWER" in authorities)
@@ -453,14 +475,15 @@ class AuthMeControllerTest(
     fun `auth me returns active approval state for active member`() {
         val activeCookie = loginAndReturnSessionCookie("host@example.com", "correct horse battery staple")
 
-        mockMvc.get("/api/auth/me") {
-            cookie(activeCookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.membershipStatus") { value("ACTIVE") }
-            jsonPath("$.approvalState") { value("ACTIVE") }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(activeCookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.membershipStatus") { value("ACTIVE") }
+                jsonPath("$.approvalState") { value("ACTIVE") }
+            }
     }
 
     @Test
@@ -468,26 +491,28 @@ class AuthMeControllerTest(
         val email = uniqueLifecycleEmail("profile.authme")
         val cookie = loginAsLifecycleUser(email, "ACTIVE")
 
-        mockMvc.patch("/api/me/profile") {
-            cookie(cookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"UpdatedMe"}"""
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .patch("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"UpdatedMe"}"""
+            }.andExpect {
+                status { isOk() }
+            }
 
-        mockMvc.get("/api/auth/me") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(true) }
-            jsonPath("$.email") { value(email) }
-            jsonPath("$.displayName") { value("UpdatedMe") }
-            jsonPath("$.shortName") { doesNotExist() }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(true) }
+                jsonPath("$.email") { value(email) }
+                jsonPath("$.displayName") { value("UpdatedMe") }
+                jsonPath("$.shortName") { doesNotExist() }
+            }
     }
 
     private fun loginAsGoogleViewerUser(email: String): Cookie {
@@ -554,7 +579,10 @@ class AuthMeControllerTest(
         return membershipId
     }
 
-    private fun loginAsLifecycleUser(email: String, status: String): Cookie {
+    private fun loginAsLifecycleUser(
+        email: String,
+        status: String,
+    ): Cookie {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         val shortName = "Life${userId.take(8)}"
@@ -585,22 +613,27 @@ class AuthMeControllerTest(
         return sessionCookieForUser(userId)
     }
 
-    private fun loginAndReturnSessionCookie(email: String, password: String): Cookie {
-        val userId = jdbcTemplate.queryForObject(
-            "select id from users where email = ?",
-            String::class.java,
-            email,
-        ) ?: error("Expected seeded user for $email")
+    private fun loginAndReturnSessionCookie(
+        email: String,
+        password: String,
+    ): Cookie {
+        val userId =
+            jdbcTemplate.queryForObject(
+                "select id from users where email = ?",
+                String::class.java,
+                email,
+            ) ?: error("Expected seeded user for $email")
 
         return sessionCookieForUser(userId)
     }
 
     private fun sessionCookieForUser(userId: String): Cookie {
-        val issuedSession = authSessionService.issueSession(
-            userId = UUID.fromString(userId).toString(),
-            userAgent = "AuthMeControllerTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = UUID.fromString(userId).toString(),
+                userAgent = "AuthMeControllerTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
@@ -609,7 +642,11 @@ class AuthMeControllerTest(
 
     private fun uniqueLifecycleEmail(prefix: String): String = "$prefix.${UUID.randomUUID()}@example.com"
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

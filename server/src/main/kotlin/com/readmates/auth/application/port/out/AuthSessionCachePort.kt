@@ -12,18 +12,50 @@ data class AuthSessionCacheSnapshot(
 
 interface AuthSessionCachePort {
     fun find(tokenHash: String): AuthSessionCacheSnapshot?
-    fun store(tokenHash: String, snapshot: AuthSessionCacheSnapshot, ttl: Duration)
-    fun rememberUserSession(userId: String, tokenHash: String, ttl: Duration)
-    fun shouldTouch(tokenHash: String, ttl: Duration): Boolean
+
+    fun store(
+        tokenHash: String,
+        snapshot: AuthSessionCacheSnapshot,
+        ttl: Duration,
+    )
+
+    fun rememberUserSession(
+        userId: String,
+        tokenHash: String,
+        ttl: Duration,
+    )
+
+    fun shouldTouch(
+        tokenHash: String,
+        ttl: Duration,
+    ): Boolean
+
     fun evict(tokenHash: String)
+
     fun evictAllForUser(userId: String)
 
     class Noop : AuthSessionCachePort {
         override fun find(tokenHash: String): AuthSessionCacheSnapshot? = null
-        override fun store(tokenHash: String, snapshot: AuthSessionCacheSnapshot, ttl: Duration) = Unit
-        override fun rememberUserSession(userId: String, tokenHash: String, ttl: Duration) = Unit
-        override fun shouldTouch(tokenHash: String, ttl: Duration): Boolean = true
+
+        override fun store(
+            tokenHash: String,
+            snapshot: AuthSessionCacheSnapshot,
+            ttl: Duration,
+        ) = Unit
+
+        override fun rememberUserSession(
+            userId: String,
+            tokenHash: String,
+            ttl: Duration,
+        ) = Unit
+
+        override fun shouldTouch(
+            tokenHash: String,
+            ttl: Duration,
+        ): Boolean = true
+
         override fun evict(tokenHash: String) = Unit
+
         override fun evictAllForUser(userId: String) = Unit
     }
 
@@ -45,21 +77,32 @@ interface AuthSessionCachePort {
             return entry.value
         }
 
-        override fun store(tokenHash: String, snapshot: AuthSessionCacheSnapshot, ttl: Duration) {
+        override fun store(
+            tokenHash: String,
+            snapshot: AuthSessionCacheSnapshot,
+            ttl: Duration,
+        ) {
             if (ttl <= Duration.ZERO) {
                 return
             }
             sessions[tokenHash] = CacheEntry(snapshot, now().plus(ttl))
         }
 
-        override fun rememberUserSession(userId: String, tokenHash: String, ttl: Duration) {
+        override fun rememberUserSession(
+            userId: String,
+            tokenHash: String,
+            ttl: Duration,
+        ) {
             if (ttl <= Duration.ZERO) {
                 return
             }
             userSessions.getOrPut(userId) { mutableSetOf() } += tokenHash
         }
 
-        override fun shouldTouch(tokenHash: String, ttl: Duration): Boolean {
+        override fun shouldTouch(
+            tokenHash: String,
+            ttl: Duration,
+        ): Boolean {
             if (ttl <= Duration.ZERO) {
                 return true
             }

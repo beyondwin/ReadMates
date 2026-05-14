@@ -9,15 +9,16 @@ internal fun requireHost(member: CurrentMember) {
     }
 }
 
-internal fun shortNameFor(displayName: String): String = when (displayName) {
-    "김호스트" -> "호스트"
-    "안멤버1" -> "멤버1"
-    "최멤버2" -> "멤버2"
-    "김멤버3" -> "멤버3"
-    "송멤버4" -> "멤버4"
-    "이멤버5" -> "멤버5"
-    else -> displayName
-}
+internal fun shortNameFor(displayName: String): String =
+    when (displayName) {
+        "김호스트" -> "호스트"
+        "안멤버1" -> "멤버1"
+        "최멤버2" -> "멤버2"
+        "김멤버3" -> "멤버3"
+        "송멤버4" -> "멤버4"
+        "이멤버5" -> "멤버5"
+        else -> displayName
+    }
 
 class CurrentSessionNotOpenException : RuntimeException("No open current session")
 
@@ -33,9 +34,10 @@ class HostSessionOpenNotAllowedException : RuntimeException("Only draft sessions
 
 class HostSessionCloseNotAllowedException : RuntimeException("Only open sessions can be closed")
 
-class HostSessionPublishNotAllowedException : RuntimeException(
-    "Only closed sessions with member-visible publication can be published",
-)
+class HostSessionPublishNotAllowedException :
+    RuntimeException(
+        "Only closed sessions with member-visible publication can be published",
+    )
 
 class InvalidMembershipIdException : RuntimeException("Invalid membership id")
 

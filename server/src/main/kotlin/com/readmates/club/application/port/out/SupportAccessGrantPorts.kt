@@ -20,13 +20,21 @@ interface RevokeSupportAccessGrantPort {
     /**
      * Returns the revoked grant, or null if the grant was not found (or already revoked).
      */
-    fun revokeGrant(grantId: UUID, revokedAt: OffsetDateTime): SupportAccessGrant?
+    fun revokeGrant(
+        grantId: UUID,
+        revokedAt: OffsetDateTime,
+    ): SupportAccessGrant?
 }
 
 interface LoadSupportAccessGrantPort {
     fun loadActiveGrantsByClub(clubId: UUID): List<SupportAccessGrant>
+
     fun loadActiveGrantsByGrantee(granteeUserId: UUID): List<SupportAccessGrant>
-    fun loadActiveGrantByGranteeAndClub(granteeUserId: UUID, clubId: UUID): SupportAccessGrant?
+
+    fun loadActiveGrantByGranteeAndClub(
+        granteeUserId: UUID,
+        clubId: UUID,
+    ): SupportAccessGrant?
 }
 
 interface WritePlatformAuditEventPort {

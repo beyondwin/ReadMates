@@ -23,11 +23,12 @@ class GoogleOidcUserService : OidcUserService() {
 
     private fun requireVerifiedEmail(user: OidcUser) {
         val email = user.claims["email"] as? String
-        val emailVerified = when (val claim = user.claims["email_verified"]) {
-            is Boolean -> claim
-            is String -> claim.equals("true", ignoreCase = true)
-            else -> false
-        }
+        val emailVerified =
+            when (val claim = user.claims["email_verified"]) {
+                is Boolean -> claim
+                is String -> claim.equals("true", ignoreCase = true)
+                else -> false
+            }
 
         if (email.isNullOrBlank() || !emailVerified) {
             throw OAuth2AuthenticationException(

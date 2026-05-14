@@ -56,17 +56,18 @@ data class AuthMemberResponse(
             )
         }
 
-        fun anonymous(email: String? = null) = AuthMemberResponse(
-            authenticated = false,
-            userId = null,
-            email = email,
-            accountName = null,
-            currentMembership = null,
-            joinedClubs = emptyList(),
-            platformAdmin = null,
-            recommendedAppEntryUrl = "/login",
-            approvalState = ApprovalState.ANONYMOUS,
-        )
+        fun anonymous(email: String? = null) =
+            AuthMemberResponse(
+                authenticated = false,
+                userId = null,
+                email = email,
+                accountName = null,
+                currentMembership = null,
+                joinedClubs = emptyList(),
+                platformAdmin = null,
+                recommendedAppEntryUrl = "/login",
+                approvalState = ApprovalState.ANONYMOUS,
+            )
 
         fun authenticatedUser(
             userId: UUID,
@@ -89,9 +90,10 @@ data class AuthMemberResponse(
         }
 
         private fun recommendedAppEntryUrl(joinedClubs: List<AuthJoinedClub>): String? {
-            val usable = joinedClubs.filter {
-                it.status in setOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED)
-            }
+            val usable =
+                joinedClubs.filter {
+                    it.status in setOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED)
+                }
             return usable.singleOrNull()?.let { "/clubs/${it.clubSlug}/app" }
         }
     }
@@ -165,10 +167,15 @@ private fun MembershipStatus.toApprovalState(): ApprovalState =
         MembershipStatus.SUSPENDED -> ApprovalState.SUSPENDED
         MembershipStatus.LEFT,
         MembershipStatus.INACTIVE,
-        MembershipStatus.INVITED -> ApprovalState.INACTIVE
+        MembershipStatus.INVITED,
+        -> ApprovalState.INACTIVE
     }
 
-class CreateInvitationRequest(email: String, name: String, applyToCurrentSession: Boolean? = null) {
+class CreateInvitationRequest(
+    email: String,
+    name: String,
+    applyToCurrentSession: Boolean? = null,
+) {
     @field:NotBlank
     @field:Email
     @field:Size(max = 320)

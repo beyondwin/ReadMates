@@ -1,10 +1,10 @@
 package com.readmates.performance
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.support.QueryCounter
 import com.readmates.support.QueryCountingDataSourcePostProcessor
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.config.BeanPostProcessor
@@ -56,12 +56,13 @@ class ServerQueryBudgetTest(
             budget = 5,
             reason = "current-session empty state should remain a small fixed number of DB round trips",
         ) {
-            mockMvc.get("/api/sessions/current") {
-                with(user("member5@example.com"))
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-            }.andExpect {
-                status { isOk() }
-            }
+            mockMvc
+                .get("/api/sessions/current") {
+                    with(user("member5@example.com"))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                }
         }
     }
 
@@ -71,12 +72,13 @@ class ServerQueryBudgetTest(
             budget = 14,
             reason = "archive detail currently hydrates several independent detail sections without batching",
         ) {
-            mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-                with(user("member5@example.com"))
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-            }.andExpect {
-                status { isOk() }
-            }
+            mockMvc
+                .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                    with(user("member5@example.com"))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                }
         }
     }
 
@@ -86,11 +88,12 @@ class ServerQueryBudgetTest(
             budget = 5,
             reason = "public club page loads club metadata, stats, and recent public sessions",
         ) {
-            mockMvc.get("/api/public/clubs/reading-sai") {
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-            }.andExpect {
-                status { isOk() }
-            }
+            mockMvc
+                .get("/api/public/clubs/reading-sai") {
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                }
         }
     }
 
@@ -100,11 +103,12 @@ class ServerQueryBudgetTest(
             budget = 3,
             reason = "public session detail loads the session plus public highlights and one-liners",
         ) {
-            mockMvc.get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306") {
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-            }.andExpect {
-                status { isOk() }
-            }
+            mockMvc
+                .get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306") {
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                }
         }
     }
 
@@ -116,12 +120,13 @@ class ServerQueryBudgetTest(
             budget = 15,
             reason = "deletion preview intentionally issues separate count queries for each owned table",
         ) {
-            mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
-                with(user("host@example.com"))
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-            }.andExpect {
-                status { isOk() }
-            }
+            mockMvc
+                .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
+                    with(user("host@example.com"))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                }.andExpect {
+                    status { isOk() }
+                }
         }
     }
 
@@ -165,7 +170,6 @@ class ServerQueryBudgetTest(
     @TestConfiguration
     class QueryBudgetConfig {
         @Bean
-        fun queryCountingDataSourcePostProcessor(): BeanPostProcessor =
-            QueryCountingDataSourcePostProcessor()
+        fun queryCountingDataSourcePostProcessor(): BeanPostProcessor = QueryCountingDataSourcePostProcessor()
     }
 }

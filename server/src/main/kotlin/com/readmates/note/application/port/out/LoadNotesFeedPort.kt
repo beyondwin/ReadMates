@@ -7,8 +7,16 @@ import com.readmates.shared.paging.PageRequest
 import java.util.UUID
 
 interface LoadNotesFeedPort {
-    fun loadNoteSessions(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteSessionResult>
-    fun loadNotesFeed(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteFeedResult>
+    fun loadNoteSessions(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<NoteSessionResult>
+
+    fun loadNotesFeed(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<NoteFeedResult>
+
     fun loadNotesFeedForSession(
         clubId: UUID,
         sessionId: UUID,

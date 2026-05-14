@@ -27,33 +27,40 @@ class PublicController(
     private val getPublicSessionUseCase: GetPublicSessionUseCase,
 ) {
     @GetMapping("/club")
-    fun club(): ResponseEntity<PublicClubResponse> =
-        club(LEGACY_PUBLIC_CLUB_SLUG)
+    fun club(): ResponseEntity<PublicClubResponse> = club(LEGACY_PUBLIC_CLUB_SLUG)
 
     @GetMapping("/clubs/{clubSlug}")
-    fun club(@PathVariable clubSlug: String): ResponseEntity<PublicClubResponse> {
-        val response = getPublicClubUseCase.getClub(clubSlug)?.toResponse()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        return ResponseEntity.ok()
+    fun club(
+        @PathVariable clubSlug: String,
+    ): ResponseEntity<PublicClubResponse> {
+        val response =
+            getPublicClubUseCase.getClub(clubSlug)?.toResponse()
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        return ResponseEntity
+            .ok()
             .header("Cache-Control", PUBLIC_CACHE_CONTROL)
             .body(response)
     }
 
     @GetMapping("/sessions/{sessionId}")
-    fun session(@PathVariable sessionId: String): ResponseEntity<PublicSessionDetailResponse> =
-        session(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
+    fun session(
+        @PathVariable sessionId: String,
+    ): ResponseEntity<PublicSessionDetailResponse> = session(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
 
     @GetMapping("/clubs/{clubSlug}/sessions/{sessionId}")
     fun session(
         @PathVariable clubSlug: String,
         @PathVariable sessionId: String,
     ): ResponseEntity<PublicSessionDetailResponse> {
-        val id = runCatching { UUID.fromString(sessionId) }.getOrNull()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val id =
+            runCatching { UUID.fromString(sessionId) }.getOrNull()
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
-        val response = getPublicSessionUseCase.getSession(clubSlug, id)?.toResponse()
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        return ResponseEntity.ok()
+        val response =
+            getPublicSessionUseCase.getSession(clubSlug, id)?.toResponse()
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        return ResponseEntity
+            .ok()
             .header("Cache-Control", PUBLIC_CACHE_CONTROL)
             .body(response)
     }

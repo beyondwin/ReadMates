@@ -1,6 +1,5 @@
 package com.readmates.club.application.service
 
-import tools.jackson.databind.ObjectMapper
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.CreateSupportAccessGrantCommand
@@ -16,6 +15,7 @@ import com.readmates.club.application.port.out.RevokeSupportAccessGrantPort
 import com.readmates.club.application.port.out.WritePlatformAuditEventPort
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.stereotype.Service
+import tools.jackson.databind.ObjectMapper
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -31,7 +31,6 @@ class SupportAccessGrantService(
     CreateSupportAccessGrantUseCase,
     RevokeSupportAccessGrantUseCase,
     ListSupportAccessGrantsUseCase {
-
     override fun synthesizeHostCurrentMember(
         userId: UUID,
         email: String,
@@ -58,22 +57,24 @@ class SupportAccessGrantService(
             )
         }
 
-        val grant = createGrantPort.createGrant(
-            clubId = command.clubId,
-            grantedByUserId = admin.userId,
-            granteeUserId = command.granteeUserId,
-            scope = command.scope,
-            reason = command.reason,
-            expiresAt = command.expiresAt,
-        )
+        val grant =
+            createGrantPort.createGrant(
+                clubId = command.clubId,
+                grantedByUserId = admin.userId,
+                granteeUserId = command.granteeUserId,
+                scope = command.scope,
+                reason = command.reason,
+                expiresAt = command.expiresAt,
+            )
 
-        val metadata = mapOf(
-            "grantId" to grant.id.toString(),
-            "clubId" to grant.clubId.toString(),
-            "granteeUserId" to grant.granteeUserId.toString(),
-            "scope" to grant.scope.name,
-            "expiresAt" to grant.expiresAt.toString(),
-        )
+        val metadata =
+            mapOf(
+                "grantId" to grant.id.toString(),
+                "clubId" to grant.clubId.toString(),
+                "granteeUserId" to grant.granteeUserId.toString(),
+                "scope" to grant.scope.name,
+                "expiresAt" to grant.expiresAt.toString(),
+            )
         auditEventPort.writeEvent(
             actorUserId = admin.userId,
             actorPlatformRole = admin.role.name,
@@ -90,14 +91,16 @@ class SupportAccessGrantService(
         grantId: UUID,
     ) {
         val now = OffsetDateTime.now(ZoneOffset.UTC)
-        val revoked = revokeGrantPort.revokeGrant(grantId, now)
-            ?: throw PlatformAdminException(PlatformAdminError.GRANT_NOT_FOUND, "Support access grant not found")
+        val revoked =
+            revokeGrantPort.revokeGrant(grantId, now)
+                ?: throw PlatformAdminException(PlatformAdminError.GRANT_NOT_FOUND, "Support access grant not found")
 
-        val metadata = mapOf(
-            "grantId" to revoked.id.toString(),
-            "clubId" to revoked.clubId.toString(),
-            "granteeUserId" to revoked.granteeUserId.toString(),
-        )
+        val metadata =
+            mapOf(
+                "grantId" to revoked.id.toString(),
+                "clubId" to revoked.clubId.toString(),
+                "granteeUserId" to revoked.granteeUserId.toString(),
+            )
         auditEventPort.writeEvent(
             actorUserId = admin.userId,
             actorPlatformRole = admin.role.name,
@@ -107,9 +110,13 @@ class SupportAccessGrantService(
         )
     }
 
-    override fun listByClub(admin: CurrentPlatformAdmin, clubId: UUID): List<SupportAccessGrant> =
-        loadGrantPort.loadActiveGrantsByClub(clubId)
+    override fun listByClub(
+        admin: CurrentPlatformAdmin,
+        clubId: UUID,
+    ): List<SupportAccessGrant> = loadGrantPort.loadActiveGrantsByClub(clubId)
 
-    override fun listByGrantee(admin: CurrentPlatformAdmin, granteeUserId: UUID): List<SupportAccessGrant> =
-        loadGrantPort.loadActiveGrantsByGrantee(granteeUserId)
+    override fun listByGrantee(
+        admin: CurrentPlatformAdmin,
+        granteeUserId: UUID,
+    ): List<SupportAccessGrant> = loadGrantPort.loadActiveGrantsByGrantee(granteeUserId)
 }

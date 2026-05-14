@@ -48,15 +48,17 @@ enum class PlatformAdminDomainManualAction {
 }
 
 val PlatformAdminClubDomain.desiredState: PlatformAdminDomainDesiredState
-    get() = if (status == ClubDomainStatus.DISABLED) {
-        PlatformAdminDomainDesiredState.DISABLED
-    } else {
-        PlatformAdminDomainDesiredState.ENABLED
-    }
+    get() =
+        if (status == ClubDomainStatus.DISABLED) {
+            PlatformAdminDomainDesiredState.DISABLED
+        } else {
+            PlatformAdminDomainDesiredState.ENABLED
+        }
 
 val PlatformAdminClubDomain.manualAction: PlatformAdminDomainManualAction
-    get() = if (status == ClubDomainStatus.ACTION_REQUIRED) {
-        PlatformAdminDomainManualAction.CLOUDFLARE_PAGES_CUSTOM_DOMAIN
-    } else {
-        PlatformAdminDomainManualAction.NONE
-    }
+    get() =
+        if (status == ClubDomainStatus.ACTION_REQUIRED) {
+            PlatformAdminDomainManualAction.CLOUDFLARE_PAGES_CUSTOM_DOMAIN
+        } else {
+            PlatformAdminDomainManualAction.NONE
+        }

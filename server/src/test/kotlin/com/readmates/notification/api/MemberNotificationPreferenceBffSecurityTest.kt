@@ -43,27 +43,29 @@ class MemberNotificationPreferenceBffSecurityTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `member notification preference bff request reaches controller without spring csrf token`() {
-        mockMvc.put("/api/me/notifications/preferences") {
-            with(user("member1@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            contentType = MediaType.APPLICATION_JSON
-            content = """
-                {
-                  "emailEnabled": false,
-                  "events": {
-                    "NEXT_BOOK_PUBLISHED": true,
-                    "SESSION_REMINDER_DUE": false,
-                    "FEEDBACK_DOCUMENT_PUBLISHED": true,
-                    "REVIEW_PUBLISHED": true
-                  }
-                }
-            """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.emailEnabled") { value(false) }
-            jsonPath("$.events.SESSION_REMINDER_DUE") { value(false) }
-            jsonPath("$.events.REVIEW_PUBLISHED") { value(true) }
-        }
+        mockMvc
+            .put("/api/me/notifications/preferences") {
+                with(user("member1@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "emailEnabled": false,
+                      "events": {
+                        "NEXT_BOOK_PUBLISHED": true,
+                        "SESSION_REMINDER_DUE": false,
+                        "FEEDBACK_DOCUMENT_PUBLISHED": true,
+                        "REVIEW_PUBLISHED": true
+                      }
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.emailEnabled") { value(false) }
+                jsonPath("$.events.SESSION_REMINDER_DUE") { value(false) }
+                jsonPath("$.events.REVIEW_PUBLISHED") { value(true) }
+            }
     }
 }

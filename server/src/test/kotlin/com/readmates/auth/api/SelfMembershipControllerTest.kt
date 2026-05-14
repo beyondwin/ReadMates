@@ -1,11 +1,11 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -14,10 +14,10 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -65,17 +65,18 @@ class SelfMembershipControllerTest(
         val sessionId = createOpenSessionWithMember("member5@example.com")
         val membershipId = membershipIdForEmail("member5@example.com")
 
-        mockMvc.post("/api/me/membership/leave") {
-            cookie(memberCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.member.status") { value("LEFT") }
-            jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
-        }
+        mockMvc
+            .post("/api/me/membership/leave") {
+                cookie(memberCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.status") { value("LEFT") }
+                jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
+            }
 
         assertEquals("LEFT", membershipStatus(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
@@ -86,15 +87,16 @@ class SelfMembershipControllerTest(
         val hostCookie = sessionCookieForEmail("host@example.com")
         val hostMembershipId = membershipIdForEmail("host@example.com")
 
-        mockMvc.post("/api/me/membership/leave") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/me/membership/leave") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
         assertEquals("ACTIVE", membershipStatus(hostMembershipId))
     }
@@ -108,18 +110,21 @@ class SelfMembershipControllerTest(
         val executor = Executors.newFixedThreadPool(2)
 
         try {
-            val statuses = listOf(hostCookie, secondHostCookie).map { cookie ->
-                executor.submit<Int> {
-                    start.await(5, TimeUnit.SECONDS)
-                    mockMvc.post("/api/me/membership/leave") {
-                        cookie(cookie)
-                        header("X-Readmates-Bff-Secret", "test-bff-secret")
-                        header("Origin", "http://localhost:3000")
-                        contentType = MediaType.APPLICATION_JSON
-                        content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-                    }.andReturn().response.status
+            val statuses =
+                listOf(hostCookie, secondHostCookie).map { cookie ->
+                    executor.submit<Int> {
+                        start.await(5, TimeUnit.SECONDS)
+                        mockMvc
+                            .post("/api/me/membership/leave") {
+                                cookie(cookie)
+                                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                header("Origin", "http://localhost:3000")
+                                contentType = MediaType.APPLICATION_JSON
+                                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+                            }.andReturn()
+                            .response.status
+                    }
                 }
-            }
             start.countDown()
 
             assertEquals(listOf(200, 409), statuses.map { it.get(10, TimeUnit.SECONDS) }.sorted())
@@ -132,14 +137,15 @@ class SelfMembershipControllerTest(
     private fun createOpenSessionWithMember(email: String): String {
         val sessionId = UUID.randomUUID().toString()
         val membershipId = membershipIdForEmail(email)
-        val nextNumber = jdbcTemplate.queryForObject(
-            """
-            select coalesce(max(number), 0) + 1000
-            from sessions
-            where club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-            Int::class.java,
-        ) ?: 1000
+        val nextNumber =
+            jdbcTemplate.queryForObject(
+                """
+                select coalesce(max(number), 0) + 1000
+                from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+                Int::class.java,
+            ) ?: 1000
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -214,16 +220,18 @@ class SelfMembershipControllerTest(
     }
 
     private fun sessionCookieForEmail(email: String): Cookie {
-        val userId = jdbcTemplate.queryForObject(
-            "select id from users where email = ?",
-            String::class.java,
-            email,
-        ) ?: error("Expected seeded user for $email")
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "SelfMembershipControllerTest",
-            ipAddress = "127.0.0.1",
-        )
+        val userId =
+            jdbcTemplate.queryForObject(
+                "select id from users where email = ?",
+                String::class.java,
+                email,
+            ) ?: error("Expected seeded user for $email")
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "SelfMembershipControllerTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
@@ -276,7 +284,10 @@ class SelfMembershipControllerTest(
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
 
-    private fun participationStatus(sessionId: String, membershipId: String): String =
+    private fun participationStatus(
+        sessionId: String,
+        membershipId: String,
+    ): String =
         jdbcTemplate.queryForObject(
             """
             select participation_status
@@ -289,7 +300,10 @@ class SelfMembershipControllerTest(
             membershipId,
         ) ?: error("Expected participant for $sessionId and $membershipId")
 
-    private fun resetSeedMembership(email: String, role: String) {
+    private fun resetSeedMembership(
+        email: String,
+        role: String,
+    ) {
         jdbcTemplate.update(
             """
             update memberships
@@ -318,7 +332,11 @@ class SelfMembershipControllerTest(
             Int::class.java,
         ) ?: 0
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

@@ -11,16 +11,17 @@ class NotificationEmailTemplatesTest {
 
     @Test
     fun `renders next book email with editorial ledger structure and absolute cta`() {
-        val copy = NotificationEmailTemplates.eventCopy(
-            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-            sessionId = sessionId,
-            sessionNumber = 8,
-            bookTitle = "Distributed Systems",
-            clubName = "읽는사이",
-            clubSlug = "reading-sai",
-            displayName = "민서",
-            appBaseUrl = "https://app.readmates.example",
-        )
+        val copy =
+            NotificationEmailTemplates.eventCopy(
+                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                sessionId = sessionId,
+                sessionNumber = 8,
+                bookTitle = "Distributed Systems",
+                clubName = "읽는사이",
+                clubSlug = "reading-sai",
+                displayName = "민서",
+                appBaseUrl = "https://app.readmates.example",
+            )
 
         assertThat(copy.title).isEqualTo("8회차 책이 공개되었습니다")
         assertThat(copy.body).isEqualTo("8회차 Distributed Systems 책이 공개되었습니다.")
@@ -59,47 +60,52 @@ class NotificationEmailTemplatesTest {
 
     @Test
     fun `renders all event subjects actions and links`() {
-        val cases = listOf(
-            NotificationEventType.SESSION_REMINDER_DUE to ExpectedEmail(
-                subject = "내일 8회차 모임이 있습니다",
-                label = "session reminder",
-                summary = "모임 전에 질문과 읽은 분량, 참석 여부를 한 번 더 정리해 주세요.",
-                contextLabel = "준비",
-                context = "질문, 읽은 분량, 참석 상태",
-                cta = "모임 준비 확인하기",
-                path = "/clubs/reading-sai/app/session/current",
-            ),
-            NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to ExpectedEmail(
-                subject = "8회차 피드백 문서가 올라왔습니다",
-                label = "feedback document",
-                summary = "참석한 회차의 정리와 다음 읽기에 참고할 내용을 확인해 주세요.",
-                contextLabel = "확인",
-                context = "피드백 문서와 모임 정리",
-                cta = "피드백 문서 확인하기",
-                path = "/clubs/reading-sai/app/feedback/$sessionId",
-            ),
-            NotificationEventType.REVIEW_PUBLISHED to ExpectedEmail(
-                subject = "8회차에 새 서평이 공개되었습니다",
-                label = "new review",
-                summary = "같은 회차에 새 서평이 공개되었습니다. 함께 읽은 기록을 이어서 확인해 주세요.",
-                contextLabel = "확인",
-                context = "새로 공개된 서평",
-                cta = "서평 확인하기",
-                path = "/clubs/reading-sai/app/notes?sessionId=$sessionId",
-            ),
-        )
+        val cases =
+            listOf(
+                NotificationEventType.SESSION_REMINDER_DUE to
+                    ExpectedEmail(
+                        subject = "내일 8회차 모임이 있습니다",
+                        label = "session reminder",
+                        summary = "모임 전에 질문과 읽은 분량, 참석 여부를 한 번 더 정리해 주세요.",
+                        contextLabel = "준비",
+                        context = "질문, 읽은 분량, 참석 상태",
+                        cta = "모임 준비 확인하기",
+                        path = "/clubs/reading-sai/app/session/current",
+                    ),
+                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to
+                    ExpectedEmail(
+                        subject = "8회차 피드백 문서가 올라왔습니다",
+                        label = "feedback document",
+                        summary = "참석한 회차의 정리와 다음 읽기에 참고할 내용을 확인해 주세요.",
+                        contextLabel = "확인",
+                        context = "피드백 문서와 모임 정리",
+                        cta = "피드백 문서 확인하기",
+                        path = "/clubs/reading-sai/app/feedback/$sessionId",
+                    ),
+                NotificationEventType.REVIEW_PUBLISHED to
+                    ExpectedEmail(
+                        subject = "8회차에 새 서평이 공개되었습니다",
+                        label = "new review",
+                        summary = "같은 회차에 새 서평이 공개되었습니다. 함께 읽은 기록을 이어서 확인해 주세요.",
+                        contextLabel = "확인",
+                        context = "새로 공개된 서평",
+                        cta = "서평 확인하기",
+                        path = "/clubs/reading-sai/app/notes?sessionId=$sessionId",
+                    ),
+            )
 
         cases.forEach { (eventType, expected) ->
-            val copy = NotificationEmailTemplates.eventCopy(
-                eventType = eventType,
-                sessionId = sessionId,
-                sessionNumber = 8,
-                bookTitle = "Distributed Systems",
-                clubName = "읽는사이",
-                clubSlug = "reading-sai",
-                displayName = null,
-                appBaseUrl = "https://app.readmates.example/",
-            )
+            val copy =
+                NotificationEmailTemplates.eventCopy(
+                    eventType = eventType,
+                    sessionId = sessionId,
+                    sessionNumber = 8,
+                    bookTitle = "Distributed Systems",
+                    clubName = "읽는사이",
+                    clubSlug = "reading-sai",
+                    displayName = null,
+                    appBaseUrl = "https://app.readmates.example/",
+                )
 
             val absoluteCtaUrl = "https://app.readmates.example${expected.path}"
 
@@ -134,16 +140,17 @@ class NotificationEmailTemplatesTest {
 
     @Test
     fun `normalizes app base url to http origin before rendering cta`() {
-        val copy = NotificationEmailTemplates.eventCopy(
-            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-            sessionId = sessionId,
-            sessionNumber = 8,
-            bookTitle = "Distributed Systems",
-            clubName = "읽는사이",
-            clubSlug = "reading-sai",
-            displayName = null,
-            appBaseUrl = " ",
-        )
+        val copy =
+            NotificationEmailTemplates.eventCopy(
+                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                sessionId = sessionId,
+                sessionNumber = 8,
+                bookTitle = "Distributed Systems",
+                clubName = "읽는사이",
+                clubSlug = "reading-sai",
+                displayName = null,
+                appBaseUrl = " ",
+            )
 
         assertThat(copy.emailBodyText)
             .contains("확인 링크: http://localhost:3000/clubs/reading-sai/app")
@@ -176,16 +183,17 @@ class NotificationEmailTemplatesTest {
 
     @Test
     fun `escapes dynamic values in html while keeping readable text fallback`() {
-        val copy = NotificationEmailTemplates.eventCopy(
-            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-            sessionId = sessionId,
-            sessionNumber = 8,
-            bookTitle = """책 <script>alert("x")</script> & 기록""",
-            clubName = """읽는사이 <script>alert("club")</script>""",
-            clubSlug = "reading-sai",
-            displayName = """민서 <img src=x onerror=alert(1)>""",
-            appBaseUrl = "https://app.readmates.example",
-        )
+        val copy =
+            NotificationEmailTemplates.eventCopy(
+                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                sessionId = sessionId,
+                sessionNumber = 8,
+                bookTitle = """책 <script>alert("x")</script> & 기록""",
+                clubName = """읽는사이 <script>alert("club")</script>""",
+                clubSlug = "reading-sai",
+                displayName = """민서 <img src=x onerror=alert(1)>""",
+                appBaseUrl = "https://app.readmates.example",
+            )
 
         assertThat(copy.emailBodyHtml)
             .contains("읽는사이 &lt;script&gt;alert(&quot;club&quot;)&lt;/script&gt;")

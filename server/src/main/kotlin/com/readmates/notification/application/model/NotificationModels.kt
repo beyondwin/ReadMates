@@ -108,11 +108,12 @@ data class NotificationEventMessage(
     val payload: NotificationEventPayload,
 )
 
-fun clubScopedAppPath(clubSlug: String, path: String): String =
-    "/clubs/$clubSlug/app/${path.trimStart('/')}"
+fun clubScopedAppPath(
+    clubSlug: String,
+    path: String,
+): String = "/clubs/$clubSlug/app/${path.trimStart('/')}"
 
-fun clubScopedAppHomePath(clubSlug: String): String =
-    "/clubs/$clubSlug/app"
+fun clubScopedAppHomePath(clubSlug: String): String = "/clubs/$clubSlug/app"
 
 data class NotificationDeliveryItem(
     val id: UUID,
@@ -435,11 +436,9 @@ data class NotificationPreferences(
     val emailEnabled: Boolean,
     val events: Map<NotificationEventType, Boolean>,
 ) {
-    fun enabled(eventType: NotificationEventType): Boolean =
-        emailEnabled && eventPreference(eventType)
+    fun enabled(eventType: NotificationEventType): Boolean = emailEnabled && eventPreference(eventType)
 
-    fun eventPreference(eventType: NotificationEventType): Boolean =
-        events[eventType] ?: defaultEventEnabled(eventType)
+    fun eventPreference(eventType: NotificationEventType): Boolean = events[eventType] ?: defaultEventEnabled(eventType)
 
     companion object {
         fun defaults(): NotificationPreferences =

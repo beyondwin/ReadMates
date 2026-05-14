@@ -1,15 +1,15 @@
 package com.readmates.notification.adapter.out.persistence
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
-import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventMessage
+import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -62,39 +62,43 @@ class JdbcNotificationEventOutboxAdapterTest(
     @Test
     fun `enqueue event is idempotent by dedupe key`() {
         insertClub()
-        val payload = NotificationEventPayload(
-            sessionId = sessionId,
-            sessionNumber = 7,
-            bookTitle = "Outbox Patterns",
-            targetDate = LocalDate.of(2026, 5, 1),
-        )
+        val payload =
+            NotificationEventPayload(
+                sessionId = sessionId,
+                sessionNumber = 7,
+                bookTitle = "Outbox Patterns",
+                targetDate = LocalDate.of(2026, 5, 1),
+            )
 
-        val first = adapter.enqueueEvent(
-            clubId = clubId,
-            eventType = NotificationEventType.SESSION_REMINDER_DUE,
-            aggregateType = "SESSION",
-            aggregateId = sessionId,
-            payload = payload,
-            dedupeKey = "event-outbox-adapter-test-dedupe",
-        )
-        val duplicate = adapter.enqueueEvent(
-            clubId = clubId,
-            eventType = NotificationEventType.SESSION_REMINDER_DUE,
-            aggregateType = "SESSION",
-            aggregateId = sessionId,
-            payload = payload.copy(bookTitle = "Duplicate Payload"),
-            dedupeKey = "event-outbox-adapter-test-dedupe",
-        )
+        val first =
+            adapter.enqueueEvent(
+                clubId = clubId,
+                eventType = NotificationEventType.SESSION_REMINDER_DUE,
+                aggregateType = "SESSION",
+                aggregateId = sessionId,
+                payload = payload,
+                dedupeKey = "event-outbox-adapter-test-dedupe",
+            )
+        val duplicate =
+            adapter.enqueueEvent(
+                clubId = clubId,
+                eventType = NotificationEventType.SESSION_REMINDER_DUE,
+                aggregateType = "SESSION",
+                aggregateId = sessionId,
+                payload = payload.copy(bookTitle = "Duplicate Payload"),
+                dedupeKey = "event-outbox-adapter-test-dedupe",
+            )
 
-        val row = jdbcTemplate.queryForMap(
-            """
-            select event_type, aggregate_type, aggregate_id, kafka_topic, kafka_key, status,
-                   json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title
-            from notification_event_outbox
-            where club_id = ?
-            """.trimIndent(),
-            clubId.toString(),
-        )
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select event_type, aggregate_type, aggregate_id, kafka_topic, kafka_key, status,
+                       json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title
+                from notification_event_outbox
+                where club_id = ?
+                """.trimIndent(),
+                clubId.toString(),
+            )
 
         assertThat(first).isTrue()
         assertThat(duplicate).isFalse()
@@ -147,15 +151,17 @@ class JdbcNotificationEventOutboxAdapterTest(
             enqueueTestEvent("event-outbox-adapter-test-concurrent-claim-$index")
         }
         val publisher = RecordingNotificationEventPublisher()
-        val service = NotificationRelayService(
-            notificationEventOutboxPort = adapter,
-            notificationEventPublisherPort = publisher,
-            maxAttempts = 5,
-        )
+        val service =
+            NotificationRelayService(
+                notificationEventOutboxPort = adapter,
+                notificationEventPublisherPort = publisher,
+                maxAttempts = 5,
+            )
 
-        val publishedCounts = runConcurrently(workerCount = 2) {
-            service.publishPending(limit = 2)
-        }
+        val publishedCounts =
+            runConcurrently(workerCount = 2) {
+                service.publishPending(limit = 2)
+            }
 
         assertThat(publishedCounts.sum()).isEqualTo(3)
         assertThat(publisher.eventIds()).hasSize(3).doesNotHaveDuplicates()
@@ -235,14 +241,16 @@ class JdbcNotificationEventOutboxAdapterTest(
     @Test
     fun `claim publishable moves due failed rows to publishing but leaves future failed rows alone`() {
         insertClub()
-        val dueFailedId = enqueueTestEvent(
-            dedupeKey = "event-outbox-adapter-test-due-failed",
-            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Due Failed"),
-        )
-        val futureFailedId = enqueueTestEvent(
-            dedupeKey = "event-outbox-adapter-test-future-failed",
-            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Future Failed"),
-        )
+        val dueFailedId =
+            enqueueTestEvent(
+                dedupeKey = "event-outbox-adapter-test-due-failed",
+                payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Due Failed"),
+            )
+        val futureFailedId =
+            enqueueTestEvent(
+                dedupeKey = "event-outbox-adapter-test-future-failed",
+                payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Future Failed"),
+            )
         markFailedForRetry(dueFailedId, nextAttemptExpression = "timestampadd(MINUTE, -1, utc_timestamp(6))")
         markFailedForRetry(futureFailedId, nextAttemptExpression = "timestampadd(MINUTE, 5, utc_timestamp(6))")
 
@@ -340,19 +348,21 @@ class JdbcNotificationEventOutboxAdapterTest(
     @Test
     fun `loadMessage maps created at and payload`() {
         insertClub()
-        val payload = NotificationEventPayload(
-            sessionId = sessionId,
-            sessionNumber = 12,
-            bookTitle = "Message Mapping",
-            documentVersion = 3,
-            authorMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000301"),
-            targetDate = LocalDate.of(2026, 5, 9),
-        )
-        val eventId = enqueueTestEvent(
-            dedupeKey = "event-outbox-adapter-test-load-message",
-            eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
-            payload = payload,
-        )
+        val payload =
+            NotificationEventPayload(
+                sessionId = sessionId,
+                sessionNumber = 12,
+                bookTitle = "Message Mapping",
+                documentVersion = 3,
+                authorMembershipId = UUID.fromString("00000000-0000-0000-0000-000000000301"),
+                targetDate = LocalDate.of(2026, 5, 9),
+            )
+        val eventId =
+            enqueueTestEvent(
+                dedupeKey = "event-outbox-adapter-test-load-message",
+                eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                payload = payload,
+            )
         jdbcTemplate.update(
             """
             update notification_event_outbox
@@ -391,25 +401,26 @@ class JdbcNotificationEventOutboxAdapterTest(
         val firstInserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 5, 1))
         val duplicateInserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 5, 1))
 
-        val row = jdbcTemplate.queryForMap(
-            """
-            select
-              event_type,
-              aggregate_type,
-              aggregate_id,
-              status,
-              kafka_topic,
-              kafka_key,
-              dedupe_key,
-              json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
-              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
-              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
-              json_unquote(json_extract(payload_json, '$.targetDate')) as target_date
-            from notification_event_outbox
-            where aggregate_id = ?
-            """.trimIndent(),
-            reminderSessionId,
-        )
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select
+                  event_type,
+                  aggregate_type,
+                  aggregate_id,
+                  status,
+                  kafka_topic,
+                  kafka_key,
+                  dedupe_key,
+                  json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+                  cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+                  json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
+                  json_unquote(json_extract(payload_json, '$.targetDate')) as target_date
+                from notification_event_outbox
+                where aggregate_id = ?
+                """.trimIndent(),
+                reminderSessionId,
+            )
 
         assertThat(firstInserted).isEqualTo(1)
         assertThat(duplicateInserted).isZero()
@@ -449,9 +460,7 @@ class JdbcNotificationEventOutboxAdapterTest(
             clubId.toString(),
         ) ?: 0
 
-    private fun claimSingleEvent(
-        dedupeKey: String,
-    ): NotificationEventOutboxItem {
+    private fun claimSingleEvent(dedupeKey: String): NotificationEventOutboxItem {
         val eventId = enqueueTestEvent(dedupeKey)
 
         return adapter.claimPublishable(10).single { it.id.toString() == eventId }
@@ -462,14 +471,15 @@ class JdbcNotificationEventOutboxAdapterTest(
         eventType: NotificationEventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
         payload: NotificationEventPayload = NotificationEventPayload(sessionId = sessionId, bookTitle = "Outbox Test"),
     ): String {
-        val inserted = adapter.enqueueEvent(
-            clubId = clubId,
-            eventType = eventType,
-            aggregateType = "SESSION",
-            aggregateId = sessionId,
-            payload = payload,
-            dedupeKey = dedupeKey,
-        )
+        val inserted =
+            adapter.enqueueEvent(
+                clubId = clubId,
+                eventType = eventType,
+                aggregateType = "SESSION",
+                aggregateId = sessionId,
+                payload = payload,
+                dedupeKey = dedupeKey,
+            )
         assertThat(inserted).isTrue()
         return eventIdForDedupeKey(dedupeKey)
     }
@@ -528,8 +538,7 @@ class JdbcNotificationEventOutboxAdapterTest(
             dedupeKey,
         ) ?: error("Missing notification event outbox row for dedupe key $dedupeKey")
 
-    private fun unsafeLongError(): String =
-        "Authorization: Bearer example reader@example.com " + "x".repeat(600)
+    private fun unsafeLongError(): String = "Authorization: Bearer example reader@example.com " + "x".repeat(600)
 
     private fun insertClub() {
         jdbcTemplate.update(
@@ -568,18 +577,22 @@ class JdbcNotificationEventOutboxAdapterTest(
         )
     }
 
-    private fun <T> runConcurrently(workerCount: Int, action: () -> T): List<T> {
+    private fun <T> runConcurrently(
+        workerCount: Int,
+        action: () -> T,
+    ): List<T> {
         val executor = Executors.newFixedThreadPool(workerCount)
         val ready = CountDownLatch(workerCount)
         val start = CountDownLatch(1)
         return try {
-            val futures = (1..workerCount).map {
-                executor.submit<T> {
-                    ready.countDown()
-                    check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
-                    action()
+            val futures =
+                (1..workerCount).map {
+                    executor.submit<T> {
+                        ready.countDown()
+                        check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
+                        action()
+                    }
                 }
-            }
             check(ready.await(5, TimeUnit.SECONDS)) { "Timed out waiting for concurrent workers" }
             start.countDown()
             futures.map { it.get(10, TimeUnit.SECONDS) }
@@ -591,7 +604,11 @@ class JdbcNotificationEventOutboxAdapterTest(
     private class RecordingNotificationEventPublisher : NotificationEventPublisherPort {
         private val eventIds = Collections.synchronizedList(mutableListOf<UUID>())
 
-        override fun publish(message: NotificationEventMessage, topic: String, key: String) {
+        override fun publish(
+            message: NotificationEventMessage,
+            topic: String,
+            key: String,
+        ) {
             eventIds += message.eventId
         }
 

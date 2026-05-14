@@ -8,6 +8,8 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 
 interface HostSessionDraftPort {
     fun create(command: HostSessionCommand): CreatedSessionResponse
+
     fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
+
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse
 }

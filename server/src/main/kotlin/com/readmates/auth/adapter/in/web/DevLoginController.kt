@@ -29,13 +29,15 @@ class DevLoginController(
         @Valid @RequestBody request: DevLoginRequest,
         httpRequest: HttpServletRequest,
     ): AuthMemberResponse {
-        val member = devLoginMember.findDevSeedActiveMemberByEmail(request.email)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown dev login email")
-        val authentication = UsernamePasswordAuthenticationToken(
-            member.email,
-            "N/A",
-            listOf(SimpleGrantedAuthority("ROLE_${member.role}")),
-        )
+        val member =
+            devLoginMember.findDevSeedActiveMemberByEmail(request.email)
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown dev login email")
+        val authentication =
+            UsernamePasswordAuthenticationToken(
+                member.email,
+                "N/A",
+                listOf(SimpleGrantedAuthority("ROLE_${member.role}")),
+            )
         val securityContext = SecurityContextHolder.createEmptyContext()
         securityContext.authentication = authentication
         SecurityContextHolder.setContext(securityContext)

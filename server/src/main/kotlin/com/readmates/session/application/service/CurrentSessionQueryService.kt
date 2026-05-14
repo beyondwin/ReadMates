@@ -9,6 +9,5 @@ import org.springframework.stereotype.Service
 class CurrentSessionQueryService(
     private val port: LoadCurrentSessionPort,
 ) : GetCurrentSessionUseCase {
-    override fun currentSession(member: CurrentMember) =
-        port.loadCurrentSession(member)
+    override fun currentSession(member: CurrentMember) = port.loadCurrentSession(member)
 }

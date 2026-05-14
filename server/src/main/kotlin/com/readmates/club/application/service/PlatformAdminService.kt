@@ -3,20 +3,20 @@ package com.readmates.club.application.service
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.CreateClubDomainCommand
-import com.readmates.club.application.model.PlatformAdminDashboardSummary
 import com.readmates.club.application.model.PlatformAdminClubDomain
+import com.readmates.club.application.model.PlatformAdminDashboardSummary
 import com.readmates.club.application.port.`in`.CheckClubDomainProvisioningUseCase
 import com.readmates.club.application.port.`in`.CreateClubDomainUseCase
 import com.readmates.club.application.port.`in`.PlatformAdminSummaryUseCase
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
-import com.readmates.club.application.port.out.CreateClubDomainResult
 import com.readmates.club.application.port.out.CreateClubDomainPort
+import com.readmates.club.application.port.out.CreateClubDomainResult
 import com.readmates.club.application.port.out.LoadClubDomainProvisioningPort
 import com.readmates.club.application.port.out.LoadPlatformAdminSummaryPort
 import com.readmates.club.application.port.out.UpdateClubDomainProvisioningPort
 import com.readmates.club.domain.ClubDomainStatus
-import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.stereotype.Service
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -61,12 +61,13 @@ class PlatformAdminService(
         }
 
         return when (
-            val result = createClubDomainPort.createClubDomain(
-                clubId = clubId,
-                hostname = hostname,
-                kind = command.kind,
-                isPrimary = command.isPrimary,
-            )
+            val result =
+                createClubDomainPort.createClubDomain(
+                    clubId = clubId,
+                    hostname = hostname,
+                    kind = command.kind,
+                    isPrimary = command.isPrimary,
+                )
         ) {
             is CreateClubDomainResult.Created -> result.domain
             CreateClubDomainResult.ClubNotFound -> throw PlatformAdminException(
@@ -88,8 +89,9 @@ class PlatformAdminService(
             throw AccessDeniedException("Platform admin role cannot manage club domains")
         }
 
-        val domain = loadClubDomainProvisioningPort.loadClubDomain(domainId)
-            ?: throw PlatformAdminException(PlatformAdminError.CLUB_DOMAIN_NOT_FOUND, "Club domain not found")
+        val domain =
+            loadClubDomainProvisioningPort.loadClubDomain(domainId)
+                ?: throw PlatformAdminException(PlatformAdminError.CLUB_DOMAIN_NOT_FOUND, "Club domain not found")
         if (domain.status == ClubDomainStatus.DISABLED) {
             throw PlatformAdminException(
                 PlatformAdminError.CLUB_DOMAIN_CONFLICT,
@@ -99,11 +101,12 @@ class PlatformAdminService(
 
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val result = checkClubDomainActualStatePort.check(domain.hostname)
-        val status = if (result.status == ClubDomainStatus.ACTIVE) {
-            ClubDomainStatus.ACTIVE
-        } else {
-            ClubDomainStatus.FAILED
-        }
+        val status =
+            if (result.status == ClubDomainStatus.ACTIVE) {
+                ClubDomainStatus.ACTIVE
+            } else {
+                ClubDomainStatus.FAILED
+            }
 
         return updateClubDomainProvisioningPort.updateClubDomainProvisioning(
             domainId = domainId,
@@ -115,7 +118,8 @@ class PlatformAdminService(
     }
 
     private fun normalizeHostname(hostname: String): String =
-        hostname.trim()
+        hostname
+            .trim()
             .removeSuffix(".")
             .lowercase(Locale.ROOT)
 

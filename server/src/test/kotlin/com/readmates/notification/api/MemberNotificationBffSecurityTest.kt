@@ -1,8 +1,8 @@
 package com.readmates.notification.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -69,12 +69,13 @@ class MemberNotificationBffSecurityTest(
     fun `mark notification read without bff secret is rejected`() {
         insertUnreadNotification()
 
-        mockMvc.post("/api/me/notifications/$MEMBER_NOTIFICATION_BFF_ID/read") {
-            with(user("member1@example.com"))
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isUnauthorized() }
-        }
+        mockMvc
+            .post("/api/me/notifications/$MEMBER_NOTIFICATION_BFF_ID/read") {
+                with(user("member1@example.com"))
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isUnauthorized() }
+            }
 
         assertEquals(1, unreadCount(MEMBER_NOTIFICATION_BFF_ID))
     }
@@ -83,12 +84,13 @@ class MemberNotificationBffSecurityTest(
     fun `mark notification read without allowed origin is rejected`() {
         insertUnreadNotification()
 
-        mockMvc.post("/api/me/notifications/$MEMBER_NOTIFICATION_BFF_ID/read") {
-            with(user("member1@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/me/notifications/$MEMBER_NOTIFICATION_BFF_ID/read") {
+                with(user("member1@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isForbidden() }
+            }
 
         assertEquals(1, unreadCount(MEMBER_NOTIFICATION_BFF_ID))
     }
@@ -97,13 +99,14 @@ class MemberNotificationBffSecurityTest(
     fun `mark notification read bff request reaches controller without spring csrf token`() {
         insertUnreadNotification()
 
-        mockMvc.post("/api/me/notifications/$MEMBER_NOTIFICATION_BFF_ID/read") {
-            with(user("member1@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isNoContent() }
-        }
+        mockMvc
+            .post("/api/me/notifications/$MEMBER_NOTIFICATION_BFF_ID/read") {
+                with(user("member1@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isNoContent() }
+            }
 
         assertEquals(0, unreadCount(MEMBER_NOTIFICATION_BFF_ID))
     }
@@ -112,12 +115,13 @@ class MemberNotificationBffSecurityTest(
     fun `mark all notifications read without bff secret is rejected`() {
         insertUnreadNotifications()
 
-        mockMvc.post("/api/me/notifications/read-all") {
-            with(user("member1@example.com"))
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isUnauthorized() }
-        }
+        mockMvc
+            .post("/api/me/notifications/read-all") {
+                with(user("member1@example.com"))
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isUnauthorized() }
+            }
 
         assertEquals(2, unreadCount())
     }
@@ -126,12 +130,13 @@ class MemberNotificationBffSecurityTest(
     fun `mark all notifications read without allowed origin is rejected`() {
         insertUnreadNotifications()
 
-        mockMvc.post("/api/me/notifications/read-all") {
-            with(user("member1@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/me/notifications/read-all") {
+                with(user("member1@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isForbidden() }
+            }
 
         assertEquals(2, unreadCount())
     }
@@ -140,14 +145,15 @@ class MemberNotificationBffSecurityTest(
     fun `mark all notifications read bff request reaches controller without spring csrf token`() {
         insertUnreadNotifications()
 
-        mockMvc.post("/api/me/notifications/read-all") {
-            with(user("member1@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.updatedCount") { value(2) }
-        }
+        mockMvc
+            .post("/api/me/notifications/read-all") {
+                with(user("member1@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.updatedCount") { value(2) }
+            }
 
         assertEquals(0, unreadCount())
     }
@@ -256,16 +262,17 @@ class MemberNotificationBffSecurityTest(
     }
 
     private fun unreadCount(vararg ids: String): Int {
-        val idPredicate = if (ids.isEmpty()) {
-            """
-              and id in (
-                '$MEMBER_NOTIFICATION_BFF_ID',
-                '$SECOND_MEMBER_NOTIFICATION_BFF_ID'
-              )
-            """.trimIndent()
-        } else {
-            "and id in (${ids.joinToString(",") { "'$it'" }})"
-        }
+        val idPredicate =
+            if (ids.isEmpty()) {
+                """
+                and id in (
+                  '$MEMBER_NOTIFICATION_BFF_ID',
+                  '$SECOND_MEMBER_NOTIFICATION_BFF_ID'
+                )
+                """.trimIndent()
+            } else {
+                "and id in (${ids.joinToString(",") { "'$it'" }})"
+            }
         return jdbcTemplate.queryForObject(
             """
             select count(*)

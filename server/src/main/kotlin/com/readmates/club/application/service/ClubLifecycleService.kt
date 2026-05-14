@@ -16,7 +16,6 @@ class ClubLifecycleService(
     private val port: ClubLifecyclePort,
     private val objectMapper: ObjectMapper,
 ) : ClubLifecycleUseCase {
-
     @Transactional
     override fun activateAfterFirstHostJoin(clubId: UUID) {
         val current = loadOrThrow(clubId)
@@ -32,7 +31,11 @@ class ClubLifecycleService(
     }
 
     @Transactional
-    override fun suspend(clubId: UUID, actor: CurrentPlatformAdmin, reason: String) {
+    override fun suspend(
+        clubId: UUID,
+        actor: CurrentPlatformAdmin,
+        reason: String,
+    ) {
         val current = loadOrThrow(clubId)
         requireTransition(current, ClubStatus.SUSPENDED)
         transition(clubId, current, ClubStatus.SUSPENDED)
@@ -46,7 +49,10 @@ class ClubLifecycleService(
     }
 
     @Transactional
-    override fun restore(clubId: UUID, actor: CurrentPlatformAdmin) {
+    override fun restore(
+        clubId: UUID,
+        actor: CurrentPlatformAdmin,
+    ) {
         val current = loadOrThrow(clubId)
         requireTransition(current, ClubStatus.ACTIVE)
         transition(clubId, current, ClubStatus.ACTIVE)
@@ -60,7 +66,10 @@ class ClubLifecycleService(
     }
 
     @Transactional
-    override fun archive(clubId: UUID, actor: CurrentPlatformAdmin) {
+    override fun archive(
+        clubId: UUID,
+        actor: CurrentPlatformAdmin,
+    ) {
         val current = loadOrThrow(clubId)
         requireTransition(current, ClubStatus.ARCHIVED)
         transition(clubId, current, ClubStatus.ARCHIVED)
@@ -77,7 +86,10 @@ class ClubLifecycleService(
         port.loadCurrentStatus(clubId)
             ?: throw ClubLifecycleException(ClubLifecycleError.CLUB_NOT_FOUND, "Club not found: $clubId")
 
-    private fun requireTransition(from: ClubStatus, to: ClubStatus) {
+    private fun requireTransition(
+        from: ClubStatus,
+        to: ClubStatus,
+    ) {
         if (!from.canTransitionTo(to)) {
             throw ClubLifecycleException(
                 ClubLifecycleError.INVALID_TRANSITION,
@@ -86,7 +98,11 @@ class ClubLifecycleService(
         }
     }
 
-    private fun transition(clubId: UUID, from: ClubStatus, to: ClubStatus) {
+    private fun transition(
+        clubId: UUID,
+        from: ClubStatus,
+        to: ClubStatus,
+    ) {
         val updated = port.transitionStatus(clubId, from, to)
         if (!updated) {
             throw ClubLifecycleException(
@@ -96,6 +112,5 @@ class ClubLifecycleService(
         }
     }
 
-    private fun auditJson(vararg pairs: Pair<String, Any?>): String =
-        objectMapper.writeValueAsString(mapOf(*pairs))
+    private fun auditJson(vararg pairs: Pair<String, Any?>): String = objectMapper.writeValueAsString(mapOf(*pairs))
 }

@@ -6,5 +6,6 @@ import com.readmates.session.application.model.HostSessionIdCommand
 
 interface HostSessionDeletionPort {
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
+
     fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse
 }

@@ -17,12 +17,13 @@ class ClubContextService(
             ?.let(loadClubContextPort::loadBySlug)
 
     override fun resolveByHost(host: String?): ResolvedClubContext? {
-        val normalizedHost = host
-            ?.trim()
-            ?.trimEnd('.')
-            ?.lowercase(Locale.ROOT)
-            ?.takeIf { it.isNotEmpty() }
-            ?: return null
+        val normalizedHost =
+            host
+                ?.trim()
+                ?.trimEnd('.')
+                ?.lowercase(Locale.ROOT)
+                ?.takeIf { it.isNotEmpty() }
+                ?: return null
 
         return loadClubContextPort.loadByHostname(normalizedHost)
     }

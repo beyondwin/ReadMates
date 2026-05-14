@@ -5,13 +5,14 @@ import org.testcontainers.mysql.MySQLContainer
 import org.testcontainers.utility.DockerImageName
 
 object MySqlTestContainer {
-    private val container = ReadmatesMySQLContainer().apply {
-        withDatabaseName("readmates")
-        withUsername("readmates")
-        withPassword("readmates")
-        withCommand("--log-bin-trust-function-creators=1")
-        start()
-    }
+    private val container =
+        ReadmatesMySQLContainer().apply {
+            withDatabaseName("readmates")
+            withUsername("readmates")
+            withPassword("readmates")
+            withCommand("--log-bin-trust-function-creators=1")
+            start()
+        }
 
     fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
         registry.add("spring.datasource.url", container::getJdbcUrl)
@@ -22,7 +23,8 @@ object MySqlTestContainer {
         registry.add("spring.datasource.hikari.minimum-idle") { "0" }
     }
 
-    private class ReadmatesMySQLContainer : MySQLContainer(
-        DockerImageName.parse("mysql:8.4"),
-    )
+    private class ReadmatesMySQLContainer :
+        MySQLContainer(
+            DockerImageName.parse("mysql:8.4"),
+        )
 }

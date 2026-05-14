@@ -1,12 +1,12 @@
 package com.readmates.auth.application.service
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.security.CurrentMember
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -32,32 +32,35 @@ class GoogleLoginServiceTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `connects existing gmail user and preserves active membership`() {
-        val member = googleLoginService.loginVerifiedGoogleUser(
-            googleSubjectId = "google-existing-host",
-            email = "host@example.com",
-            displayName = "김호스트",
-            profileImageUrl = "https://example.com/sample-host.png",
-        )
+        val member =
+            googleLoginService.loginVerifiedGoogleUser(
+                googleSubjectId = "google-existing-host",
+                email = "host@example.com",
+                displayName = "김호스트",
+                profileImageUrl = "https://example.com/sample-host.png",
+            )
 
         assertEquals("host@example.com", member.email)
         assertEquals(MembershipStatus.ACTIVE, member.membershipStatus)
         assertEquals("HOST", member.role.name)
 
-        val subject = jdbcTemplate.queryForObject(
-            "select google_subject_id from users where email = 'host@example.com'",
-            String::class.java,
-        )
+        val subject =
+            jdbcTemplate.queryForObject(
+                "select google_subject_id from users where email = 'host@example.com'",
+                String::class.java,
+            )
         assertEquals("google-existing-host", subject)
     }
 
     @Test
     fun `creates viewer membership for new google user without invite`() {
-        val member = googleLoginService.loginVerifiedGoogleUser(
-            googleSubjectId = "google-new-viewer-user",
-            email = "new.viewer@example.com",
-            displayName = "New Viewer",
-            profileImageUrl = "https://example.com/new.png",
-        )
+        val member =
+            googleLoginService.loginVerifiedGoogleUser(
+                googleSubjectId = "google-new-viewer-user",
+                email = "new.viewer@example.com",
+                displayName = "New Viewer",
+                profileImageUrl = "https://example.com/new.png",
+            )
 
         assertEquals("new.viewer@example.com", member.email)
         assertEquals(MembershipStatus.VIEWER, member.membershipStatus)
@@ -95,36 +98,39 @@ class GoogleLoginServiceTest(
         dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
-                connection.prepareStatement(
-                    """
-                    insert into users (id, google_subject_id, email, name, short_name, auth_provider)
-                    values (?, ?, ?, 'Race Viewer', 'Race Viewer', 'GOOGLE')
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, userId)
-                    statement.setString(2, googleSubjectId)
-                    statement.setString(3, email)
-                    statement.executeUpdate()
-                }
-                connection.prepareStatement(
-                    """
-                    insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
-                    values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Race Viewer')
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, membershipId)
-                    statement.setString(2, userId)
-                    statement.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        """
+                        insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+                        values (?, ?, ?, 'Race Viewer', 'Race Viewer', 'GOOGLE')
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, userId)
+                        statement.setString(2, googleSubjectId)
+                        statement.setString(3, email)
+                        statement.executeUpdate()
+                    }
+                connection
+                    .prepareStatement(
+                        """
+                        insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+                        values (?, '00000000-0000-0000-0000-000000000001', ?, 'MEMBER', 'VIEWER', null, 'Race Viewer')
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, membershipId)
+                        statement.setString(2, userId)
+                        statement.executeUpdate()
+                    }
 
-                val future = executor.submit<CurrentMember> {
-                    googleLoginService.loginVerifiedGoogleUser(
-                        googleSubjectId = googleSubjectId,
-                        email = email,
-                        displayName = "Race Viewer",
-                        profileImageUrl = null,
-                    )
-                }
+                val future =
+                    executor.submit<CurrentMember> {
+                        googleLoginService.loginVerifiedGoogleUser(
+                            googleSubjectId = googleSubjectId,
+                            email = email,
+                            displayName = "Race Viewer",
+                            profileImageUrl = null,
+                        )
+                    }
                 Thread.sleep(250)
                 assertFalse(future.isDone)
 

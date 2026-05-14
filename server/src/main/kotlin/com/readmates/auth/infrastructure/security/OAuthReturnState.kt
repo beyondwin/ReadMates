@@ -24,27 +24,31 @@ class OAuthReturnState(
     sessionCookieDomain: String,
     private val trustedReturnHostPort: TrustedReturnHostPort,
 ) {
-    private val normalizedSecret = secret.trim().also {
-        require(it.isNotEmpty()) {
-            "readmates.auth.return-state-secret must be set via READMATES_AUTH_RETURN_STATE_SECRET"
+    private val normalizedSecret =
+        secret.trim().also {
+            require(it.isNotEmpty()) {
+                "readmates.auth.return-state-secret must be set via READMATES_AUTH_RETURN_STATE_SECRET"
+            }
         }
-    }
     private val appOrigin = readmatesAppOrigin(appBaseUrl)
     private val primaryAppHost = URI.create(appOrigin).host.lowercase(Locale.ROOT)
-    private val sharedSessionCookieDomain = sessionCookieDomain
-        .trim()
-        .trimStart('.')
-        .trimEnd('.')
-        .lowercase(Locale.ROOT)
-        .takeIf { it.isNotEmpty() }
+    private val sharedSessionCookieDomain =
+        sessionCookieDomain
+            .trim()
+            .trimStart('.')
+            .trimEnd('.')
+            .lowercase(Locale.ROOT)
+            .takeIf { it.isNotEmpty() }
     private val encoder = Base64.getUrlEncoder().withoutPadding()
     private val decoder = Base64.getUrlDecoder()
     private val signingKey = SecretKeySpec(normalizedSecret.toByteArray(Charsets.UTF_8), HMAC_ALGORITHM)
 
-    fun signReturnTarget(returnTo: String?): String? =
-        signReturnTarget(returnTo, Instant.now().plus(ttl))
+    fun signReturnTarget(returnTo: String?): String? = signReturnTarget(returnTo, Instant.now().plus(ttl))
 
-    fun signReturnTarget(returnTo: String?, expiresAt: Instant): String? {
+    fun signReturnTarget(
+        returnTo: String?,
+        expiresAt: Instant,
+    ): String? {
         val trustedReturnTo = trustedReturnTarget(returnTo) ?: return null
         val expiresAtEpochSeconds = expiresAt.epochSecond
         val encodedReturnTo = encoder.encodeToString(trustedReturnTo.toByteArray(Charsets.UTF_8))
@@ -52,20 +56,32 @@ class OAuthReturnState(
         return "$encodedReturnTo.$expiresAtEpochSeconds.$signature"
     }
 
-    fun validatedReturnTarget(signedState: String?, fallback: String = DEFAULT_RETURN_TARGET): String {
+    fun validatedReturnTarget(
+        signedState: String?,
+        fallback: String = DEFAULT_RETURN_TARGET,
+    ): String {
         val trustedReturnTo = verifiedReturnTarget(signedState)
         return trustedReturnTo ?: fallback
     }
 
-    fun inviteReturnTarget(clubSlug: String, inviteToken: String): String =
-        "/clubs/$clubSlug/invite/$inviteToken"
+    fun inviteReturnTarget(
+        clubSlug: String,
+        inviteToken: String,
+    ): String = "/clubs/$clubSlug/invite/$inviteToken"
 
-    fun inviteClubSlugFromReturnState(signedState: String?, inviteToken: String): String? {
+    fun inviteClubSlugFromReturnState(
+        signedState: String?,
+        inviteToken: String,
+    ): String? {
         val returnTarget = verifiedReturnTarget(signedState) ?: return null
         return inviteClubSlug(returnTarget, inviteToken)
     }
 
-    fun inviteReturnTargetFromState(signedState: String?, clubSlug: String, inviteToken: String): String? {
+    fun inviteReturnTargetFromState(
+        signedState: String?,
+        clubSlug: String,
+        inviteToken: String,
+    ): String? {
         val returnTarget = verifiedReturnTarget(signedState) ?: return null
         return returnTarget.takeIf { inviteReturnTargetMatchesClub(it, clubSlug, inviteToken) }
     }
@@ -78,11 +94,12 @@ class OAuthReturnState(
         }
 
     private fun verifiedReturnTarget(signedState: String?): String? {
-        val parts = signedState
-            ?.trim()
-            ?.split(".")
-            ?.takeIf { it.size == 3 }
-            ?: return null
+        val parts =
+            signedState
+                ?.trim()
+                ?.split(".")
+                ?.takeIf { it.size == 3 }
+                ?: return null
         val returnTo = decode(parts[0]) ?: return null
         val expiresAtEpochSeconds = parts[1].toLongOrNull() ?: return null
         if (Instant.now().epochSecond > expiresAtEpochSeconds) {
@@ -98,11 +115,12 @@ class OAuthReturnState(
     }
 
     private fun trustedReturnTarget(returnTo: String?): String? {
-        val candidate = returnTo
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() && it.length <= MAX_RETURN_TO_LENGTH }
-            ?.takeIf { it.none(Char::isISOControl) }
-            ?: return null
+        val candidate =
+            returnTo
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() && it.length <= MAX_RETURN_TO_LENGTH }
+                ?.takeIf { it.none(Char::isISOControl) }
+                ?: return null
 
         return if (candidate.startsWith("/")) {
             candidate.takeIf { !it.startsWith("//") && !it.contains('\\') }
@@ -112,11 +130,12 @@ class OAuthReturnState(
     }
 
     private fun trustedAbsoluteReturnTarget(candidate: String): String? {
-        val uri = try {
-            URI.create(candidate)
-        } catch (_: IllegalArgumentException) {
-            return null
-        }
+        val uri =
+            try {
+                URI.create(candidate)
+            } catch (_: IllegalArgumentException) {
+                return null
+            }
         val scheme = uri.scheme?.lowercase(Locale.ROOT)
         if (scheme != "http" && scheme != "https") {
             return null
@@ -141,16 +160,18 @@ class OAuthReturnState(
         return host == cookieDomain || host.endsWith(".$cookieDomain")
     }
 
-    private fun isActiveClubDomain(host: String): Boolean {
-        return activeClubSlugForDomain(host) != null
-    }
+    private fun isActiveClubDomain(host: String): Boolean = activeClubSlugForDomain(host) != null
 
-    private fun inviteClubSlug(returnTarget: String, inviteToken: String): String? {
-        val uri = try {
-            URI.create(returnTarget)
-        } catch (_: IllegalArgumentException) {
-            return null
-        }
+    private fun inviteClubSlug(
+        returnTarget: String,
+        inviteToken: String,
+    ): String? {
+        val uri =
+            try {
+                URI.create(returnTarget)
+            } catch (_: IllegalArgumentException) {
+                return null
+            }
         val path = uri.path ?: return null
         val scopedMatch = CLUB_INVITE_PATH.matchEntire(path)
         if (scopedMatch != null) {
@@ -164,12 +185,17 @@ class OAuthReturnState(
         return activeClubSlugForDomain(host)
     }
 
-    private fun inviteReturnTargetMatchesClub(returnTarget: String, clubSlug: String, inviteToken: String): Boolean {
-        val uri = try {
-            URI.create(returnTarget)
-        } catch (_: IllegalArgumentException) {
-            return false
-        }
+    private fun inviteReturnTargetMatchesClub(
+        returnTarget: String,
+        clubSlug: String,
+        inviteToken: String,
+    ): Boolean {
+        val uri =
+            try {
+                URI.create(returnTarget)
+            } catch (_: IllegalArgumentException) {
+                return false
+            }
         val path = uri.path ?: return false
         val scopedMatch = CLUB_INVITE_PATH.matchEntire(path)
         if (scopedMatch != null) {
@@ -193,11 +219,12 @@ class OAuthReturnState(
         return activeClubSlugForDomain(host) == clubSlug
     }
 
-    private fun activeClubSlugForDomain(host: String): String? {
-        return trustedReturnHostPort.activeClubSlugForHost(host)
-    }
+    private fun activeClubSlugForDomain(host: String): String? = trustedReturnHostPort.activeClubSlugForHost(host)
 
-    private fun signature(returnTo: String, expiresAtEpochSeconds: Long): String {
+    private fun signature(
+        returnTo: String,
+        expiresAtEpochSeconds: Long,
+    ): String {
         val mac = Mac.getInstance(HMAC_ALGORITHM)
         mac.init(signingKey)
         return encoder.encodeToString(mac.doFinal("$returnTo|$expiresAtEpochSeconds".toByteArray(Charsets.UTF_8)))

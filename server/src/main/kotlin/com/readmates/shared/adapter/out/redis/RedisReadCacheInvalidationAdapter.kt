@@ -31,10 +31,11 @@ class RedisReadCacheInvalidationAdapter(
 
     private fun evictNotesContent(clubId: UUID) {
         runCatching {
-            val notesKeys = mutableSetOf(
-                "notes:club:$clubId:feed:v1",
-                "notes:club:$clubId:sessions:v1",
-            )
+            val notesKeys =
+                mutableSetOf(
+                    "notes:club:$clubId:feed:v1",
+                    "notes:club:$clubId:sessions:v1",
+                )
             redisTemplate.keys("notes:club:$clubId:session:*:feed:v1")?.let(notesKeys::addAll)
             delete(notesKeys)
             metrics.increment("readmates.notes_cache.evicted", "scope", "club")
@@ -59,5 +60,4 @@ class RedisReadCacheInvalidationAdapter(
             operation,
         )
     }
-
 }

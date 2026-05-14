@@ -17,9 +17,10 @@ data class RequestedClubContext(
 )
 
 fun HttpServletRequest.resolveClubContext(resolveClubContextUseCase: ResolveClubContextUseCase): RequestedClubContext {
-    val slug = getHeader(ClubContextHeader.CLUB_SLUG)
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
+    val slug =
+        getHeader(ClubContextHeader.CLUB_SLUG)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
     if (slug != null) {
         return RequestedClubContext(
             supplied = true,
@@ -28,9 +29,10 @@ fun HttpServletRequest.resolveClubContext(resolveClubContextUseCase: ResolveClub
         )
     }
 
-    val host = getHeader(ClubContextHeader.CLUB_HOST)
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
+    val host =
+        getHeader(ClubContextHeader.CLUB_HOST)
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
     if (host != null) {
         return RequestedClubContext(
             supplied = true,

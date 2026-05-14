@@ -1,7 +1,7 @@
 package com.readmates.note.adapter.`in`.web
 
-import com.readmates.session.application.model.ReplaceQuestionsCommand
 import com.readmates.session.application.model.ReplaceQuestionCommandItem
+import com.readmates.session.application.model.ReplaceQuestionsCommand
 import com.readmates.session.application.model.SaveQuestionCommand
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.constraints.Max
@@ -13,8 +13,7 @@ data class CreateQuestionRequest(
     @field:NotBlank val text: String,
     val draftThought: String?,
 ) {
-    fun toCommand(member: CurrentMember): SaveQuestionCommand =
-        SaveQuestionCommand(member, priority, text, draftThought)
+    fun toCommand(member: CurrentMember): SaveQuestionCommand = SaveQuestionCommand(member, priority, text, draftThought)
 }
 
 data class ReplaceQuestionsRequest(

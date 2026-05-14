@@ -7,5 +7,10 @@ import java.util.UUID
 
 interface NotificationDeliveryBacklogPort {
     fun deliveryBacklog(): NotificationDeliveryBacklog
-    fun countByStatus(clubId: UUID, channel: NotificationChannel?, status: NotificationDeliveryStatus): Int
+
+    fun countByStatus(
+        clubId: UUID,
+        channel: NotificationChannel?,
+        status: NotificationDeliveryStatus,
+    ): Int
 }

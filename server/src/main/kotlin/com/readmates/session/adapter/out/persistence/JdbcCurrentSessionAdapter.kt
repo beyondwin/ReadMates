@@ -29,32 +29,34 @@ class JdbcCurrentSessionAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : LoadCurrentSessionPort {
     override fun loadCurrentSession(member: CurrentMember): CurrentSessionPayload {
-        val session = jdbcTemplate.query(
-            """
-            select
-              id,
-              number,
-              title,
-              book_title,
-              book_author,
-              book_link,
-              book_image_url,
-              session_date,
-              start_time,
-              end_time,
-              location_label,
-              meeting_url,
-              meeting_passcode,
-              question_deadline_at
-            from sessions
-            where club_id = ?
-              and state = 'OPEN'
-            order by number desc
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toCurrentSessionDetail(member, jdbcTemplate) },
-            member.clubId.dbString(),
-        ).firstOrNull() ?: return CurrentSessionPayload(null)
+        val session =
+            jdbcTemplate
+                .query(
+                    """
+                    select
+                      id,
+                      number,
+                      title,
+                      book_title,
+                      book_author,
+                      book_link,
+                      book_image_url,
+                      session_date,
+                      start_time,
+                      end_time,
+                      location_label,
+                      meeting_url,
+                      meeting_passcode,
+                      question_deadline_at
+                    from sessions
+                    where club_id = ?
+                      and state = 'OPEN'
+                    order by number desc
+                    limit 1
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.toCurrentSessionDetail(member, jdbcTemplate) },
+                    member.clubId.dbString(),
+                ).firstOrNull() ?: return CurrentSessionPayload(null)
 
         val sessionId = UUID.fromString(session.sessionId)
         return CurrentSessionPayload(
@@ -62,22 +64,26 @@ class JdbcCurrentSessionAdapter(
         )
     }
 
-    fun findOpenSessionId(clubId: UUID): UUID {
-        return jdbcTemplate.query(
-            """
-            select id
-            from sessions
-            where club_id = ?
-              and state = 'OPEN'
-            order by number desc
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.uuid("id") },
-            clubId.dbString(),
-        ).firstOrNull() ?: throw CurrentSessionNotOpenException()
-    }
+    fun findOpenSessionId(clubId: UUID): UUID =
+        jdbcTemplate
+            .query(
+                """
+                select id
+                from sessions
+                where club_id = ?
+                  and state = 'OPEN'
+                order by number desc
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.uuid("id") },
+                clubId.dbString(),
+            ).firstOrNull() ?: throw CurrentSessionNotOpenException()
 
-    private fun findAttendees(jdbcTemplate: JdbcTemplate, sessionId: UUID, clubId: UUID): List<SessionAttendee> =
+    private fun findAttendees(
+        jdbcTemplate: JdbcTemplate,
+        sessionId: UUID,
+        clubId: UUID,
+    ): List<SessionAttendee> =
         jdbcTemplate.query(
             """
             select
@@ -116,31 +122,32 @@ class JdbcCurrentSessionAdapter(
         sessionId: UUID,
         member: CurrentMember,
     ): CurrentSessionCheckin? =
-        jdbcTemplate.query(
-            """
-            select reading_progress
-            from reading_checkins
-            where reading_checkins.session_id = ?
-              and reading_checkins.club_id = ?
-              and membership_id = ?
-              and exists (
-                select 1
-                from session_participants
-                where session_participants.session_id = reading_checkins.session_id
-                  and session_participants.club_id = reading_checkins.club_id
-                  and session_participants.membership_id = reading_checkins.membership_id
-                  and session_participants.participation_status = 'ACTIVE'
-              )
-            """.trimIndent(),
-            { resultSet, _ ->
-                CurrentSessionCheckin(
-                    readingProgress = resultSet.getInt("reading_progress"),
-                )
-            },
-            sessionId.dbString(),
-            member.clubId.dbString(),
-            member.membershipId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select reading_progress
+                from reading_checkins
+                where reading_checkins.session_id = ?
+                  and reading_checkins.club_id = ?
+                  and membership_id = ?
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = reading_checkins.session_id
+                      and session_participants.club_id = reading_checkins.club_id
+                      and session_participants.membership_id = reading_checkins.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
+                """.trimIndent(),
+                { resultSet, _ ->
+                    CurrentSessionCheckin(
+                        readingProgress = resultSet.getInt("reading_progress"),
+                    )
+                },
+                sessionId.dbString(),
+                member.clubId.dbString(),
+                member.membershipId.dbString(),
+            ).firstOrNull()
 
     private fun findQuestions(
         jdbcTemplate: JdbcTemplate,
@@ -193,54 +200,56 @@ class JdbcCurrentSessionAdapter(
         sessionId: UUID,
         member: CurrentMember,
     ): CurrentSessionOneLineReview? =
-        jdbcTemplate.query(
-            """
-            select text
-            from one_line_reviews
-            where one_line_reviews.session_id = ?
-              and one_line_reviews.club_id = ?
-              and membership_id = ?
-              and exists (
-                select 1
-                from session_participants
-                where session_participants.session_id = one_line_reviews.session_id
-                  and session_participants.club_id = one_line_reviews.club_id
-                  and session_participants.membership_id = one_line_reviews.membership_id
-                  and session_participants.participation_status = 'ACTIVE'
-              )
-            """.trimIndent(),
-            { resultSet, _ -> CurrentSessionOneLineReview(text = resultSet.getString("text")) },
-            sessionId.dbString(),
-            member.clubId.dbString(),
-            member.membershipId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select text
+                from one_line_reviews
+                where one_line_reviews.session_id = ?
+                  and one_line_reviews.club_id = ?
+                  and membership_id = ?
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = one_line_reviews.session_id
+                      and session_participants.club_id = one_line_reviews.club_id
+                      and session_participants.membership_id = one_line_reviews.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
+                """.trimIndent(),
+                { resultSet, _ -> CurrentSessionOneLineReview(text = resultSet.getString("text")) },
+                sessionId.dbString(),
+                member.clubId.dbString(),
+                member.membershipId.dbString(),
+            ).firstOrNull()
 
     private fun findMyLongReview(
         jdbcTemplate: JdbcTemplate,
         sessionId: UUID,
         member: CurrentMember,
     ): CurrentSessionLongReview? =
-        jdbcTemplate.query(
-            """
-            select body
-            from long_reviews
-            where long_reviews.session_id = ?
-              and long_reviews.club_id = ?
-              and membership_id = ?
-              and exists (
-                select 1
-                from session_participants
-                where session_participants.session_id = long_reviews.session_id
-                  and session_participants.club_id = long_reviews.club_id
-                  and session_participants.membership_id = long_reviews.membership_id
-                  and session_participants.participation_status = 'ACTIVE'
-              )
-            """.trimIndent(),
-            { resultSet, _ -> CurrentSessionLongReview(body = resultSet.getString("body")) },
-            sessionId.dbString(),
-            member.clubId.dbString(),
-            member.membershipId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select body
+                from long_reviews
+                where long_reviews.session_id = ?
+                  and long_reviews.club_id = ?
+                  and membership_id = ?
+                  and exists (
+                    select 1
+                    from session_participants
+                    where session_participants.session_id = long_reviews.session_id
+                      and session_participants.club_id = long_reviews.club_id
+                      and session_participants.membership_id = long_reviews.membership_id
+                      and session_participants.participation_status = 'ACTIVE'
+                  )
+                """.trimIndent(),
+                { resultSet, _ -> CurrentSessionLongReview(body = resultSet.getString("body")) },
+                sessionId.dbString(),
+                member.clubId.dbString(),
+                member.membershipId.dbString(),
+            ).firstOrNull()
 
     private fun findBoardOneLineReviews(
         jdbcTemplate: JdbcTemplate,
@@ -329,7 +338,11 @@ class JdbcCurrentSessionAdapter(
             member.membershipId.dbString(),
         )
 
-    private fun findBoardHighlights(jdbcTemplate: JdbcTemplate, sessionId: UUID, clubId: UUID): List<BoardHighlight> =
+    private fun findBoardHighlights(
+        jdbcTemplate: JdbcTemplate,
+        sessionId: UUID,
+        clubId: UUID,
+    ): List<BoardHighlight> =
         jdbcTemplate.query(
             """
             select highlights.text, highlights.sort_order
@@ -355,22 +368,27 @@ class JdbcCurrentSessionAdapter(
             clubId.dbString(),
         )
 
-    private fun ResultSet.toCurrentSessionDetail(member: CurrentMember, jdbcTemplate: JdbcTemplate): CurrentSessionDetail {
+    private fun ResultSet.toCurrentSessionDetail(
+        member: CurrentMember,
+        jdbcTemplate: JdbcTemplate,
+    ): CurrentSessionDetail {
         val sessionId = uuid("id")
-        val myRsvpStatus = jdbcTemplate.query(
-            """
-            select rsvp_status
-            from session_participants
-            where session_id = ?
-              and membership_id = ?
-              and club_id = ?
-              and participation_status = 'ACTIVE'
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("rsvp_status") },
-            sessionId.dbString(),
-            member.membershipId.dbString(),
-            member.clubId.dbString(),
-        ).firstOrNull() ?: "NO_RESPONSE"
+        val myRsvpStatus =
+            jdbcTemplate
+                .query(
+                    """
+                    select rsvp_status
+                    from session_participants
+                    where session_id = ?
+                      and membership_id = ?
+                      and club_id = ?
+                      and participation_status = 'ACTIVE'
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.getString("rsvp_status") },
+                    sessionId.dbString(),
+                    member.membershipId.dbString(),
+                    member.clubId.dbString(),
+                ).firstOrNull() ?: "NO_RESPONSE"
 
         return CurrentSessionDetail(
             sessionId = sessionId.toString(),
@@ -393,11 +411,11 @@ class JdbcCurrentSessionAdapter(
             myQuestions = findQuestions(jdbcTemplate, sessionId, member.clubId, member.membershipId),
             myOneLineReview = findMyOneLineReview(jdbcTemplate, sessionId, member),
             myLongReview = findMyLongReview(jdbcTemplate, sessionId, member),
-            board = CurrentSessionBoard(
-                questions = findQuestions(jdbcTemplate, sessionId, member.clubId),
-                longReviews = findBoardLongReviews(jdbcTemplate, sessionId, member),
-            ),
+            board =
+                CurrentSessionBoard(
+                    questions = findQuestions(jdbcTemplate, sessionId, member.clubId),
+                    longReviews = findBoardLongReviews(jdbcTemplate, sessionId, member),
+                ),
         )
     }
-
 }

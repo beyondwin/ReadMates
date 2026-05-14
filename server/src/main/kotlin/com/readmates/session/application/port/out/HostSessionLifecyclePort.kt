@@ -10,6 +10,8 @@ data class HostSessionTransitionResult(
 
 interface HostSessionLifecyclePort {
     fun open(command: HostSessionIdCommand): HostSessionTransitionResult
+
     fun close(command: HostSessionIdCommand): HostSessionTransitionResult
+
     fun publish(command: HostSessionIdCommand): HostSessionTransitionResult
 }

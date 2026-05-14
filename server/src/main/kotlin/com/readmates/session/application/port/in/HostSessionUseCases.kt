@@ -21,20 +21,30 @@ import com.readmates.shared.security.CurrentMember
 
 interface HostSessionLifecycleUseCase {
     fun open(command: HostSessionIdCommand): HostSessionDetailResponse
+
     fun close(command: HostSessionIdCommand): HostSessionDetailResponse
+
     fun publish(command: HostSessionIdCommand): HostSessionDetailResponse
+
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
+
     fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse
+
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse
 }
 
 interface HostSessionQueryUseCase {
-    fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem>
+    fun list(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<HostSessionListItem>
+
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
 }
 
 interface HostSessionDraftUseCase {
     fun create(command: HostSessionCommand): CreatedSessionResponse
+
     fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
 }
 

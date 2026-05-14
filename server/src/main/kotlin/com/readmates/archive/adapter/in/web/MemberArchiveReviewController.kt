@@ -32,13 +32,14 @@ class MemberArchiveReviewController(
         @PathVariable sessionId: UUID,
         @Valid @RequestBody request: SaveMemberArchiveLongReviewRequest,
     ): SaveMemberArchiveLongReviewResponse {
-        val result = saveMemberArchiveLongReviewUseCase.save(
-            SaveMemberArchiveLongReviewCommand(
-                member = currentMember,
-                sessionId = sessionId,
-                body = request.body,
-            ),
-        )
+        val result =
+            saveMemberArchiveLongReviewUseCase.save(
+                SaveMemberArchiveLongReviewCommand(
+                    member = currentMember,
+                    sessionId = sessionId,
+                    body = request.body,
+                ),
+            )
         return SaveMemberArchiveLongReviewResponse(
             sessionId = result.sessionId,
             body = result.body,

@@ -15,12 +15,16 @@ class AuthenticatedMemberResolver(
     private val memberIdentityLookup: MemberIdentityLookupPort,
     private val memberProfileStore: MemberProfileStorePort,
 ) {
-    fun resolveByEmail(email: String?, clubContext: ResolvedClubContext?): CurrentMember? {
-        val normalizedEmail = email
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.lowercase(Locale.ROOT)
-            ?: return null
+    fun resolveByEmail(
+        email: String?,
+        clubContext: ResolvedClubContext?,
+    ): CurrentMember? {
+        val normalizedEmail =
+            email
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.lowercase(Locale.ROOT)
+                ?: return null
         return if (clubContext != null) {
             memberIdentityLookup.findMemberByEmailAndClubId(normalizedEmail, clubContext.clubId)
         } else {
@@ -28,7 +32,10 @@ class AuthenticatedMemberResolver(
         }
     }
 
-    fun resolveByUserId(userId: String, clubContext: ResolvedClubContext?): CurrentMember? =
+    fun resolveByUserId(
+        userId: String,
+        clubContext: ResolvedClubContext?,
+    ): CurrentMember? =
         if (clubContext != null) {
             runCatching { UUID.fromString(userId) }
                 .getOrNull()

@@ -7,9 +7,10 @@ import tools.jackson.databind.ObjectMapper
 class CacheJsonCodec(
     private val objectMapper: ObjectMapper,
 ) {
-    fun encode(value: Any): String =
-        objectMapper.writeValueAsString(value)
+    fun encode(value: Any): String = objectMapper.writeValueAsString(value)
 
-    fun <T : Any> decode(raw: String, type: Class<T>): T? =
-        runCatching { objectMapper.readValue(raw, type) }.getOrNull()
+    fun <T : Any> decode(
+        raw: String,
+        type: Class<T>,
+    ): T? = runCatching { objectMapper.readValue(raw, type) }.getOrNull()
 }

@@ -1,17 +1,17 @@
 package com.readmates.note.adapter.out.redis
 
-import com.readmates.support.ReadmatesRedisIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.note.application.model.NoteFeedResult
 import com.readmates.note.application.model.NoteSessionResult
 import com.readmates.note.application.port.out.NotesReadCachePort
 import com.readmates.shared.cache.NotesCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.annotation.Autowired
@@ -43,33 +43,35 @@ class RedisNotesReadCacheAdapterTest(
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val meterRegistry: MeterRegistry,
 ) : ReadmatesRedisIntegrationTestSupport() {
-    private val contextRunner = ApplicationContextRunner()
-        .withUserConfiguration(NotesReadCacheAdapterBeanTestConfiguration::class.java)
+    private val contextRunner =
+        ApplicationContextRunner()
+            .withUserConfiguration(NotesReadCacheAdapterBeanTestConfiguration::class.java)
 
     @Test
     fun `selects expected notes read cache adapter for redis and notes cache flags`() {
-        val cases = listOf(
-            NotesReadCacheAdapterCase(
-                redisEnabled = true,
-                notesCacheEnabled = true,
-                expectedAdapter = RedisNotesReadCacheAdapter::class.java,
-            ),
-            NotesReadCacheAdapterCase(
-                redisEnabled = true,
-                notesCacheEnabled = false,
-                expectedAdapter = NoopNotesReadCacheAdapter::class.java,
-            ),
-            NotesReadCacheAdapterCase(
-                redisEnabled = false,
-                notesCacheEnabled = true,
-                expectedAdapter = NoopNotesReadCacheAdapter::class.java,
-            ),
-            NotesReadCacheAdapterCase(
-                redisEnabled = false,
-                notesCacheEnabled = false,
-                expectedAdapter = NoopNotesReadCacheAdapter::class.java,
-            ),
-        )
+        val cases =
+            listOf(
+                NotesReadCacheAdapterCase(
+                    redisEnabled = true,
+                    notesCacheEnabled = true,
+                    expectedAdapter = RedisNotesReadCacheAdapter::class.java,
+                ),
+                NotesReadCacheAdapterCase(
+                    redisEnabled = true,
+                    notesCacheEnabled = false,
+                    expectedAdapter = NoopNotesReadCacheAdapter::class.java,
+                ),
+                NotesReadCacheAdapterCase(
+                    redisEnabled = false,
+                    notesCacheEnabled = true,
+                    expectedAdapter = NoopNotesReadCacheAdapter::class.java,
+                ),
+                NotesReadCacheAdapterCase(
+                    redisEnabled = false,
+                    notesCacheEnabled = false,
+                    expectedAdapter = NoopNotesReadCacheAdapter::class.java,
+                ),
+            )
 
         cases.forEach { case ->
             contextRunner
@@ -154,13 +156,14 @@ class RedisNotesReadCacheAdapterTest(
         redisTemplate.opsForValue().set(key, "{")
         val missesBefore = counterValue("readmates.notes_cache.miss", "scope", "feed")
         val fallbacksBefore = counterValue("readmates.redis.fallbacks", "feature", "notes-cache-decode")
-        val errorsBefore = counterValue(
-            "readmates.redis.operation.errors",
-            "feature",
-            "notes-cache",
-            "operation",
-            "decode",
-        )
+        val errorsBefore =
+            counterValue(
+                "readmates.redis.operation.errors",
+                "feature",
+                "notes-cache",
+                "operation",
+                "decode",
+            )
 
         assertNull(adapter.getFeed(CLUB_ID))
 
@@ -189,7 +192,12 @@ class RedisNotesReadCacheAdapterTest(
         private val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000301")
 
         private fun feedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
-        private fun sessionFeedKey(clubId: UUID, sessionId: UUID) = "notes:club:$clubId:session:$sessionId:feed:v1"
+
+        private fun sessionFeedKey(
+            clubId: UUID,
+            sessionId: UUID,
+        ) = "notes:club:$clubId:session:$sessionId:feed:v1"
+
         private fun sessionsKey(clubId: UUID) = "notes:club:$clubId:sessions:v1"
     }
 }
@@ -209,33 +217,33 @@ private data class NotesReadCacheAdapterCase(
 )
 private class NotesReadCacheAdapterBeanTestConfiguration {
     @Bean
-    fun redisTemplate(): StringRedisTemplate =
-        Mockito.mock(StringRedisTemplate::class.java)
+    fun redisTemplate(): StringRedisTemplate = Mockito.mock(StringRedisTemplate::class.java)
 
     @Bean
-    fun objectMapper(): ObjectMapper =
-        JsonMapper.builder().findAndAddModules().build()
+    fun objectMapper(): ObjectMapper = JsonMapper.builder().findAndAddModules().build()
 }
 
-private fun feedItem(kind: String = "QUESTION") = NoteFeedResult(
-    sessionId = "00000000-0000-0000-0000-000000000301",
-    sessionNumber = 1,
-    bookTitle = "Book",
-    date = "2026-04-28",
-    authorName = "Member",
-    authorShortName = "Member",
-    kind = kind,
-    text = "Question",
-)
+private fun feedItem(kind: String = "QUESTION") =
+    NoteFeedResult(
+        sessionId = "00000000-0000-0000-0000-000000000301",
+        sessionNumber = 1,
+        bookTitle = "Book",
+        date = "2026-04-28",
+        authorName = "Member",
+        authorShortName = "Member",
+        kind = kind,
+        text = "Question",
+    )
 
-private fun noteSession() = NoteSessionResult(
-    sessionId = "00000000-0000-0000-0000-000000000301",
-    sessionNumber = 1,
-    bookTitle = "Book",
-    date = "2026-04-28",
-    questionCount = 1,
-    oneLinerCount = 0,
-    longReviewCount = 0,
-    highlightCount = 0,
-    totalCount = 1,
-)
+private fun noteSession() =
+    NoteSessionResult(
+        sessionId = "00000000-0000-0000-0000-000000000301",
+        sessionNumber = 1,
+        bookTitle = "Book",
+        date = "2026-04-28",
+        questionCount = 1,
+        oneLinerCount = 0,
+        longReviewCount = 0,
+        highlightCount = 0,
+        totalCount = 1,
+    )

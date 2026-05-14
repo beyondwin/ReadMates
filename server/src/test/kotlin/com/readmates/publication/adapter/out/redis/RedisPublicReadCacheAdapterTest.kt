@@ -1,7 +1,5 @@
 package com.readmates.publication.adapter.out.redis
 
-import com.readmates.support.ReadmatesRedisIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicSessionDetailResult
@@ -9,12 +7,14 @@ import com.readmates.publication.application.port.out.PublicReadCachePort
 import com.readmates.shared.cache.CacheJsonCodec
 import com.readmates.shared.cache.PublicCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
 import org.springframework.beans.factory.ObjectProvider
@@ -47,33 +47,35 @@ class RedisPublicReadCacheAdapterTest(
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val meterRegistry: MeterRegistry,
 ) : ReadmatesRedisIntegrationTestSupport() {
-    private val contextRunner = ApplicationContextRunner()
-        .withUserConfiguration(PublicReadCacheAdapterBeanTestConfiguration::class.java)
+    private val contextRunner =
+        ApplicationContextRunner()
+            .withUserConfiguration(PublicReadCacheAdapterBeanTestConfiguration::class.java)
 
     @Test
     fun `selects expected public read cache adapter for redis and public cache flags`() {
-        val cases = listOf(
-            PublicReadCacheAdapterCase(
-                redisEnabled = true,
-                publicCacheEnabled = true,
-                expectedAdapter = RedisPublicReadCacheAdapter::class.java,
-            ),
-            PublicReadCacheAdapterCase(
-                redisEnabled = true,
-                publicCacheEnabled = false,
-                expectedAdapter = NoopPublicReadCacheAdapter::class.java,
-            ),
-            PublicReadCacheAdapterCase(
-                redisEnabled = false,
-                publicCacheEnabled = true,
-                expectedAdapter = NoopPublicReadCacheAdapter::class.java,
-            ),
-            PublicReadCacheAdapterCase(
-                redisEnabled = false,
-                publicCacheEnabled = false,
-                expectedAdapter = NoopPublicReadCacheAdapter::class.java,
-            ),
-        )
+        val cases =
+            listOf(
+                PublicReadCacheAdapterCase(
+                    redisEnabled = true,
+                    publicCacheEnabled = true,
+                    expectedAdapter = RedisPublicReadCacheAdapter::class.java,
+                ),
+                PublicReadCacheAdapterCase(
+                    redisEnabled = true,
+                    publicCacheEnabled = false,
+                    expectedAdapter = NoopPublicReadCacheAdapter::class.java,
+                ),
+                PublicReadCacheAdapterCase(
+                    redisEnabled = false,
+                    publicCacheEnabled = true,
+                    expectedAdapter = NoopPublicReadCacheAdapter::class.java,
+                ),
+                PublicReadCacheAdapterCase(
+                    redisEnabled = false,
+                    publicCacheEnabled = false,
+                    expectedAdapter = NoopPublicReadCacheAdapter::class.java,
+                ),
+            )
 
         cases.forEach { case ->
             contextRunner
@@ -168,13 +170,14 @@ class RedisPublicReadCacheAdapterTest(
         redisTemplate.opsForValue().set(CLUB_KEY, "{")
         val missesBefore = counterValue("readmates.public_cache.miss", "scope", "club")
         val fallbacksBefore = counterValue("readmates.redis.fallbacks", "feature", "public-cache-decode")
-        val errorsBefore = counterValue(
-            "readmates.redis.operation.errors",
-            "feature",
-            "public-cache",
-            "operation",
-            "decode",
-        )
+        val errorsBefore =
+            counterValue(
+                "readmates.redis.operation.errors",
+                "feature",
+                "public-cache",
+                "operation",
+                "decode",
+            )
 
         assertNull(adapter.getClub())
 
@@ -196,12 +199,13 @@ class RedisPublicReadCacheAdapterTest(
     @Test
     fun `redis lookup failure returns cache miss and records operation metrics`() {
         val registry = SimpleMeterRegistry()
-        val adapter = RedisPublicReadCacheAdapter(
-            redisTemplate = failingRedisTemplate(),
-            codec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build()),
-            properties = PublicCacheProperties(enabled = true),
-            metrics = metrics(registry),
-        )
+        val adapter =
+            RedisPublicReadCacheAdapter(
+                redisTemplate = failingRedisTemplate(),
+                codec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build()),
+                properties = PublicCacheProperties(enabled = true),
+                metrics = metrics(registry),
+            )
 
         assertNull(adapter.getClub())
 
@@ -272,30 +276,30 @@ private data class PublicReadCacheAdapterCase(
 )
 private class PublicReadCacheAdapterBeanTestConfiguration {
     @Bean
-    fun redisTemplate(): StringRedisTemplate =
-        Mockito.mock(StringRedisTemplate::class.java)
+    fun redisTemplate(): StringRedisTemplate = Mockito.mock(StringRedisTemplate::class.java)
 
     @Bean
-    fun cacheJsonCodec(): CacheJsonCodec =
-        CacheJsonCodec(JsonMapper.builder().findAndAddModules().build())
+    fun cacheJsonCodec(): CacheJsonCodec = CacheJsonCodec(JsonMapper.builder().findAndAddModules().build())
 }
 
-private fun publicClub() = PublicClubResult(
-    clubName = "ReadMates",
-    tagline = "Read together",
-    about = "About",
-    stats = PublicClubStatsResult(sessions = 1, books = 1, members = 3),
-    recentSessions = emptyList(),
-)
+private fun publicClub() =
+    PublicClubResult(
+        clubName = "ReadMates",
+        tagline = "Read together",
+        about = "About",
+        stats = PublicClubStatsResult(sessions = 1, books = 1, members = 3),
+        recentSessions = emptyList(),
+    )
 
-private fun publicSession(sessionId: UUID) = PublicSessionDetailResult(
-    sessionId = sessionId.toString(),
-    sessionNumber = 1,
-    bookTitle = "Book",
-    bookAuthor = "Author",
-    bookImageUrl = null,
-    date = "2026-04-28",
-    summary = "Summary",
-    highlights = emptyList(),
-    oneLiners = emptyList(),
-)
+private fun publicSession(sessionId: UUID) =
+    PublicSessionDetailResult(
+        sessionId = sessionId.toString(),
+        sessionNumber = 1,
+        bookTitle = "Book",
+        bookAuthor = "Author",
+        bookImageUrl = null,
+        date = "2026-04-28",
+        summary = "Summary",
+        highlights = emptyList(),
+        oneLiners = emptyList(),
+    )

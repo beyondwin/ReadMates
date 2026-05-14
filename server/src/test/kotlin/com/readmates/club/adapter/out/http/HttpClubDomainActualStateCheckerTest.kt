@@ -35,12 +35,13 @@ class HttpClubDomainActualStateCheckerTest {
 
     @Test
     fun `accepts the ReadMates Cloudflare Pages marker`() {
-        val result = checkerWithFetcher(
-            MarkerHttpResult(
-                statusCode = 200,
-                body = """{"service":"readmates","surface":"cloudflare-pages","version":1}""",
-            ),
-        ).check("club.example.test")
+        val result =
+            checkerWithFetcher(
+                MarkerHttpResult(
+                    statusCode = 200,
+                    body = """{"service":"readmates","surface":"cloudflare-pages","version":1}""",
+                ),
+            ).check("club.example.test")
 
         assertEquals(ClubDomainStatus.ACTIVE, result.status)
         assertEquals(null, result.errorCode)

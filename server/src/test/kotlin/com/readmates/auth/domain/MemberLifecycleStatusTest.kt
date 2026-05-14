@@ -26,7 +26,8 @@ class MemberLifecycleStatusTest {
 
     @Test
     fun `LEFT is terminal`() {
-        MemberLifecycleStatus.values()
+        MemberLifecycleStatus
+            .values()
             .filter { it != MemberLifecycleStatus.LEFT }
             .forEach { target ->
                 assertThat(MemberLifecycleStatus.LEFT.allowsTransitionTo(target)).isFalse

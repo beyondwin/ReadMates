@@ -1,12 +1,12 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -62,33 +62,35 @@ class MemberProfileControllerTest(
 
     @Test
     fun `member updates own display name after trimming input`() {
-        val email = insertProfileMember(
-            "self.active",
-            "ACTIVE",
-            shortName = "Before",
-            profileImageUrl = "https://cdn.example.test/profiles/self-active.png",
-        )
+        val email =
+            insertProfileMember(
+                "self.active",
+                "ACTIVE",
+                shortName = "Before",
+                profileImageUrl = "https://cdn.example.test/profiles/self-active.png",
+            )
         val cookie = sessionCookieForEmail(email)
         val membershipId = membershipIdForEmail(email)
 
-        mockMvc.patch("/api/me/profile") {
-            cookie(cookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"  After  "}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.membershipId") { value(membershipId) }
-            jsonPath("$.displayName") { value("After") }
-            jsonPath("$.accountName") { value("self.active") }
-            jsonPath("$.shortName") { doesNotExist() }
-            jsonPath("$.profileImageUrl") { value("https://cdn.example.test/profiles/self-active.png") }
-            jsonPath("$.authenticated") { doesNotExist() }
-            jsonPath("$.email") { doesNotExist() }
-            jsonPath("$.membershipStatus") { doesNotExist() }
-        }
+        mockMvc
+            .patch("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"  After  "}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.membershipId") { value(membershipId) }
+                jsonPath("$.displayName") { value("After") }
+                jsonPath("$.accountName") { value("self.active") }
+                jsonPath("$.shortName") { doesNotExist() }
+                jsonPath("$.profileImageUrl") { value("https://cdn.example.test/profiles/self-active.png") }
+                jsonPath("$.authenticated") { doesNotExist() }
+                jsonPath("$.email") { doesNotExist() }
+                jsonPath("$.membershipStatus") { doesNotExist() }
+            }
 
         assertEquals("After", shortNameForEmail(email))
     }
@@ -98,34 +100,36 @@ class MemberProfileControllerTest(
         val email = insertProfileMember("self.viewer", "VIEWER", shortName = "ViewerBefore")
         val cookie = sessionCookieForEmail(email)
 
-        mockMvc.patch("/api/me/profile") {
-            cookie(cookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"ViewerAfter"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.displayName") { value("ViewerAfter") }
-            jsonPath("$.shortName") { doesNotExist() }
-        }
+        mockMvc
+            .patch("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"ViewerAfter"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.displayName") { value("ViewerAfter") }
+                jsonPath("$.shortName") { doesNotExist() }
+            }
 
         assertEquals("ViewerAfter", shortNameForEmail(email))
     }
 
     @Test
     fun `own profile update requires Spring Security authentication`() {
-        mockMvc.patch("/api/me/profile") {
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"NoSession"}"""
-        }.andExpect {
-            status { isUnauthorized() }
-            content { string("") }
-        }
+        mockMvc
+            .patch("/api/me/profile") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"NoSession"}"""
+            }.andExpect {
+                status { isUnauthorized() }
+                content { string("") }
+            }
     }
 
     @Test
@@ -134,18 +138,19 @@ class MemberProfileControllerTest(
             val email = insertProfileMember("self.${status.lowercase()}", status, shortName = "Blocked$status")
             val cookie = sessionCookieForEmail(email)
 
-            mockMvc.patch("/api/me/profile") {
-                cookie(cookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"displayName":"ShouldNotStore"}"""
-            }.andExpect {
-                status { isForbidden() }
-                jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
-                jsonPath("$.message") { value("Membership is not allowed to edit profile") }
-            }
+            mockMvc
+                .patch("/api/me/profile") {
+                    cookie(cookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"displayName":"ShouldNotStore"}"""
+                }.andExpect {
+                    status { isForbidden() }
+                    jsonPath("$.code") { value("MEMBERSHIP_NOT_ALLOWED") }
+                    jsonPath("$.message") { value("Membership is not allowed to edit profile") }
+                }
 
             assertEquals("Blocked$status", shortNameForEmail(email))
         }
@@ -155,29 +160,31 @@ class MemberProfileControllerTest(
     fun `own profile display name validation returns structured errors`() {
         val email = insertProfileMember("self.validation", "ACTIVE", shortName = "Original")
         val cookie = sessionCookieForEmail(email)
-        val cases = listOf(
-            "" to "DISPLAY_NAME_REQUIRED",
-            "   " to "DISPLAY_NAME_REQUIRED",
-            "123456789012345678901" to "DISPLAY_NAME_TOO_LONG",
-            "name@example.com" to "DISPLAY_NAME_INVALID",
-            "https://example.com/me" to "DISPLAY_NAME_INVALID",
-            "example.com" to "DISPLAY_NAME_INVALID",
-            "line\nbreak" to "DISPLAY_NAME_INVALID",
-            "관리자" to "DISPLAY_NAME_RESERVED",
-        )
+        val cases =
+            listOf(
+                "" to "DISPLAY_NAME_REQUIRED",
+                "   " to "DISPLAY_NAME_REQUIRED",
+                "123456789012345678901" to "DISPLAY_NAME_TOO_LONG",
+                "name@example.com" to "DISPLAY_NAME_INVALID",
+                "https://example.com/me" to "DISPLAY_NAME_INVALID",
+                "example.com" to "DISPLAY_NAME_INVALID",
+                "line\nbreak" to "DISPLAY_NAME_INVALID",
+                "관리자" to "DISPLAY_NAME_RESERVED",
+            )
 
         cases.forEach { (shortName, code) ->
-            mockMvc.patch("/api/me/profile") {
-                cookie(cookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"displayName":${jsonString(shortName)}}"""
-            }.andExpect {
-                status { isBadRequest() }
-                jsonPath("$.code") { value(code) }
-            }
+            mockMvc
+                .patch("/api/me/profile") {
+                    cookie(cookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"displayName":${jsonString(shortName)}}"""
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value(code) }
+                }
         }
 
         assertEquals("Original", shortNameForEmail(email))
@@ -189,83 +196,91 @@ class MemberProfileControllerTest(
         insertProfileMember("self.taken", "ACTIVE", shortName = "Taken")
         val cookie = sessionCookieForEmail(email)
 
-        mockMvc.patch("/api/me/profile") {
-            cookie(cookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"Taken"}"""
-        }.andExpect {
-            status { isConflict() }
-            jsonPath("$.code") { value("DISPLAY_NAME_DUPLICATE") }
-        }
+        mockMvc
+            .patch("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"Taken"}"""
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("DISPLAY_NAME_DUPLICATE") }
+            }
 
-        mockMvc.patch("/api/me/profile") {
-            cookie(cookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"Mine"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.displayName") { value("Mine") }
-            jsonPath("$.shortName") { doesNotExist() }
-        }
+        mockMvc
+            .patch("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"Mine"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.displayName") { value("Mine") }
+                jsonPath("$.shortName") { doesNotExist() }
+            }
     }
 
     @Test
     fun `own profile duplicate check waits for club profile name lock`() {
         val email = insertProfileMember("self.race", "ACTIVE", shortName = "RaceMine")
-        val otherMembershipId = membershipIdForEmail(
-            insertProfileMember("self.race.other", "ACTIVE", shortName = "RaceOther"),
-        )
+        val otherMembershipId =
+            membershipIdForEmail(
+                insertProfileMember("self.race.other", "ACTIVE", shortName = "RaceOther"),
+            )
         val cookie = sessionCookieForEmail(email)
         val executor = Executors.newSingleThreadExecutor()
 
         dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
-                connection.prepareStatement(
-                    """
-                    select id
-                    from clubs
-                    where id = '00000000-0000-0000-0000-000000000001'
-                    for update
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.executeQuery().use { resultSet ->
-                        resultSet.next()
+                connection
+                    .prepareStatement(
+                        """
+                        select id
+                        from clubs
+                        where id = '00000000-0000-0000-0000-000000000001'
+                        for update
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.executeQuery().use { resultSet ->
+                            resultSet.next()
+                        }
                     }
-                }
 
-                val updateStatus = executor.submit<Int> {
-                    mockMvc.patch("/api/me/profile") {
-                        cookie(cookie)
-                        header("X-Readmates-Bff-Secret", "test-bff-secret")
-                        header("Origin", "http://localhost:3000")
-                        with(csrf())
-                        contentType = MediaType.APPLICATION_JSON
-                        content = """{"displayName":"RaceTaken"}"""
-                    }.andReturn().response.status
-                }
+                val updateStatus =
+                    executor.submit<Int> {
+                        mockMvc
+                            .patch("/api/me/profile") {
+                                cookie(cookie)
+                                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                header("Origin", "http://localhost:3000")
+                                with(csrf())
+                                contentType = MediaType.APPLICATION_JSON
+                                content = """{"displayName":"RaceTaken"}"""
+                            }.andReturn()
+                            .response.status
+                    }
 
                 assertThrows(TimeoutException::class.java) {
                     updateStatus.get(300, TimeUnit.MILLISECONDS)
                 }
 
-                connection.prepareStatement(
-                    """
-                    update memberships
-                    set short_name = 'RaceTaken',
-                        updated_at = utc_timestamp(6)
-                    where id = ?
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, otherMembershipId)
-                    statement.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        """
+                        update memberships
+                        set short_name = 'RaceTaken',
+                            updated_at = utc_timestamp(6)
+                        where id = ?
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, otherMembershipId)
+                        statement.executeUpdate()
+                    }
                 connection.commit()
 
                 assertEquals(409, updateStatus.get(5, TimeUnit.SECONDS))
@@ -289,45 +304,51 @@ class MemberProfileControllerTest(
         dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
-                connection.prepareStatement(
-                    """
-                    select id
-                    from clubs
-                    where id = '00000000-0000-0000-0000-000000000001'
-                    for update
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.executeQuery().use { resultSet ->
-                        resultSet.next()
+                connection
+                    .prepareStatement(
+                        """
+                        select id
+                        from clubs
+                        where id = '00000000-0000-0000-0000-000000000001'
+                        for update
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.executeQuery().use { resultSet ->
+                            resultSet.next()
+                        }
                     }
-                }
 
-                val updateResult = executor.submit<Pair<Int, String>> {
-                    val response = mockMvc.patch("/api/me/profile") {
-                        cookie(cookie)
-                        header("X-Readmates-Bff-Secret", "test-bff-secret")
-                        header("Origin", "http://localhost:3000")
-                        with(csrf())
-                        contentType = MediaType.APPLICATION_JSON
-                        content = """{"displayName":"StatusRaceAfter"}"""
-                    }.andReturn().response
-                    response.status to response.contentAsString
-                }
+                val updateResult =
+                    executor.submit<Pair<Int, String>> {
+                        val response =
+                            mockMvc
+                                .patch("/api/me/profile") {
+                                    cookie(cookie)
+                                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                    header("Origin", "http://localhost:3000")
+                                    with(csrf())
+                                    contentType = MediaType.APPLICATION_JSON
+                                    content = """{"displayName":"StatusRaceAfter"}"""
+                                }.andReturn()
+                                .response
+                        response.status to response.contentAsString
+                    }
 
                 assertThrows(TimeoutException::class.java) {
                     updateResult.get(300, TimeUnit.MILLISECONDS)
                 }
 
-                connection.prepareStatement(
-                    """
-                    update memberships
-                    set status = 'LEFT'
-                    where id = ?
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, membershipId)
-                    statement.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        """
+                        update memberships
+                        set status = 'LEFT'
+                        where id = ?
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, membershipId)
+                        statement.executeUpdate()
+                    }
                 connection.commit()
 
                 val (status, body) = updateResult.get(5, TimeUnit.SECONDS)
@@ -345,27 +366,29 @@ class MemberProfileControllerTest(
     @Test
     fun `host updates same club member profile and receives host member list item`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
-        val targetMembershipIds = listOf("VIEWER", "ACTIVE", "SUSPENDED", "LEFT", "INACTIVE")
-            .map { status -> status to membershipIdForEmail(insertProfileMember("host.${status.lowercase()}", status)) }
+        val targetMembershipIds =
+            listOf("VIEWER", "ACTIVE", "SUSPENDED", "LEFT", "INACTIVE")
+                .map { status -> status to membershipIdForEmail(insertProfileMember("host.${status.lowercase()}", status)) }
 
         targetMembershipIds.forEach { (status, membershipId) ->
             val newShortName = "Host$status".take(20)
 
-            mockMvc.patch("/api/host/members/$membershipId/profile") {
-                cookie(hostCookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"displayName":"$newShortName"}"""
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.membershipId") { value(membershipId) }
-                jsonPath("$.displayName") { value(newShortName) }
-                jsonPath("$.shortName") { doesNotExist() }
-                jsonPath("$.status") { value(status) }
-                jsonPath("$.canDeactivate") { exists() }
-            }
+            mockMvc
+                .patch("/api/host/members/$membershipId/profile") {
+                    cookie(hostCookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"displayName":"$newShortName"}"""
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.membershipId") { value(membershipId) }
+                    jsonPath("$.displayName") { value(newShortName) }
+                    jsonPath("$.shortName") { doesNotExist() }
+                    jsonPath("$.status") { value(status) }
+                    jsonPath("$.canDeactivate") { exists() }
+                }
 
             assertEquals(newShortName, shortNameForMembership(membershipId))
         }
@@ -376,17 +399,18 @@ class MemberProfileControllerTest(
         val memberCookie = sessionCookieForEmail("member5@example.com")
         val targetMembershipId = membershipIdForEmail(insertProfileMember("host.blocked", "ACTIVE", shortName = "Blocked"))
 
-        mockMvc.patch("/api/host/members/$targetMembershipId/profile") {
-            cookie(memberCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"ShouldNotStore"}"""
-        }.andExpect {
-            status { isForbidden() }
-            jsonPath("$.code") { value("HOST_ROLE_REQUIRED") }
-        }
+        mockMvc
+            .patch("/api/host/members/$targetMembershipId/profile") {
+                cookie(memberCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"ShouldNotStore"}"""
+            }.andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("HOST_ROLE_REQUIRED") }
+            }
 
         assertEquals("Blocked", shortNameForMembership(targetMembershipId))
     }
@@ -395,16 +419,17 @@ class MemberProfileControllerTest(
     fun `host profile update requires Spring Security authentication`() {
         val targetMembershipId = membershipIdForEmail(insertProfileMember("host.anonymous", "ACTIVE", shortName = "Blocked"))
 
-        mockMvc.patch("/api/host/members/$targetMembershipId/profile") {
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"NoSession"}"""
-        }.andExpect {
-            status { isUnauthorized() }
-            content { string("") }
-        }
+        mockMvc
+            .patch("/api/host/members/$targetMembershipId/profile") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"NoSession"}"""
+            }.andExpect {
+                status { isUnauthorized() }
+                content { string("") }
+            }
 
         assertEquals("Blocked", shortNameForMembership(targetMembershipId))
     }
@@ -412,21 +437,23 @@ class MemberProfileControllerTest(
     @Test
     fun `host profile update is scoped to current club`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
-        val outsideMembershipId = membershipIdForEmail(
-            insertProfileMemberOutsideClub("outside.profile", "ACTIVE", shortName = "Outside"),
-        )
+        val outsideMembershipId =
+            membershipIdForEmail(
+                insertProfileMemberOutsideClub("outside.profile", "ACTIVE", shortName = "Outside"),
+            )
 
-        mockMvc.patch("/api/host/members/$outsideMembershipId/profile") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"displayName":"ShouldNotStore"}"""
-        }.andExpect {
-            status { isNotFound() }
-            jsonPath("$.code") { value("MEMBER_NOT_FOUND") }
-        }
+        mockMvc
+            .patch("/api/host/members/$outsideMembershipId/profile") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"ShouldNotStore"}"""
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("MEMBER_NOT_FOUND") }
+            }
 
         assertEquals("Outside", shortNameForMembership(outsideMembershipId))
     }
@@ -467,7 +494,11 @@ class MemberProfileControllerTest(
         return email
     }
 
-    private fun insertProfileMemberOutsideClub(prefix: String, status: String, shortName: String): String {
+    private fun insertProfileMemberOutsideClub(
+        prefix: String,
+        status: String,
+        shortName: String,
+    ): String {
         val clubId = UUID.randomUUID().toString()
         jdbcTemplate.update(
             """
@@ -510,16 +541,18 @@ class MemberProfileControllerTest(
     }
 
     private fun sessionCookieForEmail(email: String): Cookie {
-        val userId = jdbcTemplate.queryForObject(
-            "select id from users where email = ?",
-            String::class.java,
-            email,
-        ) ?: error("Expected seeded user for $email")
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "MemberProfileControllerTest",
-            ipAddress = "127.0.0.1",
-        )
+        val userId =
+            jdbcTemplate.queryForObject(
+                "select id from users where email = ?",
+                String::class.java,
+                email,
+            ) ?: error("Expected seeded user for $email")
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "MemberProfileControllerTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
@@ -559,10 +592,13 @@ class MemberProfileControllerTest(
             membershipId,
         ) ?: error("Expected display name for $membershipId")
 
-    private fun jsonString(value: String): String =
-        "\"${value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\""
+    private fun jsonString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\""
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

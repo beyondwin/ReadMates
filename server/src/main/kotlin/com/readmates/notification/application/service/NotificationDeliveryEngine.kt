@@ -16,8 +16,12 @@ private val DEFAULT_DELIVERY_ENGINE_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 
 
 sealed interface DeliveryEngineResult {
     data object Sent : DeliveryEngineResult
+
     data object Dead : DeliveryEngineResult
-    data class RetryableFailure(val message: String) : DeliveryEngineResult
+
+    data class RetryableFailure(
+        val message: String,
+    ) : DeliveryEngineResult
 }
 
 @Service
@@ -30,12 +34,13 @@ class NotificationDeliveryEngine(
     private val retryDelayMinutesConfig: List<Long>,
 ) {
     fun sendClaimed(item: ClaimedNotificationDeliveryItem): DeliveryEngineResult {
-        val command = MailDeliveryCommand(
-            to = requiredDeliveryField(item.id, "recipientEmail", item.recipientEmail),
-            subject = requiredDeliveryField(item.id, "subject", item.subject),
-            text = requiredDeliveryField(item.id, "bodyText", item.bodyText),
-            html = item.bodyHtml?.takeIf { it.isNotBlank() },
-        )
+        val command =
+            MailDeliveryCommand(
+                to = requiredDeliveryField(item.id, "recipientEmail", item.recipientEmail),
+                subject = requiredDeliveryField(item.id, "subject", item.subject),
+                text = requiredDeliveryField(item.id, "bodyText", item.bodyText),
+                html = item.bodyHtml?.takeIf { it.isNotBlank() },
+            )
 
         try {
             mailDeliveryPort.send(command)
@@ -75,12 +80,13 @@ class NotificationDeliveryEngine(
             return DeliveryEngineResult.Dead
         }
 
-        val marked = deliveryStatusPort.markDeliveryFailed(
-            id = item.id,
-            lockedAt = item.lockedAt,
-            error = error,
-            nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
-        )
+        val marked =
+            deliveryStatusPort.markDeliveryFailed(
+                id = item.id,
+                lockedAt = item.lockedAt,
+                error = error,
+                nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
+            )
         if (!marked) {
             throw staleDeliveryLeaseException(item.id, NotificationDeliveryStatus.FAILED)
         }
@@ -102,12 +108,18 @@ class NotificationDeliveryEngine(
         return delays[attemptCount.coerceIn(0, delays.lastIndex)]
     }
 
-    private fun requiredDeliveryField(deliveryId: UUID, name: String, value: String?): String =
+    private fun requiredDeliveryField(
+        deliveryId: UUID,
+        name: String,
+        value: String?,
+    ): String =
         value?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Claimed email delivery $deliveryId missing $name")
 
-    private fun staleDeliveryLeaseException(id: UUID, status: NotificationDeliveryStatus): IllegalStateException =
-        IllegalStateException("Could not mark email delivery $id $status; delivery lease changed")
+    private fun staleDeliveryLeaseException(
+        id: UUID,
+        status: NotificationDeliveryStatus,
+    ): IllegalStateException = IllegalStateException("Could not mark email delivery $id $status; delivery lease changed")
 
     private fun Exception.toStorageError(): String =
         sanitizeNotificationError(message ?: javaClass.simpleName, MAX_DELIVERY_ENGINE_ERROR_LENGTH)

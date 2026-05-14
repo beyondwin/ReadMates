@@ -29,116 +29,119 @@ class JdbcFeedbackDocumentStoreAdapter(
         pageRequest: PageRequest,
     ): CursorPage<StoredFeedbackDocumentListResult> {
         val cursor = FeedbackDocumentCursor.from(pageRequest.cursor)
-        val sql = if (currentMember.isHost) {
-            """
-            select *
-            from (
-              select
-                session_feedback_documents.id as document_id,
-                session_feedback_documents.session_id,
-                sessions.number as session_number,
-                sessions.book_title,
-                sessions.session_date,
-                session_feedback_documents.document_title,
-                case
-                  when session_feedback_documents.document_title is null then session_feedback_documents.source_text
-                  else null
-                end as legacy_source_text,
-                session_feedback_documents.file_name,
-                session_feedback_documents.created_at,
-                row_number() over (
-                  partition by session_feedback_documents.session_id
-                  order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
-                ) as document_rank
-              from session_feedback_documents
-              join sessions on sessions.id = session_feedback_documents.session_id
-                and sessions.club_id = session_feedback_documents.club_id
-              where session_feedback_documents.club_id = ?
-                and sessions.state in ('CLOSED', 'PUBLISHED')
-            ) ranked_documents
-            where document_rank = 1
-              and (
-                ? is null
-                or session_number < ?
-                or (session_number = ? and created_at < ?)
-                or (session_number = ? and created_at = ? and document_id < ?)
-              )
-            order by session_number desc, created_at desc, document_id desc
-            limit ?
-            """.trimIndent()
-        } else {
-            """
-            select *
-            from (
-              select
-                session_feedback_documents.id as document_id,
-                session_feedback_documents.session_id,
-                sessions.number as session_number,
-                sessions.book_title,
-                sessions.session_date,
-                session_feedback_documents.document_title,
-                case
-                  when session_feedback_documents.document_title is null then session_feedback_documents.source_text
-                  else null
-                end as legacy_source_text,
-                session_feedback_documents.file_name,
-                session_feedback_documents.created_at,
-                row_number() over (
-                  partition by session_feedback_documents.session_id
-                  order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
-                ) as document_rank
-              from session_feedback_documents
-              join sessions on sessions.id = session_feedback_documents.session_id
-                and sessions.club_id = session_feedback_documents.club_id
-              join session_participants on session_participants.session_id = sessions.id
-                and session_participants.club_id = sessions.club_id
-                and session_participants.membership_id = ?
-              where session_feedback_documents.club_id = ?
-                and session_participants.attendance_status = 'ATTENDED'
-                and session_participants.participation_status = 'ACTIVE'
-                and sessions.state in ('CLOSED', 'PUBLISHED')
-            ) ranked_documents
-            where document_rank = 1
-              and (
-                ? is null
-                or session_number < ?
-                or (session_number = ? and created_at < ?)
-                or (session_number = ? and created_at = ? and document_id < ?)
-              )
-            order by session_number desc, created_at desc, document_id desc
-            limit ?
-            """.trimIndent()
-        }
-        val args = if (currentMember.isHost) {
-            arrayOf<Any?>(
-                currentMember.clubId.dbString(),
-                cursor?.sessionNumber,
-                cursor?.sessionNumber,
-                cursor?.sessionNumber,
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.sessionNumber,
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.id,
-                pageRequest.limit + 1,
-            )
-        } else {
-            arrayOf<Any?>(
-                currentMember.membershipId.dbString(),
-                currentMember.clubId.dbString(),
-                cursor?.sessionNumber,
-                cursor?.sessionNumber,
-                cursor?.sessionNumber,
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.sessionNumber,
-                cursor?.createdAt?.toUtcLocalDateTime(),
-                cursor?.id,
-                pageRequest.limit + 1,
-            )
-        }
+        val sql =
+            if (currentMember.isHost) {
+                """
+                select *
+                from (
+                  select
+                    session_feedback_documents.id as document_id,
+                    session_feedback_documents.session_id,
+                    sessions.number as session_number,
+                    sessions.book_title,
+                    sessions.session_date,
+                    session_feedback_documents.document_title,
+                    case
+                      when session_feedback_documents.document_title is null then session_feedback_documents.source_text
+                      else null
+                    end as legacy_source_text,
+                    session_feedback_documents.file_name,
+                    session_feedback_documents.created_at,
+                    row_number() over (
+                      partition by session_feedback_documents.session_id
+                      order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
+                    ) as document_rank
+                  from session_feedback_documents
+                  join sessions on sessions.id = session_feedback_documents.session_id
+                    and sessions.club_id = session_feedback_documents.club_id
+                  where session_feedback_documents.club_id = ?
+                    and sessions.state in ('CLOSED', 'PUBLISHED')
+                ) ranked_documents
+                where document_rank = 1
+                  and (
+                    ? is null
+                    or session_number < ?
+                    or (session_number = ? and created_at < ?)
+                    or (session_number = ? and created_at = ? and document_id < ?)
+                  )
+                order by session_number desc, created_at desc, document_id desc
+                limit ?
+                """.trimIndent()
+            } else {
+                """
+                select *
+                from (
+                  select
+                    session_feedback_documents.id as document_id,
+                    session_feedback_documents.session_id,
+                    sessions.number as session_number,
+                    sessions.book_title,
+                    sessions.session_date,
+                    session_feedback_documents.document_title,
+                    case
+                      when session_feedback_documents.document_title is null then session_feedback_documents.source_text
+                      else null
+                    end as legacy_source_text,
+                    session_feedback_documents.file_name,
+                    session_feedback_documents.created_at,
+                    row_number() over (
+                      partition by session_feedback_documents.session_id
+                      order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
+                    ) as document_rank
+                  from session_feedback_documents
+                  join sessions on sessions.id = session_feedback_documents.session_id
+                    and sessions.club_id = session_feedback_documents.club_id
+                  join session_participants on session_participants.session_id = sessions.id
+                    and session_participants.club_id = sessions.club_id
+                    and session_participants.membership_id = ?
+                  where session_feedback_documents.club_id = ?
+                    and session_participants.attendance_status = 'ATTENDED'
+                    and session_participants.participation_status = 'ACTIVE'
+                    and sessions.state in ('CLOSED', 'PUBLISHED')
+                ) ranked_documents
+                where document_rank = 1
+                  and (
+                    ? is null
+                    or session_number < ?
+                    or (session_number = ? and created_at < ?)
+                    or (session_number = ? and created_at = ? and document_id < ?)
+                  )
+                order by session_number desc, created_at desc, document_id desc
+                limit ?
+                """.trimIndent()
+            }
+        val args =
+            if (currentMember.isHost) {
+                arrayOf<Any?>(
+                    currentMember.clubId.dbString(),
+                    cursor?.sessionNumber,
+                    cursor?.sessionNumber,
+                    cursor?.sessionNumber,
+                    cursor?.createdAt?.toUtcLocalDateTime(),
+                    cursor?.sessionNumber,
+                    cursor?.createdAt?.toUtcLocalDateTime(),
+                    cursor?.id,
+                    pageRequest.limit + 1,
+                )
+            } else {
+                arrayOf<Any?>(
+                    currentMember.membershipId.dbString(),
+                    currentMember.clubId.dbString(),
+                    cursor?.sessionNumber,
+                    cursor?.sessionNumber,
+                    cursor?.sessionNumber,
+                    cursor?.createdAt?.toUtcLocalDateTime(),
+                    cursor?.sessionNumber,
+                    cursor?.createdAt?.toUtcLocalDateTime(),
+                    cursor?.id,
+                    pageRequest.limit + 1,
+                )
+            }
 
-        val rows = jdbcTemplate.query(sql, { resultSet, _ ->
-            resultSet.toStoredFeedbackDocumentList()
-        }, *args)
+        val rows =
+            jdbcTemplate.query(sql, { resultSet, _ ->
+                resultSet.toStoredFeedbackDocumentList()
+            }, *args)
         return pageFromRows(rows, pageRequest.limit, ::feedbackDocumentCursor)
     }
 
@@ -146,18 +149,19 @@ class JdbcFeedbackDocumentStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
     ): FeedbackDocumentSessionResult? =
-        jdbcTemplate.query(
-            """
-            select id, number, book_title, session_date
-            from sessions
-            where id = ?
-              and club_id = ?
-              and state in ('CLOSED', 'PUBLISHED')
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toSessionMetadata() },
-            sessionId.dbString(),
-            clubId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select id, number, book_title, session_date
+                from sessions
+                where id = ?
+                  and club_id = ?
+                  and state in ('CLOSED', 'PUBLISHED')
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toSessionMetadata() },
+                sessionId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
 
     override fun hasActiveAttendedSession(
         currentMember: CurrentMember,
@@ -183,45 +187,47 @@ class JdbcFeedbackDocumentStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
     ): StoredFeedbackDocumentResult? =
-        jdbcTemplate.query(
-            """
-            select
-              session_feedback_documents.session_id,
-              sessions.number as session_number,
-              sessions.book_title,
-              sessions.session_date,
-              session_feedback_documents.source_text,
-              session_feedback_documents.file_name,
-              session_feedback_documents.created_at
-            from session_feedback_documents
-            join sessions on sessions.id = session_feedback_documents.session_id
-              and sessions.club_id = session_feedback_documents.club_id
-            where session_feedback_documents.club_id = ?
-              and session_feedback_documents.session_id = ?
-            order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toStoredFeedbackDocument() },
-            clubId.dbString(),
-            sessionId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select
+                  session_feedback_documents.session_id,
+                  sessions.number as session_number,
+                  sessions.book_title,
+                  sessions.session_date,
+                  session_feedback_documents.source_text,
+                  session_feedback_documents.file_name,
+                  session_feedback_documents.created_at
+                from session_feedback_documents
+                join sessions on sessions.id = session_feedback_documents.session_id
+                  and sessions.club_id = session_feedback_documents.club_id
+                where session_feedback_documents.club_id = ?
+                  and session_feedback_documents.session_id = ?
+                order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toStoredFeedbackDocument() },
+                clubId.dbString(),
+                sessionId.dbString(),
+            ).firstOrNull()
 
     override fun findSessionForUpload(
         clubId: UUID,
         sessionId: UUID,
     ): FeedbackDocumentSessionResult? =
-        jdbcTemplate.query(
-            """
-            select id, number, book_title, session_date
-            from sessions
-            where id = ?
-              and club_id = ?
-            for update
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toSessionMetadata() },
-            sessionId.dbString(),
-            clubId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select id, number, book_title, session_date
+                from sessions
+                where id = ?
+                  and club_id = ?
+                for update
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toSessionMetadata() },
+                sessionId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
 
     override fun nextDocumentVersion(
         clubId: UUID,
@@ -314,7 +320,11 @@ class JdbcFeedbackDocumentStoreAdapter(
             ),
         )
 
-    private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+    private fun <T> pageFromRows(
+        rows: List<T>,
+        limit: Int,
+        cursorFor: (T) -> String?,
+    ): CursorPage<T> {
         val visibleRows = rows.take(limit)
         return CursorPage(
             items = visibleRows,
@@ -330,8 +340,9 @@ class JdbcFeedbackDocumentStoreAdapter(
         companion object {
             fun from(cursor: Map<String, String>): FeedbackDocumentCursor? {
                 val sessionNumber = cursor["sessionNumber"]?.toIntOrNull() ?: return null
-                val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-                    ?: return null
+                val createdAt =
+                    cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                        ?: return null
                 val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
                 return FeedbackDocumentCursor(sessionNumber, createdAt, id)
             }

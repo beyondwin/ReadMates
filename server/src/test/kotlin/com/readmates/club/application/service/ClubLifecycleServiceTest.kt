@@ -14,15 +14,15 @@ import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
 class ClubLifecycleServiceTest {
-
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val objectMapper = JsonMapper.builder().findAndAddModules().build()
 
-    private val admin = CurrentPlatformAdmin(
-        userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-        email = "admin@example.com",
-        role = PlatformAdminRole.OPERATOR,
-    )
+    private val admin =
+        CurrentPlatformAdmin(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            email = "admin@example.com",
+            role = PlatformAdminRole.OPERATOR,
+        )
 
     @Test
     fun `activateAfterFirstHostJoin transitions SETUP_REQUIRED to ACTIVE`() {
@@ -78,9 +78,10 @@ class ClubLifecycleServiceTest {
         val port = RecordingClubLifecyclePort(initialStatus = null)
         val service = ClubLifecycleService(port, objectMapper)
 
-        val ex = assertThrows<ClubLifecycleException> {
-            service.activateAfterFirstHostJoin(clubId)
-        }
+        val ex =
+            assertThrows<ClubLifecycleException> {
+                service.activateAfterFirstHostJoin(clubId)
+            }
         assertEquals(ClubLifecycleError.CLUB_NOT_FOUND, ex.error)
     }
 
@@ -89,9 +90,10 @@ class ClubLifecycleServiceTest {
         val port = RecordingClubLifecyclePort(initialStatus = ClubStatus.ARCHIVED)
         val service = ClubLifecycleService(port, objectMapper)
 
-        val ex = assertThrows<ClubLifecycleException> {
-            service.restore(clubId, admin)
-        }
+        val ex =
+            assertThrows<ClubLifecycleException> {
+                service.restore(clubId, admin)
+            }
         assertEquals(ClubLifecycleError.INVALID_TRANSITION, ex.error)
     }
 
@@ -114,7 +116,11 @@ class ClubLifecycleServiceTest {
 
         override fun loadCurrentStatus(clubId: UUID): ClubStatus? = currentStatus
 
-        override fun transitionStatus(clubId: UUID, from: ClubStatus, to: ClubStatus): Boolean {
+        override fun transitionStatus(
+            clubId: UUID,
+            from: ClubStatus,
+            to: ClubStatus,
+        ): Boolean {
             if (currentStatus != from) return false
             currentStatus = to
             return true

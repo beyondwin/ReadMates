@@ -30,12 +30,13 @@ class NotificationEventService(
             eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
             aggregateType = SESSION_AGGREGATE_TYPE,
             aggregateId = sessionId,
-            payload = NotificationEventPayload(
-                sessionId = sessionId,
-                sessionNumber = sessionNumber,
-                bookTitle = bookTitle,
-                documentVersion = documentVersion,
-            ),
+            payload =
+                NotificationEventPayload(
+                    sessionId = sessionId,
+                    sessionNumber = sessionNumber,
+                    bookTitle = bookTitle,
+                    documentVersion = documentVersion,
+                ),
             dedupeKey = "feedback-document:$sessionId:$documentVersion",
         )
     }
@@ -55,11 +56,12 @@ class NotificationEventService(
             eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
             aggregateType = SESSION_AGGREGATE_TYPE,
             aggregateId = sessionId,
-            payload = NotificationEventPayload(
-                sessionId = sessionId,
-                sessionNumber = sessionNumber,
-                bookTitle = bookTitle,
-            ),
+            payload =
+                NotificationEventPayload(
+                    sessionId = sessionId,
+                    sessionNumber = sessionNumber,
+                    bookTitle = bookTitle,
+                ),
             dedupeKey = "next-book:$sessionId",
         )
     }
@@ -79,12 +81,13 @@ class NotificationEventService(
             eventType = NotificationEventType.REVIEW_PUBLISHED,
             aggregateType = SESSION_AGGREGATE_TYPE,
             aggregateId = sessionId,
-            payload = NotificationEventPayload(
-                sessionId = sessionId,
-                sessionNumber = sessionNumber,
-                bookTitle = bookTitle,
-                authorMembershipId = authorMembershipId,
-            ),
+            payload =
+                NotificationEventPayload(
+                    sessionId = sessionId,
+                    sessionNumber = sessionNumber,
+                    bookTitle = bookTitle,
+                    authorMembershipId = authorMembershipId,
+                ),
             dedupeKey = "review-published:$sessionId:$authorMembershipId",
         )
     }

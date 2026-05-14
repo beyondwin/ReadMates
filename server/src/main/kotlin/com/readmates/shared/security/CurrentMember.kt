@@ -28,17 +28,21 @@ data class CurrentMember(
     val isViewer: Boolean
         get() = membershipStatus == MembershipStatus.VIEWER
     val canBrowseMemberContent: Boolean
-        get() = membershipStatus in setOf(
-            MembershipStatus.VIEWER,
-            MembershipStatus.ACTIVE,
-            MembershipStatus.SUSPENDED,
-        )
+        get() =
+            membershipStatus in
+                setOf(
+                    MembershipStatus.VIEWER,
+                    MembershipStatus.ACTIVE,
+                    MembershipStatus.SUSPENDED,
+                )
     val canEditOwnProfile: Boolean
-        get() = membershipStatus in setOf(
-            MembershipStatus.VIEWER,
-            MembershipStatus.ACTIVE,
-            MembershipStatus.SUSPENDED,
-        )
+        get() =
+            membershipStatus in
+                setOf(
+                    MembershipStatus.VIEWER,
+                    MembershipStatus.ACTIVE,
+                    MembershipStatus.SUSPENDED,
+                )
 }
 
 data class GoogleOidcIdentity(
@@ -53,14 +57,15 @@ fun Authentication?.emailOrNull(): String? {
         return null
     }
 
-    val email = when (val principal = principal) {
-        is CurrentMember -> principal.email
-        is CurrentUser -> principal.email
-        is OidcUser -> principal.email
-        is UserDetails -> principal.username
-        is String -> principal
-        else -> name
-    }
+    val email =
+        when (val principal = principal) {
+            is CurrentMember -> principal.email
+            is CurrentUser -> principal.email
+            is OidcUser -> principal.email
+            is UserDetails -> principal.username
+            is String -> principal
+            else -> name
+        }
 
     return email
         ?.trim()
@@ -75,11 +80,12 @@ fun Authentication?.googleOidcIdentityOrNull(): GoogleOidcIdentity? {
 
     val user = principal as? OidcUser ?: return null
     val subject = user.subject?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-    val email = user.email
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-        ?.lowercase(Locale.ROOT)
-        ?: return null
+    val email =
+        user.email
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?.lowercase(Locale.ROOT)
+            ?: return null
     val displayName = user.fullName?.trim()?.takeIf { it.isNotEmpty() }
     val profileImageUrl = user.picture?.trim()?.takeIf { it.isNotEmpty() }
 

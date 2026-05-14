@@ -23,32 +23,22 @@ class JdbcArchiveQueryAdapter(
     override fun loadArchiveSessions(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
-    ): CursorPage<ArchiveSessionResult> {
-        return listQueries.loadArchiveSessions(jdbcTemplate, currentMember, pageRequest)
-    }
+    ): CursorPage<ArchiveSessionResult> = listQueries.loadArchiveSessions(jdbcTemplate, currentMember, pageRequest)
 
     override fun loadArchiveSessionDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): ArchiveSessionDetailHeader? {
-        return detailQueries.loadArchiveSessionDetail(jdbcTemplate, currentMember, sessionId)
-    }
+    ): ArchiveSessionDetailHeader? = detailQueries.loadArchiveSessionDetail(jdbcTemplate, currentMember, sessionId)
 
     override fun loadMyQuestions(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
-    ): CursorPage<MyArchiveQuestionResult> {
-        return listQueries.loadMyQuestions(jdbcTemplate, currentMember, pageRequest)
-    }
+    ): CursorPage<MyArchiveQuestionResult> = listQueries.loadMyQuestions(jdbcTemplate, currentMember, pageRequest)
 
     override fun loadMyReviews(
         currentMember: CurrentMember,
         pageRequest: PageRequest,
-    ): CursorPage<MyArchiveReviewResult> {
-        return listQueries.loadMyReviews(jdbcTemplate, currentMember, pageRequest)
-    }
+    ): CursorPage<MyArchiveReviewResult> = listQueries.loadMyReviews(jdbcTemplate, currentMember, pageRequest)
 
-    override fun loadMyPage(currentMember: CurrentMember): MyPageResult {
-        return listQueries.loadMyPage(jdbcTemplate, currentMember)
-    }
+    override fun loadMyPage(currentMember: CurrentMember): MyPageResult = listQueries.loadMyPage(jdbcTemplate, currentMember)
 }

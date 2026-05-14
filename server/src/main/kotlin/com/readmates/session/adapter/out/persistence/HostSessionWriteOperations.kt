@@ -13,12 +13,12 @@ import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.session.application.requireHost
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionTransitionResult
+import com.readmates.session.application.requireHost
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.toUtcOffsetDateTime
@@ -39,7 +39,11 @@ private const val DEFAULT_END_TIME = "22:00"
 internal class HostSessionWriteOperations(
     private val queries: HostSessionQueries,
 ) {
-    fun createDraftSession(jdbcTemplate: JdbcTemplate, host: CurrentMember, request: HostSessionCommand): CreatedSessionResponse {
+    fun createDraftSession(
+        jdbcTemplate: JdbcTemplate,
+        host: CurrentMember,
+        request: HostSessionCommand,
+    ): CreatedSessionResponse {
         requireHost(host)
 
         val sessionId = UUID.randomUUID()
@@ -58,15 +62,16 @@ internal class HostSessionWriteOperations(
             host.clubId.dbString(),
         )
 
-        val nextNumber = jdbcTemplate.queryForObject(
-            """
-            select coalesce(max(number), 0) + 1
-            from sessions
-            where club_id = ?
-            """.trimIndent(),
-            Int::class.java,
-            host.clubId.dbString(),
-        ) ?: 1
+        val nextNumber =
+            jdbcTemplate.queryForObject(
+                """
+                select coalesce(max(number), 0) + 1
+                from sessions
+                where club_id = ?
+                """.trimIndent(),
+                Int::class.java,
+                host.clubId.dbString(),
+            ) ?: 1
         val state = "DRAFT"
         val visibility = SessionRecordVisibility.HOST_ONLY
 
@@ -147,10 +152,11 @@ internal class HostSessionWriteOperations(
         if (!endTime.isAfter(startTime)) {
             throw InvalidSessionScheduleException()
         }
-        val questionDeadlineAt = when (request.questionDeadlineAt) {
-            null -> existingSchedule.questionDeadlineAt
-            else -> deadlineOrDefault(request, sessionDate)
-        }
+        val questionDeadlineAt =
+            when (request.questionDeadlineAt) {
+                null -> existingSchedule.questionDeadlineAt
+                else -> deadlineOrDefault(request, sessionDate)
+            }
         val shouldUpdateBookLink = request.bookLink != null
         val shouldUpdateBookImageUrl = request.bookImageUrl != null
         val shouldUpdateLocationLabel = request.locationLabel != null
@@ -161,45 +167,46 @@ internal class HostSessionWriteOperations(
         val locationLabel = request.locationLabel?.let { locationLabelOrDefault(it) }
         val meetingUrl = request.meetingUrl?.let { blankToNull(it) }
         val meetingPasscode = request.meetingPasscode?.let { blankToNull(it) }
-        val updated = jdbcTemplate.update(
-            """
-            update sessions
-            set title = ?,
-                book_title = ?,
-                book_author = ?,
-                book_link = case when ? then ? else book_link end,
-                book_image_url = case when ? then ? else book_image_url end,
-                session_date = ?,
-                start_time = ?,
-                end_time = ?,
-                location_label = case when ? then ? else location_label end,
-                meeting_url = case when ? then ? else meeting_url end,
-                meeting_passcode = case when ? then ? else meeting_passcode end,
-                question_deadline_at = ?,
-                updated_at = utc_timestamp(6)
-            where id = ?
-              and club_id = ?
-            """.trimIndent(),
-            request.title,
-            request.bookTitle,
-            request.bookAuthor,
-            shouldUpdateBookLink,
-            bookLink,
-            shouldUpdateBookImageUrl,
-            bookImageUrl,
-            sessionDate,
-            startTime,
-            endTime,
-            shouldUpdateLocationLabel,
-            locationLabel,
-            shouldUpdateMeetingUrl,
-            meetingUrl,
-            shouldUpdateMeetingPasscode,
-            meetingPasscode,
-            questionDeadlineAt,
-            sessionId.dbString(),
-            member.clubId.dbString(),
-        )
+        val updated =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set title = ?,
+                    book_title = ?,
+                    book_author = ?,
+                    book_link = case when ? then ? else book_link end,
+                    book_image_url = case when ? then ? else book_image_url end,
+                    session_date = ?,
+                    start_time = ?,
+                    end_time = ?,
+                    location_label = case when ? then ? else location_label end,
+                    meeting_url = case when ? then ? else meeting_url end,
+                    meeting_passcode = case when ? then ? else meeting_passcode end,
+                    question_deadline_at = ?,
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                request.title,
+                request.bookTitle,
+                request.bookAuthor,
+                shouldUpdateBookLink,
+                bookLink,
+                shouldUpdateBookImageUrl,
+                bookImageUrl,
+                sessionDate,
+                startTime,
+                endTime,
+                shouldUpdateLocationLabel,
+                locationLabel,
+                shouldUpdateMeetingUrl,
+                meetingUrl,
+                shouldUpdateMeetingPasscode,
+                meetingPasscode,
+                questionDeadlineAt,
+                sessionId.dbString(),
+                member.clubId.dbString(),
+            )
         if (updated == 0) {
             throw HostSessionNotFoundException()
         }
@@ -212,31 +219,36 @@ internal class HostSessionWriteOperations(
         command: ConfirmAttendanceCommand,
     ): HostAttendanceResponse {
         queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
-        val entries = command.entries.map { entry ->
-            parseMembershipId(entry.membershipId) to entry.attendanceStatus
-        }
-        val updated = jdbcTemplate.batchUpdate(
-            """
-            update session_participants
-            set attendance_status = ?,
-                updated_at = utc_timestamp(6)
-            where session_id = ?
-              and club_id = ?
-              and membership_id = ?
-              and participation_status = 'ACTIVE'
-            """.trimIndent(),
-            object : BatchPreparedStatementSetter {
-                override fun setValues(ps: PreparedStatement, i: Int) {
-                    val (membershipId, attendanceStatus) = entries[i]
-                    ps.setString(1, attendanceStatus)
-                    ps.setString(2, command.sessionId.dbString())
-                    ps.setString(3, command.host.clubId.dbString())
-                    ps.setString(4, membershipId.dbString())
-                }
+        val entries =
+            command.entries.map { entry ->
+                parseMembershipId(entry.membershipId) to entry.attendanceStatus
+            }
+        val updated =
+            jdbcTemplate.batchUpdate(
+                """
+                update session_participants
+                set attendance_status = ?,
+                    updated_at = utc_timestamp(6)
+                where session_id = ?
+                  and club_id = ?
+                  and membership_id = ?
+                  and participation_status = 'ACTIVE'
+                """.trimIndent(),
+                object : BatchPreparedStatementSetter {
+                    override fun setValues(
+                        ps: PreparedStatement,
+                        i: Int,
+                    ) {
+                        val (membershipId, attendanceStatus) = entries[i]
+                        ps.setString(1, attendanceStatus)
+                        ps.setString(2, command.sessionId.dbString())
+                        ps.setString(3, command.host.clubId.dbString())
+                        ps.setString(4, membershipId.dbString())
+                    }
 
-                override fun getBatchSize(): Int = entries.size
-            },
-        )
+                    override fun getBatchSize(): Int = entries.size
+                },
+            )
         if (updated.any { it == 0 }) {
             throw HostSessionParticipantNotFoundException()
         }
@@ -308,7 +320,10 @@ internal class HostSessionWriteOperations(
         )
     }
 
-    fun updateVisibility(jdbcTemplate: JdbcTemplate, command: com.readmates.session.application.model.UpdateHostSessionVisibilityCommand): HostSessionDetailResponse {
+    fun updateVisibility(
+        jdbcTemplate: JdbcTemplate,
+        command: com.readmates.session.application.model.UpdateHostSessionVisibilityCommand,
+    ): HostSessionDetailResponse {
         queries.requireHostSession(jdbcTemplate, command.host, command.sessionId)
         jdbcTemplate.update(
             """
@@ -341,15 +356,19 @@ internal class HostSessionWriteOperations(
         return queries.findHostSessionAfterHostCheck(jdbcTemplate, command.host, command.sessionId)
     }
 
-    fun open(jdbcTemplate: JdbcTemplate, command: HostSessionIdCommand): HostSessionTransitionResult {
+    fun open(
+        jdbcTemplate: JdbcTemplate,
+        command: HostSessionIdCommand,
+    ): HostSessionTransitionResult {
         requireHost(command.host)
         jdbcTemplate.queryForObject(
             "select id from clubs where id = ? for update",
             String::class.java,
             command.host.clubId.dbString(),
         )
-        val state = queries.findState(jdbcTemplate, command.host, command.sessionId)
-            ?: throw HostSessionNotFoundException()
+        val state =
+            queries.findState(jdbcTemplate, command.host, command.sessionId)
+                ?: throw HostSessionNotFoundException()
 
         if (state == "OPEN") {
             return HostSessionTransitionResult(
@@ -361,16 +380,17 @@ internal class HostSessionWriteOperations(
             throw HostSessionOpenNotAllowedException()
         }
 
-        val openSessionCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            where club_id = ?
-              and state = 'OPEN'
-            """.trimIndent(),
-            Int::class.java,
-            command.host.clubId.dbString(),
-        ) ?: 0
+        val openSessionCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sessions
+                where club_id = ?
+                  and state = 'OPEN'
+                """.trimIndent(),
+                Int::class.java,
+                command.host.clubId.dbString(),
+            ) ?: 0
         if (openSessionCount > 0) {
             throw OpenSessionAlreadyExistsException()
         }
@@ -393,23 +413,28 @@ internal class HostSessionWriteOperations(
         )
     }
 
-    fun close(jdbcTemplate: JdbcTemplate, command: HostSessionIdCommand): HostSessionTransitionResult {
+    fun close(
+        jdbcTemplate: JdbcTemplate,
+        command: HostSessionIdCommand,
+    ): HostSessionTransitionResult {
         requireHost(command.host)
-        val closedRows = jdbcTemplate.update(
-            """
-            update sessions
-            set state = 'CLOSED',
-                updated_at = utc_timestamp(6)
-            where id = ?
-              and club_id = ?
-              and state = 'OPEN'
-            """.trimIndent(),
-            command.sessionId.dbString(),
-            command.host.clubId.dbString(),
-        )
+        val closedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'CLOSED',
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and state = 'OPEN'
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            )
         if (closedRows == 0) {
-            val state = queries.findState(jdbcTemplate, command.host, command.sessionId)
-                ?: throw HostSessionNotFoundException()
+            val state =
+                queries.findState(jdbcTemplate, command.host, command.sessionId)
+                    ?: throw HostSessionNotFoundException()
 
             if (state == "CLOSED") {
                 return HostSessionTransitionResult(
@@ -425,31 +450,36 @@ internal class HostSessionWriteOperations(
         )
     }
 
-    fun publish(jdbcTemplate: JdbcTemplate, command: HostSessionIdCommand): HostSessionTransitionResult {
+    fun publish(
+        jdbcTemplate: JdbcTemplate,
+        command: HostSessionIdCommand,
+    ): HostSessionTransitionResult {
         requireHost(command.host)
-        val publishedRows = jdbcTemplate.update(
-            """
-            update sessions
-            set state = 'PUBLISHED',
-                updated_at = utc_timestamp(6)
-            where id = ?
-              and club_id = ?
-              and state = 'CLOSED'
-              and exists (
-                select 1
-                from public_session_publications
-                where public_session_publications.session_id = sessions.id
-                  and public_session_publications.club_id = sessions.club_id
-                  and public_session_publications.visibility in ('MEMBER', 'PUBLIC')
-                  and trim(public_session_publications.public_summary) <> ''
-              )
-            """.trimIndent(),
-            command.sessionId.dbString(),
-            command.host.clubId.dbString(),
-        )
+        val publishedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'PUBLISHED',
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and state = 'CLOSED'
+                  and exists (
+                    select 1
+                    from public_session_publications
+                    where public_session_publications.session_id = sessions.id
+                      and public_session_publications.club_id = sessions.club_id
+                      and public_session_publications.visibility in ('MEMBER', 'PUBLIC')
+                      and trim(public_session_publications.public_summary) <> ''
+                  )
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            )
         if (publishedRows == 0) {
-            val state = queries.findState(jdbcTemplate, command.host, command.sessionId)
-                ?: throw HostSessionNotFoundException()
+            val state =
+                queries.findState(jdbcTemplate, command.host, command.sessionId)
+                    ?: throw HostSessionNotFoundException()
 
             if (state == "PUBLISHED") {
                 return HostSessionTransitionResult(
@@ -479,18 +509,23 @@ internal class HostSessionWriteOperations(
         )
     }
 
-    private fun createActiveParticipants(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID) {
-        val activeMembershipIds = jdbcTemplate.query(
-            """
-            select id
-            from memberships
-            where club_id = ?
-              and status = 'ACTIVE'
-            order by joined_at is null, joined_at, created_at
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.uuid("id") },
-            clubId.dbString(),
-        )
+    private fun createActiveParticipants(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+        sessionId: UUID,
+    ) {
+        val activeMembershipIds =
+            jdbcTemplate.query(
+                """
+                select id
+                from memberships
+                where club_id = ?
+                  and status = 'ACTIVE'
+                order by joined_at is null, joined_at, created_at
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.uuid("id") },
+                clubId.dbString(),
+            )
         if (activeMembershipIds.isEmpty()) {
             return
         }
@@ -509,7 +544,10 @@ internal class HostSessionWriteOperations(
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             object : BatchPreparedStatementSetter {
-                override fun setValues(ps: PreparedStatement, i: Int) {
+                override fun setValues(
+                    ps: PreparedStatement,
+                    i: Int,
+                ) {
                     ps.setString(1, UUID.randomUUID().dbString())
                     ps.setString(2, clubId.dbString())
                     ps.setString(3, sessionId.dbString())
@@ -525,14 +563,19 @@ internal class HostSessionWriteOperations(
         runCatching { UUID.fromString(membershipId) }
             .getOrElse { throw InvalidMembershipIdException() }
 
-    private fun parseSessionTime(value: String): LocalTime =
-        LocalTime.parse(value)
+    private fun parseSessionTime(value: String): LocalTime = LocalTime.parse(value)
 
-    private fun deadlineOrDefault(request: HostSessionCommand, sessionDate: LocalDate) =
-        request.questionDeadlineAt
-            ?.takeIf { it.isNotBlank() }
-            ?.let { OffsetDateTime.parse(it).toUtcLocalDateTime() }
-            ?: sessionDate.minusDays(1).atTime(23, 59).atOffset(ZoneOffset.ofHours(9)).toUtcLocalDateTime()
+    private fun deadlineOrDefault(
+        request: HostSessionCommand,
+        sessionDate: LocalDate,
+    ) = request.questionDeadlineAt
+        ?.takeIf { it.isNotBlank() }
+        ?.let { OffsetDateTime.parse(it).toUtcLocalDateTime() }
+        ?: sessionDate
+            .minusDays(1)
+            .atTime(23, 59)
+            .atOffset(ZoneOffset.ofHours(9))
+            .toUtcLocalDateTime()
 
     private fun blankToNull(value: String?): String? = value?.trim()?.takeIf { it.isNotEmpty() }
 

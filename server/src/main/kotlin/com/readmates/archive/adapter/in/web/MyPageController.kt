@@ -12,6 +12,5 @@ class MyPageController(
     private val getMyPageSummaryUseCase: GetMyPageSummaryUseCase,
 ) {
     @GetMapping
-    fun me(currentMember: CurrentMember): MyPageResponse =
-        getMyPageSummaryUseCase.getMyPageSummary(currentMember).toWebDto()
+    fun me(currentMember: CurrentMember): MyPageResponse = getMyPageSummaryUseCase.getMyPageSummary(currentMember).toWebDto()
 }

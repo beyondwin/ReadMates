@@ -1,8 +1,8 @@
 package com.readmates.contract
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -31,82 +31,99 @@ import java.nio.file.Paths
 )
 @AutoConfigureMockMvc
 @Tag("integration")
-class FrontendFixtureContractTest @Autowired constructor(
-    private val mockMvc: MockMvc,
-    private val objectMapper: ObjectMapper,
-    private val jdbcTemplate: JdbcTemplate,
-) : ReadmatesMySqlIntegrationTestSupport() {
-    private val fixturesDir = Paths.get(
-        System.getProperty("readmates.frontend.fixtures.dir")
-            ?: error("System property 'readmates.frontend.fixtures.dir' is not set"),
-    )
+class FrontendFixtureContractTest
+    @Autowired
+    constructor(
+        private val mockMvc: MockMvc,
+        private val objectMapper: ObjectMapper,
+        private val jdbcTemplate: JdbcTemplate,
+    ) : ReadmatesMySqlIntegrationTestSupport() {
+        private val fixturesDir =
+            Paths.get(
+                System.getProperty("readmates.frontend.fixtures.dir")
+                    ?: error("System property 'readmates.frontend.fixtures.dir' is not set"),
+            )
 
-    // Seeded host session: session 1 (팩트풀니스), state=PUBLISHED, visibility=PUBLIC
-    private val seededHostSessionId = "00000000-0000-0000-0000-000000000301"
+        // Seeded host session: session 1 (팩트풀니스), state=PUBLISHED, visibility=PUBLIC
+        private val seededHostSessionId = "00000000-0000-0000-0000-000000000301"
 
-    @Test
-    fun `current session empty response matches frontend fixture key set`() {
-        val response = mockMvc.get("/api/sessions/current") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
+        @Test
+        fun `current session empty response matches frontend fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/sessions/current") {
+                        with(user("member5@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
 
-        assertTopLevelKeySetMatches(response, "current-session-empty.json")
-    }
-
-    @Test
-    fun `archive session page response matches frontend fixture key set`() {
-        val response = mockMvc.get("/api/archive/sessions") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
-
-        assertTopLevelKeySetMatches(response, "archive-session-page.json")
-    }
-
-    @Test
-    fun `host session detail response matches frontend fixture key set`() {
-        val response = mockMvc.get("/api/host/sessions/$seededHostSessionId") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
-
-        assertTopLevelKeySetMatches(response, "host-session-detail.json")
-    }
-
-    @Test
-    fun `host notification delivery list response matches frontend fixture key set`() {
-        val response = mockMvc.get("/api/host/notifications/deliveries") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
-
-        assertTopLevelKeySetMatches(response, "host-notification-delivery-list.json")
-    }
-
-    private fun assertTopLevelKeySetMatches(actualJson: String, fixtureFileName: String) {
-        val fixtureFile = fixturesDir.resolve(fixtureFileName).toFile()
-        check(fixtureFile.exists()) {
-            "Frontend fixture file not found: ${fixtureFile.absolutePath}. " +
-                "Ensure 'readmates.frontend.fixtures.dir' points to front/tests/unit/__fixtures__."
+            assertTopLevelKeySetMatches(response, "current-session-empty.json")
         }
 
-        val actual: JsonNode = objectMapper.readTree(actualJson)
-        val expected: JsonNode = objectMapper.readTree(fixtureFile)
+        @Test
+        fun `archive session page response matches frontend fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/archive/sessions") {
+                        with(user("member5@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
 
-        val actualKeys = actual.propertyNames().toSet()
-        val expectedKeys = expected.propertyNames().toSet()
+            assertTopLevelKeySetMatches(response, "archive-session-page.json")
+        }
 
-        assertThat(actualKeys)
-            .describedAs(
-                "Top-level JSON key set from server response must match fixture '$fixtureFileName'.\n" +
-                    "Keys in server response but not in fixture: ${actualKeys - expectedKeys}\n" +
-                    "Keys in fixture but not in server response: ${expectedKeys - actualKeys}",
-            )
-            .isEqualTo(expectedKeys)
+        @Test
+        fun `host session detail response matches frontend fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/host/sessions/$seededHostSessionId") {
+                        with(user("host@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
+
+            assertTopLevelKeySetMatches(response, "host-session-detail.json")
+        }
+
+        @Test
+        fun `host notification delivery list response matches frontend fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/host/notifications/deliveries") {
+                        with(user("host@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
+
+            assertTopLevelKeySetMatches(response, "host-notification-delivery-list.json")
+        }
+
+        private fun assertTopLevelKeySetMatches(
+            actualJson: String,
+            fixtureFileName: String,
+        ) {
+            val fixtureFile = fixturesDir.resolve(fixtureFileName).toFile()
+            check(fixtureFile.exists()) {
+                "Frontend fixture file not found: ${fixtureFile.absolutePath}. " +
+                    "Ensure 'readmates.frontend.fixtures.dir' points to front/tests/unit/__fixtures__."
+            }
+
+            val actual: JsonNode = objectMapper.readTree(actualJson)
+            val expected: JsonNode = objectMapper.readTree(fixtureFile)
+
+            val actualKeys = actual.propertyNames().toSet()
+            val expectedKeys = expected.propertyNames().toSet()
+
+            assertThat(actualKeys)
+                .describedAs(
+                    "Top-level JSON key set from server response must match fixture '$fixtureFileName'.\n" +
+                        "Keys in server response but not in fixture: ${actualKeys - expectedKeys}\n" +
+                        "Keys in fixture but not in server response: ${expectedKeys - actualKeys}",
+                ).isEqualTo(expectedKeys)
+        }
     }
-}

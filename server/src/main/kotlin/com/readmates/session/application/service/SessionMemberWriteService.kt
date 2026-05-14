@@ -26,12 +26,10 @@ class SessionMemberWriteService(
     ReplaceQuestionsUseCase,
     SaveReviewUseCase {
     @Transactional
-    override fun updateRsvp(command: UpdateRsvpCommand) =
-        writePort.updateRsvp(command)
+    override fun updateRsvp(command: UpdateRsvpCommand) = writePort.updateRsvp(command)
 
     @Transactional
-    override fun saveCheckin(command: SaveCheckinCommand) =
-        writePort.saveCheckin(command)
+    override fun saveCheckin(command: SaveCheckinCommand) = writePort.saveCheckin(command)
 
     @Transactional
     override fun saveQuestion(command: SaveQuestionCommand) =

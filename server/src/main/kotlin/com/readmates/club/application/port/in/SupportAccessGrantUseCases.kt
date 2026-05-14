@@ -20,6 +20,13 @@ interface RevokeSupportAccessGrantUseCase {
 }
 
 interface ListSupportAccessGrantsUseCase {
-    fun listByClub(admin: CurrentPlatformAdmin, clubId: UUID): List<SupportAccessGrant>
-    fun listByGrantee(admin: CurrentPlatformAdmin, granteeUserId: UUID): List<SupportAccessGrant>
+    fun listByClub(
+        admin: CurrentPlatformAdmin,
+        clubId: UUID,
+    ): List<SupportAccessGrant>
+
+    fun listByGrantee(
+        admin: CurrentPlatformAdmin,
+        granteeUserId: UUID,
+    ): List<SupportAccessGrant>
 }

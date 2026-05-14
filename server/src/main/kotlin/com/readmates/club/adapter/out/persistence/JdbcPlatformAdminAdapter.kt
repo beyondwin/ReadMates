@@ -71,12 +71,12 @@ class JdbcPlatformAdminAdapter(
         kind: ClubDomainKind,
         @Suppress("UNUSED_PARAMETER") isPrimary: Boolean,
     ): CreateClubDomainResult {
-
-        val clubExists = jdbcTemplate.queryForObject(
-            "select count(*) from clubs where id = ?",
-            Long::class.java,
-            clubId.dbString(),
-        ) ?: 0
+        val clubExists =
+            jdbcTemplate.queryForObject(
+                "select count(*) from clubs where id = ?",
+                Long::class.java,
+                clubId.dbString(),
+            ) ?: 0
         if (clubExists == 0L) {
             return CreateClubDomainResult.ClubNotFound
         }
@@ -116,16 +116,17 @@ class JdbcPlatformAdminAdapter(
     }
 
     override fun loadClubDomain(domainId: UUID): PlatformAdminClubDomain? =
-        jdbcTemplate.query(
-            """
-            select id, club_id, hostname, kind, status, is_primary, verified_at, last_checked_at, provisioning_error_code
-            from club_domains
-            where id = ?
-            limit 1
-            """.trimIndent(),
-            ::mapDomain,
-            domainId.dbString(),
-        )?.firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select id, club_id, hostname, kind, status, is_primary, verified_at, last_checked_at, provisioning_error_code
+                from club_domains
+                where id = ?
+                limit 1
+                """.trimIndent(),
+                ::mapDomain,
+                domainId.dbString(),
+            )?.firstOrNull()
 
     @Transactional
     override fun updateClubDomainProvisioning(
@@ -135,22 +136,22 @@ class JdbcPlatformAdminAdapter(
         lastCheckedAt: OffsetDateTime,
         errorCode: String?,
     ): PlatformAdminClubDomain? {
-
-        val updatedRows = jdbcTemplate.update(
-            """
-            update club_domains
-            set status = ?,
-                verified_at = ?,
-                last_checked_at = ?,
-                provisioning_error_code = ?
-            where id = ?
-            """.trimIndent(),
-            status.name,
-            verifiedAt?.toTimestamp(),
-            lastCheckedAt.toTimestamp(),
-            errorCode,
-            domainId.dbString(),
-        )
+        val updatedRows =
+            jdbcTemplate.update(
+                """
+                update club_domains
+                set status = ?,
+                    verified_at = ?,
+                    last_checked_at = ?,
+                    provisioning_error_code = ?
+                where id = ?
+                """.trimIndent(),
+                status.name,
+                verifiedAt?.toTimestamp(),
+                lastCheckedAt.toTimestamp(),
+                errorCode,
+                domainId.dbString(),
+            )
         if (updatedRows == 0) {
             return null
         }
@@ -158,7 +159,10 @@ class JdbcPlatformAdminAdapter(
         return loadClubDomain(domainId)
     }
 
-    private fun mapDomain(resultSet: ResultSet, @Suppress("UNUSED_PARAMETER") rowNumber: Int): PlatformAdminClubDomain =
+    private fun mapDomain(
+        resultSet: ResultSet,
+        @Suppress("UNUSED_PARAMETER") rowNumber: Int,
+    ): PlatformAdminClubDomain =
         PlatformAdminClubDomain(
             id = resultSet.uuid("id"),
             clubId = resultSet.uuid("club_id"),

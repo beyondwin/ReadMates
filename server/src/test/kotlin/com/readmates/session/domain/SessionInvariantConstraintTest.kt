@@ -1,9 +1,9 @@
 package com.readmates.session.domain
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -87,7 +87,11 @@ class SessionInvariantConstraintTest(
         createdSessionIds += "00000000-0000-0000-0000-000000099005"
     }
 
-    private fun insertSession(id: String, state: String, visibility: String) {
+    private fun insertSession(
+        id: String,
+        state: String,
+        visibility: String,
+    ) {
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -115,6 +119,10 @@ class SessionInvariantConstraintTest(
 
     private fun idSuffix(id: String): Int {
         // Use the last 5 characters as a high session number (e.g., 99001) to avoid conflicts with seeded data
-        return id.takeLast(5).trimStart('0').ifEmpty { "0" }.toInt()
+        return id
+            .takeLast(5)
+            .trimStart('0')
+            .ifEmpty { "0" }
+            .toInt()
     }
 }

@@ -39,10 +39,11 @@ data class FeedbackRevealingQuote(
 
 class FeedbackDocumentParser {
     fun parse(source: String): ParsedFeedbackDocument {
-        val lines = source
-            .replace("\r\n", "\n")
-            .replace("\r", "\n")
-            .split("\n")
+        val lines =
+            source
+                .replace("\r\n", "\n")
+                .replace("\r", "\n")
+                .split("\n")
 
         if (lines.none { it.trim() == MARKER }) {
             invalidTemplate()
@@ -97,9 +98,10 @@ class FeedbackDocumentParser {
         }
 
     private fun parseParticipants(lines: List<String>): List<FeedbackParticipant> {
-        val headerIndexes = lines.mapIndexedNotNull { index, line ->
-            if (PARTICIPANT_PATTERN.matches(line.trim())) index else null
-        }
+        val headerIndexes =
+            lines.mapIndexedNotNull { index, line ->
+                if (PARTICIPANT_PATTERN.matches(line.trim())) index else null
+            }
         if (headerIndexes.isEmpty()) {
             invalidTemplate()
         }
@@ -118,13 +120,14 @@ class FeedbackDocumentParser {
             invalidTemplate()
         }
 
-        val role = lines
-            .firstOrNull { it.trim().startsWith("역할:") }
-            ?.trim()
-            ?.substringAfter("역할:")
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: invalidTemplate()
+        val role =
+            lines
+                .firstOrNull { it.trim().startsWith("역할:") }
+                ?.trim()
+                ?.substringAfter("역할:")
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: invalidTemplate()
 
         val styleIndex = headingIndex(lines, "#### 참여 스타일")
         val contributionIndex = headingIndex(lines, "#### 실질 기여")
@@ -169,9 +172,10 @@ class FeedbackDocumentParser {
     }
 
     private fun parseProblems(lines: List<String>): List<FeedbackProblem> {
-        val headerIndexes = lines.mapIndexedNotNull { index, line ->
-            if (PROBLEM_PATTERN.matches(line.trim())) index else null
-        }
+        val headerIndexes =
+            lines.mapIndexedNotNull { index, line ->
+                if (PROBLEM_PATTERN.matches(line.trim())) index else null
+            }
         if (headerIndexes.isEmpty()) {
             invalidTemplate()
         }
@@ -183,12 +187,14 @@ class FeedbackDocumentParser {
     }
 
     private fun parseProblem(lines: List<String>): FeedbackProblem {
-        val title = PROBLEM_PATTERN.matchEntire(lines.first().trim())
-            ?.groupValues
-            ?.get(1)
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: invalidTemplate()
+        val title =
+            PROBLEM_PATTERN
+                .matchEntire(lines.first().trim())
+                ?.groupValues
+                ?.get(1)
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: invalidTemplate()
         val fields = labeledBulletFields(lines.drop(1))
 
         return FeedbackProblem(
@@ -200,13 +206,14 @@ class FeedbackDocumentParser {
     }
 
     private fun parseRevealingQuote(lines: List<String>): FeedbackRevealingQuote {
-        val quote = lines
-            .firstOrNull { it.trim().startsWith(">") }
-            ?.trim()
-            ?.removePrefix(">")
-            ?.trim()
-            ?.takeIf { it.isNotBlank() }
-            ?: invalidTemplate()
+        val quote =
+            lines
+                .firstOrNull { it.trim().startsWith(">") }
+                ?.trim()
+                ?.removePrefix(">")
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: invalidTemplate()
         val context = prefixedValue(lines, "맥락:")
         val note = prefixedValue(lines, "주석:")
 
@@ -246,8 +253,9 @@ class FeedbackDocumentParser {
             val trimmed = line.trim()
             when {
                 trimmed.isBlank() -> null
-                trimmed.startsWith("- ") -> trimmed.removePrefix("- ").trim().takeIf { it.isNotBlank() }
-                    ?: invalidTemplate()
+                trimmed.startsWith("- ") ->
+                    trimmed.removePrefix("- ").trim().takeIf { it.isNotBlank() }
+                        ?: invalidTemplate()
                 else -> invalidTemplate()
             }
         }
@@ -257,27 +265,33 @@ class FeedbackDocumentParser {
             val trimmed = line.trim()
             when {
                 trimmed.isBlank() -> null
-                else -> NUMBERED_ITEM_PATTERN.matchEntire(trimmed)
-                    ?.groupValues
-                    ?.get(1)
-                    ?.trim()
-                    ?.takeIf { it.isNotBlank() }
-                    ?: invalidTemplate()
+                else ->
+                    NUMBERED_ITEM_PATTERN
+                        .matchEntire(trimmed)
+                        ?.groupValues
+                        ?.get(1)
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: invalidTemplate()
             }
         }
 
     private fun labeledBulletFields(lines: List<String>): Map<String, String> =
-        lines.mapNotNull { line ->
-            val trimmed = line.trim()
-            if (trimmed.isBlank()) {
-                null
-            } else {
-                val match = LABELED_BULLET_PATTERN.matchEntire(trimmed) ?: invalidTemplate()
-                match.groupValues[1].trim() to match.groupValues[2].trim()
-            }
-        }.toMap()
+        lines
+            .mapNotNull { line ->
+                val trimmed = line.trim()
+                if (trimmed.isBlank()) {
+                    null
+                } else {
+                    val match = LABELED_BULLET_PATTERN.matchEntire(trimmed) ?: invalidTemplate()
+                    match.groupValues[1].trim() to match.groupValues[2].trim()
+                }
+            }.toMap()
 
-    private fun prefixedValue(lines: List<String>, prefix: String): String =
+    private fun prefixedValue(
+        lines: List<String>,
+        prefix: String,
+    ): String =
         lines
             .firstOrNull { it.trim().startsWith(prefix) }
             ?.trim()
@@ -286,20 +300,32 @@ class FeedbackDocumentParser {
             ?.takeIf { it.isNotBlank() }
             ?: invalidTemplate()
 
-    private fun findHeading(lines: List<String>, heading: String, startIndex: Int): Int =
-        lines.indexOfFirstFrom(startIndex) { it.trim() == heading }.takeIf { it >= 0 } ?: invalidTemplate()
+    private fun findHeading(
+        lines: List<String>,
+        heading: String,
+        startIndex: Int,
+    ): Int = lines.indexOfFirstFrom(startIndex) { it.trim() == heading }.takeIf { it >= 0 } ?: invalidTemplate()
 
-    private fun headingIndex(lines: List<String>, heading: String): Int =
-        lines.indexOfFirst { it.trim() == heading }
+    private fun headingIndex(
+        lines: List<String>,
+        heading: String,
+    ): Int = lines.indexOfFirst { it.trim() == heading }
 
-    private fun nextNonBlankLine(lines: List<String>, startIndex: Int): String =
-        lines.asSequence()
+    private fun nextNonBlankLine(
+        lines: List<String>,
+        startIndex: Int,
+    ): String =
+        lines
+            .asSequence()
             .drop(startIndex)
             .map { it.trim() }
             .firstOrNull { it.isNotBlank() }
             ?: invalidTemplate()
 
-    private fun List<String>.indexOfFirstFrom(startIndex: Int, predicate: (String) -> Boolean): Int {
+    private fun List<String>.indexOfFirstFrom(
+        startIndex: Int,
+        predicate: (String) -> Boolean,
+    ): Int {
         for (index in startIndex until size) {
             if (predicate(this[index])) {
                 return index

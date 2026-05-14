@@ -19,10 +19,10 @@ import org.springframework.test.web.servlet.get
 class CurrentSessionControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-
     @Test
     fun `returns unauthorized when current member cannot be resolved`() {
-        mockMvc.get("/api/sessions/current")
+        mockMvc
+            .get("/api/sessions/current")
             .andExpect {
                 status { isUnauthorized() }
             }

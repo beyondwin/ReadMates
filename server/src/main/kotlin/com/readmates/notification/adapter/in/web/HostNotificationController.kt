@@ -19,8 +19,8 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
@@ -45,14 +45,15 @@ class HostNotificationController(
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
     ): HostNotificationItemListResponse =
-        manageHostNotificationsUseCase.listItems(
-            host,
-            HostNotificationItemQuery(
-                status = status,
-                eventType = eventType,
-            ),
-            PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
-        ).toResponse()
+        manageHostNotificationsUseCase
+            .listItems(
+                host,
+                HostNotificationItemQuery(
+                    status = status,
+                    eventType = eventType,
+                ),
+                PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
+            ).toResponse()
 
     @GetMapping("/events")
     fun events(
@@ -105,25 +106,24 @@ class HostNotificationController(
     fun previewManual(
         host: CurrentMember,
         @RequestBody request: ManualNotificationPreviewRequest,
-    ): ManualNotificationPreviewResponse =
-        manageManualHostNotificationsUseCase.preview(host, request.toCommand()).toResponse()
+    ): ManualNotificationPreviewResponse = manageManualHostNotificationsUseCase.preview(host, request.toCommand()).toResponse()
 
     @PostMapping("/manual")
     fun confirmManual(
         host: CurrentMember,
         @RequestBody request: ManualNotificationConfirmRequest,
-    ): ManualNotificationConfirmResponse =
-        manageManualHostNotificationsUseCase.confirm(host, request.toCommand()).toResponse()
+    ): ManualNotificationConfirmResponse = manageManualHostNotificationsUseCase.confirm(host, request.toCommand()).toResponse()
 
     @PostMapping("/test-mail")
     fun sendTestMail(
         host: CurrentMember,
         @RequestBody request: SendNotificationTestMailRequest,
     ): NotificationTestMailAuditResponse =
-        sendNotificationTestMailUseCase.sendTestMail(
-            host,
-            SendNotificationTestMailCommand(request.recipientEmail),
-        ).toResponse()
+        sendNotificationTestMailUseCase
+            .sendTestMail(
+                host,
+                SendNotificationTestMailCommand(request.recipientEmail),
+            ).toResponse()
 
     @GetMapping("/test-mail/audit")
     fun testMailAudit(
@@ -139,8 +139,7 @@ class HostNotificationController(
     fun detail(
         host: CurrentMember,
         @PathVariable id: UUID,
-    ): HostNotificationDetailResponse =
-        manageHostNotificationsUseCase.detail(host, id).toResponse()
+    ): HostNotificationDetailResponse = manageHostNotificationsUseCase.detail(host, id).toResponse()
 
     @PostMapping("/process")
     fun process(host: CurrentMember): Map<String, Int> {
@@ -155,15 +154,13 @@ class HostNotificationController(
     fun retry(
         host: CurrentMember,
         @PathVariable id: UUID,
-    ): HostNotificationDetailResponse =
-        manageHostNotificationsUseCase.retry(host, id).toResponse()
+    ): HostNotificationDetailResponse = manageHostNotificationsUseCase.retry(host, id).toResponse()
 
     @PostMapping("/items/{id}/restore")
     fun restore(
         host: CurrentMember,
         @PathVariable id: UUID,
-    ): HostNotificationDetailResponse =
-        manageHostNotificationsUseCase.restore(host, id).toResponse()
+    ): HostNotificationDetailResponse = manageHostNotificationsUseCase.restore(host, id).toResponse()
 }
 
 private const val PROCESS_BATCH_SIZE = 20

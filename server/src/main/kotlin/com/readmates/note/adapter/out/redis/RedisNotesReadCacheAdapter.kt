@@ -24,33 +24,50 @@ class RedisNotesReadCacheAdapter(
     private val feedListType = objectMapper.typeFactory.constructCollectionType(List::class.java, NoteFeedResult::class.java)
     private val sessionListType = objectMapper.typeFactory.constructCollectionType(List::class.java, NoteSessionResult::class.java)
 
-    override fun getFeed(clubId: UUID): List<NoteFeedResult>? =
-        getList(feedKey(clubId), feedListType, "feed", "get-feed")
+    override fun getFeed(clubId: UUID): List<NoteFeedResult>? = getList(feedKey(clubId), feedListType, "feed", "get-feed")
 
-    override fun putFeed(clubId: UUID, result: List<NoteFeedResult>) {
+    override fun putFeed(
+        clubId: UUID,
+        result: List<NoteFeedResult>,
+    ) {
         store(feedKey(clubId), result, "put-feed")
     }
 
-    override fun getSessionFeed(clubId: UUID, sessionId: UUID): List<NoteFeedResult>? =
-        getList(sessionFeedKey(clubId, sessionId), feedListType, "session-feed", "get-session-feed")
+    override fun getSessionFeed(
+        clubId: UUID,
+        sessionId: UUID,
+    ): List<NoteFeedResult>? = getList(sessionFeedKey(clubId, sessionId), feedListType, "session-feed", "get-session-feed")
 
-    override fun putSessionFeed(clubId: UUID, sessionId: UUID, result: List<NoteFeedResult>) {
+    override fun putSessionFeed(
+        clubId: UUID,
+        sessionId: UUID,
+        result: List<NoteFeedResult>,
+    ) {
         store(sessionFeedKey(clubId, sessionId), result, "put-session-feed")
     }
 
     override fun getSessions(clubId: UUID): List<NoteSessionResult>? =
         getList(sessionsKey(clubId), sessionListType, "sessions", "get-sessions")
 
-    override fun putSessions(clubId: UUID, result: List<NoteSessionResult>) {
+    override fun putSessions(
+        clubId: UUID,
+        result: List<NoteSessionResult>,
+    ) {
         store(sessionsKey(clubId), result, "put-sessions")
     }
 
-    private fun <T : Any> getList(key: String, type: JavaType, scope: String, operation: String): List<T>? =
+    private fun <T : Any> getList(
+        key: String,
+        type: JavaType,
+        scope: String,
+        operation: String,
+    ): List<T>? =
         runCatching {
-            val raw = redisTemplate.opsForValue().get(key) ?: run {
-                recordCacheMiss(scope)
-                return null
-            }
+            val raw =
+                redisTemplate.opsForValue().get(key) ?: run {
+                    recordCacheMiss(scope)
+                    return null
+                }
             decodeList<T>(raw, type, key, scope) ?: return null
         }.getOrElse {
             recordCacheMiss(scope)
@@ -59,10 +76,16 @@ class RedisNotesReadCacheAdapter(
             null
         }
 
-    private fun <T : Any> decodeList(raw: String, type: JavaType, key: String, scope: String): List<T>? {
-        val decoded = runCatching {
-            objectMapper.readValue<List<T>>(raw, type)
-        }.getOrNull()
+    private fun <T : Any> decodeList(
+        raw: String,
+        type: JavaType,
+        key: String,
+        scope: String,
+    ): List<T>? {
+        val decoded =
+            runCatching {
+                objectMapper.readValue<List<T>>(raw, type)
+            }.getOrNull()
         if (decoded == null) {
             safeDelete(key)
             recordCacheMiss(scope)
@@ -74,7 +97,11 @@ class RedisNotesReadCacheAdapter(
         return decoded
     }
 
-    private fun store(key: String, result: Any, operation: String) {
+    private fun store(
+        key: String,
+        result: Any,
+        operation: String,
+    ) {
         if (properties.feedTtl <= Duration.ZERO) {
             return
         }
@@ -112,7 +139,12 @@ class RedisNotesReadCacheAdapter(
 
     private companion object {
         fun feedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
-        fun sessionFeedKey(clubId: UUID, sessionId: UUID) = "notes:club:$clubId:session:$sessionId:feed:v1"
+
+        fun sessionFeedKey(
+            clubId: UUID,
+            sessionId: UUID,
+        ) = "notes:club:$clubId:session:$sessionId:feed:v1"
+
         fun sessionsKey(clubId: UUID) = "notes:club:$clubId:sessions:v1"
     }
 }

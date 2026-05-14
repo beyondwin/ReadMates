@@ -151,7 +151,10 @@ private class RecordingEventOutbox : NotificationEventOutboxPort {
 
     override fun claimPublishable(limit: Int): List<NotificationEventOutboxItem> = error("unused")
 
-    override fun markPublished(id: UUID, lockedAt: OffsetDateTime): Boolean = error("unused")
+    override fun markPublished(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean = error("unused")
 
     override fun markPublishFailed(
         id: UUID,
@@ -160,7 +163,11 @@ private class RecordingEventOutbox : NotificationEventOutboxPort {
         nextAttemptDelayMinutes: Long,
     ): Boolean = error("unused")
 
-    override fun markPublishDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = error("unused")
+    override fun markPublishDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean = error("unused")
 
     override fun loadMessage(eventId: UUID): NotificationEventMessage? = error("unused")
 

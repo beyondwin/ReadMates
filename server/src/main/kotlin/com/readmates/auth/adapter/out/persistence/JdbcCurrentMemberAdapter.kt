@@ -9,6 +9,5 @@ import org.springframework.stereotype.Component
 class JdbcCurrentMemberAdapter(
     private val memberIdentityLookup: MemberIdentityLookupPort,
 ) : LoadCurrentMemberPort {
-    override fun loadActiveMemberByEmail(email: String): CurrentMember? =
-        memberIdentityLookup.findActiveMemberByEmail(email)
+    override fun loadActiveMemberByEmail(email: String): CurrentMember? = memberIdentityLookup.findActiveMemberByEmail(email)
 }

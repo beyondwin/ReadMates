@@ -31,5 +31,6 @@ interface ReplaceQuestionsUseCase {
 
 interface SaveReviewUseCase {
     fun saveOneLineReview(command: SaveOneLineReviewCommand): OneLineReviewResult
+
     fun saveLongReview(command: SaveLongReviewCommand): LongReviewResult
 }

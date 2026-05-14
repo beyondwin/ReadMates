@@ -15,5 +15,8 @@ interface GetNotesFeedUseCase {
 }
 
 interface ListNoteSessionsUseCase {
-    fun listNoteSessions(member: CurrentMember, pageRequest: PageRequest): CursorPage<NoteSessionResult>
+    fun listNoteSessions(
+        member: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<NoteSessionResult>
 }

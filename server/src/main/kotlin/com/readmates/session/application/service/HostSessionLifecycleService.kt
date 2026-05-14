@@ -41,48 +41,54 @@ class HostSessionLifecycleService(
 
     @Transactional
     override fun open(command: HostSessionIdCommand) =
-        lifecyclePort.open(command).also { result ->
-            if (result.changed) {
-                logger.info(
-                    "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                    command.host.clubId,
-                    command.sessionId,
-                    "DRAFT",
-                    "OPEN",
-                )
-                cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-            }
-        }.detail
+        lifecyclePort
+            .open(command)
+            .also { result ->
+                if (result.changed) {
+                    logger.info(
+                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                        command.host.clubId,
+                        command.sessionId,
+                        "DRAFT",
+                        "OPEN",
+                    )
+                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                }
+            }.detail
 
     @Transactional
     override fun close(command: HostSessionIdCommand) =
-        lifecyclePort.close(command).also { result ->
-            if (result.changed) {
-                logger.info(
-                    "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                    command.host.clubId,
-                    command.sessionId,
-                    "OPEN",
-                    "CLOSED",
-                )
-                cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-            }
-        }.detail
+        lifecyclePort
+            .close(command)
+            .also { result ->
+                if (result.changed) {
+                    logger.info(
+                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                        command.host.clubId,
+                        command.sessionId,
+                        "OPEN",
+                        "CLOSED",
+                    )
+                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                }
+            }.detail
 
     @Transactional
     override fun publish(command: HostSessionIdCommand) =
-        lifecyclePort.publish(command).also { result ->
-            if (result.changed) {
-                logger.info(
-                    "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                    command.host.clubId,
-                    command.sessionId,
-                    "CLOSED",
-                    "PUBLISHED",
-                )
-                cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-            }
-        }.detail
+        lifecyclePort
+            .publish(command)
+            .also { result ->
+                if (result.changed) {
+                    logger.info(
+                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                        command.host.clubId,
+                        command.sessionId,
+                        "CLOSED",
+                        "PUBLISHED",
+                    )
+                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                }
+            }.detail
 
     override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.deletionPreview(command)
 
@@ -104,7 +110,12 @@ private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCa
         documentVersion: Int,
     ) = Unit
 
-    override fun recordNextBookPublished(clubId: UUID, sessionId: UUID, sessionNumber: Int, bookTitle: String) = Unit
+    override fun recordNextBookPublished(
+        clubId: UUID,
+        sessionId: UUID,
+        sessionNumber: Int,
+        bookTitle: String,
+    ) = Unit
 
     override fun recordReviewPublished(
         clubId: UUID,

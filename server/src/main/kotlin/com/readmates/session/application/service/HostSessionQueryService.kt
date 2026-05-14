@@ -15,7 +15,10 @@ class HostSessionQueryService(
 ) : HostSessionQueryUseCase,
     ListUpcomingSessionsUseCase,
     GetHostDashboardUseCase {
-    override fun list(host: CurrentMember, pageRequest: PageRequest) = queryPort.list(host, pageRequest)
+    override fun list(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ) = queryPort.list(host, pageRequest)
 
     override fun detail(command: HostSessionIdCommand) = queryPort.detail(command)
 

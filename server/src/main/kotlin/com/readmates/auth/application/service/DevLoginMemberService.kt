@@ -9,6 +9,5 @@ import org.springframework.stereotype.Service
 class DevLoginMemberService(
     private val devSeedMemberLookup: DevSeedMemberLookupPort,
 ) : DevLoginMemberUseCase {
-    override fun findDevSeedActiveMemberByEmail(email: String): CurrentMember? =
-        devSeedMemberLookup.findDevSeedActiveMemberByEmail(email)
+    override fun findDevSeedActiveMemberByEmail(email: String): CurrentMember? = devSeedMemberLookup.findDevSeedActiveMemberByEmail(email)
 }

@@ -21,23 +21,25 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 class CurrentMemberArgumentResolverTest {
-    private val legacyMember = CurrentMember(
-        userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-        membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
-        clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-        clubSlug = "reading-sai",
-        email = "member@example.com",
-        displayName = "멤버",
-        accountName = "김멤버",
-        role = MembershipRole.MEMBER,
-        membershipStatus = MembershipStatus.ACTIVE,
-    )
-    private val sampleClubMember = legacyMember.copy(
-        membershipId = UUID.fromString("00000000-0000-0000-0000-000000000202"),
-        clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
-        clubSlug = "sample-book-club",
-        displayName = "샘플멤버",
-    )
+    private val legacyMember =
+        CurrentMember(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubSlug = "reading-sai",
+            email = "member@example.com",
+            displayName = "멤버",
+            accountName = "김멤버",
+            role = MembershipRole.MEMBER,
+            membershipStatus = MembershipStatus.ACTIVE,
+        )
+    private val sampleClubMember =
+        legacyMember.copy(
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000202"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
+            clubSlug = "sample-book-club",
+            displayName = "샘플멤버",
+        )
 
     @Test
     fun `supports CurrentMember parameters`() {
@@ -63,12 +65,13 @@ class CurrentMemberArgumentResolverTest {
         val authentication = UsernamePasswordAuthenticationToken("member@example.com", "password", emptyList())
         request.userPrincipal = authentication
 
-        val resolved = resolver.resolveArgument(
-            sampleMethodParameter("currentMemberEndpoint"),
-            null,
-            ServletWebRequest(request),
-            null,
-        )
+        val resolved =
+            resolver.resolveArgument(
+                sampleMethodParameter("currentMemberEndpoint"),
+                null,
+                ServletWebRequest(request),
+                null,
+            )
 
         assertEquals(legacyMember, resolved)
         assertEquals(1, resolveMembers.legacyEmailLookups)
@@ -83,12 +86,13 @@ class CurrentMemberArgumentResolverTest {
         request.userPrincipal = authentication
         request.addHeader("X-Readmates-Club-Slug", "sample-book-club")
 
-        val resolved = resolver.resolveArgument(
-            sampleMethodParameter("currentMemberEndpoint"),
-            null,
-            ServletWebRequest(request),
-            null,
-        )
+        val resolved =
+            resolver.resolveArgument(
+                sampleMethodParameter("currentMemberEndpoint"),
+                null,
+                ServletWebRequest(request),
+                null,
+            )
 
         assertEquals(sampleClubMember, resolved)
         assertEquals(0, resolveMembers.legacyEmailLookups)
@@ -137,9 +141,15 @@ class CurrentMemberArgumentResolverTest {
 
         override fun findUserIdByEmail(email: String): UUID? = member?.userId
 
-        override fun resolveByUserAndClub(userId: UUID, clubId: UUID): CurrentMember? = clubMember
+        override fun resolveByUserAndClub(
+            userId: UUID,
+            clubId: UUID,
+        ): CurrentMember? = clubMember
 
-        override fun resolveByEmailAndClub(email: String, clubId: UUID): CurrentMember? = clubMember
+        override fun resolveByEmailAndClub(
+            email: String,
+            clubId: UUID,
+        ): CurrentMember? = clubMember
 
         override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
 

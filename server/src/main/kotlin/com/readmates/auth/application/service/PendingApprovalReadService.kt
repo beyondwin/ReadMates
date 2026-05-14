@@ -33,26 +33,27 @@ class PendingApprovalReadService(
             throw AuthApplicationException(AuthApplicationError.PENDING_APPROVAL_REQUIRED, "Pending approval required")
         }
 
-        return pendingApprovalStore.findPendingApproval(member.clubId)
+        return pendingApprovalStore
+            .findPendingApproval(member.clubId)
             ?.toPendingApprovalAppResponse()
             ?: throw AuthApplicationException(AuthApplicationError.CLUB_NOT_FOUND, "Club not found")
     }
 
-    private fun PendingApprovalRow.toPendingApprovalAppResponse(): PendingApprovalAppResponse {
-        return PendingApprovalAppResponse(
+    private fun PendingApprovalRow.toPendingApprovalAppResponse(): PendingApprovalAppResponse =
+        PendingApprovalAppResponse(
             approvalState = "VIEWER",
             clubName = clubName,
-            currentSession = sessionId?.let {
-                PendingCurrentSessionResponse(
-                    sessionId = it.toString(),
-                    sessionNumber = requireNotNull(sessionNumber),
-                    title = requireNotNull(title),
-                    bookTitle = requireNotNull(bookTitle),
-                    bookAuthor = requireNotNull(bookAuthor),
-                    date = requireNotNull(sessionDate).toString(),
-                    locationLabel = requireNotNull(locationLabel),
-                )
-            },
+            currentSession =
+                sessionId?.let {
+                    PendingCurrentSessionResponse(
+                        sessionId = it.toString(),
+                        sessionNumber = requireNotNull(sessionNumber),
+                        title = requireNotNull(title),
+                        bookTitle = requireNotNull(bookTitle),
+                        bookAuthor = requireNotNull(bookAuthor),
+                        date = requireNotNull(sessionDate).toString(),
+                        locationLabel = requireNotNull(locationLabel),
+                    )
+                },
         )
-    }
 }

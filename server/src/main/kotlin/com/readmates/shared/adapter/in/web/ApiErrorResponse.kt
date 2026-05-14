@@ -49,9 +49,10 @@ fun HttpStatus.defaultApiErrorMessage(): String =
         HttpStatus.CONFLICT -> "요청한 작업이 현재 상태와 충돌합니다."
         HttpStatus.GONE -> "더 이상 사용할 수 없는 경로입니다."
         HttpStatus.SERVICE_UNAVAILABLE -> "서비스를 일시적으로 사용할 수 없습니다."
-        else -> if (is5xxServerError) {
-            "서비스 오류가 발생했습니다."
-        } else {
-            "요청을 처리할 수 없습니다."
-        }
+        else ->
+            if (is5xxServerError) {
+                "서비스 오류가 발생했습니다."
+            } else {
+                "요청을 처리할 수 없습니다."
+            }
     }

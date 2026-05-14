@@ -5,5 +5,9 @@ import com.readmates.shared.security.CurrentMember
 
 interface NotificationPreferencesPort {
     fun getPreferences(member: CurrentMember): NotificationPreferences
-    fun savePreferences(member: CurrentMember, preferences: NotificationPreferences): NotificationPreferences
+
+    fun savePreferences(
+        member: CurrentMember,
+        preferences: NotificationPreferences,
+    ): NotificationPreferences
 }

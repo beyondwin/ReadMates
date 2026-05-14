@@ -14,8 +14,7 @@ data class UpdateRsvpRequest(
     @field:Pattern(regexp = "NO_RESPONSE|GOING|MAYBE|DECLINED")
     val status: String,
 ) {
-    fun toCommand(member: CurrentMember): UpdateRsvpCommand =
-        UpdateRsvpCommand(member = member, status = status)
+    fun toCommand(member: CurrentMember): UpdateRsvpCommand = UpdateRsvpCommand(member = member, status = status)
 }
 
 data class RsvpResponse(

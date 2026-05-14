@@ -20,15 +20,14 @@ import org.springframework.test.web.servlet.post
 class ReviewControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-
     @Test
     fun `rejects a blank one line review`() {
-        mockMvc.post("/api/sessions/current/one-line-reviews") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{ "text": " " }"""
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .post("/api/sessions/current/one-line-reviews") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{ "text": " " }"""
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
-
 }

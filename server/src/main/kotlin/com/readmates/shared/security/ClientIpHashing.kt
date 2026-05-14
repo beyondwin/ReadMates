@@ -24,8 +24,9 @@ object ClientIpHashing {
         val now = ZonedDateTime.now(clock)
         val week = now.get(WeekFields.ISO.weekOfWeekBasedYear())
         val year = now.get(WeekFields.ISO.weekBasedYear())
-        val salt = "${baseSecret}::${year}-W${week}"
-        return MessageDigest.getInstance("SHA-256")
+        val salt = "$baseSecret::$year-W$week"
+        return MessageDigest
+            .getInstance("SHA-256")
             .digest("$salt::$ip".toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
             .take(32)

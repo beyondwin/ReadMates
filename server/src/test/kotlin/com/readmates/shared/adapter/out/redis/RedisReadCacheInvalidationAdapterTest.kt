@@ -1,13 +1,13 @@
 package com.readmates.shared.adapter.out.redis
 
-import com.readmates.support.ReadmatesRedisIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.shared.cache.RedisCacheMetrics
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
@@ -66,10 +66,11 @@ class RedisReadCacheInvalidationAdapterTest(
     @Test
     fun `redis failure records fallback and operation error metrics`() {
         val registry = SimpleMeterRegistry()
-        val adapter = RedisReadCacheInvalidationAdapter(
-            redisTemplate = failingRedisTemplate(),
-            metrics = metrics(registry),
-        )
+        val adapter =
+            RedisReadCacheInvalidationAdapter(
+                redisTemplate = failingRedisTemplate(),
+                metrics = metrics(registry),
+            )
 
         adapter.evictClubContent(TARGET_CLUB_ID)
 
@@ -140,29 +141,35 @@ class RedisReadCacheInvalidationAdapterTest(
         private val UNRELATED_PUBLIC_CLUB_KEY = "public:club:$UNRELATED_CLUB_ID:home:v1"
 
         private fun publicSessionKey(sessionId: UUID) = "public:club:$TARGET_CLUB_ID:session:$sessionId:v1"
+
         private fun unrelatedPublicSessionKey(sessionId: UUID) = "public:club:$UNRELATED_CLUB_ID:session:$sessionId:v1"
+
         private fun notesFeedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
+
         private fun notesSessionsKey(clubId: UUID) = "notes:club:$clubId:sessions:v1"
+
         private fun notesSessionFeedKey(
             clubId: UUID,
             sessionId: UUID,
         ) = "notes:club:$clubId:session:$sessionId:feed:v1"
 
-        private val targetKeys = setOf(
-            PUBLIC_CLUB_KEY,
-            publicSessionKey(SESSION_ID),
-            publicSessionKey(OTHER_SESSION_ID),
-            notesFeedKey(TARGET_CLUB_ID),
-            notesSessionsKey(TARGET_CLUB_ID),
-            notesSessionFeedKey(TARGET_CLUB_ID, SESSION_ID),
-        )
-        private val unrelatedClubKeys = setOf(
-            UNRELATED_PUBLIC_CLUB_KEY,
-            unrelatedPublicSessionKey(SESSION_ID),
-            notesFeedKey(UNRELATED_CLUB_ID),
-            notesSessionsKey(UNRELATED_CLUB_ID),
-            notesSessionFeedKey(UNRELATED_CLUB_ID, OTHER_SESSION_ID),
-        )
+        private val targetKeys =
+            setOf(
+                PUBLIC_CLUB_KEY,
+                publicSessionKey(SESSION_ID),
+                publicSessionKey(OTHER_SESSION_ID),
+                notesFeedKey(TARGET_CLUB_ID),
+                notesSessionsKey(TARGET_CLUB_ID),
+                notesSessionFeedKey(TARGET_CLUB_ID, SESSION_ID),
+            )
+        private val unrelatedClubKeys =
+            setOf(
+                UNRELATED_PUBLIC_CLUB_KEY,
+                unrelatedPublicSessionKey(SESSION_ID),
+                notesFeedKey(UNRELATED_CLUB_ID),
+                notesSessionsKey(UNRELATED_CLUB_ID),
+                notesSessionFeedKey(UNRELATED_CLUB_ID, OTHER_SESSION_ID),
+            )
         private val allKeys = targetKeys + unrelatedClubKeys
     }
 }

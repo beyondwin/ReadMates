@@ -2,8 +2,8 @@ package com.readmates.auth.adapter.`in`.web
 
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
-import com.readmates.auth.application.InvitationDomainException
 import com.readmates.auth.application.InvitationDomainError
+import com.readmates.auth.application.InvitationDomainException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import org.springframework.http.HttpStatus

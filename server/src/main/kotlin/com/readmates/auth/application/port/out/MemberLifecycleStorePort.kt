@@ -36,16 +36,56 @@ data class HostMemberListRow(
 )
 
 interface MemberLifecycleStorePort {
-    fun listMembers(clubId: UUID, pageRequest: PageRequest): CursorPage<HostMemberListRow>
-    fun suspendActiveMember(clubId: UUID, membershipId: UUID): Boolean
-    fun restoreSuspendedMember(clubId: UUID, membershipId: UUID): Boolean
-    fun markMemberLeftByHost(clubId: UUID, membershipId: UUID): Boolean
-    fun markMembershipLeft(clubId: UUID, membershipId: UUID): Boolean
+    fun listMembers(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<HostMemberListRow>
+
+    fun suspendActiveMember(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean
+
+    fun restoreSuspendedMember(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean
+
+    fun markMemberLeftByHost(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean
+
+    fun markMembershipLeft(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean
+
     fun findCurrentOpenSessionId(clubId: UUID): UUID?
-    fun addToCurrentSession(clubId: UUID, sessionId: UUID, membershipId: UUID)
-    fun markRemovedFromCurrentSession(clubId: UUID, sessionId: UUID, membershipId: UUID)
-    fun findMembershipInClubForUpdate(clubId: UUID, membershipId: UUID): LifecycleMembershipRow?
+
+    fun addToCurrentSession(
+        clubId: UUID,
+        sessionId: UUID,
+        membershipId: UUID,
+    )
+
+    fun markRemovedFromCurrentSession(
+        clubId: UUID,
+        sessionId: UUID,
+        membershipId: UUID,
+    )
+
+    fun findMembershipInClubForUpdate(
+        clubId: UUID,
+        membershipId: UUID,
+    ): LifecycleMembershipRow?
+
     fun lockActiveHostRows(clubId: UUID)
+
     fun activeHostCount(clubId: UUID): Int
-    fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow?
+
+    fun findHostMemberListItem(
+        clubId: UUID,
+        membershipId: UUID,
+    ): HostMemberListRow?
 }

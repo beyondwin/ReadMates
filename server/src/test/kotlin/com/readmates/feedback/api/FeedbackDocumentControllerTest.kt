@@ -1,10 +1,10 @@
 package com.readmates.feedback.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
-import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -119,24 +119,26 @@ class FeedbackDocumentControllerTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `attended member can list seeded session feedback document`() {
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[?(@.sessionNumber == 1)].sessionNumber") { value(hasItem(1)) }
-            jsonPath("$.items[?(@.sessionNumber == 1)].bookTitle") { value(hasItem("팩트풀니스")) }
-            jsonPath("$.items[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[?(@.sessionNumber == 1)].sessionNumber") { value(hasItem(1)) }
+                jsonPath("$.items[?(@.sessionNumber == 1)].bookTitle") { value(hasItem("팩트풀니스")) }
+                jsonPath("$.items[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
+            }
     }
 
     @Test
     fun `non attending member does not see session feedback document in list`() {
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("member2@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("member2@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
+            }
     }
 
     @Test
@@ -153,31 +155,35 @@ class FeedbackDocumentControllerTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `open session feedback document is not listed or directly readable`() {
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
+            }
 
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
+            }
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isNotFound() }
+            }
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isNotFound() }
+            }
     }
 
     @Test
@@ -194,20 +200,22 @@ class FeedbackDocumentControllerTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `closed session feedback document remains listed and directly readable`() {
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[?(@.sessionNumber == 1)].fileName") { value(hasItem("251126 1차.md")) }
+            }
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionNumber") { value(1) }
-            jsonPath("$.fileName") { value("251126 1차.md") }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(1) }
+                jsonPath("$.fileName") { value("251126 1차.md") }
+            }
     }
 
     @Test
@@ -224,18 +232,20 @@ class FeedbackDocumentControllerTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `removed attended member cannot list or read feedback document`() {
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(1))) }
+            }
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
@@ -252,111 +262,120 @@ class FeedbackDocumentControllerTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `suspended attended member cannot list or read feedback document`() {
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `attended member can read parsed session feedback document`() {
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000301") }
-            jsonPath("$.sessionNumber") { value(1) }
-            jsonPath("$.title") { value("독서모임 1차 피드백") }
-            jsonPath("$.subtitle") { value("팩트풀니스 · 2025.11.26") }
-            jsonPath("$.bookTitle") { value("팩트풀니스") }
-            jsonPath("$.date") { value("2025-11-26") }
-            jsonPath("$.fileName") { value("251126 1차.md") }
-            jsonPath("$.uploadedAt") { exists() }
-            jsonPath("$.metadata[0].label") { value("일시") }
-            jsonPath("$.metadata[0].value") { value("2025.11.26 (수) · 19:42") }
-            jsonPath("$.observerNotes.length()") { value(4) }
-            jsonPath("$.participants.length()") { value(3) }
-            jsonPath("$.participants[0].number") { value(1) }
-            jsonPath("$.participants[0].name") { value("이멤버5") }
-            jsonPath("$.participants[0].role") { value("책의 프레임을 숫자, 조직, 기술 사례로 번역하는 해설자") }
-            jsonPath("$.participants[0].style[0]") { exists() }
-            jsonPath("$.participants[0].contributions[0]") { exists() }
-            jsonPath("$.participants[0].problems[0].title") { value("프레임 비판 뒤 대안이 추상적으로 남았다") }
-            jsonPath("$.participants[0].problems[0].core") { exists() }
-            jsonPath("$.participants[0].problems[0].evidence") { exists() }
-            jsonPath("$.participants[0].problems[0].interpretation") { exists() }
-            jsonPath("$.participants[0].actionItems[0]") { exists() }
-            jsonPath("$.participants[0].revealingQuote.quote") { exists() }
-            jsonPath("$.participants[0].revealingQuote.context") { exists() }
-            jsonPath("$.participants[0].revealingQuote.note") { exists() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000301") }
+                jsonPath("$.sessionNumber") { value(1) }
+                jsonPath("$.title") { value("독서모임 1차 피드백") }
+                jsonPath("$.subtitle") { value("팩트풀니스 · 2025.11.26") }
+                jsonPath("$.bookTitle") { value("팩트풀니스") }
+                jsonPath("$.date") { value("2025-11-26") }
+                jsonPath("$.fileName") { value("251126 1차.md") }
+                jsonPath("$.uploadedAt") { exists() }
+                jsonPath("$.metadata[0].label") { value("일시") }
+                jsonPath("$.metadata[0].value") { value("2025.11.26 (수) · 19:42") }
+                jsonPath("$.observerNotes.length()") { value(4) }
+                jsonPath("$.participants.length()") { value(3) }
+                jsonPath("$.participants[0].number") { value(1) }
+                jsonPath("$.participants[0].name") { value("이멤버5") }
+                jsonPath("$.participants[0].role") { value("책의 프레임을 숫자, 조직, 기술 사례로 번역하는 해설자") }
+                jsonPath("$.participants[0].style[0]") { exists() }
+                jsonPath("$.participants[0].contributions[0]") { exists() }
+                jsonPath("$.participants[0].problems[0].title") { value("프레임 비판 뒤 대안이 추상적으로 남았다") }
+                jsonPath("$.participants[0].problems[0].core") { exists() }
+                jsonPath("$.participants[0].problems[0].evidence") { exists() }
+                jsonPath("$.participants[0].problems[0].interpretation") { exists() }
+                jsonPath("$.participants[0].actionItems[0]") { exists() }
+                jsonPath("$.participants[0].revealingQuote.quote") { exists() }
+                jsonPath("$.participants[0].revealingQuote.context") { exists() }
+                jsonPath("$.participants[0].revealingQuote.note") { exists() }
+            }
     }
 
     @Test
     fun `host can read seeded session feedback document`() {
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.title") { value("독서모임 1차 피드백") }
-            jsonPath("$.fileName") { value("251126 1차.md") }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.title") { value("독서모임 1차 피드백") }
+                jsonPath("$.fileName") { value("251126 1차.md") }
+            }
     }
 
     @Test
     fun `non attending member cannot read session feedback document`() {
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("member2@example.com"))
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("member2@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `host status endpoint reports seeded feedback document`() {
-        mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.uploaded") { value(true) }
-            jsonPath("$.fileName") { value("251126 1차.md") }
-        }
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.uploaded") { value(true) }
+                jsonPath("$.fileName") { value("251126 1차.md") }
+            }
     }
 
     @Test
     fun `host uploads markdown feedback document without csrf and receives parsed title`() {
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(validMarkdownFile())
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.title") { value("독서모임 6차 피드백") }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(validMarkdownFile())
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.title") { value("독서모임 6차 피드백") }
+            }
     }
 
     @Test
     fun `uploaded feedback document stores title for list projection`() {
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(validMarkdownFile())
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.title") { value("독서모임 6차 피드백") }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(validMarkdownFile())
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.title") { value("독서모임 6차 피드백") }
+            }
 
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[?(@.sessionNumber == 6)].title") { value(hasItem("독서모임 6차 피드백")) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[?(@.sessionNumber == 6)].title") { value(hasItem("독서모임 6차 피드백")) }
+            }
 
         assertThat(
             jdbcTemplate.queryForObject(
@@ -374,35 +393,38 @@ class FeedbackDocumentControllerTest(
 
     @Test
     fun `host feedback upload enqueues attendee notification`() {
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(validMarkdownFile())
-        }.andExpect {
-            status { isCreated() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(validMarkdownFile())
+            }.andExpect {
+                status { isCreated() }
+            }
 
-        val event = jdbcTemplate.queryForMap(
-            """
-            select
-              dedupe_key,
-              json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
-              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
-              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
-              cast(json_unquote(json_extract(payload_json, '$.documentVersion')) as signed) as document_version
-            from notification_event_outbox
-            where event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
-              and aggregate_id = '00000000-0000-0000-0000-000000000306'
-            """.trimIndent(),
-        )
+        val event =
+            jdbcTemplate.queryForMap(
+                """
+                select
+                  dedupe_key,
+                  json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+                  cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+                  json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
+                  cast(json_unquote(json_extract(payload_json, '$.documentVersion')) as signed) as document_version
+                from notification_event_outbox
+                where event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
+                  and aggregate_id = '00000000-0000-0000-0000-000000000306'
+                """.trimIndent(),
+            )
 
-        val documentVersion = jdbcTemplate.queryForObject(
-            """
-            select max(version)
-            from session_feedback_documents
-            where session_id = '00000000-0000-0000-0000-000000000306'
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val documentVersion =
+            jdbcTemplate.queryForObject(
+                """
+                select max(version)
+                from session_feedback_documents
+                where session_id = '00000000-0000-0000-0000-000000000306'
+                """.trimIndent(),
+                Int::class.java,
+            )
 
         assertThat(event["dedupe_key"]).isEqualTo(
             "feedback-document:00000000-0000-0000-0000-000000000306:$documentVersion",
@@ -415,264 +437,293 @@ class FeedbackDocumentControllerTest(
 
     @Test
     fun `latest uploaded feedback document version wins for read list and status`() {
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(validMarkdownFile())
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.fileName") { value("feedback-6-test.md") }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(validMarkdownFile())
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.fileName") { value("feedback-6-test.md") }
+            }
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.title") { value("독서모임 6차 피드백") }
-            jsonPath("$.fileName") { value("feedback-6-test.md") }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.title") { value("독서모임 6차 피드백") }
+                jsonPath("$.fileName") { value("feedback-6-test.md") }
+            }
 
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[?(@.sessionNumber == 6)].fileName") { value(hasItem("feedback-6-test.md")) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[?(@.sessionNumber == 6)].fileName") { value(hasItem("feedback-6-test.md")) }
+            }
 
-        mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.uploaded") { value(true) }
-            jsonPath("$.fileName") { value("feedback-6-test.md") }
-        }
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.uploaded") { value(true) }
+                jsonPath("$.fileName") { value("feedback-6-test.md") }
+            }
     }
 
     @Test
     fun `host upload with missing marker returns bad request`() {
-        val file = MockMultipartFile(
-            "file",
-            "feedback-6-missing-marker.md",
-            "text/markdown",
-            validFeedbackMarkdown()
-                .replace("<!-- readmates-feedback:v1 -->\n\n", "")
-                .toByteArray(StandardCharsets.UTF_8),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "feedback-6-missing-marker.md",
+                "text/markdown",
+                validFeedbackMarkdown()
+                    .replace("<!-- readmates-feedback:v1 -->\n\n", "")
+                    .toByteArray(StandardCharsets.UTF_8),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects unsupported extension`() {
-        val file = MockMultipartFile(
-            "file",
-            "feedback-6.pdf",
-            "application/pdf",
-            validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "feedback-6.pdf",
+                "application/pdf",
+                validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects empty file`() {
-        val file = MockMultipartFile(
-            "file",
-            "feedback-6.md",
-            "text/markdown",
-            ByteArray(0),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "feedback-6.md",
+                "text/markdown",
+                ByteArray(0),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects invalid utf8`() {
-        val file = MockMultipartFile(
-            "file",
-            "feedback-6.md",
-            "text/markdown",
-            byteArrayOf(0xC3.toByte(), 0x28),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "feedback-6.md",
+                "text/markdown",
+                byteArrayOf(0xC3.toByte(), 0x28),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects too large file`() {
-        val file = MockMultipartFile(
-            "file",
-            "feedback-6.md",
-            "text/markdown",
-            ByteArray((512 * 1024) + 1) { 'a'.code.toByte() },
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "feedback-6.md",
+                "text/markdown",
+                ByteArray((512 * 1024) + 1) { 'a'.code.toByte() },
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects long filename before persistence`() {
-        val file = MockMultipartFile(
-            "file",
-            "${"a".repeat(253)}.md",
-            "text/markdown",
-            validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "${"a".repeat(253)}.md",
+                "text/markdown",
+                validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects slash filename before persistence`() {
-        val file = MockMultipartFile(
-            "file",
-            "../feedback-6.md",
-            "text/markdown",
-            validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "../feedback-6.md",
+                "text/markdown",
+                validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects backslash filename before persistence`() {
-        val file = MockMultipartFile(
-            "file",
-            "..\\feedback-6.md",
-            "text/markdown",
-            validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "..\\feedback-6.md",
+                "text/markdown",
+                validFeedbackMarkdown().toByteArray(StandardCharsets.UTF_8),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `host upload rejects nul source text before persistence`() {
-        val file = MockMultipartFile(
-            "file",
-            "feedback-6.md",
-            "text/markdown",
-            (validFeedbackMarkdown() + "\u0000").toByteArray(StandardCharsets.UTF_8),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "feedback-6.md",
+                "text/markdown",
+                (validFeedbackMarkdown() + "\u0000").toByteArray(StandardCharsets.UTF_8),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-            file(file)
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+                file(file)
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `member cannot upload markdown feedback document`() {
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("member5@example.com"))
-            file(validMarkdownFile())
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("member5@example.com"))
+                file(validMarkdownFile())
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `member upload rejects before reading malformed file`() {
-        val file = MockMultipartFile(
-            "file",
-            "feedback-6.md",
-            "text/markdown",
-            byteArrayOf(0xC3.toByte(), 0x28),
-        )
+        val file =
+            MockMultipartFile(
+                "file",
+                "feedback-6.md",
+                "text/markdown",
+                byteArrayOf(0xC3.toByte(), 0x28),
+            )
 
-        mockMvc.multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("member5@example.com"))
-            file(file)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("member5@example.com"))
+                file(file)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `host sees fallback list title for invalid stored latest document`() {
         insertInvalidLatestDocument()
 
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[?(@.sessionNumber == 6)].title") { value(hasItem("문서 형식 확인 필요")) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[?(@.sessionNumber == 6)].title") { value(hasItem("문서 형식 확인 필요")) }
+            }
     }
 
     @Test
     fun `member list skips invalid stored latest document`() {
         insertInvalidLatestDocument()
 
-        mockMvc.get("/api/feedback-documents/me") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(6))) }
-        }
+        mockMvc
+            .get("/api/feedback-documents/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(6))) }
+            }
     }
 
     @Test
     fun `stored invalid document returns host repair status instead of parser bad request`() {
         insertInvalidLatestDocument()
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isUnprocessableContent() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isUnprocessableContent() }
+            }
     }
 
     @Test
     fun `stored invalid document returns generic member unavailable status`() {
         insertInvalidLatestDocument()
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isUnprocessableContent() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000306/feedback-document") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isUnprocessableContent() }
+            }
     }
 
     private fun insertInvalidLatestDocument() {

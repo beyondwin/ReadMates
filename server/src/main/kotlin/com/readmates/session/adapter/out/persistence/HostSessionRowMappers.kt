@@ -67,11 +67,12 @@ internal fun ResultSet.toHostSessionDetailBase() =
         state = getString("state"),
         visibility = SessionRecordVisibility.valueOf(getString("visibility")),
         attendees = emptyList(),
-        feedbackDocument = HostSessionFeedbackDocument(
-            uploaded = false,
-            fileName = null,
-            uploadedAt = null,
-        ),
+        feedbackDocument =
+            HostSessionFeedbackDocument(
+                uploaded = false,
+                fileName = null,
+                uploadedAt = null,
+            ),
     )
 
 internal fun ResultSet.toHostSessionAttendee() =

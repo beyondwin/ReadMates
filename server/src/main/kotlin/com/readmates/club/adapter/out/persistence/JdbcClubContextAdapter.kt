@@ -12,45 +12,45 @@ import java.sql.ResultSet
 class JdbcClubContextAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : LoadClubContextPort {
-    override fun loadBySlug(slug: ClubSlug): ResolvedClubContext? {
-        return jdbcTemplate.query(
-            """
-            select
-              clubs.id,
-              clubs.slug,
-              clubs.name,
-              clubs.status,
-              null as hostname
-            from clubs
-            where clubs.slug = ?
-              and clubs.status in ('ACTIVE', 'SETUP_REQUIRED')
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toResolvedClubContext() },
-            slug.value,
-        ).firstOrNull()
-    }
+    override fun loadBySlug(slug: ClubSlug): ResolvedClubContext? =
+        jdbcTemplate
+            .query(
+                """
+                select
+                  clubs.id,
+                  clubs.slug,
+                  clubs.name,
+                  clubs.status,
+                  null as hostname
+                from clubs
+                where clubs.slug = ?
+                  and clubs.status in ('ACTIVE', 'SETUP_REQUIRED')
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toResolvedClubContext() },
+                slug.value,
+            ).firstOrNull()
 
-    override fun loadByHostname(hostname: String): ResolvedClubContext? {
-        return jdbcTemplate.query(
-            """
-            select
-              clubs.id,
-              clubs.slug,
-              clubs.name,
-              clubs.status,
-              club_domains.hostname
-            from club_domains
-            join clubs on clubs.id = club_domains.club_id
-            where club_domains.hostname = ?
-              and club_domains.status = 'ACTIVE'
-              and clubs.status in ('ACTIVE', 'SETUP_REQUIRED')
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toResolvedClubContext() },
-            hostname,
-        ).firstOrNull()
-    }
+    override fun loadByHostname(hostname: String): ResolvedClubContext? =
+        jdbcTemplate
+            .query(
+                """
+                select
+                  clubs.id,
+                  clubs.slug,
+                  clubs.name,
+                  clubs.status,
+                  club_domains.hostname
+                from club_domains
+                join clubs on clubs.id = club_domains.club_id
+                where club_domains.hostname = ?
+                  and club_domains.status = 'ACTIVE'
+                  and clubs.status in ('ACTIVE', 'SETUP_REQUIRED')
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toResolvedClubContext() },
+                hostname,
+            ).firstOrNull()
 
     private fun ResultSet.toResolvedClubContext(): ResolvedClubContext =
         ResolvedClubContext(

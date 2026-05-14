@@ -64,24 +64,54 @@ data class ManualNotificationConfirmedDispatch(
 )
 
 interface ManualNotificationDispatchPort {
-    fun findSessionContext(clubId: UUID, sessionId: UUID): ManualNotificationSessionContext?
+    fun findSessionContext(
+        clubId: UUID,
+        sessionId: UUID,
+    ): ManualNotificationSessionContext?
+
     fun listMembers(
         clubId: UUID,
         sessionId: UUID?,
         search: String?,
         pageRequest: PageRequest,
     ): CursorPage<ManualNotificationMemberOption>
+
     fun listDispatches(
         clubId: UUID,
         sessionId: UUID?,
         eventType: NotificationEventType?,
         pageRequest: PageRequest,
     ): ManualNotificationDispatchList
-    fun validateMembershipEdits(clubId: UUID, membershipIds: Set<UUID>): Boolean
-    fun previewTargets(clubId: UUID, selection: ManualNotificationSelection): ManualNotificationTargetSnapshot
-    fun recentDispatches(clubId: UUID, sessionId: UUID, eventType: NotificationEventType): List<ManualNotificationRecentDispatch>
-    fun insertPreview(clubId: UUID, hostMembershipId: UUID, selectionHash: String, expiresAt: OffsetDateTime): UUID
-    fun findPreview(id: UUID, clubId: UUID, hostMembershipId: UUID): ManualNotificationPreviewRecord?
+
+    fun validateMembershipEdits(
+        clubId: UUID,
+        membershipIds: Set<UUID>,
+    ): Boolean
+
+    fun previewTargets(
+        clubId: UUID,
+        selection: ManualNotificationSelection,
+    ): ManualNotificationTargetSnapshot
+
+    fun recentDispatches(
+        clubId: UUID,
+        sessionId: UUID,
+        eventType: NotificationEventType,
+    ): List<ManualNotificationRecentDispatch>
+
+    fun insertPreview(
+        clubId: UUID,
+        hostMembershipId: UUID,
+        selectionHash: String,
+        expiresAt: OffsetDateTime,
+    ): UUID
+
+    fun findPreview(
+        id: UUID,
+        clubId: UUID,
+        hostMembershipId: UUID,
+    ): ManualNotificationPreviewRecord?
+
     fun findConsumedManualDispatch(
         previewId: UUID,
         clubId: UUID,
@@ -89,6 +119,7 @@ interface ManualNotificationDispatchPort {
         selectionHash: String,
         now: OffsetDateTime,
     ): ManualNotificationConfirmedDispatch?
+
     fun confirmManualDispatch(
         previewId: UUID,
         clubId: UUID,
@@ -100,6 +131,7 @@ interface ManualNotificationDispatchPort {
         targetSnapshot: ManualNotificationTargetSnapshot,
         resend: Boolean,
     ): ManualNotificationConfirmedDispatch?
+
     fun insertManualDispatch(
         clubId: UUID,
         hostMembershipId: UUID,

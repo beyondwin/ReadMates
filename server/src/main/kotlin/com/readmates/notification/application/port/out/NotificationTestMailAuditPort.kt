@@ -15,6 +15,13 @@ interface NotificationTestMailAuditPort {
         cooldownStartedAfter: OffsetDateTime,
     ): NotificationTestMailAuditItem?
 
-    fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem
-    fun listTestMailAudit(clubId: UUID, pageRequest: PageRequest): CursorPage<NotificationTestMailAuditItem>
+    fun markTestMailAuditFailed(
+        id: UUID,
+        lastError: String,
+    ): NotificationTestMailAuditItem
+
+    fun listTestMailAudit(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<NotificationTestMailAuditItem>
 }

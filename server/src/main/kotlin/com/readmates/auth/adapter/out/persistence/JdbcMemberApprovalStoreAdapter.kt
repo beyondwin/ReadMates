@@ -20,46 +20,53 @@ import java.util.UUID
 class JdbcMemberApprovalStoreAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : MemberApprovalStorePort {
-    override fun listPendingViewers(clubId: UUID, pageRequest: PageRequest): CursorPage<ViewerMemberRow> {
+    override fun listPendingViewers(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<ViewerMemberRow> {
         val cursor = MemberApprovalCreatedAtDescCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate.query(
-            """
-            select
-              memberships.id as membership_id,
-              users.id as user_id,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              users.profile_image_url,
-              memberships.status,
-              memberships.created_at
-            from memberships
-            join users on users.id = memberships.user_id
-            where memberships.club_id = ?
-              and memberships.role = 'MEMBER'
-              and memberships.status = 'VIEWER'
-              and (
-                ? is null
-                or memberships.created_at < ?
-                or (memberships.created_at = ? and memberships.id < ?)
-              )
-            order by memberships.created_at desc, memberships.id desc
-            limit ?
-            """.trimIndent(),
-            ::mapViewerMember,
-            clubId.dbString(),
-            cursor?.createdAt,
-            cursor?.createdAt?.toUtcLocalDateTime(),
-            cursor?.createdAt?.toUtcLocalDateTime(),
-            cursor?.id,
-            pageRequest.limit + 1,
-        )
+        val rows =
+            jdbcTemplate.query(
+                """
+                select
+                  memberships.id as membership_id,
+                  users.id as user_id,
+                  users.email,
+                  users.name as account_name,
+                  coalesce(memberships.short_name, users.name) as display_name,
+                  users.profile_image_url,
+                  memberships.status,
+                  memberships.created_at
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.club_id = ?
+                  and memberships.role = 'MEMBER'
+                  and memberships.status = 'VIEWER'
+                  and (
+                    ? is null
+                    or memberships.created_at < ?
+                    or (memberships.created_at = ? and memberships.id < ?)
+                  )
+                order by memberships.created_at desc, memberships.id desc
+                limit ?
+                """.trimIndent(),
+                ::mapViewerMember,
+                clubId.dbString(),
+                cursor?.createdAt,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.id,
+                pageRequest.limit + 1,
+            )
         return pageFromRows(rows, pageRequest.limit) { row ->
             memberApprovalCreatedAtDescCursor(row.createdAt, row.membershipId.toString())
         }
     }
 
-    override fun activateViewer(clubId: UUID, membershipId: UUID): Boolean =
+    override fun activateViewer(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update memberships
@@ -75,7 +82,10 @@ class JdbcMemberApprovalStoreAdapter(
             clubId.dbString(),
         ) == 1
 
-    override fun deactivateViewer(clubId: UUID, membershipId: UUID): Boolean =
+    override fun deactivateViewer(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update memberships
@@ -90,7 +100,10 @@ class JdbcMemberApprovalStoreAdapter(
             clubId.dbString(),
         ) == 1
 
-    override fun addToCurrentOpenSession(clubId: UUID, membershipId: UUID) {
+    override fun addToCurrentOpenSession(
+        clubId: UUID,
+        membershipId: UUID,
+    ) {
         jdbcTemplate.update(
             """
             insert into session_participants (
@@ -120,44 +133,52 @@ class JdbcMemberApprovalStoreAdapter(
         )
     }
 
-    override fun findMemberForHost(clubId: UUID, membershipId: UUID): ViewerMemberRow? =
-        jdbcTemplate.query(
-            """
-            select
-              memberships.id as membership_id,
-              users.id as user_id,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              users.profile_image_url,
-              memberships.status,
-              memberships.created_at
-            from memberships
-            join users on users.id = memberships.user_id
-            where memberships.id = ?
-              and memberships.club_id = ?
-              and memberships.role = 'MEMBER'
-            """.trimIndent(),
-            ::mapViewerMember,
-            membershipId.dbString(),
-            clubId.dbString(),
-        ).firstOrNull()
+    override fun findMemberForHost(
+        clubId: UUID,
+        membershipId: UUID,
+    ): ViewerMemberRow? =
+        jdbcTemplate
+            .query(
+                """
+                select
+                  memberships.id as membership_id,
+                  users.id as user_id,
+                  users.email,
+                  users.name as account_name,
+                  coalesce(memberships.short_name, users.name) as display_name,
+                  users.profile_image_url,
+                  memberships.status,
+                  memberships.created_at
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.id = ?
+                  and memberships.club_id = ?
+                  and memberships.role = 'MEMBER'
+                """.trimIndent(),
+                ::mapViewerMember,
+                membershipId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
 
-    private fun mapViewerMember(resultSet: ResultSet, @Suppress("UNUSED_PARAMETER") rowNumber: Int) =
-        ViewerMemberRow(
-            membershipId = resultSet.uuid("membership_id"),
-            userId = resultSet.uuid("user_id"),
-            email = resultSet.getString("email"),
-            displayName = resultSet.getString("display_name"),
-            accountName = resultSet.getString("account_name"),
-            profileImageUrl = resultSet.getString("profile_image_url"),
-            status = MembershipStatus.valueOf(resultSet.getString("status")),
-            createdAt = resultSet.utcOffsetDateTime("created_at"),
-        )
-
+    private fun mapViewerMember(
+        resultSet: ResultSet,
+        @Suppress("UNUSED_PARAMETER") rowNumber: Int,
+    ) = ViewerMemberRow(
+        membershipId = resultSet.uuid("membership_id"),
+        userId = resultSet.uuid("user_id"),
+        email = resultSet.getString("email"),
+        displayName = resultSet.getString("display_name"),
+        accountName = resultSet.getString("account_name"),
+        profileImageUrl = resultSet.getString("profile_image_url"),
+        status = MembershipStatus.valueOf(resultSet.getString("status")),
+        createdAt = resultSet.utcOffsetDateTime("created_at"),
+    )
 }
 
-private fun memberApprovalCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =
+private fun memberApprovalCreatedAtDescCursor(
+    createdAt: OffsetDateTime,
+    id: String,
+): String? =
     CursorCodec.encode(
         mapOf(
             "createdAt" to createdAt.toString(),
@@ -165,7 +186,11 @@ private fun memberApprovalCreatedAtDescCursor(createdAt: OffsetDateTime, id: Str
         ),
     )
 
-private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+private fun <T> pageFromRows(
+    rows: List<T>,
+    limit: Int,
+    cursorFor: (T) -> String?,
+): CursorPage<T> {
     val visibleRows = rows.take(limit)
     return CursorPage(
         items = visibleRows,
@@ -179,8 +204,9 @@ private data class MemberApprovalCreatedAtDescCursor(
 ) {
     companion object {
         fun from(cursor: Map<String, String>): MemberApprovalCreatedAtDescCursor? {
-            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-                ?: return null
+            val createdAt =
+                cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
             val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
             return MemberApprovalCreatedAtDescCursor(createdAt, id)
         }

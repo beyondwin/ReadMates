@@ -15,11 +15,9 @@ data class RateLimitDecision(
     val fallback: Boolean = false,
 ) {
     companion object {
-        fun allowed(fallback: Boolean = false) =
-            RateLimitDecision(allowed = true, fallback = fallback)
+        fun allowed(fallback: Boolean = false) = RateLimitDecision(allowed = true, fallback = fallback)
 
-        fun denied(retryAfterSeconds: Long?) =
-            RateLimitDecision(allowed = false, retryAfterSeconds = retryAfterSeconds)
+        fun denied(retryAfterSeconds: Long?) = RateLimitDecision(allowed = false, retryAfterSeconds = retryAfterSeconds)
     }
 }
 

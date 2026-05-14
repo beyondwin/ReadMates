@@ -1,15 +1,15 @@
 package com.readmates.session.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
@@ -162,29 +162,31 @@ class HostSessionControllerDbTest(
     fun `host creates draft upcoming session without participants`() {
         seedNonActiveMemberships()
 
-        mockMvc.post("/api/host/sessions") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = hostSessionRequestJson()
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.sessionNumber") { value(7) }
-            jsonPath("$.state") { value("DRAFT") }
-            jsonPath("$.visibility") { value("HOST_ONLY") }
-        }
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = hostSessionRequestJson()
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.sessionNumber") { value(7) }
+                jsonPath("$.state") { value("DRAFT") }
+                jsonPath("$.visibility") { value("HOST_ONLY") }
+            }
 
-        val participantCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from session_participants
-            join sessions on sessions.id = session_participants.session_id
-              and sessions.club_id = session_participants.club_id
-            where sessions.club_id = '00000000-0000-0000-0000-000000000001'
-              and sessions.number = 7
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val participantCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from session_participants
+                join sessions on sessions.id = session_participants.session_id
+                  and sessions.club_id = session_participants.club_id
+                where sessions.club_id = '00000000-0000-0000-0000-000000000001'
+                  and sessions.number = 7
+                """.trimIndent(),
+                Int::class.java,
+            )
         assertEquals(0, participantCount)
     }
 
@@ -192,79 +194,85 @@ class HostSessionControllerDbTest(
     fun `host can list draft and open sessions including host only visibility`() {
         val sessionId = createDraftSessionSeven()
 
-        mockMvc.get("/api/host/sessions") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[0].sessionId") { value(sessionId) }
-            jsonPath("$.items[0].state") { value("DRAFT") }
-            jsonPath("$.items[0].visibility") { value("HOST_ONLY") }
-        }
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].sessionId") { value(sessionId) }
+                jsonPath("$.items[0].state") { value("DRAFT") }
+                jsonPath("$.items[0].visibility") { value("HOST_ONLY") }
+            }
     }
 
     @Test
     fun `host sessions list returns paged contract`() {
         createDraftSessionSeven()
 
-        mockMvc.get("/api/host/sessions") {
-            with(user("host@example.com"))
-            param("limit", "2")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items.length()") { value(2) }
-            jsonPath("$.nextCursor") { exists() }
-        }
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                param("limit", "2")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(2) }
+                jsonPath("$.nextCursor") { exists() }
+            }
     }
 
     @Test
     fun `host updates draft session visibility and member upcoming sessions include it`() {
         val sessionId = createDraftSessionSeven()
 
-        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"visibility":"MEMBER"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.visibility") { value("MEMBER") }
-        }
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/visibility") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"MEMBER"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.visibility") { value("MEMBER") }
+            }
 
-        mockMvc.get("/api/sessions/upcoming") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$[0].sessionId") { value(sessionId) }
-            jsonPath("$[0].visibility") { value("MEMBER") }
-        }
+        mockMvc
+            .get("/api/sessions/upcoming") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$[0].sessionId") { value(sessionId) }
+                jsonPath("$[0].visibility") { value("MEMBER") }
+            }
     }
 
     @Test
     fun `member visible draft session enqueues next book notification`() {
         val sessionId = createDraftSessionSeven()
 
-        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"visibility":"MEMBER"}"""
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/visibility") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"MEMBER"}"""
+            }.andExpect {
+                status { isOk() }
+            }
 
-        val event = jdbcTemplate.queryForMap(
-            """
-            select
-              dedupe_key,
-              json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
-              cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
-              json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title
-            from notification_event_outbox
-            where event_type = 'NEXT_BOOK_PUBLISHED'
-              and aggregate_id = ?
-            """.trimIndent(),
-            sessionId,
-        )
+        val event =
+            jdbcTemplate.queryForMap(
+                """
+                select
+                  dedupe_key,
+                  json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+                  cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+                  json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title
+                from notification_event_outbox
+                where event_type = 'NEXT_BOOK_PUBLISHED'
+                  and aggregate_id = ?
+                """.trimIndent(),
+                sessionId,
+            )
 
         assertThat(event["dedupe_key"]).isEqualTo("next-book:$sessionId")
         assertThat(event["session_id"]).isEqualTo(sessionId)
@@ -280,30 +288,32 @@ class HostSessionControllerDbTest(
         updateSessionState(sessionId, "CLOSED")
         insertPublicationRow(sessionId, visibility = "MEMBER", isPublic = false, published = false)
 
-        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"visibility":"PUBLIC"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.visibility") { value("PUBLIC") }
-        }
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/visibility") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"PUBLIC"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.visibility") { value("PUBLIC") }
+            }
 
         val publicPublication = findPublicationRow(sessionId)
         assertEquals("PUBLIC", publicPublication["visibility"])
         assertEquals(true, publicPublication["is_public"])
         assertNotNull(publicPublication["published_at"])
 
-        mockMvc.patch("/api/host/sessions/$sessionId/visibility") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"visibility":"HOST_ONLY"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.visibility") { value("HOST_ONLY") }
-        }
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/visibility") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"HOST_ONLY"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.visibility") { value("HOST_ONLY") }
+            }
 
         val hostOnlyPublication = findPublicationRow(sessionId)
         assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
@@ -330,16 +340,17 @@ class HostSessionControllerDbTest(
         // Outside club session uses MEMBER visibility (DRAFT+PUBLIC violates the invariant)
         createOutsideClubSession(state = "DRAFT", visibility = "MEMBER")
 
-        mockMvc.get("/api/sessions/upcoming") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.length()") { value(2) }
-            jsonPath("$[0].sessionId") { value(memberSessionId) }
-            jsonPath("$[0].visibility") { value("MEMBER") }
-            jsonPath("$[1].sessionId") { value(memberSessionId2) }
-            jsonPath("$[1].visibility") { value("MEMBER") }
-        }
+        mockMvc
+            .get("/api/sessions/upcoming") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(2) }
+                jsonPath("$[0].sessionId") { value(memberSessionId) }
+                jsonPath("$[0].visibility") { value("MEMBER") }
+                jsonPath("$[1].sessionId") { value(memberSessionId2) }
+                jsonPath("$[1].visibility") { value("MEMBER") }
+            }
 
         assertEquals("HOST_ONLY", findSessionVisibility(hostOnlySessionId))
         assertEquals("OPEN", findSessionState(openSessionId))
@@ -350,13 +361,14 @@ class HostSessionControllerDbTest(
     fun `host starts draft session as open and creates active participants`() {
         val sessionId = createDraftSessionSeven()
 
-        mockMvc.post("/api/host/sessions/$sessionId/open") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.state") { value("OPEN") }
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
 
         val participantCount = participantCountForSessionNumber(7)
         assertEquals(6, participantCount)
@@ -366,14 +378,15 @@ class HostSessionControllerDbTest(
     fun `host open transition is idempotent for already open session`() {
         createSessionSeven()
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
-            jsonPath("$.state") { value("OPEN") }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+                jsonPath("$.state") { value("OPEN") }
+            }
 
         assertEquals(6, participantCountForSessionNumber(7))
     }
@@ -383,12 +396,13 @@ class HostSessionControllerDbTest(
         createSessionSeven()
         updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
@@ -399,26 +413,28 @@ class HostSessionControllerDbTest(
         updateSessionVisibility("00000000-0000-0000-0000-000000009777", "MEMBER")
         updateSessionState("00000000-0000-0000-0000-000000009777", "PUBLISHED")
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `host closes open session`() {
         createSessionSeven()
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
-            jsonPath("$.state") { value("CLOSED") }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+                jsonPath("$.state") { value("CLOSED") }
+            }
 
         assertEquals("CLOSED", findSessionState("00000000-0000-0000-0000-000000009777"))
     }
@@ -428,14 +444,15 @@ class HostSessionControllerDbTest(
         createSessionSeven()
         updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
-            jsonPath("$.state") { value("CLOSED") }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+                jsonPath("$.state") { value("CLOSED") }
+            }
     }
 
     @Test
@@ -443,29 +460,31 @@ class HostSessionControllerDbTest(
         createSessionSeven()
         updateSessionState("00000000-0000-0000-0000-000000009777", "CLOSED")
 
-        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "publicSummary": "공개 전환 테스트 요약입니다.",
-                  "visibility": "PUBLIC"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "공개 전환 테스트 요약입니다.",
+                      "visibility": "PUBLIC"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+            }
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.state") { value("PUBLISHED") }
-            jsonPath("$.publication.visibility") { value("PUBLIC") }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("PUBLISHED") }
+                jsonPath("$.publication.visibility") { value("PUBLIC") }
+            }
 
         assertEquals("PUBLISHED", findSessionState("00000000-0000-0000-0000-000000009777"))
         assertNotNull(findPublicationRow("00000000-0000-0000-0000-000000009777")["published_at"])
@@ -475,48 +494,53 @@ class HostSessionControllerDbTest(
     fun `host cannot publish open draft host only or unpublished sessions`() {
         createSessionSeven()
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
 
-        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "publicSummary": "호스트 전용 요약입니다.",
-                  "visibility": "HOST_ONLY"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "호스트 전용 요약입니다.",
+                      "visibility": "HOST_ONLY"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+            }
 
-        mockMvc.post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
@@ -526,12 +550,13 @@ class HostSessionControllerDbTest(
 
         HostSessionCloseRaceProbe.publishBeforeNextCloseUpdate(sessionId)
         try {
-            mockMvc.post("/api/host/sessions/$sessionId/close") {
-                with(user("host@example.com"))
-                with(csrf())
-            }.andExpect {
-                status { isConflict() }
-            }
+            mockMvc
+                .post("/api/host/sessions/$sessionId/close") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                }.andExpect {
+                    status { isConflict() }
+                }
         } finally {
             HostSessionCloseRaceProbe.clear()
         }
@@ -543,103 +568,111 @@ class HostSessionControllerDbTest(
     fun `host cannot close draft or published session`() {
         val sessionId = createDraftSessionSeven()
 
-        mockMvc.post("/api/host/sessions/$sessionId/close") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
 
         // PUBLISHED+HOST_ONLY violates the invariant; set visibility to MEMBER first
         updateSessionVisibility(sessionId, "MEMBER")
         updateSessionState(sessionId, "PUBLISHED")
 
-        mockMvc.post("/api/host/sessions/$sessionId/close") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `host session external urls must be https urls`() {
-        val invalidUrlFields = listOf(
-            """"bookLink": "http://example.com/books/test-book"""",
-            """"bookImageUrl": "data:image/svg+xml,<svg></svg>"""",
-            """"meetingUrl": "javascript:alert(1)"""",
-            """"meetingUrl": "https://user@example.com/meeting"""",
-        )
+        val invalidUrlFields =
+            listOf(
+                """"bookLink": "http://example.com/books/test-book"""",
+                """"bookImageUrl": "data:image/svg+xml,<svg></svg>"""",
+                """"meetingUrl": "javascript:alert(1)"""",
+                """"meetingUrl": "https://user@example.com/meeting"""",
+            )
 
         invalidUrlFields.forEach { invalidUrlField ->
-            mockMvc.post("/api/host/sessions") {
-                with(user("host@example.com"))
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content =
-                    """
-                    {
-                      "title": "7회차 · URL 검증 테스트",
-                      "bookTitle": "URL 검증 책",
-                      "bookAuthor": "URL 검증 저자",
-                      "date": "2026-05-20",
-                      $invalidUrlField
-                    }
-                    """.trimIndent()
-            }.andExpect {
-                status { isBadRequest() }
-            }
+            mockMvc
+                .post("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "title": "7회차 · URL 검증 테스트",
+                          "bookTitle": "URL 검증 책",
+                          "bookAuthor": "URL 검증 저자",
+                          "date": "2026-05-20",
+                          $invalidUrlField
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isBadRequest() }
+                }
         }
 
-        val generatedSessionCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            where club_id = '00000000-0000-0000-0000-000000000001'
-              and number >= 7
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val generatedSessionCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and number >= 7
+                """.trimIndent(),
+                Int::class.java,
+            )
         assertEquals(0, generatedSessionCount)
     }
 
     @Test
     fun `host cannot start another open session while one exists`() {
         val firstSessionId = createDraftSessionSeven()
-        mockMvc.post("/api/host/sessions/$firstSessionId/open") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .post("/api/host/sessions/$firstSessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
 
         val secondSessionId = createDraftSessionEight()
-        mockMvc.post("/api/host/sessions/$secondSessionId/open") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/sessions/$secondSessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `member cannot create host session`() {
-        mockMvc.post("/api/host/sessions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "title": "7회차 · 테스트 책",
-                  "bookTitle": "테스트 책",
-                  "bookAuthor": "테스트 저자",
-                  "date": "2026-05-20"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "title": "7회차 · 테스트 책",
+                      "bookTitle": "테스트 책",
+                      "bookAuthor": "테스트 저자",
+                      "date": "2026-05-20"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
@@ -647,26 +680,27 @@ class HostSessionControllerDbTest(
         createSessionSeven()
         seedSessionOwnedRows()
 
-        mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
-            jsonPath("$.sessionNumber") { value(7) }
-            jsonPath("$.title") { value("7회차 · 테스트 책") }
-            jsonPath("$.state") { value("OPEN") }
-            jsonPath("$.canDelete") { value(true) }
-            jsonPath("$.counts.participants") { value(6) }
-            jsonPath("$.counts.rsvpResponses") { value(1) }
-            jsonPath("$.counts.questions") { value(2) }
-            jsonPath("$.counts.checkins") { value(1) }
-            jsonPath("$.counts.oneLineReviews") { value(1) }
-            jsonPath("$.counts.longReviews") { value(1) }
-            jsonPath("$.counts.highlights") { value(1) }
-            jsonPath("$.counts.publications") { value(1) }
-            jsonPath("$.counts.feedbackReports") { value(1) }
-            jsonPath("$.counts.feedbackDocuments") { value(1) }
-        }
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+                jsonPath("$.sessionNumber") { value(7) }
+                jsonPath("$.title") { value("7회차 · 테스트 책") }
+                jsonPath("$.state") { value("OPEN") }
+                jsonPath("$.canDelete") { value(true) }
+                jsonPath("$.counts.participants") { value(6) }
+                jsonPath("$.counts.rsvpResponses") { value(1) }
+                jsonPath("$.counts.questions") { value(2) }
+                jsonPath("$.counts.checkins") { value(1) }
+                jsonPath("$.counts.oneLineReviews") { value(1) }
+                jsonPath("$.counts.longReviews") { value(1) }
+                jsonPath("$.counts.highlights") { value(1) }
+                jsonPath("$.counts.publications") { value(1) }
+                jsonPath("$.counts.feedbackReports") { value(1) }
+                jsonPath("$.counts.feedbackDocuments") { value(1) }
+            }
     }
 
     @Test
@@ -675,25 +709,26 @@ class HostSessionControllerDbTest(
         seedSessionOwnedRows()
         seedNonSessionRows()
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
-            jsonPath("$.sessionNumber") { value(7) }
-            jsonPath("$.deleted") { value(true) }
-            jsonPath("$.counts.participants") { value(6) }
-            jsonPath("$.counts.rsvpResponses") { value(1) }
-            jsonPath("$.counts.questions") { value(2) }
-            jsonPath("$.counts.checkins") { value(1) }
-            jsonPath("$.counts.oneLineReviews") { value(1) }
-            jsonPath("$.counts.longReviews") { value(1) }
-            jsonPath("$.counts.highlights") { value(1) }
-            jsonPath("$.counts.publications") { value(1) }
-            jsonPath("$.counts.feedbackReports") { value(1) }
-            jsonPath("$.counts.feedbackDocuments") { value(1) }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
+                jsonPath("$.sessionNumber") { value(7) }
+                jsonPath("$.deleted") { value(true) }
+                jsonPath("$.counts.participants") { value(6) }
+                jsonPath("$.counts.rsvpResponses") { value(1) }
+                jsonPath("$.counts.questions") { value(2) }
+                jsonPath("$.counts.checkins") { value(1) }
+                jsonPath("$.counts.oneLineReviews") { value(1) }
+                jsonPath("$.counts.longReviews") { value(1) }
+                jsonPath("$.counts.highlights") { value(1) }
+                jsonPath("$.counts.publications") { value(1) }
+                jsonPath("$.counts.feedbackReports") { value(1) }
+                jsonPath("$.counts.feedbackDocuments") { value(1) }
+            }
 
         assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777'"))
         assertEquals(0, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009777'"))
@@ -742,18 +777,20 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
         )
 
-        mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isConflict() }
+            }
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
 
         jdbcTemplate.update(
             """
@@ -763,70 +800,76 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
         )
 
-        mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isConflict() }
+            }
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `member cannot preview or delete host session`() {
         createSessionSeven()
 
-        mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
-            with(user("member5@example.com"))
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-            with(user("member5@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("member5@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `delete returns not found for missing session`() {
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009778") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009778") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isNotFound() }
+            }
     }
 
     @Test
     fun `host saves session record visibility and compatibility publication columns`() {
         createSessionSeven()
 
-        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "publicSummary": "멤버에게만 공유할 테스트 기록입니다.",
-                  "visibility": "MEMBER"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.publicSummary") { value("멤버에게만 공유할 테스트 기록입니다.") }
-            jsonPath("$.visibility") { value("MEMBER") }
-            jsonPath("$.isPublic") { doesNotExist() }
-            jsonPath("$.published") { doesNotExist() }
-        }
+        mockMvc
+            .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "멤버에게만 공유할 테스트 기록입니다.",
+                      "visibility": "MEMBER"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.publicSummary") { value("멤버에게만 공유할 테스트 기록입니다.") }
+                jsonPath("$.visibility") { value("MEMBER") }
+                jsonPath("$.isPublic") { doesNotExist() }
+                jsonPath("$.published") { doesNotExist() }
+            }
 
         val memberPublication = findPublicationRow()
         assertEquals("MEMBER", memberPublication["visibility"])
@@ -834,24 +877,25 @@ class HostSessionControllerDbTest(
         assertNull(memberPublication["published_at"])
         assertEquals("MEMBER", findSessionVisibility("00000000-0000-0000-0000-000000009777"))
 
-        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "publicSummary": "모두에게 공개할 테스트 기록입니다.",
-                  "visibility": "PUBLIC"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.publicSummary") { value("모두에게 공개할 테스트 기록입니다.") }
-            jsonPath("$.visibility") { value("PUBLIC") }
-            jsonPath("$.isPublic") { doesNotExist() }
-            jsonPath("$.published") { doesNotExist() }
-        }
+        mockMvc
+            .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "모두에게 공개할 테스트 기록입니다.",
+                      "visibility": "PUBLIC"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.publicSummary") { value("모두에게 공개할 테스트 기록입니다.") }
+                jsonPath("$.visibility") { value("PUBLIC") }
+                jsonPath("$.isPublic") { doesNotExist() }
+                jsonPath("$.published") { doesNotExist() }
+            }
 
         val publicPublication = findPublicationRow()
         assertEquals("PUBLIC", publicPublication["visibility"])
@@ -859,24 +903,25 @@ class HostSessionControllerDbTest(
         assertNotNull(publicPublication["published_at"])
         assertEquals("PUBLIC", findSessionVisibility("00000000-0000-0000-0000-000000009777"))
 
-        mockMvc.put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "publicSummary": "호스트만 볼 테스트 기록입니다.",
-                  "visibility": "HOST_ONLY"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.publicSummary") { value("호스트만 볼 테스트 기록입니다.") }
-            jsonPath("$.visibility") { value("HOST_ONLY") }
-            jsonPath("$.isPublic") { doesNotExist() }
-            jsonPath("$.published") { doesNotExist() }
-        }
+        mockMvc
+            .put("/api/host/sessions/00000000-0000-0000-0000-000000009777/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "호스트만 볼 테스트 기록입니다.",
+                      "visibility": "HOST_ONLY"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.publicSummary") { value("호스트만 볼 테스트 기록입니다.") }
+                jsonPath("$.visibility") { value("HOST_ONLY") }
+                jsonPath("$.isPublic") { doesNotExist() }
+                jsonPath("$.published") { doesNotExist() }
+            }
 
         val hostOnlyPublication = findPublicationRow()
         assertEquals("HOST_ONLY", hostOnlyPublication["visibility"])
@@ -889,96 +934,107 @@ class HostSessionControllerDbTest(
     fun `host cannot preview or delete session outside own club`() {
         createOutsideClubSession()
 
-        mockMvc.get("/api/host/sessions/00000000-0000-0000-0000-000000019777/deletion-preview") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000019777/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isNotFound() }
+            }
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000019777") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000019777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isNotFound() }
+            }
     }
 
     @Test
     fun `preview and delete return bad request for malformed session id`() {
-        mockMvc.get("/api/host/sessions/not-a-uuid/deletion-preview") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .get("/api/host/sessions/not-a-uuid/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isBadRequest() }
+            }
 
-        mockMvc.delete("/api/host/sessions/not-a-uuid") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/not-a-uuid") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `session number is reused after deleting open session`() {
         createSessionSeven()
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
 
-        mockMvc.post("/api/host/sessions") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "title": "7회차 · 다시 만든 책",
-                  "bookTitle": "다시 만든 책",
-                  "bookAuthor": "다시 만든 저자",
-                  "date": "2026-05-27"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.sessionNumber") { value(7) }
-            jsonPath("$.state") { value("DRAFT") }
-        }
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "title": "7회차 · 다시 만든 책",
+                      "bookTitle": "다시 만든 책",
+                      "bookAuthor": "다시 만든 저자",
+                      "date": "2026-05-27"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.sessionNumber") { value(7) }
+                jsonPath("$.state") { value("DRAFT") }
+            }
     }
 
     @Test
     fun `second delete returns not found after first delete succeeds`() {
         createSessionSeven()
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
 
-        mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isNotFound() }
+            }
     }
 
     @Test
     fun `concurrent host deletes remove open session once through controller lock path`() {
         createSessionSeven()
 
-        val statuses = runConcurrently(workerCount = 2) {
-            mockMvc.delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-                with(user("host@example.com"))
-                with(csrf())
-            }.andReturn().response.status
-        }
+        val statuses =
+            runConcurrently(workerCount = 2) {
+                mockMvc
+                    .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                        with(user("host@example.com"))
+                        with(csrf())
+                    }.andReturn()
+                    .response.status
+            }
 
         assertThat(statuses.count { it == 200 }).isEqualTo(1)
         assertThat(statuses.count { it == 404 }).isEqualTo(1)
@@ -1007,18 +1063,22 @@ class HostSessionControllerDbTest(
 
     private fun createDraftSessionEight(): String = createDraftSession("8회차 · 다음 책", "다음 책", "2026-06-17")
 
-    private fun <T> runConcurrently(workerCount: Int, action: () -> T): List<T> {
+    private fun <T> runConcurrently(
+        workerCount: Int,
+        action: () -> T,
+    ): List<T> {
         val executor = Executors.newFixedThreadPool(workerCount)
         val ready = CountDownLatch(workerCount)
         val start = CountDownLatch(1)
         return try {
-            val futures = (1..workerCount).map {
-                executor.submit<T> {
-                    ready.countDown()
-                    check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
-                    action()
+            val futures =
+                (1..workerCount).map {
+                    executor.submit<T> {
+                        ready.countDown()
+                        check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
+                        action()
+                    }
                 }
-            }
             check(ready.await(5, TimeUnit.SECONDS)) { "Timed out waiting for concurrent workers" }
             start.countDown()
             futures.map { it.get(10, TimeUnit.SECONDS) }
@@ -1027,26 +1087,32 @@ class HostSessionControllerDbTest(
         }
     }
 
-    private fun createDraftSession(title: String, bookTitle: String, date: String): String {
-        val response = mockMvc.post("/api/host/sessions") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "title": "$title",
-                  "bookTitle": "$bookTitle",
-                  "bookAuthor": "테스트 저자",
-                  "bookLink": "https://example.com/books/test-book",
-                  "bookImageUrl": "https://example.com/covers/test-book.jpg",
-                  "date": "$date",
-                  "locationLabel": "온라인"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isCreated() }
-        }.andReturn()
+    private fun createDraftSession(
+        title: String,
+        bookTitle: String,
+        date: String,
+    ): String {
+        val response =
+            mockMvc
+                .post("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "title": "$title",
+                          "bookTitle": "$bookTitle",
+                          "bookAuthor": "테스트 저자",
+                          "bookLink": "https://example.com/books/test-book",
+                          "bookImageUrl": "https://example.com/covers/test-book.jpg",
+                          "date": "$date",
+                          "locationLabel": "온라인"
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isCreated() }
+                }.andReturn()
 
         return """"sessionId"\s*:\s*"([^"]+)""""
             .toRegex()
@@ -1168,7 +1234,10 @@ class HostSessionControllerDbTest(
         )
     }
 
-    private fun createOutsideClubSession(state: String = "OPEN", visibility: String = "HOST_ONLY") {
+    private fun createOutsideClubSession(
+        state: String = "OPEN",
+        visibility: String = "HOST_ONLY",
+    ) {
         jdbcTemplate.update(
             """
             insert into clubs (id, slug, name, tagline, about)
@@ -1246,15 +1315,16 @@ class HostSessionControllerDbTest(
     }
 
     private fun seedNonSessionRows() {
-        val hostFixture = jdbcTemplate.queryForMap(
-            """
-            select memberships.id as membership_id, users.id as user_id
-            from memberships
-            join users on users.id = memberships.user_id
-            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
-              and users.email = 'host@example.com'
-            """.trimIndent(),
-        )
+        val hostFixture =
+            jdbcTemplate.queryForMap(
+                """
+                select memberships.id as membership_id, users.id as user_id
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+                  and users.email = 'host@example.com'
+                """.trimIndent(),
+            )
 
         jdbcTemplate.update(
             """
@@ -1307,26 +1377,28 @@ class HostSessionControllerDbTest(
     }
 
     private fun seedSessionOwnedRows() {
-        val hostMembershipId = jdbcTemplate.queryForObject(
-            """
-            select memberships.id
-            from memberships
-            join users on users.id = memberships.user_id
-            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
-              and users.email = 'host@example.com'
-            """.trimIndent(),
-            String::class.java,
-        )
-        val memberMembershipId = jdbcTemplate.queryForObject(
-            """
-            select memberships.id
-            from memberships
-            join users on users.id = memberships.user_id
-            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
-              and users.email = 'member5@example.com'
-            """.trimIndent(),
-            String::class.java,
-        )
+        val hostMembershipId =
+            jdbcTemplate.queryForObject(
+                """
+                select memberships.id
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+                  and users.email = 'host@example.com'
+                """.trimIndent(),
+                String::class.java,
+            )
+        val memberMembershipId =
+            jdbcTemplate.queryForObject(
+                """
+                select memberships.id
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+                  and users.email = 'member5@example.com'
+                """.trimIndent(),
+                String::class.java,
+            )
 
         jdbcTemplate.update(
             """
@@ -1396,7 +1468,10 @@ class HostSessionControllerDbTest(
         )
     }
 
-    private fun countRows(tableName: String, whereClause: String): Int =
+    private fun countRows(
+        tableName: String,
+        whereClause: String,
+    ): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from $tableName where $whereClause",
             Int::class.java,
@@ -1436,7 +1511,10 @@ class HostSessionControllerDbTest(
         )
     }
 
-    private fun updateSessionVisibility(sessionId: String, visibility: String) {
+    private fun updateSessionVisibility(
+        sessionId: String,
+        visibility: String,
+    ) {
         jdbcTemplate.update(
             """
             update sessions
@@ -1449,7 +1527,10 @@ class HostSessionControllerDbTest(
         )
     }
 
-    private fun updateSessionState(sessionId: String, state: String) {
+    private fun updateSessionState(
+        sessionId: String,
+        state: String,
+    ) {
         jdbcTemplate.update(
             """
             update sessions
@@ -1500,8 +1581,7 @@ class HostSessionControllerDbTest(
     class CloseRaceJdbcTemplateConfig {
         @Bean
         @Primary
-        fun closeRaceJdbcTemplate(dataSource: DataSource): JdbcTemplate =
-            CloseRaceJdbcTemplate(dataSource)
+        fun closeRaceJdbcTemplate(dataSource: DataSource): JdbcTemplate = CloseRaceJdbcTemplate(dataSource)
     }
 }
 
@@ -1516,7 +1596,10 @@ private object HostSessionCloseRaceProbe {
         targetSessionId.remove()
     }
 
-    fun consumeIfMatches(sql: String, args: Array<out Any?>): String? {
+    fun consumeIfMatches(
+        sql: String,
+        args: Array<out Any?>,
+    ): String? {
         val sessionId = targetSessionId.get() ?: return null
         val normalizedSql = sql.trimIndent().replace(Regex("\\s+"), " ")
         val isHostSessionCloseUpdate = normalizedSql.startsWith("update sessions set state = 'CLOSED', updated_at = utc_timestamp(6)")
@@ -1529,23 +1612,29 @@ private object HostSessionCloseRaceProbe {
     }
 }
 
-private class CloseRaceJdbcTemplate(private val rawDataSource: DataSource) : JdbcTemplate(rawDataSource) {
-    override fun update(sql: String, vararg args: Any?): Int {
+private class CloseRaceJdbcTemplate(
+    private val rawDataSource: DataSource,
+) : JdbcTemplate(rawDataSource) {
+    override fun update(
+        sql: String,
+        vararg args: Any?,
+    ): Int {
         val sessionId = HostSessionCloseRaceProbe.consumeIfMatches(sql, args)
         if (sessionId != null) {
             rawDataSource.connection.use { connection ->
                 connection.autoCommit = true
-                connection.prepareStatement(
-                    """
-                    update sessions
-                    set state = 'PUBLISHED', visibility = 'MEMBER'
-                    where id = ?
-                      and club_id = '00000000-0000-0000-0000-000000000001'
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, sessionId)
-                    statement.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        """
+                        update sessions
+                        set state = 'PUBLISHED', visibility = 'MEMBER'
+                        where id = ?
+                          and club_id = '00000000-0000-0000-0000-000000000001'
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, sessionId)
+                        statement.executeUpdate()
+                    }
             }
         }
         return super.update(sql, *args)

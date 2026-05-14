@@ -23,7 +23,10 @@ class AuthMeController(
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
 ) {
     @GetMapping
-    fun me(authentication: Authentication?, request: HttpServletRequest): AuthMemberResponse {
+    fun me(
+        authentication: Authentication?,
+        request: HttpServletRequest,
+    ): AuthMemberResponse {
         val sessionProfileMember = authentication?.principal as? CurrentMember
         val sessionUser = authentication?.principal as? CurrentUser
         val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
@@ -53,8 +56,9 @@ class AuthMeController(
                 )
             }
 
-            val requestedMember = requestedClubContext.context
-                ?.let { context -> resolveCurrentMemberUseCase.resolveByUserAndClub(sessionProfileMember.userId, context.clubId) }
+            val requestedMember =
+                requestedClubContext.context
+                    ?.let { context -> resolveCurrentMemberUseCase.resolveByUserAndClub(sessionProfileMember.userId, context.clubId) }
             if (requestedClubContext.supplied && requestedMember == null) {
                 return AuthMemberResponse.authenticatedUser(
                     userId = sessionProfileMember.userId,
@@ -80,10 +84,12 @@ class AuthMeController(
 
         val email = authentication.emailOrNull()
         if (email != null && requestedClubContext.supplied) {
-            val userId = resolveCurrentMemberUseCase.findUserIdByEmail(email)
-                ?: return AuthMemberResponse.anonymous(email)
-            val requestedMember = requestedClubContext.context
-                ?.let { context -> resolveCurrentMemberUseCase.resolveByEmailAndClub(email, context.clubId) }
+            val userId =
+                resolveCurrentMemberUseCase.findUserIdByEmail(email)
+                    ?: return AuthMemberResponse.anonymous(email)
+            val requestedMember =
+                requestedClubContext.context
+                    ?.let { context -> resolveCurrentMemberUseCase.resolveByEmailAndClub(email, context.clubId) }
             if (requestedMember == null) {
                 return authenticatedWithoutMembership(email, userId)
             }
@@ -94,8 +100,9 @@ class AuthMeController(
             )
         }
 
-        val member = email?.let(resolveCurrentMemberUseCase::resolveByEmail)
-            ?: return authenticatedWithoutMembership(email)
+        val member =
+            email?.let(resolveCurrentMemberUseCase::resolveByEmail)
+                ?: return authenticatedWithoutMembership(email)
         return AuthMemberResponse.from(
             member,
             joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(member.userId),
@@ -103,10 +110,14 @@ class AuthMeController(
         )
     }
 
-    private fun authenticatedWithoutMembership(email: String?, knownUserId: UUID? = null): AuthMemberResponse {
+    private fun authenticatedWithoutMembership(
+        email: String?,
+        knownUserId: UUID? = null,
+    ): AuthMemberResponse {
         val resolvedEmail = email ?: return AuthMemberResponse.anonymous(null)
-        val userId = knownUserId ?: resolveCurrentMemberUseCase.findUserIdByEmail(resolvedEmail)
-            ?: return AuthMemberResponse.anonymous(email)
+        val userId =
+            knownUserId ?: resolveCurrentMemberUseCase.findUserIdByEmail(resolvedEmail)
+                ?: return AuthMemberResponse.anonymous(email)
         return AuthMemberResponse.authenticatedUser(
             userId = userId,
             email = resolvedEmail,

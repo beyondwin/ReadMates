@@ -14,8 +14,7 @@ import org.springframework.web.bind.annotation.RestController
 data class CheckinRequest(
     @field:Min(0) @field:Max(100) val readingProgress: Int,
 ) {
-    fun toCommand(member: CurrentMember): SaveCheckinCommand =
-        SaveCheckinCommand(member = member, readingProgress = readingProgress)
+    fun toCommand(member: CurrentMember): SaveCheckinCommand = SaveCheckinCommand(member = member, readingProgress = readingProgress)
 }
 
 data class CheckinResponse(

@@ -23,15 +23,18 @@ fun HostMemberListRow.toHostMemberListItem(currentMembershipId: UUID): HostMembe
         currentSessionParticipationStatus = participationStatus,
         canSuspend = isMutableMember && status == MembershipStatus.ACTIVE,
         canRestore = isMutableMember && status == MembershipStatus.SUSPENDED,
-        canDeactivate = isMutableMember &&
-            status in setOf(MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED, MembershipStatus.VIEWER),
-        canAddToCurrentSession = isMutableMember &&
-            currentSessionId != null &&
-            status == MembershipStatus.ACTIVE &&
-            participationStatus != SessionParticipationStatus.ACTIVE,
-        canRemoveFromCurrentSession = isMutableMember &&
-            currentSessionId != null &&
-            status == MembershipStatus.ACTIVE &&
-            participationStatus == SessionParticipationStatus.ACTIVE,
+        canDeactivate =
+            isMutableMember &&
+                status in setOf(MembershipStatus.ACTIVE, MembershipStatus.SUSPENDED, MembershipStatus.VIEWER),
+        canAddToCurrentSession =
+            isMutableMember &&
+                currentSessionId != null &&
+                status == MembershipStatus.ACTIVE &&
+                participationStatus != SessionParticipationStatus.ACTIVE,
+        canRemoveFromCurrentSession =
+            isMutableMember &&
+                currentSessionId != null &&
+                status == MembershipStatus.ACTIVE &&
+                participationStatus == SessionParticipationStatus.ACTIVE,
     )
 }

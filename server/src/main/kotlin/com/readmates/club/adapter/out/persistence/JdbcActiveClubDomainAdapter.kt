@@ -13,10 +13,10 @@ class JdbcActiveClubDomainAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val clock: Clock,
 ) : ActiveClubDomainPort {
-
-    private val cache = AtomicReference<Pair<Instant, Set<String>>>(
-        Pair(Instant.EPOCH, emptySet()),
-    )
+    private val cache =
+        AtomicReference<Pair<Instant, Set<String>>>(
+            Pair(Instant.EPOCH, emptySet()),
+        )
 
     override fun isActiveOrigin(origin: String): Boolean {
         val hostname = origin.removePrefix("https://")
@@ -28,10 +28,12 @@ class JdbcActiveClubDomainAdapter(
         if (Duration.between(fetchedAt, clock.instant()) < TTL) {
             return hostnames
         }
-        val refreshed = jdbcTemplate.queryForList(
-            "SELECT hostname FROM club_domains WHERE status = 'ACTIVE'",
-            String::class.java,
-        ).toSet()
+        val refreshed =
+            jdbcTemplate
+                .queryForList(
+                    "SELECT hostname FROM club_domains WHERE status = 'ACTIVE'",
+                    String::class.java,
+                ).toSet()
         cache.set(Pair(clock.instant(), refreshed))
         return refreshed
     }

@@ -24,7 +24,6 @@ class JdbcSupportAccessGrantAdapter(
 ) : CreateSupportAccessGrantPort,
     RevokeSupportAccessGrantPort,
     LoadSupportAccessGrantPort {
-
     @Transactional
     override fun createGrant(
         clubId: UUID,
@@ -65,16 +64,20 @@ class JdbcSupportAccessGrantAdapter(
     }
 
     @Transactional
-    override fun revokeGrant(grantId: UUID, revokedAt: OffsetDateTime): SupportAccessGrant? {
-        val affected = jdbcTemplate.update(
-            """
-            update support_access_grants
-            set revoked_at = ?
-            where id = ? and revoked_at is null
-            """.trimIndent(),
-            revokedAt.toTimestamp(),
-            grantId.dbString(),
-        )
+    override fun revokeGrant(
+        grantId: UUID,
+        revokedAt: OffsetDateTime,
+    ): SupportAccessGrant? {
+        val affected =
+            jdbcTemplate.update(
+                """
+                update support_access_grants
+                set revoked_at = ?
+                where id = ? and revoked_at is null
+                """.trimIndent(),
+                revokedAt.toTimestamp(),
+                grantId.dbString(),
+            )
         if (affected == 0) return null
         return loadGrant(grantId)
     }
@@ -103,34 +106,42 @@ class JdbcSupportAccessGrantAdapter(
             granteeUserId.dbString(),
         )
 
-    override fun loadActiveGrantByGranteeAndClub(granteeUserId: UUID, clubId: UUID): SupportAccessGrant? =
-        jdbcTemplate.query(
-            """
-            select id, club_id, granted_by_user_id, grantee_user_id, scope, reason, expires_at, revoked_at, created_at
-            from support_access_grants
-            where grantee_user_id = ? and club_id = ?
-              and scope = 'HOST_SUPPORT_READ'
-              and revoked_at is null and expires_at > utc_timestamp(6)
-            limit 1
-            """.trimIndent(),
-            ::mapGrant,
-            granteeUserId.dbString(),
-            clubId.dbString(),
-        ).firstOrNull()
+    override fun loadActiveGrantByGranteeAndClub(
+        granteeUserId: UUID,
+        clubId: UUID,
+    ): SupportAccessGrant? =
+        jdbcTemplate
+            .query(
+                """
+                select id, club_id, granted_by_user_id, grantee_user_id, scope, reason, expires_at, revoked_at, created_at
+                from support_access_grants
+                where grantee_user_id = ? and club_id = ?
+                  and scope = 'HOST_SUPPORT_READ'
+                  and revoked_at is null and expires_at > utc_timestamp(6)
+                limit 1
+                """.trimIndent(),
+                ::mapGrant,
+                granteeUserId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
 
     private fun loadGrant(grantId: UUID): SupportAccessGrant? =
-        jdbcTemplate.query(
-            """
-            select id, club_id, granted_by_user_id, grantee_user_id, scope, reason, expires_at, revoked_at, created_at
-            from support_access_grants
-            where id = ?
-            limit 1
-            """.trimIndent(),
-            ::mapGrant,
-            grantId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select id, club_id, granted_by_user_id, grantee_user_id, scope, reason, expires_at, revoked_at, created_at
+                from support_access_grants
+                where id = ?
+                limit 1
+                """.trimIndent(),
+                ::mapGrant,
+                grantId.dbString(),
+            ).firstOrNull()
 
-    private fun mapGrant(rs: ResultSet, @Suppress("UNUSED_PARAMETER") rowNum: Int): SupportAccessGrant =
+    private fun mapGrant(
+        rs: ResultSet,
+        @Suppress("UNUSED_PARAMETER") rowNum: Int,
+    ): SupportAccessGrant =
         SupportAccessGrant(
             id = rs.uuid("id"),
             clubId = rs.uuid("club_id"),

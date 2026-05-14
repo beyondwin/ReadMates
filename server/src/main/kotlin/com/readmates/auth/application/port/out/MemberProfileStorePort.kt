@@ -19,11 +19,36 @@ data class MemberProfileRow(
 
 interface MemberProfileStorePort {
     fun findProfileMemberByEmail(email: String): MemberProfileRow?
+
     fun findProfileMemberByUserId(userId: UUID): MemberProfileRow?
-    fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID): MemberProfileRow?
+
+    fun findProfileMemberInClubForUpdate(
+        clubId: UUID,
+        membershipId: UUID,
+    ): MemberProfileRow?
+
     fun lockClubProfileNames(clubId: UUID): Boolean
-    fun displayNameExistsInClub(clubId: UUID, displayName: String, excludingMembershipId: UUID): Boolean
-    fun updateOwnDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean
-    fun updateDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean
-    fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow?
+
+    fun displayNameExistsInClub(
+        clubId: UUID,
+        displayName: String,
+        excludingMembershipId: UUID,
+    ): Boolean
+
+    fun updateOwnDisplayName(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+    ): Boolean
+
+    fun updateDisplayName(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+    ): Boolean
+
+    fun findHostMemberListItem(
+        clubId: UUID,
+        membershipId: UUID,
+    ): HostMemberListRow?
 }

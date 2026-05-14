@@ -83,18 +83,20 @@ class FeedbackDocumentParserTest {
 
     @Test
     fun `rejects missing marker with bad request template error`() {
-        val exception = assertThrows(FeedbackDocumentException::class.java) {
-            parser.parse(validFeedbackMarkdown().replace("<!-- readmates-feedback:v1 -->\n\n", ""))
-        }
+        val exception =
+            assertThrows(FeedbackDocumentException::class.java) {
+                parser.parse(validFeedbackMarkdown().replace("<!-- readmates-feedback:v1 -->\n\n", ""))
+            }
 
         assertTemplateError(exception)
     }
 
     @Test
     fun `rejects missing required heading with bad request template error`() {
-        val exception = assertThrows(FeedbackDocumentException::class.java) {
-            parser.parse(validFeedbackMarkdown().replace("## 관찰자 노트", "## 관찰 메모"))
-        }
+        val exception =
+            assertThrows(FeedbackDocumentException::class.java) {
+                parser.parse(validFeedbackMarkdown().replace("## 관찰자 노트", "## 관찰 메모"))
+            }
 
         assertTemplateError(exception)
     }

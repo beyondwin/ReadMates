@@ -49,15 +49,54 @@ data class CreateHostInvitationCommand(
 
 interface HostInvitationStorePort {
     fun acquireInvitationCreateLock(lockKey: String)
-    fun activeMemberCountByEmail(clubId: UUID, email: String): Int
-    fun revokeLivePendingInvitation(clubId: UUID, email: String)
+
+    fun activeMemberCountByEmail(
+        clubId: UUID,
+        email: String,
+    ): Int
+
+    fun revokeLivePendingInvitation(
+        clubId: UUID,
+        email: String,
+    )
+
     fun createInvitation(command: CreateHostInvitationCommand)
-    fun listHostInvitations(clubId: UUID, pageRequest: PageRequest): CursorPage<HostInvitationListRow>
-    fun findHostInvitation(clubId: UUID, invitationId: UUID): HostInvitationListRow?
-    fun revokePendingInvitation(clubId: UUID, invitationId: UUID)
-    fun findInvitationByTokenHash(tokenHash: String, forUpdate: Boolean): InvitationTokenRow?
-    fun upsertActiveMembership(clubId: UUID, userId: UUID, role: MembershipRole): UUID
-    fun acceptInvitation(invitationId: UUID, acceptedUserId: UUID): Boolean
-    fun addToCurrentOpenSessionIfSafe(clubId: UUID, membershipId: UUID)
+
+    fun listHostInvitations(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<HostInvitationListRow>
+
+    fun findHostInvitation(
+        clubId: UUID,
+        invitationId: UUID,
+    ): HostInvitationListRow?
+
+    fun revokePendingInvitation(
+        clubId: UUID,
+        invitationId: UUID,
+    )
+
+    fun findInvitationByTokenHash(
+        tokenHash: String,
+        forUpdate: Boolean,
+    ): InvitationTokenRow?
+
+    fun upsertActiveMembership(
+        clubId: UUID,
+        userId: UUID,
+        role: MembershipRole,
+    ): UUID
+
+    fun acceptInvitation(
+        invitationId: UUID,
+        acceptedUserId: UUID,
+    ): Boolean
+
+    fun addToCurrentOpenSessionIfSafe(
+        clubId: UUID,
+        membershipId: UUID,
+    )
+
     fun findCurrentMember(membershipId: UUID): CurrentMember?
 }

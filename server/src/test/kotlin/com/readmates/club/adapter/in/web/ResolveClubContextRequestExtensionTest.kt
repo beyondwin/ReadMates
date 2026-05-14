@@ -17,12 +17,14 @@ class ResolveClubContextRequestExtensionTest {
     @Test
     fun `slug header with successful lookup yields SLUG source and non-null context`() {
         val resolved = sampleResolvedContext(slug = "reading-sai")
-        val useCase = StubResolveClubContextUseCase(
-            bySlug = mapOf("reading-sai" to resolved),
-        )
-        val request = MockHttpServletRequest().apply {
-            addHeader(ClubContextHeader.CLUB_SLUG, "reading-sai")
-        }
+        val useCase =
+            StubResolveClubContextUseCase(
+                bySlug = mapOf("reading-sai" to resolved),
+            )
+        val request =
+            MockHttpServletRequest().apply {
+                addHeader(ClubContextHeader.CLUB_SLUG, "reading-sai")
+            }
 
         val result = request.resolveClubContext(useCase)
 
@@ -34,9 +36,10 @@ class ResolveClubContextRequestExtensionTest {
     @Test
     fun `slug header with no matching club yields SLUG source and null context`() {
         val useCase = StubResolveClubContextUseCase()
-        val request = MockHttpServletRequest().apply {
-            addHeader(ClubContextHeader.CLUB_SLUG, "missing-club")
-        }
+        val request =
+            MockHttpServletRequest().apply {
+                addHeader(ClubContextHeader.CLUB_SLUG, "missing-club")
+            }
 
         val result = request.resolveClubContext(useCase)
 
@@ -48,12 +51,14 @@ class ResolveClubContextRequestExtensionTest {
     @Test
     fun `host header with successful lookup yields HOST_FALLBACK source and non-null context`() {
         val resolved = sampleResolvedContext(slug = "reading-sai", hostname = "readmates.example.test")
-        val useCase = StubResolveClubContextUseCase(
-            byHost = mapOf("readmates.example.test" to resolved),
-        )
-        val request = MockHttpServletRequest().apply {
-            addHeader(ClubContextHeader.CLUB_HOST, "readmates.example.test")
-        }
+        val useCase =
+            StubResolveClubContextUseCase(
+                byHost = mapOf("readmates.example.test" to resolved),
+            )
+        val request =
+            MockHttpServletRequest().apply {
+                addHeader(ClubContextHeader.CLUB_HOST, "readmates.example.test")
+            }
 
         val result = request.resolveClubContext(useCase)
 
@@ -65,9 +70,10 @@ class ResolveClubContextRequestExtensionTest {
     @Test
     fun `host header with no matching club yields HOST_FALLBACK source and null context`() {
         val useCase = StubResolveClubContextUseCase()
-        val request = MockHttpServletRequest().apply {
-            addHeader(ClubContextHeader.CLUB_HOST, "unregistered.example.test")
-        }
+        val request =
+            MockHttpServletRequest().apply {
+                addHeader(ClubContextHeader.CLUB_HOST, "unregistered.example.test")
+            }
 
         val result = request.resolveClubContext(useCase)
 
@@ -92,14 +98,16 @@ class ResolveClubContextRequestExtensionTest {
     fun `slug header wins over host header when both are present`() {
         val slugResolved = sampleResolvedContext(slug = "reading-sai")
         val hostResolved = sampleResolvedContext(slug = "other-club", hostname = "other.example.test")
-        val useCase = StubResolveClubContextUseCase(
-            bySlug = mapOf("reading-sai" to slugResolved),
-            byHost = mapOf("other.example.test" to hostResolved),
-        )
-        val request = MockHttpServletRequest().apply {
-            addHeader(ClubContextHeader.CLUB_SLUG, "reading-sai")
-            addHeader(ClubContextHeader.CLUB_HOST, "other.example.test")
-        }
+        val useCase =
+            StubResolveClubContextUseCase(
+                bySlug = mapOf("reading-sai" to slugResolved),
+                byHost = mapOf("other.example.test" to hostResolved),
+            )
+        val request =
+            MockHttpServletRequest().apply {
+                addHeader(ClubContextHeader.CLUB_SLUG, "reading-sai")
+                addHeader(ClubContextHeader.CLUB_HOST, "other.example.test")
+            }
 
         val result = request.resolveClubContext(useCase)
 

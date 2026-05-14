@@ -31,10 +31,10 @@ class NotesFeedService(
         return loadNotesFeedPort.loadNotesFeed(member.clubId, pageRequest)
     }
 
-    override fun listNoteSessions(member: CurrentMember, pageRequest: PageRequest) =
-        loadNotesFeedPort.loadNoteSessions(member.clubId, pageRequest)
+    override fun listNoteSessions(
+        member: CurrentMember,
+        pageRequest: PageRequest,
+    ) = loadNotesFeedPort.loadNoteSessions(member.clubId, pageRequest)
 
-    private fun parseSessionIdOrNull(sessionId: String): UUID? =
-        runCatching { UUID.fromString(sessionId) }.getOrNull()
-
+    private fun parseSessionIdOrNull(sessionId: String): UUID? = runCatching { UUID.fromString(sessionId) }.getOrNull()
 }

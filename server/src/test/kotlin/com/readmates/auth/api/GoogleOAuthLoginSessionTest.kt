@@ -1,18 +1,18 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.service.InvitationTokenService
+import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
 import com.readmates.auth.infrastructure.security.OAuthReturnState
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
-import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
 import com.readmates.auth.infrastructure.security.readmatesAppOrigin
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
@@ -70,14 +70,15 @@ class GoogleOAuthLoginSessionTest(
         request.remoteAddr = "127.0.0.1"
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-session-existing",
-                email = "oauth.session@example.com",
-                name = "OAuth Session",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-session-existing",
+                    email = "oauth.session@example.com",
+                    name = "OAuth Session",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -108,14 +109,15 @@ class GoogleOAuthLoginSessionTest(
         request.remoteAddr = "127.0.0.1"
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-session-return-target",
-                email = "oauth.session.return@example.com",
-                name = "OAuth Return Target",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-session-return-target",
+                    email = "oauth.session.return@example.com",
+                    name = "OAuth Return Target",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -142,14 +144,15 @@ class GoogleOAuthLoginSessionTest(
         request.remoteAddr = "127.0.0.1"
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-invalid-return-state",
-                email = "oauth.invalid.return@example.com",
-                name = "OAuth Invalid Return",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-invalid-return-state",
+                    email = "oauth.invalid.return@example.com",
+                    name = "OAuth Invalid Return",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -164,25 +167,27 @@ class GoogleOAuthLoginSessionTest(
 
     @Test
     fun `successful google login issues readmates session cookie for platform admin without membership`() {
-        val userId = createPlatformAdminUser(
-            googleSubjectId = "google-oauth-platform-admin",
-            email = "oauth.platform.admin@example.com",
-            displayName = "OAuth Platform Admin",
-        )
+        val userId =
+            createPlatformAdminUser(
+                googleSubjectId = "google-oauth-platform-admin",
+                email = "oauth.platform.admin@example.com",
+                displayName = "OAuth Platform Admin",
+            )
         val servletSession = securitySession()
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.addHeader(HttpHeaders.USER_AGENT, "MockMvc")
         request.remoteAddr = "127.0.0.1"
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-platform-admin",
-                email = "oauth.platform.admin@example.com",
-                name = "OAuth Platform Admin",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-platform-admin",
+                    email = "oauth.platform.admin@example.com",
+                    name = "OAuth Platform Admin",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -194,17 +199,19 @@ class GoogleOAuthLoginSessionTest(
         assertTrue(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
 
-        val issuedSessionCount = jdbcTemplate.queryForObject(
-            "select count(*) from auth_sessions where user_id = ?",
-            Int::class.java,
-            userId,
-        )
+        val issuedSessionCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from auth_sessions where user_id = ?",
+                Int::class.java,
+                userId,
+            )
         assertEquals(1, issuedSessionCount)
-        val membershipCount = jdbcTemplate.queryForObject(
-            "select count(*) from memberships where user_id = ?",
-            Int::class.java,
-            userId,
-        )
+        val membershipCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from memberships where user_id = ?",
+                Int::class.java,
+                userId,
+            )
         assertEquals(0, membershipCount)
     }
 
@@ -219,14 +226,15 @@ class GoogleOAuthLoginSessionTest(
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-conflict-subject",
-                email = "oauth.other@example.com",
-                name = "OAuth Other",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-conflict-subject",
+                    email = "oauth.other@example.com",
+                    name = "OAuth Other",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -251,14 +259,15 @@ class GoogleOAuthLoginSessionTest(
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-left-member",
-                email = "oauth.left@example.com",
-                name = "OAuth Left Member",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-left-member",
+                    email = "oauth.left@example.com",
+                    name = "OAuth Left Member",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -273,11 +282,12 @@ class GoogleOAuthLoginSessionTest(
 
     @Test
     fun `successful google invite login accepts invitation and issues readmates session`() {
-        val token = createInvitation(
-            token = "oauthInviteAcceptToken00000000000000000000000000",
-            email = "oauth.invited@example.com",
-            name = "OAuth Invited",
-        )
+        val token =
+            createInvitation(
+                token = "oauthInviteAcceptToken00000000000000000000000000",
+                email = "oauth.invited@example.com",
+                name = "OAuth Invited",
+            )
         createOpenSession()
         val servletSession = securitySession()
         servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
@@ -290,14 +300,15 @@ class GoogleOAuthLoginSessionTest(
         request.remoteAddr = "127.0.0.1"
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-invited",
-                email = "oauth.invited@example.com",
-                name = "OAuth Invited",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-invited",
+                    email = "oauth.invited@example.com",
+                    name = "OAuth Invited",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -309,53 +320,57 @@ class GoogleOAuthLoginSessionTest(
         assertTrue(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
 
-        val invitation = jdbcTemplate.queryForMap(
-            "select status, accepted_user_id from invitations where invited_email = ?",
-            "oauth.invited@example.com",
-        )
+        val invitation =
+            jdbcTemplate.queryForMap(
+                "select status, accepted_user_id from invitations where invited_email = ?",
+                "oauth.invited@example.com",
+            )
         assertEquals("ACCEPTED", invitation["status"])
         assertNotNull(invitation["accepted_user_id"])
 
-        val memberState = jdbcTemplate.queryForMap(
-            """
-            select users.google_subject_id,
-                   users.auth_provider,
-                   users.last_login_at,
-                   memberships.status
-            from users
-            join memberships on memberships.user_id = users.id
-            where users.email = ?
-            """.trimIndent(),
-            "oauth.invited@example.com",
-        )
+        val memberState =
+            jdbcTemplate.queryForMap(
+                """
+                select users.google_subject_id,
+                       users.auth_provider,
+                       users.last_login_at,
+                       memberships.status
+                from users
+                join memberships on memberships.user_id = users.id
+                where users.email = ?
+                """.trimIndent(),
+                "oauth.invited@example.com",
+            )
         assertEquals("google-oauth-invited", memberState["google_subject_id"])
         assertEquals("GOOGLE", memberState["auth_provider"])
         assertEquals("ACTIVE", memberState["status"])
         assertNotNull(memberState["last_login_at"])
 
-        val participantCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from session_participants
-            join sessions on sessions.id = session_participants.session_id
-            join memberships on memberships.id = session_participants.membership_id
-            join users on users.id = memberships.user_id
-            where users.email = ?
-              and sessions.state = 'OPEN'
-            """.trimIndent(),
-            Int::class.java,
-            "oauth.invited@example.com",
-        )
+        val participantCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from session_participants
+                join sessions on sessions.id = session_participants.session_id
+                join memberships on memberships.id = session_participants.membership_id
+                join users on users.id = memberships.user_id
+                where users.email = ?
+                  and sessions.state = 'OPEN'
+                """.trimIndent(),
+                Int::class.java,
+                "oauth.invited@example.com",
+            )
         assertEquals(1, participantCount)
     }
 
     @Test
     fun `google invite login rejects mismatched return club without accepting invitation`() {
-        val token = createInvitation(
-            token = "oauthInviteWrongClubToken00000000000000000000000",
-            email = "oauth.invite.wrong.club@example.com",
-            name = "OAuth Wrong Club",
-        )
+        val token =
+            createInvitation(
+                token = "oauthInviteWrongClubToken00000000000000000000000",
+                email = "oauth.invite.wrong.club@example.com",
+                name = "OAuth Wrong Club",
+            )
         val servletSession = securitySession()
         servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
         servletSession.setAttribute(
@@ -365,14 +380,15 @@ class GoogleOAuthLoginSessionTest(
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-invite-wrong-club",
-                email = "oauth.invite.wrong.club@example.com",
-                name = "OAuth Wrong Club",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-invite-wrong-club",
+                    email = "oauth.invite.wrong.club@example.com",
+                    name = "OAuth Wrong Club",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -384,17 +400,19 @@ class GoogleOAuthLoginSessionTest(
         assertTrue(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
 
-        val invitation = jdbcTemplate.queryForMap(
-            "select status, accepted_user_id from invitations where invited_email = ?",
-            "oauth.invite.wrong.club@example.com",
-        )
+        val invitation =
+            jdbcTemplate.queryForMap(
+                "select status, accepted_user_id from invitations where invited_email = ?",
+                "oauth.invite.wrong.club@example.com",
+            )
         assertEquals("PENDING", invitation["status"])
         assertNull(invitation["accepted_user_id"])
-        val userCount = jdbcTemplate.queryForObject(
-            "select count(*) from users where email = ?",
-            Int::class.java,
-            "oauth.invite.wrong.club@example.com",
-        )
+        val userCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from users where email = ?",
+                Int::class.java,
+                "oauth.invite.wrong.club@example.com",
+            )
         assertEquals(0, userCount)
     }
 
@@ -413,11 +431,12 @@ class GoogleOAuthLoginSessionTest(
             )
             """.trimIndent(),
         )
-        val token = createInvitation(
-            token = "oauthInviteDomainToken0000000000000000000000000",
-            email = "oauth.invite.domain@example.com",
-            name = "OAuth Domain",
-        )
+        val token =
+            createInvitation(
+                token = "oauthInviteDomainToken0000000000000000000000000",
+                email = "oauth.invite.domain@example.com",
+                name = "OAuth Domain",
+            )
         val servletSession = securitySession()
         servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
         servletSession.setAttribute(
@@ -429,14 +448,15 @@ class GoogleOAuthLoginSessionTest(
         request.remoteAddr = "127.0.0.1"
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-invite-domain",
-                email = "oauth.invite.domain@example.com",
-                name = "OAuth Domain",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-invite-domain",
+                    email = "oauth.invite.domain@example.com",
+                    name = "OAuth Domain",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -465,9 +485,10 @@ class GoogleOAuthLoginSessionTest(
             """.trimIndent(),
         )
         val token = "oauthInviteCrossHostToken000000000000000000000"
-        val signedState = oauthReturnState.signReturnTarget(
-            "https://reading.readmates.example/clubs/sample-book-club/invite/$token",
-        )
+        val signedState =
+            oauthReturnState.signReturnTarget(
+                "https://reading.readmates.example/clubs/sample-book-club/invite/$token",
+            )
 
         assertEquals("sample-book-club", oauthReturnState.inviteClubSlugFromReturnState(signedState, token))
         assertNull(
@@ -481,24 +502,26 @@ class GoogleOAuthLoginSessionTest(
 
     @Test
     fun `google invite login rejects mismatched invitation email without accepting invitation`() {
-        val token = createInvitation(
-            token = "oauthInviteMismatchToken000000000000000000000000",
-            email = "oauth.invite.owner@example.com",
-            name = "OAuth Invite Owner",
-        )
+        val token =
+            createInvitation(
+                token = "oauthInviteMismatchToken000000000000000000000000",
+                email = "oauth.invite.owner@example.com",
+                name = "OAuth Invite Owner",
+            )
         val servletSession = securitySession()
         servletSession.setAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE, token)
         val request = MockHttpServletRequest("GET", "/login/oauth2/code/google")
         request.setSession(servletSession)
         val response = MockHttpServletResponse()
-        val authentication = TestingAuthenticationToken(
-            googleOidcUser(
-                googleSubjectId = "google-oauth-invite-mismatch",
-                email = "oauth.invite.other@example.com",
-                name = "OAuth Invite Other",
-            ),
-            "credentials",
-        )
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser(
+                    googleSubjectId = "google-oauth-invite-mismatch",
+                    email = "oauth.invite.other@example.com",
+                    name = "OAuth Invite Other",
+                ),
+                "credentials",
+            )
         SecurityContextHolder.getContext().authentication = authentication
 
         successHandler.onAuthenticationSuccess(request, response, authentication)
@@ -510,17 +533,19 @@ class GoogleOAuthLoginSessionTest(
         assertTrue(servletSession.isInvalid)
         assertNull(SecurityContextHolder.getContext().authentication)
 
-        val status = jdbcTemplate.queryForObject(
-            "select status from invitations where invited_email = ?",
-            String::class.java,
-            "oauth.invite.owner@example.com",
-        )
+        val status =
+            jdbcTemplate.queryForObject(
+                "select status from invitations where invited_email = ?",
+                String::class.java,
+                "oauth.invite.owner@example.com",
+            )
         assertEquals("PENDING", status)
-        val acceptedUserCount = jdbcTemplate.queryForObject(
-            "select count(*) from users where email = ?",
-            Int::class.java,
-            "oauth.invite.owner@example.com",
-        )
+        val acceptedUserCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from users where email = ?",
+                Int::class.java,
+                "oauth.invite.owner@example.com",
+            )
         assertEquals(0, acceptedUserCount)
     }
 
@@ -736,7 +761,10 @@ class GoogleOAuthLoginSessionTest(
         email: String,
         displayName: String,
     ): String {
-        val userId = java.util.UUID.randomUUID().toString()
+        val userId =
+            java.util.UUID
+                .randomUUID()
+                .toString()
         jdbcTemplate.update(
             """
             insert into users (id, google_subject_id, email, name, short_name, profile_image_url, auth_provider)
@@ -758,7 +786,11 @@ class GoogleOAuthLoginSessionTest(
         return userId
     }
 
-    private fun createInvitation(token: String, email: String, name: String): String {
+    private fun createInvitation(
+        token: String,
+        email: String,
+        name: String,
+    ): String {
         jdbcTemplate.update(
             """
             insert into invitations (
@@ -843,14 +875,19 @@ private fun securitySession(): MockHttpSession {
     return session
 }
 
-private fun googleOidcUser(googleSubjectId: String, email: String, name: String): DefaultOidcUser {
-    val claims = mapOf(
-        StandardClaimNames.SUB to googleSubjectId,
-        StandardClaimNames.EMAIL to email,
-        StandardClaimNames.EMAIL_VERIFIED to true,
-        StandardClaimNames.NAME to name,
-        StandardClaimNames.PICTURE to "https://example.com/avatar.png",
-    )
+private fun googleOidcUser(
+    googleSubjectId: String,
+    email: String,
+    name: String,
+): DefaultOidcUser {
+    val claims =
+        mapOf(
+            StandardClaimNames.SUB to googleSubjectId,
+            StandardClaimNames.EMAIL to email,
+            StandardClaimNames.EMAIL_VERIFIED to true,
+            StandardClaimNames.NAME to name,
+            StandardClaimNames.PICTURE to "https://example.com/avatar.png",
+        )
     val now = Instant.now()
     val idToken = OidcIdToken("test-id-token", now, now.plusSeconds(60), claims)
 

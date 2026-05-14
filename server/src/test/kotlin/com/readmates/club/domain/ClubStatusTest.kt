@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ClubStatusTest {
-
     @Test
     fun `canTransitionTo returns true for all allowed transitions`() {
         assertTrue(ClubStatus.SETUP_REQUIRED.canTransitionTo(ClubStatus.ACTIVE))

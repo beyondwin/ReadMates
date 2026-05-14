@@ -63,11 +63,12 @@ class RateLimitFilter(
 
     private fun HttpServletRequest.toRateLimitCheck(): RateLimitCheck? {
         val path = requestURI
-        val ipHash = ClientIpHashing.hashClientIp(
-            raw = rateLimitIdentifier(),
-            baseSecret = ipHashingProperties.baseSecret,
-            requireNonBlankSecret = false,
-        )
+        val ipHash =
+            ClientIpHashing.hashClientIp(
+                raw = rateLimitIdentifier(),
+                baseSecret = ipHashingProperties.baseSecret,
+                requireNonBlankSecret = false,
+            )
 
         return when {
             method == "GET" && path.startsWith("/oauth2/authorization/") ->
@@ -117,17 +118,22 @@ class RateLimitFilter(
             }
 
             method in MUTATING_METHODS && path.startsWith("/api/host/") -> {
-                val subject = SecurityContextHolder.getContext().authentication.emailOrNull()
-                    ?.let(::stableHash)
-                    ?: ipHash
+                val subject =
+                    SecurityContextHolder
+                        .getContext()
+                        .authentication
+                        .emailOrNull()
+                        ?.let(::stableHash)
+                        ?: ipHash
                 val feedbackUpload = FEEDBACK_UPLOAD.matches(path)
                 RateLimitCheck(
-                    key = if (feedbackUpload) {
-                        val sessionId = FEEDBACK_UPLOAD.matchEntire(path)!!.groupValues[1]
-                        "rl:user:$subject:feedback-upload:${stableHash(sessionId).take(12)}"
-                    } else {
-                        "rl:user:$subject:host-mutation"
-                    },
+                    key =
+                        if (feedbackUpload) {
+                            val sessionId = FEEDBACK_UPLOAD.matchEntire(path)!!.groupValues[1]
+                            "rl:user:$subject:feedback-upload:${stableHash(sessionId).take(12)}"
+                        } else {
+                            "rl:user:$subject:host-mutation"
+                        },
                     limit = if (feedbackUpload) 10 else 60,
                     window = if (feedbackUpload) Duration.ofMinutes(10) else Duration.ofMinutes(1),
                     sensitive = feedbackUpload,

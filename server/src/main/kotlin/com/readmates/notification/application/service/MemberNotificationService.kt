@@ -14,7 +14,10 @@ import java.util.UUID
 class MemberNotificationService(
     private val memberNotificationPort: MemberNotificationPort,
 ) : ManageMemberNotificationsUseCase {
-    override fun list(member: CurrentMember, pageRequest: PageRequest): MemberNotificationList {
+    override fun list(
+        member: CurrentMember,
+        pageRequest: PageRequest,
+    ): MemberNotificationList {
         val clampedRequest = pageRequest.copy(limit = pageRequest.limit.coerceIn(MIN_LIMIT, MAX_LIMIT))
         val page = memberNotificationPort.listForMembership(member.clubId, member.membershipId, clampedRequest)
         return MemberNotificationList(
@@ -24,10 +27,12 @@ class MemberNotificationService(
         )
     }
 
-    override fun unreadCount(member: CurrentMember): Int =
-        memberNotificationPort.unreadCount(member.clubId, member.membershipId)
+    override fun unreadCount(member: CurrentMember): Int = memberNotificationPort.unreadCount(member.clubId, member.membershipId)
 
-    override fun markRead(member: CurrentMember, id: UUID) {
+    override fun markRead(
+        member: CurrentMember,
+        id: UUID,
+    ) {
         if (!memberNotificationPort.markRead(member.clubId, member.membershipId, id)) {
             throw NotificationApplicationException(
                 NotificationApplicationError.NOTIFICATION_NOT_FOUND,
@@ -36,8 +41,7 @@ class MemberNotificationService(
         }
     }
 
-    override fun markAllRead(member: CurrentMember): Int =
-        memberNotificationPort.markAllRead(member.clubId, member.membershipId)
+    override fun markAllRead(member: CurrentMember): Int = memberNotificationPort.markAllRead(member.clubId, member.membershipId)
 }
 
 private const val MIN_LIMIT = 1

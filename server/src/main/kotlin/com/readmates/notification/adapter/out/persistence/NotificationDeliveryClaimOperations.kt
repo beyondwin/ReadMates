@@ -10,35 +10,41 @@ private const val DELIVERY_LEASE_TIMEOUT_MINUTES = 15
 internal class NotificationDeliveryClaimOperations(
     private val rowMappers: NotificationDeliveryRowMappers,
 ) {
-    fun claimEmailDelivery(jdbcTemplate: JdbcTemplate, id: UUID): ClaimedNotificationDeliveryItem? {
+    fun claimEmailDelivery(
+        jdbcTemplate: JdbcTemplate,
+        id: UUID,
+    ): ClaimedNotificationDeliveryItem? {
         resetStaleSendingRows(jdbcTemplate)
-        val selectedId = jdbcTemplate.query(
-            """
-            select id
-            from notification_deliveries
-            where id = ?
-              and channel = 'EMAIL'
-              and status in ('PENDING', 'FAILED')
-              and next_attempt_at <= utc_timestamp(6)
-            limit 1
-            for update skip locked
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
-            id.dbString(),
-        ).firstOrNull() ?: return null
+        val selectedId =
+            jdbcTemplate
+                .query(
+                    """
+                    select id
+                    from notification_deliveries
+                    where id = ?
+                      and channel = 'EMAIL'
+                      and status in ('PENDING', 'FAILED')
+                      and next_attempt_at <= utc_timestamp(6)
+                    limit 1
+                    for update skip locked
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
+                    id.dbString(),
+                ).firstOrNull() ?: return null
 
-        val updated = jdbcTemplate.update(
-            """
-            update notification_deliveries
-            set status = 'SENDING',
-                locked_at = utc_timestamp(6),
-                updated_at = utc_timestamp(6)
-            where id = ?
-              and channel = 'EMAIL'
-              and status in ('PENDING', 'FAILED')
-            """.trimIndent(),
-            selectedId.dbString(),
-        )
+        val updated =
+            jdbcTemplate.update(
+                """
+                update notification_deliveries
+                set status = 'SENDING',
+                    locked_at = utc_timestamp(6),
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and channel = 'EMAIL'
+                  and status in ('PENDING', 'FAILED')
+                """.trimIndent(),
+                selectedId.dbString(),
+            )
         if (updated == 0) {
             return null
         }
@@ -46,26 +52,30 @@ internal class NotificationDeliveryClaimOperations(
         return claimedDeliveryItems(jdbcTemplate, listOf(selectedId)).firstOrNull()
     }
 
-    fun claimEmailDeliveries(jdbcTemplate: JdbcTemplate, limit: Int): List<ClaimedNotificationDeliveryItem> {
+    fun claimEmailDeliveries(
+        jdbcTemplate: JdbcTemplate,
+        limit: Int,
+    ): List<ClaimedNotificationDeliveryItem> {
         if (limit <= 0) {
             return emptyList()
         }
 
         resetStaleSendingRows(jdbcTemplate)
-        val ids = jdbcTemplate.query(
-            """
-            select id
-            from notification_deliveries
-            where channel = 'EMAIL'
-              and status in ('PENDING', 'FAILED')
-              and next_attempt_at <= utc_timestamp(6)
-            order by next_attempt_at, created_at
-            limit ?
-            for update skip locked
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
-            limit,
-        )
+        val ids =
+            jdbcTemplate.query(
+                """
+                select id
+                from notification_deliveries
+                where channel = 'EMAIL'
+                  and status in ('PENDING', 'FAILED')
+                  and next_attempt_at <= utc_timestamp(6)
+                order by next_attempt_at, created_at
+                limit ?
+                for update skip locked
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
+                limit,
+            )
         if (ids.isEmpty()) {
             return emptyList()
         }
@@ -97,22 +107,23 @@ internal class NotificationDeliveryClaimOperations(
         }
 
         resetStaleSendingRows(jdbcTemplate, clubId)
-        val ids = jdbcTemplate.query(
-            """
-            select id
-            from notification_deliveries
-            where club_id = ?
-              and channel = 'EMAIL'
-              and status in ('PENDING', 'FAILED')
-              and next_attempt_at <= utc_timestamp(6)
-            order by next_attempt_at, created_at
-            limit ?
-            for update skip locked
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
-            clubId.dbString(),
-            limit,
-        )
+        val ids =
+            jdbcTemplate.query(
+                """
+                select id
+                from notification_deliveries
+                where club_id = ?
+                  and channel = 'EMAIL'
+                  and status in ('PENDING', 'FAILED')
+                  and next_attempt_at <= utc_timestamp(6)
+                order by next_attempt_at, created_at
+                limit ?
+                for update skip locked
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
+                clubId.dbString(),
+                limit,
+            )
         if (ids.isEmpty()) {
             return emptyList()
         }
@@ -141,37 +152,40 @@ internal class NotificationDeliveryClaimOperations(
         id: UUID,
     ): ClaimedNotificationDeliveryItem? {
         resetStaleSendingRows(jdbcTemplate, clubId)
-        val selectedId = jdbcTemplate.query(
-            """
-            select id
-            from notification_deliveries
-            where club_id = ?
-              and id = ?
-              and channel = 'EMAIL'
-              and status in ('PENDING', 'FAILED')
-              and next_attempt_at <= utc_timestamp(6)
-            limit 1
-            for update skip locked
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
-            clubId.dbString(),
-            id.dbString(),
-        ).firstOrNull() ?: return null
+        val selectedId =
+            jdbcTemplate
+                .query(
+                    """
+                    select id
+                    from notification_deliveries
+                    where club_id = ?
+                      and id = ?
+                      and channel = 'EMAIL'
+                      and status in ('PENDING', 'FAILED')
+                      and next_attempt_at <= utc_timestamp(6)
+                    limit 1
+                    for update skip locked
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.getString("id").let(UUID::fromString) },
+                    clubId.dbString(),
+                    id.dbString(),
+                ).firstOrNull() ?: return null
 
-        val updated = jdbcTemplate.update(
-            """
-            update notification_deliveries
-            set status = 'SENDING',
-                locked_at = utc_timestamp(6),
-                updated_at = utc_timestamp(6)
-            where club_id = ?
-              and id = ?
-              and channel = 'EMAIL'
-              and status in ('PENDING', 'FAILED')
-            """.trimIndent(),
-            clubId.dbString(),
-            selectedId.dbString(),
-        )
+        val updated =
+            jdbcTemplate.update(
+                """
+                update notification_deliveries
+                set status = 'SENDING',
+                    locked_at = utc_timestamp(6),
+                    updated_at = utc_timestamp(6)
+                where club_id = ?
+                  and id = ?
+                  and channel = 'EMAIL'
+                  and status in ('PENDING', 'FAILED')
+                """.trimIndent(),
+                clubId.dbString(),
+                selectedId.dbString(),
+            )
         if (updated == 0) {
             return null
         }
@@ -179,7 +193,10 @@ internal class NotificationDeliveryClaimOperations(
         return claimedDeliveryItems(jdbcTemplate, listOf(selectedId)).firstOrNull()
     }
 
-    private fun claimedDeliveryItems(jdbcTemplate: JdbcTemplate, ids: List<UUID>): List<ClaimedNotificationDeliveryItem> {
+    private fun claimedDeliveryItems(
+        jdbcTemplate: JdbcTemplate,
+        ids: List<UUID>,
+    ): List<ClaimedNotificationDeliveryItem> {
         if (ids.isEmpty()) {
             return emptyList()
         }
@@ -219,7 +236,10 @@ internal class NotificationDeliveryClaimOperations(
         )
     }
 
-    private fun resetStaleSendingRows(jdbcTemplate: JdbcTemplate, clubId: UUID? = null) {
+    private fun resetStaleSendingRows(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID? = null,
+    ) {
         val clubPredicate = if (clubId == null) "" else "and club_id = ?"
         val args = if (clubId == null) emptyArray() else arrayOf(clubId.dbString() as Any)
         jdbcTemplate.update(

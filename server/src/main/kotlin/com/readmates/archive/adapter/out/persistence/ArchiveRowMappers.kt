@@ -16,8 +16,9 @@ internal fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): Archi
     val sessionNumber = getInt("number")
     val myAttendanceStatus = getString("my_attendance_status")
     val feedbackDocumentUploadedAt = utcOffsetDateTimeOrNull("feedback_document_uploaded_at")?.toString()
-    val feedbackDocumentReadable = feedbackDocumentUploadedAt != null &&
-        canReadArchiveFeedbackDocument(currentMember, myAttendanceStatus)
+    val feedbackDocumentReadable =
+        feedbackDocumentUploadedAt != null &&
+            canReadArchiveFeedbackDocument(currentMember, myAttendanceStatus)
 
     return ArchiveSessionResult(
         sessionId = uuid("id").toString(),
@@ -31,17 +32,19 @@ internal fun ResultSet.toArchiveSessionItem(currentMember: CurrentMember): Archi
         total = getInt("total"),
         published = getBoolean("published"),
         state = getString("state"),
-        feedbackDocument = MemberArchiveFeedbackDocumentStatusResult(
-            available = feedbackDocumentUploadedAt != null,
-            readable = feedbackDocumentReadable,
-            lockedReason = when {
-                feedbackDocumentUploadedAt == null -> "NOT_AVAILABLE"
-                feedbackDocumentReadable -> null
-                else -> "NOT_ATTENDED"
-            },
-            title = if (feedbackDocumentUploadedAt == null) null else "독서모임 ${sessionNumber}차 피드백",
-            uploadedAt = feedbackDocumentUploadedAt,
-        ),
+        feedbackDocument =
+            MemberArchiveFeedbackDocumentStatusResult(
+                available = feedbackDocumentUploadedAt != null,
+                readable = feedbackDocumentReadable,
+                lockedReason =
+                    when {
+                        feedbackDocumentUploadedAt == null -> "NOT_AVAILABLE"
+                        feedbackDocumentReadable -> null
+                        else -> "NOT_ATTENDED"
+                    },
+                title = if (feedbackDocumentUploadedAt == null) null else "독서모임 ${sessionNumber}차 피드백",
+                uploadedAt = feedbackDocumentUploadedAt,
+            ),
     )
 }
 
@@ -75,5 +78,7 @@ internal fun ResultSet.toMyRecentAttendanceResult() =
         attended = getBoolean("attended"),
     )
 
-internal fun canReadArchiveFeedbackDocument(currentMember: CurrentMember, myAttendanceStatus: String?): Boolean =
-    currentMember.isHost || (currentMember.isActive && myAttendanceStatus == "ATTENDED")
+internal fun canReadArchiveFeedbackDocument(
+    currentMember: CurrentMember,
+    myAttendanceStatus: String?,
+): Boolean = currentMember.isHost || (currentMember.isActive && myAttendanceStatus == "ATTENDED")

@@ -11,10 +11,11 @@ class PrimaryOriginOAuthAuthorizationRequestResolver(
     clientRegistrationRepository: ClientRegistrationRepository,
     authBaseUrl: String,
 ) : OAuth2AuthorizationRequestResolver {
-    private val delegate = DefaultOAuth2AuthorizationRequestResolver(
-        clientRegistrationRepository,
-        OAuth2AuthorizationRequestRedirectFilter.DEFAULT_AUTHORIZATION_REQUEST_BASE_URI,
-    )
+    private val delegate =
+        DefaultOAuth2AuthorizationRequestResolver(
+            clientRegistrationRepository,
+            OAuth2AuthorizationRequestRedirectFilter.DEFAULT_AUTHORIZATION_REQUEST_BASE_URI,
+        )
     private val authOrigin = readmatesAppOrigin(authBaseUrl)
 
     override fun resolve(request: HttpServletRequest): OAuth2AuthorizationRequest? {
@@ -22,15 +23,20 @@ class PrimaryOriginOAuthAuthorizationRequestResolver(
         return delegate.resolve(request)?.withPrimaryOriginRedirectUri(registrationId)
     }
 
-    override fun resolve(request: HttpServletRequest, clientRegistrationId: String): OAuth2AuthorizationRequest? =
-        delegate.resolve(request, clientRegistrationId)
+    override fun resolve(
+        request: HttpServletRequest,
+        clientRegistrationId: String,
+    ): OAuth2AuthorizationRequest? =
+        delegate
+            .resolve(request, clientRegistrationId)
             ?.withPrimaryOriginRedirectUri(clientRegistrationId)
 
     private fun OAuth2AuthorizationRequest.withPrimaryOriginRedirectUri(registrationId: String?): OAuth2AuthorizationRequest =
         if (registrationId.isNullOrBlank()) {
             this
         } else {
-            OAuth2AuthorizationRequest.from(this)
+            OAuth2AuthorizationRequest
+                .from(this)
                 .redirectUri("$authOrigin/login/oauth2/code/$registrationId")
                 .build()
         }

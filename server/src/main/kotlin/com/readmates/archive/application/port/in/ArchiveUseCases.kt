@@ -11,7 +11,10 @@ import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface ListArchiveSessionsUseCase {
-    fun listArchiveSessions(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<ArchiveSessionResult>
+    fun listArchiveSessions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<ArchiveSessionResult>
 }
 
 interface GetArchiveSessionDetailUseCase {
@@ -22,11 +25,17 @@ interface GetArchiveSessionDetailUseCase {
 }
 
 interface ListMyArchiveQuestionsUseCase {
-    fun listMyQuestions(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<MyArchiveQuestionResult>
+    fun listMyQuestions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<MyArchiveQuestionResult>
 }
 
 interface ListMyArchiveReviewsUseCase {
-    fun listMyReviews(currentMember: CurrentMember, pageRequest: PageRequest): CursorPage<MyArchiveReviewResult>
+    fun listMyReviews(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<MyArchiveReviewResult>
 }
 
 interface GetMyPageSummaryUseCase {

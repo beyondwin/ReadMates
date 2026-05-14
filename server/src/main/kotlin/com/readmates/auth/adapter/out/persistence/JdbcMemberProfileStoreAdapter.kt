@@ -22,116 +22,132 @@ class JdbcMemberProfileStoreAdapter(
 ) : MemberProfileStorePort {
     override fun findProfileMemberByEmail(email: String): MemberProfileRow? {
         val normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() } ?: return null
-        return jdbcTemplate.query(
-            """
-            select
-              memberships.id as membership_id,
-              users.id as user_id,
-              memberships.club_id,
-              clubs.slug as club_slug,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              users.profile_image_url,
-              memberships.role,
-              memberships.status
-            from users
-            join memberships on memberships.user_id = users.id
-            join clubs on clubs.id = memberships.club_id
-            where lower(users.email) = ?
-              and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
-            order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toMemberProfileRow() },
-            normalizedEmail,
-        ).firstOrNull()
+        return jdbcTemplate
+            .query(
+                """
+                select
+                  memberships.id as membership_id,
+                  users.id as user_id,
+                  memberships.club_id,
+                  clubs.slug as club_slug,
+                  users.email,
+                  users.name as account_name,
+                  coalesce(memberships.short_name, users.name) as display_name,
+                  users.profile_image_url,
+                  memberships.role,
+                  memberships.status
+                from users
+                join memberships on memberships.user_id = users.id
+                join clubs on clubs.id = memberships.club_id
+                where lower(users.email) = ?
+                  and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
+                order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toMemberProfileRow() },
+                normalizedEmail,
+            ).firstOrNull()
     }
 
     override fun findProfileMemberByUserId(userId: UUID): MemberProfileRow? =
-        jdbcTemplate.query(
-            """
-            select
-              memberships.id as membership_id,
-              users.id as user_id,
-              memberships.club_id,
-              clubs.slug as club_slug,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              users.profile_image_url,
-              memberships.role,
-              memberships.status
-            from users
-            join memberships on memberships.user_id = users.id
-            join clubs on clubs.id = memberships.club_id
-            where users.id = ?
-              and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
-            order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toMemberProfileRow() },
-            userId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select
+                  memberships.id as membership_id,
+                  users.id as user_id,
+                  memberships.club_id,
+                  clubs.slug as club_slug,
+                  users.email,
+                  users.name as account_name,
+                  coalesce(memberships.short_name, users.name) as display_name,
+                  users.profile_image_url,
+                  memberships.role,
+                  memberships.status
+                from users
+                join memberships on memberships.user_id = users.id
+                join clubs on clubs.id = memberships.club_id
+                where users.id = ?
+                  and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
+                order by memberships.joined_at is null, memberships.joined_at desc, memberships.created_at desc
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toMemberProfileRow() },
+                userId.dbString(),
+            ).firstOrNull()
 
-    override fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID): MemberProfileRow? =
-        jdbcTemplate.query(
-            """
-            select
-              memberships.id as membership_id,
-              users.id as user_id,
-              memberships.club_id,
-              clubs.slug as club_slug,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              users.profile_image_url,
-              memberships.role,
-              memberships.status
-            from memberships
-            join users on users.id = memberships.user_id
-            join clubs on clubs.id = memberships.club_id
-            where memberships.id = ?
-              and memberships.club_id = ?
-              and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
-            for update
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toMemberProfileRow() },
-            membershipId.dbString(),
-            clubId.dbString(),
-        ).firstOrNull()
+    override fun findProfileMemberInClubForUpdate(
+        clubId: UUID,
+        membershipId: UUID,
+    ): MemberProfileRow? =
+        jdbcTemplate
+            .query(
+                """
+                select
+                  memberships.id as membership_id,
+                  users.id as user_id,
+                  memberships.club_id,
+                  clubs.slug as club_slug,
+                  users.email,
+                  users.name as account_name,
+                  coalesce(memberships.short_name, users.name) as display_name,
+                  users.profile_image_url,
+                  memberships.role,
+                  memberships.status
+                from memberships
+                join users on users.id = memberships.user_id
+                join clubs on clubs.id = memberships.club_id
+                where memberships.id = ?
+                  and memberships.club_id = ?
+                  and memberships.status in ('VIEWER', 'ACTIVE', 'SUSPENDED', 'LEFT', 'INACTIVE')
+                for update
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toMemberProfileRow() },
+                membershipId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
 
     override fun lockClubProfileNames(clubId: UUID): Boolean =
-        jdbcTemplate.query(
-            """
-            select clubs.id
-            from clubs
-            where clubs.id = ?
-            for update
-            """.trimIndent(),
-            { _, _ -> true },
-            clubId.dbString(),
-        ).firstOrNull() == true
+        jdbcTemplate
+            .query(
+                """
+                select clubs.id
+                from clubs
+                where clubs.id = ?
+                for update
+                """.trimIndent(),
+                { _, _ -> true },
+                clubId.dbString(),
+            ).firstOrNull() == true
 
-    override fun displayNameExistsInClub(clubId: UUID, displayName: String, excludingMembershipId: UUID): Boolean =
-        jdbcTemplate.query(
-            """
-            select memberships.id
-            from memberships
-            join users on users.id = memberships.user_id
-            where memberships.club_id = ?
-              and memberships.id <> ?
-              and memberships.short_name = ?
-            limit 1
-            for update
-            """.trimIndent(),
-            { _, _ -> true },
-            clubId.dbString(),
-            excludingMembershipId.dbString(),
-            displayName,
-        ).firstOrNull() == true
+    override fun displayNameExistsInClub(
+        clubId: UUID,
+        displayName: String,
+        excludingMembershipId: UUID,
+    ): Boolean =
+        jdbcTemplate
+            .query(
+                """
+                select memberships.id
+                from memberships
+                join users on users.id = memberships.user_id
+                where memberships.club_id = ?
+                  and memberships.id <> ?
+                  and memberships.short_name = ?
+                limit 1
+                for update
+                """.trimIndent(),
+                { _, _ -> true },
+                clubId.dbString(),
+                excludingMembershipId.dbString(),
+                displayName,
+            ).firstOrNull() == true
 
-    override fun updateOwnDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean =
+    override fun updateOwnDisplayName(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update memberships
@@ -146,7 +162,11 @@ class JdbcMemberProfileStoreAdapter(
             clubId.dbString(),
         ) == 1
 
-    override fun updateDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean =
+    override fun updateDisplayName(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update memberships
@@ -161,44 +181,48 @@ class JdbcMemberProfileStoreAdapter(
             clubId.dbString(),
         ) == 1
 
-    override fun findHostMemberListItem(clubId: UUID, membershipId: UUID): HostMemberListRow? =
-        jdbcTemplate.query(
-            """
-            select
-              memberships.id as membership_id,
-              users.id as user_id,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              users.profile_image_url,
-              memberships.role,
-              memberships.status,
-              memberships.joined_at,
-              memberships.created_at,
-              current_session.id as current_session_id,
-              session_participants.participation_status
-            from memberships
-            join users on users.id = memberships.user_id
-            left join sessions current_session on current_session.club_id = memberships.club_id
-              and current_session.state = 'OPEN'
-              and current_session.id = (
-                select sessions.id
-                from sessions
-                where sessions.club_id = memberships.club_id
-                  and sessions.state = 'OPEN'
-                order by sessions.number desc
-                limit 1
-              )
-            left join session_participants on session_participants.session_id = current_session.id
-              and session_participants.club_id = memberships.club_id
-              and session_participants.membership_id = memberships.id
-            where memberships.id = ?
-              and memberships.club_id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toHostMemberListRow() },
-            membershipId.dbString(),
-            clubId.dbString(),
-        ).firstOrNull()
+    override fun findHostMemberListItem(
+        clubId: UUID,
+        membershipId: UUID,
+    ): HostMemberListRow? =
+        jdbcTemplate
+            .query(
+                """
+                select
+                  memberships.id as membership_id,
+                  users.id as user_id,
+                  users.email,
+                  users.name as account_name,
+                  coalesce(memberships.short_name, users.name) as display_name,
+                  users.profile_image_url,
+                  memberships.role,
+                  memberships.status,
+                  memberships.joined_at,
+                  memberships.created_at,
+                  current_session.id as current_session_id,
+                  session_participants.participation_status
+                from memberships
+                join users on users.id = memberships.user_id
+                left join sessions current_session on current_session.club_id = memberships.club_id
+                  and current_session.state = 'OPEN'
+                  and current_session.id = (
+                    select sessions.id
+                    from sessions
+                    where sessions.club_id = memberships.club_id
+                      and sessions.state = 'OPEN'
+                    order by sessions.number desc
+                    limit 1
+                  )
+                left join session_participants on session_participants.session_id = current_session.id
+                  and session_participants.club_id = memberships.club_id
+                  and session_participants.membership_id = memberships.id
+                where memberships.id = ?
+                  and memberships.club_id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toHostMemberListRow() },
+                membershipId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
 
     private fun ResultSet.toMemberProfileRow(): MemberProfileRow =
         MemberProfileRow(
@@ -216,8 +240,9 @@ class JdbcMemberProfileStoreAdapter(
 
     private fun ResultSet.toHostMemberListRow(): HostMemberListRow {
         val currentSessionId = getString("current_session_id")?.let { uuid("current_session_id") }
-        val participationStatus = getString("participation_status")
-            ?.let { SessionParticipationStatus.valueOf(it) }
+        val participationStatus =
+            getString("participation_status")
+                ?.let { SessionParticipationStatus.valueOf(it) }
         return HostMemberListRow(
             membershipId = uuid("membership_id"),
             userId = uuid("user_id"),
@@ -233,5 +258,4 @@ class JdbcMemberProfileStoreAdapter(
             participationStatus = participationStatus,
         )
     }
-
 }

@@ -20,10 +20,11 @@ class NotificationDispatchService(
     private val meterRegistry: MeterRegistry,
 ) : DispatchNotificationEventUseCase {
     private val operationalLogger = LoggerFactory.getLogger(javaClass)
-    private val unknownStatusCounter = Counter
-        .builder("notification.dispatch.unknown_status")
-        .description("Email deliveries whose status was UNKNOWN at claim time")
-        .register(meterRegistry)
+    private val unknownStatusCounter =
+        Counter
+            .builder("notification.dispatch.unknown_status")
+            .description("Email deliveries whose status was UNKNOWN at claim time")
+            .register(meterRegistry)
 
     override fun dispatch(message: NotificationEventMessage) {
         val deliveries = transactionalOps.persistPlannedDeliveries(message)

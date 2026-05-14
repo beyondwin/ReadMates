@@ -37,17 +37,16 @@ class JdbcHostSessionWriteAdapter(
     private val writeOperations = HostSessionWriteOperations(queries)
 
     @Transactional
-    override fun create(command: HostSessionCommand) =
-        writeOperations.createDraftSession(jdbcTemplate, command.host, command)
+    override fun create(command: HostSessionCommand) = writeOperations.createDraftSession(jdbcTemplate, command.host, command)
 
-    override fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem> =
-        queries.list(jdbcTemplate, host, pageRequest)
+    override fun list(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<HostSessionListItem> = queries.list(jdbcTemplate, host, pageRequest)
 
-    override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> =
-        queries.upcoming(jdbcTemplate, member)
+    override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> = queries.upcoming(jdbcTemplate, member)
 
-    override fun detail(command: HostSessionIdCommand) =
-        queries.findHostSession(jdbcTemplate, command.host, command.sessionId)
+    override fun detail(command: HostSessionIdCommand) = queries.findHostSession(jdbcTemplate, command.host, command.sessionId)
 
     @Transactional
     override fun update(command: UpdateHostSessionCommand) =
@@ -57,34 +56,26 @@ class JdbcHostSessionWriteAdapter(
         deletionQueries.previewOpenSessionDeletion(command.host, command.sessionId)
 
     @Transactional
-    override fun delete(command: HostSessionIdCommand) =
-        deletionQueries.deleteOpenHostSession(command.host, command.sessionId)
+    override fun delete(command: HostSessionIdCommand) = deletionQueries.deleteOpenHostSession(command.host, command.sessionId)
 
     @Transactional
-    override fun confirmAttendance(command: ConfirmAttendanceCommand) =
-        writeOperations.confirmHostAttendance(jdbcTemplate, command)
+    override fun confirmAttendance(command: ConfirmAttendanceCommand) = writeOperations.confirmHostAttendance(jdbcTemplate, command)
 
     @Transactional
-    override fun upsertPublication(command: UpsertPublicationCommand) =
-        writeOperations.upsertHostPublication(jdbcTemplate, command)
+    override fun upsertPublication(command: UpsertPublicationCommand) = writeOperations.upsertHostPublication(jdbcTemplate, command)
 
-    override fun dashboard(host: CurrentMember) =
-        queries.hostDashboard(jdbcTemplate, host)
+    override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)
 
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse =
         writeOperations.updateVisibility(jdbcTemplate, command)
 
     @Transactional
-    override fun open(command: HostSessionIdCommand): HostSessionTransitionResult =
-        writeOperations.open(jdbcTemplate, command)
+    override fun open(command: HostSessionIdCommand): HostSessionTransitionResult = writeOperations.open(jdbcTemplate, command)
 
     @Transactional
-    override fun close(command: HostSessionIdCommand): HostSessionTransitionResult =
-        writeOperations.close(jdbcTemplate, command)
+    override fun close(command: HostSessionIdCommand): HostSessionTransitionResult = writeOperations.close(jdbcTemplate, command)
 
     @Transactional
-    override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult =
-        writeOperations.publish(jdbcTemplate, command)
-
+    override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult = writeOperations.publish(jdbcTemplate, command)
 }

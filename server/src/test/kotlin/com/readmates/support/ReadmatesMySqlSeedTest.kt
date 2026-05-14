@@ -1,8 +1,8 @@
 package com.readmates.support
 
-import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -21,27 +21,29 @@ class ReadmatesMySqlSeedTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `seed has baseline multi club metadata`() {
-        val club = jdbcTemplate.queryForMap(
-            """
-            select id, slug, status
-            from clubs
-            where slug = 'reading-sai'
-            """.trimIndent(),
-        )
+        val club =
+            jdbcTemplate.queryForMap(
+                """
+                select id, slug, status
+                from clubs
+                where slug = 'reading-sai'
+                """.trimIndent(),
+            )
 
         assertThat(club["slug"]).isEqualTo("reading-sai")
         assertThat(club["status"]).isEqualTo("ACTIVE")
 
-        val domainCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from club_domains
-            where club_id = ?
-              and status in ('ACTION_REQUIRED', 'ACTIVE')
-            """.trimIndent(),
-            Int::class.java,
-            club["id"],
-        )
+        val domainCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from club_domains
+                where club_id = ?
+                  and status in ('ACTION_REQUIRED', 'ACTIVE')
+                """.trimIndent(),
+                Int::class.java,
+                club["id"],
+            )
         assertThat(domainCount).isGreaterThanOrEqualTo(0)
 
         assertEquals(
@@ -59,17 +61,19 @@ class ReadmatesMySqlSeedTest(
 
     @Test
     fun `dev seed contains second club for cross club tests`() {
-        val clubs = jdbcTemplate.queryForList(
-            """
-            select slug, status
-            from clubs
-            where slug in ('reading-sai', 'sample-book-club')
-            order by slug
-            """.trimIndent(),
-        )
+        val clubs =
+            jdbcTemplate.queryForList(
+                """
+                select slug, status
+                from clubs
+                where slug in ('reading-sai', 'sample-book-club')
+                order by slug
+                """.trimIndent(),
+            )
 
         assertThat(clubs).hasSize(2)
-        assertThat(clubs).extracting<String> { row -> row["slug"].toString() }
+        assertThat(clubs)
+            .extracting<String> { row -> row["slug"].toString() }
             .containsExactly("reading-sai", "sample-book-club")
         assertThat(clubs).allSatisfy { row ->
             assertThat(row["status"]).isEqualTo("ACTIVE")
@@ -79,7 +83,10 @@ class ReadmatesMySqlSeedTest(
     @Test
     fun `mysql dev seed creates readmates club host and six archived sessions`() {
         assertEquals(1, jdbcTemplate.queryForObject("select count(*) from clubs where slug = 'reading-sai'", Int::class.java))
-        assertEquals(1, jdbcTemplate.queryForObject("select count(*) from memberships where role = 'HOST' and status = 'ACTIVE'", Int::class.java))
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject("select count(*) from memberships where role = 'HOST' and status = 'ACTIVE'", Int::class.java),
+        )
         assertEquals(6, jdbcTemplate.queryForObject("select count(*) from sessions where state = 'PUBLISHED'", Int::class.java))
         assertEquals(
             6,

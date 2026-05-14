@@ -12,7 +12,10 @@ interface GetPublicClubUseCase {
 }
 
 interface GetPublicSessionUseCase {
-    fun getSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult?
+    fun getSession(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicSessionDetailResult?
 
     fun getSession(sessionId: UUID): PublicSessionDetailResult? = getSession(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
 }

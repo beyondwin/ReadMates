@@ -28,21 +28,22 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders
 import java.util.UUID
 
 class ArchiveControllerTest {
-    private val mockMvc: MockMvc = MockMvcBuilders
-        .standaloneSetup(
-            ArchiveController(
-                listArchiveSessionsUseCase = archiveUseCases,
-                getArchiveSessionDetailUseCase = archiveUseCases,
-                listMyArchiveQuestionsUseCase = archiveUseCases,
-                listMyArchiveReviewsUseCase = archiveUseCases,
-            ),
-        )
-        .setCustomArgumentResolvers(CurrentMemberArgumentResolver(resolveCurrentMemberUseCase))
-        .build()
+    private val mockMvc: MockMvc =
+        MockMvcBuilders
+            .standaloneSetup(
+                ArchiveController(
+                    listArchiveSessionsUseCase = archiveUseCases,
+                    getArchiveSessionDetailUseCase = archiveUseCases,
+                    listMyArchiveQuestionsUseCase = archiveUseCases,
+                    listMyArchiveReviewsUseCase = archiveUseCases,
+                ),
+            ).setCustomArgumentResolvers(CurrentMemberArgumentResolver(resolveCurrentMemberUseCase))
+            .build()
 
     @Test
     fun `returns unauthorized when the current member cannot be resolved`() {
-        mockMvc.get("/api/archive/sessions")
+        mockMvc
+            .get("/api/archive/sessions")
             .andExpect {
                 status { isUnauthorized() }
             }
@@ -50,10 +51,10 @@ class ArchiveControllerTest {
 
     @Test
     fun `archive sessions returns cursor page`() {
-        mockMvc.get("/api/archive/sessions?limit=2") {
-            with(memberUser())
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions?limit=2") {
+                with(memberUser())
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items") { isArray() }
                 jsonPath("$.nextCursor") { exists() }
@@ -62,47 +63,61 @@ class ArchiveControllerTest {
     }
 }
 
-private val archiveUseCases = object :
-    ListArchiveSessionsUseCase,
-    GetArchiveSessionDetailUseCase,
-    ListMyArchiveQuestionsUseCase,
-    ListMyArchiveReviewsUseCase {
-    override fun listArchiveSessions(
-        currentMember: CurrentMember,
-        pageRequest: PageRequest,
-    ): CursorPage<ArchiveSessionResult> =
-        CursorPage(
-            items = listOf(
-                archiveSession(sessionNumber = 3),
-                archiveSession(sessionNumber = 2),
-            ),
-            nextCursor = "next-page",
-        )
+private val archiveUseCases =
+    object :
+        ListArchiveSessionsUseCase,
+        GetArchiveSessionDetailUseCase,
+        ListMyArchiveQuestionsUseCase,
+        ListMyArchiveReviewsUseCase {
+        override fun listArchiveSessions(
+            currentMember: CurrentMember,
+            pageRequest: PageRequest,
+        ): CursorPage<ArchiveSessionResult> =
+            CursorPage(
+                items =
+                    listOf(
+                        archiveSession(sessionNumber = 3),
+                        archiveSession(sessionNumber = 2),
+                    ),
+                nextCursor = "next-page",
+            )
 
-    override fun getArchiveSessionDetail(
-        currentMember: CurrentMember,
-        sessionId: UUID,
-    ): MemberArchiveSessionDetailResult? = null
+        override fun getArchiveSessionDetail(
+            currentMember: CurrentMember,
+            sessionId: UUID,
+        ): MemberArchiveSessionDetailResult? = null
 
-    override fun listMyQuestions(
-        currentMember: CurrentMember,
-        pageRequest: PageRequest,
-    ): CursorPage<MyArchiveQuestionResult> = CursorPage(emptyList(), null)
+        override fun listMyQuestions(
+            currentMember: CurrentMember,
+            pageRequest: PageRequest,
+        ): CursorPage<MyArchiveQuestionResult> = CursorPage(emptyList(), null)
 
-    override fun listMyReviews(
-        currentMember: CurrentMember,
-        pageRequest: PageRequest,
-    ): CursorPage<MyArchiveReviewResult> = CursorPage(emptyList(), null)
-}
+        override fun listMyReviews(
+            currentMember: CurrentMember,
+            pageRequest: PageRequest,
+        ): CursorPage<MyArchiveReviewResult> = CursorPage(emptyList(), null)
+    }
 
-private val resolveCurrentMemberUseCase = object : ResolveCurrentMemberUseCase {
-    override fun resolveByEmail(email: String): CurrentMember? = currentMember
-    override fun findUserIdByEmail(email: String): UUID? = currentMember.userId
-    override fun resolveByUserAndClub(userId: UUID, clubId: UUID): CurrentMember? = currentMember
-    override fun resolveByEmailAndClub(email: String, clubId: UUID): CurrentMember? = currentMember
-    override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
-    override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
-}
+private val resolveCurrentMemberUseCase =
+    object : ResolveCurrentMemberUseCase {
+        override fun resolveByEmail(email: String): CurrentMember? = currentMember
+
+        override fun findUserIdByEmail(email: String): UUID? = currentMember.userId
+
+        override fun resolveByUserAndClub(
+            userId: UUID,
+            clubId: UUID,
+        ): CurrentMember? = currentMember
+
+        override fun resolveByEmailAndClub(
+            email: String,
+            clubId: UUID,
+        ): CurrentMember? = currentMember
+
+        override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
+
+        override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
+    }
 
 private fun memberUser(email: String = "member@example.com"): RequestPostProcessor =
     RequestPostProcessor { request ->
@@ -123,23 +138,25 @@ private fun archiveSession(sessionNumber: Int): ArchiveSessionResult =
         total = 1,
         published = true,
         state = "PUBLISHED",
-        feedbackDocument = MemberArchiveFeedbackDocumentStatusResult(
-            available = false,
-            readable = false,
-            lockedReason = "NOT_AVAILABLE",
-            title = null,
-            uploadedAt = null,
-        ),
+        feedbackDocument =
+            MemberArchiveFeedbackDocumentStatusResult(
+                available = false,
+                readable = false,
+                lockedReason = "NOT_AVAILABLE",
+                title = null,
+                uploadedAt = null,
+            ),
     )
 
-private val currentMember = CurrentMember(
-    userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-    membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
-    clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-    clubSlug = "reading-sai",
-    email = "member@example.com",
-    displayName = "Member",
-    accountName = "Member",
-    role = MembershipRole.MEMBER,
-    membershipStatus = MembershipStatus.ACTIVE,
-)
+private val currentMember =
+    CurrentMember(
+        userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+        membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+        clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+        clubSlug = "reading-sai",
+        email = "member@example.com",
+        displayName = "Member",
+        accountName = "Member",
+        role = MembershipRole.MEMBER,
+        membershipStatus = MembershipStatus.ACTIVE,
+    )

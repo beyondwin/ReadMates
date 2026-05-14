@@ -1,24 +1,24 @@
 package com.readmates.notification.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
+import com.readmates.notification.application.model.NotificationEmailTemplates
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
-import com.readmates.notification.application.model.NotificationEmailTemplates
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
-import org.assertj.core.api.Assertions.assertThat
-import org.hamcrest.Matchers.containsString
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.mail.Session
 import jakarta.mail.internet.MimeMessage
+import org.assertj.core.api.Assertions.assertThat
+import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
@@ -103,18 +103,21 @@ class HostNotificationControllerTest(
             attemptCount = 2,
         )
 
-        val response = mockMvc.get("/api/host/notifications/summary") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.pending") { value(0) }
-            jsonPath("$.failed") { value(1) }
-            jsonPath("$.dead") { value(0) }
-            jsonPath("$.sentLast24h") { value(0) }
-            jsonPath("$.latestFailures[0].eventType") { value("FEEDBACK_DOCUMENT_PUBLISHED") }
-            jsonPath("$.latestFailures[0].attemptCount") { value(2) }
-            jsonPath("$.latestFailures[0].recipientEmail") { value("m***@example.com") }
-        }.andReturn().response.contentAsString
+        val response =
+            mockMvc
+                .get("/api/host/notifications/summary") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.pending") { value(0) }
+                    jsonPath("$.failed") { value(1) }
+                    jsonPath("$.dead") { value(0) }
+                    jsonPath("$.sentLast24h") { value(0) }
+                    jsonPath("$.latestFailures[0].eventType") { value("FEEDBACK_DOCUMENT_PUBLISHED") }
+                    jsonPath("$.latestFailures[0].attemptCount") { value(2) }
+                    jsonPath("$.latestFailures[0].recipientEmail") { value("m***@example.com") }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(response).doesNotContain("member@example.com")
         assertThat(response).doesNotContain("lastError")
@@ -123,12 +126,13 @@ class HostNotificationControllerTest(
 
     @Test
     fun `host can process notifications without csrf`() {
-        mockMvc.post("/api/host/notifications/process") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.processed") { value(0) }
-        }
+        mockMvc
+            .post("/api/host/notifications/process") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.processed") { value(0) }
+            }
     }
 
     @Test
@@ -158,29 +162,33 @@ class HostNotificationControllerTest(
             dedupeKey = "host-notification-controller-test-delivery-list",
         )
 
-        mockMvc.get("/api/host/notifications/events") {
-            with(user("host@example.com"))
-            param("limit", "2")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items.length()") { value(1) }
-            jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009501") }
-            jsonPath("$.items[0].eventType") { value("NEXT_BOOK_PUBLISHED") }
-            jsonPath("$.items[0].status") { value("PUBLISHED") }
-            jsonPath("$.nextCursor") { value(null) }
-        }
+        mockMvc
+            .get("/api/host/notifications/events") {
+                with(user("host@example.com"))
+                param("limit", "2")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(1) }
+                jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009501") }
+                jsonPath("$.items[0].eventType") { value("NEXT_BOOK_PUBLISHED") }
+                jsonPath("$.items[0].status") { value("PUBLISHED") }
+                jsonPath("$.nextCursor") { value(null) }
+            }
 
-        val response = mockMvc.get("/api/host/notifications/deliveries") {
-            with(user("host@example.com"))
-            param("limit", "2")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009601") }
-            jsonPath("$.items[0].channel") { value("EMAIL") }
-            jsonPath("$.items[0].status") { value("SENT") }
-            jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
-            jsonPath("$.nextCursor") { value(null) }
-        }.andReturn().response.contentAsString
+        val response =
+            mockMvc
+                .get("/api/host/notifications/deliveries") {
+                    with(user("host@example.com"))
+                    param("limit", "2")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009601") }
+                    jsonPath("$.items[0].channel") { value("EMAIL") }
+                    jsonPath("$.items[0].status") { value("SENT") }
+                    jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
+                    jsonPath("$.nextCursor") { value(null) }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(response).doesNotContain("member1@example.com")
     }
@@ -206,30 +214,34 @@ class HostNotificationControllerTest(
             dedupeKey = "host-notification-controller-test-paged-item-3",
         )
 
-        val response = mockMvc.get("/api/host/notifications/items") {
-            with(user("host@example.com"))
-            param("limit", "2")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items.length()") { value(2) }
-            jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
-            jsonPath("$.nextCursor") { exists() }
-        }.andReturn().response.contentAsString
+        val response =
+            mockMvc
+                .get("/api/host/notifications/items") {
+                    with(user("host@example.com"))
+                    param("limit", "2")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items.length()") { value(2) }
+                    jsonPath("$.items[0].recipientEmail") { value("m***@example.com") }
+                    jsonPath("$.nextCursor") { exists() }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(response).doesNotContain("member@example.com")
     }
 
     @Test
     fun `host sends test mail and audit stores masked recipient only`() {
-        mockMvc.post("/api/host/notifications/test-mail") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"recipientEmail":"external@example.com"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.recipientEmail") { value("e***@example.com") }
-            jsonPath("$.status") { value("SENT") }
-        }
+        mockMvc
+            .post("/api/host/notifications/test-mail") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"recipientEmail":"external@example.com"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.recipientEmail") { value("e***@example.com") }
+                jsonPath("$.status") { value("SENT") }
+            }
 
         val copy = NotificationEmailTemplates.testMailCopy("읽는사이")
         val command = testMailDeliveryPort.sent.single()
@@ -239,13 +251,14 @@ class HostNotificationControllerTest(
         assertThat(command.html).isEqualTo(copy.emailBodyHtml)
         assertThat(command.html).doesNotContain("<a ")
 
-        val rows = jdbcTemplate.queryForList(
-            """
-            select recipient_masked_email, recipient_email_hash
-            from notification_test_mail_audit
-            where club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-        )
+        val rows =
+            jdbcTemplate.queryForList(
+                """
+                select recipient_masked_email, recipient_email_hash
+                from notification_test_mail_audit
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+            )
 
         assertThat(rows).hasSize(1)
         assertThat(rows.single()["recipient_masked_email"]).isEqualTo("e***@example.com")
@@ -256,43 +269,48 @@ class HostNotificationControllerTest(
     @Test
     fun `host test mail rejects second send within cooldown`() {
         repeat(2) { index ->
-            mockMvc.post("/api/host/notifications/test-mail") {
-                with(user("host@example.com"))
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"recipientEmail":"host@example.com"}"""
-            }.andExpect {
-                if (index == 0) {
-                    status { isOk() }
-                } else {
-                    status { isTooManyRequests() }
+            mockMvc
+                .post("/api/host/notifications/test-mail") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"recipientEmail":"host@example.com"}"""
+                }.andExpect {
+                    if (index == 0) {
+                        status { isOk() }
+                    } else {
+                        status { isTooManyRequests() }
+                    }
                 }
-            }
         }
     }
 
     @Test
     fun `host test mail failure audit stores and returns sanitized error`() {
-        val response = mockMvc.post("/api/host/notifications/test-mail") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"recipientEmail":"$FAILING_TEST_MAIL_RECIPIENT"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.recipientEmail") { value("f***@example.com") }
-            jsonPath("$.status") { value("FAILED") }
-        }.andReturn().response.contentAsString
+        val response =
+            mockMvc
+                .post("/api/host/notifications/test-mail") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"recipientEmail":"$FAILING_TEST_MAIL_RECIPIENT"}"""
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.recipientEmail") { value("f***@example.com") }
+                    jsonPath("$.status") { value("FAILED") }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(response).contains("[redacted-email]")
         assertThat(response).contains("[redacted-secret]")
         assertNoSensitiveErrorValues(response)
 
-        val rows = jdbcTemplate.queryForList(
-            """
-            select status, last_error
-            from notification_test_mail_audit
-            where club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-        )
+        val rows =
+            jdbcTemplate.queryForList(
+                """
+                select status, last_error
+                from notification_test_mail_audit
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+            )
 
         assertThat(rows).hasSize(1)
         assertThat(rows.single()["status"]).isEqualTo("FAILED")
@@ -301,13 +319,16 @@ class HostNotificationControllerTest(
         assertThat(storedError).contains("[redacted-secret]")
         assertNoSensitiveErrorValues(storedError)
 
-        val auditResponse = mockMvc.get("/api/host/notifications/test-mail/audit") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[0].status") { value("FAILED") }
-            jsonPath("$.nextCursor") { value(null) }
-        }.andReturn().response.contentAsString
+        val auditResponse =
+            mockMvc
+                .get("/api/host/notifications/test-mail/audit") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[0].status") { value("FAILED") }
+                    jsonPath("$.nextCursor") { value(null) }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(auditResponse).contains("[redacted-email]")
         assertThat(auditResponse).contains("[redacted-secret]")
@@ -339,13 +360,16 @@ class HostNotificationControllerTest(
             SENSITIVE_TEST_MAIL_ERROR,
         )
 
-        val response = mockMvc.get("/api/host/notifications/test-mail/audit") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[0].status") { value("FAILED") }
-            jsonPath("$.nextCursor") { value(null) }
-        }.andReturn().response.contentAsString
+        val response =
+            mockMvc
+                .get("/api/host/notifications/test-mail/audit") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[0].status") { value("FAILED") }
+                    jsonPath("$.nextCursor") { value(null) }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(response).contains("[redacted-email]")
         assertThat(response).contains("[redacted-secret]")
@@ -362,18 +386,21 @@ class HostNotificationControllerTest(
             lastError = "SMTP temporary failure for member@example.com",
         )
 
-        val response = mockMvc.get("/api/host/notifications/items/00000000-0000-0000-0000-000000009402") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.id") { value("00000000-0000-0000-0000-000000009402") }
-            jsonPath("$.recipientEmail") { value("m***@example.com") }
-            jsonPath("$.subject") { value("3회차 피드백 문서가 올라왔습니다") }
-            jsonPath("$.status") { value("PENDING") }
-            jsonPath("$.metadata.sessionNumber") { value(3) }
-            jsonPath("$.metadata.bookTitle") { value("메타데이터 테스트 책") }
-            jsonPath("$.lastError") { value("SMTP temporary failure for [redacted-email]") }
-        }.andReturn().response.contentAsString
+        val response =
+            mockMvc
+                .get("/api/host/notifications/items/00000000-0000-0000-0000-000000009402") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.id") { value("00000000-0000-0000-0000-000000009402") }
+                    jsonPath("$.recipientEmail") { value("m***@example.com") }
+                    jsonPath("$.subject") { value("3회차 피드백 문서가 올라왔습니다") }
+                    jsonPath("$.status") { value("PENDING") }
+                    jsonPath("$.metadata.sessionNumber") { value(3) }
+                    jsonPath("$.metadata.bookTitle") { value("메타데이터 테스트 책") }
+                    jsonPath("$.lastError") { value("SMTP temporary failure for [redacted-email]") }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(response).doesNotContain("bodyText")
         assertThat(response).doesNotContain("bodyHtml")
@@ -404,13 +431,14 @@ class HostNotificationControllerTest(
             dedupeKey = "host-notification-controller-test-restore",
         )
 
-        mockMvc.post("/api/host/notifications/items/00000000-0000-0000-0000-000000009403/restore") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.id") { value("00000000-0000-0000-0000-000000009403") }
-            jsonPath("$.status") { value("PENDING") }
-        }
+        mockMvc
+            .post("/api/host/notifications/items/00000000-0000-0000-0000-000000009403/restore") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.id") { value("00000000-0000-0000-0000-000000009403") }
+                jsonPath("$.status") { value("PENDING") }
+            }
     }
 
     @Test
@@ -422,14 +450,17 @@ class HostNotificationControllerTest(
             dedupeKey = "host-notification-controller-test-retry",
         )
 
-        val response = mockMvc.post("/api/host/notifications/items/00000000-0000-0000-0000-000000009404/retry") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.id") { value("00000000-0000-0000-0000-000000009404") }
-            jsonPath("$.status") { value("SENT") }
-            jsonPath("$.recipientEmail") { value("m***@example.com") }
-        }.andReturn().response.contentAsString
+        val response =
+            mockMvc
+                .post("/api/host/notifications/items/00000000-0000-0000-0000-000000009404/retry") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.id") { value("00000000-0000-0000-0000-000000009404") }
+                    jsonPath("$.status") { value("SENT") }
+                    jsonPath("$.recipientEmail") { value("m***@example.com") }
+                }.andReturn()
+                .response.contentAsString
 
         assertThat(response).doesNotContain("member@example.com")
         assertThat(response).doesNotContain("ReadMates에서 확인해 주세요.")
@@ -454,11 +485,12 @@ class HostNotificationControllerTest(
             "00000000-0000-0000-0000-000000009405",
             "00000000-0000-0000-0000-000000009406",
         ).forEach { id ->
-            mockMvc.post("/api/host/notifications/items/$id/retry") {
-                with(user("host@example.com"))
-            }.andExpect {
-                status { isForbidden() }
-            }
+            mockMvc
+                .post("/api/host/notifications/items/$id/retry") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isForbidden() }
+                }
         }
     }
 
@@ -476,57 +508,68 @@ class HostNotificationControllerTest(
             dedupeKey = "host-notification-controller-test-other-club",
         )
 
-        mockMvc.post("/api/host/notifications/process") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.processed") { value(1) }
-        }
+        mockMvc
+            .post("/api/host/notifications/process") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.processed") { value(1) }
+            }
 
-        val otherClubStatus = jdbcTemplate.queryForObject(
-            """
-            select status
-            from notification_deliveries
-            where id = '00000000-0000-0000-0000-000000009102'
-            """.trimIndent(),
-            String::class.java,
-        )
-        val hostClubStatus = jdbcTemplate.queryForObject(
-            """
-            select status
-            from notification_deliveries
-            where id = '00000000-0000-0000-0000-000000009101'
-            """.trimIndent(),
-            String::class.java,
-        )
+        val otherClubStatus =
+            jdbcTemplate.queryForObject(
+                """
+                select status
+                from notification_deliveries
+                where id = '00000000-0000-0000-0000-000000009102'
+                """.trimIndent(),
+                String::class.java,
+            )
+        val hostClubStatus =
+            jdbcTemplate.queryForObject(
+                """
+                select status
+                from notification_deliveries
+                where id = '00000000-0000-0000-0000-000000009101'
+                """.trimIndent(),
+                String::class.java,
+            )
 
-        org.assertj.core.api.Assertions.assertThat(hostClubStatus).isEqualTo("SENT")
-        org.assertj.core.api.Assertions.assertThat(otherClubStatus).isEqualTo("PENDING")
+        org.assertj.core.api.Assertions
+            .assertThat(hostClubStatus)
+            .isEqualTo("SENT")
+        org.assertj.core.api.Assertions
+            .assertThat(otherClubStatus)
+            .isEqualTo("PENDING")
     }
 
     @Test
     fun `host previews manual reminder without exposing raw email`() {
         withTemporarySessionState("OPEN", "MEMBER") {
-            val response = mockMvc.post("/api/host/notifications/manual/preview") {
-                with(user("host@example.com"))
-                contentType = MediaType.APPLICATION_JSON
-                content = """
-                  {
-                    "sessionId": "00000000-0000-0000-0000-000000000301",
-                    "eventType": "SESSION_REMINDER_DUE",
-                    "audience": "ALL_ACTIVE_MEMBERS",
-                    "requestedChannels": "BOTH",
-                    "excludedMembershipIds": [],
-                    "includedMembershipIds": [],
-                    "sendMode": "NOW"
-                  }
-                """.trimIndent()
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.template.eventType") { value("SESSION_REMINDER_DUE") }
-                jsonPath("$.audience.finalTargetCount") { exists() }
-                jsonPath("$.channels.requested") { value("BOTH") }
-            }.andReturn().response.contentAsString
+            val response =
+                mockMvc
+                    .post("/api/host/notifications/manual/preview") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content =
+                            """
+                            {
+                              "sessionId": "00000000-0000-0000-0000-000000000301",
+                              "eventType": "SESSION_REMINDER_DUE",
+                              "audience": "ALL_ACTIVE_MEMBERS",
+                              "requestedChannels": "BOTH",
+                              "excludedMembershipIds": [],
+                              "includedMembershipIds": [],
+                              "sendMode": "NOW"
+                            }
+                            """.trimIndent()
+                    }.andExpect {
+                        status { isOk() }
+                        jsonPath("$.template.eventType") { value("SESSION_REMINDER_DUE") }
+                        jsonPath("$.audience.finalTargetCount") { exists() }
+                        jsonPath("$.channels.requested") { value("BOTH") }
+                    }.andReturn()
+                    .response.contentAsString
 
             assertThat(response).doesNotContain("member@example.com")
             assertThat(response).doesNotContain("host@example.com")
@@ -536,44 +579,56 @@ class HostNotificationControllerTest(
     @Test
     fun `host confirms manual reminder after preview`() {
         withTemporarySessionState("OPEN", "MEMBER") {
-            val previewId = mockMvc.post("/api/host/notifications/manual/preview") {
-                with(user("host@example.com"))
-                contentType = MediaType.APPLICATION_JSON
-                content = """
-                  {
-                    "sessionId": "00000000-0000-0000-0000-000000000301",
-                    "eventType": "SESSION_REMINDER_DUE",
-                    "audience": "ALL_ACTIVE_MEMBERS",
-                    "requestedChannels": "IN_APP",
-                    "excludedMembershipIds": [],
-                    "includedMembershipIds": [],
-                    "sendMode": "NOW"
-                  }
-                """.trimIndent()
-            }.andReturn().response.contentAsString
-                .let { tools.jackson.databind.ObjectMapper().readTree(it).get("previewId").asText() }
+            val previewId =
+                mockMvc
+                    .post("/api/host/notifications/manual/preview") {
+                        with(user("host@example.com"))
+                        contentType = MediaType.APPLICATION_JSON
+                        content =
+                            """
+                            {
+                              "sessionId": "00000000-0000-0000-0000-000000000301",
+                              "eventType": "SESSION_REMINDER_DUE",
+                              "audience": "ALL_ACTIVE_MEMBERS",
+                              "requestedChannels": "IN_APP",
+                              "excludedMembershipIds": [],
+                              "includedMembershipIds": [],
+                              "sendMode": "NOW"
+                            }
+                            """.trimIndent()
+                    }.andReturn()
+                    .response.contentAsString
+                    .let {
+                        tools.jackson.databind
+                            .ObjectMapper()
+                            .readTree(it)
+                            .get("previewId")
+                            .asText()
+                    }
 
-            mockMvc.post("/api/host/notifications/manual") {
-                with(user("host@example.com"))
-                contentType = MediaType.APPLICATION_JSON
-                content = """
-                  {
-                    "previewId": "$previewId",
-                    "sessionId": "00000000-0000-0000-0000-000000000301",
-                    "eventType": "SESSION_REMINDER_DUE",
-                    "audience": "ALL_ACTIVE_MEMBERS",
-                    "requestedChannels": "IN_APP",
-                    "excludedMembershipIds": [],
-                    "includedMembershipIds": [],
-                    "sendMode": "NOW",
-                    "resendConfirmed": false
-                  }
-                """.trimIndent()
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.status") { value("PENDING") }
-                jsonPath("$.summary.requestedChannels") { value("IN_APP") }
-            }
+            mockMvc
+                .post("/api/host/notifications/manual") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "previewId": "$previewId",
+                          "sessionId": "00000000-0000-0000-0000-000000000301",
+                          "eventType": "SESSION_REMINDER_DUE",
+                          "audience": "ALL_ACTIVE_MEMBERS",
+                          "requestedChannels": "IN_APP",
+                          "excludedMembershipIds": [],
+                          "includedMembershipIds": [],
+                          "sendMode": "NOW",
+                          "resendConfirmed": false
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.status") { value("PENDING") }
+                    jsonPath("$.summary.requestedChannels") { value("IN_APP") }
+                }
         }
     }
 
@@ -583,15 +638,16 @@ class HostNotificationControllerTest(
             val previewId = createManualPreview()
             confirmManualDispatch(previewId, resendConfirmed = true)
 
-            mockMvc.get("/api/host/notifications/manual/dispatches") {
-                with(user("host@example.com"))
-                param("sessionId", "00000000-0000-0000-0000-000000000301")
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.items[0].source") { value("MANUAL") }
-                jsonPath("$.items[0].requestedChannels") { value("BOTH") }
-                jsonPath("$.items[0].requestedBy") { value(containsString("***@")) }
-            }
+            mockMvc
+                .get("/api/host/notifications/manual/dispatches") {
+                    with(user("host@example.com"))
+                    param("sessionId", "00000000-0000-0000-0000-000000000301")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[0].source") { value("MANUAL") }
+                    jsonPath("$.items[0].requestedChannels") { value("BOTH") }
+                    jsonPath("$.items[0].requestedBy") { value(containsString("***@")) }
+                }
         }
     }
 
@@ -601,38 +657,49 @@ class HostNotificationControllerTest(
             val previewId = createManualPreview()
             val eventId = confirmManualDispatch(previewId, resendConfirmed = true)
 
-            mockMvc.get("/api/host/notifications/events") {
-                with(user("host@example.com"))
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.items[?(@.id == '$eventId')].source") { value("MANUAL") }
-                jsonPath("$.items[?(@.id == '$eventId')].manualDispatch.requestedChannels") { value("BOTH") }
-            }
+            mockMvc
+                .get("/api/host/notifications/events") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[?(@.id == '$eventId')].source") { value("MANUAL") }
+                    jsonPath("$.items[?(@.id == '$eventId')].manualDispatch.requestedChannels") { value("BOTH") }
+                }
         }
     }
 
     @Test
     fun `nearby notification post path without csrf remains protected`() {
-        mockMvc.post("/api/host/notifications/process/extra") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/host/notifications/process/extra") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
-    private fun insertPendingNotification(id: String, clubId: String, dedupeKey: String) {
+    private fun insertPendingNotification(
+        id: String,
+        clubId: String,
+        dedupeKey: String,
+    ) {
         insertNotification(id = id, clubId = clubId, status = NotificationOutboxStatus.PENDING, dedupeKey = dedupeKey)
     }
 
-    private fun <T> withTemporarySessionState(state: String, visibility: String, block: () -> T): T {
-        val original = jdbcTemplate.queryForMap(
-            """
-            select state, visibility
-            from sessions
-            where id = '00000000-0000-0000-0000-000000000301'
-              and club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-        )
+    private fun <T> withTemporarySessionState(
+        state: String,
+        visibility: String,
+        block: () -> T,
+    ): T {
+        val original =
+            jdbcTemplate.queryForMap(
+                """
+                select state, visibility
+                from sessions
+                where id = '00000000-0000-0000-0000-000000000301'
+                  and club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+            )
         return try {
             jdbcTemplate.update(
                 """
@@ -660,44 +727,65 @@ class HostNotificationControllerTest(
     }
 
     private fun createManualPreview(): String =
-        mockMvc.post("/api/host/notifications/manual/preview") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """
-              {
-                "sessionId": "00000000-0000-0000-0000-000000000301",
-                "eventType": "SESSION_REMINDER_DUE",
-                "audience": "ALL_ACTIVE_MEMBERS",
-                "requestedChannels": "BOTH",
-                "excludedMembershipIds": [],
-                "includedMembershipIds": [],
-                "sendMode": "NOW"
-              }
-            """.trimIndent()
-        }.andReturn().response.contentAsString
-            .let { tools.jackson.databind.ObjectMapper().readTree(it).get("previewId").asText() }
+        mockMvc
+            .post("/api/host/notifications/manual/preview") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "sessionId": "00000000-0000-0000-0000-000000000301",
+                      "eventType": "SESSION_REMINDER_DUE",
+                      "audience": "ALL_ACTIVE_MEMBERS",
+                      "requestedChannels": "BOTH",
+                      "excludedMembershipIds": [],
+                      "includedMembershipIds": [],
+                      "sendMode": "NOW"
+                    }
+                    """.trimIndent()
+            }.andReturn()
+            .response.contentAsString
+            .let {
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(it)
+                    .get("previewId")
+                    .asText()
+            }
 
-    private fun confirmManualDispatch(previewId: String, resendConfirmed: Boolean): String =
-        mockMvc.post("/api/host/notifications/manual") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """
-              {
-                "previewId": "$previewId",
-                "sessionId": "00000000-0000-0000-0000-000000000301",
-                "eventType": "SESSION_REMINDER_DUE",
-                "audience": "ALL_ACTIVE_MEMBERS",
-                "requestedChannels": "BOTH",
-                "excludedMembershipIds": [],
-                "includedMembershipIds": [],
-                "sendMode": "NOW",
-                "resendConfirmed": $resendConfirmed
-              }
-            """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
-            .let { tools.jackson.databind.ObjectMapper().readTree(it).get("eventId").asText() }
+    private fun confirmManualDispatch(
+        previewId: String,
+        resendConfirmed: Boolean,
+    ): String =
+        mockMvc
+            .post("/api/host/notifications/manual") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "previewId": "$previewId",
+                      "sessionId": "00000000-0000-0000-0000-000000000301",
+                      "eventType": "SESSION_REMINDER_DUE",
+                      "audience": "ALL_ACTIVE_MEMBERS",
+                      "requestedChannels": "BOTH",
+                      "excludedMembershipIds": [],
+                      "includedMembershipIds": [],
+                      "sendMode": "NOW",
+                      "resendConfirmed": $resendConfirmed
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+            }.andReturn()
+            .response.contentAsString
+            .let {
+                tools.jackson.databind
+                    .ObjectMapper()
+                    .readTree(it)
+                    .get("eventId")
+                    .asText()
+            }
 
     private fun insertOtherClub() {
         jdbcTemplate.update(
@@ -895,14 +983,12 @@ class HostNotificationControllerTest(
     class TestMailDeliveryConfig {
         @Bean
         @Primary
-        fun testMailDeliveryPort(): RecordingTestMailDeliveryPort =
-            RecordingTestMailDeliveryPort()
+        fun testMailDeliveryPort(): RecordingTestMailDeliveryPort = RecordingTestMailDeliveryPort()
 
         @Bean
         fun testJavaMailSender(): JavaMailSender =
             object : JavaMailSender {
-                override fun createMimeMessage(): MimeMessage =
-                    MimeMessage(Session.getInstance(Properties()))
+                override fun createMimeMessage(): MimeMessage = MimeMessage(Session.getInstance(Properties()))
 
                 override fun createMimeMessage(contentStream: InputStream): MimeMessage =
                     MimeMessage(Session.getInstance(Properties()), contentStream)

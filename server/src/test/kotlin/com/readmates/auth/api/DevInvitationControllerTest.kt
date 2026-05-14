@@ -31,7 +31,8 @@ class DevInvitationControllerTest(
     fun `legacy dev password invitation accept endpoint returns gone`() {
         val token = createInvitation("dev.invited@example.com")
 
-        mockMvc.post("/api/dev/invitations/$token/accept")
+        mockMvc
+            .post("/api/dev/invitations/$token/accept")
             .andExpect {
                 status { isGone() }
                 jsonPath("$.code") { value("GONE") }
@@ -41,17 +42,18 @@ class DevInvitationControllerTest(
     }
 
     private fun createInvitation(email: String): String {
-        val acceptUrl = mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","name":"개발 초대"}"""
-        }
-            .andExpect { status { isCreated() } }
-            .andReturn()
-            .response
-            .contentAsString
-            .substringAfter("\"acceptUrl\":\"")
-            .substringBefore("\"")
+        val acceptUrl =
+            mockMvc
+                .post("/api/host/invitations") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"email":"$email","name":"개발 초대"}"""
+                }.andExpect { status { isCreated() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .substringAfter("\"acceptUrl\":\"")
+                .substringBefore("\"")
 
         return acceptUrl.substringAfterLast("/")
     }

@@ -2,8 +2,8 @@ package com.readmates.session.application.service
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.session.application.model.ReplaceQuestionsCommand
 import com.readmates.session.application.model.ReplaceQuestionCommandItem
+import com.readmates.session.application.model.ReplaceQuestionsCommand
 import com.readmates.session.application.model.ReplaceQuestionsResult
 import com.readmates.session.application.model.SaveCheckinCommand
 import com.readmates.session.application.model.SaveOneLineReviewCommand
@@ -18,17 +18,18 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class SessionMemberWriteServiceTest {
-    private val member = CurrentMember(
-        userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-        membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
-        clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-        clubSlug = "reading-sai",
-        email = "member@example.com",
-        displayName = "멤버",
-        accountName = "김멤버",
-        role = MembershipRole.MEMBER,
-        membershipStatus = MembershipStatus.ACTIVE,
-    )
+    private val member =
+        CurrentMember(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubSlug = "reading-sai",
+            email = "member@example.com",
+            displayName = "멤버",
+            accountName = "김멤버",
+            role = MembershipRole.MEMBER,
+            membershipStatus = MembershipStatus.ACTIVE,
+        )
 
     @Test
     fun `delegates rsvp update to write port`() {
@@ -61,15 +62,16 @@ class SessionMemberWriteServiceTest {
         val port = RecordingSessionParticipationWritePort()
         val service = SessionMemberWriteService(port)
 
-        val result = service.replaceQuestions(
-            ReplaceQuestionsCommand(
-                member,
-                listOf(
-                    ReplaceQuestionCommandItem(priority = 1, text = "첫 질문"),
-                    ReplaceQuestionCommandItem(priority = 3, text = "셋째 질문"),
+        val result =
+            service.replaceQuestions(
+                ReplaceQuestionsCommand(
+                    member,
+                    listOf(
+                        ReplaceQuestionCommandItem(priority = 1, text = "첫 질문"),
+                        ReplaceQuestionCommandItem(priority = 3, text = "셋째 질문"),
+                    ),
                 ),
-            ),
-        )
+            )
 
         assertEquals(listOf("첫 질문", "셋째 질문"), result.questions.map { it.text })
         assertEquals(listOf(1, 3), result.questions.map { it.priority })
@@ -101,9 +103,10 @@ class SessionMemberWriteServiceTest {
 
     @Test
     fun `does not evict when write port throws`() {
-        val port = RecordingSessionParticipationWritePort().apply {
-            throwOnSaveOneLineReview = true
-        }
+        val port =
+            RecordingSessionParticipationWritePort().apply {
+                throwOnSaveOneLineReview = true
+            }
         val invalidation = RecordingReadCacheInvalidationPort()
         val service = SessionMemberWriteService(port, invalidation)
 
@@ -119,33 +122,43 @@ class SessionMemberWriteServiceTest {
         var throwOnSaveOneLineReview = false
 
         override fun updateRsvp(command: UpdateRsvpCommand) =
-            com.readmates.session.application.model.RsvpResult(command.status)
+            com.readmates.session.application.model
+                .RsvpResult(command.status)
                 .also { calls += "updateRsvp:${command.status}" }
 
         override fun saveCheckin(command: SaveCheckinCommand) =
-            com.readmates.session.application.model.CheckinResult(command.readingProgress)
+            com.readmates.session.application.model
+                .CheckinResult(command.readingProgress)
                 .also { calls += "saveCheckin:${command.readingProgress}" }
 
         override fun saveQuestion(command: SaveQuestionCommand) =
-            com.readmates.session.application.model.QuestionResult(command.priority, command.text, command.draftThought)
+            com.readmates.session.application.model
+                .QuestionResult(command.priority, command.text, command.draftThought)
                 .also { calls += "saveQuestion:${command.priority}:${command.text}" }
 
         override fun replaceQuestions(command: ReplaceQuestionsCommand) =
-            ReplaceQuestionsResult(command.questions.map { question ->
-                com.readmates.session.application.model.QuestionResult(question.priority, question.text, null)
-            }).also {
+            ReplaceQuestionsResult(
+                command.questions.map { question ->
+                    com.readmates.session.application.model
+                        .QuestionResult(question.priority, question.text, null)
+                },
+            ).also {
                 calls += "replaceQuestions:${command.questions.joinToString("|") { question -> "${question.priority}:${question.text}" }}"
             }
 
-        override fun saveOneLineReview(command: com.readmates.session.application.model.SaveOneLineReviewCommand): com.readmates.session.application.model.OneLineReviewResult {
+        override fun saveOneLineReview(
+            command: com.readmates.session.application.model.SaveOneLineReviewCommand,
+        ): com.readmates.session.application.model.OneLineReviewResult {
             if (throwOnSaveOneLineReview) {
                 throw IllegalStateException("write failed")
             }
-            return com.readmates.session.application.model.OneLineReviewResult(command.text)
+            return com.readmates.session.application.model
+                .OneLineReviewResult(command.text)
         }
 
         override fun saveLongReview(command: com.readmates.session.application.model.SaveLongReviewCommand) =
-            com.readmates.session.application.model.LongReviewResult(command.body)
+            com.readmates.session.application.model
+                .LongReviewResult(command.body)
     }
 
     private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {

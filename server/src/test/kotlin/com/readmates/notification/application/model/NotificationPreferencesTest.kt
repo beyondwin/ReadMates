@@ -17,13 +17,15 @@ class NotificationPreferencesTest {
 
     @Test
     fun `global email disabled makes every event effectively disabled`() {
-        val preferences = NotificationPreferences(
-            emailEnabled = false,
-            events = mapOf(
-                NotificationEventType.NEXT_BOOK_PUBLISHED to true,
-                NotificationEventType.REVIEW_PUBLISHED to true,
-            ),
-        )
+        val preferences =
+            NotificationPreferences(
+                emailEnabled = false,
+                events =
+                    mapOf(
+                        NotificationEventType.NEXT_BOOK_PUBLISHED to true,
+                        NotificationEventType.REVIEW_PUBLISHED to true,
+                    ),
+            )
 
         assertThat(preferences.enabled(NotificationEventType.NEXT_BOOK_PUBLISHED)).isFalse()
         assertThat(preferences.enabled(NotificationEventType.REVIEW_PUBLISHED)).isFalse()

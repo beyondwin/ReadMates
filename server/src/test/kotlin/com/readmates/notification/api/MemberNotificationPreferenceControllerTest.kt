@@ -1,8 +1,8 @@
 package com.readmates.notification.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -46,58 +46,62 @@ class MemberNotificationPreferenceControllerTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `authenticated member reads default notification preferences`() {
-        mockMvc.get("/api/me/notifications/preferences") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.emailEnabled") { value(true) }
-            jsonPath("$.events.NEXT_BOOK_PUBLISHED") { value(true) }
-            jsonPath("$.events.SESSION_REMINDER_DUE") { value(true) }
-            jsonPath("$.events.FEEDBACK_DOCUMENT_PUBLISHED") { value(true) }
-            jsonPath("$.events.REVIEW_PUBLISHED") { value(false) }
-        }
+        mockMvc
+            .get("/api/me/notifications/preferences") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.emailEnabled") { value(true) }
+                jsonPath("$.events.NEXT_BOOK_PUBLISHED") { value(true) }
+                jsonPath("$.events.SESSION_REMINDER_DUE") { value(true) }
+                jsonPath("$.events.FEEDBACK_DOCUMENT_PUBLISHED") { value(true) }
+                jsonPath("$.events.REVIEW_PUBLISHED") { value(false) }
+            }
     }
 
     @Test
     fun `authenticated member saves notification preferences`() {
-        mockMvc.put("/api/me/notifications/preferences") {
-            with(user("member1@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """
-                {
-                  "emailEnabled": false,
-                  "events": {
-                    "NEXT_BOOK_PUBLISHED": true,
-                    "SESSION_REMINDER_DUE": false,
-                    "FEEDBACK_DOCUMENT_PUBLISHED": true,
-                    "REVIEW_PUBLISHED": true
-                  }
-                }
-            """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.emailEnabled") { value(false) }
-            jsonPath("$.events.NEXT_BOOK_PUBLISHED") { value(true) }
-            jsonPath("$.events.SESSION_REMINDER_DUE") { value(false) }
-            jsonPath("$.events.FEEDBACK_DOCUMENT_PUBLISHED") { value(true) }
-            jsonPath("$.events.REVIEW_PUBLISHED") { value(true) }
-        }
+        mockMvc
+            .put("/api/me/notifications/preferences") {
+                with(user("member1@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "emailEnabled": false,
+                      "events": {
+                        "NEXT_BOOK_PUBLISHED": true,
+                        "SESSION_REMINDER_DUE": false,
+                        "FEEDBACK_DOCUMENT_PUBLISHED": true,
+                        "REVIEW_PUBLISHED": true
+                      }
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.emailEnabled") { value(false) }
+                jsonPath("$.events.NEXT_BOOK_PUBLISHED") { value(true) }
+                jsonPath("$.events.SESSION_REMINDER_DUE") { value(false) }
+                jsonPath("$.events.FEEDBACK_DOCUMENT_PUBLISHED") { value(true) }
+                jsonPath("$.events.REVIEW_PUBLISHED") { value(true) }
+            }
 
-        val saved = jdbcTemplate.queryForMap(
-            """
-            select
-              notification_preferences.email_enabled,
-              notification_preferences.session_reminder_due_enabled,
-              notification_preferences.review_published_enabled
-            from notification_preferences
-            join memberships on memberships.id = notification_preferences.membership_id
-              and memberships.club_id = notification_preferences.club_id
-            join users on users.id = memberships.user_id
-            where users.email = 'member1@example.com'
-              and notification_preferences.club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-        )
+        val saved =
+            jdbcTemplate.queryForMap(
+                """
+                select
+                  notification_preferences.email_enabled,
+                  notification_preferences.session_reminder_due_enabled,
+                  notification_preferences.review_published_enabled
+                from notification_preferences
+                join memberships on memberships.id = notification_preferences.membership_id
+                  and memberships.club_id = notification_preferences.club_id
+                join users on users.id = memberships.user_id
+                where users.email = 'member1@example.com'
+                  and notification_preferences.club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+            )
 
         assertThat(saved["email_enabled"]).isEqualTo(false)
         assertThat(saved["session_reminder_due_enabled"]).isEqualTo(false)
@@ -106,7 +110,8 @@ class MemberNotificationPreferenceControllerTest(
 
     @Test
     fun `unauthenticated member notification preference read is rejected`() {
-        mockMvc.get("/api/me/notifications/preferences")
+        mockMvc
+            .get("/api/me/notifications/preferences")
             .andExpect {
                 status { isUnauthorized() }
             }

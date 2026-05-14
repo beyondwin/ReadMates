@@ -18,8 +18,7 @@ import org.springframework.web.server.ResponseStatusException
 class CurrentPlatformAdminArgumentResolver(
     private val resolveCurrentMemberUseCase: ResolveCurrentMemberUseCase,
 ) : HandlerMethodArgumentResolver {
-    override fun supportsParameter(parameter: MethodParameter): Boolean =
-        parameter.parameterType == CurrentPlatformAdmin::class.java
+    override fun supportsParameter(parameter: MethodParameter): Boolean = parameter.parameterType == CurrentPlatformAdmin::class.java
 
     override fun resolveArgument(
         parameter: MethodParameter,
@@ -27,17 +26,22 @@ class CurrentPlatformAdminArgumentResolver(
         webRequest: NativeWebRequest,
         binderFactory: WebDataBinderFactory?,
     ): CurrentPlatformAdmin {
-        val request = webRequest.getNativeRequest(HttpServletRequest::class.java)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val authentication = request.userPrincipal as? Authentication
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val request =
+            webRequest.getNativeRequest(HttpServletRequest::class.java)
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val authentication =
+            request.userPrincipal as? Authentication
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
 
-        val userId = when (val principal = authentication.principal) {
-            is CurrentMember -> principal.userId
-            is CurrentUser -> principal.userId
-            else -> authentication.emailOrNull()
-                ?.let(resolveCurrentMemberUseCase::findUserIdByEmail)
-        } ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val userId =
+            when (val principal = authentication.principal) {
+                is CurrentMember -> principal.userId
+                is CurrentUser -> principal.userId
+                else ->
+                    authentication
+                        .emailOrNull()
+                        ?.let(resolveCurrentMemberUseCase::findUserIdByEmail)
+            } ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
 
         return resolveCurrentMemberUseCase.findPlatformAdmin(userId)
             ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)

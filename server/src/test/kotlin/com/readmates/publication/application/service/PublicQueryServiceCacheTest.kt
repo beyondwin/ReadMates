@@ -87,9 +87,10 @@ class PublicQueryServiceCacheTest {
 
     private class RecordingPublicLoader(
         private val club: PublicClubResult? = publicClub(),
-        private val session: PublicSessionDetailResult? = publicSession(
-            UUID.fromString("00000000-0000-0000-0000-000000000301"),
-        ),
+        private val session: PublicSessionDetailResult? =
+            publicSession(
+                UUID.fromString("00000000-0000-0000-0000-000000000301"),
+            ),
     ) : LoadPublishedPublicDataPort {
         var clubLoads = 0
         var sessionLoads = 0
@@ -109,13 +110,18 @@ class PublicQueryServiceCacheTest {
             return session ?: return null
         }
 
-        override fun loadSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult? {
+        override fun loadSession(
+            clubSlug: String,
+            sessionId: UUID,
+        ): PublicSessionDetailResult? {
             sessionLoads += 1
             return session ?: return null
         }
     }
 
-    private class StaticClubContextResolver(private val clubId: UUID) : ResolveClubContextUseCase {
+    private class StaticClubContextResolver(
+        private val clubId: UUID,
+    ) : ResolveClubContextUseCase {
         var slugLoads = 0
 
         override fun resolveBySlug(slug: String): ResolvedClubContext? {
@@ -133,24 +139,26 @@ class PublicQueryServiceCacheTest {
     }
 
     companion object {
-        fun publicClub() = PublicClubResult(
-            clubName = "ReadMates",
-            tagline = "Read together",
-            about = "About",
-            stats = PublicClubStatsResult(sessions = 1, books = 1, members = 3),
-            recentSessions = emptyList(),
-        )
+        fun publicClub() =
+            PublicClubResult(
+                clubName = "ReadMates",
+                tagline = "Read together",
+                about = "About",
+                stats = PublicClubStatsResult(sessions = 1, books = 1, members = 3),
+                recentSessions = emptyList(),
+            )
 
-        fun publicSession(sessionId: UUID) = PublicSessionDetailResult(
-            sessionId = sessionId.toString(),
-            sessionNumber = 1,
-            bookTitle = "Book",
-            bookAuthor = "Author",
-            bookImageUrl = null,
-            date = "2026-04-28",
-            summary = "Summary",
-            highlights = emptyList(),
-            oneLiners = emptyList(),
-        )
+        fun publicSession(sessionId: UUID) =
+            PublicSessionDetailResult(
+                sessionId = sessionId.toString(),
+                sessionNumber = 1,
+                bookTitle = "Book",
+                bookAuthor = "Author",
+                bookImageUrl = null,
+                date = "2026-04-28",
+                summary = "Summary",
+                highlights = emptyList(),
+                oneLiners = emptyList(),
+            )
     }
 }

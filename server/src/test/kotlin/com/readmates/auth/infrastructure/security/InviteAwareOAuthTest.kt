@@ -1,13 +1,13 @@
 package com.readmates.auth.infrastructure.security
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletRequest
 import jakarta.servlet.ServletResponse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -72,10 +72,11 @@ class InviteAwareOAuthTest(
 
     @Test
     fun `expired or tampered signed return state falls back to app`() {
-        val expiredState = oauthReturnState.signReturnTarget(
-            returnTo = "/clubs/reading-sai/app",
-            expiresAt = Instant.now().minusSeconds(1),
-        )
+        val expiredState =
+            oauthReturnState.signReturnTarget(
+                returnTo = "/clubs/reading-sai/app",
+                expiresAt = Instant.now().minusSeconds(1),
+            )
         val validState = oauthReturnState.signReturnTarget("/clubs/reading-sai/app")
         val tamperedState = validState!!.dropLast(1) + if (validState.last() == 'a') "b" else "a"
 
@@ -92,7 +93,10 @@ class InviteAwareOAuthTest(
         createClubDomain(hostname = hostname, status = "DISABLED")
     }
 
-    private fun createClubDomain(hostname: String, status: String) {
+    private fun createClubDomain(
+        hostname: String,
+        status: String,
+    ) {
         jdbcTemplate.update(
             """
             insert into club_domains (id, club_id, hostname, kind, status, is_primary)
@@ -109,7 +113,10 @@ class InviteAwareOAuthTest(
     private class RecordingFilterChain : FilterChain {
         var invoked = false
 
-        override fun doFilter(request: ServletRequest, response: ServletResponse) {
+        override fun doFilter(
+            request: ServletRequest,
+            response: ServletResponse,
+        ) {
             invoked = true
         }
     }

@@ -1,11 +1,11 @@
 package com.readmates.notification.adapter.`in`.kafka
 
 import com.readmates.notification.adapter.`in`.scheduler.NotificationEventRelayScheduler
+import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
+import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.`in`.DispatchNotificationEventUseCase
-import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
-import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
 import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.domain.NotificationEventType
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -14,8 +14,8 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -23,10 +23,11 @@ import java.util.UUID
 class NotificationEventKafkaListenerTest {
     @Test
     fun `listener uses notification kafka listener container factory`() {
-        val listener = NotificationEventKafkaListener::class.java.getDeclaredMethod(
-            "onMessage",
-            NotificationEventMessage::class.java,
-        )
+        val listener =
+            NotificationEventKafkaListener::class.java.getDeclaredMethod(
+                "onMessage",
+                NotificationEventMessage::class.java,
+            )
 
         val kafkaListener = listener.getAnnotation(KafkaListener::class.java)
 
@@ -63,10 +64,11 @@ class NotificationEventKafkaListenerTest {
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
                 "readmates.notifications.kafka.consumer-group=notification-workers",
             ).run { context ->
-                val consumerFactory = context.getBean(
-                    "notificationEventConsumerFactory",
-                    DefaultKafkaConsumerFactory::class.java,
-                )
+                val consumerFactory =
+                    context.getBean(
+                        "notificationEventConsumerFactory",
+                        DefaultKafkaConsumerFactory::class.java,
+                    )
 
                 assertThat(consumerFactory.configurationProperties[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG])
                     .isEqualTo(false)
@@ -118,7 +120,8 @@ private fun notificationEventMessage(schemaVersion: Int): NotificationEventMessa
         aggregateType = "SESSION",
         aggregateId = UUID.fromString("33333333-3333-4333-8333-333333333333"),
         occurredAt = OffsetDateTime.of(2026, 4, 29, 12, 0, 0, 0, ZoneOffset.UTC),
-        payload = NotificationEventPayload(
-            sessionId = UUID.fromString("33333333-3333-4333-8333-333333333333"),
-        ),
+        payload =
+            NotificationEventPayload(
+                sessionId = UUID.fromString("33333333-3333-4333-8333-333333333333"),
+            ),
     )

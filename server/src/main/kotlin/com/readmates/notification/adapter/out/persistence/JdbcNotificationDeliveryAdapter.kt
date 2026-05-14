@@ -45,67 +45,71 @@ class JdbcNotificationDeliveryAdapter(
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
         planningOperations.persistPlannedDeliveries(jdbcTemplate, message)
 
-    override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? =
-        claimOperations.claimEmailDelivery(jdbcTemplate, id)
+    override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem? = claimOperations.claimEmailDelivery(jdbcTemplate, id)
 
     override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> =
         claimOperations.claimEmailDeliveries(jdbcTemplate, limit)
 
-    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> =
-        claimOperations.claimEmailDeliveriesForClub(jdbcTemplate, clubId, limit)
+    override fun claimEmailDeliveriesForClub(
+        clubId: UUID,
+        limit: Int,
+    ): List<ClaimedNotificationDeliveryItem> = claimOperations.claimEmailDeliveriesForClub(jdbcTemplate, clubId, limit)
 
-    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? =
-        claimOperations.claimHostEmailDelivery(jdbcTemplate, clubId, id)
+    override fun claimHostEmailDelivery(
+        clubId: UUID,
+        id: UUID,
+    ): ClaimedNotificationDeliveryItem? = claimOperations.claimHostEmailDelivery(jdbcTemplate, clubId, id)
 
-    override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? =
-        statusOperations.findDeliveryStatus(jdbcTemplate, id)
+    override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = statusOperations.findDeliveryStatus(jdbcTemplate, id)
 
-    override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean =
-        statusOperations.markDeliverySent(jdbcTemplate, id, lockedAt)
+    override fun markDeliverySent(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean = statusOperations.markDeliverySent(jdbcTemplate, id, lockedAt)
 
     override fun markDeliveryFailed(
         id: UUID,
         lockedAt: OffsetDateTime,
         error: String,
         nextAttemptDelayMinutes: Long,
-    ): Boolean =
-        statusOperations.markDeliveryFailed(jdbcTemplate, id, lockedAt, error, nextAttemptDelayMinutes)
+    ): Boolean = statusOperations.markDeliveryFailed(jdbcTemplate, id, lockedAt, error, nextAttemptDelayMinutes)
 
-    override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean =
-        statusOperations.markDeliveryDead(jdbcTemplate, id, lockedAt, error)
+    override fun markDeliveryDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean = statusOperations.markDeliveryDead(jdbcTemplate, id, lockedAt, error)
 
-    override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean =
-        statusOperations.restoreDeadEmailDeliveryForClub(jdbcTemplate, clubId, id)
+    override fun restoreDeadEmailDeliveryForClub(
+        clubId: UUID,
+        id: UUID,
+    ): Boolean = statusOperations.restoreDeadEmailDeliveryForClub(jdbcTemplate, clubId, id)
 
-    override fun deliveryBacklog(): NotificationDeliveryBacklog =
-        backlogQueries.deliveryBacklog(jdbcTemplate)
+    override fun deliveryBacklog(): NotificationDeliveryBacklog = backlogQueries.deliveryBacklog(jdbcTemplate)
 
     override fun countByStatus(
         clubId: UUID,
         channel: NotificationChannel?,
         status: NotificationDeliveryStatus,
-    ): Int =
-        backlogQueries.countByStatus(jdbcTemplate, clubId, channel, status)
+    ): Int = backlogQueries.countByStatus(jdbcTemplate, clubId, channel, status)
 
-    override fun hostSummary(clubId: UUID): HostNotificationSummary =
-        ledgerQueries.hostSummary(jdbcTemplate, clubId)
+    override fun hostSummary(clubId: UUID): HostNotificationSummary = ledgerQueries.hostSummary(jdbcTemplate, clubId)
 
     override fun listHostEmailItems(
         clubId: UUID,
         query: HostNotificationItemQuery,
         pageRequest: PageRequest,
-    ): HostNotificationItemList =
-        ledgerQueries.listHostEmailItems(jdbcTemplate, clubId, query, pageRequest)
+    ): HostNotificationItemList = ledgerQueries.listHostEmailItems(jdbcTemplate, clubId, query, pageRequest)
 
-    override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
-        ledgerQueries.hostEmailDetail(jdbcTemplate, clubId, id)
+    override fun hostEmailDetail(
+        clubId: UUID,
+        id: UUID,
+    ): HostNotificationDetail? = ledgerQueries.hostEmailDetail(jdbcTemplate, clubId, id)
 
     override fun listHostDeliveries(
         clubId: UUID,
         status: NotificationDeliveryStatus?,
         channel: NotificationChannel?,
         pageRequest: PageRequest,
-    ): CursorPage<HostNotificationDelivery> =
-        ledgerQueries.listHostDeliveries(jdbcTemplate, clubId, status, channel, pageRequest)
-
+    ): CursorPage<HostNotificationDelivery> = ledgerQueries.listHostDeliveries(jdbcTemplate, clubId, status, channel, pageRequest)
 }

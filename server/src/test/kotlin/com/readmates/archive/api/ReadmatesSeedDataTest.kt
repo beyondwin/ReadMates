@@ -1,8 +1,8 @@
 package com.readmates.archive.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -27,27 +27,29 @@ class ReadmatesSeedDataTest(
 
     @Test
     fun `seed attendance matches recode participants`() {
-        val rows = jdbcTemplate.query(
-            """
-            select sessions.number, users.email, session_participants.attendance_status
-            from session_participants
-            join sessions on sessions.id = session_participants.session_id
-            join memberships on memberships.id = session_participants.membership_id
-            join users on users.id = memberships.user_id
-            where sessions.club_id = ?
-              and sessions.number between 1 and 6
-            order by sessions.number, users.email
-            """.trimIndent(),
-            { rs, _ -> Triple(rs.getInt("number"), rs.getString("email"), rs.getString("attendance_status")) },
-            CLUB_ID,
-        )
+        val rows =
+            jdbcTemplate.query(
+                """
+                select sessions.number, users.email, session_participants.attendance_status
+                from session_participants
+                join sessions on sessions.id = session_participants.session_id
+                join memberships on memberships.id = session_participants.membership_id
+                join users on users.id = memberships.user_id
+                where sessions.club_id = ?
+                  and sessions.number between 1 and 6
+                order by sessions.number, users.email
+                """.trimIndent(),
+                { rs, _ -> Triple(rs.getInt("number"), rs.getString("email"), rs.getString("attendance_status")) },
+                CLUB_ID,
+            )
 
         assertEquals(36, rows.size)
         EXPECTED_ATTENDANCE.forEach { (sessionNumber, expectedAttendedEmails) ->
-            val actualAttendedEmails = rows
-                .filter { it.first == sessionNumber && it.third == "ATTENDED" }
-                .map { it.second }
-                .toSet()
+            val actualAttendedEmails =
+                rows
+                    .filter { it.first == sessionNumber && it.third == "ATTENDED" }
+                    .map { it.second }
+                    .toSet()
             assertEquals(expectedAttendedEmails, actualAttendedEmails, "session $sessionNumber attendance")
         }
     }
@@ -67,28 +69,30 @@ class ReadmatesSeedDataTest(
 
     @Test
     fun `seed highlights exist for every attended participant`() {
-        val rows = jdbcTemplate.query(
-            """
-            select sessions.number, users.email
-            from highlights
-            join sessions on sessions.id = highlights.session_id
-              and sessions.club_id = highlights.club_id
-            join memberships on memberships.id = highlights.membership_id
-              and memberships.club_id = highlights.club_id
-            join users on users.id = memberships.user_id
-            where sessions.club_id = ?
-              and sessions.number between 1 and 6
-            order by sessions.number, users.email
-            """.trimIndent(),
-            { rs, _ -> rs.getInt("number") to rs.getString("email") },
-            CLUB_ID,
-        )
+        val rows =
+            jdbcTemplate.query(
+                """
+                select sessions.number, users.email
+                from highlights
+                join sessions on sessions.id = highlights.session_id
+                  and sessions.club_id = highlights.club_id
+                join memberships on memberships.id = highlights.membership_id
+                  and memberships.club_id = highlights.club_id
+                join users on users.id = memberships.user_id
+                where sessions.club_id = ?
+                  and sessions.number between 1 and 6
+                order by sessions.number, users.email
+                """.trimIndent(),
+                { rs, _ -> rs.getInt("number") to rs.getString("email") },
+                CLUB_ID,
+            )
 
         EXPECTED_ATTENDANCE.forEach { (sessionNumber, expectedAttendedEmails) ->
-            val actualHighlightEmails = rows
-                .filter { it.first == sessionNumber }
-                .map { it.second }
-                .toSet()
+            val actualHighlightEmails =
+                rows
+                    .filter { it.first == sessionNumber }
+                    .map { it.second }
+                    .toSet()
 
             assertEquals(expectedAttendedEmails, actualHighlightEmails, "session $sessionNumber highlight authors")
         }
@@ -96,25 +100,26 @@ class ReadmatesSeedDataTest(
 
     @Test
     fun `seed sessions include cover image urls and neutral locations`() {
-        val rows = jdbcTemplate.query(
-            """
-            select number, book_image_url, location_label, meeting_url, meeting_passcode
-            from sessions
-            where club_id = ?
-              and number between 1 and 6
-            order by number
-            """.trimIndent(),
-            { rs, _ ->
-                SeedSessionMetadata(
-                    number = rs.getInt("number"),
-                    bookImageUrl = rs.getString("book_image_url"),
-                    locationLabel = rs.getString("location_label"),
-                    meetingUrl = rs.getString("meeting_url"),
-                    meetingPasscode = rs.getString("meeting_passcode"),
-                )
-            },
-            CLUB_ID,
-        )
+        val rows =
+            jdbcTemplate.query(
+                """
+                select number, book_image_url, location_label, meeting_url, meeting_passcode
+                from sessions
+                where club_id = ?
+                  and number between 1 and 6
+                order by number
+                """.trimIndent(),
+                { rs, _ ->
+                    SeedSessionMetadata(
+                        number = rs.getInt("number"),
+                        bookImageUrl = rs.getString("book_image_url"),
+                        locationLabel = rs.getString("location_label"),
+                        meetingUrl = rs.getString("meeting_url"),
+                        meetingPasscode = rs.getString("meeting_passcode"),
+                    )
+                },
+                CLUB_ID,
+            )
 
         assertEquals(6, rows.size)
         rows.forEach { row ->
@@ -128,18 +133,19 @@ class ReadmatesSeedDataTest(
     }
 
     private fun countBySession(tableName: String): Map<Int, Int> =
-        jdbcTemplate.query(
-            """
-            select sessions.number, count(*) as count
-            from $tableName
-            join sessions on sessions.id = $tableName.session_id
-            where sessions.club_id = ?
-              and sessions.number between 1 and 6
-            group by sessions.number
-            """.trimIndent(),
-            { rs, _ -> rs.getInt("number") to rs.getInt("count") },
-            CLUB_ID,
-        ).toMap()
+        jdbcTemplate
+            .query(
+                """
+                select sessions.number, count(*) as count
+                from $tableName
+                join sessions on sessions.id = $tableName.session_id
+                where sessions.club_id = ?
+                  and sessions.number between 1 and 6
+                group by sessions.number
+                """.trimIndent(),
+                { rs, _ -> rs.getInt("number") to rs.getInt("count") },
+                CLUB_ID,
+            ).toMap()
 
     private data class SeedSessionMetadata(
         val number: Int,
@@ -154,13 +160,22 @@ class ReadmatesSeedDataTest(
         private const val SEEDED_EMAILS =
             "'host@example.com','member1@example.com','member2@example.com','member3@example.com','member4@example.com','member5@example.com'"
 
-        private val EXPECTED_ATTENDANCE = mapOf(
-            1 to setOf("host@example.com", "member1@example.com", "member5@example.com"),
-            2 to setOf("host@example.com", "member2@example.com", "member5@example.com"),
-            3 to setOf("host@example.com", "member2@example.com", "member5@example.com", "member3@example.com", "member1@example.com", "member4@example.com"),
-            4 to setOf("host@example.com", "member2@example.com", "member3@example.com", "member4@example.com"),
-            5 to setOf("host@example.com", "member4@example.com", "member2@example.com", "member1@example.com"),
-            6 to setOf("host@example.com", "member5@example.com", "member2@example.com"),
-        )
+        private val EXPECTED_ATTENDANCE =
+            mapOf(
+                1 to setOf("host@example.com", "member1@example.com", "member5@example.com"),
+                2 to setOf("host@example.com", "member2@example.com", "member5@example.com"),
+                3 to
+                    setOf(
+                        "host@example.com",
+                        "member2@example.com",
+                        "member5@example.com",
+                        "member3@example.com",
+                        "member1@example.com",
+                        "member4@example.com",
+                    ),
+                4 to setOf("host@example.com", "member2@example.com", "member3@example.com", "member4@example.com"),
+                5 to setOf("host@example.com", "member4@example.com", "member2@example.com", "member1@example.com"),
+                6 to setOf("host@example.com", "member5@example.com", "member2@example.com"),
+            )
     }
 }

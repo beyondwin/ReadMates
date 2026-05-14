@@ -13,6 +13,5 @@ class CurrentSessionController(
     private val getCurrentSessionUseCase: GetCurrentSessionUseCase,
 ) {
     @GetMapping
-    fun current(member: CurrentMember): CurrentSessionPayload =
-        getCurrentSessionUseCase.currentSession(member)
+    fun current(member: CurrentMember): CurrentSessionPayload = getCurrentSessionUseCase.currentSession(member)
 }

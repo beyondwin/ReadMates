@@ -17,8 +17,10 @@ data class PublicationRequest(
     @field:NotBlank val publicSummary: String,
     val visibility: SessionRecordVisibility,
 ) {
-    fun toCommand(host: CurrentMember, sessionId: UUID): UpsertPublicationCommand =
-        UpsertPublicationCommand(host, sessionId, publicSummary.trim(), visibility)
+    fun toCommand(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): UpsertPublicationCommand = UpsertPublicationCommand(host, sessionId, publicSummary.trim(), visibility)
 }
 
 @RestController

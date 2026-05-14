@@ -29,100 +29,125 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 class MemberNotificationControllerTest {
-    private val mockMvc: MockMvc = MockMvcBuilders
-        .standaloneSetup(
-            MemberNotificationController(memberNotificationsUseCase),
-            MemberNotificationPreferenceController(notificationPreferencesUseCase),
-        )
-        .setCustomArgumentResolvers(CurrentMemberArgumentResolver(resolveCurrentMemberUseCase, resolveClubContextUseCase))
-        .build()
+    private val mockMvc: MockMvc =
+        MockMvcBuilders
+            .standaloneSetup(
+                MemberNotificationController(memberNotificationsUseCase),
+                MemberNotificationPreferenceController(notificationPreferencesUseCase),
+            ).setCustomArgumentResolvers(CurrentMemberArgumentResolver(resolveCurrentMemberUseCase, resolveClubContextUseCase))
+            .build()
 
     @Test
     fun `list current member notifications`() {
-        mockMvc.get("/api/me/notifications") {
-            with(memberUser())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.unreadCount") { value(1) }
-            jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009101") }
-            jsonPath("$.nextCursor") { value("next-member-notifications") }
-            jsonPath("$.items[0].eventType") { value("NEXT_BOOK_PUBLISHED") }
-            jsonPath("$.items[0].title") { value("다음 책이 공개되었습니다") }
-            jsonPath("$.items[0].body") { value("새로운 책을 확인해 주세요.") }
-            jsonPath("$.items[0].deepLinkPath") { value("/app/sessions/current") }
-            jsonPath("$.items[0].readAt") { value(null) }
-            jsonPath("$.items[0].createdAt") { value("2026-04-29T09:30Z") }
-        }
+        mockMvc
+            .get("/api/me/notifications") {
+                with(memberUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.unreadCount") { value(1) }
+                jsonPath("$.items[0].id") { value("00000000-0000-0000-0000-000000009101") }
+                jsonPath("$.nextCursor") { value("next-member-notifications") }
+                jsonPath("$.items[0].eventType") { value("NEXT_BOOK_PUBLISHED") }
+                jsonPath("$.items[0].title") { value("다음 책이 공개되었습니다") }
+                jsonPath("$.items[0].body") { value("새로운 책을 확인해 주세요.") }
+                jsonPath("$.items[0].deepLinkPath") { value("/app/sessions/current") }
+                jsonPath("$.items[0].readAt") { value(null) }
+                jsonPath("$.items[0].createdAt") { value("2026-04-29T09:30Z") }
+            }
     }
 
     @Test
     fun `read current member unread notification count`() {
-        mockMvc.get("/api/me/notifications/unread-count") {
-            with(memberUser())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.unreadCount") { value(1) }
-        }
+        mockMvc
+            .get("/api/me/notifications/unread-count") {
+                with(memberUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.unreadCount") { value(1) }
+            }
     }
 
     @Test
     fun `mark current member notification read`() {
-        mockMvc.post("/api/me/notifications/00000000-0000-0000-0000-000000009101/read") {
-            with(memberUser())
-        }.andExpect {
-            status { isNoContent() }
-        }
+        mockMvc
+            .post("/api/me/notifications/00000000-0000-0000-0000-000000009101/read") {
+                with(memberUser())
+            }.andExpect {
+                status { isNoContent() }
+            }
     }
 
     @Test
     fun `mark all current member notifications read`() {
-        mockMvc.post("/api/me/notifications/read-all") {
-            with(memberUser())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.updatedCount") { value(3) }
-        }
+        mockMvc
+            .post("/api/me/notifications/read-all") {
+                with(memberUser())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.updatedCount") { value(3) }
+            }
     }
 }
 
-private val resolveCurrentMemberUseCase = object : ResolveCurrentMemberUseCase {
-    override fun resolveByEmail(email: String): CurrentMember? = currentMember
-    override fun findUserIdByEmail(email: String): UUID? = currentMember.userId
-    override fun resolveByUserAndClub(userId: UUID, clubId: UUID): CurrentMember? = currentMember
-    override fun resolveByEmailAndClub(email: String, clubId: UUID): CurrentMember? = currentMember
-    override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
-    override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
-}
+private val resolveCurrentMemberUseCase =
+    object : ResolveCurrentMemberUseCase {
+        override fun resolveByEmail(email: String): CurrentMember? = currentMember
 
-private val resolveClubContextUseCase = object : ResolveClubContextUseCase {
-    override fun resolveBySlug(slug: String): ResolvedClubContext? = null
-    override fun resolveByHost(host: String?): ResolvedClubContext? = null
-}
+        override fun findUserIdByEmail(email: String): UUID? = currentMember.userId
 
-private val memberNotificationsUseCase = object : ManageMemberNotificationsUseCase {
-    override fun list(member: CurrentMember, pageRequest: PageRequest): MemberNotificationList =
-        MemberNotificationList(
-            items = listOf(notification),
-            unreadCount = 1,
-            nextCursor = "next-member-notifications",
-        )
+        override fun resolveByUserAndClub(
+            userId: UUID,
+            clubId: UUID,
+        ): CurrentMember? = currentMember
 
-    override fun unreadCount(member: CurrentMember): Int = 1
+        override fun resolveByEmailAndClub(
+            email: String,
+            clubId: UUID,
+        ): CurrentMember? = currentMember
 
-    override fun markRead(member: CurrentMember, id: UUID) = Unit
+        override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
 
-    override fun markAllRead(member: CurrentMember): Int = 3
-}
+        override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
+    }
 
-private val notificationPreferencesUseCase = object : ManageNotificationPreferencesUseCase {
-    override fun getPreferences(member: CurrentMember): NotificationPreferences =
-        NotificationPreferences.defaults()
+private val resolveClubContextUseCase =
+    object : ResolveClubContextUseCase {
+        override fun resolveBySlug(slug: String): ResolvedClubContext? = null
 
-    override fun savePreferences(
-        member: CurrentMember,
-        preferences: NotificationPreferences,
-    ): NotificationPreferences = preferences
-}
+        override fun resolveByHost(host: String?): ResolvedClubContext? = null
+    }
+
+private val memberNotificationsUseCase =
+    object : ManageMemberNotificationsUseCase {
+        override fun list(
+            member: CurrentMember,
+            pageRequest: PageRequest,
+        ): MemberNotificationList =
+            MemberNotificationList(
+                items = listOf(notification),
+                unreadCount = 1,
+                nextCursor = "next-member-notifications",
+            )
+
+        override fun unreadCount(member: CurrentMember): Int = 1
+
+        override fun markRead(
+            member: CurrentMember,
+            id: UUID,
+        ) = Unit
+
+        override fun markAllRead(member: CurrentMember): Int = 3
+    }
+
+private val notificationPreferencesUseCase =
+    object : ManageNotificationPreferencesUseCase {
+        override fun getPreferences(member: CurrentMember): NotificationPreferences = NotificationPreferences.defaults()
+
+        override fun savePreferences(
+            member: CurrentMember,
+            preferences: NotificationPreferences,
+        ): NotificationPreferences = preferences
+    }
 
 private fun memberUser(email: String = "member@example.com"): RequestPostProcessor =
     RequestPostProcessor { request ->
@@ -130,25 +155,27 @@ private fun memberUser(email: String = "member@example.com"): RequestPostProcess
         request
     }
 
-private val currentMember = CurrentMember(
-    userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-    membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
-    clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-    clubSlug = "reading-sai",
-    email = "member@example.com",
-    displayName = "멤버",
-    accountName = "김멤버",
-    role = MembershipRole.MEMBER,
-    membershipStatus = MembershipStatus.ACTIVE,
-)
+private val currentMember =
+    CurrentMember(
+        userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+        membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+        clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+        clubSlug = "reading-sai",
+        email = "member@example.com",
+        displayName = "멤버",
+        accountName = "김멤버",
+        role = MembershipRole.MEMBER,
+        membershipStatus = MembershipStatus.ACTIVE,
+    )
 
-private val notification = MemberNotificationItem(
-    id = UUID.fromString("00000000-0000-0000-0000-000000009101"),
-    eventId = UUID.fromString("00000000-0000-0000-0000-000000008101"),
-    eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-    title = "다음 책이 공개되었습니다",
-    body = "새로운 책을 확인해 주세요.",
-    deepLinkPath = "/app/sessions/current",
-    readAt = null,
-    createdAt = OffsetDateTime.parse("2026-04-29T09:30:00Z"),
-)
+private val notification =
+    MemberNotificationItem(
+        id = UUID.fromString("00000000-0000-0000-0000-000000009101"),
+        eventId = UUID.fromString("00000000-0000-0000-0000-000000008101"),
+        eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+        title = "다음 책이 공개되었습니다",
+        body = "새로운 책을 확인해 주세요.",
+        deepLinkPath = "/app/sessions/current",
+        readAt = null,
+        createdAt = OffsetDateTime.parse("2026-04-29T09:30:00Z"),
+    )

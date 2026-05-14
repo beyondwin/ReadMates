@@ -13,17 +13,24 @@ class InvitationController(
     private val invitations: PreviewInvitationUseCase,
 ) {
     @GetMapping("/api/invitations/{token}")
-    fun preview(@PathVariable token: String) = invitations.previewInvitation(token)
+    fun preview(
+        @PathVariable token: String,
+    ) = invitations.previewInvitation(token)
 
     @GetMapping("/api/clubs/{clubSlug}/invitations/{token}")
-    fun previewForClub(@PathVariable clubSlug: String, @PathVariable token: String) =
-        invitations.previewInvitation(token, clubSlug)
+    fun previewForClub(
+        @PathVariable clubSlug: String,
+        @PathVariable token: String,
+    ) = invitations.previewInvitation(token, clubSlug)
 
     @PostMapping("/api/invitations/{token}/accept")
-    fun accept(@PathVariable("token") _token: String): Nothing =
-        throw ResponseStatusException(HttpStatus.GONE, "Password invitation acceptance has been removed")
+    fun accept(
+        @PathVariable("token") _token: String,
+    ): Nothing = throw ResponseStatusException(HttpStatus.GONE, "Password invitation acceptance has been removed")
 
     @PostMapping("/api/clubs/{clubSlug}/invitations/{token}/accept")
-    fun acceptForClub(@PathVariable("clubSlug") _clubSlug: String, @PathVariable("token") _token: String): Nothing =
-        throw ResponseStatusException(HttpStatus.GONE, "Password invitation acceptance has been removed")
+    fun acceptForClub(
+        @PathVariable("clubSlug") _clubSlug: String,
+        @PathVariable("token") _token: String,
+    ): Nothing = throw ResponseStatusException(HttpStatus.GONE, "Password invitation acceptance has been removed")
 }

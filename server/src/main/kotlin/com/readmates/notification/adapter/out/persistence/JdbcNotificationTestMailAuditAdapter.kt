@@ -32,36 +32,40 @@ class JdbcNotificationTestMailAuditAdapter(
         recipientEmailHash: String,
         cooldownStartedAfter: OffsetDateTime,
     ): NotificationTestMailAuditItem? {
-        val lockedHostMembershipId = jdbcTemplate.query(
-            """
-            select id
-            from memberships
-            where id = ?
-              and club_id = ?
-            limit 1
-            for update
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.uuid("id") },
-            hostMembershipId.dbString(),
-            clubId.dbString(),
-        ).firstOrNull() ?: return null
+        val lockedHostMembershipId =
+            jdbcTemplate
+                .query(
+                    """
+                    select id
+                    from memberships
+                    where id = ?
+                      and club_id = ?
+                    limit 1
+                    for update
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.uuid("id") },
+                    hostMembershipId.dbString(),
+                    clubId.dbString(),
+                ).firstOrNull() ?: return null
 
-        val recentAttemptId = jdbcTemplate.query(
-            """
-            select id
-            from notification_test_mail_audit
-            where club_id = ?
-              and host_membership_id = ?
-              and created_at > ?
-            order by created_at desc
-            limit 1
-            for update
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.uuid("id") },
-            clubId.dbString(),
-            lockedHostMembershipId.dbString(),
-            cooldownStartedAfter.toUtcLocalDateTime(),
-        ).firstOrNull()
+        val recentAttemptId =
+            jdbcTemplate
+                .query(
+                    """
+                    select id
+                    from notification_test_mail_audit
+                    where club_id = ?
+                      and host_membership_id = ?
+                      and created_at > ?
+                    order by created_at desc
+                    limit 1
+                    for update
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.uuid("id") },
+                    clubId.dbString(),
+                    lockedHostMembershipId.dbString(),
+                    cooldownStartedAfter.toUtcLocalDateTime(),
+                ).firstOrNull()
         if (recentAttemptId != null) {
             return null
         }
@@ -86,67 +90,77 @@ class JdbcNotificationTestMailAuditAdapter(
             recipientEmailHash,
         )
 
-        return jdbcTemplate.query(
-            """
-            select id, recipient_masked_email, status, last_error, created_at
-            from notification_test_mail_audit
-            where id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
-            id.dbString(),
-        ).single()
+        return jdbcTemplate
+            .query(
+                """
+                select id, recipient_masked_email, status, last_error, created_at
+                from notification_test_mail_audit
+                where id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
+                id.dbString(),
+            ).single()
     }
 
-    override fun markTestMailAuditFailed(id: UUID, lastError: String): NotificationTestMailAuditItem {
-        val updated = jdbcTemplate.update(
-            """
-            update notification_test_mail_audit
-            set status = 'FAILED',
-                last_error = ?,
-                updated_at = utc_timestamp(6)
-            where id = ?
-            """.trimIndent(),
-            lastError.take(MAX_TEST_MAIL_STORAGE_ERROR_LENGTH),
-            id.dbString(),
-        )
+    override fun markTestMailAuditFailed(
+        id: UUID,
+        lastError: String,
+    ): NotificationTestMailAuditItem {
+        val updated =
+            jdbcTemplate.update(
+                """
+                update notification_test_mail_audit
+                set status = 'FAILED',
+                    last_error = ?,
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                """.trimIndent(),
+                lastError.take(MAX_TEST_MAIL_STORAGE_ERROR_LENGTH),
+                id.dbString(),
+            )
         if (updated == 0) {
             throw IllegalStateException("Notification test mail audit row not found")
         }
 
-        return jdbcTemplate.query(
-            """
-            select id, recipient_masked_email, status, last_error, created_at
-            from notification_test_mail_audit
-            where id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
-            id.dbString(),
-        ).single()
+        return jdbcTemplate
+            .query(
+                """
+                select id, recipient_masked_email, status, last_error, created_at
+                from notification_test_mail_audit
+                where id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
+                id.dbString(),
+            ).single()
     }
 
-    override fun listTestMailAudit(clubId: UUID, pageRequest: PageRequest): CursorPage<NotificationTestMailAuditItem> {
+    override fun listTestMailAudit(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<NotificationTestMailAuditItem> {
         val cursor = TestMailAuditCreatedAtDescCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate.query(
-            """
-            select id, recipient_masked_email, status, last_error, created_at
-            from notification_test_mail_audit
-            where club_id = ?
-              and (
-                ? is null
-                or created_at < ?
-                or (created_at = ? and id < ?)
-              )
-            order by created_at desc, id desc
-            limit ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
-            clubId.dbString(),
-            cursor?.createdAt,
-            cursor?.createdAt?.toUtcLocalDateTime(),
-            cursor?.createdAt?.toUtcLocalDateTime(),
-            cursor?.id,
-            pageRequest.limit.coerceAtMost(TEST_MAIL_AUDIT_LIMIT) + 1,
-        )
+        val rows =
+            jdbcTemplate.query(
+                """
+                select id, recipient_masked_email, status, last_error, created_at
+                from notification_test_mail_audit
+                where club_id = ?
+                  and (
+                    ? is null
+                    or created_at < ?
+                    or (created_at = ? and id < ?)
+                  )
+                order by created_at desc, id desc
+                limit ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toNotificationTestMailAuditItem() },
+                clubId.dbString(),
+                cursor?.createdAt,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.id,
+                pageRequest.limit.coerceAtMost(TEST_MAIL_AUDIT_LIMIT) + 1,
+            )
         val limit = pageRequest.limit.coerceAtMost(TEST_MAIL_AUDIT_LIMIT)
         return pageFromRows(rows, limit) { row ->
             testMailAuditCreatedAtDescCursor(row.createdAt, row.id.toString())
@@ -161,10 +175,12 @@ class JdbcNotificationTestMailAuditAdapter(
             lastError = getString("last_error"),
             createdAt = utcOffsetDateTime("created_at"),
         )
-
 }
 
-private fun testMailAuditCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =
+private fun testMailAuditCreatedAtDescCursor(
+    createdAt: OffsetDateTime,
+    id: String,
+): String? =
     CursorCodec.encode(
         mapOf(
             "createdAt" to createdAt.toString(),
@@ -172,7 +188,11 @@ private fun testMailAuditCreatedAtDescCursor(createdAt: OffsetDateTime, id: Stri
         ),
     )
 
-private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+private fun <T> pageFromRows(
+    rows: List<T>,
+    limit: Int,
+    cursorFor: (T) -> String?,
+): CursorPage<T> {
     val visibleRows = rows.take(limit)
     return CursorPage(
         items = visibleRows,
@@ -186,8 +206,9 @@ private data class TestMailAuditCreatedAtDescCursor(
 ) {
     companion object {
         fun from(cursor: Map<String, String>): TestMailAuditCreatedAtDescCursor? {
-            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-                ?: return null
+            val createdAt =
+                cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
             val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
             return TestMailAuditCreatedAtDescCursor(createdAt, id)
         }

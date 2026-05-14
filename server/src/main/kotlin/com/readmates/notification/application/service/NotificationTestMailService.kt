@@ -41,16 +41,17 @@ class NotificationTestMailService(
             )
         }
 
-        val audit = notificationTestMailAuditPort.reserveTestMailAuditAttempt(
-            clubId = currentHost.clubId,
-            hostMembershipId = currentHost.membershipId,
-            recipientMaskedEmail = recipient.maskEmail(),
-            recipientEmailHash = sha256Hex(recipient),
-            cooldownStartedAfter = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(TEST_MAIL_COOLDOWN_SECONDS),
-        ) ?: throw NotificationApplicationException(
-            NotificationApplicationError.TEST_MAIL_COOLDOWN,
-            "Test mail cooldown is active",
-        )
+        val audit =
+            notificationTestMailAuditPort.reserveTestMailAuditAttempt(
+                clubId = currentHost.clubId,
+                hostMembershipId = currentHost.membershipId,
+                recipientMaskedEmail = recipient.maskEmail(),
+                recipientEmailHash = sha256Hex(recipient),
+                cooldownStartedAfter = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(TEST_MAIL_COOLDOWN_SECONDS),
+            ) ?: throw NotificationApplicationException(
+                NotificationApplicationError.TEST_MAIL_COOLDOWN,
+                "Test mail cooldown is active",
+            )
 
         return try {
             val copy = NotificationEmailTemplates.testMailCopy(currentHost.clubName)
@@ -68,8 +69,10 @@ class NotificationTestMailService(
         }
     }
 
-    override fun listTestMailAudit(host: CurrentMember, pageRequest: PageRequest) =
-        notificationTestMailAuditPort.listTestMailAudit(requireHost(host).clubId, pageRequest)
+    override fun listTestMailAudit(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ) = notificationTestMailAuditPort.listTestMailAudit(requireHost(host).clubId, pageRequest)
 
     private fun requireHost(host: CurrentMember): CurrentMember {
         if (!host.isHost) {
@@ -98,7 +101,8 @@ class NotificationTestMailService(
     }
 
     private fun sha256Hex(value: String): String =
-        MessageDigest.getInstance("SHA-256")
+        MessageDigest
+            .getInstance("SHA-256")
             .digest(value.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
 }

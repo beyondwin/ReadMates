@@ -16,16 +16,18 @@ data class HostDashboardResponse(
     val currentSessionMissingMembers: List<HostDashboardMissingMember> = emptyList(),
 ) {
     companion object {
-        fun from(result: HostDashboardResult) = HostDashboardResponse(
-            rsvpPending = result.rsvpPending,
-            checkinMissing = result.checkinMissing,
-            publishPending = result.publishPending,
-            feedbackPending = result.feedbackPending,
-            currentSessionMissingMemberCount = result.currentSessionMissingMemberCount,
-            currentSessionMissingMembers = result.currentSessionMissingMembers.map {
-                HostDashboardMissingMember(it.membershipId, it.displayName, it.email)
-            },
-        )
+        fun from(result: HostDashboardResult) =
+            HostDashboardResponse(
+                rsvpPending = result.rsvpPending,
+                checkinMissing = result.checkinMissing,
+                publishPending = result.publishPending,
+                feedbackPending = result.feedbackPending,
+                currentSessionMissingMemberCount = result.currentSessionMissingMemberCount,
+                currentSessionMissingMembers =
+                    result.currentSessionMissingMembers.map {
+                        HostDashboardMissingMember(it.membershipId, it.displayName, it.email)
+                    },
+            )
     }
 }
 
@@ -41,6 +43,5 @@ class HostDashboardController(
     private val getHostDashboardUseCase: GetHostDashboardUseCase,
 ) {
     @GetMapping
-    fun dashboard(member: CurrentMember): HostDashboardResponse =
-        HostDashboardResponse.from(getHostDashboardUseCase.dashboard(member))
+    fun dashboard(member: CurrentMember): HostDashboardResponse = HostDashboardResponse.from(getHostDashboardUseCase.dashboard(member))
 }

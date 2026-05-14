@@ -39,15 +39,15 @@ class FeedbackDocumentController(
             .listMyReadableFeedbackDocuments(
                 currentMember,
                 PageRequest.cursor(limit, cursor, defaultLimit = 30, maxLimit = 100),
-            )
-            .toWebDto()
+            ).toWebDto()
 
     @GetMapping("/api/sessions/{sessionId}/feedback-document")
     fun feedbackDocument(
         currentMember: CurrentMember,
         @PathVariable sessionId: String,
     ): FeedbackDocumentResponse =
-        getReadableFeedbackDocumentUseCase.getReadableFeedbackDocument(currentMember, parseSessionId(sessionId))
+        getReadableFeedbackDocumentUseCase
+            .getReadableFeedbackDocument(currentMember, parseSessionId(sessionId))
             ?.toWebDto()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
@@ -56,7 +56,8 @@ class FeedbackDocumentController(
         currentMember: CurrentMember,
         @PathVariable sessionId: String,
     ): FeedbackDocumentStatus =
-        getHostFeedbackDocumentStatusUseCase.getHostFeedbackDocumentStatus(currentMember, parseSessionId(sessionId))
+        getHostFeedbackDocumentStatusUseCase
+            .getHostFeedbackDocumentStatus(currentMember, parseSessionId(sessionId))
             .toWebDto()
 
     @PostMapping(
@@ -73,16 +74,18 @@ class FeedbackDocumentController(
         authorizeHostFeedbackDocumentUploadUseCase.authorizeHostFeedbackDocumentUpload(currentMember)
         val upload = feedbackDocumentUploadValidator.validate(file)
 
-        return uploadHostFeedbackDocumentUseCase.uploadHostFeedbackDocument(
-            currentMember = currentMember,
-            command = FeedbackDocumentUploadCommand(
-                sessionId = sessionUuid,
-                fileName = upload.fileName,
-                contentType = upload.contentType,
-                sourceText = upload.sourceText,
-                fileSize = upload.fileSize,
-            ),
-        ).toWebDto()
+        return uploadHostFeedbackDocumentUseCase
+            .uploadHostFeedbackDocument(
+                currentMember = currentMember,
+                command =
+                    FeedbackDocumentUploadCommand(
+                        sessionId = sessionUuid,
+                        fileName = upload.fileName,
+                        contentType = upload.contentType,
+                        sourceText = upload.sourceText,
+                        fileSize = upload.fileSize,
+                    ),
+            ).toWebDto()
     }
 
     private fun parseSessionId(value: String): UUID =

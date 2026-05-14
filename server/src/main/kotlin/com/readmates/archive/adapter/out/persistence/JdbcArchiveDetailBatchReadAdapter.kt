@@ -20,7 +20,6 @@ import java.util.UUID
 class JdbcArchiveDetailBatchReadAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : ArchiveDetailBatchReadPort {
-
     override fun loadDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
@@ -31,75 +30,83 @@ class JdbcArchiveDetailBatchReadAdapter(
         val personalRows = loadPersonalBatch(currentMember, sessionId)
         val feedbackDocument = loadFeedbackDocument(currentMember, sessionId, sessionNumber, myAttendanceStatus)
 
-        val publicHighlights = publicRows
-            .filter { it.section == "HIGHLIGHT" }
-            .map { row ->
-                MemberArchiveHighlightResult(
-                    text = row.text ?: "",
-                    sortOrder = row.sortOrder ?: 0,
-                    authorName = row.authorName,
-                    authorShortName = row.authorShortName,
-                )
-            }
+        val publicHighlights =
+            publicRows
+                .filter { it.section == "HIGHLIGHT" }
+                .map { row ->
+                    MemberArchiveHighlightResult(
+                        text = row.text ?: "",
+                        sortOrder = row.sortOrder ?: 0,
+                        authorName = row.authorName,
+                        authorShortName = row.authorShortName,
+                    )
+                }
 
-        val clubQuestions = publicRows
-            .filter { it.section == "CLUB_QUESTION" }
-            .map { row ->
-                MemberArchiveQuestionResult(
-                    priority = row.priority ?: 0,
-                    text = row.text ?: "",
-                    draftThought = row.draftThought,
-                    authorName = row.authorName ?: "",
-                    authorShortName = row.authorShortName ?: "",
-                )
-            }
+        val clubQuestions =
+            publicRows
+                .filter { it.section == "CLUB_QUESTION" }
+                .map { row ->
+                    MemberArchiveQuestionResult(
+                        priority = row.priority ?: 0,
+                        text = row.text ?: "",
+                        draftThought = row.draftThought,
+                        authorName = row.authorName ?: "",
+                        authorShortName = row.authorShortName ?: "",
+                    )
+                }
 
-        val clubOneLiners = publicRows
-            .filter { it.section == "CLUB_ONE_LINER" }
-            .map { row ->
-                MemberArchiveOneLinerResult(
-                    authorName = row.authorName ?: "",
-                    authorShortName = row.authorShortName ?: "",
-                    text = row.text ?: "",
-                )
-            }
+        val clubOneLiners =
+            publicRows
+                .filter { it.section == "CLUB_ONE_LINER" }
+                .map { row ->
+                    MemberArchiveOneLinerResult(
+                        authorName = row.authorName ?: "",
+                        authorShortName = row.authorShortName ?: "",
+                        text = row.text ?: "",
+                    )
+                }
 
-        val publicOneLiners = publicRows
-            .filter { it.section == "PUBLIC_ONE_LINER" }
-            .map { row ->
-                MemberArchiveOneLinerResult(
-                    authorName = row.authorName ?: "",
-                    authorShortName = row.authorShortName ?: "",
-                    text = row.text ?: "",
-                )
-            }
+        val publicOneLiners =
+            publicRows
+                .filter { it.section == "PUBLIC_ONE_LINER" }
+                .map { row ->
+                    MemberArchiveOneLinerResult(
+                        authorName = row.authorName ?: "",
+                        authorShortName = row.authorShortName ?: "",
+                        text = row.text ?: "",
+                    )
+                }
 
-        val myQuestions = personalRows
-            .filter { it.section == "MY_QUESTION" }
-            .map { row ->
-                MemberArchiveQuestionResult(
-                    priority = row.priority ?: 0,
-                    text = row.text ?: "",
-                    draftThought = row.draftThought,
-                    authorName = row.authorName ?: "",
-                    authorShortName = row.authorShortName ?: row.authorName ?: "",
-                )
-            }
+        val myQuestions =
+            personalRows
+                .filter { it.section == "MY_QUESTION" }
+                .map { row ->
+                    MemberArchiveQuestionResult(
+                        priority = row.priority ?: 0,
+                        text = row.text ?: "",
+                        draftThought = row.draftThought,
+                        authorName = row.authorName ?: "",
+                        authorShortName = row.authorShortName ?: row.authorName ?: "",
+                    )
+                }
 
-        val myCheckin = personalRows
-            .firstOrNull { it.section == "MY_CHECKIN" }
-            ?.readingProgress
-            ?.let { MemberArchiveCheckinResult(readingProgress = it) }
+        val myCheckin =
+            personalRows
+                .firstOrNull { it.section == "MY_CHECKIN" }
+                ?.readingProgress
+                ?.let { MemberArchiveCheckinResult(readingProgress = it) }
 
-        val myOneLineReview = personalRows
-            .firstOrNull { it.section == "MY_ONE_LINE_REVIEW" }
-            ?.text
-            ?.let { MemberArchiveOneLineReviewResult(text = it) }
+        val myOneLineReview =
+            personalRows
+                .firstOrNull { it.section == "MY_ONE_LINE_REVIEW" }
+                ?.text
+                ?.let { MemberArchiveOneLineReviewResult(text = it) }
 
-        val myLongReview = personalRows
-            .firstOrNull { it.section == "MY_LONG_REVIEW" }
-            ?.body
-            ?.let { MemberArchiveLongReviewResult(body = it) }
+        val myLongReview =
+            personalRows
+                .firstOrNull { it.section == "MY_LONG_REVIEW" }
+                ?.body
+                ?.let { MemberArchiveLongReviewResult(body = it) }
 
         return ArchiveDetailFragments(
             publicHighlights = publicHighlights,
@@ -135,7 +142,10 @@ class JdbcArchiveDetailBatchReadAdapter(
         val authorShortName: String?,
     )
 
-    private fun loadPublicBatch(clubId: UUID, sessionId: UUID): List<PublicBatchRow> =
+    private fun loadPublicBatch(
+        clubId: UUID,
+        sessionId: UUID,
+    ): List<PublicBatchRow> =
         jdbcTemplate.query(
             """
             select 'HIGHLIGHT' as section,
@@ -232,13 +242,20 @@ class JdbcArchiveDetailBatchReadAdapter(
                     authorShortName = rs.getString("author_short_name"),
                 )
             },
-            clubId.dbString(), sessionId.dbString(),
-            clubId.dbString(), sessionId.dbString(),
-            clubId.dbString(), sessionId.dbString(),
-            clubId.dbString(), sessionId.dbString(),
+            clubId.dbString(),
+            sessionId.dbString(),
+            clubId.dbString(),
+            sessionId.dbString(),
+            clubId.dbString(),
+            sessionId.dbString(),
+            clubId.dbString(),
+            sessionId.dbString(),
         )
 
-    private fun loadPersonalBatch(currentMember: CurrentMember, sessionId: UUID): List<PersonalBatchRow> =
+    private fun loadPersonalBatch(
+        currentMember: CurrentMember,
+        sessionId: UUID,
+    ): List<PersonalBatchRow> =
         jdbcTemplate.query(
             """
             select 'MY_QUESTION' as section,
@@ -341,10 +358,18 @@ class JdbcArchiveDetailBatchReadAdapter(
                     authorShortName = rs.getString("author_short_name"),
                 )
             },
-            currentMember.clubId.dbString(), sessionId.dbString(), currentMember.membershipId.dbString(),
-            currentMember.clubId.dbString(), sessionId.dbString(), currentMember.membershipId.dbString(),
-            currentMember.clubId.dbString(), sessionId.dbString(), currentMember.membershipId.dbString(),
-            currentMember.clubId.dbString(), sessionId.dbString(), currentMember.membershipId.dbString(),
+            currentMember.clubId.dbString(),
+            sessionId.dbString(),
+            currentMember.membershipId.dbString(),
+            currentMember.clubId.dbString(),
+            sessionId.dbString(),
+            currentMember.membershipId.dbString(),
+            currentMember.clubId.dbString(),
+            sessionId.dbString(),
+            currentMember.membershipId.dbString(),
+            currentMember.clubId.dbString(),
+            sessionId.dbString(),
+            currentMember.membershipId.dbString(),
         )
 
     private fun loadFeedbackDocument(
@@ -353,19 +378,21 @@ class JdbcArchiveDetailBatchReadAdapter(
         sessionNumber: Int,
         myAttendanceStatus: String?,
     ): MemberArchiveFeedbackDocumentStatusResult {
-        val uploadedAt = jdbcTemplate.query(
-            """
-            select created_at
-            from session_feedback_documents
-            where club_id = ?
-              and session_id = ?
-            order by version desc, created_at desc
-            limit 1
-            """.trimIndent(),
-            { rs, _ -> rs.utcOffsetDateTime("created_at").toString() },
-            currentMember.clubId.dbString(),
-            sessionId.dbString(),
-        ).firstOrNull()
+        val uploadedAt =
+            jdbcTemplate
+                .query(
+                    """
+                    select created_at
+                    from session_feedback_documents
+                    where club_id = ?
+                      and session_id = ?
+                    order by version desc, created_at desc
+                    limit 1
+                    """.trimIndent(),
+                    { rs, _ -> rs.utcOffsetDateTime("created_at").toString() },
+                    currentMember.clubId.dbString(),
+                    sessionId.dbString(),
+                ).firstOrNull()
 
         if (uploadedAt == null) {
             return MemberArchiveFeedbackDocumentStatusResult(

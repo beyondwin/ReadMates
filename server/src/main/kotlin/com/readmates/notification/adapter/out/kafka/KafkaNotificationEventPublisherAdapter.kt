@@ -17,43 +17,54 @@ import java.util.concurrent.TimeoutException
 @Component
 @ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
-class KafkaNotificationEventPublisherAdapter @Autowired constructor(
-    @param:Qualifier("notificationEventKafkaTemplate")
-    private val kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,
-    private val kafkaProperties: NotificationKafkaProperties,
-) : NotificationEventPublisherPort {
+class KafkaNotificationEventPublisherAdapter
+    @Autowired
     constructor(
-        kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,
-        sendTimeout: Duration,
-    ) : this(kafkaTemplate, NotificationKafkaProperties(sendTimeout = sendTimeout))
+        @param:Qualifier("notificationEventKafkaTemplate")
+        private val kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,
+        private val kafkaProperties: NotificationKafkaProperties,
+    ) : NotificationEventPublisherPort {
+        constructor(
+            kafkaTemplate: KafkaTemplate<String, NotificationEventMessage>,
+            sendTimeout: Duration,
+        ) : this(kafkaTemplate, NotificationKafkaProperties(sendTimeout = sendTimeout))
 
-    override fun publish(message: NotificationEventMessage, topic: String, key: String) {
-        val kafkaMessage = MessageBuilder.withPayload(message)
-            .setHeader(KafkaHeaders.TOPIC, topic)
-            .setHeader(KafkaHeaders.KEY, key)
-            .setHeader("readmates-schema-version", message.schemaVersion.toString())
-            .setHeader("readmates-event-id", message.eventId.toString())
-            .setHeader("readmates-event-type", message.eventType.name)
-            .build()
+        override fun publish(
+            message: NotificationEventMessage,
+            topic: String,
+            key: String,
+        ) {
+            val kafkaMessage =
+                MessageBuilder
+                    .withPayload(message)
+                    .setHeader(KafkaHeaders.TOPIC, topic)
+                    .setHeader(KafkaHeaders.KEY, key)
+                    .setHeader("readmates-schema-version", message.schemaVersion.toString())
+                    .setHeader("readmates-event-id", message.eventId.toString())
+                    .setHeader("readmates-event-type", message.eventType.name)
+                    .build()
 
-        try {
-            kafkaTemplate.send(kafkaMessage).get(kafkaProperties.sendTimeout.toMillis(), TimeUnit.MILLISECONDS)
-        } catch (ex: NotificationKafkaPublishException) {
-            throw ex
-        } catch (ex: InterruptedException) {
-            Thread.currentThread().interrupt()
-            throw NotificationKafkaPublishException("Interrupted publishing notification event ${message.eventId}", ex)
-        } catch (ex: TimeoutException) {
-            throw NotificationKafkaPublishException(
-                "Timed out publishing notification event ${message.eventId} after ${kafkaProperties.sendTimeout}",
-                ex,
-            )
-        } catch (ex: ExecutionException) {
-            throw NotificationKafkaPublishException("Failed publishing notification event ${message.eventId}", ex.cause ?: ex)
-        } catch (ex: RuntimeException) {
-            throw NotificationKafkaPublishException("Failed publishing notification event ${message.eventId}", ex)
+            try {
+                kafkaTemplate.send(kafkaMessage).get(kafkaProperties.sendTimeout.toMillis(), TimeUnit.MILLISECONDS)
+            } catch (ex: NotificationKafkaPublishException) {
+                throw ex
+            } catch (ex: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw NotificationKafkaPublishException("Interrupted publishing notification event ${message.eventId}", ex)
+            } catch (ex: TimeoutException) {
+                throw NotificationKafkaPublishException(
+                    "Timed out publishing notification event ${message.eventId} after ${kafkaProperties.sendTimeout}",
+                    ex,
+                )
+            } catch (ex: ExecutionException) {
+                throw NotificationKafkaPublishException("Failed publishing notification event ${message.eventId}", ex.cause ?: ex)
+            } catch (ex: RuntimeException) {
+                throw NotificationKafkaPublishException("Failed publishing notification event ${message.eventId}", ex)
+            }
         }
     }
-}
 
-class NotificationKafkaPublishException(message: String, cause: Throwable) : RuntimeException(message, cause)
+class NotificationKafkaPublishException(
+    message: String,
+    cause: Throwable,
+) : RuntimeException(message, cause)

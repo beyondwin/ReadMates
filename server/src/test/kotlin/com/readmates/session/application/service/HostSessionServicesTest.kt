@@ -46,17 +46,18 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.UUID
 
 class HostSessionServicesTest {
-    private val host = CurrentMember(
-        userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-        membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
-        clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-        clubSlug = "reading-sai",
-        email = "host@example.com",
-        displayName = "호스트",
-        accountName = "김호스트",
-        role = MembershipRole.HOST,
-        membershipStatus = MembershipStatus.ACTIVE,
-    )
+    private val host =
+        CurrentMember(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubSlug = "reading-sai",
+            email = "host@example.com",
+            displayName = "호스트",
+            accountName = "김호스트",
+            role = MembershipRole.HOST,
+            membershipStatus = MembershipStatus.ACTIVE,
+        )
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
 
     @Test
@@ -139,11 +140,12 @@ class HostSessionServicesTest {
     fun `delegates attendance confirmation to host attendance port`() {
         val port = RecordingHostSessionPorts()
         val service = HostSessionAttendanceService(port)
-        val command = ConfirmAttendanceCommand(
-            host = host,
-            sessionId = sessionId,
-            entries = listOf(AttendanceEntryCommand("membership-1", "ATTENDED")),
-        )
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries = listOf(AttendanceEntryCommand("membership-1", "ATTENDED")),
+            )
 
         val result = service.confirmAttendance(command)
 
@@ -167,12 +169,13 @@ class HostSessionServicesTest {
         val port = RecordingHostSessionPorts()
         val invalidation = RecordingReadCacheInvalidationPort()
         val service = HostSessionPublicationService(port, invalidation)
-        val command = UpsertPublicationCommand(
-            host = host,
-            sessionId = sessionId,
-            publicSummary = "요약",
-            visibility = SessionRecordVisibility.PUBLIC,
-        )
+        val command =
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.PUBLIC,
+            )
 
         service.upsertPublication(command)
 
@@ -184,12 +187,13 @@ class HostSessionServicesTest {
         val port = RecordingHostSessionPorts()
         val invalidation = RecordingReadCacheInvalidationPort()
         val service = HostSessionPublicationService(port, invalidation)
-        val command = UpsertPublicationCommand(
-            host = host,
-            sessionId = sessionId,
-            publicSummary = "요약",
-            visibility = SessionRecordVisibility.PUBLIC,
-        )
+        val command =
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.PUBLIC,
+            )
 
         TransactionSynchronizationManager.initSynchronization()
         try {
@@ -212,16 +216,18 @@ class HostSessionServicesTest {
         val port = RecordingHostSessionPorts()
         val invalidation = ThrowingReadCacheInvalidationPort()
         val service = HostSessionPublicationService(port, invalidation)
-        val command = UpsertPublicationCommand(
-            host = host,
-            sessionId = sessionId,
-            publicSummary = "요약",
-            visibility = SessionRecordVisibility.PUBLIC,
-        )
+        val command =
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.PUBLIC,
+            )
 
         var result: HostPublicationResponse? = null
         assertDoesNotThrow {
-            service.upsertPublication(command)
+            service
+                .upsertPublication(command)
                 .also { result = it }
         }
 
@@ -231,17 +237,19 @@ class HostSessionServicesTest {
 
     @Test
     fun `does not evict when host write port throws`() {
-        val port = RecordingHostSessionPorts().apply {
-            throwOnUpsertPublication = true
-        }
+        val port =
+            RecordingHostSessionPorts().apply {
+                throwOnUpsertPublication = true
+            }
         val invalidation = RecordingReadCacheInvalidationPort()
         val service = HostSessionPublicationService(port, invalidation)
-        val command = UpsertPublicationCommand(
-            host = host,
-            sessionId = sessionId,
-            publicSummary = "요약",
-            visibility = SessionRecordVisibility.PUBLIC,
-        )
+        val command =
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.PUBLIC,
+            )
 
         assertThrows(IllegalStateException::class.java) {
             service.upsertPublication(command)
@@ -252,11 +260,12 @@ class HostSessionServicesTest {
 
     @Test
     fun `does not evict when current session transitions are no-ops`() {
-        val port = RecordingHostSessionPorts().apply {
-            openChanged = false
-            closeChanged = false
-            publishChanged = false
-        }
+        val port =
+            RecordingHostSessionPorts().apply {
+                openChanged = false
+                closeChanged = false
+                publishChanged = false
+            }
         val invalidation = RecordingReadCacheInvalidationPort()
         val service = HostSessionLifecycleService(port, port, port, invalidation)
         val command = HostSessionIdCommand(host, sessionId)
@@ -298,11 +307,12 @@ class HostSessionServicesTest {
 
     @Test
     fun `no-op lifecycle transitions do not log state changes`() {
-        val port = RecordingHostSessionPorts().apply {
-            openChanged = false
-            closeChanged = false
-            publishChanged = false
-        }
+        val port =
+            RecordingHostSessionPorts().apply {
+                openChanged = false
+                closeChanged = false
+                publishChanged = false
+            }
         val service = HostSessionLifecycleService(port, port, port)
         val command = HostSessionIdCommand(host, sessionId)
 
@@ -315,21 +325,22 @@ class HostSessionServicesTest {
         }
     }
 
-    private fun hostSessionCommand() = HostSessionCommand(
-        host = host,
-        title = "7회차",
-        bookTitle = "책",
-        bookAuthor = "저자",
-        bookLink = "https://example.com/book",
-        bookImageUrl = "https://example.com/image.jpg",
-        date = "2026-05-20",
-        startTime = "19:30",
-        endTime = "21:30",
-        questionDeadlineAt = null,
-        locationLabel = "온라인",
-        meetingUrl = "https://meet.example.com/readmates",
-        meetingPasscode = "readmates",
-    )
+    private fun hostSessionCommand() =
+        HostSessionCommand(
+            host = host,
+            title = "7회차",
+            bookTitle = "책",
+            bookAuthor = "저자",
+            bookLink = "https://example.com/book",
+            bookImageUrl = "https://example.com/image.jpg",
+            date = "2026-05-20",
+            startTime = "19:30",
+            endTime = "21:30",
+            questionDeadlineAt = null,
+            locationLabel = "온라인",
+            meetingUrl = "https://meet.example.com/readmates",
+            meetingPasscode = "readmates",
+        )
 
     private class RecordingHostSessionPorts :
         HostSessionQueryPort,
@@ -350,7 +361,10 @@ class HostSessionServicesTest {
         var publishChanged = true
         var throwOnUpsertPublication = false
 
-        override fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem> {
+        override fun list(
+            host: CurrentMember,
+            pageRequest: PageRequest,
+        ): CursorPage<HostSessionListItem> {
             listHost = host
             return CursorPage(emptyList(), null)
         }
@@ -458,44 +472,47 @@ class HostSessionServicesTest {
             return emptyList()
         }
 
-        private fun hostSessionDetail(sessionId: UUID) = HostSessionDetailResponse(
-            sessionId = sessionId.toString(),
-            sessionNumber = 7,
-            title = "7회차",
-            bookTitle = "책",
-            bookAuthor = "저자",
-            bookLink = null,
-            bookImageUrl = null,
-            date = "2026-05-20",
-            startTime = "20:00",
-            endTime = "22:00",
-            questionDeadlineAt = "2026-05-19T14:59Z",
-            locationLabel = "온라인",
-            meetingUrl = null,
-            meetingPasscode = null,
-            publication = null,
-            state = "OPEN",
-            attendees = emptyList(),
-            feedbackDocument = HostSessionFeedbackDocument(
-                uploaded = false,
-                fileName = null,
-                uploadedAt = null,
-            ),
-            visibility = SessionRecordVisibility.HOST_ONLY,
-        )
+        private fun hostSessionDetail(sessionId: UUID) =
+            HostSessionDetailResponse(
+                sessionId = sessionId.toString(),
+                sessionNumber = 7,
+                title = "7회차",
+                bookTitle = "책",
+                bookAuthor = "저자",
+                bookLink = null,
+                bookImageUrl = null,
+                date = "2026-05-20",
+                startTime = "20:00",
+                endTime = "22:00",
+                questionDeadlineAt = "2026-05-19T14:59Z",
+                locationLabel = "온라인",
+                meetingUrl = null,
+                meetingPasscode = null,
+                publication = null,
+                state = "OPEN",
+                attendees = emptyList(),
+                feedbackDocument =
+                    HostSessionFeedbackDocument(
+                        uploaded = false,
+                        fileName = null,
+                        uploadedAt = null,
+                    ),
+                visibility = SessionRecordVisibility.HOST_ONLY,
+            )
 
-        private fun emptyDeletionCounts() = HostSessionDeletionCounts(
-            participants = 0,
-            rsvpResponses = 0,
-            questions = 0,
-            checkins = 0,
-            oneLineReviews = 0,
-            longReviews = 0,
-            highlights = 0,
-            publications = 0,
-            feedbackReports = 0,
-            feedbackDocuments = 0,
-        )
+        private fun emptyDeletionCounts() =
+            HostSessionDeletionCounts(
+                participants = 0,
+                rsvpResponses = 0,
+                questions = 0,
+                checkins = 0,
+                oneLineReviews = 0,
+                longReviews = 0,
+                highlights = 0,
+                publications = 0,
+                feedbackReports = 0,
+                feedbackDocuments = 0,
+            )
     }
 
     private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {

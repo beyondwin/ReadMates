@@ -40,31 +40,31 @@ class JdbcAuthSessionAdapter(
         )
     }
 
-    override fun findValidByTokenHash(tokenHash: String): StoredAuthSession? {
-        return jdbcTemplate.query(
-            """
-            select id, user_id, session_token_hash, created_at, last_seen_at, expires_at, revoked_at, user_agent, ip_hash
-            from auth_sessions
-            where session_token_hash = ?
-              and revoked_at is null
-              and expires_at > utc_timestamp(6)
-            """.trimIndent(),
-            { resultSet, _ ->
-                StoredAuthSession(
-                    id = resultSet.uuid("id").toString(),
-                    userId = resultSet.uuid("user_id").toString(),
-                    sessionTokenHash = resultSet.getString("session_token_hash"),
-                    createdAt = resultSet.utcOffsetDateTime("created_at"),
-                    lastSeenAt = resultSet.utcOffsetDateTime("last_seen_at"),
-                    expiresAt = resultSet.utcOffsetDateTime("expires_at"),
-                    revoked = resultSet.getObject("revoked_at") != null,
-                    userAgent = resultSet.getString("user_agent"),
-                    ipHash = resultSet.getString("ip_hash"),
-                )
-            },
-            tokenHash,
-        ).firstOrNull()
-    }
+    override fun findValidByTokenHash(tokenHash: String): StoredAuthSession? =
+        jdbcTemplate
+            .query(
+                """
+                select id, user_id, session_token_hash, created_at, last_seen_at, expires_at, revoked_at, user_agent, ip_hash
+                from auth_sessions
+                where session_token_hash = ?
+                  and revoked_at is null
+                  and expires_at > utc_timestamp(6)
+                """.trimIndent(),
+                { resultSet, _ ->
+                    StoredAuthSession(
+                        id = resultSet.uuid("id").toString(),
+                        userId = resultSet.uuid("user_id").toString(),
+                        sessionTokenHash = resultSet.getString("session_token_hash"),
+                        createdAt = resultSet.utcOffsetDateTime("created_at"),
+                        lastSeenAt = resultSet.utcOffsetDateTime("last_seen_at"),
+                        expiresAt = resultSet.utcOffsetDateTime("expires_at"),
+                        revoked = resultSet.getObject("revoked_at") != null,
+                        userAgent = resultSet.getString("user_agent"),
+                        ipHash = resultSet.getString("ip_hash"),
+                    )
+                },
+                tokenHash,
+            ).firstOrNull()
 
     override fun touchByTokenHash(tokenHash: String) {
         jdbcTemplate.update(

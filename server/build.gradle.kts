@@ -4,6 +4,7 @@ plugins {
     id("org.springframework.boot") version "4.0.6"
     id("io.spring.dependency-management") version "1.1.7"
     id("org.flywaydb.flyway") version "11.7.2"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
 }
 
 group = "com.readmates"
@@ -71,9 +72,10 @@ tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
 
 val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
 
-val serverTestJavaLauncher = javaToolchains.launcherFor {
-    languageVersion.set(JavaLanguageVersion.of(21))
-}
+val serverTestJavaLauncher =
+    javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 
 val testSourceSet = sourceSets.named("test")
 
@@ -137,5 +139,18 @@ tasks.register<Test>("architectureTest") {
     shouldRunAfter("unitTest")
     useJUnitPlatform {
         includeTags("architecture")
+    }
+}
+
+ktlint {
+    version.set("1.7.1")
+    android.set(false)
+    ignoreFailures.set(false)
+    filter {
+        exclude("**/generated/**")
+    }
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
     }
 }

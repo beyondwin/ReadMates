@@ -14,22 +14,23 @@ class JdbcNotificationPreferencesAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : NotificationPreferencesPort {
     override fun getPreferences(member: CurrentMember): NotificationPreferences =
-        jdbcTemplate.query(
-            """
-            select
-              email_enabled,
-              next_book_published_enabled,
-              session_reminder_due_enabled,
-              feedback_document_published_enabled,
-              review_published_enabled
-            from notification_preferences
-            where membership_id = ?
-              and club_id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toNotificationPreferences() },
-            member.membershipId.dbString(),
-            member.clubId.dbString(),
-        ).firstOrNull() ?: NotificationPreferences.defaults()
+        jdbcTemplate
+            .query(
+                """
+                select
+                  email_enabled,
+                  next_book_published_enabled,
+                  session_reminder_due_enabled,
+                  feedback_document_published_enabled,
+                  review_published_enabled
+                from notification_preferences
+                where membership_id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toNotificationPreferences() },
+                member.membershipId.dbString(),
+                member.clubId.dbString(),
+            ).firstOrNull() ?: NotificationPreferences.defaults()
 
     override fun savePreferences(
         member: CurrentMember,
@@ -70,12 +71,12 @@ class JdbcNotificationPreferencesAdapter(
     private fun ResultSet.toNotificationPreferences(): NotificationPreferences =
         NotificationPreferences(
             emailEnabled = getBoolean("email_enabled"),
-            events = mapOf(
-                NotificationEventType.NEXT_BOOK_PUBLISHED to getBoolean("next_book_published_enabled"),
-                NotificationEventType.SESSION_REMINDER_DUE to getBoolean("session_reminder_due_enabled"),
-                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to getBoolean("feedback_document_published_enabled"),
-                NotificationEventType.REVIEW_PUBLISHED to getBoolean("review_published_enabled"),
-            ),
+            events =
+                mapOf(
+                    NotificationEventType.NEXT_BOOK_PUBLISHED to getBoolean("next_book_published_enabled"),
+                    NotificationEventType.SESSION_REMINDER_DUE to getBoolean("session_reminder_due_enabled"),
+                    NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to getBoolean("feedback_document_published_enabled"),
+                    NotificationEventType.REVIEW_PUBLISHED to getBoolean("review_published_enabled"),
+                ),
         )
-
 }

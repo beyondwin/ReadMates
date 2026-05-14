@@ -35,11 +35,11 @@ class DevLoginControllerTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `logs in seeded host by email`() {
-        mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"host@example.com"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"host@example.com"}"""
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.email") { value("host@example.com") }
@@ -60,11 +60,11 @@ class DevLoginControllerTest(
             """.trimIndent(),
         )
 
-        mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"host@example.com"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"host@example.com"}"""
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.email") { value("host@example.com") }
@@ -74,22 +74,22 @@ class DevLoginControllerTest(
 
     @Test
     fun `rejects unknown email`() {
-        mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"unknown@example.com"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"unknown@example.com"}"""
+            }.andExpect {
                 status { isUnauthorized() }
             }
     }
 
     @Test
     fun `rejects malformed email`() {
-        mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"not-an-email"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"not-an-email"}"""
+            }.andExpect {
                 status { isBadRequest() }
             }
     }
@@ -138,32 +138,32 @@ class DevLoginControllerTest(
             """.trimIndent(),
         )
 
-        mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"active.nonseed@example.com"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"active.nonseed@example.com"}"""
+            }.andExpect {
                 status { isUnauthorized() }
             }
     }
 
     @Test
     fun `persists dev login session for auth me`() {
-        val session = mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"host@example.com"}"""
-        }
-            .andExpect {
-                status { isOk() }
-            }
-            .andReturn()
-            .request
-            .session as MockHttpSession
+        val session =
+            mockMvc
+                .post("/api/dev/login") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"email":"host@example.com"}"""
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .request
+                .session as MockHttpSession
 
-        mockMvc.get("/api/auth/me") {
-            this.session = session
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/auth/me") {
+                this.session = session
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.email") { value("host@example.com") }
@@ -176,28 +176,28 @@ class DevLoginControllerTest(
 
     @Test
     fun `logout clears dev login session`() {
-        val session = mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"host@example.com"}"""
-        }
-            .andExpect {
-                status { isOk() }
-            }
-            .andReturn()
-            .request
-            .session as MockHttpSession
+        val session =
+            mockMvc
+                .post("/api/dev/login") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"email":"host@example.com"}"""
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .request
+                .session as MockHttpSession
 
-        mockMvc.post("/api/dev/logout") {
-            this.session = session
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/logout") {
+                this.session = session
+            }.andExpect {
                 status { isNoContent() }
             }
 
-        mockMvc.get("/api/auth/me") {
-            this.session = session
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/auth/me") {
+                this.session = session
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.authenticated") { value(false) }
                 jsonPath("$.email") { value(null) }
@@ -221,7 +221,6 @@ class DevLoginControllerTest(
             where email = 'active.nonseed@example.com'
         """
     }
-
 }
 
 @SpringBootTest(
@@ -235,14 +234,13 @@ class DevLoginControllerTest(
 class DevLoginDisabledControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-
     @Test
     fun `dev login endpoint is unavailable when disabled`() {
-        mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"host@example.com"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"host@example.com"}"""
+            }.andExpect {
                 status { isNotFound() }
             }
     }
@@ -260,14 +258,13 @@ class DevLoginDisabledControllerTest(
 class DevLoginProductionProfileControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-
     @Test
     fun `dev login endpoint is unavailable under prod profile`() {
-        mockMvc.post("/api/dev/login") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"host@example.com"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/dev/login") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"host@example.com"}"""
+            }.andExpect {
                 status { isNotFound() }
             }
     }

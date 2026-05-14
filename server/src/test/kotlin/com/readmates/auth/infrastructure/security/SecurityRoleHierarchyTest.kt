@@ -1,10 +1,10 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -52,44 +52,48 @@ class SecurityRoleHierarchyTest(
     fun `viewer can access archive sessions`() {
         val cookie = viewerSessionCookie("hierarchy.viewer.archive")
 
-        mockMvc.get("/api/archive/sessions") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .get("/api/archive/sessions") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+            }
     }
 
     @Test
     fun `member inherits viewer access to archive sessions`() {
         val memberCookie = memberSessionCookieForSeedUser("member5@example.com")
 
-        mockMvc.get("/api/archive/sessions") {
-            cookie(memberCookie)
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .get("/api/archive/sessions") {
+                cookie(memberCookie)
+            }.andExpect {
+                status { isOk() }
+            }
     }
 
     @Test
     fun `host can access host sessions`() {
         val hostCookie = memberSessionCookieForSeedUser("host@example.com")
 
-        mockMvc.get("/api/host/sessions") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .get("/api/host/sessions") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isOk() }
+            }
     }
 
     @Test
     fun `viewer cannot access host sessions`() {
         val cookie = viewerSessionCookie("hierarchy.viewer.host")
 
-        mockMvc.get("/api/host/sessions") {
-            cookie(cookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/host/sessions") {
+                cookie(cookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     private fun viewerSessionCookie(emailPrefix: String): Cookie {
@@ -118,31 +122,38 @@ class SecurityRoleHierarchyTest(
         )
         createdMembershipIds += membershipId
 
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "SecurityRoleHierarchyTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "SecurityRoleHierarchyTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
     private fun memberSessionCookieForSeedUser(email: String): Cookie {
-        val userId = jdbcTemplate.queryForObject(
-            "select id from users where email = ?",
-            String::class.java,
-            email,
-        ) ?: error("Expected seeded user for $email")
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "SecurityRoleHierarchyTest",
-            ipAddress = "127.0.0.1",
-        )
+        val userId =
+            jdbcTemplate.queryForObject(
+                "select id from users where email = ?",
+                String::class.java,
+                email,
+            ) ?: error("Expected seeded user for $email")
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "SecurityRoleHierarchyTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

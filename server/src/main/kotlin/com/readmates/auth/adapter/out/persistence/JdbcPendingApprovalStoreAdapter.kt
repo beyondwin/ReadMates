@@ -14,38 +14,38 @@ class JdbcPendingApprovalStoreAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : PendingApprovalStorePort {
     override fun findPendingApproval(clubId: UUID): PendingApprovalRow? =
-        jdbcTemplate.query(
-            """
-            select
-              clubs.name as club_name,
-              sessions.id as session_id,
-              sessions.number as session_number,
-              sessions.title,
-              sessions.book_title,
-              sessions.book_author,
-              sessions.session_date,
-              sessions.location_label
-            from clubs
-            left join sessions on sessions.club_id = clubs.id
-              and sessions.state in ('OPEN', 'PUBLISHED')
-            where clubs.id = ?
-            order by sessions.number desc
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ ->
-                val sessionId = resultSet.getString("session_id")
-                PendingApprovalRow(
-                    clubName = resultSet.getString("club_name"),
-                    sessionId = sessionId?.let { resultSet.uuid("session_id") },
-                    sessionNumber = sessionId?.let { resultSet.getInt("session_number") },
-                    title = resultSet.getString("title"),
-                    bookTitle = resultSet.getString("book_title"),
-                    bookAuthor = resultSet.getString("book_author"),
-                    sessionDate = resultSet.getObject("session_date", LocalDate::class.java),
-                    locationLabel = resultSet.getString("location_label"),
-                )
-            },
-            clubId.dbString(),
-        ).firstOrNull()
-
+        jdbcTemplate
+            .query(
+                """
+                select
+                  clubs.name as club_name,
+                  sessions.id as session_id,
+                  sessions.number as session_number,
+                  sessions.title,
+                  sessions.book_title,
+                  sessions.book_author,
+                  sessions.session_date,
+                  sessions.location_label
+                from clubs
+                left join sessions on sessions.club_id = clubs.id
+                  and sessions.state in ('OPEN', 'PUBLISHED')
+                where clubs.id = ?
+                order by sessions.number desc
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ ->
+                    val sessionId = resultSet.getString("session_id")
+                    PendingApprovalRow(
+                        clubName = resultSet.getString("club_name"),
+                        sessionId = sessionId?.let { resultSet.uuid("session_id") },
+                        sessionNumber = sessionId?.let { resultSet.getInt("session_number") },
+                        title = resultSet.getString("title"),
+                        bookTitle = resultSet.getString("book_title"),
+                        bookAuthor = resultSet.getString("book_author"),
+                        sessionDate = resultSet.getObject("session_date", LocalDate::class.java),
+                        locationLabel = resultSet.getString("location_label"),
+                    )
+                },
+                clubId.dbString(),
+            ).firstOrNull()
 }

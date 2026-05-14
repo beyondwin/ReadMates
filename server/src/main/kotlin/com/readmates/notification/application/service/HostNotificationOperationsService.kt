@@ -1,7 +1,7 @@
 package com.readmates.notification.application.service
 
-import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationDeliveryList
+import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationEventList
 import com.readmates.notification.application.model.HostNotificationItemList
 import com.readmates.notification.application.model.HostNotificationItemQuery
@@ -52,11 +52,12 @@ class HostNotificationOperationsService(
         pageRequest: PageRequest,
     ): HostNotificationEventList {
         val currentHost = requireHost(host)
-        val page = notificationEventOutboxPort.listHostEvents(
-            clubId = currentHost.clubId,
-            status = status,
-            pageRequest = pageRequest.copy(limit = pageRequest.limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT)),
-        )
+        val page =
+            notificationEventOutboxPort.listHostEvents(
+                clubId = currentHost.clubId,
+                status = status,
+                pageRequest = pageRequest.copy(limit = pageRequest.limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT)),
+            )
         return HostNotificationEventList(
             items = page.items,
             nextCursor = page.nextCursor,
@@ -70,38 +71,50 @@ class HostNotificationOperationsService(
         pageRequest: PageRequest,
     ): HostNotificationDeliveryList {
         val currentHost = requireHost(host)
-        val page = notificationDeliveryLedgerPort.listHostDeliveries(
-            clubId = currentHost.clubId,
-            status = status,
-            channel = channel,
-            pageRequest = pageRequest.copy(limit = pageRequest.limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT)),
-        )
+        val page =
+            notificationDeliveryLedgerPort.listHostDeliveries(
+                clubId = currentHost.clubId,
+                status = status,
+                channel = channel,
+                pageRequest = pageRequest.copy(limit = pageRequest.limit.coerceIn(1, MAX_HOST_LEDGER_LIMIT)),
+            )
         return HostNotificationDeliveryList(
             items = page.items,
             nextCursor = page.nextCursor,
         )
     }
 
-    override fun detail(host: CurrentMember, id: UUID): HostNotificationDetail =
+    override fun detail(
+        host: CurrentMember,
+        id: UUID,
+    ): HostNotificationDetail =
         notificationDeliveryLedgerPort.hostEmailDetail(requireHost(host).clubId, id)
             ?: throw notificationAccessDenied()
 
-    override fun retry(host: CurrentMember, id: UUID): HostNotificationDetail {
+    override fun retry(
+        host: CurrentMember,
+        id: UUID,
+    ): HostNotificationDetail {
         val currentHost = requireHost(host)
         if (!deliveryEnabled) {
-            return notificationDeliveryLedgerPort.hostEmailDetail(currentHost.clubId, id)
+            return notificationDeliveryLedgerPort
+                .hostEmailDetail(currentHost.clubId, id)
                 ?.takeIf { it.status == NotificationOutboxStatus.PENDING || it.status == NotificationOutboxStatus.FAILED }
                 ?: throw notificationAccessDenied()
         }
 
-        val item = transactionalOps.claimHostEmailDelivery(currentHost.clubId, id)
-            ?: throw notificationAccessDenied()
+        val item =
+            transactionalOps.claimHostEmailDelivery(currentHost.clubId, id)
+                ?: throw notificationAccessDenied()
         notificationDeliveryProcessingService.processClaimed(item)
         return notificationDeliveryLedgerPort.hostEmailDetail(currentHost.clubId, id)
             ?: throw notificationAccessDenied()
     }
 
-    override fun restore(host: CurrentMember, id: UUID): HostNotificationDetail {
+    override fun restore(
+        host: CurrentMember,
+        id: UUID,
+    ): HostNotificationDetail {
         val currentHost = requireHost(host)
         if (!notificationDeliveryStatusPort.restoreDeadEmailDeliveryForClub(currentHost.clubId, id)) {
             throw notificationAccessDenied()
@@ -117,8 +130,7 @@ class HostNotificationOperationsService(
         return host
     }
 
-    private fun notificationAccessDenied(): AccessDeniedException =
-        AccessDeniedException("Notification not found")
+    private fun notificationAccessDenied(): AccessDeniedException = AccessDeniedException("Notification not found")
 }
 
 private const val MAX_HOST_LEDGER_LIMIT = 100

@@ -16,17 +16,18 @@ import java.util.UUID
 class NotesFeedServiceCacheTest {
     private val firstPage = PageRequest.cursor(null, null, defaultLimit = 60, maxLimit = 120)
     private val sessionPage = PageRequest.cursor(null, null, defaultLimit = 30, maxLimit = 100)
-    private val member = CurrentMember(
-        userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
-        membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
-        clubId = CLUB_ID,
-        clubSlug = "reading-sai",
-        email = "member@example.com",
-        displayName = "Member",
-        accountName = "Member",
-        role = MembershipRole.MEMBER,
-        membershipStatus = MembershipStatus.ACTIVE,
-    )
+    private val member =
+        CurrentMember(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = CLUB_ID,
+            clubSlug = "reading-sai",
+            email = "member@example.com",
+            displayName = "Member",
+            accountName = "Member",
+            role = MembershipRole.MEMBER,
+            membershipStatus = MembershipStatus.ACTIVE,
+        )
 
     @Test
     fun `paged club feed bypasses legacy unpaged cache`() {
@@ -97,18 +98,21 @@ class NotesFeedServiceCacheTest {
         var sessionFeedLoads = 0
         var sessionsLoads = 0
 
-        override fun loadNoteSessions(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteSessionResult> =
-            CursorPage(listOf(noteSession()), null).also { sessionsLoads += 1 }
+        override fun loadNoteSessions(
+            clubId: UUID,
+            pageRequest: PageRequest,
+        ): CursorPage<NoteSessionResult> = CursorPage(listOf(noteSession()), null).also { sessionsLoads += 1 }
 
-        override fun loadNotesFeed(clubId: UUID, pageRequest: PageRequest): CursorPage<NoteFeedResult> =
-            CursorPage(listOf(feedItem()), null).also { feedLoads += 1 }
+        override fun loadNotesFeed(
+            clubId: UUID,
+            pageRequest: PageRequest,
+        ): CursorPage<NoteFeedResult> = CursorPage(listOf(feedItem()), null).also { feedLoads += 1 }
 
         override fun loadNotesFeedForSession(
             clubId: UUID,
             sessionId: UUID,
             pageRequest: PageRequest,
-        ): CursorPage<NoteFeedResult> =
-            CursorPage(listOf(feedItem()), null).also { sessionFeedLoads += 1 }
+        ): CursorPage<NoteFeedResult> = CursorPage(listOf(feedItem()), null).also { sessionFeedLoads += 1 }
     }
 
     private class RecordingNotesCache(
@@ -124,16 +128,26 @@ class NotesFeedServiceCacheTest {
             return feed
         }
 
-        override fun putFeed(clubId: UUID, result: List<NoteFeedResult>) {
+        override fun putFeed(
+            clubId: UUID,
+            result: List<NoteFeedResult>,
+        ) {
             putCalls += 1
         }
 
-        override fun getSessionFeed(clubId: UUID, sessionId: UUID): List<NoteFeedResult>? {
+        override fun getSessionFeed(
+            clubId: UUID,
+            sessionId: UUID,
+        ): List<NoteFeedResult>? {
             getCalls += 1
             return sessionFeed
         }
 
-        override fun putSessionFeed(clubId: UUID, sessionId: UUID, result: List<NoteFeedResult>) {
+        override fun putSessionFeed(
+            clubId: UUID,
+            sessionId: UUID,
+            result: List<NoteFeedResult>,
+        ) {
             putCalls += 1
         }
 
@@ -142,7 +156,10 @@ class NotesFeedServiceCacheTest {
             return sessions
         }
 
-        override fun putSessions(clubId: UUID, result: List<NoteSessionResult>) {
+        override fun putSessions(
+            clubId: UUID,
+            result: List<NoteSessionResult>,
+        ) {
             putCalls += 1
         }
     }
@@ -151,27 +168,29 @@ class NotesFeedServiceCacheTest {
         private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         private val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000301")
 
-        fun feedItem(text: String = "Question") = NoteFeedResult(
-            sessionId = SESSION_ID.toString(),
-            sessionNumber = 1,
-            bookTitle = "Book",
-            date = "2026-04-28",
-            authorName = "Member",
-            authorShortName = "Member",
-            kind = "QUESTION",
-            text = text,
-        )
+        fun feedItem(text: String = "Question") =
+            NoteFeedResult(
+                sessionId = SESSION_ID.toString(),
+                sessionNumber = 1,
+                bookTitle = "Book",
+                date = "2026-04-28",
+                authorName = "Member",
+                authorShortName = "Member",
+                kind = "QUESTION",
+                text = text,
+            )
 
-        fun noteSession(bookTitle: String = "Book") = NoteSessionResult(
-            sessionId = SESSION_ID.toString(),
-            sessionNumber = 1,
-            bookTitle = bookTitle,
-            date = "2026-04-28",
-            questionCount = 1,
-            oneLinerCount = 0,
-            longReviewCount = 0,
-            highlightCount = 0,
-            totalCount = 1,
-        )
+        fun noteSession(bookTitle: String = "Book") =
+            NoteSessionResult(
+                sessionId = SESSION_ID.toString(),
+                sessionNumber = 1,
+                bookTitle = bookTitle,
+                date = "2026-04-28",
+                questionCount = 1,
+                oneLinerCount = 0,
+                longReviewCount = 0,
+                highlightCount = 0,
+                totalCount = 1,
+            )
     }
 }

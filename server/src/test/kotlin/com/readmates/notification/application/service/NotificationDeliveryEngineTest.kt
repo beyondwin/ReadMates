@@ -38,11 +38,12 @@ class NotificationDeliveryEngineTest {
         val deliveryPort = EngineRecordingDeliveryPort()
         val mailPort = EngineRecordingMailPort()
         val registry = SimpleMeterRegistry()
-        val engine = notificationDeliveryEngine(
-            deliveryStatusPort = deliveryPort,
-            mailPort = mailPort,
-            metrics = ReadmatesOperationalMetrics(registry),
-        )
+        val engine =
+            notificationDeliveryEngine(
+                deliveryStatusPort = deliveryPort,
+                mailPort = mailPort,
+                metrics = ReadmatesOperationalMetrics(registry),
+            )
 
         val result = engine.sendClaimed(engineClaimedDelivery())
 
@@ -63,11 +64,12 @@ class NotificationDeliveryEngineTest {
     fun `sendClaimed marks failed and returns retryable failure before max attempts`() {
         val deliveryPort = EngineRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
-        val engine = notificationDeliveryEngine(
-            deliveryStatusPort = deliveryPort,
-            mailPort = EngineFailingMailPort("smtp rejected"),
-            metrics = ReadmatesOperationalMetrics(registry),
-        )
+        val engine =
+            notificationDeliveryEngine(
+                deliveryStatusPort = deliveryPort,
+                mailPort = EngineFailingMailPort("smtp rejected"),
+                metrics = ReadmatesOperationalMetrics(registry),
+            )
 
         val result = engine.sendClaimed(engineClaimedDelivery(attemptCount = 1))
 
@@ -85,11 +87,12 @@ class NotificationDeliveryEngineTest {
     fun `sendClaimed marks dead and increments dead metric at max attempts`() {
         val deliveryPort = EngineRecordingDeliveryPort()
         val registry = SimpleMeterRegistry()
-        val engine = notificationDeliveryEngine(
-            deliveryStatusPort = deliveryPort,
-            mailPort = EngineFailingMailPort("provider token=raw-secret failed for member@example.com"),
-            metrics = ReadmatesOperationalMetrics(registry),
-        )
+        val engine =
+            notificationDeliveryEngine(
+                deliveryStatusPort = deliveryPort,
+                mailPort = EngineFailingMailPort("provider token=raw-secret failed for member@example.com"),
+                metrics = ReadmatesOperationalMetrics(registry),
+            )
 
         val result = engine.sendClaimed(engineClaimedDelivery(attemptCount = 4))
 
@@ -119,11 +122,12 @@ class NotificationDeliveryEngineTest {
     @Test
     fun `sendClaimed uses configured retry delays when marking retryable failure`() {
         val deliveryPort = EngineRecordingDeliveryPort()
-        val engine = notificationDeliveryEngine(
-            deliveryStatusPort = deliveryPort,
-            mailPort = EngineFailingMailPort("smtp rejected"),
-            retryDelayMinutesConfig = listOf(2L, 4L, 8L),
-        )
+        val engine =
+            notificationDeliveryEngine(
+                deliveryStatusPort = deliveryPort,
+                mailPort = EngineFailingMailPort("smtp rejected"),
+                retryDelayMinutesConfig = listOf(2L, 4L, 8L),
+            )
 
         val result = engine.sendClaimed(engineClaimedDelivery(attemptCount = 2))
 
@@ -146,8 +150,12 @@ class NotificationDeliveryEngineTest {
             retryDelayMinutesConfig = retryDelayMinutesConfig,
         )
 
-    private fun engineCounter(registry: SimpleMeterRegistry, name: String): Double =
-        registry.find(name)
+    private fun engineCounter(
+        registry: SimpleMeterRegistry,
+        name: String,
+    ): Double =
+        registry
+            .find(name)
             .tag("event_type", NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED.name)
             .counter()
             ?.count()
@@ -162,10 +170,10 @@ private class EngineRecordingMailPort : MailDeliveryPort {
     }
 }
 
-private class EngineFailingMailPort(private val message: String) : MailDeliveryPort {
-    override fun send(command: MailDeliveryCommand) {
-        throw IllegalStateException(message)
-    }
+private class EngineFailingMailPort(
+    private val message: String,
+) : MailDeliveryPort {
+    override fun send(command: MailDeliveryCommand): Unit = throw IllegalStateException(message)
 }
 
 private data class EngineFailedMark(
@@ -192,7 +200,10 @@ private class EngineRecordingDeliveryPort(
 
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = error("unused")
 
-    override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean {
+    override fun markDeliverySent(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean {
         sent += id to lockedAt
         return markSentResult
     }
@@ -207,12 +218,19 @@ private class EngineRecordingDeliveryPort(
         return markFailedResult
     }
 
-    override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean {
+    override fun markDeliveryDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean {
         dead += EngineDeadMark(id, lockedAt, error)
         return markDeadResult
     }
 
-    override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = error("unused")
+    override fun restoreDeadEmailDeliveryForClub(
+        clubId: UUID,
+        id: UUID,
+    ): Boolean = error("unused")
 }
 
 private fun engineClaimedDelivery(

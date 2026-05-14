@@ -6,9 +6,10 @@ import org.junit.jupiter.api.Test
 import java.time.Duration
 
 class OAuthReturnStateTest {
-    private val trustedReturnHostPort = object : TrustedReturnHostPort {
-        override fun activeClubSlugForHost(host: String): String? = null
-    }
+    private val trustedReturnHostPort =
+        object : TrustedReturnHostPort {
+            override fun activeClubSlugForHost(host: String): String? = null
+        }
 
     @Test
     fun `fails fast when return state secret is blank`() {
@@ -20,8 +21,7 @@ class OAuthReturnStateTest {
                 sessionCookieDomain = "",
                 trustedReturnHostPort = trustedReturnHostPort,
             )
-        }
-            .isInstanceOf(IllegalArgumentException::class.java)
+        }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("readmates.auth.return-state-secret")
     }
 }

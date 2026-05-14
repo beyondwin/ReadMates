@@ -13,8 +13,18 @@ import java.util.UUID
 
 interface HostNotificationDeliveryLedgerPort {
     fun hostSummary(clubId: UUID): HostNotificationSummary
-    fun listHostEmailItems(clubId: UUID, query: HostNotificationItemQuery, pageRequest: PageRequest): HostNotificationItemList
-    fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail?
+
+    fun listHostEmailItems(
+        clubId: UUID,
+        query: HostNotificationItemQuery,
+        pageRequest: PageRequest,
+    ): HostNotificationItemList
+
+    fun hostEmailDetail(
+        clubId: UUID,
+        id: UUID,
+    ): HostNotificationDetail?
+
     fun listHostDeliveries(
         clubId: UUID,
         status: NotificationDeliveryStatus?,

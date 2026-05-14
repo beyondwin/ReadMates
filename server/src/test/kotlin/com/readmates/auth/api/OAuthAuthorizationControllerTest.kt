@@ -1,10 +1,10 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -30,47 +30,51 @@ class OAuthAuthorizationControllerTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `google authorization endpoint redirects to provider when client registration is configured`() {
-        val result = mockMvc.get("/oauth2/authorization/google")
-            .andExpect {
-                status { is3xxRedirection() }
-            }
-            .andReturn()
+        val result =
+            mockMvc
+                .get("/oauth2/authorization/google")
+                .andExpect {
+                    status { is3xxRedirection() }
+                }.andReturn()
 
         assertTrue(
-            result.response.getHeader(HttpHeaders.LOCATION)
+            result.response
+                .getHeader(HttpHeaders.LOCATION)
                 ?.startsWith("https://accounts.google.com/o/oauth2/v2/auth?") == true,
         )
     }
 
     @Test
     fun `google authorization redirect uri uses primary auth origin despite forwarded club host`() {
-        val result = mockMvc.get("/oauth2/authorization/google") {
-            header("X-Forwarded-Host", "reading-sai.example.test")
-            header("X-Forwarded-Proto", "https")
-        }
-            .andExpect {
-                status { is3xxRedirection() }
-            }
-            .andReturn()
+        val result =
+            mockMvc
+                .get("/oauth2/authorization/google") {
+                    header("X-Forwarded-Host", "reading-sai.example.test")
+                    header("X-Forwarded-Proto", "https")
+                }.andExpect {
+                    status { is3xxRedirection() }
+                }.andReturn()
 
         val location = result.response.getHeader(HttpHeaders.LOCATION)
-        val redirectUri = UriComponentsBuilder.fromUriString(location!!)
-            .build()
-            .queryParams
-            .getFirst("redirect_uri")
+        val redirectUri =
+            UriComponentsBuilder
+                .fromUriString(location!!)
+                .build()
+                .queryParams
+                .getFirst("redirect_uri")
 
         assertEquals("https://auth.readmates.example/login/oauth2/code/google", redirectUri)
     }
 
     @Test
     fun `google authorization captures invite token before provider redirect`() {
-        val result = mockMvc.get("/oauth2/authorization/google") {
-            param("inviteToken", "inviteCaptureToken00000000000000000000000000")
-        }
-            .andExpect {
-                status { is3xxRedirection() }
-            }
-            .andReturn()
+        val result =
+            mockMvc
+                .get("/oauth2/authorization/google") {
+                    param("inviteToken", "inviteCaptureToken00000000000000000000000000")
+                }.andExpect {
+                    status { is3xxRedirection() }
+                }.andReturn()
 
         assertEquals(
             "inviteCaptureToken00000000000000000000000000",

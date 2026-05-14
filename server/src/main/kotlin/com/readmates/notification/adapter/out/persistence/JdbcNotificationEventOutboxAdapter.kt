@@ -131,19 +131,20 @@ class JdbcNotificationEventOutboxAdapter(
         }
 
         resetStalePublishingRows(jdbcTemplate)
-        val ids = jdbcTemplate.query(
-            """
-            select id
-            from notification_event_outbox
-            where status in ('PENDING', 'FAILED')
-              and next_attempt_at <= utc_timestamp(6)
-            order by next_attempt_at, created_at
-            limit ?
-            for update skip locked
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.uuid("id") },
-            limit,
-        )
+        val ids =
+            jdbcTemplate.query(
+                """
+                select id
+                from notification_event_outbox
+                where status in ('PENDING', 'FAILED')
+                  and next_attempt_at <= utc_timestamp(6)
+                order by next_attempt_at, created_at
+                limit ?
+                for update skip locked
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.uuid("id") },
+                limit,
+            )
         if (ids.isEmpty()) {
             return emptyList()
         }
@@ -176,7 +177,10 @@ class JdbcNotificationEventOutboxAdapter(
         )
     }
 
-    override fun markPublished(id: UUID, lockedAt: OffsetDateTime): Boolean =
+    override fun markPublished(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update notification_event_outbox
@@ -218,7 +222,11 @@ class JdbcNotificationEventOutboxAdapter(
             lockedAt.toUtcLocalDateTime(),
         ) > 0
 
-    override fun markPublishDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean =
+    override fun markPublishDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update notification_event_outbox
@@ -238,24 +246,25 @@ class JdbcNotificationEventOutboxAdapter(
         ) > 0
 
     override fun loadMessage(eventId: UUID): NotificationEventMessage? =
-        jdbcTemplate.query(
-            """
-            select notification_event_outbox.id,
-                   notification_event_outbox.club_id,
-                   clubs.slug as club_slug,
-                   notification_event_outbox.event_type,
-                   notification_event_outbox.aggregate_type,
-                   notification_event_outbox.aggregate_id,
-                   notification_event_outbox.payload_json,
-                   notification_event_outbox.created_at,
-                   clubs.name as club_name
-            from notification_event_outbox
-            join clubs on clubs.id = notification_event_outbox.club_id
-            where notification_event_outbox.id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toNotificationEventMessage() },
-            eventId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select notification_event_outbox.id,
+                       notification_event_outbox.club_id,
+                       clubs.slug as club_slug,
+                       notification_event_outbox.event_type,
+                       notification_event_outbox.aggregate_type,
+                       notification_event_outbox.aggregate_id,
+                       notification_event_outbox.payload_json,
+                       notification_event_outbox.created_at,
+                       clubs.name as club_name
+                from notification_event_outbox
+                join clubs on clubs.id = notification_event_outbox.club_id
+                where notification_event_outbox.id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toNotificationEventMessage() },
+                eventId.dbString(),
+            ).firstOrNull()
 
     override fun listHostEvents(
         clubId: UUID,
@@ -264,21 +273,22 @@ class JdbcNotificationEventOutboxAdapter(
     ): CursorPage<HostNotificationEvent> {
         val cursor = NotificationEventUpdatedAtDescCursor.from(pageRequest.cursor)
         val statusPredicate = if (status == null) "" else "and notification_event_outbox.status = ?"
-        val cursorPredicate = if (cursor == null) {
-            ""
-        } else {
-            """
-            and (
-              notification_event_outbox.updated_at < ?
-              or (notification_event_outbox.updated_at = ? and notification_event_outbox.created_at < ?)
-              or (
-                notification_event_outbox.updated_at = ?
-                and notification_event_outbox.created_at = ?
-                and notification_event_outbox.id < ?
-              )
-            )
-            """.trimIndent()
-        }
+        val cursorPredicate =
+            if (cursor == null) {
+                ""
+            } else {
+                """
+                and (
+                  notification_event_outbox.updated_at < ?
+                  or (notification_event_outbox.updated_at = ? and notification_event_outbox.created_at < ?)
+                  or (
+                    notification_event_outbox.updated_at = ?
+                    and notification_event_outbox.created_at = ?
+                    and notification_event_outbox.id < ?
+                  )
+                )
+                """.trimIndent()
+            }
         val args = mutableListOf<Any>(clubId.dbString())
         status?.let { args += it.name }
         if (cursor != null) {
@@ -290,39 +300,40 @@ class JdbcNotificationEventOutboxAdapter(
             args += cursor.id
         }
         args += pageRequest.limit + 1
-        val rows = jdbcTemplate.query(
-            """
-            select
-              notification_event_outbox.id,
-              notification_event_outbox.event_type,
-              notification_event_outbox.status,
-              notification_event_outbox.attempt_count,
-              case when notification_manual_dispatches.id is null then 'AUTOMATIC' else 'MANUAL' end as source,
-              notification_manual_dispatches.id as manual_dispatch_id,
-              notification_manual_dispatches.requested_channels,
-              notification_manual_dispatches.audience,
-              notification_manual_dispatches.resend,
-              notification_manual_dispatches.target_count,
-              notification_manual_dispatches.expected_in_app_count,
-              notification_manual_dispatches.expected_email_count,
-              users.email as requested_by_email,
-              notification_event_outbox.created_at,
-              notification_event_outbox.updated_at
-            from notification_event_outbox
-            left join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id
-              and notification_manual_dispatches.club_id = notification_event_outbox.club_id
-            left join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id
-              and memberships.club_id = notification_manual_dispatches.club_id
-            left join users on users.id = memberships.user_id
-            where notification_event_outbox.club_id = ?
-              $statusPredicate
-              $cursorPredicate
-            order by notification_event_outbox.updated_at desc, notification_event_outbox.created_at desc, notification_event_outbox.id desc
-            limit ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toHostNotificationEvent() },
-            *args.toTypedArray(),
-        )
+        val rows =
+            jdbcTemplate.query(
+                """
+                select
+                  notification_event_outbox.id,
+                  notification_event_outbox.event_type,
+                  notification_event_outbox.status,
+                  notification_event_outbox.attempt_count,
+                  case when notification_manual_dispatches.id is null then 'AUTOMATIC' else 'MANUAL' end as source,
+                  notification_manual_dispatches.id as manual_dispatch_id,
+                  notification_manual_dispatches.requested_channels,
+                  notification_manual_dispatches.audience,
+                  notification_manual_dispatches.resend,
+                  notification_manual_dispatches.target_count,
+                  notification_manual_dispatches.expected_in_app_count,
+                  notification_manual_dispatches.expected_email_count,
+                  users.email as requested_by_email,
+                  notification_event_outbox.created_at,
+                  notification_event_outbox.updated_at
+                from notification_event_outbox
+                left join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id
+                  and notification_manual_dispatches.club_id = notification_event_outbox.club_id
+                left join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id
+                  and memberships.club_id = notification_manual_dispatches.club_id
+                left join users on users.id = memberships.user_id
+                where notification_event_outbox.club_id = ?
+                  $statusPredicate
+                  $cursorPredicate
+                order by notification_event_outbox.updated_at desc, notification_event_outbox.created_at desc, notification_event_outbox.id desc
+                limit ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toHostNotificationEvent() },
+                *args.toTypedArray(),
+            )
         return pageFromRows(rows, pageRequest.limit) { row ->
             notificationEventUpdatedAtDescCursor(row.updatedAt, row.createdAt, row.id.toString())
         }
@@ -382,8 +393,7 @@ class JdbcNotificationEventOutboxAdapter(
         )
     }
 
-    private fun parsePayload(rawPayload: String): NotificationEventPayload =
-        objectMapper.readValue(rawPayload, payloadType)
+    private fun parsePayload(rawPayload: String): NotificationEventPayload = objectMapper.readValue(rawPayload, payloadType)
 
     private fun resetStalePublishingRows(jdbcTemplate: JdbcTemplate) {
         jdbcTemplate.update(
@@ -408,10 +418,13 @@ class JdbcNotificationEventOutboxAdapter(
         if (domain.isBlank()) return "숨김"
         return "${value.first()}***@$domain"
     }
-
 }
 
-private fun notificationEventUpdatedAtDescCursor(updatedAt: OffsetDateTime, createdAt: OffsetDateTime, id: String): String? =
+private fun notificationEventUpdatedAtDescCursor(
+    updatedAt: OffsetDateTime,
+    createdAt: OffsetDateTime,
+    id: String,
+): String? =
     CursorCodec.encode(
         mapOf(
             "updatedAt" to updatedAt.toString(),
@@ -420,7 +433,11 @@ private fun notificationEventUpdatedAtDescCursor(updatedAt: OffsetDateTime, crea
         ),
     )
 
-private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+private fun <T> pageFromRows(
+    rows: List<T>,
+    limit: Int,
+    cursorFor: (T) -> String?,
+): CursorPage<T> {
     val visibleRows = rows.take(limit)
     return CursorPage(
         items = visibleRows,
@@ -435,10 +452,12 @@ private data class NotificationEventUpdatedAtDescCursor(
 ) {
     companion object {
         fun from(cursor: Map<String, String>): NotificationEventUpdatedAtDescCursor? {
-            val updatedAt = cursor["updatedAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-                ?: return null
-            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-                ?: return null
+            val updatedAt =
+                cursor["updatedAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
+            val createdAt =
+                cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
             val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
             return NotificationEventUpdatedAtDescCursor(updatedAt, createdAt, id)
         }

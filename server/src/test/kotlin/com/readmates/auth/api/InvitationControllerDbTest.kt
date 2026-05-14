@@ -1,11 +1,11 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.service.InvitationService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -40,7 +40,8 @@ class InvitationControllerDbTest(
     fun `preview returns masked pending invitation`() {
         val token = createInvitation("preview.member@example.com", "미리보기 멤버")
 
-        mockMvc.get("/api/invitations/$token")
+        mockMvc
+            .get("/api/invitations/$token")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.clubName") { value("읽는사이") }
@@ -58,7 +59,8 @@ class InvitationControllerDbTest(
     fun `club scoped preview returns invitation when route slug matches token club`() {
         val token = createInvitation("scoped.preview@example.com", "클럽 초대 멤버")
 
-        mockMvc.get("/api/clubs/reading-sai/invitations/$token")
+        mockMvc
+            .get("/api/clubs/reading-sai/invitations/$token")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.clubName") { value("읽는사이") }
@@ -73,7 +75,8 @@ class InvitationControllerDbTest(
     fun `club scoped preview rejects route slug that does not match token club`() {
         val token = createInvitation("wrong.club.preview@example.com", "다른 클럽 초대")
 
-        mockMvc.get("/api/clubs/sample-book-club/invitations/$token")
+        mockMvc
+            .get("/api/clubs/sample-book-club/invitations/$token")
             .andExpect {
                 status { isNotFound() }
                 jsonPath("$.code") { value("INVITATION_CLUB_MISMATCH") }
@@ -84,45 +87,50 @@ class InvitationControllerDbTest(
     fun `club scoped password invitation accept endpoint is gone`() {
         val token = createInvitation("scoped.accepted.member@example.com", "초대 멤버")
 
-        mockMvc.post("/api/clubs/reading-sai/invitations/$token/accept") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """
-                {
-                  "password": "correct horse battery staple",
-                  "passwordConfirmation": "correct horse battery staple"
-                }
-            """.trimIndent()
-        }.andExpect {
-            status { isGone() }
-            jsonPath("$.code") { value("GONE") }
-            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
-            jsonPath("$.status") { value(410) }
-        }
+        mockMvc
+            .post("/api/clubs/reading-sai/invitations/$token/accept") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "password": "correct horse battery staple",
+                      "passwordConfirmation": "correct horse battery staple"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("GONE") }
+                jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+                jsonPath("$.status") { value(410) }
+            }
     }
 
     @Test
     fun `legacy password invitation accept endpoint is gone`() {
         val token = createInvitation("accepted.member@example.com", "초대 멤버")
 
-        mockMvc.post("/api/invitations/$token/accept") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """
-                {
-                  "password": "correct horse battery staple",
-                  "passwordConfirmation": "correct horse battery staple"
-                }
-            """.trimIndent()
-        }.andExpect {
-            status { isGone() }
-            jsonPath("$.code") { value("GONE") }
-            jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
-            jsonPath("$.status") { value(410) }
-        }
+        mockMvc
+            .post("/api/invitations/$token/accept") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "password": "correct horse battery staple",
+                      "passwordConfirmation": "correct horse battery staple"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("GONE") }
+                jsonPath("$.message") { value("더 이상 사용할 수 없는 경로입니다.") }
+                jsonPath("$.status") { value(410) }
+            }
     }
 
     @Test
     fun `invalid token returns not found`() {
-        mockMvc.get("/api/invitations/not-a-real-token")
+        mockMvc
+            .get("/api/invitations/not-a-real-token")
             .andExpect {
                 status { isNotFound() }
                 jsonPath("$.code") { value("INVITATION_NOT_FOUND") }
@@ -134,22 +142,24 @@ class InvitationControllerDbTest(
         val invite = createPendingInvitation(email = "invited.active.${UUID.randomUUID()}@example.com")
         val cookie = completeGoogleInvite(invite.acceptUrl, invite.email)
 
-        mockMvc.get("/api/auth/me") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.membershipStatus") { value("ACTIVE") }
-            jsonPath("$.approvalState") { value("ACTIVE") }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.membershipStatus") { value("ACTIVE") }
+                jsonPath("$.approvalState") { value("ACTIVE") }
+            }
     }
 
     @Test
     fun `accepting invite with current session intent disabled does not create current participant`() {
-        val token = createInvitation(
-            email = "intent.disabled@example.com",
-            name = "다음 세션 멤버",
-            applyToCurrentSession = false,
-        )
+        val token =
+            createInvitation(
+                email = "intent.disabled@example.com",
+                name = "다음 세션 멤버",
+                applyToCurrentSession = false,
+            )
         createOpenSession("00000000-0000-0000-0000-000000005101")
 
         invitationService.acceptGoogleInvitation(
@@ -166,11 +176,12 @@ class InvitationControllerDbTest(
 
     @Test
     fun `accepting invite with current session intent enabled creates participant when session is safe`() {
-        val token = createInvitation(
-            email = "intent.enabled@example.com",
-            name = "이번 세션 멤버",
-            applyToCurrentSession = true,
-        )
+        val token =
+            createInvitation(
+                email = "intent.enabled@example.com",
+                name = "이번 세션 멤버",
+                applyToCurrentSession = true,
+            )
         createOpenSession("00000000-0000-0000-0000-000000005102")
 
         invitationService.acceptGoogleInvitation(
@@ -187,11 +198,12 @@ class InvitationControllerDbTest(
 
     @Test
     fun `accepting invite after question deadline leaves active membership without participant`() {
-        val token = createInvitation(
-            email = "intent.deadline-passed@example.com",
-            name = "마감 후 멤버",
-            applyToCurrentSession = true,
-        )
+        val token =
+            createInvitation(
+                email = "intent.deadline-passed@example.com",
+                name = "마감 후 멤버",
+                applyToCurrentSession = true,
+            )
         createOpenSession(
             sessionId = "00000000-0000-0000-0000-000000005103",
             questionDeadlineSql = "date_sub(utc_timestamp(6), interval 1 minute)",
@@ -211,11 +223,12 @@ class InvitationControllerDbTest(
 
     @Test
     fun `accepting invite after Korea local session date leaves active membership without participant`() {
-        val token = createInvitation(
-            email = "intent.session-passed@example.com",
-            name = "회차 지남 멤버",
-            applyToCurrentSession = true,
-        )
+        val token =
+            createInvitation(
+                email = "intent.session-passed@example.com",
+                name = "회차 지남 멤버",
+                applyToCurrentSession = true,
+            )
         createOpenSession(
             sessionId = "00000000-0000-0000-0000-000000005104",
             sessionDate = LocalDate.now().minusDays(1),
@@ -233,18 +246,23 @@ class InvitationControllerDbTest(
         assertEquals(0, currentParticipantCount("intent.session-passed@example.com"))
     }
 
-    private fun createInvitation(email: String, name: String, applyToCurrentSession: Boolean = true): String {
-        val acceptUrl = mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","name":"$name","applyToCurrentSession":$applyToCurrentSession}"""
-        }
-            .andExpect { status { isCreated() } }
-            .andReturn()
-            .response
-            .contentAsString
-            .substringAfter("\"acceptUrl\":\"")
-            .substringBefore("\"")
+    private fun createInvitation(
+        email: String,
+        name: String,
+        applyToCurrentSession: Boolean = true,
+    ): String {
+        val acceptUrl =
+            mockMvc
+                .post("/api/host/invitations") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"email":"$email","name":"$name","applyToCurrentSession":$applyToCurrentSession}"""
+                }.andExpect { status { isCreated() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .substringAfter("\"acceptUrl\":\"")
+                .substringBefore("\"")
 
         return acceptUrl.substringAfterLast("/")
     }
@@ -254,19 +272,24 @@ class InvitationControllerDbTest(
         return PendingInvitation(acceptUrl = "http://localhost:3000/invite/$token", email = email)
     }
 
-    private fun completeGoogleInvite(acceptUrl: String, email: String): Cookie {
-        val member = invitationService.acceptGoogleInvitation(
-            rawToken = acceptUrl.substringAfterLast("/"),
-            googleSubjectId = "google-invited-active-${UUID.randomUUID()}",
-            email = email,
-            displayName = "초대 활성 멤버",
-            profileImageUrl = null,
-        )
-        val issuedSession = authSessionService.issueSession(
-            userId = member.userId.toString(),
-            userAgent = "InvitationControllerDbTest",
-            ipAddress = "127.0.0.1",
-        )
+    private fun completeGoogleInvite(
+        acceptUrl: String,
+        email: String,
+    ): Cookie {
+        val member =
+            invitationService.acceptGoogleInvitation(
+                rawToken = acceptUrl.substringAfterLast("/"),
+                googleSubjectId = "google-invited-active-${UUID.randomUUID()}",
+                email = email,
+                displayName = "초대 활성 멤버",
+                profileImageUrl = null,
+            )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = member.userId.toString(),
+                userAgent = "InvitationControllerDbTest",
+                ipAddress = "127.0.0.1",
+            )
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 

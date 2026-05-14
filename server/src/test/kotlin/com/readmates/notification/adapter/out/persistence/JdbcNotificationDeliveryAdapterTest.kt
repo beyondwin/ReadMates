@@ -1,7 +1,5 @@
 package com.readmates.notification.adapter.out.persistence
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.MailDeliveryCommand
@@ -13,9 +11,11 @@ import com.readmates.notification.application.service.ReadmatesOperationalMetric
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -127,8 +127,7 @@ class JdbcNotificationDeliveryAdapterTest(
 
         assertThatThrownBy {
             deliveryAdapter.persistPlannedDeliveries(message(eventId = missingEventId))
-        }
-            .isInstanceOf(MissingNotificationEventOutboxException::class.java)
+        }.isInstanceOf(MissingNotificationEventOutboxException::class.java)
             .hasMessageContaining("Notification event outbox row not found")
             .hasMessageContaining(missingEventId.toString())
 
@@ -140,17 +139,19 @@ class JdbcNotificationDeliveryAdapterTest(
     fun `persistPlannedDeliveries plans from persisted outbox event when Kafka message fields are stale`() {
         insertEventOutboxRow()
 
-        val deliveries = deliveryAdapter.persistPlannedDeliveries(
-            message(
-                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-                aggregateId = UUID.fromString("00000000-0000-0000-0000-000000009798"),
-                payload = NotificationEventPayload(
-                    sessionId = UUID.fromString("00000000-0000-0000-0000-000000009797"),
-                    sessionNumber = 99,
-                    bookTitle = "Kafka payload book",
+        val deliveries =
+            deliveryAdapter.persistPlannedDeliveries(
+                message(
+                    eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                    aggregateId = UUID.fromString("00000000-0000-0000-0000-000000009798"),
+                    payload =
+                        NotificationEventPayload(
+                            sessionId = UUID.fromString("00000000-0000-0000-0000-000000009797"),
+                            sessionNumber = 99,
+                            bookTitle = "Kafka payload book",
+                        ),
                 ),
-            ),
-        )
+            )
 
         assertThat(deliveries).hasSize(6)
         assertThat(deliveries.filter { it.channel == NotificationChannel.EMAIL })
@@ -189,9 +190,10 @@ class JdbcNotificationDeliveryAdapterTest(
                 deliveryRowsFor(newlyJoinedMember.membershipId, NotificationChannel.EMAIL, NotificationDeliveryStatus.PENDING),
             ).isZero()
 
-            val existingEmailDelivery = duplicate.single {
-                it.recipientMembershipId == member1 && it.channel == NotificationChannel.EMAIL
-            }
+            val existingEmailDelivery =
+                duplicate.single {
+                    it.recipientMembershipId == member1 && it.channel == NotificationChannel.EMAIL
+                }
             assertThat(existingEmailDelivery.recipientEmail).isEqualTo("member1@example.com")
             assertThat(existingEmailDelivery.subject).isEqualTo("1회차 피드백 문서가 올라왔습니다")
             assertThat(existingEmailDelivery.bodyText).contains("팩트풀니스")
@@ -250,9 +252,10 @@ class JdbcNotificationDeliveryAdapterTest(
             excludedMembershipIds = listOf(member2),
         )
 
-        val deliveries = deliveryAdapter.persistPlannedDeliveries(
-            message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
-        )
+        val deliveries =
+            deliveryAdapter.persistPlannedDeliveries(
+                message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
+            )
 
         assertThat(deliveries).allSatisfy { assertThat(it.channel).isEqualTo(NotificationChannel.IN_APP) }
         assertThat(deliveries.map { it.recipientMembershipId }).contains(member1)
@@ -274,9 +277,10 @@ class JdbcNotificationDeliveryAdapterTest(
         )
         val newlyJoinedMember = insertActiveMember("joined.after.event.manual")
         try {
-            val deliveries = deliveryAdapter.persistPlannedDeliveries(
-                message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
-            )
+            val deliveries =
+                deliveryAdapter.persistPlannedDeliveries(
+                    message(eventId = manualEventId, eventType = NotificationEventType.SESSION_REMINDER_DUE),
+                )
 
             assertThat(deliveries.map { it.recipientMembershipId }).contains(member1)
             assertThat(deliveries.map { it.recipientMembershipId }).doesNotContain(newlyJoinedMember.membershipId)
@@ -313,21 +317,24 @@ class JdbcNotificationDeliveryAdapterTest(
         insertEventOutboxRow()
         deliveryAdapter.persistPlannedDeliveries(message())
         val mailPort = RecordingMailPort()
-        val service = NotificationDeliveryProcessingService(
-            deliveryEngine = NotificationDeliveryEngine(
-                deliveryStatusPort = deliveryAdapter,
-                mailDeliveryPort = mailPort,
-                metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                maxAttempts = 5,
-                retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
-            ),
-            transactionalOps = transactionalOps,
-            deliveryEnabled = true,
-        )
+        val service =
+            NotificationDeliveryProcessingService(
+                deliveryEngine =
+                    NotificationDeliveryEngine(
+                        deliveryStatusPort = deliveryAdapter,
+                        mailDeliveryPort = mailPort,
+                        metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                        maxAttempts = 5,
+                        retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+                    ),
+                transactionalOps = transactionalOps,
+                deliveryEnabled = true,
+            )
 
-        val processedCounts = runConcurrently(workerCount = 2) {
-            service.processPending(limit = 2)
-        }
+        val processedCounts =
+            runConcurrently(workerCount = 2) {
+                service.processPending(limit = 2)
+            }
         val remainingProcessedCount = service.processPending(limit = 2)
 
         assertThat(processedCounts.sum() + remainingProcessedCount).isEqualTo(3)
@@ -341,9 +348,10 @@ class JdbcNotificationDeliveryAdapterTest(
         deliveryAdapter.persistPlannedDeliveries(message())
         val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
 
-        val claimed = withTemporarySessionCopy(number = 99, bookTitle = "변경된 책") {
-            deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
-        }
+        val claimed =
+            withTemporarySessionCopy(number = 99, bookTitle = "변경된 책") {
+                deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
+            }
 
         assertThat(claimed.subject).isEqualTo("1회차 피드백 문서가 올라왔습니다")
         assertThat(claimed.bodyText).contains("1회차", "팩트풀니스", "확인 링크:")
@@ -359,12 +367,13 @@ class JdbcNotificationDeliveryAdapterTest(
         val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
         val claimed = deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
 
-        val failed = deliveryAdapter.markDeliveryFailed(
-            id = emailDeliveryId,
-            lockedAt = claimed.lockedAt,
-            error = "smtp rejected",
-            nextAttemptDelayMinutes = 60,
-        )
+        val failed =
+            deliveryAdapter.markDeliveryFailed(
+                id = emailDeliveryId,
+                lockedAt = claimed.lockedAt,
+                error = "smtp rejected",
+                nextAttemptDelayMinutes = 60,
+            )
         val notDueClaim = deliveryAdapter.claimEmailDelivery(emailDeliveryId)
 
         assertThat(failed).isTrue()
@@ -483,20 +492,20 @@ class JdbcNotificationDeliveryAdapterTest(
         )
     }
 
-    private fun uuidListJson(ids: List<UUID>): String =
-        ids.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
+    private fun uuidListJson(ids: List<UUID>): String = ids.joinToString(prefix = "[", postfix = "]") { "\"$it\"" }
 
     private fun message(
         eventId: UUID = this.eventId,
         eventType: NotificationEventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
         authorMembershipId: UUID? = null,
         aggregateId: UUID = sessionId,
-        payload: NotificationEventPayload = NotificationEventPayload(
-            sessionId = sessionId,
-            sessionNumber = 1,
-            bookTitle = "팩트풀니스",
-            authorMembershipId = authorMembershipId,
-        ),
+        payload: NotificationEventPayload =
+            NotificationEventPayload(
+                sessionId = sessionId,
+                sessionNumber = 1,
+                bookTitle = "팩트풀니스",
+                authorMembershipId = authorMembershipId,
+            ),
     ): NotificationEventMessage =
         NotificationEventMessage(
             eventId = eventId,
@@ -508,7 +517,10 @@ class JdbcNotificationDeliveryAdapterTest(
             payload = payload,
         )
 
-    private fun disableMemberPreference(email: String, column: String) {
+    private fun disableMemberPreference(
+        email: String,
+        column: String,
+    ) {
         val membership = membershipForEmail(email)
         jdbcTemplate.update(
             """
@@ -531,11 +543,12 @@ class JdbcNotificationDeliveryAdapterTest(
         )
     }
 
-    private fun insertActiveMember(emailPrefix: String): InsertedMember {
-        return insertMember(emailPrefix, status = "ACTIVE")
-    }
+    private fun insertActiveMember(emailPrefix: String): InsertedMember = insertMember(emailPrefix, status = "ACTIVE")
 
-    private fun insertMember(emailPrefix: String, status: String): InsertedMember {
+    private fun insertMember(
+        emailPrefix: String,
+        status: String,
+    ): InsertedMember {
         val idSuffix = UUID.randomUUID().toString()
         val userId = UUID.randomUUID()
         val membershipId = UUID.randomUUID()
@@ -577,7 +590,10 @@ class JdbcNotificationDeliveryAdapterTest(
         )
     }
 
-    private fun updateSessionCopy(number: Int, bookTitle: String) {
+    private fun updateSessionCopy(
+        number: Int,
+        bookTitle: String,
+    ) {
         jdbcTemplate.update(
             """
             update sessions
@@ -593,17 +609,22 @@ class JdbcNotificationDeliveryAdapterTest(
         )
     }
 
-    private fun <T> withTemporarySessionCopy(number: Int, bookTitle: String, block: () -> T): T {
-        val original = jdbcTemplate.queryForMap(
-            """
-            select number, book_title
-            from sessions
-            where id = ?
-              and club_id = ?
-            """.trimIndent(),
-            sessionId.toString(),
-            clubId.toString(),
-        )
+    private fun <T> withTemporarySessionCopy(
+        number: Int,
+        bookTitle: String,
+        block: () -> T,
+    ): T {
+        val original =
+            jdbcTemplate.queryForMap(
+                """
+                select number, book_title
+                from sessions
+                where id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                sessionId.toString(),
+                clubId.toString(),
+            )
         return try {
             updateSessionCopy(number, bookTitle)
             block()
@@ -658,17 +679,18 @@ class JdbcNotificationDeliveryAdapterTest(
     private fun membershipIdForEmail(email: String): UUID = membershipForEmail(email).first
 
     private fun membershipForEmail(email: String): Pair<UUID, UUID> {
-        val row = jdbcTemplate.queryForMap(
-            """
-            select memberships.id as membership_id, memberships.club_id
-            from memberships
-            join users on users.id = memberships.user_id
-            where users.email = ?
-              and memberships.club_id = ?
-            """.trimIndent(),
-            email,
-            clubId.toString(),
-        )
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select memberships.id as membership_id, memberships.club_id
+                from memberships
+                join users on users.id = memberships.user_id
+                where users.email = ?
+                  and memberships.club_id = ?
+                """.trimIndent(),
+                email,
+                clubId.toString(),
+            )
         return UUID.fromString(row["membership_id"].toString()) to UUID.fromString(row["club_id"].toString())
     }
 
@@ -707,7 +729,10 @@ class JdbcNotificationDeliveryAdapterTest(
             status.name,
         ) ?: 0
 
-    private fun deliveryRowsFor(eventId: UUID, membershipId: UUID): Int =
+    private fun deliveryRowsFor(
+        eventId: UUID,
+        membershipId: UUID,
+    ): Int =
         jdbcTemplate.queryForObject(
             """
             select count(*)
@@ -763,18 +788,22 @@ class JdbcNotificationDeliveryAdapterTest(
             status.name,
         ) ?: 0
 
-    private fun <T> runConcurrently(workerCount: Int, action: () -> T): List<T> {
+    private fun <T> runConcurrently(
+        workerCount: Int,
+        action: () -> T,
+    ): List<T> {
         val executor = Executors.newFixedThreadPool(workerCount)
         val ready = CountDownLatch(workerCount)
         val start = CountDownLatch(1)
         return try {
-            val futures = (1..workerCount).map {
-                executor.submit<T> {
-                    ready.countDown()
-                    check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
-                    action()
+            val futures =
+                (1..workerCount).map {
+                    executor.submit<T> {
+                        ready.countDown()
+                        check(start.await(5, TimeUnit.SECONDS)) { "Timed out waiting to start concurrent work" }
+                        action()
+                    }
                 }
-            }
             check(ready.await(5, TimeUnit.SECONDS)) { "Timed out waiting for concurrent workers" }
             start.countDown()
             futures.map { it.get(10, TimeUnit.SECONDS) }

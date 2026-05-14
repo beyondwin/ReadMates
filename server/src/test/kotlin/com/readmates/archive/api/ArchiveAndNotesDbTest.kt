@@ -1,8 +1,7 @@
 package com.readmates.archive.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.hamcrest.Matchers.empty
 import org.hamcrest.Matchers.emptyOrNullString
@@ -13,6 +12,7 @@ import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -58,10 +58,10 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `archive sessions are returned newest first from seeded sessions`() {
-        mockMvc.get("/api/archive/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(6) }
                 jsonPath("$.items[0].sessionNumber") { value(6) }
@@ -91,22 +91,22 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `archive sessions are scoped by requested club slug for the same member`() {
-        mockMvc.get("/api/archive/sessions") {
-            header("X-Readmates-Club-Slug", "reading-sai")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                header("X-Readmates-Club-Slug", "reading-sai")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(6) }
                 jsonPath("$.items[*].bookTitle") { value(hasItem("가난한 찰리의 연감")) }
                 jsonPath("$.items[*].bookTitle") { value(not(hasItem("샘플 클럽 아카이브 테스트 책"))) }
             }
 
-        mockMvc.get("/api/archive/sessions") {
-            header("X-Readmates-Club-Slug", "sample-book-club")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(1) }
                 jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000009181") }
@@ -139,72 +139,79 @@ class ArchiveAndNotesDbTest(
             sessionId = "00000000-0000-0000-0000-000000000306",
         )
 
-        mockMvc.get("/api/archive/sessions") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(hasItems(997, 6)) }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(998))) }
-            jsonPath("$.items[?(@.sessionNumber == 997)].state") { value(hasItem("CLOSED")) }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(999))) }
-            jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
-            jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
-            jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
-        }
+        mockMvc
+            .get("/api/archive/sessions") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(hasItems(997, 6)) }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(998))) }
+                jsonPath("$.items[?(@.sessionNumber == 997)].state") { value(hasItem("CLOSED")) }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(999))) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }
+            }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009992") {
-            cookie(cookie)
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000009992") {
+                cookie(cookie)
+            }.andExpect {
+                status { isNotFound() }
+            }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009993") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionNumber") { value(997) }
-            jsonPath("$.state") { value("CLOSED") }
-            jsonPath("$.attendance") { value(0) }
-            jsonPath("$.total") { value(0) }
-        }
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000009993") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(997) }
+                jsonPath("$.state") { value("CLOSED") }
+                jsonPath("$.attendance") { value(0) }
+                jsonPath("$.total") { value(0) }
+            }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000301") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionNumber") { value(1) }
-            jsonPath("$.state") { value("PUBLISHED") }
-        }
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000301") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionNumber") { value(1) }
+                jsonPath("$.state") { value("PUBLISHED") }
+            }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009991") {
-            cookie(cookie)
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000009991") {
+                cookie(cookie)
+            }.andExpect {
+                status { isNotFound() }
+            }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.myAttendanceStatus") { value("ATTENDED") }
-            jsonPath("$.feedbackDocument.available") { value(true) }
-            jsonPath("$.feedbackDocument.readable") { value(false) }
-        }
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.myAttendanceStatus") { value("ATTENDED") }
+                jsonPath("$.feedbackDocument.available") { value(true) }
+                jsonPath("$.feedbackDocument.readable") { value(false) }
+            }
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            cookie(cookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                cookie(cookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `notes feed includes seeded prepared questions`() {
-        mockMvc.get("/api/notes/feed") {
-            param("limit", "120")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("limit", "120")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(greaterThan(0)) }
                 jsonPath("$.items[0].kind") { value(not(emptyOrNullString())) }
@@ -224,10 +231,10 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `notes feed includes book metadata`() {
-        mockMvc.get("/api/notes/feed") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[0].bookTitle") { exists() }
                 jsonPath("$.items[0].date") { exists() }
@@ -249,10 +256,10 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `note sessions are returned newest first with public note counts`() {
-        mockMvc.get("/api/notes/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(6) }
                 jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
@@ -284,29 +291,32 @@ class ArchiveAndNotesDbTest(
     fun `notes surfaces exclude host only published records`() {
         insertHostOnlyPublishedSessionWithOneLine(number = 90)
 
-        mockMvc.get("/api/notes/sessions") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(90))) }
-        }
+        mockMvc
+            .get("/api/notes/sessions") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(90))) }
+            }
 
-        mockMvc.get("/api/notes/feed") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(90))) }
-            jsonPath("$.items[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
-        }
+        mockMvc
+            .get("/api/notes/feed") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(90))) }
+                jsonPath("$.items[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
+            }
 
-        mockMvc.get("/api/notes/feed") {
-            param("sessionId", HOST_ONLY_PUBLISHED_NOTE_SESSION_ID)
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items.length()") { value(0) }
-            jsonPath("$.items[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
-        }
+        mockMvc
+            .get("/api/notes/feed") {
+                param("sessionId", HOST_ONLY_PUBLISHED_NOTE_SESSION_ID)
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(0) }
+                jsonPath("$.items[*].text") { value(not(hasItem(HOST_ONLY_PUBLISHED_NOTE_TEXT))) }
+            }
     }
 
     @Test
@@ -314,19 +324,21 @@ class ArchiveAndNotesDbTest(
         val sessionId = insertClosedPublicSessionWithQuestion(number = 91)
 
         try {
-            mockMvc.get("/api/archive/sessions") {
-                with(user("member1@example.com"))
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.items[*].sessionNumber") { value(hasItem(91)) }
-            }
+            mockMvc
+                .get("/api/archive/sessions") {
+                    with(user("member1@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[*].sessionNumber") { value(hasItem(91)) }
+                }
 
-            mockMvc.get("/api/notes/sessions") {
-                with(user("member1@example.com"))
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(91))) }
-            }
+            mockMvc
+                .get("/api/notes/sessions") {
+                    with(user("member1@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[*].sessionNumber") { value(not(hasItem(91))) }
+                }
 
             jdbcTemplate.update(
                 """
@@ -337,12 +349,13 @@ class ArchiveAndNotesDbTest(
                 sessionId,
             )
 
-            mockMvc.get("/api/notes/sessions") {
-                with(user("member1@example.com"))
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.items[*].sessionNumber") { value(hasItem(91)) }
-            }
+            mockMvc
+                .get("/api/notes/sessions") {
+                    with(user("member1@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[*].sessionNumber") { value(hasItem(91)) }
+                }
         } finally {
             cleanupClosedPublicSessionWithQuestion(sessionId)
         }
@@ -462,20 +475,20 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `notes sessions and feed include public long reviews only`() {
-        mockMvc.get("/api/notes/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.sessionNumber == 6)].longReviewCount") { value(hasItem(1)) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].totalCount") { value(hasItem(13)) }
             }
 
-        mockMvc.get("/api/notes/feed") {
-            param("sessionId", "00000000-0000-0000-0000-000000000306")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("sessionId", "00000000-0000-0000-0000-000000000306")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(13) }
                 jsonPath("$.items[*].kind") { value(hasItem("LONG_REVIEW")) }
@@ -498,10 +511,10 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `notes sessions and feed exclude removed participant authored records`() {
-        mockMvc.get("/api/notes/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.sessionNumber == 6)].questionCount") { value(hasItem(4)) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].oneLinerCount") { value(hasItem(2)) }
@@ -512,11 +525,11 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.items[?(@.sessionNumber == 6)].totalCount") { value(hasItem(8)) }
             }
 
-        mockMvc.get("/api/notes/feed") {
-            param("sessionId", "00000000-0000-0000-0000-000000000306")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("sessionId", "00000000-0000-0000-0000-000000000306")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(8) }
                 jsonPath("$.items[*].text") {
@@ -531,11 +544,11 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `notes feed can be filtered to a published session in the same club`() {
-        mockMvc.get("/api/notes/feed") {
-            param("sessionId", "00000000-0000-0000-0000-000000000306")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("sessionId", "00000000-0000-0000-0000-000000000306")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(12) }
                 jsonPath("$.items[*].sessionId") { value(everyItem(equalTo("00000000-0000-0000-0000-000000000306"))) }
@@ -566,21 +579,21 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `notes feed applies cursor page limit to whole feed and session feed`() {
-        mockMvc.get("/api/notes/feed") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(60) }
                 jsonPath("$.nextCursor") { exists() }
             }
 
-        mockMvc.get("/api/notes/feed") {
-            param("sessionId", "00000000-0000-0000-0000-000000000306")
-            param("limit", "120")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("sessionId", "00000000-0000-0000-0000-000000000306")
+                param("limit", "120")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(120) }
                 jsonPath("$.nextCursor") { exists() }
@@ -613,11 +626,11 @@ class ArchiveAndNotesDbTest(
             "00000000-0000-0000-0000-000000009061",
             "00000000-0000-0000-0000-000000009073",
         ).forEach { sessionId ->
-            mockMvc.get("/api/notes/feed") {
-                param("sessionId", sessionId)
-                with(user("member5@example.com"))
-            }
-                .andExpect {
+            mockMvc
+                .get("/api/notes/feed") {
+                    param("sessionId", sessionId)
+                    with(user("member5@example.com"))
+                }.andExpect {
                     status { isOk() }
                     jsonPath("$.items.length()") { value(0) }
                 }
@@ -626,11 +639,11 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `notes feed uses seeded highlight authors`() {
-        mockMvc.get("/api/notes/feed") {
-            param("limit", "120")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("limit", "120")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.kind == 'HIGHLIGHT')].authorName") { value(hasItems("멤버5", "멤버2", "호스트")) }
                 jsonPath("$.items[?(@.kind == 'HIGHLIGHT')].authorShortName") { value(hasItems("멤버5", "멤버2", "호스트")) }
@@ -651,11 +664,11 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `archive detail and notes feed author names use the latest member display name`() {
-        mockMvc.get("/api/notes/feed") {
-            param("sessionId", "00000000-0000-0000-0000-000000000306")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("sessionId", "00000000-0000-0000-0000-000000000306")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.kind == 'QUESTION')].authorName") { value(hasItem("새멤버5")) }
                 jsonPath("$.items[?(@.kind == 'ONE_LINE_REVIEW')].authorName") { value(hasItem("새멤버5")) }
@@ -663,10 +676,10 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.items[*].authorName") { value(not(hasItem("이멤버5"))) }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.publicHighlights[*].authorName") { value(hasItem("새멤버5")) }
                 jsonPath("$.clubQuestions[*].authorName") { value(hasItem("새멤버5")) }
@@ -695,10 +708,10 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `member archive and notes feed anonymize left member authored records`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000301") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000301") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("PUBLISHED") }
                 jsonPath("$.clubQuestions[*].authorName") { value(hasItem("탈퇴한 멤버")) }
@@ -716,11 +729,11 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.publicOneLiners[*].authorShortName") { value(not(hasItem("멤버1"))) }
             }
 
-        mockMvc.get("/api/notes/feed") {
-            param("sessionId", "00000000-0000-0000-0000-000000000301")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                param("sessionId", "00000000-0000-0000-0000-000000000301")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.authorName == '탈퇴한 멤버')].kind") {
                     value(hasItems("QUESTION", "ONE_LINE_REVIEW", "HIGHLIGHT"))
@@ -735,10 +748,10 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `my archive questions returns only current member questions`() {
-        mockMvc.get("/api/archive/me/questions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/me/questions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[0].sessionNumber") { exists() }
                 jsonPath("$.items[0].bookTitle") { exists() }
@@ -761,10 +774,10 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `my archive reviews returns current member long reviews and excludes one-liners`() {
-        mockMvc.get("/api/archive/me/reviews") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/me/reviews") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[*].kind") { value(not(hasItem("ONE_LINE_REVIEW"))) }
                 jsonPath("$.items[0].kind") { value("LONG_REVIEW") }
@@ -788,10 +801,10 @@ class ArchiveAndNotesDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `notes feed returns latest created item first`() {
-        mockMvc.get("/api/notes/feed") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/notes/feed") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[0].kind") { value("QUESTION") }
                 jsonPath("$.items[0].text") { value(LATEST_FEED_QUESTION_TEXT) }
@@ -800,10 +813,10 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `my page returns the current seeded member profile and reading rhythm`() {
-        mockMvc.get("/api/app/me") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/app/me") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.displayName") { value("멤버5") }
                 jsonPath("$.accountName") { value("이멤버5") }
@@ -826,7 +839,8 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `public club endpoint resolves by slug`() {
-        mockMvc.get("/api/public/clubs/reading-sai")
+        mockMvc
+            .get("/api/public/clubs/reading-sai")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.clubName") { exists() }
@@ -835,7 +849,8 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `public club endpoint returns not found for unknown slug`() {
-        mockMvc.get("/api/public/clubs/missing-club")
+        mockMvc
+            .get("/api/public/clubs/missing-club")
             .andExpect {
                 status { isNotFound() }
             }
@@ -843,13 +858,15 @@ class ArchiveAndNotesDbTest(
 
     @Test
     fun `public session endpoint resolves by slug and rejects a session from another club`() {
-        mockMvc.get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306")
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000306") }
             }
 
-        mockMvc.get("/api/public/clubs/sample-book-club/sessions/00000000-0000-0000-0000-000000000306")
+        mockMvc
+            .get("/api/public/clubs/sample-book-club/sessions/00000000-0000-0000-0000-000000000306")
             .andExpect {
                 status { isNotFound() }
             }
@@ -1576,15 +1593,19 @@ class ArchiveAndNotesDbTest(
             userId,
         )
         createdMembershipIds += membershipId
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "ArchiveAndNotesDbTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "ArchiveAndNotesDbTest",
+                ipAddress = "127.0.0.1",
+            )
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun insertViewerSessionParticipant(membershipId: String, sessionId: String) {
+    private fun insertViewerSessionParticipant(
+        membershipId: String,
+        sessionId: String,
+    ) {
         val participantId = UUID.randomUUID().toString()
         jdbcTemplate.update(
             """
@@ -1614,7 +1635,11 @@ class ArchiveAndNotesDbTest(
         createdSessionParticipantIds += participantId
     }
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

@@ -1,10 +1,10 @@
 package com.readmates.publication.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -32,14 +32,17 @@ class PublicControllerDbTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `public club returns real published sessions`() {
-        mockMvc.get("/api/public/club")
+        mockMvc
+            .get("/api/public/club")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.clubName") { value("읽는사이") }
                 jsonPath("$.stats.sessions") { value(6) }
                 jsonPath("$.recentSessions[0].sessionNumber") { value(6) }
                 jsonPath("$.recentSessions[0].bookTitle") { value("가난한 찰리의 연감") }
-                jsonPath("$.recentSessions[0].bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
+                jsonPath(
+                    "$.recentSessions[0].bookImageUrl",
+                ) { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
                 jsonPath("$.recentSessions[0].highlightCount") { value(3) }
                 jsonPath("$.recentSessions[0].oneLinerCount") { value(3) }
                 jsonPath("$.recentSessions[0].meetingUrl") { doesNotExist() }
@@ -49,7 +52,8 @@ class PublicControllerDbTest(
 
     @Test
     fun `public session returns details for published session`() {
-        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
+        mockMvc
+            .get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.sessionNumber") { value(6) }
@@ -80,14 +84,16 @@ class PublicControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `public surfaces keep session one-liners private to members`() {
-        mockMvc.get("/api/public/club")
+        mockMvc
+            .get("/api/public/club")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.recentSessions[0].sessionNumber") { value(6) }
                 jsonPath("$.recentSessions[0].oneLinerCount") { value(2) }
             }
 
-        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
+        mockMvc
+            .get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.oneLiners.length()") { value(2) }
@@ -109,7 +115,8 @@ class PublicControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `public surfaces exclude removed participant authored records`() {
-        mockMvc.get("/api/public/club")
+        mockMvc
+            .get("/api/public/club")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.recentSessions[0].sessionNumber") { value(6) }
@@ -117,7 +124,8 @@ class PublicControllerDbTest(
                 jsonPath("$.recentSessions[0].oneLinerCount") { value(2) }
             }
 
-        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
+        mockMvc
+            .get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.highlights.length()") { value(2) }
@@ -145,7 +153,8 @@ class PublicControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `public session anonymizes left member one-liner authors`() {
-        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000301")
+        mockMvc
+            .get("/api/public/sessions/00000000-0000-0000-0000-000000000301")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.highlights[*].authorName") { value(hasItem("탈퇴한 멤버")) }
@@ -175,7 +184,8 @@ class PublicControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `public club excludes public open session`() {
-        mockMvc.get("/api/public/club")
+        mockMvc
+            .get("/api/public/club")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.stats.sessions") { value(6) }
@@ -201,31 +211,33 @@ class PublicControllerDbTest(
         val sessionId = createSessionSeven()
         updateSessionState(sessionId, "CLOSED")
 
-        mockMvc.put("/api/host/sessions/$sessionId/publication") {
-            with(user("host@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "publicSummary": "아직 공개 완료 전 요약입니다.",
-                  "visibility": "PUBLIC"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "아직 공개 완료 전 요약입니다.",
+                      "visibility": "PUBLIC"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+            }
 
         mockMvc.get("/api/public/sessions/$sessionId").andExpect {
             status { isNotFound() }
         }
 
-        mockMvc.post("/api/host/sessions/$sessionId/publish") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
 
         mockMvc.get("/api/public/sessions/$sessionId").andExpect {
             status { isOk() }
@@ -249,7 +261,8 @@ class PublicControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `club scoped public records expose only published public sessions`() {
-        mockMvc.get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000991")
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000991")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.bookTitle") { value("공개 범위 테스트 책 - 발행 공개") }
@@ -262,13 +275,15 @@ class PublicControllerDbTest(
             "00000000-0000-0000-0000-000000000994",
             "00000000-0000-0000-0000-000000000995",
         ).forEach { sessionId ->
-            mockMvc.get("/api/public/clubs/reading-sai/sessions/$sessionId")
+            mockMvc
+                .get("/api/public/clubs/reading-sai/sessions/$sessionId")
                 .andExpect {
                     status { isNotFound() }
                 }
         }
 
-        mockMvc.get("/api/public/clubs/reading-sai")
+        mockMvc
+            .get("/api/public/clubs/reading-sai")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.stats.sessions") { value(7) }
@@ -296,12 +311,14 @@ class PublicControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `public surfaces hide member visible published session`() {
-        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000997")
+        mockMvc
+            .get("/api/public/sessions/00000000-0000-0000-0000-000000000997")
             .andExpect {
                 status { isNotFound() }
             }
 
-        mockMvc.get("/api/public/club")
+        mockMvc
+            .get("/api/public/club")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.stats.sessions") { value(6) }
@@ -326,12 +343,14 @@ class PublicControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `public surfaces hide host only published session`() {
-        mockMvc.get("/api/public/sessions/00000000-0000-0000-0000-000000000996")
+        mockMvc
+            .get("/api/public/sessions/00000000-0000-0000-0000-000000000996")
             .andExpect {
                 status { isNotFound() }
             }
 
-        mockMvc.get("/api/public/club")
+        mockMvc
+            .get("/api/public/club")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.stats.sessions") { value(6) }
@@ -396,7 +415,10 @@ class PublicControllerDbTest(
         return sessionId
     }
 
-    private fun updateSessionState(sessionId: String, state: String) {
+    private fun updateSessionState(
+        sessionId: String,
+        state: String,
+    ) {
         jdbcTemplate.update(
             """
             update sessions

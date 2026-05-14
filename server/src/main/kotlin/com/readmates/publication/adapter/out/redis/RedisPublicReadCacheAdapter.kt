@@ -1,7 +1,7 @@
 package com.readmates.publication.adapter.out.redis
 
-import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
 import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_ID
+import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.port.out.PublicReadCachePort
@@ -22,21 +22,19 @@ class RedisPublicReadCacheAdapter(
     private val properties: PublicCacheProperties,
     private val metrics: RedisCacheMetrics,
 ) : PublicReadCachePort {
-    override fun getClub(): PublicClubResult? =
-        loadClubFromCache(clubKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID)))
+    override fun getClub(): PublicClubResult? = loadClubFromCache(clubKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID)))
 
-    override fun getClub(clubSlug: String): PublicClubResult? =
-        if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) getClub() else null
+    override fun getClub(clubSlug: String): PublicClubResult? = if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) getClub() else null
 
-    override fun getClub(clubId: UUID): PublicClubResult? =
-        loadClubFromCache(clubKey(clubId))
+    override fun getClub(clubId: UUID): PublicClubResult? = loadClubFromCache(clubKey(clubId))
 
     private fun loadClubFromCache(key: String): PublicClubResult? =
         runCatching {
-            val raw = redisTemplate.opsForValue().get(key) ?: run {
-                recordCacheMiss("club")
-                return null
-            }
+            val raw =
+                redisTemplate.opsForValue().get(key) ?: run {
+                    recordCacheMiss("club")
+                    return null
+                }
             val decoded = codec.decode(raw, PublicClubResult::class.java)
             if (decoded == null) {
                 safeDelete(key)
@@ -58,34 +56,42 @@ class RedisPublicReadCacheAdapter(
         store(clubKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID)), result, properties.clubTtl, "put-club")
     }
 
-    override fun putClub(clubSlug: String, result: PublicClubResult) {
+    override fun putClub(
+        clubSlug: String,
+        result: PublicClubResult,
+    ) {
         if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) {
             putClub(result)
         }
     }
 
-    override fun putClub(clubId: UUID, result: PublicClubResult) {
+    override fun putClub(
+        clubId: UUID,
+        result: PublicClubResult,
+    ) {
         store(clubKey(clubId), result, properties.clubTtl, "put-club")
     }
 
-    override fun getSession(sessionId: UUID): PublicSessionDetailResult? {
-        return loadSessionFromCache(sessionKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID), sessionId))
-    }
+    override fun getSession(sessionId: UUID): PublicSessionDetailResult? =
+        loadSessionFromCache(sessionKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID), sessionId))
 
-    override fun getSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult? {
-        return if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) getSession(sessionId) else null
-    }
+    override fun getSession(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicSessionDetailResult? = if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) getSession(sessionId) else null
 
-    override fun getSession(clubId: UUID, sessionId: UUID): PublicSessionDetailResult? {
-        return loadSessionFromCache(sessionKey(clubId, sessionId))
-    }
+    override fun getSession(
+        clubId: UUID,
+        sessionId: UUID,
+    ): PublicSessionDetailResult? = loadSessionFromCache(sessionKey(clubId, sessionId))
 
     private fun loadSessionFromCache(key: String): PublicSessionDetailResult? =
         runCatching {
-            val raw = redisTemplate.opsForValue().get(key) ?: run {
-                recordCacheMiss("session")
-                return null
-            }
+            val raw =
+                redisTemplate.opsForValue().get(key) ?: run {
+                    recordCacheMiss("session")
+                    return null
+                }
             val decoded = codec.decode(raw, PublicSessionDetailResult::class.java)
             if (decoded == null) {
                 safeDelete(key)
@@ -103,17 +109,28 @@ class RedisPublicReadCacheAdapter(
             null
         }
 
-    override fun putSession(sessionId: UUID, result: PublicSessionDetailResult) {
+    override fun putSession(
+        sessionId: UUID,
+        result: PublicSessionDetailResult,
+    ) {
         store(sessionKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID), sessionId), result, properties.sessionTtl, "put-session")
     }
 
-    override fun putSession(clubSlug: String, sessionId: UUID, result: PublicSessionDetailResult) {
+    override fun putSession(
+        clubSlug: String,
+        sessionId: UUID,
+        result: PublicSessionDetailResult,
+    ) {
         if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) {
             putSession(sessionId, result)
         }
     }
 
-    override fun putSession(clubId: UUID, sessionId: UUID, result: PublicSessionDetailResult) {
+    override fun putSession(
+        clubId: UUID,
+        sessionId: UUID,
+        result: PublicSessionDetailResult,
+    ) {
         store(sessionKey(clubId, sessionId), result, properties.sessionTtl, "put-session")
     }
 
@@ -126,10 +143,11 @@ class RedisPublicReadCacheAdapter(
 
     private fun loadClubIdFromCache(key: String): UUID? =
         runCatching {
-            val raw = redisTemplate.opsForValue().get(key) ?: run {
-                recordCacheMiss("club-id")
-                return null
-            }
+            val raw =
+                redisTemplate.opsForValue().get(key) ?: run {
+                    recordCacheMiss("club-id")
+                    return null
+                }
             recordCacheHit("club-id")
             UUID.fromString(raw)
         }.getOrElse {
@@ -139,13 +157,21 @@ class RedisPublicReadCacheAdapter(
             null
         }
 
-    override fun putClubId(clubSlug: String, clubId: UUID) {
+    override fun putClubId(
+        clubSlug: String,
+        clubId: UUID,
+    ) {
         if (clubSlug != LEGACY_PUBLIC_CLUB_SLUG) {
             storeRaw(clubIdKey(clubSlug), clubId.toString(), properties.clubTtl, "put-club-id")
         }
     }
 
-    private fun store(key: String, result: Any, ttl: Duration, operation: String) {
+    private fun store(
+        key: String,
+        result: Any,
+        ttl: Duration,
+        operation: String,
+    ) {
         if (ttl <= Duration.ZERO) {
             return
         }
@@ -157,7 +183,12 @@ class RedisPublicReadCacheAdapter(
         }
     }
 
-    private fun storeRaw(key: String, value: String, ttl: Duration, operation: String) {
+    private fun storeRaw(
+        key: String,
+        value: String,
+        ttl: Duration,
+        operation: String,
+    ) {
         if (ttl <= Duration.ZERO) {
             return
         }
@@ -196,7 +227,10 @@ class RedisPublicReadCacheAdapter(
     private companion object {
         fun clubKey(clubId: UUID) = "public:club:$clubId:home:v1"
 
-        fun sessionKey(clubId: UUID, sessionId: UUID) = "public:club:$clubId:session:$sessionId:v1"
+        fun sessionKey(
+            clubId: UUID,
+            sessionId: UUID,
+        ) = "public:club:$clubId:session:$sessionId:v1"
 
         fun clubIdKey(clubSlug: String) = "public:club-slug:$clubSlug:id:v1"
     }

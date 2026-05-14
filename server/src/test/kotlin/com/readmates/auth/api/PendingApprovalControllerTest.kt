@@ -1,10 +1,10 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -59,77 +59,87 @@ class PendingApprovalControllerTest(
     fun `viewer user can read pending app summary compatibility route`() {
         val cookie = pendingSessionCookie("pending.summary@example.com")
 
-        mockMvc.get("/api/app/pending") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
-            jsonPath("$.approvalState") { value("VIEWER") }
-            jsonPath("$.clubName") { value("ReadMates") }
-            jsonPath("$.currentSession.sessionNumber") { value(2) }
-            jsonPath("$.currentSession.title") { value("2회차 · 열린 책") }
-            jsonPath("$.currentSession.bookTitle") { value("열린 책") }
-            jsonPath("$.currentSession.bookAuthor") { value("열린 저자") }
-            jsonPath("$.currentSession.date") { value("2026-05-20") }
-            jsonPath("$.currentSession.locationLabel") { value("온라인") }
-        }
+        mockMvc
+            .get("/api/app/pending") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
+                jsonPath("$.approvalState") { value("VIEWER") }
+                jsonPath("$.clubName") { value("ReadMates") }
+                jsonPath("$.currentSession.sessionNumber") { value(2) }
+                jsonPath("$.currentSession.title") { value("2회차 · 열린 책") }
+                jsonPath("$.currentSession.bookTitle") { value("열린 책") }
+                jsonPath("$.currentSession.bookAuthor") { value("열린 저자") }
+                jsonPath("$.currentSession.date") { value("2026-05-20") }
+                jsonPath("$.currentSession.locationLabel") { value("온라인") }
+            }
     }
 
     @Test
     fun `viewer user can read viewer app summary route`() {
         val cookie = pendingSessionCookie("viewer.summary@example.com")
 
-        mockMvc.get("/api/app/viewer") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
-            jsonPath("$.approvalState") { value("VIEWER") }
-            jsonPath("$.clubName") { value("ReadMates") }
-            jsonPath("$.currentSession.sessionNumber") { value(2) }
-        }
+        mockMvc
+            .get("/api/app/viewer") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                content { contentTypeCompatibleWith(MediaType.APPLICATION_JSON) }
+                jsonPath("$.approvalState") { value("VIEWER") }
+                jsonPath("$.clubName") { value("ReadMates") }
+                jsonPath("$.currentSession.sessionNumber") { value(2) }
+            }
     }
 
     @Test
     fun `pending approval summary returns null current session when club has no open or published session`() {
-        val cookie = pendingSessionCookie(
-            email = "pending.no-session@example.com",
-            withSessions = false,
-        )
+        val cookie =
+            pendingSessionCookie(
+                email = "pending.no-session@example.com",
+                withSessions = false,
+            )
 
-        mockMvc.get("/api/app/pending") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.approvalState") { value("VIEWER") }
-            jsonPath("$.clubName") { value("ReadMates") }
-            jsonPath("$.currentSession") { value(null) }
-        }
+        mockMvc
+            .get("/api/app/pending") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.approvalState") { value("VIEWER") }
+                jsonPath("$.clubName") { value("ReadMates") }
+                jsonPath("$.currentSession") { value(null) }
+            }
     }
 
     @Test
     fun `active member cannot read pending app summary`() {
-        val cookie = memberSessionCookie(
-            email = "active.pending-summary@example.com",
-            membershipStatus = "ACTIVE",
-        )
+        val cookie =
+            memberSessionCookie(
+                email = "active.pending-summary@example.com",
+                membershipStatus = "ACTIVE",
+            )
 
-        mockMvc.get("/api/app/pending") {
-            cookie(cookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/app/pending") {
+                cookie(cookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `anonymous user cannot read pending app summary`() {
-        mockMvc.get("/api/app/pending")
+        mockMvc
+            .get("/api/app/pending")
             .andExpect {
                 status { isUnauthorized() }
             }
     }
 
-    private fun pendingSessionCookie(email: String, withSessions: Boolean = true): Cookie =
+    private fun pendingSessionCookie(
+        email: String,
+        withSessions: Boolean = true,
+    ): Cookie =
         memberSessionCookie(
             email = email,
             membershipStatus = "VIEWER",
@@ -212,11 +222,12 @@ class PendingApprovalControllerTest(
             )
         }
 
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "PendingApprovalControllerTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "PendingApprovalControllerTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
@@ -257,7 +268,11 @@ class PendingApprovalControllerTest(
         createdSessionIds += sessionId
     }
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

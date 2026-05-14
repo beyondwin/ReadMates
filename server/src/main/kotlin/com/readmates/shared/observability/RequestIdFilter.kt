@@ -14,11 +14,16 @@ class RequestIdFilter : OncePerRequestFilter() {
         filterChain: FilterChain,
     ) {
         val incoming = request.getHeader(HEADER)
-        val id = if (incoming != null && ALLOWED.matches(incoming)) {
-            incoming
-        } else {
-            UUID.randomUUID().toString().replace("-", "").take(12)
-        }
+        val id =
+            if (incoming != null && ALLOWED.matches(incoming)) {
+                incoming
+            } else {
+                UUID
+                    .randomUUID()
+                    .toString()
+                    .replace("-", "")
+                    .take(12)
+            }
         MDC.put(MDC_KEY, id)
         response.setHeader(HEADER, id)
         try {

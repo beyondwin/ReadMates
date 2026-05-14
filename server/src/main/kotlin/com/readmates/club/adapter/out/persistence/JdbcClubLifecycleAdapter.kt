@@ -11,15 +11,19 @@ import java.util.UUID
 class JdbcClubLifecycleAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : ClubLifecyclePort {
-
     override fun loadCurrentStatus(clubId: UUID): ClubStatus? =
-        jdbcTemplate.query(
-            "select status from clubs where id = ? limit 1",
-            { rs, _ -> ClubStatus.valueOf(rs.getString("status")) },
-            clubId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                "select status from clubs where id = ? limit 1",
+                { rs, _ -> ClubStatus.valueOf(rs.getString("status")) },
+                clubId.dbString(),
+            ).firstOrNull()
 
-    override fun transitionStatus(clubId: UUID, from: ClubStatus, to: ClubStatus): Boolean =
+    override fun transitionStatus(
+        clubId: UUID,
+        from: ClubStatus,
+        to: ClubStatus,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update clubs

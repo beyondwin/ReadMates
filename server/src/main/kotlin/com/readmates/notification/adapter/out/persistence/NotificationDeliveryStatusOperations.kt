@@ -12,18 +12,26 @@ import kotlin.math.max
 private const val MAX_DELIVERY_ERROR_LENGTH = 500
 
 internal class NotificationDeliveryStatusOperations {
-    fun findDeliveryStatus(jdbcTemplate: JdbcTemplate, id: UUID): NotificationDeliveryStatus? =
-        jdbcTemplate.query(
-            """
-            select status
-            from notification_deliveries
-            where id = ?
-            """.trimIndent(),
-            { resultSet, _ -> NotificationDeliveryStatus.valueOf(resultSet.getString("status")) },
-            id.dbString(),
-        ).firstOrNull()
+    fun findDeliveryStatus(
+        jdbcTemplate: JdbcTemplate,
+        id: UUID,
+    ): NotificationDeliveryStatus? =
+        jdbcTemplate
+            .query(
+                """
+                select status
+                from notification_deliveries
+                where id = ?
+                """.trimIndent(),
+                { resultSet, _ -> NotificationDeliveryStatus.valueOf(resultSet.getString("status")) },
+                id.dbString(),
+            ).firstOrNull()
 
-    fun markDeliverySent(jdbcTemplate: JdbcTemplate, id: UUID, lockedAt: OffsetDateTime): Boolean =
+    fun markDeliverySent(
+        jdbcTemplate: JdbcTemplate,
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update notification_deliveries
@@ -66,7 +74,12 @@ internal class NotificationDeliveryStatusOperations {
             lockedAt.toUtcLocalDateTime(),
         ) > 0
 
-    fun markDeliveryDead(jdbcTemplate: JdbcTemplate, id: UUID, lockedAt: OffsetDateTime, error: String): Boolean =
+    fun markDeliveryDead(
+        jdbcTemplate: JdbcTemplate,
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update notification_deliveries
@@ -85,7 +98,11 @@ internal class NotificationDeliveryStatusOperations {
             lockedAt.toUtcLocalDateTime(),
         ) > 0
 
-    fun restoreDeadEmailDeliveryForClub(jdbcTemplate: JdbcTemplate, clubId: UUID, id: UUID): Boolean =
+    fun restoreDeadEmailDeliveryForClub(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+        id: UUID,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update notification_deliveries

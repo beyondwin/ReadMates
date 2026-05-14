@@ -19,105 +19,113 @@ import java.util.UUID
 class JdbcPublicQueryAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : LoadPublishedPublicDataPort {
-    override fun loadClub(): PublicClubResult? =
-        loadClub(LEGACY_PUBLIC_CLUB_SLUG)
+    override fun loadClub(): PublicClubResult? = loadClub(LEGACY_PUBLIC_CLUB_SLUG)
 
-    override fun loadClub(clubSlug: String): PublicClubResult? {
+    override fun loadClub(clubSlug: String): PublicClubResult? =
+        jdbcTemplate
+            .query(
+                """
+                select id, name, tagline, about
+                from clubs
+                where slug = ?
+                  and status = 'ACTIVE'
+                """.trimIndent(),
+                { rs, _ ->
+                    val clubId = rs.uuid("id")
+                    PublicClubResult(
+                        clubName = rs.getString("name"),
+                        tagline = rs.getString("tagline"),
+                        about = rs.getString("about"),
+                        stats = publicStats(jdbcTemplate, clubId),
+                        recentSessions = publicSessions(jdbcTemplate, clubId),
+                    )
+                },
+                clubSlug,
+            ).firstOrNull()
 
-        return jdbcTemplate.query(
-            """
-            select id, name, tagline, about
-            from clubs
-            where slug = ?
-              and status = 'ACTIVE'
-            """.trimIndent(),
-            { rs, _ ->
-                val clubId = rs.uuid("id")
-                PublicClubResult(
-                    clubName = rs.getString("name"),
-                    tagline = rs.getString("tagline"),
-                    about = rs.getString("about"),
-                    stats = publicStats(jdbcTemplate, clubId),
-                    recentSessions = publicSessions(jdbcTemplate, clubId),
-                )
-            },
-            clubSlug,
-        ).firstOrNull()
-    }
+    override fun loadSession(sessionId: UUID): PublicSessionDetailResult? = loadSession(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
 
-    override fun loadSession(sessionId: UUID): PublicSessionDetailResult? =
-        loadSession(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
+    override fun loadSession(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicSessionDetailResult? =
+        jdbcTemplate
+            .query(
+                """
+                select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
+                       public_session_publications.public_summary
+                from sessions
+                join clubs on clubs.id = sessions.club_id
+                join public_session_publications on public_session_publications.session_id = sessions.id
+                  and public_session_publications.club_id = sessions.club_id
+                where clubs.slug = ?
+                  and clubs.status = 'ACTIVE'
+                  and sessions.id = ?
+                  and sessions.state = 'PUBLISHED'
+                  and public_session_publications.visibility = 'PUBLIC'
+                """.trimIndent(),
+                { rs, _ ->
+                    PublicSessionDetailResult(
+                        sessionId = rs.uuid("id").toString(),
+                        sessionNumber = rs.getInt("number"),
+                        bookTitle = rs.getString("book_title"),
+                        bookAuthor = rs.getString("book_author"),
+                        bookImageUrl = rs.getString("book_image_url"),
+                        date = rs.getObject("session_date", LocalDate::class.java).toString(),
+                        summary = rs.getString("public_summary"),
+                        highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), sessionId),
+                        oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), sessionId),
+                    )
+                },
+                clubSlug,
+                sessionId.dbString(),
+            ).firstOrNull()
 
-    override fun loadSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult? {
-
-        return jdbcTemplate.query(
-            """
-            select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
-                   public_session_publications.public_summary
-            from sessions
-            join clubs on clubs.id = sessions.club_id
-            join public_session_publications on public_session_publications.session_id = sessions.id
-              and public_session_publications.club_id = sessions.club_id
-            where clubs.slug = ?
-              and clubs.status = 'ACTIVE'
-              and sessions.id = ?
-              and sessions.state = 'PUBLISHED'
-              and public_session_publications.visibility = 'PUBLIC'
-            """.trimIndent(),
-            { rs, _ ->
-                PublicSessionDetailResult(
-                    sessionId = rs.uuid("id").toString(),
-                    sessionNumber = rs.getInt("number"),
-                    bookTitle = rs.getString("book_title"),
-                    bookAuthor = rs.getString("book_author"),
-                    bookImageUrl = rs.getString("book_image_url"),
-                    date = rs.getObject("session_date", LocalDate::class.java).toString(),
-                    summary = rs.getString("public_summary"),
-                    highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), sessionId),
-                    oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), sessionId),
-                )
-            },
-            clubSlug,
-            sessionId.dbString(),
-        ).firstOrNull()
-    }
-
-    private fun publicStats(jdbcTemplate: JdbcTemplate, clubId: UUID): PublicClubStatsResult =
+    private fun publicStats(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+    ): PublicClubStatsResult =
         PublicClubStatsResult(
-            sessions = jdbcTemplate.queryForObject(
-                """
-                select count(*)
-                from sessions
-                join public_session_publications on public_session_publications.session_id = sessions.id
-                  and public_session_publications.club_id = sessions.club_id
-                where sessions.club_id = ?
-                  and sessions.state = 'PUBLISHED'
-                  and public_session_publications.visibility = 'PUBLIC'
-                """.trimIndent(),
-                Int::class.java,
-                clubId.dbString(),
-            ) ?: 0,
-            books = jdbcTemplate.queryForObject(
-                """
-                select count(distinct sessions.book_title)
-                from sessions
-                join public_session_publications on public_session_publications.session_id = sessions.id
-                  and public_session_publications.club_id = sessions.club_id
-                where sessions.club_id = ?
-                  and sessions.state = 'PUBLISHED'
-                  and public_session_publications.visibility = 'PUBLIC'
-                """.trimIndent(),
-                Int::class.java,
-                clubId.dbString(),
-            ) ?: 0,
-            members = jdbcTemplate.queryForObject(
-                "select count(*) from memberships where club_id = ? and status = 'ACTIVE'",
-                Int::class.java,
-                clubId.dbString(),
-            ) ?: 0,
+            sessions =
+                jdbcTemplate.queryForObject(
+                    """
+                    select count(*)
+                    from sessions
+                    join public_session_publications on public_session_publications.session_id = sessions.id
+                      and public_session_publications.club_id = sessions.club_id
+                    where sessions.club_id = ?
+                      and sessions.state = 'PUBLISHED'
+                      and public_session_publications.visibility = 'PUBLIC'
+                    """.trimIndent(),
+                    Int::class.java,
+                    clubId.dbString(),
+                ) ?: 0,
+            books =
+                jdbcTemplate.queryForObject(
+                    """
+                    select count(distinct sessions.book_title)
+                    from sessions
+                    join public_session_publications on public_session_publications.session_id = sessions.id
+                      and public_session_publications.club_id = sessions.club_id
+                    where sessions.club_id = ?
+                      and sessions.state = 'PUBLISHED'
+                      and public_session_publications.visibility = 'PUBLIC'
+                    """.trimIndent(),
+                    Int::class.java,
+                    clubId.dbString(),
+                ) ?: 0,
+            members =
+                jdbcTemplate.queryForObject(
+                    "select count(*) from memberships where club_id = ? and status = 'ACTIVE'",
+                    Int::class.java,
+                    clubId.dbString(),
+                ) ?: 0,
         )
 
-    private fun publicSessions(jdbcTemplate: JdbcTemplate, clubId: UUID): List<PublicSessionSummaryResult> =
+    private fun publicSessions(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+    ): List<PublicSessionSummaryResult> =
         jdbcTemplate.query(
             """
             select sessions.id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
@@ -179,7 +187,11 @@ class JdbcPublicQueryAdapter(
             clubId.dbString(),
         )
 
-    private fun publicHighlights(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicHighlightResult> =
+    private fun publicHighlights(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+        sessionId: UUID,
+    ): List<PublicHighlightResult> =
         jdbcTemplate.query(
             """
             select
@@ -214,7 +226,11 @@ class JdbcPublicQueryAdapter(
             sessionId.dbString(),
         )
 
-    private fun publicOneLiners(jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID): List<PublicOneLinerResult> =
+    private fun publicOneLiners(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+        sessionId: UUID,
+    ): List<PublicOneLinerResult> =
         jdbcTemplate.query(
             """
             select

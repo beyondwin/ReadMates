@@ -50,21 +50,22 @@ class FeedbackDocumentService(
         requireReadableFeedbackMember(currentMember)
         val page = feedbackDocumentStorePort.listLatestReadableDocuments(currentMember, pageRequest)
         return CursorPage(
-            items = page.items.mapNotNull { document ->
-                when {
-                    document.title != null -> document.toListItem(document.title)
-                    document.legacySourceText != null -> {
-                        val parsedDocument = parseStoredListDocument(document.legacySourceText)
-                        when {
-                            parsedDocument != null -> document.toListItem(parsedDocument.title)
-                            currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
-                            else -> null
+            items =
+                page.items.mapNotNull { document ->
+                    when {
+                        document.title != null -> document.toListItem(document.title)
+                        document.legacySourceText != null -> {
+                            val parsedDocument = parseStoredListDocument(document.legacySourceText)
+                            when {
+                                parsedDocument != null -> document.toListItem(parsedDocument.title)
+                                currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
+                                else -> null
+                            }
                         }
+                        currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
+                        else -> null
                     }
-                    currentMember.isHost -> document.toListItem(FALLBACK_INVALID_DOCUMENT_TITLE)
-                    else -> null
-                }
-            },
+                },
             nextCursor = page.nextCursor,
         )
     }
@@ -101,8 +102,7 @@ class FeedbackDocumentService(
         )
     }
 
-    override fun authorizeHostFeedbackDocumentUpload(currentMember: CurrentMember) =
-        requireHostFeedbackDocumentUploadAccess(currentMember)
+    override fun authorizeHostFeedbackDocumentUpload(currentMember: CurrentMember) = requireHostFeedbackDocumentUploadAccess(currentMember)
 
     @Transactional
     override fun uploadHostFeedbackDocument(
@@ -112,8 +112,9 @@ class FeedbackDocumentService(
         requireHostFeedbackDocumentUploadAccess(currentMember)
         return runCatching {
             val parsedDocument = parser.parse(command.sourceText)
-            val session = feedbackDocumentStorePort.findSessionForUpload(currentMember.clubId, command.sessionId)
-                ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
+            val session =
+                feedbackDocumentStorePort.findSessionForUpload(currentMember.clubId, command.sessionId)
+                    ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
             val version = feedbackDocumentStorePort.nextDocumentVersion(currentMember.clubId, command.sessionId)
             feedbackDocumentStorePort.insertDocument(
                 currentMember = currentMember,
@@ -130,11 +131,12 @@ class FeedbackDocumentService(
                 documentVersion = version,
             )
 
-            val storedDocument = feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)
-                ?: throw FeedbackDocumentException(
-                    FeedbackDocumentError.STORAGE_UNAVAILABLE,
-                    "Stored feedback document not found after upload",
-                )
+            val storedDocument =
+                feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)
+                    ?: throw FeedbackDocumentException(
+                        FeedbackDocumentError.STORAGE_UNAVAILABLE,
+                        "Stored feedback document not found after upload",
+                    )
             storedDocument.toResponse(session, parsedDocument)
         }.onSuccess {
             operationalMetrics.feedbackUploadSucceeded()
@@ -168,11 +170,12 @@ class FeedbackDocumentService(
     ): ParsedFeedbackDocument =
         runCatching { parser.parse(sourceText) }
             .getOrElse {
-                val reason = if (currentMember.isHost) {
-                    FALLBACK_INVALID_DOCUMENT_TITLE
-                } else {
-                    "피드백 문서를 불러올 수 없습니다."
-                }
+                val reason =
+                    if (currentMember.isHost) {
+                        FALLBACK_INVALID_DOCUMENT_TITLE
+                    } else {
+                        "피드백 문서를 불러올 수 없습니다."
+                    }
                 throw FeedbackDocumentException(FeedbackDocumentError.INVALID_STORED_DOCUMENT, reason)
             }
 
@@ -202,29 +205,32 @@ class FeedbackDocumentService(
             uploadedAt = uploadedAt.toString(),
             metadata = parsedDocument.metadata.map { FeedbackMetadataItemResult(it.label, it.value) },
             observerNotes = parsedDocument.observerNotes,
-            participants = parsedDocument.participants.map { participant ->
-                FeedbackParticipantResult(
-                    number = participant.number,
-                    name = participant.name,
-                    role = participant.role,
-                    style = participant.styleParagraphs,
-                    contributions = participant.contributionBullets,
-                    problems = participant.problems.map { problem ->
-                        FeedbackProblemResult(
-                            title = problem.title,
-                            core = problem.core,
-                            evidence = problem.evidence,
-                            interpretation = problem.interpretation,
-                        )
-                    },
-                    actionItems = participant.actionItems,
-                    revealingQuote = FeedbackRevealingQuoteResult(
-                        quote = participant.revealingQuote.quote,
-                        context = participant.revealingQuote.context,
-                        note = participant.revealingQuote.note,
-                    ),
-                )
-            },
+            participants =
+                parsedDocument.participants.map { participant ->
+                    FeedbackParticipantResult(
+                        number = participant.number,
+                        name = participant.name,
+                        role = participant.role,
+                        style = participant.styleParagraphs,
+                        contributions = participant.contributionBullets,
+                        problems =
+                            participant.problems.map { problem ->
+                                FeedbackProblemResult(
+                                    title = problem.title,
+                                    core = problem.core,
+                                    evidence = problem.evidence,
+                                    interpretation = problem.interpretation,
+                                )
+                            },
+                        actionItems = participant.actionItems,
+                        revealingQuote =
+                            FeedbackRevealingQuoteResult(
+                                quote = participant.revealingQuote.quote,
+                                context = participant.revealingQuote.context,
+                                note = participant.revealingQuote.note,
+                            ),
+                    )
+                },
         )
 
     private companion object {

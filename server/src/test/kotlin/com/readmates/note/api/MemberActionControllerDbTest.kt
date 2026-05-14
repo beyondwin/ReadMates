@@ -1,9 +1,9 @@
 package com.readmates.note.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -36,38 +36,41 @@ class MemberActionControllerDbTest(
 
     @Test
     fun `rsvp returns conflict when no open session exists`() {
-        mockMvc.patch("/api/sessions/current/rsvp") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"status":"GOING"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .patch("/api/sessions/current/rsvp") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"status":"GOING"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `checkin returns conflict when no open session exists`() {
-        mockMvc.put("/api/sessions/current/checkin") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .put("/api/sessions/current/checkin") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"readingProgress":80}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `question returns conflict when no open session exists`() {
-        mockMvc.post("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"priority":1,"text":"무엇을 이야기하면 좋을까요?","draftThought":"첫 생각"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"priority":1,"text":"무엇을 이야기하면 좋을까요?","draftThought":"첫 생각"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
@@ -84,14 +87,15 @@ class MemberActionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `checkin returns conflict when member is not a participant in open session`() {
-        mockMvc.put("/api/sessions/current/checkin") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .put("/api/sessions/current/checkin") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"readingProgress":80}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
@@ -108,14 +112,15 @@ class MemberActionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `question returns conflict when member is not a participant in open session`() {
-        mockMvc.post("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"priority":1,"text":"참가자가 아닌 질문","draftThought":null}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"priority":1,"text":"참가자가 아닌 질문","draftThought":null}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
@@ -137,14 +142,15 @@ class MemberActionControllerDbTest(
             """.trimIndent(),
         )
 
-        mockMvc.post("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"priority":1,"text":"정지 중 질문","draftThought":null}"""
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"priority":1,"text":"정지 중 질문","draftThought":null}"""
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
@@ -168,14 +174,15 @@ class MemberActionControllerDbTest(
             """.trimIndent(),
         )
 
-        mockMvc.put("/api/sessions/current/checkin") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80}"""
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .put("/api/sessions/current/checkin") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"readingProgress":80}"""
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
@@ -193,29 +200,31 @@ class MemberActionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `persists checkin reading progress for current member`() {
-        mockMvc.put("/api/sessions/current/checkin") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.readingProgress") { value(80) }
-            jsonPath("$.note") { doesNotExist() }
-        }
+        mockMvc
+            .put("/api/sessions/current/checkin") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"readingProgress":80}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.readingProgress") { value(80) }
+                jsonPath("$.note") { doesNotExist() }
+            }
 
-        val readingProgress = jdbcTemplate.queryForObject(
-            """
-            select reading_checkins.reading_progress
-            from reading_checkins
-            join memberships on memberships.id = reading_checkins.membership_id
-              and memberships.club_id = reading_checkins.club_id
-            join users on users.id = memberships.user_id
-            where reading_checkins.session_id = '00000000-0000-0000-0000-000000009102'
-              and users.email = 'member5@example.com'
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val readingProgress =
+            jdbcTemplate.queryForObject(
+                """
+                select reading_checkins.reading_progress
+                from reading_checkins
+                join memberships on memberships.id = reading_checkins.membership_id
+                  and memberships.club_id = reading_checkins.club_id
+                join users on users.id = memberships.user_id
+                where reading_checkins.session_id = '00000000-0000-0000-0000-000000009102'
+                  and users.email = 'member5@example.com'
+                """.trimIndent(),
+                Int::class.java,
+            )
         assertEquals(80, readingProgress)
     }
 
@@ -234,99 +243,109 @@ class MemberActionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `persists one-line and long reviews for current member`() {
-        mockMvc.post("/api/sessions/current/one-line-reviews") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"text":"저장된 한줄평"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.text") { value("저장된 한줄평") }
-        }
+        mockMvc
+            .post("/api/sessions/current/one-line-reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"text":"저장된 한줄평"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.text") { value("저장된 한줄평") }
+            }
 
-        mockMvc.post("/api/sessions/current/reviews") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"body":"저장된 장문 서평"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.body") { value("저장된 장문 서평") }
-        }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":"저장된 장문 서평"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.body") { value("저장된 장문 서평") }
+            }
 
-        val oneLineReview = jdbcTemplate.query(
-            """
-            select one_line_reviews.text
-            from one_line_reviews
-            join memberships on memberships.id = one_line_reviews.membership_id
-              and memberships.club_id = one_line_reviews.club_id
-            join users on users.id = memberships.user_id
-            where one_line_reviews.session_id = '00000000-0000-0000-0000-000000009102'
-              and users.email = 'member5@example.com'
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("text") },
-        ).firstOrNull()
-        val oneLineReviewVisibility = jdbcTemplate.query(
-            """
-            select one_line_reviews.visibility
-            from one_line_reviews
-            join memberships on memberships.id = one_line_reviews.membership_id
-              and memberships.club_id = one_line_reviews.club_id
-            join users on users.id = memberships.user_id
-            where one_line_reviews.session_id = '00000000-0000-0000-0000-000000009102'
-              and users.email = 'member5@example.com'
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("visibility") },
-        ).firstOrNull()
-        val longReview = jdbcTemplate.query(
-            """
-            select long_reviews.body
-            from long_reviews
-            join memberships on memberships.id = long_reviews.membership_id
-              and memberships.club_id = long_reviews.club_id
-            join users on users.id = memberships.user_id
-            where long_reviews.session_id = '00000000-0000-0000-0000-000000009102'
-              and users.email = 'member5@example.com'
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("body") },
-        ).firstOrNull()
+        val oneLineReview =
+            jdbcTemplate
+                .query(
+                    """
+                    select one_line_reviews.text
+                    from one_line_reviews
+                    join memberships on memberships.id = one_line_reviews.membership_id
+                      and memberships.club_id = one_line_reviews.club_id
+                    join users on users.id = memberships.user_id
+                    where one_line_reviews.session_id = '00000000-0000-0000-0000-000000009102'
+                      and users.email = 'member5@example.com'
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.getString("text") },
+                ).firstOrNull()
+        val oneLineReviewVisibility =
+            jdbcTemplate
+                .query(
+                    """
+                    select one_line_reviews.visibility
+                    from one_line_reviews
+                    join memberships on memberships.id = one_line_reviews.membership_id
+                      and memberships.club_id = one_line_reviews.club_id
+                    join users on users.id = memberships.user_id
+                    where one_line_reviews.session_id = '00000000-0000-0000-0000-000000009102'
+                      and users.email = 'member5@example.com'
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.getString("visibility") },
+                ).firstOrNull()
+        val longReview =
+            jdbcTemplate
+                .query(
+                    """
+                    select long_reviews.body
+                    from long_reviews
+                    join memberships on memberships.id = long_reviews.membership_id
+                      and memberships.club_id = long_reviews.club_id
+                    join users on users.id = memberships.user_id
+                    where long_reviews.session_id = '00000000-0000-0000-0000-000000009102'
+                      and users.email = 'member5@example.com'
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.getString("body") },
+                ).firstOrNull()
 
         assertEquals("저장된 한줄평", oneLineReview)
         assertEquals("SESSION", oneLineReviewVisibility)
         assertEquals("저장된 장문 서평", longReview)
 
-        val oneLineReviewSessionNumbers = jdbcTemplate.query(
-            """
-            select sessions.number
-            from one_line_reviews
-            join sessions on sessions.id = one_line_reviews.session_id
-              and sessions.club_id = one_line_reviews.club_id
-            join memberships on memberships.id = one_line_reviews.membership_id
-              and memberships.club_id = one_line_reviews.club_id
-            join users on users.id = memberships.user_id
-            where one_line_reviews.club_id = '00000000-0000-0000-0000-000000000001'
-              and sessions.number in (97, 99)
-              and users.email = 'member5@example.com'
-            order by sessions.number
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getInt("number") },
-        )
-        val longReviewSessionNumbers = jdbcTemplate.query(
-            """
-            select sessions.number
-            from long_reviews
-            join sessions on sessions.id = long_reviews.session_id
-              and sessions.club_id = long_reviews.club_id
-            join memberships on memberships.id = long_reviews.membership_id
-              and memberships.club_id = long_reviews.club_id
-            join users on users.id = memberships.user_id
-            where long_reviews.club_id = '00000000-0000-0000-0000-000000000001'
-              and sessions.number in (97, 99)
-              and users.email = 'member5@example.com'
-            order by sessions.number
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getInt("number") },
-        )
+        val oneLineReviewSessionNumbers =
+            jdbcTemplate.query(
+                """
+                select sessions.number
+                from one_line_reviews
+                join sessions on sessions.id = one_line_reviews.session_id
+                  and sessions.club_id = one_line_reviews.club_id
+                join memberships on memberships.id = one_line_reviews.membership_id
+                  and memberships.club_id = one_line_reviews.club_id
+                join users on users.id = memberships.user_id
+                where one_line_reviews.club_id = '00000000-0000-0000-0000-000000000001'
+                  and sessions.number in (97, 99)
+                  and users.email = 'member5@example.com'
+                order by sessions.number
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getInt("number") },
+            )
+        val longReviewSessionNumbers =
+            jdbcTemplate.query(
+                """
+                select sessions.number
+                from long_reviews
+                join sessions on sessions.id = long_reviews.session_id
+                  and sessions.club_id = long_reviews.club_id
+                join memberships on memberships.id = long_reviews.membership_id
+                  and memberships.club_id = long_reviews.club_id
+                join users on users.id = memberships.user_id
+                where long_reviews.club_id = '00000000-0000-0000-0000-000000000001'
+                  and sessions.number in (97, 99)
+                  and users.email = 'member5@example.com'
+                order by sessions.number
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getInt("number") },
+            )
 
         assertEquals(listOf(99), oneLineReviewSessionNumbers)
         assertEquals(listOf(99), longReviewSessionNumbers)
@@ -347,38 +366,41 @@ class MemberActionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `blank long review save clears the current member review`() {
-        mockMvc.post("/api/sessions/current/reviews") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"body":"저장 후 지울 장문 서평"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.body") { value("저장 후 지울 장문 서평") }
-        }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":"저장 후 지울 장문 서평"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.body") { value("저장 후 지울 장문 서평") }
+            }
 
-        mockMvc.post("/api/sessions/current/reviews") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"body":" "}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.body") { value("") }
-        }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":" "}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.body") { value("") }
+            }
 
-        val longReviewCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from long_reviews
-            join memberships on memberships.id = long_reviews.membership_id
-              and memberships.club_id = long_reviews.club_id
-            join users on users.id = memberships.user_id
-            where long_reviews.session_id = '00000000-0000-0000-0000-000000009102'
-              and users.email = 'member5@example.com'
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val longReviewCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from long_reviews
+                join memberships on memberships.id = long_reviews.membership_id
+                  and memberships.club_id = long_reviews.club_id
+                join users on users.id = memberships.user_id
+                where long_reviews.session_id = '00000000-0000-0000-0000-000000009102'
+                  and users.email = 'member5@example.com'
+                """.trimIndent(),
+                Int::class.java,
+            )
 
         assertEquals(0, longReviewCount)
     }
@@ -398,23 +420,25 @@ class MemberActionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `reviews conflict when current session excludes member even if older open session includes member`() {
-        mockMvc.post("/api/sessions/current/one-line-reviews") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"text":"저장되면 안 되는 한줄평"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/sessions/current/one-line-reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"text":"저장되면 안 되는 한줄평"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
-        mockMvc.post("/api/sessions/current/reviews") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"body":"저장되면 안 되는 장문 서평"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":"저장되면 안 되는 장문 서평"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
         val oneLineReviewCount = reviewCountForLatestOpenSessionWithoutMemberScenario("one_line_reviews")
         val longReviewCount = reviewCountForLatestOpenSessionWithoutMemberScenario("long_reviews")
@@ -438,14 +462,15 @@ class MemberActionControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `older removed participation does not make latest non participant forbidden`() {
-        mockMvc.put("/api/sessions/current/checkin") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"readingProgress":80}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .put("/api/sessions/current/checkin") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"readingProgress":80}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     private fun reviewCountForLatestOpenSessionWithoutMemberScenario(tableName: String): Int =

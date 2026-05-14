@@ -6,8 +6,27 @@ import java.util.UUID
 
 interface NotificationDeliveryStatusPort {
     fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus?
-    fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean
-    fun markDeliveryFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean
-    fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean
-    fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean
+
+    fun markDeliverySent(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean
+
+    fun markDeliveryFailed(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+        nextAttemptDelayMinutes: Long,
+    ): Boolean
+
+    fun markDeliveryDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean
+
+    fun restoreDeadEmailDeliveryForClub(
+        clubId: UUID,
+        id: UUID,
+    ): Boolean
 }

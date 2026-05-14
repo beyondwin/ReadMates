@@ -5,7 +5,16 @@ import java.util.UUID
 
 interface NotificationDeliveryClaimPort {
     fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem?
+
     fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem>
-    fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem>
-    fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem?
+
+    fun claimEmailDeliveriesForClub(
+        clubId: UUID,
+        limit: Int,
+    ): List<ClaimedNotificationDeliveryItem>
+
+    fun claimHostEmailDelivery(
+        clubId: UUID,
+        id: UUID,
+    ): ClaimedNotificationDeliveryItem?
 }

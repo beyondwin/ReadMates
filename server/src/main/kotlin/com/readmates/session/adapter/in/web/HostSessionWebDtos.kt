@@ -24,9 +24,10 @@ data class HostSessionRequest(
     @field:Size(max = 255) val meetingPasscode: String? = null,
 ) {
     @AssertTrue(message = "date must be a valid ISO calendar date")
-    fun isValidCalendarDate(): Boolean = runCatching {
-        LocalDate.parse(date)
-    }.isSuccess
+    fun isValidCalendarDate(): Boolean =
+        runCatching {
+            LocalDate.parse(date)
+        }.isSuccess
 
     @AssertTrue(message = "startTime and endTime must be valid local times")
     fun hasValidTimeRange(): Boolean {
@@ -37,9 +38,10 @@ data class HostSessionRequest(
 
     @AssertTrue(message = "questionDeadlineAt must be an ISO offset datetime")
     fun hasValidQuestionDeadline(): Boolean =
-        questionDeadlineAt.isNullOrBlank() || runCatching {
-            java.time.OffsetDateTime.parse(questionDeadlineAt)
-        }.isSuccess
+        questionDeadlineAt.isNullOrBlank() ||
+            runCatching {
+                java.time.OffsetDateTime.parse(questionDeadlineAt)
+            }.isSuccess
 
     @AssertTrue(message = "bookLink must be an https URL")
     fun hasAllowedBookLink(): Boolean = isHttpsUrlOrBlank(bookLink)

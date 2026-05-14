@@ -18,9 +18,28 @@ data class ViewerMemberRow(
 )
 
 interface MemberApprovalStorePort {
-    fun listPendingViewers(clubId: UUID, pageRequest: PageRequest): CursorPage<ViewerMemberRow>
-    fun activateViewer(clubId: UUID, membershipId: UUID): Boolean
-    fun deactivateViewer(clubId: UUID, membershipId: UUID): Boolean
-    fun addToCurrentOpenSession(clubId: UUID, membershipId: UUID)
-    fun findMemberForHost(clubId: UUID, membershipId: UUID): ViewerMemberRow?
+    fun listPendingViewers(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<ViewerMemberRow>
+
+    fun activateViewer(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean
+
+    fun deactivateViewer(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Boolean
+
+    fun addToCurrentOpenSession(
+        clubId: UUID,
+        membershipId: UUID,
+    )
+
+    fun findMemberForHost(
+        clubId: UUID,
+        membershipId: UUID,
+    ): ViewerMemberRow?
 }

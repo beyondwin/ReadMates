@@ -38,7 +38,8 @@ class ArchiveController(
         currentMember: CurrentMember,
         @PathVariable sessionId: String,
     ): MemberArchiveSessionDetailResponse =
-        getArchiveSessionDetailUseCase.getArchiveSessionDetail(currentMember, parseSessionId(sessionId))
+        getArchiveSessionDetailUseCase
+            .getArchiveSessionDetail(currentMember, parseSessionId(sessionId))
             ?.toWebDto()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 

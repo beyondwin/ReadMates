@@ -1,8 +1,8 @@
 package com.readmates.contract
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -31,72 +31,86 @@ import java.nio.file.Paths
 )
 @AutoConfigureMockMvc
 @Tag("integration")
-class FrontendZodSchemaContractTest @Autowired constructor(
-    private val mockMvc: MockMvc,
-    private val objectMapper: ObjectMapper,
-) : ReadmatesMySqlIntegrationTestSupport() {
-    private val zodFixturesDir = Paths.get(
-        System.getProperty("readmates.frontend.zod.fixtures.dir")
-            ?: error("System property 'readmates.frontend.zod.fixtures.dir' is not set"),
-    )
+class FrontendZodSchemaContractTest
+    @Autowired
+    constructor(
+        private val mockMvc: MockMvc,
+        private val objectMapper: ObjectMapper,
+    ) : ReadmatesMySqlIntegrationTestSupport() {
+        private val zodFixturesDir =
+            Paths.get(
+                System.getProperty("readmates.frontend.zod.fixtures.dir")
+                    ?: error("System property 'readmates.frontend.zod.fixtures.dir' is not set"),
+            )
 
-    // Seeded host session: session 1 (팩트풀니스), state=PUBLISHED, visibility=PUBLIC
-    private val seededHostSessionId = "00000000-0000-0000-0000-000000000301"
+        // Seeded host session: session 1 (팩트풀니스), state=PUBLISHED, visibility=PUBLIC
+        private val seededHostSessionId = "00000000-0000-0000-0000-000000000301"
 
-    @Test
-    fun `host session detail response matches zod schema fixture key set`() {
-        val response = mockMvc.get("/api/host/sessions/$seededHostSessionId") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
+        @Test
+        fun `host session detail response matches zod schema fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/host/sessions/$seededHostSessionId") {
+                        with(user("host@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
 
-        assertTopLevelKeySetMatches(response, "host-session-detail.json")
-    }
-
-    @Test
-    fun `host notification delivery list response matches zod schema fixture key set`() {
-        val response = mockMvc.get("/api/host/notifications/deliveries") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
-
-        assertTopLevelKeySetMatches(response, "host-notification-delivery-list.json")
-    }
-
-    @Test
-    fun `host invitation list response matches zod schema fixture key set`() {
-        val response = mockMvc.get("/api/host/invitations") {
-            with(user("host@example.com"))
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
-
-        assertTopLevelKeySetMatches(response, "host-invitation-list.json")
-    }
-
-    private fun assertTopLevelKeySetMatches(actualJson: String, fixtureFileName: String) {
-        val fixtureFile = zodFixturesDir.resolve(fixtureFileName).toFile()
-        check(fixtureFile.exists()) {
-            "Frontend zod schema fixture file not found: ${fixtureFile.absolutePath}. " +
-                "Run `pnpm --dir front zod:export-fixtures` to generate fixtures, " +
-                "then ensure 'readmates.frontend.zod.fixtures.dir' points to " +
-                "front/tests/unit/__fixtures__/zod-schemas."
+            assertTopLevelKeySetMatches(response, "host-session-detail.json")
         }
 
-        val actual: JsonNode = objectMapper.readTree(actualJson)
-        val expected: JsonNode = objectMapper.readTree(fixtureFile)
+        @Test
+        fun `host notification delivery list response matches zod schema fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/host/notifications/deliveries") {
+                        with(user("host@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
 
-        val actualKeys = actual.propertyNames().toSet()
-        val expectedKeys = expected.propertyNames().toSet()
+            assertTopLevelKeySetMatches(response, "host-notification-delivery-list.json")
+        }
 
-        assertThat(actualKeys)
-            .describedAs(
-                "Top-level JSON key set from server response must match zod schema fixture '$fixtureFileName'.\n" +
-                    "Keys in server response but not in zod fixture: ${actualKeys - expectedKeys}\n" +
-                    "Keys in zod fixture but not in server response: ${expectedKeys - actualKeys}",
-            )
-            .isEqualTo(expectedKeys)
+        @Test
+        fun `host invitation list response matches zod schema fixture key set`() {
+            val response =
+                mockMvc
+                    .get("/api/host/invitations") {
+                        with(user("host@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
+
+            assertTopLevelKeySetMatches(response, "host-invitation-list.json")
+        }
+
+        private fun assertTopLevelKeySetMatches(
+            actualJson: String,
+            fixtureFileName: String,
+        ) {
+            val fixtureFile = zodFixturesDir.resolve(fixtureFileName).toFile()
+            check(fixtureFile.exists()) {
+                "Frontend zod schema fixture file not found: ${fixtureFile.absolutePath}. " +
+                    "Run `pnpm --dir front zod:export-fixtures` to generate fixtures, " +
+                    "then ensure 'readmates.frontend.zod.fixtures.dir' points to " +
+                    "front/tests/unit/__fixtures__/zod-schemas."
+            }
+
+            val actual: JsonNode = objectMapper.readTree(actualJson)
+            val expected: JsonNode = objectMapper.readTree(fixtureFile)
+
+            val actualKeys = actual.propertyNames().toSet()
+            val expectedKeys = expected.propertyNames().toSet()
+
+            assertThat(actualKeys)
+                .describedAs(
+                    "Top-level JSON key set from server response must match zod schema fixture '$fixtureFileName'.\n" +
+                        "Keys in server response but not in zod fixture: ${actualKeys - expectedKeys}\n" +
+                        "Keys in zod fixture but not in server response: ${expectedKeys - actualKeys}",
+                ).isEqualTo(expectedKeys)
+        }
     }
-}

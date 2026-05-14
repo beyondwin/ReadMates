@@ -27,11 +27,12 @@ object QueryCounter {
 class QueryCountingDataSource(
     private val delegate: DataSource,
 ) : DataSource {
-    override fun getConnection(): Connection =
-        delegate.connection.countPrepareStatements()
+    override fun getConnection(): Connection = delegate.connection.countPrepareStatements()
 
-    override fun getConnection(username: String?, password: String?): Connection =
-        delegate.getConnection(username, password).countPrepareStatements()
+    override fun getConnection(
+        username: String?,
+        password: String?,
+    ): Connection = delegate.getConnection(username, password).countPrepareStatements()
 
     override fun getLogWriter(): PrintWriter? = delegate.logWriter
 
@@ -72,7 +73,10 @@ class QueryCountingDataSource(
 
 class QueryCountingDataSourcePostProcessor : BeanPostProcessor {
     @Throws(BeansException::class)
-    override fun postProcessAfterInitialization(bean: Any, beanName: String): Any {
+    override fun postProcessAfterInitialization(
+        bean: Any,
+        beanName: String,
+    ): Any {
         if (bean is DataSource && bean !is QueryCountingDataSource) {
             return QueryCountingDataSource(bean)
         }

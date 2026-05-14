@@ -18,11 +18,11 @@ import org.springframework.stereotype.Service
  */
 @Service
 class DefaultAuthoritySynthesisService : AuthoritySynthesisService {
-
     override fun synthesize(request: AuthoritySynthesisRequest): AuthoritySynthesisResult {
-        val baseAuthorities = request.incomingAuthorities
-            .filterNot { it in MEMBER_ROLE_AUTHORITIES }
-            .toMutableSet()
+        val baseAuthorities =
+            request.incomingAuthorities
+                .filterNot { it in MEMBER_ROLE_AUTHORITIES }
+                .toMutableSet()
 
         if (request.member != null) {
             val roleAuthority = if (request.member.isViewer) ROLE_VIEWER else "$ROLE_PREFIX${request.member.role}"

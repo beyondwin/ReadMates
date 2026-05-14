@@ -33,7 +33,6 @@ import java.util.UUID
  * is loaded and no database is required.
  */
 class MemberAuthoritiesFilterTest {
-
     private val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val email = "admin@example.com"
 
@@ -185,23 +184,27 @@ class MemberAuthoritiesFilterTest {
         resolveBySlug: (String) -> ResolvedClubContext?,
         synthesize: (UUID) -> SupportMemberSynthesis?,
     ): MemberAuthoritiesFilter {
-        val fakeClubContextUseCase = object : ResolveClubContextUseCase {
-            override fun resolveBySlug(slug: String): ResolvedClubContext? = resolveBySlug(slug)
-            override fun resolveByHost(host: String?): ResolvedClubContext? = null
-        }
-        val fakeAuthenticatedMemberResolver = AuthenticatedMemberResolver(
-            memberIdentityLookup = NoOpMemberIdentityLookupPort(),
-            memberProfileStore = NoOpMemberProfileStorePort(),
-        )
-        val fakeSupportGrantUseCase = object : CheckSupportAccessGrantUseCase {
-            override fun synthesizeHostCurrentMember(
-                userId: UUID,
-                email: String,
-                clubId: UUID,
-                clubSlug: String,
-                clubName: String,
-            ): SupportMemberSynthesis? = synthesize(userId)
-        }
+        val fakeClubContextUseCase =
+            object : ResolveClubContextUseCase {
+                override fun resolveBySlug(slug: String): ResolvedClubContext? = resolveBySlug(slug)
+
+                override fun resolveByHost(host: String?): ResolvedClubContext? = null
+            }
+        val fakeAuthenticatedMemberResolver =
+            AuthenticatedMemberResolver(
+                memberIdentityLookup = NoOpMemberIdentityLookupPort(),
+                memberProfileStore = NoOpMemberProfileStorePort(),
+            )
+        val fakeSupportGrantUseCase =
+            object : CheckSupportAccessGrantUseCase {
+                override fun synthesizeHostCurrentMember(
+                    userId: UUID,
+                    email: String,
+                    clubId: UUID,
+                    clubSlug: String,
+                    clubName: String,
+                ): SupportMemberSynthesis? = synthesize(userId)
+            }
         return MemberAuthoritiesFilter(
             authoritySynthesisService = DefaultAuthoritySynthesisService(),
             authenticatedMemberResolver = fakeAuthenticatedMemberResolver,
@@ -220,7 +223,11 @@ class MemberAuthoritiesFilterTest {
             addHeader(ClubContextHeader.CLUB_HOST, host)
         }
 
-    private fun setAuthentication(email: String, userId: UUID, authorities: List<String>) {
+    private fun setAuthentication(
+        email: String,
+        userId: UUID,
+        authorities: List<String>,
+    ) {
         val principal = CurrentUser(userId = userId, email = email)
         val grantedAuthorities = authorities.map { SimpleGrantedAuthority(it) }
         val authentication = UsernamePasswordAuthenticationToken(principal, null, grantedAuthorities)
@@ -228,7 +235,9 @@ class MemberAuthoritiesFilterTest {
     }
 
     private fun currentAuthorities(): Set<String> =
-        SecurityContextHolder.getContext().authentication
+        SecurityContextHolder
+            .getContext()
+            .authentication
             ?.authorities
             ?.mapNotNull { it.authority }
             ?.toSet()
@@ -240,13 +249,27 @@ class MemberAuthoritiesFilterTest {
      */
     private class NoOpMemberIdentityLookupPort : MemberIdentityLookupPort {
         override fun findActiveMemberByEmail(email: String): CurrentMember? = null
+
         override fun findActiveMemberByUserId(userId: String): CurrentMember? = null
-        override fun findMemberByUserIdAndClubId(userId: UUID, clubId: UUID): CurrentMember? = null
-        override fun findMemberByEmailAndClubId(email: String, clubId: UUID): CurrentMember? = null
+
+        override fun findMemberByUserIdAndClubId(
+            userId: UUID,
+            clubId: UUID,
+        ): CurrentMember? = null
+
+        override fun findMemberByEmailAndClubId(
+            email: String,
+            clubId: UUID,
+        ): CurrentMember? = null
+
         override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? = null
+
         override fun findAnyUserIdByEmail(email: String): UUID? = null
+
         override fun findUserById(userId: UUID): CurrentUser? = null
+
         override fun findMembershipStatusByUserId(userId: UUID): MembershipStatus? = null
+
         override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
     }
 
@@ -255,12 +278,37 @@ class MemberAuthoritiesFilterTest {
      */
     private class NoOpMemberProfileStorePort : MemberProfileStorePort {
         override fun findProfileMemberByEmail(email: String) = null
+
         override fun findProfileMemberByUserId(userId: UUID) = null
-        override fun findProfileMemberInClubForUpdate(clubId: UUID, membershipId: UUID) = null
+
+        override fun findProfileMemberInClubForUpdate(
+            clubId: UUID,
+            membershipId: UUID,
+        ) = null
+
         override fun lockClubProfileNames(clubId: UUID): Boolean = false
-        override fun displayNameExistsInClub(clubId: UUID, displayName: String, excludingMembershipId: UUID): Boolean = false
-        override fun updateOwnDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean = false
-        override fun updateDisplayName(clubId: UUID, membershipId: UUID, displayName: String): Boolean = false
-        override fun findHostMemberListItem(clubId: UUID, membershipId: UUID) = null
+
+        override fun displayNameExistsInClub(
+            clubId: UUID,
+            displayName: String,
+            excludingMembershipId: UUID,
+        ): Boolean = false
+
+        override fun updateOwnDisplayName(
+            clubId: UUID,
+            membershipId: UUID,
+            displayName: String,
+        ): Boolean = false
+
+        override fun updateDisplayName(
+            clubId: UUID,
+            membershipId: UUID,
+            displayName: String,
+        ): Boolean = false
+
+        override fun findHostMemberListItem(
+            clubId: UUID,
+            membershipId: UUID,
+        ) = null
     }
 }

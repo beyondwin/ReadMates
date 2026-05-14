@@ -32,28 +32,30 @@ data class NoteSessionItem(
     val totalCount: Int,
 )
 
-internal fun NoteFeedResult.toNoteFeedItem() = NoteFeedItem(
-    sessionId = sessionId,
-    sessionNumber = sessionNumber,
-    bookTitle = bookTitle,
-    date = date,
-    authorName = authorName,
-    authorShortName = authorShortName,
-    kind = kind,
-    text = text,
-)
+internal fun NoteFeedResult.toNoteFeedItem() =
+    NoteFeedItem(
+        sessionId = sessionId,
+        sessionNumber = sessionNumber,
+        bookTitle = bookTitle,
+        date = date,
+        authorName = authorName,
+        authorShortName = authorShortName,
+        kind = kind,
+        text = text,
+    )
 
-internal fun NoteSessionResult.toNoteSessionItem() = NoteSessionItem(
-    sessionId = sessionId,
-    sessionNumber = sessionNumber,
-    bookTitle = bookTitle,
-    date = date,
-    questionCount = questionCount,
-    oneLinerCount = oneLinerCount,
-    longReviewCount = longReviewCount,
-    highlightCount = highlightCount,
-    totalCount = totalCount,
-)
+internal fun NoteSessionResult.toNoteSessionItem() =
+    NoteSessionItem(
+        sessionId = sessionId,
+        sessionNumber = sessionNumber,
+        bookTitle = bookTitle,
+        date = date,
+        questionCount = questionCount,
+        oneLinerCount = oneLinerCount,
+        longReviewCount = longReviewCount,
+        highlightCount = highlightCount,
+        totalCount = totalCount,
+    )
 
 internal fun <T, R> CursorPage<T>.mapItems(mapper: (T) -> R): CursorPageResponse<R> =
     CursorPageResponse(items = items.map(mapper), nextCursor = nextCursor)

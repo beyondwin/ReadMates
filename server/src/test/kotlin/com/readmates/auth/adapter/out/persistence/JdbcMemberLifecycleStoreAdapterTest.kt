@@ -1,12 +1,12 @@
 package com.readmates.auth.adapter.out.persistence
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.domain.IllegalMemberStateTransitionException
 import com.readmates.auth.domain.MemberLifecycleStatus
 import com.readmates.shared.db.dbString
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -49,8 +49,7 @@ class JdbcMemberLifecycleStoreAdapterTest(
 
         assertThatThrownBy {
             adapter.restoreSuspendedMember(clubId, membershipId)
-        }
-            .isInstanceOf(IllegalMemberStateTransitionException::class.java)
+        }.isInstanceOf(IllegalMemberStateTransitionException::class.java)
             .satisfies({ ex ->
                 val t = ex as IllegalMemberStateTransitionException
                 assertThat(t.from).isEqualTo(MemberLifecycleStatus.LEFT)
@@ -66,8 +65,7 @@ class JdbcMemberLifecycleStoreAdapterTest(
 
         assertThatThrownBy {
             adapter.suspendActiveMember(clubId, membershipId)
-        }
-            .isInstanceOf(IllegalMemberStateTransitionException::class.java)
+        }.isInstanceOf(IllegalMemberStateTransitionException::class.java)
             .satisfies({ ex ->
                 val t = ex as IllegalMemberStateTransitionException
                 assertThat(t.from).isEqualTo(MemberLifecycleStatus.INACTIVE)
@@ -81,8 +79,7 @@ class JdbcMemberLifecycleStoreAdapterTest(
 
         assertThatThrownBy {
             adapter.restoreSuspendedMember(clubId, membershipId)
-        }
-            .isInstanceOf(IllegalMemberStateTransitionException::class.java)
+        }.isInstanceOf(IllegalMemberStateTransitionException::class.java)
             .satisfies({ ex ->
                 val t = ex as IllegalMemberStateTransitionException
                 assertThat(t.from).isEqualTo(MemberLifecycleStatus.INACTIVE)
@@ -96,8 +93,7 @@ class JdbcMemberLifecycleStoreAdapterTest(
 
         assertThatThrownBy {
             adapter.markMemberLeftByHost(clubId, membershipId)
-        }
-            .isInstanceOf(IllegalMemberStateTransitionException::class.java)
+        }.isInstanceOf(IllegalMemberStateTransitionException::class.java)
             .satisfies({ ex ->
                 val t = ex as IllegalMemberStateTransitionException
                 assertThat(t.from).isEqualTo(MemberLifecycleStatus.INACTIVE)

@@ -20,19 +20,19 @@ import org.springframework.test.web.servlet.put
 class CheckinControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-
     @Test
     fun `rejects reading progress outside the accepted range`() {
-        mockMvc.put("/api/sessions/current/checkin") {
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "readingProgress": 101
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .put("/api/sessions/current/checkin") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "readingProgress": 101
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 }

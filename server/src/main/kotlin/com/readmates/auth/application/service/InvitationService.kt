@@ -1,7 +1,5 @@
 package com.readmates.auth.application.service
 
-import com.readmates.auth.domain.InvitationStatus
-import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.application.InvitationDomainError
 import com.readmates.auth.application.InvitationDomainException
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
@@ -13,6 +11,8 @@ import com.readmates.auth.application.port.out.HostInvitationStorePort
 import com.readmates.auth.application.port.out.InvitationTokenRow
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
+import com.readmates.auth.domain.InvitationStatus
+import com.readmates.auth.domain.MembershipRole
 import com.readmates.shared.db.dbString
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
@@ -65,7 +65,8 @@ class InvitationService(
     private val googleAccountStore: GoogleAccountStorePort,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
-) : ManageHostInvitationsUseCase, PreviewInvitationUseCase {
+) : ManageHostInvitationsUseCase,
+    PreviewInvitationUseCase {
     @Transactional
     override fun createInvitation(
         host: CurrentMember,
@@ -102,7 +103,10 @@ class InvitationService(
         return toHostInvitationResponse(created).copy(acceptUrl = acceptUrl(created.clubSlug, token, created.primaryHost))
     }
 
-    override fun listHostInvitations(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostInvitationResponse> {
+    override fun listHostInvitations(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<HostInvitationResponse> {
         requireHost(host)
         val page = invitationStore.listHostInvitations(host.clubId, pageRequest)
         return CursorPage(
@@ -111,7 +115,10 @@ class InvitationService(
         )
     }
 
-    override fun previewInvitation(rawToken: String, clubSlug: String?): InvitationPreviewResponse {
+    override fun previewInvitation(
+        rawToken: String,
+        clubSlug: String?,
+    ): InvitationPreviewResponse {
         val invitation = findInvitationByToken(rawToken)
         if (clubSlug != null && invitation.clubSlug != clubSlug) {
             throw InvitationDomainException("INVITATION_CLUB_MISMATCH", InvitationDomainError.NOT_FOUND, "Invitation not found")
@@ -161,14 +168,16 @@ class InvitationService(
             )
         }
 
-        val normalizedSubject = googleSubjectId.trim().takeIf { it.isNotEmpty() }
-            ?: throw GoogleLoginException("Google subject is required")
-        val userId = connectOrCreateInvitedGoogleUser(
-            googleSubjectId = normalizedSubject,
-            normalizedEmail = normalizedEmail,
-            displayName = displayName ?: invitation.name,
-            profileImageUrl = profileImageUrl,
-        )
+        val normalizedSubject =
+            googleSubjectId.trim().takeIf { it.isNotEmpty() }
+                ?: throw GoogleLoginException("Google subject is required")
+        val userId =
+            connectOrCreateInvitedGoogleUser(
+                googleSubjectId = normalizedSubject,
+                normalizedEmail = normalizedEmail,
+                displayName = displayName ?: invitation.name,
+                profileImageUrl = profileImageUrl,
+            )
         val membershipId = invitationStore.upsertActiveMembership(invitation.clubId, userId, invitation.role)
 
         if (!invitationStore.acceptInvitation(invitation.id, userId)) {
@@ -192,7 +201,10 @@ class InvitationService(
     }
 
     @Transactional
-    override fun revokeInvitation(host: CurrentMember, invitationId: UUID): HostInvitationResponse {
+    override fun revokeInvitation(
+        host: CurrentMember,
+        invitationId: UUID,
+    ): HostInvitationResponse {
         requireHost(host)
         invitationStore.revokePendingInvitation(host.clubId, invitationId)
         return findHostInvitation(host.clubId, invitationId)
@@ -201,8 +213,7 @@ class InvitationService(
     private fun findHostInvitation(
         clubId: UUID,
         invitationId: UUID,
-    ): HostInvitationResponse =
-        toHostInvitationResponse(findHostInvitationRow(clubId, invitationId))
+    ): HostInvitationResponse = toHostInvitationResponse(findHostInvitationRow(clubId, invitationId))
 
     private fun findHostInvitationRow(
         clubId: UUID,
@@ -211,10 +222,12 @@ class InvitationService(
         invitationStore.findHostInvitation(clubId, invitationId)
             ?: throw InvitationDomainException("INVITATION_NOT_FOUND", InvitationDomainError.NOT_FOUND, "Invitation not found")
 
-    private fun findInvitationByToken(rawToken: String): InvitationTokenRow =
-        queryInvitationByToken(rawToken, forUpdate = false)
+    private fun findInvitationByToken(rawToken: String): InvitationTokenRow = queryInvitationByToken(rawToken, forUpdate = false)
 
-    private fun queryInvitationByToken(rawToken: String, forUpdate: Boolean): InvitationTokenRow =
+    private fun queryInvitationByToken(
+        rawToken: String,
+        forUpdate: Boolean,
+    ): InvitationTokenRow =
         invitationStore.findInvitationByTokenHash(tokenService.hashToken(rawToken), forUpdate)
             ?: throw InvitationDomainException("INVITATION_NOT_FOUND", InvitationDomainError.NOT_FOUND, "Invitation not found")
 
@@ -231,11 +244,12 @@ class InvitationService(
 
         val existingUserId = memberIdentityLookup.findAnyUserIdByEmail(normalizedEmail)
         if (existingUserId != null) {
-            val connected = googleAccountStore.connectGoogleSubject(
-                userId = existingUserId,
-                googleSubjectId = googleSubjectId,
-                profileImageUrl = profileImageUrl,
-            )
+            val connected =
+                googleAccountStore.connectGoogleSubject(
+                    userId = existingUserId,
+                    googleSubjectId = googleSubjectId,
+                    profileImageUrl = profileImageUrl,
+                )
             if (!connected) {
                 throw GoogleLoginException("Existing user is connected to a different Google account")
             }
@@ -250,13 +264,15 @@ class InvitationService(
                 profileImageUrl = profileImageUrl,
             )
         } catch (_: MemberAccountDuplicateException) {
-            val racedUserId = memberIdentityLookup.findAnyUserIdByEmail(normalizedEmail)
-                ?: throw GoogleLoginException("Google account is already connected")
-            val connected = googleAccountStore.connectGoogleSubject(
-                userId = racedUserId,
-                googleSubjectId = googleSubjectId,
-                profileImageUrl = profileImageUrl,
-            )
+            val racedUserId =
+                memberIdentityLookup.findAnyUserIdByEmail(normalizedEmail)
+                    ?: throw GoogleLoginException("Google account is already connected")
+            val connected =
+                googleAccountStore.connectGoogleSubject(
+                    userId = racedUserId,
+                    googleSubjectId = googleSubjectId,
+                    profileImageUrl = profileImageUrl,
+                )
             if (!connected) {
                 throw GoogleLoginException("Existing user is connected to a different Google account")
             }
@@ -264,7 +280,10 @@ class InvitationService(
         }
     }
 
-    private fun rejectActiveMember(clubId: UUID, email: String) {
+    private fun rejectActiveMember(
+        clubId: UUID,
+        email: String,
+    ) {
         val count = invitationStore.activeMemberCountByEmail(clubId, email)
         if (count > 0) {
             throw InvitationDomainException("MEMBER_ALREADY_ACTIVE", InvitationDomainError.CONFLICT, "Member is already active")
@@ -290,21 +309,30 @@ class InvitationService(
         name.trim().takeIf { it.isNotEmpty() }?.take(120)
             ?: throw InvitationDomainException("INVALID_INVITATION_NAME", InvitationDomainError.BAD_REQUEST, "Name is required")
 
-    private fun invitationLockKey(clubId: UUID, email: String): String =
-        "invitation:${sha256Short("${clubId.dbString()}:${normalizeEmail(email)}")}"
+    private fun invitationLockKey(
+        clubId: UUID,
+        email: String,
+    ): String = "invitation:${sha256Short("${clubId.dbString()}:${normalizeEmail(email)}")}"
 
-    private fun effectiveStatus(status: InvitationStatus, expiresAt: OffsetDateTime): InvitationStatus =
+    private fun effectiveStatus(
+        status: InvitationStatus,
+        expiresAt: OffsetDateTime,
+    ): InvitationStatus =
         if (status == InvitationStatus.PENDING && expiresAt.isBefore(OffsetDateTime.now(ZoneOffset.UTC))) {
             InvitationStatus.EXPIRED
         } else {
             status
         }
 
-    private fun canRevoke(status: InvitationStatus, expiresAt: OffsetDateTime): Boolean =
-        status == InvitationStatus.PENDING && !expiresAt.isBefore(OffsetDateTime.now(ZoneOffset.UTC))
+    private fun canRevoke(
+        status: InvitationStatus,
+        expiresAt: OffsetDateTime,
+    ): Boolean = status == InvitationStatus.PENDING && !expiresAt.isBefore(OffsetDateTime.now(ZoneOffset.UTC))
 
-    private fun canReissue(effectiveStatus: InvitationStatus, hasActiveMembership: Boolean): Boolean =
-        effectiveStatus != InvitationStatus.ACCEPTED && !hasActiveMembership
+    private fun canReissue(
+        effectiveStatus: InvitationStatus,
+        hasActiveMembership: Boolean,
+    ): Boolean = effectiveStatus != InvitationStatus.ACCEPTED && !hasActiveMembership
 
     private fun toHostInvitationResponse(row: HostInvitationListRow): HostInvitationResponse {
         val effectiveStatus = effectiveStatus(row.status, row.expiresAt)
@@ -338,19 +366,24 @@ class InvitationService(
         }
     }
 
-    private fun acceptUrl(clubSlug: String, token: String, primaryHost: String?): String =
+    private fun acceptUrl(
+        clubSlug: String,
+        token: String,
+        primaryHost: String?,
+    ): String =
         if (primaryHost != null) {
             "https://$primaryHost/invite/$token"
         } else {
             "${appBaseUrl.trimEnd('/')}${invitePath(clubSlug, token)}"
         }
 
-    private fun invitePath(clubSlug: String, token: String): String =
-        "/clubs/$clubSlug/invite/$token"
+    private fun invitePath(
+        clubSlug: String,
+        token: String,
+    ): String = "/clubs/$clubSlug/invite/$token"
 
     private fun sha256Short(value: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
         return HexFormat.of().formatHex(digest).take(16)
     }
-
 }

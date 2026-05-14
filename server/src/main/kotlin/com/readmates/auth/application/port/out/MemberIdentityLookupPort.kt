@@ -8,12 +8,26 @@ import java.util.UUID
 
 interface MemberIdentityLookupPort {
     fun findActiveMemberByEmail(email: String): CurrentMember?
+
     fun findActiveMemberByUserId(userId: String): CurrentMember?
-    fun findMemberByUserIdAndClubId(userId: UUID, clubId: UUID): CurrentMember?
-    fun findMemberByEmailAndClubId(email: String, clubId: UUID): CurrentMember?
+
+    fun findMemberByUserIdAndClubId(
+        userId: UUID,
+        clubId: UUID,
+    ): CurrentMember?
+
+    fun findMemberByEmailAndClubId(
+        email: String,
+        clubId: UUID,
+    ): CurrentMember?
+
     fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember?
+
     fun findAnyUserIdByEmail(email: String): UUID?
+
     fun findUserById(userId: UUID): CurrentUser?
+
     fun findMembershipStatusByUserId(userId: UUID): MembershipStatus?
+
     fun listJoinedClubs(userId: UUID): List<JoinedClubSummary>
 }

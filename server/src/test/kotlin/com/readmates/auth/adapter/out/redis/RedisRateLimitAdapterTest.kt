@@ -1,31 +1,31 @@
 package com.readmates.auth.adapter.out.redis
 
-import com.readmates.support.ReadmatesRedisIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitPort
 import com.readmates.shared.cache.RateLimitProperties
 import com.readmates.shared.cache.RedisCacheMetrics
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentCaptor
+import org.mockito.Mockito
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
-import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.support.StaticApplicationContext
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.RedisScript
-import org.mockito.ArgumentCaptor
-import org.mockito.Mockito
 import java.time.Duration
 
 @SpringBootTest(
@@ -42,17 +42,19 @@ class RedisRateLimitAdapterTest(
     @param:Autowired private val adapter: RedisRateLimitAdapter,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
 ) : ReadmatesRedisIntegrationTestSupport() {
-    private val contextRunner = ApplicationContextRunner()
-        .withUserConfiguration(RateLimitAdapterBeanTestConfiguration::class.java)
+    private val contextRunner =
+        ApplicationContextRunner()
+            .withUserConfiguration(RateLimitAdapterBeanTestConfiguration::class.java)
 
     @Test
     fun `selects expected rate limit adapter for redis and rate limit flags`() {
-        val cases = listOf(
-            RateLimitAdapterCase(redisEnabled = true, rateLimitEnabled = true, expectedAdapter = RedisRateLimitAdapter::class.java),
-            RateLimitAdapterCase(redisEnabled = true, rateLimitEnabled = false, expectedAdapter = NoopRateLimitAdapter::class.java),
-            RateLimitAdapterCase(redisEnabled = false, rateLimitEnabled = true, expectedAdapter = NoopRateLimitAdapter::class.java),
-            RateLimitAdapterCase(redisEnabled = false, rateLimitEnabled = false, expectedAdapter = NoopRateLimitAdapter::class.java),
-        )
+        val cases =
+            listOf(
+                RateLimitAdapterCase(redisEnabled = true, rateLimitEnabled = true, expectedAdapter = RedisRateLimitAdapter::class.java),
+                RateLimitAdapterCase(redisEnabled = true, rateLimitEnabled = false, expectedAdapter = NoopRateLimitAdapter::class.java),
+                RateLimitAdapterCase(redisEnabled = false, rateLimitEnabled = true, expectedAdapter = NoopRateLimitAdapter::class.java),
+                RateLimitAdapterCase(redisEnabled = false, rateLimitEnabled = false, expectedAdapter = NoopRateLimitAdapter::class.java),
+            )
 
         cases.forEach { case ->
             contextRunner
@@ -74,12 +76,13 @@ class RedisRateLimitAdapterTest(
     fun `allows requests until limit and denies after limit`() {
         redisTemplate.delete("rl:test:limit")
 
-        val check = RateLimitCheck(
-            key = "rl:test:limit",
-            limit = 2,
-            window = Duration.ofMinutes(1),
-            sensitive = false,
-        )
+        val check =
+            RateLimitCheck(
+                key = "rl:test:limit",
+                limit = 2,
+                window = Duration.ofMinutes(1),
+                sensitive = false,
+            )
 
         assertTrue(adapter.check(check).allowed)
         assertTrue(adapter.check(check).allowed)
@@ -91,14 +94,15 @@ class RedisRateLimitAdapterTest(
         val key = "rl:test:first-ttl"
         redisTemplate.delete(key)
 
-        val decision = adapter.check(
-            RateLimitCheck(
-                key = key,
-                limit = 2,
-                window = Duration.ofMinutes(1),
-                sensitive = false,
-            ),
-        )
+        val decision =
+            adapter.check(
+                RateLimitCheck(
+                    key = key,
+                    limit = 2,
+                    window = Duration.ofMinutes(1),
+                    sensitive = false,
+                ),
+            )
 
         assertTrue(decision.allowed)
         assertTrue(redisTemplate.getExpire(key) > 0)
@@ -107,32 +111,36 @@ class RedisRateLimitAdapterTest(
     @Test
     fun `increments counter through redis script`() {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
-        Mockito.`when`(
-            redisTemplate.execute(
-                Mockito.any<RedisScript<Long>>(),
-                Mockito.anyList<String>(),
-                Mockito.eq("30000"),
-            ),
-        ).thenReturn(1L)
-        val adapter = RedisRateLimitAdapter(
-            redisTemplate = redisTemplate,
-            properties = RateLimitProperties(enabled = true),
-            metrics = noOpMetrics(),
-        )
+        Mockito
+            .`when`(
+                redisTemplate.execute(
+                    Mockito.any<RedisScript<Long>>(),
+                    Mockito.anyList<String>(),
+                    Mockito.eq("30000"),
+                ),
+            ).thenReturn(1L)
+        val adapter =
+            RedisRateLimitAdapter(
+                redisTemplate = redisTemplate,
+                properties = RateLimitProperties(enabled = true),
+                metrics = noOpMetrics(),
+            )
 
-        val decision = adapter.check(
-            RateLimitCheck(
-                key = "rl:test:script",
-                limit = 2,
-                window = Duration.ofSeconds(30),
-                sensitive = false,
-            ),
-        )
+        val decision =
+            adapter.check(
+                RateLimitCheck(
+                    key = "rl:test:script",
+                    limit = 2,
+                    window = Duration.ofSeconds(30),
+                    sensitive = false,
+                ),
+            )
 
         assertTrue(decision.allowed)
         assertFalse(decision.fallback)
         @Suppress("UNCHECKED_CAST")
         val scriptCaptor = ArgumentCaptor.forClass(RedisScript::class.java) as ArgumentCaptor<RedisScript<Long>>
+
         @Suppress("UNCHECKED_CAST")
         val keysCaptor = ArgumentCaptor.forClass(List::class.java) as ArgumentCaptor<List<String>>
         Mockito.verify(redisTemplate).execute(scriptCaptor.capture(), keysCaptor.capture(), Mockito.eq("30000"))
@@ -144,20 +152,22 @@ class RedisRateLimitAdapterTest(
     @Test
     fun `fails open when redis check fails for non-sensitive request`() {
         val meterRegistry = SimpleMeterRegistry()
-        val adapter = RedisRateLimitAdapter(
-            redisTemplate = failingRedisTemplate(),
-            properties = RateLimitProperties(enabled = true, failClosedSensitive = true),
-            metrics = metrics(meterRegistry),
-        )
+        val adapter =
+            RedisRateLimitAdapter(
+                redisTemplate = failingRedisTemplate(),
+                properties = RateLimitProperties(enabled = true, failClosedSensitive = true),
+                metrics = metrics(meterRegistry),
+            )
 
-        val decision = adapter.check(
-            RateLimitCheck(
-                key = "rl:test:fallback",
-                limit = 1,
-                window = Duration.ofMinutes(1),
-                sensitive = false,
-            ),
-        )
+        val decision =
+            adapter.check(
+                RateLimitCheck(
+                    key = "rl:test:fallback",
+                    limit = 1,
+                    window = Duration.ofMinutes(1),
+                    sensitive = false,
+                ),
+            )
 
         assertTrue(decision.allowed)
         assertTrue(decision.fallback)
@@ -177,20 +187,22 @@ class RedisRateLimitAdapterTest(
 
     @Test
     fun `fails closed when redis check fails for sensitive request and fail closed is enabled`() {
-        val adapter = RedisRateLimitAdapter(
-            redisTemplate = failingRedisTemplate(),
-            properties = RateLimitProperties(enabled = true, failClosedSensitive = true),
-            metrics = noOpMetrics(),
-        )
+        val adapter =
+            RedisRateLimitAdapter(
+                redisTemplate = failingRedisTemplate(),
+                properties = RateLimitProperties(enabled = true, failClosedSensitive = true),
+                metrics = noOpMetrics(),
+            )
 
-        val decision = adapter.check(
-            RateLimitCheck(
-                key = "rl:test:sensitive-fallback",
-                limit = 1,
-                window = Duration.ofMinutes(1),
-                sensitive = true,
-            ),
-        )
+        val decision =
+            adapter.check(
+                RateLimitCheck(
+                    key = "rl:test:sensitive-fallback",
+                    limit = 1,
+                    window = Duration.ofMinutes(1),
+                    sensitive = true,
+                ),
+            )
 
         assertFalse(decision.allowed)
     }
@@ -200,8 +212,7 @@ class RedisRateLimitAdapterTest(
             override fun opsForValue() = throw IllegalStateException("redis unavailable")
         }
 
-    private fun noOpMetrics() =
-        RedisCacheMetrics(StaticApplicationContext().getBeanProvider(MeterRegistry::class.java))
+    private fun noOpMetrics() = RedisCacheMetrics(StaticApplicationContext().getBeanProvider(MeterRegistry::class.java))
 
     private fun metrics(meterRegistry: MeterRegistry) =
         RedisCacheMetrics(
@@ -238,6 +249,5 @@ private data class RateLimitAdapterCase(
 )
 private class RateLimitAdapterBeanTestConfiguration {
     @Bean
-    fun redisTemplate(): StringRedisTemplate =
-        Mockito.mock(StringRedisTemplate::class.java)
+    fun redisTemplate(): StringRedisTemplate = Mockito.mock(StringRedisTemplate::class.java)
 }

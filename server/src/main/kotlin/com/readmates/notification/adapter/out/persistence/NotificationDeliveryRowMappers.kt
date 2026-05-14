@@ -5,8 +5,8 @@ import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationFailure
 import com.readmates.notification.application.model.HostNotificationItem
-import com.readmates.notification.application.model.NotificationEmailTemplates
 import com.readmates.notification.application.model.NotificationDeliveryItem
+import com.readmates.notification.application.model.NotificationEmailTemplates
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.domain.NotificationChannel
@@ -96,14 +96,15 @@ internal class NotificationDeliveryRowMappers(
 
     fun ResultSet.toClaimedNotificationDeliveryItem(): ClaimedNotificationDeliveryItem {
         val eventType = NotificationEventType.valueOf(getString("event_type"))
-        val copy = copyFor(
-            eventType = eventType,
-            aggregateId = uuid("aggregate_id"),
-            payload = parsePayload(getString("payload_json")),
-            clubSlug = getString("club_slug"),
-            clubName = getString("club_name"),
-            displayName = getString("display_name"),
-        )
+        val copy =
+            copyFor(
+                eventType = eventType,
+                aggregateId = uuid("aggregate_id"),
+                payload = parsePayload(getString("payload_json")),
+                clubSlug = getString("club_slug"),
+                clubName = getString("club_name"),
+                displayName = getString("display_name"),
+            )
         return ClaimedNotificationDeliveryItem(
             id = uuid("id"),
             eventId = uuid("event_id"),
@@ -157,14 +158,15 @@ internal class NotificationDeliveryRowMappers(
     fun ResultSet.toHostNotificationDetail(): HostNotificationDetail {
         val eventType = NotificationEventType.valueOf(getString("event_type"))
         val payload = parsePayload(getString("payload_json"))
-        val copy = copyFor(
-            eventType = eventType,
-            aggregateId = uuid("aggregate_id"),
-            payload = payload,
-            clubSlug = getString("club_slug"),
-            clubName = getString("club_name"),
-            displayName = getString("display_name"),
-        )
+        val copy =
+            copyFor(
+                eventType = eventType,
+                aggregateId = uuid("aggregate_id"),
+                payload = payload,
+                clubSlug = getString("club_slug"),
+                clubName = getString("club_name"),
+                displayName = getString("display_name"),
+            )
         return HostNotificationDetail(
             id = uuid("id"),
             eventType = eventType,
@@ -172,10 +174,11 @@ internal class NotificationDeliveryRowMappers(
             recipientEmail = getString("recipient_email"),
             subject = copy.emailSubject,
             deepLinkPath = copy.deepLinkPath,
-            metadata = mapOf(
-                "sessionNumber" to payload.sessionNumber,
-                "bookTitle" to payload.bookTitle,
-            ).filterValues { it != null },
+            metadata =
+                mapOf(
+                    "sessionNumber" to payload.sessionNumber,
+                    "bookTitle" to payload.bookTitle,
+                ).filterValues { it != null },
             attemptCount = getInt("attempt_count"),
             lastError = getString("last_error"),
             createdAt = utcOffsetDateTime("created_at"),
@@ -183,7 +186,10 @@ internal class NotificationDeliveryRowMappers(
         )
     }
 
-    fun copyFor(message: NotificationEventMessage, displayName: String?): DeliveryCopy =
+    fun copyFor(
+        message: NotificationEventMessage,
+        displayName: String?,
+    ): DeliveryCopy =
         copyFor(
             eventType = message.eventType,
             aggregateId = message.aggregateId,
@@ -220,16 +226,17 @@ internal class NotificationDeliveryRowMappers(
         clubSlug: String,
         displayName: String?,
     ): DeliveryCopy {
-        val rendered = NotificationEmailTemplates.eventCopy(
-            eventType = eventType,
-            sessionId = sessionId,
-            sessionNumber = sessionNumber,
-            bookTitle = bookTitle,
-            clubName = clubName,
-            clubSlug = clubSlug,
-            displayName = displayName,
-            appBaseUrl = appBaseUrl,
-        )
+        val rendered =
+            NotificationEmailTemplates.eventCopy(
+                eventType = eventType,
+                sessionId = sessionId,
+                sessionNumber = sessionNumber,
+                bookTitle = bookTitle,
+                clubName = clubName,
+                clubSlug = clubSlug,
+                displayName = displayName,
+                appBaseUrl = appBaseUrl,
+            )
         return DeliveryCopy(
             title = rendered.title,
             body = rendered.body,
@@ -240,11 +247,9 @@ internal class NotificationDeliveryRowMappers(
         )
     }
 
-    fun sessionId(message: NotificationEventMessage): UUID =
-        message.payload.sessionId ?: message.aggregateId
+    fun sessionId(message: NotificationEventMessage): UUID = message.payload.sessionId ?: message.aggregateId
 
-    fun parsePayload(rawPayload: String): NotificationEventPayload =
-        objectMapper.readValue(rawPayload, payloadType)
+    fun parsePayload(rawPayload: String): NotificationEventPayload = objectMapper.readValue(rawPayload, payloadType)
 
     private fun NotificationDeliveryStatus.toOutboxStatus(): NotificationOutboxStatus =
         when (this) {

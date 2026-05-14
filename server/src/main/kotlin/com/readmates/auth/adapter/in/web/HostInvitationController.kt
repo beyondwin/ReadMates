@@ -59,16 +59,17 @@ class HostInvitationController(
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationError(error: MethodArgumentNotValidException): ResponseEntity<ApiErrorResponse> {
         val fieldErrors = error.bindingResult.fieldErrors
-        val (code, message) = when {
-            fieldErrors.any { it.field == "email" && isOverEmailLengthLimit(it.rejectedValue) } ->
-                "INVALID_INVITATION_EMAIL" to "Email must be 320 characters or less"
-            fieldErrors.any { it.field == "email" } ->
-                "INVALID_INVITATION_EMAIL" to "Invalid invitation email"
-            fieldErrors.any { it.field == "name" } ->
-                "INVALID_INVITATION_NAME" to "Name is required"
-            else ->
-                "INVALID_INVITATION_REQUEST" to "Invalid invitation request"
-        }
+        val (code, message) =
+            when {
+                fieldErrors.any { it.field == "email" && isOverEmailLengthLimit(it.rejectedValue) } ->
+                    "INVALID_INVITATION_EMAIL" to "Email must be 320 characters or less"
+                fieldErrors.any { it.field == "email" } ->
+                    "INVALID_INVITATION_EMAIL" to "Invalid invitation email"
+                fieldErrors.any { it.field == "name" } ->
+                    "INVALID_INVITATION_NAME" to "Name is required"
+                else ->
+                    "INVALID_INVITATION_REQUEST" to "Invalid invitation request"
+            }
         return apiErrorResponse(HttpStatus.BAD_REQUEST, code, message)
     }
 

@@ -31,15 +31,16 @@ class NotificationRelayServiceTest {
         val publisher = RecordingPublisher()
         val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
 
-        val published = captureRelayLogs().use { logs ->
-            service.publishPending(limit = 10).also {
-                val event = logs.events.single()
-                assertThat(event.level).isEqualTo(Level.INFO)
-                assertThat(event.message).isEqualTo("Notification event published eventId={} topic={} key={}")
-                assertThat(event.argumentArray.toList()).containsExactly(item.id, item.kafkaTopic, item.kafkaKey)
-                assertThat(event.formattedMessage).doesNotContain(message.payload.toString())
+        val published =
+            captureRelayLogs().use { logs ->
+                service.publishPending(limit = 10).also {
+                    val event = logs.events.single()
+                    assertThat(event.level).isEqualTo(Level.INFO)
+                    assertThat(event.message).isEqualTo("Notification event published eventId={} topic={} key={}")
+                    assertThat(event.argumentArray.toList()).containsExactly(item.id, item.kafkaTopic, item.kafkaKey)
+                    assertThat(event.formattedMessage).doesNotContain(message.payload.toString())
+                }
             }
-        }
 
         assertThat(published).isEqualTo(1)
         assertThat(publisher.publishedMessages).containsExactly(PublishedMessage(message, item.kafkaTopic, item.kafkaKey))
@@ -52,15 +53,16 @@ class NotificationRelayServiceTest {
         val outbox = FakeEventOutbox(claimedItems = listOf(item))
         val service = NotificationRelayService(outbox, RecordingPublisher(), maxAttempts = 5)
 
-        val published = captureRelayLogs().use { logs ->
-            service.publishPending(limit = 10).also {
-                val event = logs.events.single()
-                assertThat(event.level).isEqualTo(Level.WARN)
-                assertThat(event.message).isEqualTo("Notification event publish dead eventId={} attemptCount={} error={}")
-                assertThat(event.argumentArray.toList())
-                    .containsExactly(item.id, item.attemptCount + 1, "Notification event message missing")
+        val published =
+            captureRelayLogs().use { logs ->
+                service.publishPending(limit = 10).also {
+                    val event = logs.events.single()
+                    assertThat(event.level).isEqualTo(Level.WARN)
+                    assertThat(event.message).isEqualTo("Notification event publish dead eventId={} attemptCount={} error={}")
+                    assertThat(event.argumentArray.toList())
+                        .containsExactly(item.id, item.attemptCount + 1, "Notification event message missing")
+                }
             }
-        }
 
         assertThat(published).isEqualTo(1)
         assertThat(outbox.deadEvents).containsExactly(DeadEvent(item.id, "Notification event message missing"))
@@ -74,14 +76,15 @@ class NotificationRelayServiceTest {
         val publisher = RecordingPublisher(failure = IllegalStateException("broker unavailable"))
         val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
 
-        val published = captureRelayLogs().use { logs ->
-            service.publishPending(limit = 10).also {
-                val event = logs.events.single()
-                assertThat(event.level).isEqualTo(Level.WARN)
-                assertThat(event.message).isEqualTo("Notification event publish failed eventId={} attemptCount={} error={}")
-                assertThat(event.argumentArray.toList()).containsExactly(item.id, item.attemptCount + 1, "broker unavailable")
+        val published =
+            captureRelayLogs().use { logs ->
+                service.publishPending(limit = 10).also {
+                    val event = logs.events.single()
+                    assertThat(event.level).isEqualTo(Level.WARN)
+                    assertThat(event.message).isEqualTo("Notification event publish failed eventId={} attemptCount={} error={}")
+                    assertThat(event.argumentArray.toList()).containsExactly(item.id, item.attemptCount + 1, "broker unavailable")
+                }
             }
-        }
 
         assertThat(published).isEqualTo(1)
         assertThat(outbox.failedEvents).containsExactly(FailedEvent(item.id, "broker unavailable", 15))
@@ -95,14 +98,15 @@ class NotificationRelayServiceTest {
         val publisher = RecordingPublisher(failure = IllegalStateException("broker unavailable"))
         val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
 
-        val published = captureRelayLogs().use { logs ->
-            service.publishPending(limit = 10).also {
-                val event = logs.events.single()
-                assertThat(event.level).isEqualTo(Level.WARN)
-                assertThat(event.message).isEqualTo("Notification event publish dead eventId={} attemptCount={} error={}")
-                assertThat(event.argumentArray.toList()).containsExactly(item.id, item.attemptCount + 1, "broker unavailable")
+        val published =
+            captureRelayLogs().use { logs ->
+                service.publishPending(limit = 10).also {
+                    val event = logs.events.single()
+                    assertThat(event.level).isEqualTo(Level.WARN)
+                    assertThat(event.message).isEqualTo("Notification event publish dead eventId={} attemptCount={} error={}")
+                    assertThat(event.argumentArray.toList()).containsExactly(item.id, item.attemptCount + 1, "broker unavailable")
+                }
             }
-        }
 
         assertThat(published).isEqualTo(1)
         assertThat(outbox.deadEvents).containsExactly(DeadEvent(item.id, "broker unavailable"))
@@ -145,7 +149,10 @@ private class FakeEventOutbox(
         return claimedItems
     }
 
-    override fun markPublished(id: UUID, lockedAt: OffsetDateTime): Boolean {
+    override fun markPublished(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean {
         publishedIds += id
         return true
     }
@@ -160,7 +167,11 @@ private class FakeEventOutbox(
         return true
     }
 
-    override fun markPublishDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean {
+    override fun markPublishDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean {
         deadEvents += DeadEvent(id, error)
         return true
     }
@@ -179,7 +190,11 @@ private class RecordingPublisher(
 ) : NotificationEventPublisherPort {
     val publishedMessages = mutableListOf<PublishedMessage>()
 
-    override fun publish(message: NotificationEventMessage, topic: String, key: String) {
+    override fun publish(
+        message: NotificationEventMessage,
+        topic: String,
+        key: String,
+    ) {
         failure?.let { throw it }
         publishedMessages += PublishedMessage(message, topic, key)
     }

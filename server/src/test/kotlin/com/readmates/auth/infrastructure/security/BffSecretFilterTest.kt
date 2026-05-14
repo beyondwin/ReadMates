@@ -22,7 +22,8 @@ class BffSecretFilterTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `protected api request without bff secret is rejected`() {
-        mockMvc.get("/api/auth/me")
+        mockMvc
+            .get("/api/auth/me")
             .andExpect {
                 status { isUnauthorized() }
             }
@@ -30,26 +31,29 @@ class BffSecretFilterTest(
 
     @Test
     fun `protected api request with bff secret reaches controller`() {
-        mockMvc.get("/api/auth/me") {
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.authenticated") { value(false) }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.authenticated") { value(false) }
+            }
     }
 
     @Test
     fun `protected api request with wrong bff secret is rejected`() {
-        mockMvc.get("/api/auth/me") {
-            header("X-Readmates-Bff-Secret", "wrong-secret")
-        }.andExpect {
-            status { isUnauthorized() }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                header("X-Readmates-Bff-Secret", "wrong-secret")
+            }.andExpect {
+                status { isUnauthorized() }
+            }
     }
 
     @Test
     fun `non api health path remains reachable without bff secret`() {
-        mockMvc.get("/internal/health")
+        mockMvc
+            .get("/internal/health")
             .andExpect {
                 status { isOk() }
                 jsonPath("$.status") { value("UP") }

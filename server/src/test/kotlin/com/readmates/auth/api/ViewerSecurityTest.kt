@@ -1,15 +1,15 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
-import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
+import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.feedback.application.FeedbackDocumentError
 import com.readmates.feedback.application.FeedbackDocumentException
 import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
@@ -66,23 +66,25 @@ class ViewerSecurityTest(
     fun `viewer can read auth me`() {
         val cookie = viewerSessionCookie("viewer.readonly")
 
-        mockMvc.get("/api/auth/me") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.approvalState") { value("VIEWER") }
-        }
+        mockMvc
+            .get("/api/auth/me") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.approvalState") { value("VIEWER") }
+            }
     }
 
     @Test
     fun `viewer can read current session`() {
         val cookie = viewerSessionCookie("viewer.current")
 
-        mockMvc.get("/api/sessions/current") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .get("/api/sessions/current") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+            }
     }
 
     @Test
@@ -91,104 +93,116 @@ class ViewerSecurityTest(
         val memberVisibleSessionId = insertUpcomingSession(number = 87, visibility = "MEMBER")
         insertUpcomingSession(number = 88, visibility = "HOST_ONLY")
 
-        mockMvc.get("/api/sessions/upcoming") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.length()") { value(1) }
-            jsonPath("$[0].sessionId") { value(memberVisibleSessionId) }
-            jsonPath("$[0].visibility") { value("MEMBER") }
-            jsonPath("$[0].bookTitle") { value("Viewer Upcoming Member Book") }
-        }
+        mockMvc
+            .get("/api/sessions/upcoming") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.length()") { value(1) }
+                jsonPath("$[0].sessionId") { value(memberVisibleSessionId) }
+                jsonPath("$[0].visibility") { value("MEMBER") }
+                jsonPath("$[0].bookTitle") { value("Viewer Upcoming Member Book") }
+            }
     }
 
     @Test
     fun `viewer can read archive sessions`() {
         val cookie = viewerSessionCookie("viewer.archive")
 
-        mockMvc.get("/api/archive/sessions") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .get("/api/archive/sessions") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+            }
     }
 
     @Test
     fun `viewer can read member home`() {
         val cookie = viewerSessionCookie("viewer.home", membershipDisplayName = "Viewer Home")
 
-        mockMvc.get("/api/app/me") {
-            cookie(cookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.displayName") { value("Viewer Home") }
-            jsonPath("$.accountName") { value("Viewer Member") }
-            jsonPath("$.email") { exists() }
-            jsonPath("$.role") { value("MEMBER") }
-            jsonPath("$.membershipStatus") { value("VIEWER") }
-            jsonPath("$.clubName") { value("읽는사이") }
-        }
+        mockMvc
+            .get("/api/app/me") {
+                cookie(cookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.displayName") { value("Viewer Home") }
+                jsonPath("$.accountName") { value("Viewer Member") }
+                jsonPath("$.email") { exists() }
+                jsonPath("$.role") { value("MEMBER") }
+                jsonPath("$.membershipStatus") { value("VIEWER") }
+                jsonPath("$.clubName") { value("읽는사이") }
+            }
     }
 
     @Test
     fun `viewer cannot mutate current session`() {
         val cookie = viewerSessionCookie("viewer.write")
 
-        mockMvc.post("/api/sessions/current/questions") {
-            cookie(cookie)
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"questions":[{"priority":1,"text":"Question?","draftThought":null}]}"""
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                cookie(cookie)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"questions":[{"priority":1,"text":"Question?","draftThought":null}]}"""
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `viewer cannot read feedback document`() {
         val cookie = viewerSessionCookie("viewer.feedback")
 
-        mockMvc.get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
-            cookie(cookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/sessions/00000000-0000-0000-0000-000000000301/feedback-document") {
+                cookie(cookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `viewer cannot access host api`() {
         val cookie = viewerSessionCookie("viewer.host")
 
-        mockMvc.get("/api/host/dashboard") {
-            cookie(cookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/host/dashboard") {
+                cookie(cookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `feedback document use case rejects viewer before readable lookup`() {
         val email = viewerMemberEmail("viewer.feedback.guard")
         viewerSessionCookie(email)
-        val currentMember = resolveCurrentMemberUseCase.resolveByEmail(email)
-            ?: error("Expected viewer member to resolve")
+        val currentMember =
+            resolveCurrentMemberUseCase.resolveByEmail(email)
+                ?: error("Expected viewer member to resolve")
 
-        val exception = assertThrows<FeedbackDocumentException> {
-            getReadableFeedbackDocumentUseCase.getReadableFeedbackDocument(
-                currentMember,
-                UUID.fromString("00000000-0000-0000-0000-000000000301"),
-            )
-        }
+        val exception =
+            assertThrows<FeedbackDocumentException> {
+                getReadableFeedbackDocumentUseCase.getReadableFeedbackDocument(
+                    currentMember,
+                    UUID.fromString("00000000-0000-0000-0000-000000000301"),
+                )
+            }
 
         assertEquals(FeedbackDocumentError.ACTIVE_MEMBERSHIP_REQUIRED, exception.error)
         assertEquals("Feedback documents require active membership", exception.message)
     }
 
-    private fun viewerSessionCookie(emailPrefixOrAddress: String, membershipDisplayName: String? = null): Cookie {
-        val email = if (emailPrefixOrAddress.contains("@")) {
-            emailPrefixOrAddress
-        } else {
-            viewerMemberEmail(emailPrefixOrAddress)
-        }
+    private fun viewerSessionCookie(
+        emailPrefixOrAddress: String,
+        membershipDisplayName: String? = null,
+    ): Cookie {
+        val email =
+            if (emailPrefixOrAddress.contains("@")) {
+                emailPrefixOrAddress
+            } else {
+                viewerMemberEmail(emailPrefixOrAddress)
+            }
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         val displayName = membershipDisplayName ?: "Viewer${userId.take(8)}"
@@ -216,16 +230,20 @@ class ViewerSecurityTest(
         )
         createdMembershipIds += membershipId
 
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "ViewerSecurityTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "ViewerSecurityTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun insertUpcomingSession(number: Int, visibility: String): String {
+    private fun insertUpcomingSession(
+        number: Int,
+        visibility: String,
+    ): String {
         val sessionId = UUID.randomUUID().toString()
         jdbcTemplate.update(
             """
@@ -270,10 +288,13 @@ class ViewerSecurityTest(
         return sessionId
     }
 
-    private fun viewerMemberEmail(prefix: String): String =
-        "$prefix.${UUID.randomUUID()}@example.com"
+    private fun viewerMemberEmail(prefix: String): String = "$prefix.${UUID.randomUUID()}@example.com"
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

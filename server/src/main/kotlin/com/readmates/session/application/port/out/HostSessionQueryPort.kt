@@ -10,8 +10,14 @@ import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 
 interface HostSessionQueryPort {
-    fun list(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostSessionListItem>
+    fun list(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<HostSessionListItem>
+
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
+
     fun dashboard(host: CurrentMember): HostDashboardResult
+
     fun upcoming(member: CurrentMember): List<UpcomingSessionItem>
 }

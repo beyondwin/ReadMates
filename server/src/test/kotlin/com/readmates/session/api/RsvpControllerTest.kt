@@ -20,14 +20,14 @@ import org.springframework.test.web.servlet.patch
 class RsvpControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-
     @Test
     fun `rejects an invalid RSVP status`() {
-        mockMvc.patch("/api/sessions/current/rsvp") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{ "status": "LATE" }"""
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .patch("/api/sessions/current/rsvp") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{ "status": "LATE" }"""
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 }

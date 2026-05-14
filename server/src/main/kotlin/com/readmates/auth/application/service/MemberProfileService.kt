@@ -20,19 +20,22 @@ import java.util.UUID
 class MemberProfileService(
     private val memberProfileStore: MemberProfileStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
-) : UpdateOwnMemberProfileUseCase, UpdateHostMemberProfileUseCase {
+) : UpdateOwnMemberProfileUseCase,
+    UpdateHostMemberProfileUseCase {
     @Transactional
     override fun updateOwnProfile(
         authenticationEmail: String?,
         command: UpdateMemberProfileCommand,
     ): MemberProfile {
-        val email = authenticationEmail
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.lowercase(Locale.ROOT)
-            ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
-        val member = memberProfileStore.findProfileMemberByEmail(email)
-            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val email =
+            authenticationEmail
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.lowercase(Locale.ROOT)
+                ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
+        val member =
+            memberProfileStore.findProfileMemberByEmail(email)
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         val currentMember = member.toCurrentMember()
         if (!currentMember.canEditOwnProfile) {
             throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
@@ -40,9 +43,11 @@ class MemberProfileService(
 
         val displayName = validateDisplayName(command.displayName)
         updateOwnDisplayName(member.clubId, member.membershipId, displayName)
-        val profile = memberProfileStore.findProfileMemberByEmail(email)
-            ?.toMemberProfile()
-            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val profile =
+            memberProfileStore
+                .findProfileMemberByEmail(email)
+                ?.toMemberProfile()
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         cacheInvalidation.evictClubContentAfterCommit(member.clubId)
         return profile
     }
@@ -53,33 +58,43 @@ class MemberProfileService(
         membershipId: UUID,
         command: UpdateMemberProfileCommand,
     ): HostMemberListItem {
-        val email = authenticationEmail
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-            ?.lowercase(Locale.ROOT)
-            ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
-        val host = memberProfileStore.findProfileMemberByEmail(email)
-            ?.toCurrentMember()
-            ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
+        val email =
+            authenticationEmail
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.lowercase(Locale.ROOT)
+                ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
+        val host =
+            memberProfileStore
+                .findProfileMemberByEmail(email)
+                ?.toCurrentMember()
+                ?: throw MemberProfileException(MemberProfileError.AUTHENTICATION_REQUIRED)
         if (!host.isHost) {
             throw MemberProfileException(MemberProfileError.HOST_ROLE_REQUIRED)
         }
 
         val displayName = validateDisplayName(command.displayName)
         updateHostDisplayName(host.clubId, membershipId, displayName)
-        val member = memberProfileStore.findHostMemberListItem(host.clubId, membershipId)
-            ?.toHostMemberListItem(host.membershipId)
-            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val member =
+            memberProfileStore
+                .findHostMemberListItem(host.clubId, membershipId)
+                ?.toHostMemberListItem(host.membershipId)
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         cacheInvalidation.evictClubContentAfterCommit(host.clubId)
         return member
     }
 
-    private fun updateHostDisplayName(clubId: UUID, membershipId: UUID, displayName: String) {
+    private fun updateHostDisplayName(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+    ) {
         if (!memberProfileStore.lockClubProfileNames(clubId)) {
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
-        val target = memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
-            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val target =
+            memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         if (target.status !in PROFILE_EDIT_TARGET_STATUSES) {
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
@@ -91,12 +106,17 @@ class MemberProfileService(
         }
     }
 
-    private fun updateOwnDisplayName(clubId: UUID, membershipId: UUID, displayName: String) {
+    private fun updateOwnDisplayName(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+    ) {
         if (!memberProfileStore.lockClubProfileNames(clubId)) {
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
-        val currentMember = memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
-            ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        val currentMember =
+            memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         if (!currentMember.toCurrentMember().canEditOwnProfile) {
             throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
         }
@@ -104,8 +124,9 @@ class MemberProfileService(
             throw MemberProfileException(MemberProfileError.DISPLAY_NAME_DUPLICATE)
         }
         if (!memberProfileStore.updateOwnDisplayName(clubId, membershipId, displayName)) {
-            val updatedMember = memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
-                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+            val updatedMember =
+                memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+                    ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
             if (!updatedMember.toCurrentMember().canEditOwnProfile) {
                 throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
             }
@@ -114,8 +135,9 @@ class MemberProfileService(
     }
 
     private fun validateDisplayName(rawDisplayName: String?): String {
-        val displayName = rawDisplayName?.trim()
-            ?: throw MemberProfileException(MemberProfileError.DISPLAY_NAME_REQUIRED)
+        val displayName =
+            rawDisplayName?.trim()
+                ?: throw MemberProfileException(MemberProfileError.DISPLAY_NAME_REQUIRED)
         if (displayName.isEmpty()) {
             throw MemberProfileException(MemberProfileError.DISPLAY_NAME_REQUIRED)
         }
@@ -157,23 +179,27 @@ class MemberProfileService(
         )
 
     private companion object {
-        val PROFILE_EDIT_TARGET_STATUSES = setOf(
-            MembershipStatus.VIEWER,
-            MembershipStatus.ACTIVE,
-            MembershipStatus.SUSPENDED,
-            MembershipStatus.LEFT,
-            MembershipStatus.INACTIVE,
-        )
+        val PROFILE_EDIT_TARGET_STATUSES =
+            setOf(
+                MembershipStatus.VIEWER,
+                MembershipStatus.ACTIVE,
+                MembershipStatus.SUSPENDED,
+                MembershipStatus.LEFT,
+                MembershipStatus.INACTIVE,
+            )
         val RESERVED_DISPLAY_NAMES = setOf("탈퇴한 멤버", "관리자", "호스트", "운영자")
         val EMAIL_SHAPED = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
         val URL_PREFIX = Regex("^https?://", RegexOption.IGNORE_CASE)
-        val DOMAIN_LIKE = Regex(
-            "^(?i)(www\\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:[:/].*)?$",
-        )
+        val DOMAIN_LIKE =
+            Regex(
+                "^(?i)(www\\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:[:/].*)?$",
+            )
     }
 }
 
-class MemberProfileException(val error: MemberProfileError) : RuntimeException(error.code)
+class MemberProfileException(
+    val error: MemberProfileError,
+) : RuntimeException(error.code)
 
 enum class MemberProfileError {
     AUTHENTICATION_REQUIRED,

@@ -32,8 +32,7 @@ class MemberNotificationController(
             .toResponse()
 
     @GetMapping("/unread-count")
-    fun unreadCount(member: CurrentMember): Map<String, Int> =
-        mapOf("unreadCount" to manageMemberNotificationsUseCase.unreadCount(member))
+    fun unreadCount(member: CurrentMember): Map<String, Int> = mapOf("unreadCount" to manageMemberNotificationsUseCase.unreadCount(member))
 
     @PostMapping("/{id}/read")
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -45,8 +44,7 @@ class MemberNotificationController(
     }
 
     @PostMapping("/read-all")
-    fun markAllRead(member: CurrentMember): Map<String, Int> =
-        mapOf("updatedCount" to manageMemberNotificationsUseCase.markAllRead(member))
+    fun markAllRead(member: CurrentMember): Map<String, Int> = mapOf("updatedCount" to manageMemberNotificationsUseCase.markAllRead(member))
 }
 
 @RestController
@@ -62,6 +60,5 @@ class MemberNotificationPreferenceController(
     fun savePreferences(
         member: CurrentMember,
         @RequestBody request: NotificationPreferencesRequest,
-    ): NotificationPreferencesResponse =
-        manageNotificationPreferencesUseCase.savePreferences(member, request.toModel()).toResponse()
+    ): NotificationPreferencesResponse = manageNotificationPreferencesUseCase.savePreferences(member, request.toModel()).toResponse()
 }

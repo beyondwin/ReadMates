@@ -1,8 +1,8 @@
 package com.readmates.notification.adapter.`in`.web
 
-import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDeliveryList
+import com.readmates.notification.application.model.HostNotificationDetail
 import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.HostNotificationEventList
 import com.readmates.notification.application.model.HostNotificationFailure
@@ -201,15 +201,16 @@ data class ManualNotificationConfirmRequest(
     fun toCommand(): ManualNotificationConfirmCommand =
         ManualNotificationConfirmCommand(
             previewId = previewId,
-            selection = ManualNotificationSelectionRequest(
-                sessionId = sessionId,
-                eventType = eventType,
-                audience = audience,
-                requestedChannels = requestedChannels,
-                excludedMembershipIds = excludedMembershipIds,
-                includedMembershipIds = includedMembershipIds,
-                sendMode = sendMode,
-            ).toSelection(),
+            selection =
+                ManualNotificationSelectionRequest(
+                    sessionId = sessionId,
+                    eventType = eventType,
+                    audience = audience,
+                    requestedChannels = requestedChannels,
+                    excludedMembershipIds = excludedMembershipIds,
+                    includedMembershipIds = includedMembershipIds,
+                    sendMode = sendMode,
+                ).toSelection(),
             resendConfirmed = resendConfirmed,
         )
 }
@@ -229,9 +230,10 @@ data class NotificationPreferencesRequest(
     fun toModel(): NotificationPreferences =
         NotificationPreferences(
             emailEnabled = emailEnabled,
-            events = NotificationEventType.entries.associateWith { eventType ->
-                events[eventType] ?: NotificationPreferences.defaultEventEnabled(eventType)
-            },
+            events =
+                NotificationEventType.entries.associateWith { eventType ->
+                    events[eventType] ?: NotificationPreferences.defaultEventEnabled(eventType)
+                },
         )
 }
 
@@ -424,17 +426,18 @@ fun HostNotificationDeliveryList.toResponse(): HostNotificationDeliveryListRespo
 fun ManualNotificationOptions.toResponse(): ManualNotificationOptionsResponse =
     ManualNotificationOptionsResponse(
         session = session?.toResponse(),
-        templates = templates.map {
-            ManualNotificationTemplateOptionResponse(
-                eventType = it.eventType,
-                label = it.label,
-                enabled = it.enabled,
-                disabledReason = it.disabledReason,
-                defaultAudience = it.defaultAudience,
-                allowedAudiences = it.allowedAudiences.toList(),
-                defaultChannels = it.defaultChannels,
-            )
-        },
+        templates =
+            templates.map {
+                ManualNotificationTemplateOptionResponse(
+                    eventType = it.eventType,
+                    label = it.label,
+                    enabled = it.enabled,
+                    disabledReason = it.disabledReason,
+                    defaultAudience = it.defaultAudience,
+                    allowedAudiences = it.allowedAudiences.toList(),
+                    defaultChannels = it.defaultChannels,
+                )
+            },
         members = CursorPageResponse(members.map { it.toResponse() }, nextCursor),
         recentDispatches = recentDispatches.map { it.toResponse() },
     )
@@ -579,8 +582,7 @@ private fun maskEmail(email: String): String {
     return "${local.first()}***@$domain"
 }
 
-private fun String?.toHostSafeLastError(): String? =
-    sanitizeNotificationError(this, MAX_HOST_LAST_ERROR_LENGTH)
+private fun String?.toHostSafeLastError(): String? = sanitizeNotificationError(this, MAX_HOST_LAST_ERROR_LENGTH)
 
 private fun Map<String, Any?>.toHostSafeMetadata(depth: Int = 0): Map<String, Any?> {
     val safe = linkedMapOf<String, Any?>()
@@ -597,26 +599,32 @@ private fun Map<String, Any?>.toHostSafeMetadata(depth: Int = 0): Map<String, An
     return safe
 }
 
-private fun Any?.toHostSafeMetadataValue(key: String, depth: Int): Any? {
+private fun Any?.toHostSafeMetadataValue(
+    key: String,
+    depth: Int,
+): Any? {
     if (depth > 0) {
         return UnsafeHostMetadataValue
     }
 
     return when (key) {
-        "sessionNumber" -> when (this) {
-            is Number -> this.toInt()
-            else -> UnsafeHostMetadataValue
-        }
-        "bookTitle" -> when (this) {
-            is String -> trim()
-                .take(MAX_HOST_METADATA_STRING_LENGTH)
-                .takeIf { it.isNotEmpty() }
-                ?.takeUnless {
-                    EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
-                        SENSITIVE_VALUE_PATTERN.containsMatchIn(it)
-                } ?: UnsafeHostMetadataValue
-            else -> UnsafeHostMetadataValue
-        }
+        "sessionNumber" ->
+            when (this) {
+                is Number -> this.toInt()
+                else -> UnsafeHostMetadataValue
+            }
+        "bookTitle" ->
+            when (this) {
+                is String ->
+                    trim()
+                        .take(MAX_HOST_METADATA_STRING_LENGTH)
+                        .takeIf { it.isNotEmpty() }
+                        ?.takeUnless {
+                            EMAIL_LIKE_PATTERN.containsMatchIn(it) ||
+                                SENSITIVE_VALUE_PATTERN.containsMatchIn(it)
+                        } ?: UnsafeHostMetadataValue
+                else -> UnsafeHostMetadataValue
+            }
         else -> UnsafeHostMetadataValue
     }
 }

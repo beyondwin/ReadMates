@@ -1,12 +1,12 @@
 package com.readmates.club.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.jayway.jsonpath.JsonPath
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -60,14 +60,15 @@ class PlatformAdminBffSecurityTest(
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
         val hostname = "missing-secret-${UUID.randomUUID()}.example.test"
 
-        mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-            cookie(sessionCookieForUser(owner))
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isUnauthorized() }
-        }
+        mockMvc
+            .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+                cookie(sessionCookieForUser(owner))
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isUnauthorized() }
+            }
 
         assertEquals(0, countDomainRows(hostname))
     }
@@ -77,14 +78,15 @@ class PlatformAdminBffSecurityTest(
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
         val hostname = "missing-origin-${UUID.randomUUID()}.example.test"
 
-        mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-            cookie(sessionCookieForUser(owner))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+                cookie(sessionCookieForUser(owner))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isForbidden() }
+            }
 
         assertEquals(0, countDomainRows(hostname))
     }
@@ -94,23 +96,28 @@ class PlatformAdminBffSecurityTest(
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
         val hostname = "bff-${UUID.randomUUID()}.example.test"
 
-        val result = mockMvc.post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-            cookie(sessionCookieForUser(operator))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.hostname") { value(hostname) }
-            jsonPath("$.status") { value("ACTION_REQUIRED") }
-        }.andReturn()
+        val result =
+            mockMvc
+                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+                    cookie(sessionCookieForUser(operator))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.hostname") { value(hostname) }
+                    jsonPath("$.status") { value("ACTION_REQUIRED") }
+                }.andReturn()
         createdClubDomainIds += JsonPath.read<String>(result.response.contentAsString, "$.id")
 
         assertEquals(1, countDomainRows(hostname))
     }
 
-    private fun createPlatformAdminUser(role: String, status: String): String {
+    private fun createPlatformAdminUser(
+        role: String,
+        status: String,
+    ): String {
         val userId = UUID.randomUUID().toString()
         val email = "platform.${UUID.randomUUID()}@example.com"
         jdbcTemplate.update(
@@ -136,11 +143,12 @@ class PlatformAdminBffSecurityTest(
     }
 
     private fun sessionCookieForUser(userId: String): Cookie {
-        val issuedSession = authSessionService.issueSession(
-            userId = UUID.fromString(userId).toString(),
-            userAgent = "PlatformAdminBffSecurityTest",
-            ipAddress = "127.0.0.1",
-        )
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = UUID.fromString(userId).toString(),
+                userAgent = "PlatformAdminBffSecurityTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
@@ -152,7 +160,11 @@ class PlatformAdminBffSecurityTest(
             hostname,
         ) ?: 0
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

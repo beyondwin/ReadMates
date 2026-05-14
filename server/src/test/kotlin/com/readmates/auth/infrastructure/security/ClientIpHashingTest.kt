@@ -63,6 +63,5 @@ class ClientIpHashingTest {
         assertNotEquals(hash1, hash2)
     }
 
-    private fun fixedClock(instant: String): Clock =
-        Clock.fixed(Instant.parse(instant), ZoneOffset.UTC)
+    private fun fixedClock(instant: String): Clock = Clock.fixed(Instant.parse(instant), ZoneOffset.UTC)
 }

@@ -3,7 +3,8 @@ package com.readmates.auth.infrastructure.security
 enum class BffSecretAuditMode {
     ROTATION_ONLY,
     ALL,
-    OFF;
+    OFF,
+    ;
 
     fun shouldRecord(alias: String): Boolean =
         when (this) {

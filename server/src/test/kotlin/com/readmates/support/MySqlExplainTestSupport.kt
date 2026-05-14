@@ -14,7 +14,10 @@ data class MySqlExplainRow(
     val extra: String?,
 )
 
-fun JdbcTemplate.explain(sql: String, vararg args: Any?): List<MySqlExplainRow> =
+fun JdbcTemplate.explain(
+    sql: String,
+    vararg args: Any?,
+): List<MySqlExplainRow> =
     query(
         "explain $sql",
         { resultSet, _ ->
@@ -32,34 +35,39 @@ fun JdbcTemplate.explain(sql: String, vararg args: Any?): List<MySqlExplainRow> 
         *args,
     )
 
-fun List<MySqlExplainRow>.assertUsesIndexFor(tableName: String, reason: String) {
+fun List<MySqlExplainRow>.assertUsesIndexFor(
+    tableName: String,
+    reason: String,
+) {
     val candidates = filter { it.table == tableName }
     assertThat(candidates)
         .describedAs("EXPLAIN plan should include table $tableName for $reason. Plan: $this")
         .isNotEmpty
-    val allowedAccessTypes = setOf(
-        "const",
-        "eq_ref",
-        "index_merge",
-        "index_subquery",
-        "range",
-        "ref",
-        "ref_or_null",
-        "system",
-        "unique_subquery",
-    )
-    val invalidAccessRows = candidates.filter { row ->
-        row.accessType?.lowercase() !in allowedAccessTypes
-    }
+    val allowedAccessTypes =
+        setOf(
+            "const",
+            "eq_ref",
+            "index_merge",
+            "index_subquery",
+            "range",
+            "ref",
+            "ref_or_null",
+            "system",
+            "unique_subquery",
+        )
+    val invalidAccessRows =
+        candidates.filter { row ->
+            row.accessType?.lowercase() !in allowedAccessTypes
+        }
     assertThat(invalidAccessRows)
         .describedAs(
             "EXPLAIN plan should use targeted indexed access for $tableName ($reason), " +
                 "not full table or full index scans. Plan: $this",
-        )
-        .isEmpty()
-    val missingKeyRows = candidates.filter { row ->
-        row.accessType?.lowercase() != "system" && row.key.isNullOrBlank()
-    }
+        ).isEmpty()
+    val missingKeyRows =
+        candidates.filter { row ->
+            row.accessType?.lowercase() != "system" && row.key.isNullOrBlank()
+        }
     assertThat(missingKeyRows)
         .describedAs("EXPLAIN key should be present for $tableName ($reason). Plan: $this")
         .isEmpty()

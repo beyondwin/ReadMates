@@ -13,9 +13,9 @@ import com.readmates.notification.application.model.NotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.HostNotificationDeliveryLedgerPort
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
-import com.readmates.notification.application.port.out.HostNotificationDeliveryLedgerPort
 import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
 import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
@@ -25,9 +25,9 @@ import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.notification.domain.NotificationOutboxStatus
-import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.CurrentMember
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -40,30 +40,34 @@ class HostNotificationOperationsServiceTest {
     @Test
     fun `retry returns eligible detail without claiming or sending when delivery is disabled`() {
         val detail = hostDetail(status = NotificationOutboxStatus.PENDING)
-        val deliveryPort = RecordingDeliveryPort(
-            claimedDelivery = claimedDelivery(),
-            details = mapOf(detail.id to detail),
-        )
+        val deliveryPort =
+            RecordingDeliveryPort(
+                claimedDelivery = claimedDelivery(),
+                details = mapOf(detail.id to detail),
+            )
         val mailPort = RecordingMailPort()
-        val processingService = NotificationDeliveryProcessingService(
-            deliveryEngine = NotificationDeliveryEngine(
-                deliveryStatusPort = deliveryPort,
-                mailDeliveryPort = mailPort,
-                metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                maxAttempts = 5,
-                retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
-            ),
-            transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryPlanningPort, deliveryPort),
-            deliveryEnabled = false,
-        )
-        val service = HostNotificationOperationsService(
-            notificationEventOutboxPort = EmptyEventOutboxPort,
-            notificationDeliveryLedgerPort = deliveryPort,
-            notificationDeliveryStatusPort = deliveryPort,
-            notificationDeliveryProcessingService = processingService,
-            transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryPlanningPort, deliveryPort),
-            deliveryEnabled = false,
-        )
+        val processingService =
+            NotificationDeliveryProcessingService(
+                deliveryEngine =
+                    NotificationDeliveryEngine(
+                        deliveryStatusPort = deliveryPort,
+                        mailDeliveryPort = mailPort,
+                        metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                        maxAttempts = 5,
+                        retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+                    ),
+                transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryPlanningPort, deliveryPort),
+                deliveryEnabled = false,
+            )
+        val service =
+            HostNotificationOperationsService(
+                notificationEventOutboxPort = EmptyEventOutboxPort,
+                notificationDeliveryLedgerPort = deliveryPort,
+                notificationDeliveryStatusPort = deliveryPort,
+                notificationDeliveryProcessingService = processingService,
+                transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryPlanningPort, deliveryPort),
+                deliveryEnabled = false,
+            )
 
         val result = service.retry(host(), detail.id)
 
@@ -114,18 +118,27 @@ private object EmptyEventOutboxPort : NotificationEventOutboxPort {
         dedupeKey: String,
     ): Boolean = error("unused")
 
-    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int =
-        error("unused")
+    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int = error("unused")
 
-    override fun claimPublishable(limit: Int): List<NotificationEventOutboxItem> =
-        error("unused")
+    override fun claimPublishable(limit: Int): List<NotificationEventOutboxItem> = error("unused")
 
-    override fun markPublished(id: UUID, lockedAt: OffsetDateTime): Boolean = error("unused")
+    override fun markPublished(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean = error("unused")
 
-    override fun markPublishFailed(id: UUID, lockedAt: OffsetDateTime, error: String, nextAttemptDelayMinutes: Long): Boolean =
-        error("unused")
+    override fun markPublishFailed(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+        nextAttemptDelayMinutes: Long,
+    ): Boolean = error("unused")
 
-    override fun markPublishDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean = error("unused")
+    override fun markPublishDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean = error("unused")
 
     override fun loadMessage(eventId: UUID): NotificationEventMessage? = error("unused")
 
@@ -137,14 +150,15 @@ private object EmptyEventOutboxPort : NotificationEventOutboxPort {
 }
 
 private object NoopDeliveryPlanningPort : NotificationDeliveryPlanningPort {
-    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =
-        error("unused")
+    override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> = error("unused")
 }
 
 private class RecordingDeliveryPort(
     private val claimedDelivery: ClaimedNotificationDeliveryItem? = null,
     private val details: Map<UUID, HostNotificationDetail> = emptyMap(),
-) : NotificationDeliveryClaimPort, NotificationDeliveryStatusPort, HostNotificationDeliveryLedgerPort {
+) : NotificationDeliveryClaimPort,
+    NotificationDeliveryStatusPort,
+    HostNotificationDeliveryLedgerPort {
     val claimHostRequests = mutableListOf<Pair<UUID, UUID>>()
     val sent = mutableListOf<Pair<UUID, OffsetDateTime>>()
     val failed = mutableListOf<UUID>()
@@ -154,16 +168,25 @@ private class RecordingDeliveryPort(
 
     override fun claimEmailDeliveries(limit: Int): List<ClaimedNotificationDeliveryItem> = error("unused")
 
-    override fun claimEmailDeliveriesForClub(clubId: UUID, limit: Int): List<ClaimedNotificationDeliveryItem> = error("unused")
+    override fun claimEmailDeliveriesForClub(
+        clubId: UUID,
+        limit: Int,
+    ): List<ClaimedNotificationDeliveryItem> = error("unused")
 
-    override fun claimHostEmailDelivery(clubId: UUID, id: UUID): ClaimedNotificationDeliveryItem? {
+    override fun claimHostEmailDelivery(
+        clubId: UUID,
+        id: UUID,
+    ): ClaimedNotificationDeliveryItem? {
         claimHostRequests += clubId to id
         return claimedDelivery?.takeIf { it.clubId == clubId && it.id == id }
     }
 
     override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus? = error("unused")
 
-    override fun markDeliverySent(id: UUID, lockedAt: OffsetDateTime): Boolean {
+    override fun markDeliverySent(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+    ): Boolean {
         sent += id to lockedAt
         return true
     }
@@ -178,12 +201,19 @@ private class RecordingDeliveryPort(
         return true
     }
 
-    override fun markDeliveryDead(id: UUID, lockedAt: OffsetDateTime, error: String): Boolean {
+    override fun markDeliveryDead(
+        id: UUID,
+        lockedAt: OffsetDateTime,
+        error: String,
+    ): Boolean {
         dead += id
         return true
     }
 
-    override fun restoreDeadEmailDeliveryForClub(clubId: UUID, id: UUID): Boolean = error("unused")
+    override fun restoreDeadEmailDeliveryForClub(
+        clubId: UUID,
+        id: UUID,
+    ): Boolean = error("unused")
 
     override fun hostSummary(clubId: UUID): HostNotificationSummary = error("unused")
 
@@ -191,11 +221,12 @@ private class RecordingDeliveryPort(
         clubId: UUID,
         query: HostNotificationItemQuery,
         pageRequest: PageRequest,
-    ): HostNotificationItemList =
-        error("unused")
+    ): HostNotificationItemList = error("unused")
 
-    override fun hostEmailDetail(clubId: UUID, id: UUID): HostNotificationDetail? =
-        details[id]?.takeIf { clubId == CLUB_ID }
+    override fun hostEmailDetail(
+        clubId: UUID,
+        id: UUID,
+    ): HostNotificationDetail? = details[id]?.takeIf { clubId == CLUB_ID }
 
     override fun listHostDeliveries(
         clubId: UUID,

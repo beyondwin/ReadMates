@@ -12,12 +12,14 @@ import org.springframework.stereotype.Component
 @Component
 @Conditional(NoopRateLimitCondition::class)
 class NoopRateLimitAdapter : RateLimitPort {
-    override fun check(check: RateLimitCheck): RateLimitDecision =
-        RateLimitDecision.allowed()
+    override fun check(check: RateLimitCheck): RateLimitDecision = RateLimitDecision.allowed()
 }
 
 private class NoopRateLimitCondition : Condition {
-    override fun matches(context: ConditionContext, metadata: AnnotatedTypeMetadata): Boolean {
+    override fun matches(
+        context: ConditionContext,
+        metadata: AnnotatedTypeMetadata,
+    ): Boolean {
         val redisEnabled = context.environment.getProperty("readmates.redis.enabled", Boolean::class.java, false)
         val rateLimitEnabled = context.environment.getProperty("readmates.rate-limit.enabled", Boolean::class.java, false)
 

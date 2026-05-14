@@ -1,7 +1,7 @@
 package com.readmates.auth.adapter.out.persistence
 
-import com.readmates.auth.application.InvitationDomainException
 import com.readmates.auth.application.InvitationDomainError
+import com.readmates.auth.application.InvitationDomainException
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand
 import com.readmates.auth.application.port.out.HostInvitationListRow
 import com.readmates.auth.application.port.out.HostInvitationStorePort
@@ -35,31 +35,36 @@ class JdbcHostInvitationStoreAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : HostInvitationStorePort {
     override fun acquireInvitationCreateLock(lockKey: String) {
-        jdbcTemplate.execute(ConnectionCallback<Unit> { connection ->
-            connection.prepareStatement("select get_lock(?, 5)").use { statement ->
-                statement.setString(1, lockKey)
-                statement.executeQuery().use { resultSet ->
-                    resultSet.next()
-                    if (resultSet.getInt(1) != 1) {
-                        throw InvitationDomainException(
-                            "INVITATION_LOCK_TIMEOUT",
-                            InvitationDomainError.CONFLICT,
-                            "Could not acquire invitation lock",
-                        )
+        jdbcTemplate.execute(
+            ConnectionCallback<Unit> { connection ->
+                connection.prepareStatement("select get_lock(?, 5)").use { statement ->
+                    statement.setString(1, lockKey)
+                    statement.executeQuery().use { resultSet ->
+                        resultSet.next()
+                        if (resultSet.getInt(1) != 1) {
+                            throw InvitationDomainException(
+                                "INVITATION_LOCK_TIMEOUT",
+                                InvitationDomainError.CONFLICT,
+                                "Could not acquire invitation lock",
+                            )
+                        }
                     }
                 }
-            }
-            TransactionSynchronizationManager.registerSynchronization(
-                object : TransactionSynchronization {
-                    override fun afterCompletion(status: Int) {
-                        releaseInvitationLock(connection, lockKey)
-                    }
-                },
-            )
-        })
+                TransactionSynchronizationManager.registerSynchronization(
+                    object : TransactionSynchronization {
+                        override fun afterCompletion(status: Int) {
+                            releaseInvitationLock(connection, lockKey)
+                        }
+                    },
+                )
+            },
+        )
     }
 
-    override fun activeMemberCountByEmail(clubId: UUID, email: String): Int =
+    override fun activeMemberCountByEmail(
+        clubId: UUID,
+        email: String,
+    ): Int =
         jdbcTemplate.queryForObject(
             """
             select count(*)
@@ -74,7 +79,10 @@ class JdbcHostInvitationStoreAdapter(
             email,
         ) ?: 0
 
-    override fun revokeLivePendingInvitation(clubId: UUID, email: String) {
+    override fun revokeLivePendingInvitation(
+        clubId: UUID,
+        email: String,
+    ) {
         jdbcTemplate.update(
             """
             update invitations
@@ -118,102 +126,113 @@ class JdbcHostInvitationStoreAdapter(
         )
     }
 
-    override fun listHostInvitations(clubId: UUID, pageRequest: PageRequest): CursorPage<HostInvitationListRow> {
+    override fun listHostInvitations(
+        clubId: UUID,
+        pageRequest: PageRequest,
+    ): CursorPage<HostInvitationListRow> {
         val cursor = HostInvitationCreatedAtDescCursor.from(pageRequest.cursor)
-        val rows = jdbcTemplate.query(
-            """
-            select
-              invitations.id,
-              clubs.slug as club_slug,
-              invitations.invited_email,
-              invitations.invited_name,
-              invitations.role,
-              invitations.status,
-              invitations.expires_at,
-              invitations.accepted_at,
-              invitations.created_at,
-              invitations.apply_to_current_session,
-              primary_domains.hostname as primary_host,
-              exists (
-                select 1
-                from users
-                join memberships on memberships.user_id = users.id
-                where memberships.club_id = invitations.club_id
-                  and lower(users.email) = lower(invitations.invited_email)
-                and memberships.status = 'ACTIVE'
-              ) as has_active_membership
-            from invitations
-            join clubs on clubs.id = invitations.club_id
-            left join (
-              select club_id, min(hostname) as hostname
-              from club_domains
-              where status = 'ACTIVE'
-                and is_primary = true
-              group by club_id
-            ) primary_domains on primary_domains.club_id = invitations.club_id
-            where invitations.club_id = ?
-              and (
-                ? is null
-                or invitations.created_at < ?
-                or (invitations.created_at = ? and invitations.id < ?)
-              )
-            order by invitations.created_at desc, invitations.id desc
-            limit ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toHostInvitationListRow() },
-            clubId.dbString(),
-            cursor?.createdAt,
-            cursor?.createdAt?.toUtcLocalDateTime(),
-            cursor?.createdAt?.toUtcLocalDateTime(),
-            cursor?.id,
-            pageRequest.limit + 1,
-        )
+        val rows =
+            jdbcTemplate.query(
+                """
+                select
+                  invitations.id,
+                  clubs.slug as club_slug,
+                  invitations.invited_email,
+                  invitations.invited_name,
+                  invitations.role,
+                  invitations.status,
+                  invitations.expires_at,
+                  invitations.accepted_at,
+                  invitations.created_at,
+                  invitations.apply_to_current_session,
+                  primary_domains.hostname as primary_host,
+                  exists (
+                    select 1
+                    from users
+                    join memberships on memberships.user_id = users.id
+                    where memberships.club_id = invitations.club_id
+                      and lower(users.email) = lower(invitations.invited_email)
+                    and memberships.status = 'ACTIVE'
+                  ) as has_active_membership
+                from invitations
+                join clubs on clubs.id = invitations.club_id
+                left join (
+                  select club_id, min(hostname) as hostname
+                  from club_domains
+                  where status = 'ACTIVE'
+                    and is_primary = true
+                  group by club_id
+                ) primary_domains on primary_domains.club_id = invitations.club_id
+                where invitations.club_id = ?
+                  and (
+                    ? is null
+                    or invitations.created_at < ?
+                    or (invitations.created_at = ? and invitations.id < ?)
+                  )
+                order by invitations.created_at desc, invitations.id desc
+                limit ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toHostInvitationListRow() },
+                clubId.dbString(),
+                cursor?.createdAt,
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.createdAt?.toUtcLocalDateTime(),
+                cursor?.id,
+                pageRequest.limit + 1,
+            )
         return pageFromRows(rows, pageRequest.limit) { row ->
             hostInvitationCreatedAtDescCursor(row.createdAt, row.invitationId.toString())
         }
     }
 
-    override fun findHostInvitation(clubId: UUID, invitationId: UUID): HostInvitationListRow? =
-        jdbcTemplate.query(
-            """
-            select
-              invitations.id,
-              clubs.slug as club_slug,
-              invitations.invited_email,
-              invitations.invited_name,
-              invitations.role,
-              invitations.status,
-              invitations.expires_at,
-              invitations.accepted_at,
-              invitations.created_at,
-              invitations.apply_to_current_session,
-              primary_domains.hostname as primary_host,
-              exists (
-                select 1
-                from users
-                join memberships on memberships.user_id = users.id
-                where memberships.club_id = invitations.club_id
-                  and lower(users.email) = lower(invitations.invited_email)
-                and memberships.status = 'ACTIVE'
-              ) as has_active_membership
-            from invitations
-            join clubs on clubs.id = invitations.club_id
-            left join (
-              select club_id, min(hostname) as hostname
-              from club_domains
-              where status = 'ACTIVE'
-                and is_primary = true
-              group by club_id
-            ) primary_domains on primary_domains.club_id = invitations.club_id
-            where invitations.club_id = ?
-              and invitations.id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.toHostInvitationListRow() },
-            clubId.dbString(),
-            invitationId.dbString(),
-        ).firstOrNull()
+    override fun findHostInvitation(
+        clubId: UUID,
+        invitationId: UUID,
+    ): HostInvitationListRow? =
+        jdbcTemplate
+            .query(
+                """
+                select
+                  invitations.id,
+                  clubs.slug as club_slug,
+                  invitations.invited_email,
+                  invitations.invited_name,
+                  invitations.role,
+                  invitations.status,
+                  invitations.expires_at,
+                  invitations.accepted_at,
+                  invitations.created_at,
+                  invitations.apply_to_current_session,
+                  primary_domains.hostname as primary_host,
+                  exists (
+                    select 1
+                    from users
+                    join memberships on memberships.user_id = users.id
+                    where memberships.club_id = invitations.club_id
+                      and lower(users.email) = lower(invitations.invited_email)
+                    and memberships.status = 'ACTIVE'
+                  ) as has_active_membership
+                from invitations
+                join clubs on clubs.id = invitations.club_id
+                left join (
+                  select club_id, min(hostname) as hostname
+                  from club_domains
+                  where status = 'ACTIVE'
+                    and is_primary = true
+                  group by club_id
+                ) primary_domains on primary_domains.club_id = invitations.club_id
+                where invitations.club_id = ?
+                  and invitations.id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.toHostInvitationListRow() },
+                clubId.dbString(),
+                invitationId.dbString(),
+            ).firstOrNull()
 
-    override fun revokePendingInvitation(clubId: UUID, invitationId: UUID) {
+    override fun revokePendingInvitation(
+        clubId: UUID,
+        invitationId: UUID,
+    ) {
         jdbcTemplate.update(
             """
             update invitations
@@ -229,57 +248,67 @@ class JdbcHostInvitationStoreAdapter(
         )
     }
 
-    override fun findInvitationByTokenHash(tokenHash: String, forUpdate: Boolean): InvitationTokenRow? {
+    override fun findInvitationByTokenHash(
+        tokenHash: String,
+        forUpdate: Boolean,
+    ): InvitationTokenRow? {
         val lockClause = if (forUpdate) "for update" else ""
-        return jdbcTemplate.query(
-            """
-            select
-              invitations.id,
-              invitations.club_id,
-              clubs.slug as club_slug,
-              clubs.name as club_name,
-              invitations.invited_email,
-              invitations.invited_name,
-              invitations.role,
-              invitations.status,
-              invitations.expires_at,
-              invitations.apply_to_current_session
-            from invitations
-            join clubs on clubs.id = invitations.club_id
-            where invitations.token_hash = ?
-            $lockClause
-            """.trimIndent(),
-            { resultSet, _ ->
-                InvitationTokenRow(
-                    id = resultSet.uuid("id"),
-                    clubId = resultSet.uuid("club_id"),
-                    clubSlug = resultSet.getString("club_slug"),
-                    clubName = resultSet.getString("club_name"),
-                    email = resultSet.getString("invited_email"),
-                    name = resultSet.getString("invited_name"),
-                    role = MembershipRole.valueOf(resultSet.getString("role")),
-                    status = InvitationStatus.valueOf(resultSet.getString("status")),
-                    expiresAt = resultSet.utcOffsetDateTime("expires_at"),
-                    applyToCurrentSession = resultSet.getBoolean("apply_to_current_session"),
-                )
-            },
-            tokenHash,
-        ).firstOrNull()
+        return jdbcTemplate
+            .query(
+                """
+                select
+                  invitations.id,
+                  invitations.club_id,
+                  clubs.slug as club_slug,
+                  clubs.name as club_name,
+                  invitations.invited_email,
+                  invitations.invited_name,
+                  invitations.role,
+                  invitations.status,
+                  invitations.expires_at,
+                  invitations.apply_to_current_session
+                from invitations
+                join clubs on clubs.id = invitations.club_id
+                where invitations.token_hash = ?
+                $lockClause
+                """.trimIndent(),
+                { resultSet, _ ->
+                    InvitationTokenRow(
+                        id = resultSet.uuid("id"),
+                        clubId = resultSet.uuid("club_id"),
+                        clubSlug = resultSet.getString("club_slug"),
+                        clubName = resultSet.getString("club_name"),
+                        email = resultSet.getString("invited_email"),
+                        name = resultSet.getString("invited_name"),
+                        role = MembershipRole.valueOf(resultSet.getString("role")),
+                        status = InvitationStatus.valueOf(resultSet.getString("status")),
+                        expiresAt = resultSet.utcOffsetDateTime("expires_at"),
+                        applyToCurrentSession = resultSet.getBoolean("apply_to_current_session"),
+                    )
+                },
+                tokenHash,
+            ).firstOrNull()
     }
 
-    override fun upsertActiveMembership(clubId: UUID, userId: UUID, role: MembershipRole): UUID {
-        val existingMembershipId = jdbcTemplate.query(
-            """
-            select id
-            from memberships
-            where club_id = ?
-              and user_id = ?
-            limit 1
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.uuid("id") },
-            clubId.dbString(),
-            userId.dbString(),
-        ).firstOrNull()
+    override fun upsertActiveMembership(
+        clubId: UUID,
+        userId: UUID,
+        role: MembershipRole,
+    ): UUID {
+        val existingMembershipId =
+            jdbcTemplate
+                .query(
+                    """
+                    select id
+                    from memberships
+                    where club_id = ?
+                      and user_id = ?
+                    limit 1
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.uuid("id") },
+                    clubId.dbString(),
+                    userId.dbString(),
+                ).firstOrNull()
 
         if (existingMembershipId != null) {
             jdbcTemplate.update(
@@ -313,7 +342,10 @@ class JdbcHostInvitationStoreAdapter(
         return membershipId
     }
 
-    override fun acceptInvitation(invitationId: UUID, acceptedUserId: UUID): Boolean =
+    override fun acceptInvitation(
+        invitationId: UUID,
+        acceptedUserId: UUID,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update invitations
@@ -329,7 +361,10 @@ class JdbcHostInvitationStoreAdapter(
             invitationId.dbString(),
         ) == 1
 
-    override fun addToCurrentOpenSessionIfSafe(clubId: UUID, membershipId: UUID) {
+    override fun addToCurrentOpenSessionIfSafe(
+        clubId: UUID,
+        membershipId: UUID,
+    ) {
         jdbcTemplate.update(
             """
             insert into session_participants (
@@ -360,41 +395,42 @@ class JdbcHostInvitationStoreAdapter(
     }
 
     override fun findCurrentMember(membershipId: UUID): CurrentMember? =
-        jdbcTemplate.query(
-            """
-            select
-              users.id as user_id,
-              memberships.id as membership_id,
-              clubs.id as club_id,
-              clubs.slug as club_slug,
-              clubs.name as club_name,
-              users.email,
-              users.name as account_name,
-              coalesce(memberships.short_name, users.name) as display_name,
-              memberships.role,
-              memberships.status as membership_status
-            from memberships
-            join users on users.id = memberships.user_id
-            join clubs on clubs.id = memberships.club_id
-            where memberships.id = ?
-              and memberships.status = 'ACTIVE'
-            """.trimIndent(),
-            { resultSet, _ ->
-                CurrentMember(
-                    userId = resultSet.uuid("user_id"),
-                    membershipId = resultSet.uuid("membership_id"),
-                    clubId = resultSet.uuid("club_id"),
-                    clubSlug = resultSet.getString("club_slug"),
-                    email = resultSet.getString("email").lowercase(Locale.ROOT),
-                    displayName = resultSet.getString("display_name"),
-                    accountName = resultSet.getString("account_name"),
-                    role = MembershipRole.valueOf(resultSet.getString("role")),
-                    membershipStatus = MembershipStatus.valueOf(resultSet.getString("membership_status")),
-                    clubName = resultSet.getString("club_name"),
-                )
-            },
-            membershipId.dbString(),
-        ).firstOrNull()
+        jdbcTemplate
+            .query(
+                """
+                select
+                  users.id as user_id,
+                  memberships.id as membership_id,
+                  clubs.id as club_id,
+                  clubs.slug as club_slug,
+                  clubs.name as club_name,
+                  users.email,
+                  users.name as account_name,
+                  coalesce(memberships.short_name, users.name) as display_name,
+                  memberships.role,
+                  memberships.status as membership_status
+                from memberships
+                join users on users.id = memberships.user_id
+                join clubs on clubs.id = memberships.club_id
+                where memberships.id = ?
+                  and memberships.status = 'ACTIVE'
+                """.trimIndent(),
+                { resultSet, _ ->
+                    CurrentMember(
+                        userId = resultSet.uuid("user_id"),
+                        membershipId = resultSet.uuid("membership_id"),
+                        clubId = resultSet.uuid("club_id"),
+                        clubSlug = resultSet.getString("club_slug"),
+                        email = resultSet.getString("email").lowercase(Locale.ROOT),
+                        displayName = resultSet.getString("display_name"),
+                        accountName = resultSet.getString("account_name"),
+                        role = MembershipRole.valueOf(resultSet.getString("role")),
+                        membershipStatus = MembershipStatus.valueOf(resultSet.getString("membership_status")),
+                        clubName = resultSet.getString("club_name"),
+                    )
+                },
+                membershipId.dbString(),
+            ).firstOrNull()
 
     private fun ResultSet.toHostInvitationListRow(): HostInvitationListRow =
         HostInvitationListRow(
@@ -412,7 +448,10 @@ class JdbcHostInvitationStoreAdapter(
             primaryHost = getString("primary_host"),
         )
 
-    private fun releaseInvitationLock(connection: Connection, lockKey: String) {
+    private fun releaseInvitationLock(
+        connection: Connection,
+        lockKey: String,
+    ) {
         try {
             connection.prepareStatement("select release_lock(?)").use { statement ->
                 statement.setString(1, lockKey)
@@ -437,7 +476,10 @@ class JdbcHostInvitationStoreAdapter(
     }
 }
 
-private fun hostInvitationCreatedAtDescCursor(createdAt: OffsetDateTime, id: String): String? =
+private fun hostInvitationCreatedAtDescCursor(
+    createdAt: OffsetDateTime,
+    id: String,
+): String? =
     CursorCodec.encode(
         mapOf(
             "createdAt" to createdAt.toString(),
@@ -445,7 +487,11 @@ private fun hostInvitationCreatedAtDescCursor(createdAt: OffsetDateTime, id: Str
         ),
     )
 
-private fun <T> pageFromRows(rows: List<T>, limit: Int, cursorFor: (T) -> String?): CursorPage<T> {
+private fun <T> pageFromRows(
+    rows: List<T>,
+    limit: Int,
+    cursorFor: (T) -> String?,
+): CursorPage<T> {
     val visibleRows = rows.take(limit)
     return CursorPage(
         items = visibleRows,
@@ -459,8 +505,9 @@ private data class HostInvitationCreatedAtDescCursor(
 ) {
     companion object {
         fun from(cursor: Map<String, String>): HostInvitationCreatedAtDescCursor? {
-            val createdAt = cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
-                ?: return null
+            val createdAt =
+                cursor["createdAt"]?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+                    ?: return null
             val id = cursor["id"]?.takeIf { it.isNotBlank() } ?: return null
             return HostInvitationCreatedAtDescCursor(createdAt, id)
         }

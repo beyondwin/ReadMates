@@ -1,8 +1,7 @@
 package com.readmates.archive.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.archive.adapter.`in`.web.ArchiveController
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.hamcrest.Matchers.emptyOrNullString
 import org.hamcrest.Matchers.everyItem
 import org.hamcrest.Matchers.greaterThan
@@ -10,6 +9,7 @@ import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -18,11 +18,11 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get as requestGet
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get as requestGet
 
 @SpringBootTest(
     properties = [
@@ -48,10 +48,10 @@ class ArchiveControllerDbTest(
 
     @Test
     fun `archive session detail returns attended member detail with feedback status`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000000306") }
                 jsonPath("$.sessionNumber") { value(6) }
@@ -125,27 +125,27 @@ class ArchiveControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `archive session detail is scoped by requested club slug`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
-            header("X-Readmates-Club-Slug", "reading-sai")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
+                header("X-Readmates-Club-Slug", "reading-sai")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isNotFound() }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
-            header("X-Readmates-Club-Slug", "reading-sai")
-            with(user("host@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
+                header("X-Readmates-Club-Slug", "reading-sai")
+                with(user("host@example.com"))
+            }.andExpect {
                 status { isNotFound() }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
-            header("X-Readmates-Club-Slug", "sample-book-club")
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000009281") {
+                header("X-Readmates-Club-Slug", "sample-book-club")
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009281") }
                 jsonPath("$.bookTitle") { value("샘플 클럽 상세 테스트 책") }
@@ -169,36 +169,36 @@ class ArchiveControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `member archive exposes member and public summaries but only marks public records as published`() {
-        mockMvc.get("/api/archive/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.sessionNumber == 998)].published") { value(hasItem(false)) }
                 jsonPath("$.items[?(@.sessionNumber == 997)].published") { value(hasItem(false)) }
                 jsonPath("$.items[?(@.sessionNumber == 996)].published") { value(hasItem(true)) }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000998") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000998") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.publicSummary") { value(null) }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000997") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000997") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.publicSummary") { value("멤버 공개 아카이브 테스트 요약입니다.") }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000996") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000996") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.publicSummary") { value("전체 공개 아카이브 테스트 요약입니다.") }
             }
@@ -206,10 +206,10 @@ class ArchiveControllerDbTest(
 
     @Test
     fun `archive session detail locks feedback document for member who did not attend`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            with(user("member1@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                with(user("member1@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.bookTitle") { value("가난한 찰리의 연감") }
                 jsonPath("$.feedbackDocument.available") { value(true) }
@@ -222,10 +222,10 @@ class ArchiveControllerDbTest(
 
     @Test
     fun `archive session list exposes locked feedback document for member who did not attend`() {
-        mockMvc.get("/api/archive/sessions") {
-            with(user("member1@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                with(user("member1@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
@@ -240,22 +240,28 @@ class ArchiveControllerDbTest(
         insertArchiveVisibilitySession(number = 88, state = "DRAFT", visibility = "MEMBER")
         val hostOnlySessionId = insertArchiveVisibilitySession(number = 89, state = "CLOSED", visibility = "HOST_ONLY")
 
-        mockMvc.get("/api/archive/sessions") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(88))) }
-            jsonPath("$.items[*].sessionNumber") { value(not(hasItem(89))) }
-        }
+        mockMvc
+            .get("/api/archive/sessions") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(88))) }
+                jsonPath("$.items[*].sessionNumber") { value(not(hasItem(89))) }
+            }
 
-        mockMvc.get("/api/archive/sessions/$hostOnlySessionId") {
-            with(user("member1@example.com"))
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .get("/api/archive/sessions/$hostOnlySessionId") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isNotFound() }
+            }
     }
 
-    private fun insertArchiveVisibilitySession(number: Int, state: String, visibility: String): String {
+    private fun insertArchiveVisibilitySession(
+        number: Int,
+        state: String,
+        visibility: String,
+    ): String {
         val sessionId = UUID.randomUUID().toString()
         createdArchiveVisibilitySessionIds.add(sessionId)
 
@@ -282,7 +288,11 @@ class ArchiveControllerDbTest(
         return sessionId
     }
 
-    private fun deleteWhereIn(table: String, column: String, ids: Collection<String>) {
+    private fun deleteWhereIn(
+        table: String,
+        column: String,
+        ids: Collection<String>,
+    ) {
         if (ids.isEmpty()) return
         val placeholders = ids.joinToString(",") { "?" }
         jdbcTemplate.update(
@@ -293,10 +303,10 @@ class ArchiveControllerDbTest(
 
     @Test
     fun `archive session detail makes feedback document readable for host`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            with(user("host@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                with(user("host@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.isHost") { value(true) }
                 jsonPath("$.feedbackDocument.available") { value(true) }
@@ -320,10 +330,10 @@ class ArchiveControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `archive feedback document remains locked for suspended attended member`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.myAttendanceStatus") { value("ATTENDED") }
                 jsonPath("$.feedbackDocument.available") { value(true) }
@@ -333,10 +343,10 @@ class ArchiveControllerDbTest(
                 jsonPath("$.feedbackDocument.body") { doesNotExist() }
             }
 
-        mockMvc.get("/api/archive/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.available") { value(hasItem(true)) }
                 jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.readable") { value(hasItem(false)) }
@@ -358,10 +368,10 @@ class ArchiveControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `archive member detail includes session visible one-liners only in club list`() {
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners[*].text") { value(hasItem("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")) }
@@ -371,21 +381,21 @@ class ArchiveControllerDbTest(
 
     @Test
     fun `archive session detail rejects invalid session id`() {
-        mockMvc.get("/api/archive/sessions/not-a-uuid") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/not-a-uuid") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isBadRequest() }
             }
     }
 
     @Test
     fun `archive session detail returns not found for missing session`() {
-        mockMvc.perform(
-            requestGet("/api/archive/sessions/00000000-0000-0000-0000-000000009999")
-                .with(user("member5@example.com")),
-        )
-            .andExpect(status().isNotFound)
+        mockMvc
+            .perform(
+                requestGet("/api/archive/sessions/00000000-0000-0000-0000-000000009999")
+                    .with(user("member5@example.com")),
+            ).andExpect(status().isNotFound)
             .andExpect(handler().handlerType(ArchiveController::class.java))
     }
 
@@ -405,18 +415,18 @@ class ArchiveControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `archive preserved records exclude same club open sessions`() {
-        mockMvc.get("/api/archive/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[*].sessionNumber") { value(not(hasItem(906))) }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000906") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000906") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isNotFound() }
             }
     }
@@ -435,20 +445,20 @@ class ArchiveControllerDbTest(
         executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
     )
     fun `archive sessions exclude removed participant counts and authored records`() {
-        mockMvc.get("/api/archive/sessions") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
                 jsonPath("$.items[0].attendance") { value(2) }
                 jsonPath("$.items[0].total") { value(5) }
             }
 
-        mockMvc.get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
-            with(user("member5@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/archive/sessions/00000000-0000-0000-0000-000000000306") {
+                with(user("member5@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.attendance") { value(2) }
                 jsonPath("$.total") { value(5) }
@@ -459,7 +469,9 @@ class ArchiveControllerDbTest(
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
                 jsonPath("$.clubOneLiners[*].authorName") { value(not(hasItem("멤버2"))) }
                 jsonPath("$.publicOneLiners[*].authorName") { value(not(hasItem("멤버2"))) }
-                jsonPath("$.clubQuestions[*].text") { value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?"))) }
+                jsonPath("$.clubQuestions[*].text") {
+                    value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?")))
+                }
                 jsonPath("$.clubOneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
                 jsonPath("$.publicOneLiners[*].text") { value(not(hasItem("전기와 연감 형식이 왜 반복해서 등장하는지 계속 묻게 됐다."))) }
             }

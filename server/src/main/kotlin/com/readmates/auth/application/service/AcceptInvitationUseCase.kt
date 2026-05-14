@@ -6,12 +6,14 @@ import org.springframework.stereotype.Service
 @Service
 class AcceptInvitationUseCase {
     companion object {
-        fun validateEmailMatch(invitedEmail: String, googleEmail: String): InvitationStatus {
-            return if (invitedEmail.equals(googleEmail, ignoreCase = true)) {
+        fun validateEmailMatch(
+            invitedEmail: String,
+            googleEmail: String,
+        ): InvitationStatus =
+            if (invitedEmail.equals(googleEmail, ignoreCase = true)) {
                 InvitationStatus.ACCEPTED
             } else {
                 InvitationStatus.PENDING
             }
-        }
     }
 }

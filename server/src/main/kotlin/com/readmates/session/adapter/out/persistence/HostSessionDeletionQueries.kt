@@ -25,7 +25,10 @@ private data class HostSessionDeletionTarget(
 class HostSessionDeletionQueries(
     private val jdbcTemplate: JdbcTemplate,
 ) {
-    fun previewOpenSessionDeletion(member: CurrentMember, sessionId: UUID): HostSessionDeletionPreviewResponse {
+    fun previewOpenSessionDeletion(
+        member: CurrentMember,
+        sessionId: UUID,
+    ): HostSessionDeletionPreviewResponse {
         requireHost(member)
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = false)
         requireOpenDeletionTarget(target)
@@ -41,7 +44,10 @@ class HostSessionDeletionQueries(
     }
 
     @Transactional
-    fun deleteOpenHostSession(member: CurrentMember, sessionId: UUID): HostSessionDeletionResponse {
+    fun deleteOpenHostSession(
+        member: CurrentMember,
+        sessionId: UUID,
+    ): HostSessionDeletionResponse {
         requireHost(member)
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = true)
         requireOpenDeletionTarget(target)
@@ -49,16 +55,17 @@ class HostSessionDeletionQueries(
 
         deleteSessionOwnedRows(jdbcTemplate, member.clubId, sessionId)
 
-        val deletedSessions = jdbcTemplate.update(
-            """
-            delete from sessions
-            where id = ?
-              and club_id = ?
-              and state = 'OPEN'
-            """.trimIndent(),
-            sessionId.dbString(),
-            member.clubId.dbString(),
-        )
+        val deletedSessions =
+            jdbcTemplate.update(
+                """
+                delete from sessions
+                where id = ?
+                  and club_id = ?
+                  and state = 'OPEN'
+                """.trimIndent(),
+                sessionId.dbString(),
+                member.clubId.dbString(),
+            )
         if (deletedSessions == 0) {
             throw HostSessionNotFoundException()
         }
@@ -78,25 +85,26 @@ class HostSessionDeletionQueries(
         lock: Boolean,
     ): HostSessionDeletionTarget {
         val lockClause = if (lock) "for update" else ""
-        return jdbcTemplate.query(
-            """
-            select id, number, title, state
-            from sessions
-            where id = ?
-              and club_id = ?
-            $lockClause
-            """.trimIndent(),
-            { resultSet, _ ->
-                HostSessionDeletionTarget(
-                    sessionId = resultSet.uuid("id"),
-                    sessionNumber = resultSet.getInt("number"),
-                    title = resultSet.getString("title"),
-                    state = resultSet.getString("state"),
-                )
-            },
-            sessionId.dbString(),
-            member.clubId.dbString(),
-        ).firstOrNull() ?: throw HostSessionNotFoundException()
+        return jdbcTemplate
+            .query(
+                """
+                select id, number, title, state
+                from sessions
+                where id = ?
+                  and club_id = ?
+                $lockClause
+                """.trimIndent(),
+                { resultSet, _ ->
+                    HostSessionDeletionTarget(
+                        sessionId = resultSet.uuid("id"),
+                        sessionNumber = resultSet.getInt("number"),
+                        title = resultSet.getString("title"),
+                        state = resultSet.getString("state"),
+                    )
+                },
+                sessionId.dbString(),
+                member.clubId.dbString(),
+            ).firstOrNull() ?: throw HostSessionNotFoundException()
     }
 
     private fun requireOpenDeletionTarget(target: HostSessionDeletionTarget) {
@@ -111,72 +119,82 @@ class HostSessionDeletionQueries(
         sessionId: UUID,
     ): HostSessionDeletionCounts =
         HostSessionDeletionCounts(
-            participants = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from session_participants where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            rsvpResponses = jdbcTemplate.queryForObject(
-                """
-                select count(*)
-                from session_participants
-                where club_id = ?
-                  and session_id = ?
-                  and rsvp_status <> 'NO_RESPONSE'
-                """.trimIndent(),
-                Int::class.java,
-                clubId.dbString(),
-                sessionId.dbString(),
-            ) ?: 0,
-            questions = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from questions where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            checkins = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from reading_checkins where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            oneLineReviews = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from one_line_reviews where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            longReviews = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from long_reviews where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            highlights = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from highlights where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            publications = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from public_session_publications where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            feedbackReports = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from feedback_reports where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
-            feedbackDocuments = countSessionRows(
-                jdbcTemplate,
-                "select count(*) from session_feedback_documents where club_id = ? and session_id = ?",
-                clubId,
-                sessionId,
-            ),
+            participants =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from session_participants where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            rsvpResponses =
+                jdbcTemplate.queryForObject(
+                    """
+                    select count(*)
+                    from session_participants
+                    where club_id = ?
+                      and session_id = ?
+                      and rsvp_status <> 'NO_RESPONSE'
+                    """.trimIndent(),
+                    Int::class.java,
+                    clubId.dbString(),
+                    sessionId.dbString(),
+                ) ?: 0,
+            questions =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from questions where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            checkins =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from reading_checkins where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            oneLineReviews =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from one_line_reviews where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            longReviews =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from long_reviews where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            highlights =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from highlights where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            publications =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from public_session_publications where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            feedbackReports =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from feedback_reports where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
+            feedbackDocuments =
+                countSessionRows(
+                    jdbcTemplate,
+                    "select count(*) from session_feedback_documents where club_id = ? and session_id = ?",
+                    clubId,
+                    sessionId,
+                ),
         )
 
     private fun countSessionRows(
@@ -198,14 +216,25 @@ class HostSessionDeletionQueries(
         sessionId: UUID,
     ) {
         jdbcTemplate.update("delete from feedback_reports where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
-        jdbcTemplate.update("delete from session_feedback_documents where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
-        jdbcTemplate.update("delete from public_session_publications where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
+        jdbcTemplate.update(
+            "delete from session_feedback_documents where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
+        jdbcTemplate.update(
+            "delete from public_session_publications where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
         jdbcTemplate.update("delete from highlights where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
         jdbcTemplate.update("delete from one_line_reviews where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
         jdbcTemplate.update("delete from long_reviews where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
         jdbcTemplate.update("delete from questions where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
         jdbcTemplate.update("delete from reading_checkins where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
-        jdbcTemplate.update("delete from session_participants where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())
+        jdbcTemplate.update(
+            "delete from session_participants where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
     }
-
 }

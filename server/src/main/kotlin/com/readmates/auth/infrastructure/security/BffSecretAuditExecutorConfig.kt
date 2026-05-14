@@ -12,9 +12,11 @@ class BffSecretAuditExecutorConfig(
 ) {
     @Bean("bffSecretAuditExecutor")
     fun bffSecretAuditExecutor(): ThreadPoolTaskExecutor {
-        val droppedCounter: Counter = Counter.builder("bff.audit.shutdown.dropped")
-            .description("BFF audit tasks rejected because the executor was shutting down or its queue was full")
-            .register(meterRegistry)
+        val droppedCounter: Counter =
+            Counter
+                .builder("bff.audit.shutdown.dropped")
+                .description("BFF audit tasks rejected because the executor was shutting down or its queue was full")
+                .register(meterRegistry)
 
         return ThreadPoolTaskExecutor().apply {
             corePoolSize = 1

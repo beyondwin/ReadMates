@@ -13,7 +13,10 @@ import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
 interface ManageHostInvitationsUseCase {
-    fun listHostInvitations(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostInvitationResponse>
+    fun listHostInvitations(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<HostInvitationResponse>
 
     fun createInvitation(
         host: CurrentMember,
@@ -22,30 +25,75 @@ interface ManageHostInvitationsUseCase {
         applyToCurrentSession: Boolean = true,
     ): HostInvitationResponse
 
-    fun revokeInvitation(host: CurrentMember, invitationId: UUID): HostInvitationResponse
+    fun revokeInvitation(
+        host: CurrentMember,
+        invitationId: UUID,
+    ): HostInvitationResponse
 }
 
 interface PreviewInvitationUseCase {
-    fun previewInvitation(rawToken: String, clubSlug: String? = null): InvitationPreviewResponse
+    fun previewInvitation(
+        rawToken: String,
+        clubSlug: String? = null,
+    ): InvitationPreviewResponse
 }
 
 interface ManageMemberApprovalsUseCase {
-    fun listViewers(host: CurrentMember, pageRequest: PageRequest): CursorPage<ViewerMemberResponse>
-    fun activateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse
-    fun deactivateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse
+    fun listViewers(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<ViewerMemberResponse>
+
+    fun activateViewer(
+        host: CurrentMember,
+        membershipId: UUID,
+    ): ViewerMemberResponse
+
+    fun deactivateViewer(
+        host: CurrentMember,
+        membershipId: UUID,
+    ): ViewerMemberResponse
 }
 
 interface ManageMemberLifecycleUseCase {
-    fun listMembers(host: CurrentMember, pageRequest: PageRequest): CursorPage<HostMemberListItem>
-    fun suspend(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse
-    fun restore(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse
-    fun deactivate(host: CurrentMember, membershipId: UUID, request: MemberLifecycleRequest): MemberLifecycleResponse
-    fun addToCurrentSession(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse
-    fun removeFromCurrentSession(host: CurrentMember, membershipId: UUID): MemberLifecycleResponse
+    fun listMembers(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<HostMemberListItem>
+
+    fun suspend(
+        host: CurrentMember,
+        membershipId: UUID,
+        request: MemberLifecycleRequest,
+    ): MemberLifecycleResponse
+
+    fun restore(
+        host: CurrentMember,
+        membershipId: UUID,
+    ): MemberLifecycleResponse
+
+    fun deactivate(
+        host: CurrentMember,
+        membershipId: UUID,
+        request: MemberLifecycleRequest,
+    ): MemberLifecycleResponse
+
+    fun addToCurrentSession(
+        host: CurrentMember,
+        membershipId: UUID,
+    ): MemberLifecycleResponse
+
+    fun removeFromCurrentSession(
+        host: CurrentMember,
+        membershipId: UUID,
+    ): MemberLifecycleResponse
 }
 
 interface LeaveMembershipUseCase {
-    fun leave(member: CurrentMember, request: MemberLifecycleRequest): MemberLifecycleResponse
+    fun leave(
+        member: CurrentMember,
+        request: MemberLifecycleRequest,
+    ): MemberLifecycleResponse
 }
 
 interface GetPendingApprovalUseCase {

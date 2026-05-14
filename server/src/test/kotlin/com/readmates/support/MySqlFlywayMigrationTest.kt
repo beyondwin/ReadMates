@@ -1,16 +1,16 @@
 package com.readmates.support
 
-import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataIntegrityViolationException
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.UncategorizedSQLException
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.TestPropertySource
 import java.util.UUID
 
@@ -26,15 +26,16 @@ class MySqlFlywayMigrationTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `mysql baseline creates auth session and feedback document tables`() {
-        val tableCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from information_schema.tables
-            where table_schema = database()
-              and table_name in ('users', 'auth_sessions', 'session_feedback_documents')
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val tableCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.tables
+                where table_schema = database()
+                  and table_name in ('users', 'auth_sessions', 'session_feedback_documents')
+                """.trimIndent(),
+                Int::class.java,
+            )
 
         assertEquals(3, tableCount)
         assertKafkaNotificationTablesExist(jdbcTemplate)
@@ -85,107 +86,121 @@ class MySqlFlywayMigrationTest(
         assertEquals("invited_by_membership_id,club_id", foreignKeyColumns("invitations", "invitations_inviter_fk"))
         assertEquals("memberships:id,club_id", foreignKeyReference("invitations", "invitations_inviter_fk"))
 
-        val membershipStatuses = jdbcTemplate.queryForList(
-            """
-            select constraint_name, check_clause
-            from information_schema.check_constraints
-            where constraint_schema = database()
-              and constraint_name = 'memberships_status_check'
-            """.trimIndent(),
+        val membershipStatuses =
+            jdbcTemplate.queryForList(
+                """
+                select constraint_name, check_clause
+                from information_schema.check_constraints
+                where constraint_schema = database()
+                  and constraint_name = 'memberships_status_check'
+                """.trimIndent(),
+            )
+        assertTrue(
+            membershipStatuses.any { row ->
+                row["CHECK_CLAUSE"].toString().contains("VIEWER") &&
+                    !row["CHECK_CLAUSE"].toString().contains("PENDING_APPROVAL") &&
+                    row["CHECK_CLAUSE"].toString().contains("SUSPENDED") &&
+                    row["CHECK_CLAUSE"].toString().contains("LEFT")
+            },
         )
-        assertTrue(membershipStatuses.any { row ->
-            row["CHECK_CLAUSE"].toString().contains("VIEWER") &&
-                !row["CHECK_CLAUSE"].toString().contains("PENDING_APPROVAL") &&
-                row["CHECK_CLAUSE"].toString().contains("SUSPENDED") &&
-                row["CHECK_CLAUSE"].toString().contains("LEFT")
-        })
 
-        val participantColumns = jdbcTemplate.queryForList(
-            """
-            select column_name
-            from information_schema.columns
-            where table_schema = database()
-              and table_name = 'session_participants'
-              and column_name = 'participation_status'
-            """.trimIndent(),
-        )
+        val participantColumns =
+            jdbcTemplate.queryForList(
+                """
+                select column_name
+                from information_schema.columns
+                where table_schema = database()
+                  and table_name = 'session_participants'
+                  and column_name = 'participation_status'
+                """.trimIndent(),
+            )
         assertEquals(1, participantColumns.size)
 
-        val checkinNoteColumns = jdbcTemplate.queryForList(
-            """
-            select column_name
-            from information_schema.columns
-            where table_schema = database()
-              and table_name = 'reading_checkins'
-              and column_name = 'note'
-            """.trimIndent(),
-        )
+        val checkinNoteColumns =
+            jdbcTemplate.queryForList(
+                """
+                select column_name
+                from information_schema.columns
+                where table_schema = database()
+                  and table_name = 'reading_checkins'
+                  and column_name = 'note'
+                """.trimIndent(),
+            )
         assertEquals(0, checkinNoteColumns.size)
 
-        val oneLineVisibilityConstraints = jdbcTemplate.queryForList(
-            """
-            select constraint_name, check_clause
-            from information_schema.check_constraints
-            where constraint_schema = database()
-              and constraint_name = 'one_line_reviews_visibility_check'
-            """.trimIndent(),
+        val oneLineVisibilityConstraints =
+            jdbcTemplate.queryForList(
+                """
+                select constraint_name, check_clause
+                from information_schema.check_constraints
+                where constraint_schema = database()
+                  and constraint_name = 'one_line_reviews_visibility_check'
+                """.trimIndent(),
+            )
+        assertTrue(
+            oneLineVisibilityConstraints.any { row ->
+                row["CHECK_CLAUSE"].toString().contains("SESSION") &&
+                    row["CHECK_CLAUSE"].toString().contains("PUBLIC") &&
+                    row["CHECK_CLAUSE"].toString().contains("PRIVATE")
+            },
         )
-        assertTrue(oneLineVisibilityConstraints.any { row ->
-            row["CHECK_CLAUSE"].toString().contains("SESSION") &&
-                row["CHECK_CLAUSE"].toString().contains("PUBLIC") &&
-                row["CHECK_CLAUSE"].toString().contains("PRIVATE")
-        })
 
-        val sessionVisibilityColumns = jdbcTemplate.queryForList(
-            """
-            select column_name, column_default, is_nullable
-            from information_schema.columns
-            where table_schema = database()
-              and table_name = 'sessions'
-              and column_name = 'visibility'
-            """.trimIndent(),
-        )
+        val sessionVisibilityColumns =
+            jdbcTemplate.queryForList(
+                """
+                select column_name, column_default, is_nullable
+                from information_schema.columns
+                where table_schema = database()
+                  and table_name = 'sessions'
+                  and column_name = 'visibility'
+                """.trimIndent(),
+            )
         assertEquals(1, sessionVisibilityColumns.size)
         assertEquals("NO", sessionVisibilityColumns.first()["IS_NULLABLE"])
 
-        val sessionVisibilityConstraints = jdbcTemplate.queryForList(
-            """
-            select constraint_name, check_clause
-            from information_schema.check_constraints
-            where constraint_schema = database()
-              and constraint_name = 'sessions_visibility_check'
-            """.trimIndent(),
+        val sessionVisibilityConstraints =
+            jdbcTemplate.queryForList(
+                """
+                select constraint_name, check_clause
+                from information_schema.check_constraints
+                where constraint_schema = database()
+                  and constraint_name = 'sessions_visibility_check'
+                """.trimIndent(),
+            )
+        assertTrue(
+            sessionVisibilityConstraints.any { row ->
+                val clause = row["CHECK_CLAUSE"].toString()
+                clause.contains("HOST_ONLY") &&
+                    clause.contains("MEMBER") &&
+                    clause.contains("PUBLIC")
+            },
         )
-        assertTrue(sessionVisibilityConstraints.any { row ->
-            val clause = row["CHECK_CLAUSE"].toString()
-            clause.contains("HOST_ONLY") &&
-                clause.contains("MEMBER") &&
-                clause.contains("PUBLIC")
-        })
 
-        val publishedPublicSeedCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            join public_session_publications on public_session_publications.session_id = sessions.id
-            where sessions.state = 'PUBLISHED'
-              and public_session_publications.visibility = 'PUBLIC'
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val publishedPublicSeedCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sessions
+                join public_session_publications on public_session_publications.session_id = sessions.id
+                where sessions.state = 'PUBLISHED'
+                  and public_session_publications.visibility = 'PUBLIC'
+                """.trimIndent(),
+                Int::class.java,
+            )
         assertTrue(requireNotNull(publishedPublicSeedCount) > 0)
 
-        val publicSeedSessionVisibilityMismatchCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            join public_session_publications on public_session_publications.session_id = sessions.id
-            where sessions.state = 'PUBLISHED'
-              and public_session_publications.visibility = 'PUBLIC'
-              and sessions.visibility <> 'PUBLIC'
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val publicSeedSessionVisibilityMismatchCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sessions
+                join public_session_publications on public_session_publications.session_id = sessions.id
+                where sessions.state = 'PUBLISHED'
+                  and public_session_publications.visibility = 'PUBLIC'
+                  and sessions.visibility <> 'PUBLIC'
+                """.trimIndent(),
+                Int::class.java,
+            )
         assertEquals(0, publicSeedSessionVisibilityMismatchCount)
     }
 
@@ -309,15 +324,16 @@ class MySqlFlywayMigrationTest(
 
     @Test
     fun `mysql creates notification preference and test mail audit tables`() {
-        val tableCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from information_schema.tables
-            where table_schema = database()
-              and table_name in ('notification_preferences', 'notification_test_mail_audit')
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val tableCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.tables
+                where table_schema = database()
+                  and table_name in ('notification_preferences', 'notification_test_mail_audit')
+                """.trimIndent(),
+                Int::class.java,
+            )
 
         assertEquals(2, tableCount)
 
@@ -403,20 +419,21 @@ class MySqlFlywayMigrationTest(
                 clubId,
             )
 
-            val preferences = jdbcTemplate.queryForMap(
-                """
-                select email_enabled,
-                       next_book_published_enabled,
-                       session_reminder_due_enabled,
-                       feedback_document_published_enabled,
-                       review_published_enabled
-                from notification_preferences
-                where membership_id = ?
-                  and club_id = ?
-                """.trimIndent(),
-                membershipId,
-                clubId,
-            )
+            val preferences =
+                jdbcTemplate.queryForMap(
+                    """
+                    select email_enabled,
+                           next_book_published_enabled,
+                           session_reminder_due_enabled,
+                           feedback_document_published_enabled,
+                           review_published_enabled
+                    from notification_preferences
+                    where membership_id = ?
+                      and club_id = ?
+                    """.trimIndent(),
+                    membershipId,
+                    clubId,
+                )
 
             assertEquals(true, preferences["email_enabled"])
             assertEquals(true, preferences["next_book_published_enabled"])
@@ -431,14 +448,15 @@ class MySqlFlywayMigrationTest(
                 recipientEmailHash = "a".repeat(64),
             )
 
-            val uppercaseHashError = assertThrows(UncategorizedSQLException::class.java) {
-                insertTestMailAudit(
-                    id = UUID.randomUUID().toString(),
-                    clubId = clubId,
-                    hostMembershipId = membershipId,
-                    recipientEmailHash = "A".repeat(64),
-                )
-            }
+            val uppercaseHashError =
+                assertThrows(UncategorizedSQLException::class.java) {
+                    insertTestMailAudit(
+                        id = UUID.randomUUID().toString(),
+                        clubId = clubId,
+                        hostMembershipId = membershipId,
+                        recipientEmailHash = "A".repeat(64),
+                    )
+                }
             assertTrue(uppercaseHashError.message.orEmpty().contains("notification_test_mail_audit_hash_check"))
         } finally {
             deleteWhereIn("notification_test_mail_audit", "host_membership_id", setOf(membershipId))
@@ -451,21 +469,22 @@ class MySqlFlywayMigrationTest(
 
     @Test
     fun `mysql creates multi club platform metadata tables`() {
-        val tableCount = jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from information_schema.tables
-            where table_schema = database()
-              and table_name in (
-                'club_domains',
-                'platform_admins',
-                'club_audit_events',
-                'platform_audit_events',
-                'support_access_grants'
-              )
-            """.trimIndent(),
-            Int::class.java,
-        )
+        val tableCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.tables
+                where table_schema = database()
+                  and table_name in (
+                    'club_domains',
+                    'platform_admins',
+                    'club_audit_events',
+                    'platform_audit_events',
+                    'support_access_grants'
+                  )
+                """.trimIndent(),
+                Int::class.java,
+            )
 
         assertEquals(5, tableCount)
         assertEquals("NO", columnValue("clubs", "status", "is_nullable"))
@@ -687,19 +706,21 @@ class MySqlFlywayMigrationTest(
     }
 
     private fun assertKafkaNotificationTablesExist(jdbcTemplate: JdbcTemplate) {
-        val tables = jdbcTemplate.queryForList(
-            """
-            select table_name
-            from information_schema.tables
-            where table_schema = database()
-              and table_name in (
-                'notification_event_outbox',
-                'notification_deliveries',
-                'member_notifications'
-              )
-            """.trimIndent(),
-            String::class.java,
-        ).toSet()
+        val tables =
+            jdbcTemplate
+                .queryForList(
+                    """
+                    select table_name
+                    from information_schema.tables
+                    where table_schema = database()
+                      and table_name in (
+                        'notification_event_outbox',
+                        'notification_deliveries',
+                        'member_notifications'
+                      )
+                    """.trimIndent(),
+                    String::class.java,
+                ).toSet()
 
         assertThat(tables).containsExactlyInAnyOrder(
             "notification_event_outbox",
@@ -743,37 +764,42 @@ class MySqlFlywayMigrationTest(
         tableName: String,
         columnName: String,
         metadataColumn: String,
-    ): String = jdbcTemplate.queryForObject(
-        """
-        select $metadataColumn
-        from information_schema.columns
-        where table_schema = database()
-          and table_name = ?
-          and column_name = ?
-        """.trimIndent(),
-        String::class.java,
-        tableName,
-        columnName,
-    ) ?: error("Column $tableName.$columnName does not exist")
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select $metadataColumn
+            from information_schema.columns
+            where table_schema = database()
+              and table_name = ?
+              and column_name = ?
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            columnName,
+        ) ?: error("Column $tableName.$columnName does not exist")
 
     private fun uniqueIndexCount(
         tableName: String,
         columnName: String,
-    ): Int = jdbcTemplate.queryForObject(
-        """
-        select count(*)
-        from information_schema.statistics
-        where table_schema = database()
-          and table_name = ?
-          and column_name = ?
-          and non_unique = 0
-        """.trimIndent(),
-        Int::class.java,
-        tableName,
-        columnName,
-    ) ?: 0
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.statistics
+            where table_schema = database()
+              and table_name = ?
+              and column_name = ?
+              and non_unique = 0
+            """.trimIndent(),
+            Int::class.java,
+            tableName,
+            columnName,
+        ) ?: 0
 
-    private fun indexColumns(tableName: String, indexName: String): String =
+    private fun indexColumns(
+        tableName: String,
+        indexName: String,
+    ): String =
         jdbcTemplate.queryForObject(
             """
             select group_concat(column_name order by seq_in_index separator ',')
@@ -790,48 +816,55 @@ class MySqlFlywayMigrationTest(
     private fun foreignKeyColumns(
         tableName: String,
         constraintName: String,
-    ): String = jdbcTemplate.queryForObject(
-        """
-        select group_concat(column_name order by ordinal_position separator ',')
-        from information_schema.key_column_usage
-        where constraint_schema = database()
-          and table_name = ?
-          and constraint_name = ?
-        """.trimIndent(),
-        String::class.java,
-        tableName,
-        constraintName,
-    ) ?: error("Foreign key $tableName.$constraintName does not exist")
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select group_concat(column_name order by ordinal_position separator ',')
+            from information_schema.key_column_usage
+            where constraint_schema = database()
+              and table_name = ?
+              and constraint_name = ?
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            constraintName,
+        ) ?: error("Foreign key $tableName.$constraintName does not exist")
 
     private fun foreignKeyReference(
         tableName: String,
         constraintName: String,
-    ): String = jdbcTemplate.queryForObject(
-        """
-        select concat(referenced_table_name, ':', group_concat(referenced_column_name order by ordinal_position separator ','))
-        from information_schema.key_column_usage
-        where constraint_schema = database()
-          and table_name = ?
-          and constraint_name = ?
-        group by referenced_table_name
-        """.trimIndent(),
-        String::class.java,
-        tableName,
-        constraintName,
-    ) ?: error("Foreign key $tableName.$constraintName does not exist")
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select concat(referenced_table_name, ':', group_concat(referenced_column_name order by ordinal_position separator ','))
+            from information_schema.key_column_usage
+            where constraint_schema = database()
+              and table_name = ?
+              and constraint_name = ?
+            group by referenced_table_name
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            constraintName,
+        ) ?: error("Foreign key $tableName.$constraintName does not exist")
 
-    private fun checkConstraintClause(constraintName: String): String = jdbcTemplate.queryForObject(
-        """
-        select check_clause
-        from information_schema.check_constraints
-        where constraint_schema = database()
-          and constraint_name = ?
-        """.trimIndent(),
-        String::class.java,
-        constraintName,
-    ) ?: error("Check constraint $constraintName does not exist")
+    private fun checkConstraintClause(constraintName: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select check_clause
+            from information_schema.check_constraints
+            where constraint_schema = database()
+              and constraint_name = ?
+            """.trimIndent(),
+            String::class.java,
+            constraintName,
+        ) ?: error("Check constraint $constraintName does not exist")
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

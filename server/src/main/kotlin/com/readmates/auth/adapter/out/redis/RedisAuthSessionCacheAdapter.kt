@@ -1,7 +1,7 @@
 package com.readmates.auth.adapter.out.redis
 
-import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.auth.application.port.out.AuthSessionCachePort
+import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.shared.cache.CacheJsonCodec
 import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -21,10 +21,11 @@ class RedisAuthSessionCacheAdapter(
     override fun find(tokenHash: String): AuthSessionCacheSnapshot? {
         val key = sessionKey(tokenHash)
         return runCatching {
-            val raw = redisTemplate.opsForValue().get(key) ?: run {
-                recordCacheMiss()
-                return null
-            }
+            val raw =
+                redisTemplate.opsForValue().get(key) ?: run {
+                    recordCacheMiss()
+                    return null
+                }
             val cached = codec.decode(raw, CachedAuthSession::class.java)
             if (cached == null || cached.schemaVersion != SCHEMA_VERSION) {
                 safeDelete(key)
@@ -33,13 +34,14 @@ class RedisAuthSessionCacheAdapter(
                 recordOperationError("decode")
                 return null
             }
-            val snapshot = runCatching { cached.toSnapshot() }.getOrElse {
-                safeDelete(key)
-                recordCacheMiss()
-                recordFallback("auth-session-decode")
-                recordOperationError("decode")
-                return null
-            }
+            val snapshot =
+                runCatching { cached.toSnapshot() }.getOrElse {
+                    safeDelete(key)
+                    recordCacheMiss()
+                    recordFallback("auth-session-decode")
+                    recordOperationError("decode")
+                    return null
+                }
             if (!snapshot.expiresAt.isAfter(OffsetDateTime.now())) {
                 safeDelete(key)
                 recordCacheMiss()
@@ -54,7 +56,11 @@ class RedisAuthSessionCacheAdapter(
         }
     }
 
-    override fun store(tokenHash: String, snapshot: AuthSessionCacheSnapshot, ttl: Duration) {
+    override fun store(
+        tokenHash: String,
+        snapshot: AuthSessionCacheSnapshot,
+        ttl: Duration,
+    ) {
         if (ttl <= Duration.ZERO) {
             return
         }
@@ -66,7 +72,11 @@ class RedisAuthSessionCacheAdapter(
         }
     }
 
-    override fun rememberUserSession(userId: String, tokenHash: String, ttl: Duration) {
+    override fun rememberUserSession(
+        userId: String,
+        tokenHash: String,
+        ttl: Duration,
+    ) {
         if (ttl <= Duration.ZERO) {
             return
         }
@@ -84,7 +94,10 @@ class RedisAuthSessionCacheAdapter(
         }
     }
 
-    override fun shouldTouch(tokenHash: String, ttl: Duration): Boolean {
+    override fun shouldTouch(
+        tokenHash: String,
+        ttl: Duration,
+    ): Boolean {
         if (ttl <= Duration.ZERO) {
             return true
         }
@@ -155,8 +168,11 @@ class RedisAuthSessionCacheAdapter(
     }
 
     private fun sessionKey(tokenHash: String) = "auth:session:$tokenHash"
+
     private fun touchKey(tokenHash: String) = "auth:last-seen-touch:$tokenHash"
+
     private fun userSessionsKey(userId: String) = "auth:user-sessions:$userId"
+
     private fun Duration.toRedisMillis() = maxOf(toMillis(), 1L)
 
     private data class CachedAuthSession(
@@ -185,17 +201,18 @@ class RedisAuthSessionCacheAdapter(
 
     private companion object {
         const val SCHEMA_VERSION = 1
-        val REMEMBER_USER_SESSION_SCRIPT: DefaultRedisScript<Long> = DefaultRedisScript(
-            """
-            redis.call('SADD', KEYS[1], ARGV[1])
-            local ttl = redis.call('PTTL', KEYS[1])
-            local requestedTtl = tonumber(ARGV[2])
-            if ttl < 0 or ttl < requestedTtl then
-              redis.call('PEXPIRE', KEYS[1], requestedTtl)
-            end
-            return ttl
-            """.trimIndent(),
-            Long::class.java,
-        )
+        val REMEMBER_USER_SESSION_SCRIPT: DefaultRedisScript<Long> =
+            DefaultRedisScript(
+                """
+                redis.call('SADD', KEYS[1], ARGV[1])
+                local ttl = redis.call('PTTL', KEYS[1])
+                local requestedTtl = tonumber(ARGV[2])
+                if ttl < 0 or ttl < requestedTtl then
+                  redis.call('PEXPIRE', KEYS[1], requestedTtl)
+                end
+                return ttl
+                """.trimIndent(),
+                Long::class.java,
+            )
     }
 }

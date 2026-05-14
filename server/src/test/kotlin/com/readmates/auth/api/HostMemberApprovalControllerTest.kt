@@ -1,13 +1,13 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -64,13 +64,14 @@ class HostMemberApprovalControllerTest(
         val viewerEmail = uniqueEmail("viewer.list")
         insertViewerMember(viewerEmail, "Viewer List")
 
-        mockMvc.get("/api/host/members/viewers") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items[0].email") { value(viewerEmail) }
-            jsonPath("$.items[0].status") { value("VIEWER") }
-        }
+        mockMvc
+            .get("/api/host/members/viewers") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].email") { value(viewerEmail) }
+                jsonPath("$.items[0].status") { value("VIEWER") }
+            }
     }
 
     @Test
@@ -80,14 +81,15 @@ class HostMemberApprovalControllerTest(
             insertViewerMember(uniqueEmail("viewer.paged.$index"), "Viewer Paged $index")
         }
 
-        mockMvc.get("/api/host/members/pending-approvals") {
-            cookie(hostCookie)
-            param("limit", "2")
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.items.length()") { value(2) }
-            jsonPath("$.nextCursor") { exists() }
-        }
+        mockMvc
+            .get("/api/host/members/pending-approvals") {
+                cookie(hostCookie)
+                param("limit", "2")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items.length()") { value(2) }
+                jsonPath("$.nextCursor") { exists() }
+            }
     }
 
     @Test
@@ -96,34 +98,37 @@ class HostMemberApprovalControllerTest(
         val sessionId = createOpenSession()
         val membershipId = insertViewerMember(uniqueEmail("viewer.activate"), "Viewer Activate")
 
-        mockMvc.post("/api/host/members/$membershipId/activate") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.status") { value("ACTIVE") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/activate") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("ACTIVE") }
+            }
 
-        val membership = jdbcTemplate.queryForMap(
-            """
-            select status, joined_at
-            from memberships
-            where id = ?
-            """.trimIndent(),
-            membershipId,
-        )
+        val membership =
+            jdbcTemplate.queryForMap(
+                """
+                select status, joined_at
+                from memberships
+                where id = ?
+                """.trimIndent(),
+                membershipId,
+            )
         assertEquals("ACTIVE", membership["status"])
         assertNotNull(membership["joined_at"])
 
-        val participant = jdbcTemplate.queryForMap(
-            """
-            select rsvp_status, attendance_status, participation_status
-            from session_participants
-            where session_id = ?
-              and membership_id = ?
-            """.trimIndent(),
-            sessionId,
-            membershipId,
-        )
+        val participant =
+            jdbcTemplate.queryForMap(
+                """
+                select rsvp_status, attendance_status, participation_status
+                from session_participants
+                where session_id = ?
+                  and membership_id = ?
+                """.trimIndent(),
+                sessionId,
+                membershipId,
+            )
         assertEquals("NO_RESPONSE", participant["rsvp_status"])
         assertEquals("UNKNOWN", participant["attendance_status"])
         assertEquals("ACTIVE", participant["participation_status"])
@@ -134,21 +139,23 @@ class HostMemberApprovalControllerTest(
         val hostCookie = sessionCookieForEmail("host@example.com")
         val membershipId = insertViewerMember(uniqueEmail("viewer.deactivate"), "Viewer Deactivate")
 
-        mockMvc.post("/api/host/members/$membershipId/deactivate-viewer") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.status") { value("INACTIVE") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/deactivate-viewer") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("INACTIVE") }
+            }
 
-        val membership = jdbcTemplate.queryForMap(
-            """
-            select status, joined_at
-            from memberships
-            where id = ?
-            """.trimIndent(),
-            membershipId,
-        )
+        val membership =
+            jdbcTemplate.queryForMap(
+                """
+                select status, joined_at
+                from memberships
+                where id = ?
+                """.trimIndent(),
+                membershipId,
+            )
         assertEquals("INACTIVE", membership["status"])
         assertEquals(null, membership["joined_at"])
     }
@@ -159,25 +166,28 @@ class HostMemberApprovalControllerTest(
         val approvedMembershipId = insertViewerMember(uniqueEmail("viewer.alias.approve"), "Viewer Alias Approve")
         val rejectedMembershipId = insertViewerMember(uniqueEmail("viewer.alias.reject"), "Viewer Alias Reject")
 
-        mockMvc.get("/api/host/members/pending-approvals") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .get("/api/host/members/pending-approvals") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isOk() }
+            }
 
-        mockMvc.post("/api/host/members/$approvedMembershipId/approve") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.status") { value("ACTIVE") }
-        }
+        mockMvc
+            .post("/api/host/members/$approvedMembershipId/approve") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("ACTIVE") }
+            }
 
-        mockMvc.post("/api/host/members/$rejectedMembershipId/reject") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.status") { value("INACTIVE") }
-        }
+        mockMvc
+            .post("/api/host/members/$rejectedMembershipId/reject") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("INACTIVE") }
+            }
 
         assertEquals("ACTIVE", membershipStatus(approvedMembershipId))
         assertEquals("INACTIVE", membershipStatus(rejectedMembershipId))
@@ -187,11 +197,12 @@ class HostMemberApprovalControllerTest(
     fun `member cannot list viewer members`() {
         val memberCookie = sessionCookieForEmail("member5@example.com")
 
-        mockMvc.get("/api/host/members/viewers") {
-            cookie(memberCookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .get("/api/host/members/viewers") {
+                cookie(memberCookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
@@ -200,16 +211,18 @@ class HostMemberApprovalControllerTest(
         val activateMembershipId = insertViewerMember(uniqueEmail("member.blocked.activate"), "Blocked Activate")
         val deactivateMembershipId = insertViewerMember(uniqueEmail("member.blocked.deactivate"), "Blocked Deactivate")
 
-        mockMvc.post("/api/host/members/$activateMembershipId/activate") {
-            cookie(memberCookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
-        mockMvc.post("/api/host/members/$deactivateMembershipId/deactivate-viewer") {
-            cookie(memberCookie)
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/host/members/$activateMembershipId/activate") {
+                cookie(memberCookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
+        mockMvc
+            .post("/api/host/members/$deactivateMembershipId/deactivate-viewer") {
+                cookie(memberCookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
 
         assertEquals("VIEWER", membershipStatus(activateMembershipId))
         assertEquals("VIEWER", membershipStatus(deactivateMembershipId))
@@ -222,23 +235,28 @@ class HostMemberApprovalControllerTest(
         val outsideMembershipId = insertViewerMemberOutsideClub(outsideEmail, "Outside Viewer")
         val outsideDeactivateMembershipId = insertViewerMemberOutsideClub(uniqueEmail("outside.deactivate"), "Outside Deactivate")
 
-        val listResponse = mockMvc.get("/api/host/members/viewers") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
+        val listResponse =
+            mockMvc
+                .get("/api/host/members/viewers") {
+                    cookie(hostCookie)
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response.contentAsString
         assertFalse(listResponse.contains(outsideEmail))
 
-        mockMvc.post("/api/host/members/$outsideMembershipId/activate") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isNotFound() }
-        }
-        mockMvc.post("/api/host/members/$outsideDeactivateMembershipId/deactivate-viewer") {
-            cookie(hostCookie)
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .post("/api/host/members/$outsideMembershipId/activate") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isNotFound() }
+            }
+        mockMvc
+            .post("/api/host/members/$outsideDeactivateMembershipId/deactivate-viewer") {
+                cookie(hostCookie)
+            }.andExpect {
+                status { isNotFound() }
+            }
 
         assertEquals(
             "VIEWER",
@@ -250,7 +268,10 @@ class HostMemberApprovalControllerTest(
         )
     }
 
-    private fun insertViewerMember(email: String, name: String): String {
+    private fun insertViewerMember(
+        email: String,
+        name: String,
+    ): String {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         jdbcTemplate.update(
@@ -278,7 +299,10 @@ class HostMemberApprovalControllerTest(
         return membershipId
     }
 
-    private fun insertViewerMemberOutsideClub(email: String, name: String): String {
+    private fun insertViewerMemberOutsideClub(
+        email: String,
+        name: String,
+    ): String {
         val clubId = UUID.randomUUID().toString()
         val slug = "outside-approval-${UUID.randomUUID()}"
         jdbcTemplate.update(
@@ -321,14 +345,15 @@ class HostMemberApprovalControllerTest(
 
     private fun createOpenSession(): String {
         val sessionId = UUID.randomUUID().toString()
-        val nextNumber = jdbcTemplate.queryForObject(
-            """
-            select coalesce(max(number), 0) + 1000
-            from sessions
-            where club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-            Int::class.java,
-        ) ?: 1000
+        val nextNumber =
+            jdbcTemplate.queryForObject(
+                """
+                select coalesce(max(number), 0) + 1000
+                from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+                Int::class.java,
+            ) ?: 1000
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -378,22 +403,23 @@ class HostMemberApprovalControllerTest(
     }
 
     private fun sessionCookieForEmail(email: String): Cookie {
-        val userId = jdbcTemplate.queryForObject(
-            "select id from users where email = ?",
-            String::class.java,
-            email,
-        ) ?: error("Expected seeded user for $email")
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "HostMemberApprovalControllerTest",
-            ipAddress = "127.0.0.1",
-        )
+        val userId =
+            jdbcTemplate.queryForObject(
+                "select id from users where email = ?",
+                String::class.java,
+                email,
+            ) ?: error("Expected seeded user for $email")
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "HostMemberApprovalControllerTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun uniqueEmail(prefix: String): String =
-        "$prefix.${UUID.randomUUID()}@example.com"
+    private fun uniqueEmail(prefix: String): String = "$prefix.${UUID.randomUUID()}@example.com"
 
     private fun membershipStatus(membershipId: String): String =
         jdbcTemplate.queryForObject(
@@ -402,7 +428,11 @@ class HostMemberApprovalControllerTest(
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

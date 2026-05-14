@@ -4,9 +4,13 @@ import com.readmates.auth.application.model.StoredAuthSession
 
 interface AuthSessionStorePort {
     fun create(session: StoredAuthSession)
+
     fun findValidByTokenHash(tokenHash: String): StoredAuthSession?
+
     fun touchByTokenHash(tokenHash: String)
+
     fun revokeByTokenHash(tokenHash: String)
+
     fun revokeAllForUser(userId: String)
 
     class InMemoryForTest : AuthSessionStorePort {

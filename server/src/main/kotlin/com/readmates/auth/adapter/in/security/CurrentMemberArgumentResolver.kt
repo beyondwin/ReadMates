@@ -24,8 +24,7 @@ class CurrentMemberArgumentResolver(
     private val resolveClubContextUseCase: ResolveClubContextUseCase = NoopResolveClubContextUseCase,
     private val checkSupportAccessGrantUseCase: CheckSupportAccessGrantUseCase? = null,
 ) : HandlerMethodArgumentResolver {
-    override fun supportsParameter(parameter: MethodParameter): Boolean =
-        parameter.parameterType == CurrentMember::class.java
+    override fun supportsParameter(parameter: MethodParameter): Boolean = parameter.parameterType == CurrentMember::class.java
 
     override fun resolveArgument(
         parameter: MethodParameter,
@@ -33,37 +32,43 @@ class CurrentMemberArgumentResolver(
         webRequest: NativeWebRequest,
         binderFactory: WebDataBinderFactory?,
     ): CurrentMember {
-        val request = webRequest.getNativeRequest(HttpServletRequest::class.java)
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val authentication = request.userPrincipal as? Authentication
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val email = authentication.emailOrNull()
-            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val request =
+            webRequest.getNativeRequest(HttpServletRequest::class.java)
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val authentication =
+            request.userPrincipal as? Authentication
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+        val email =
+            authentication.emailOrNull()
+                ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
         val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
         if (requestedClubContext.supplied) {
-            val clubContext = requestedClubContext.context
-                ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
+            val clubContext =
+                requestedClubContext.context
+                    ?: throw ResponseStatusException(HttpStatus.FORBIDDEN)
 
             // Attempt normal membership resolution first
             val member = resolveCurrentMemberUseCase.resolveByEmailAndClub(email, clubContext.clubId)
             if (member != null) return member
 
             // No membership — check if MemberAuthoritiesFilter already resolved a support synthesis
-            val userId = when (val principal = authentication.principal) {
-                is CurrentMember -> principal.userId
-                is CurrentUser -> principal.userId
-                else -> null
-            }
+            val userId =
+                when (val principal = authentication.principal) {
+                    is CurrentMember -> principal.userId
+                    is CurrentUser -> principal.userId
+                    else -> null
+                }
             if (userId != null) {
                 // Check if MemberAuthoritiesFilter already resolved the synthesis for this request
                 val cached = request.getAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR) as? SupportMemberSynthesis
-                val synthesis = cached ?: checkSupportAccessGrantUseCase?.synthesizeHostCurrentMember(
-                    userId = userId,
-                    email = email,
-                    clubId = clubContext.clubId,
-                    clubSlug = clubContext.slug,
-                    clubName = clubContext.name,
-                )
+                val synthesis =
+                    cached ?: checkSupportAccessGrantUseCase?.synthesizeHostCurrentMember(
+                        userId = userId,
+                        email = email,
+                        clubId = clubContext.clubId,
+                        clubSlug = clubContext.slug,
+                        clubName = clubContext.name,
+                    )
                 if (synthesis != null) {
                     return CurrentMember(
                         userId = userId,

@@ -9,11 +9,12 @@ import org.springframework.web.server.ResponseStatusException
 class ApiErrorResponseTest {
     @Test
     fun `builds a public safe error response from status code and code`() {
-        val response = apiErrorResponse(
-            status = HttpStatus.NOT_FOUND,
-            code = "RESOURCE_NOT_FOUND",
-            message = "요청한 리소스를 찾을 수 없습니다.",
-        )
+        val response =
+            apiErrorResponse(
+                status = HttpStatus.NOT_FOUND,
+                code = "RESOURCE_NOT_FOUND",
+                message = "요청한 리소스를 찾을 수 없습니다.",
+            )
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
         assertThat(response.body).isEqualTo(
@@ -41,9 +42,10 @@ class ApiErrorResponseTest {
 
     @Test
     fun `shared handler maps response status exceptions to safe JSON body`() {
-        val response = SharedApplicationErrorHandler().handleResponseStatusException(
-            ResponseStatusException(HttpStatus.GONE, "Password login has been removed"),
-        )
+        val response =
+            SharedApplicationErrorHandler().handleResponseStatusException(
+                ResponseStatusException(HttpStatus.GONE, "Password login has been removed"),
+            )
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.GONE)
         assertThat(response.body).isEqualTo(

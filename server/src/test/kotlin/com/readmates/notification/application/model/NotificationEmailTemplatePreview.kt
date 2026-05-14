@@ -24,8 +24,7 @@ object NotificationEmailTemplatePreview {
         return absolutePath
     }
 
-    private fun defaultReportPath(): Path =
-        Path.of("build/reports/readmates/notification-email-preview/index.html")
+    private fun defaultReportPath(): Path = Path.of("build/reports/readmates/notification-email-preview/index.html")
 
     private fun samples(): List<EmailPreviewSample> {
         val appBaseUrl = "https://app.readmates.example"
@@ -43,50 +42,54 @@ object NotificationEmailTemplatePreview {
             EmailPreviewSample(
                 name = "다음 책 공개",
                 eventLabel = "next book",
-                copy = eventCopy(
-                    eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-                    bookTitle = bookTitle,
-                    clubName = clubName,
-                    clubSlug = clubSlug,
-                    displayName = displayName,
-                    appBaseUrl = appBaseUrl,
-                ),
+                copy =
+                    eventCopy(
+                        eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                        bookTitle = bookTitle,
+                        clubName = clubName,
+                        clubSlug = clubSlug,
+                        displayName = displayName,
+                        appBaseUrl = appBaseUrl,
+                    ),
             ),
             EmailPreviewSample(
                 name = "모임 리마인더",
                 eventLabel = "session reminder",
-                copy = eventCopy(
-                    eventType = NotificationEventType.SESSION_REMINDER_DUE,
-                    bookTitle = bookTitle,
-                    clubName = clubName,
-                    clubSlug = clubSlug,
-                    displayName = displayName,
-                    appBaseUrl = appBaseUrl,
-                ),
+                copy =
+                    eventCopy(
+                        eventType = NotificationEventType.SESSION_REMINDER_DUE,
+                        bookTitle = bookTitle,
+                        clubName = clubName,
+                        clubSlug = clubSlug,
+                        displayName = displayName,
+                        appBaseUrl = appBaseUrl,
+                    ),
             ),
             EmailPreviewSample(
                 name = "피드백 문서 공개",
                 eventLabel = "feedback document",
-                copy = eventCopy(
-                    eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
-                    bookTitle = bookTitle,
-                    clubName = clubName,
-                    clubSlug = clubSlug,
-                    displayName = displayName,
-                    appBaseUrl = appBaseUrl,
-                ),
+                copy =
+                    eventCopy(
+                        eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
+                        bookTitle = bookTitle,
+                        clubName = clubName,
+                        clubSlug = clubSlug,
+                        displayName = displayName,
+                        appBaseUrl = appBaseUrl,
+                    ),
             ),
             EmailPreviewSample(
                 name = "새 서평 공개",
                 eventLabel = "new review",
-                copy = eventCopy(
-                    eventType = NotificationEventType.REVIEW_PUBLISHED,
-                    bookTitle = bookTitle,
-                    clubName = clubName,
-                    clubSlug = clubSlug,
-                    displayName = displayName,
-                    appBaseUrl = appBaseUrl,
-                ),
+                copy =
+                    eventCopy(
+                        eventType = NotificationEventType.REVIEW_PUBLISHED,
+                        bookTitle = bookTitle,
+                        clubName = clubName,
+                        clubSlug = clubSlug,
+                        displayName = displayName,
+                        appBaseUrl = appBaseUrl,
+                    ),
             ),
         )
     }
@@ -270,14 +273,15 @@ object NotificationEmailTemplatePreview {
             </section>
             <section class="html-panel" aria-label="${escapeAttribute(sample.name)} HTML email preview">
               <h3 class="panel-title">HTML email preview</h3>
-              <iframe title="${escapeAttribute(sample.name)} HTML email preview" srcdoc="${escapeAttribute(sample.copy.emailBodyHtml)}"></iframe>
+              <iframe title="${escapeAttribute(
+            sample.name,
+        )} HTML email preview" srcdoc="${escapeAttribute(sample.copy.emailBodyHtml)}"></iframe>
             </section>
           </div>
         </section>
         """.trimIndent()
 
-    private fun escapeAttribute(value: String): String =
-        escapeHtml(value)
+    private fun escapeAttribute(value: String): String = escapeHtml(value)
 
     private fun escapeHtml(value: String): String =
         buildString(value.length) {

@@ -7,10 +7,11 @@ import org.junit.jupiter.api.Test
 class CursorCodecTest {
     @Test
     fun `encode round trips cursor values with reserved characters`() {
-        val cursor = mapOf(
-            "number" to "7",
-            "id" to "session%26id=readmates",
-        )
+        val cursor =
+            mapOf(
+                "number" to "7",
+                "id" to "session%26id=readmates",
+            )
 
         val encoded = CursorCodec.encode(cursor)
         val decoded = CursorCodec.decode(encoded)

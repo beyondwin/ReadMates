@@ -11,8 +11,8 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.security.core.Authentication
 import org.springframework.security.core.AuthenticationException
-import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.oauth2.core.oidc.user.OidcUser
 import org.springframework.security.web.authentication.AuthenticationFailureHandler
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler
 import org.springframework.stereotype.Component
@@ -27,7 +27,8 @@ class ReadmatesOAuthSuccessHandler(
     private val oauthReturnState: OAuthReturnState,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
-) : AuthenticationSuccessHandler, AuthenticationFailureHandler {
+) : AuthenticationSuccessHandler,
+    AuthenticationFailureHandler {
     private val appOrigin = readmatesAppOrigin(appBaseUrl)
 
     override fun onAuthenticationSuccess(
@@ -39,40 +40,45 @@ class ReadmatesOAuthSuccessHandler(
         try {
             val inviteToken = capturedInviteToken(request)
             val signedReturnState = capturedReturnState(request)
-            val login = if (inviteToken != null) {
-                val acceptedMember = invitationService.acceptGoogleInvitation(
-                    rawToken = inviteToken,
-                    googleSubjectId = oidcUser.subject,
-                    email = oidcUser.email,
-                    displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
-                    profileImageUrl = oidcUser.getClaimAsString("picture"),
-                    expectedClubSlug = oauthReturnState.inviteClubSlugFromReturnState(signedReturnState, inviteToken),
+            val login =
+                if (inviteToken != null) {
+                    val acceptedMember =
+                        invitationService.acceptGoogleInvitation(
+                            rawToken = inviteToken,
+                            googleSubjectId = oidcUser.subject,
+                            email = oidcUser.email,
+                            displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
+                            profileImageUrl = oidcUser.getClaimAsString("picture"),
+                            expectedClubSlug = oauthReturnState.inviteClubSlugFromReturnState(signedReturnState, inviteToken),
+                        )
+                    OAuthLoginRedirect(
+                        userId = acceptedMember.userId,
+                        returnTarget =
+                            oauthReturnState.inviteReturnTargetFromState(
+                                signedState = signedReturnState,
+                                clubSlug = acceptedMember.clubSlug,
+                                inviteToken = inviteToken,
+                            ) ?: oauthReturnState.inviteReturnTarget(acceptedMember.clubSlug, inviteToken),
+                    )
+                } else {
+                    val loginResult =
+                        googleLoginService.loginVerifiedGoogleUserForSession(
+                            googleSubjectId = oidcUser.subject,
+                            email = oidcUser.email,
+                            displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
+                            profileImageUrl = oidcUser.getClaimAsString("picture"),
+                        )
+                    OAuthLoginRedirect(
+                        userId = loginResult.userId,
+                        returnTarget = oauthReturnState.validatedReturnTarget(signedReturnState),
+                    )
+                }
+            val issuedSession =
+                authSessionService.issueSession(
+                    userId = login.userId.toString(),
+                    userAgent = request.getHeader("User-Agent"),
+                    ipAddress = request.remoteAddr,
                 )
-                OAuthLoginRedirect(
-                    userId = acceptedMember.userId,
-                    returnTarget = oauthReturnState.inviteReturnTargetFromState(
-                        signedState = signedReturnState,
-                        clubSlug = acceptedMember.clubSlug,
-                        inviteToken = inviteToken,
-                    ) ?: oauthReturnState.inviteReturnTarget(acceptedMember.clubSlug, inviteToken),
-                )
-            } else {
-                val loginResult = googleLoginService.loginVerifiedGoogleUserForSession(
-                    googleSubjectId = oidcUser.subject,
-                    email = oidcUser.email,
-                    displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
-                    profileImageUrl = oidcUser.getClaimAsString("picture"),
-                )
-                OAuthLoginRedirect(
-                    userId = loginResult.userId,
-                    returnTarget = oauthReturnState.validatedReturnTarget(signedReturnState),
-                )
-            }
-            val issuedSession = authSessionService.issueSession(
-                userId = login.userId.toString(),
-                userAgent = request.getHeader("User-Agent"),
-                ipAddress = request.remoteAddr,
-            )
 
             response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.sessionCookie(issuedSession.rawToken))
             clearServletAuthenticationState(request)
@@ -81,11 +87,12 @@ class ReadmatesOAuthSuccessHandler(
             if (exception !is GoogleLoginException && exception !is InvitationDomainException) {
                 throw exception
             }
-            val error = if (exception is GoogleLoginException) {
-                exception.redirectError
-            } else {
-                "google"
-            }
+            val error =
+                if (exception is GoogleLoginException) {
+                    exception.redirectError
+                } else {
+                    "google"
+                }
             redirectToLoginError(request, response, error)
         }
     }
@@ -98,7 +105,11 @@ class ReadmatesOAuthSuccessHandler(
         redirectToLoginError(request, response, "google")
     }
 
-    private fun redirectToLoginError(request: HttpServletRequest, response: HttpServletResponse, error: String) {
+    private fun redirectToLoginError(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        error: String,
+    ) {
         response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
         clearServletAuthenticationState(request)
         response.sendRedirect("$appOrigin/login?error=$error")
@@ -106,10 +117,12 @@ class ReadmatesOAuthSuccessHandler(
 
     private fun capturedInviteToken(request: HttpServletRequest): String? {
         val session = request.getSession(false) ?: return null
-        val inviteToken = InviteTokenFormat.normalize(
-            session.getAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE)
-                ?.toString(),
-        )
+        val inviteToken =
+            InviteTokenFormat.normalize(
+                session
+                    .getAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE)
+                    ?.toString(),
+            )
         session.removeAttribute(OAuthInviteTokenSession.INVITE_TOKEN_SESSION_ATTRIBUTE)
         return inviteToken
     }
@@ -134,11 +147,12 @@ private data class OAuthLoginRedirect(
 
 internal fun readmatesAppOrigin(appBaseUrl: String): String {
     val rawValue = appBaseUrl.trim().ifEmpty { "http://localhost:3000" }
-    val uri = try {
-        URI.create(rawValue)
-    } catch (exception: IllegalArgumentException) {
-        throw IllegalArgumentException("readmates.app-base-url must be an http/https origin", exception)
-    }
+    val uri =
+        try {
+            URI.create(rawValue)
+        } catch (exception: IllegalArgumentException) {
+            throw IllegalArgumentException("readmates.app-base-url must be an http/https origin", exception)
+        }
     val scheme = uri.scheme?.lowercase(Locale.ROOT)
 
     require(scheme == "http" || scheme == "https") {

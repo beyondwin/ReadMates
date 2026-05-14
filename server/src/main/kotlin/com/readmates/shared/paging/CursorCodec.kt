@@ -14,9 +14,10 @@ object CursorCodec {
             return null
         }
 
-        val payload = cursor.toSortedMap().entries.joinToString("&") { (key, value) ->
-            "${escape(key)}=${escape(value)}"
-        }
+        val payload =
+            cursor.toSortedMap().entries.joinToString("&") { (key, value) ->
+                "${escape(key)}=${escape(value)}"
+            }
         return encoder.encodeToString(payload.toByteArray(StandardCharsets.UTF_8))
     }
 

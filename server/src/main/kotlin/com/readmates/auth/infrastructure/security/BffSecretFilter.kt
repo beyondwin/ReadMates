@@ -36,20 +36,23 @@ class BffSecretFilter(
     @param:Autowired(required = false)
     private val auditExecutor: TaskExecutor? = null,
 ) : OncePerRequestFilter() {
-
     private val auditMode = BffSecretAuditMode.from(auditModeRaw)
 
-    private val secrets: List<String> = run {
-        val fromList = configuredSecretsRaw
-            .split(',')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        val fromLegacy = legacyExpectedSecret.trim()
-            .takeIf { it.isNotBlank() }
-            ?.let { listOf(it) }
-            ?: emptyList()
-        if (fromList.isNotEmpty()) fromList else fromLegacy
-    }
+    private val secrets: List<String> =
+        run {
+            val fromList =
+                configuredSecretsRaw
+                    .split(',')
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+            val fromLegacy =
+                legacyExpectedSecret
+                    .trim()
+                    .takeIf { it.isNotBlank() }
+                    ?.let { listOf(it) }
+                    ?: emptyList()
+            if (fromList.isNotEmpty()) fromList else fromLegacy
+        }
 
     init {
         if (bffSecretRequired && secrets.isEmpty()) {
@@ -95,29 +98,35 @@ class BffSecretFilter(
         filterChain.doFilter(request, response)
     }
 
-    private fun auditAsync(alias: String, request: HttpServletRequest) {
+    private fun auditAsync(
+        alias: String,
+        request: HttpServletRequest,
+    ) {
         val port = auditPort ?: return
         if (!auditMode.shouldRecord(alias)) {
             return
         }
-        val executor = auditExecutor ?: run {
-            operationalLogger.warn("BFF audit record skipped: bffSecretAuditExecutor is not configured")
-            return
-        }
-
-        val clientIpHash = ClientIpHashing.hashClientIp(
-            raw = request.remoteAddr,
-            baseSecret = ipHashingProperties.baseSecret,
-            requireNonBlankSecret = false,
-        )
-        val path = request.requestURI
-        val task = Runnable {
-            try {
-                port.recordUsage(alias, clientIpHash, path)
-            } catch (ex: Exception) {
-                operationalLogger.warn("BFF audit record failed: {}", ex.message)
+        val executor =
+            auditExecutor ?: run {
+                operationalLogger.warn("BFF audit record skipped: bffSecretAuditExecutor is not configured")
+                return
             }
-        }
+
+        val clientIpHash =
+            ClientIpHashing.hashClientIp(
+                raw = request.remoteAddr,
+                baseSecret = ipHashingProperties.baseSecret,
+                requireNonBlankSecret = false,
+            )
+        val path = request.requestURI
+        val task =
+            Runnable {
+                try {
+                    port.recordUsage(alias, clientIpHash, path)
+                } catch (ex: Exception) {
+                    operationalLogger.warn("BFF audit record failed: {}", ex.message)
+                }
+            }
 
         try {
             executor.execute(task)
@@ -135,15 +144,15 @@ class BffSecretFilter(
         }
 
     private fun hasAllowedOrigin(request: HttpServletRequest): Boolean {
-        val origin = request.getHeader("Origin")?.toOrigin()
-            ?: request.getHeader("Referer")?.toOrigin()
-            ?: return false
+        val origin =
+            request.getHeader("Origin")?.toOrigin()
+                ?: request.getHeader("Referer")?.toOrigin()
+                ?: return false
 
         return allowedOriginPort.isAllowed(origin)
     }
 
-    private fun isMutatingRequest(request: HttpServletRequest): Boolean =
-        request.method in MUTATING_METHODS
+    private fun isMutatingRequest(request: HttpServletRequest): Boolean = request.method in MUTATING_METHODS
 
     private fun isApiRequest(request: HttpServletRequest): Boolean {
         val servletPath = request.servletPath.orEmpty()
@@ -157,10 +166,15 @@ class BffSecretFilter(
         const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
 
-        fun parseAllowedOrigins(allowedOrigins: String, appBaseUrl: String): Set<String> {
-            val configuredOrigins = allowedOrigins.split(',')
-                .mapNotNull { it.toOrigin() }
-                .toSet()
+        fun parseAllowedOrigins(
+            allowedOrigins: String,
+            appBaseUrl: String,
+        ): Set<String> {
+            val configuredOrigins =
+                allowedOrigins
+                    .split(',')
+                    .mapNotNull { it.toOrigin() }
+                    .toSet()
 
             return configuredOrigins.ifEmpty {
                 setOfNotNull(appBaseUrl.toOrigin())
@@ -171,9 +185,15 @@ class BffSecretFilter(
             trim()
                 .takeIf { it.isNotEmpty() }
                 ?.let {
-                    runCatching { URI.create(it).toURL().toURI().toString().trimEnd('/') }.getOrNull()
-                }
-                ?.let {
+                    runCatching {
+                        URI
+                            .create(it)
+                            .toURL()
+                            .toURI()
+                            .toString()
+                            .trimEnd('/')
+                    }.getOrNull()
+                }?.let {
                     runCatching {
                         val uri = URI.create(it)
                         val scheme = uri.scheme ?: return@runCatching null

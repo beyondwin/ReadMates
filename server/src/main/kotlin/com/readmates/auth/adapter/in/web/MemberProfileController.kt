@@ -30,10 +30,11 @@ class MemberProfileController(
         authentication: Authentication?,
         @RequestBody request: MemberProfileUpdateRequest,
     ): MemberProfileResponse {
-        val profile = updateOwnMemberProfile.updateOwnProfile(
-            authentication.emailOrNull(),
-            request.toCommand(),
-        )
+        val profile =
+            updateOwnMemberProfile.updateOwnProfile(
+                authentication.emailOrNull(),
+                request.toCommand(),
+            )
         return MemberProfileResponse.from(profile)
     }
 
@@ -56,19 +57,20 @@ class MemberProfileController(
             message = exception.error.responseMessage(),
         )
 
-    private fun MemberProfileUpdateRequest.toCommand(): UpdateMemberProfileCommand =
-        UpdateMemberProfileCommand(displayName = displayName)
+    private fun MemberProfileUpdateRequest.toCommand(): UpdateMemberProfileCommand = UpdateMemberProfileCommand(displayName = displayName)
 
     private fun MemberProfileError.httpStatus(): HttpStatus =
         when (this) {
             MemberProfileError.AUTHENTICATION_REQUIRED -> HttpStatus.UNAUTHORIZED
             MemberProfileError.HOST_ROLE_REQUIRED,
-            MemberProfileError.MEMBERSHIP_NOT_ALLOWED -> HttpStatus.FORBIDDEN
+            MemberProfileError.MEMBERSHIP_NOT_ALLOWED,
+            -> HttpStatus.FORBIDDEN
             MemberProfileError.MEMBER_NOT_FOUND -> HttpStatus.NOT_FOUND
             MemberProfileError.DISPLAY_NAME_REQUIRED,
             MemberProfileError.DISPLAY_NAME_TOO_LONG,
             MemberProfileError.DISPLAY_NAME_INVALID,
-            MemberProfileError.DISPLAY_NAME_RESERVED -> HttpStatus.BAD_REQUEST
+            MemberProfileError.DISPLAY_NAME_RESERVED,
+            -> HttpStatus.BAD_REQUEST
             MemberProfileError.DISPLAY_NAME_DUPLICATE -> HttpStatus.CONFLICT
         }
 

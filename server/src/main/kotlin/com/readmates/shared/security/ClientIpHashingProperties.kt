@@ -28,8 +28,9 @@ data class ClientIpHashingProperties(
      */
     fun validate(environment: Environment) {
         val activeProfiles = environment.activeProfiles
-        val isProductionLike = activeProfiles.isEmpty() ||
-            activeProfiles.any { it.contains("production", ignoreCase = true) }
+        val isProductionLike =
+            activeProfiles.isEmpty() ||
+                activeProfiles.any { it.contains("production", ignoreCase = true) }
 
         if (baseSecret.isNotBlank()) {
             return

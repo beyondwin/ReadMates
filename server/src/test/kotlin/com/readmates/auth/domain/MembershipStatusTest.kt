@@ -5,15 +5,16 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class MembershipStatusTest {
-
-    private val allowedTransitions: Map<MembershipStatus, Set<MembershipStatus>> = mapOf(
-        MembershipStatus.INVITED to setOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
-        MembershipStatus.VIEWER to setOf(MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
-        MembershipStatus.ACTIVE to setOf(MembershipStatus.SUSPENDED, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
-        MembershipStatus.SUSPENDED to setOf(MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
-        MembershipStatus.LEFT to emptySet(),
-        MembershipStatus.INACTIVE to emptySet(),
-    )
+    private val allowedTransitions: Map<MembershipStatus, Set<MembershipStatus>> =
+        mapOf(
+            MembershipStatus.INVITED to
+                setOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
+            MembershipStatus.VIEWER to setOf(MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
+            MembershipStatus.ACTIVE to setOf(MembershipStatus.SUSPENDED, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
+            MembershipStatus.SUSPENDED to setOf(MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT),
+            MembershipStatus.LEFT to emptySet(),
+            MembershipStatus.INACTIVE to emptySet(),
+        )
 
     @Test
     fun `allowed transitions return true`() {

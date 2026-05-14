@@ -15,9 +15,14 @@ import com.readmates.session.application.model.UpdateRsvpCommand
 
 interface SessionParticipationWritePort {
     fun updateRsvp(command: UpdateRsvpCommand): RsvpResult
+
     fun saveCheckin(command: SaveCheckinCommand): CheckinResult
+
     fun saveQuestion(command: SaveQuestionCommand): QuestionResult
+
     fun replaceQuestions(command: ReplaceQuestionsCommand): ReplaceQuestionsResult
+
     fun saveOneLineReview(command: SaveOneLineReviewCommand): OneLineReviewResult
+
     fun saveLongReview(command: SaveLongReviewCommand): LongReviewResult
 }

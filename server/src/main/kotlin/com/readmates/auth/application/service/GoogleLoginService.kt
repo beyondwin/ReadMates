@@ -35,12 +35,13 @@ class GoogleLoginService(
         displayName: String?,
         profileImageUrl: String?,
     ): CurrentMember {
-        val result = loginVerifiedGoogleUserForSession(
-            googleSubjectId = googleSubjectId,
-            email = email,
-            displayName = displayName,
-            profileImageUrl = profileImageUrl,
-        )
+        val result =
+            loginVerifiedGoogleUserForSession(
+                googleSubjectId = googleSubjectId,
+                email = email,
+                displayName = displayName,
+                profileImageUrl = profileImageUrl,
+            )
         return result.currentMember ?: throwBlockedOrMissingMembership(result.userId)
     }
 
@@ -50,14 +51,17 @@ class GoogleLoginService(
         email: String,
         displayName: String?,
         profileImageUrl: String?,
-    ): GoogleLoginResult = connectOrCreate(
-        googleSubjectId = googleSubjectId.trim().takeIf { it.isNotEmpty() }
-            ?: throw GoogleLoginException("Google subject is required"),
-        normalizedEmail = email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
-            ?: throw GoogleLoginException("Google email is required"),
-        displayName = displayName,
-        profileImageUrl = profileImageUrl,
-    )
+    ): GoogleLoginResult =
+        connectOrCreate(
+            googleSubjectId =
+                googleSubjectId.trim().takeIf { it.isNotEmpty() }
+                    ?: throw GoogleLoginException("Google subject is required"),
+            normalizedEmail =
+                email.trim().lowercase(Locale.ROOT).takeIf { it.isNotEmpty() }
+                    ?: throw GoogleLoginException("Google email is required"),
+            displayName = displayName,
+            profileImageUrl = profileImageUrl,
+        )
 
     private fun connectOrCreate(
         googleSubjectId: String,
@@ -83,8 +87,8 @@ class GoogleLoginService(
         normalizedEmail: String,
         displayName: String?,
         profileImageUrl: String?,
-    ): CurrentMember {
-        return try {
+    ): CurrentMember =
+        try {
             googleAccountStore.createViewerGoogleMember(
                 googleSubjectId = googleSubjectId,
                 email = normalizedEmail,
@@ -94,7 +98,6 @@ class GoogleLoginService(
         } catch (exception: MemberAccountDuplicateException) {
             resolveDuplicateViewerGoogleMember(googleSubjectId, normalizedEmail, profileImageUrl, exception)
         }
-    }
 
     private fun resolveDuplicateViewerGoogleMember(
         googleSubjectId: String,
@@ -125,11 +128,12 @@ class GoogleLoginService(
         }
 
         val userId = memberIdentityLookup.findAnyUserIdByEmail(normalizedEmail) ?: return null
-        val connected = googleAccountStore.connectGoogleSubject(
-            userId = userId,
-            googleSubjectId = googleSubjectId,
-            profileImageUrl = profileImageUrl,
-        )
+        val connected =
+            googleAccountStore.connectGoogleSubject(
+                userId = userId,
+                googleSubjectId = googleSubjectId,
+                profileImageUrl = profileImageUrl,
+            )
         if (!connected) {
             throw GoogleLoginException("Existing user is connected to a different Google account")
         }
@@ -153,6 +157,5 @@ class GoogleLoginService(
         throw GoogleLoginException("Connected user has no membership")
     }
 
-    private fun CurrentMember.toLoginResult(): GoogleLoginResult =
-        GoogleLoginResult(userId = userId, currentMember = this)
+    private fun CurrentMember.toLoginResult(): GoogleLoginResult = GoogleLoginResult(userId = userId, currentMember = this)
 }

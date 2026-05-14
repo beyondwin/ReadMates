@@ -10,9 +10,10 @@ import org.springframework.http.HttpStatus
 class ArchiveErrorHandlerTest {
     @Test
     fun `maps missing archive session to JSON 404`() {
-        val response = ArchiveErrorHandler().handleArchiveApplicationException(
-            ArchiveApplicationException(ArchiveApplicationError.SESSION_NOT_FOUND, "Archive session not found"),
-        )
+        val response =
+            ArchiveErrorHandler().handleArchiveApplicationException(
+                ArchiveApplicationException(ArchiveApplicationError.SESSION_NOT_FOUND, "Archive session not found"),
+            )
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
         assertThat(response.body).isEqualTo(
@@ -26,12 +27,13 @@ class ArchiveErrorHandlerTest {
 
     @Test
     fun `maps member app access failure to JSON 403`() {
-        val response = ArchiveErrorHandler().handleArchiveApplicationException(
-            ArchiveApplicationException(
-                ArchiveApplicationError.MEMBER_APP_ACCESS_REQUIRED,
-                "Member app access required",
-            ),
-        )
+        val response =
+            ArchiveErrorHandler().handleArchiveApplicationException(
+                ArchiveApplicationException(
+                    ArchiveApplicationError.MEMBER_APP_ACCESS_REQUIRED,
+                    "Member app access required",
+                ),
+            )
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.FORBIDDEN)
         assertThat(response.body).isEqualTo(

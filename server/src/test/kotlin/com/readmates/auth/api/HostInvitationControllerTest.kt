@@ -1,10 +1,10 @@
 package com.readmates.auth.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -37,12 +37,12 @@ class HostInvitationControllerTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `host creates a pending member invitation with a one time accept url`() {
-        mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":" New.Member@Example.com ","name":"새멤버"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":" New.Member@Example.com ","name":"새멤버"}"""
+            }.andExpect {
                 status { isCreated() }
                 jsonPath("$.email") { value("new.member@example.com") }
                 jsonPath("$.name") { value("새멤버") }
@@ -55,13 +55,14 @@ class HostInvitationControllerTest(
                 jsonPath("$.canReissue") { value(true) }
             }
 
-        val row = jdbcTemplate.queryForMap(
-            """
-            select invited_email, invited_name, role, status, length(token_hash) as token_hash_length
-            from invitations
-            where invited_email = 'new.member@example.com'
-            """.trimIndent(),
-        )
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select invited_email, invited_name, role, status, length(token_hash) as token_hash_length
+                from invitations
+                where invited_email = 'new.member@example.com'
+                """.trimIndent(),
+            )
         assertEquals("new.member@example.com", row["invited_email"])
         assertEquals("새멤버", row["invited_name"])
         assertEquals("MEMBER", row["role"])
@@ -73,33 +74,34 @@ class HostInvitationControllerTest(
     fun `host invitation rejects email longer than database email limit before persistence`() {
         val longEmail = "${"a".repeat(309)}@example.com"
 
-        mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$longEmail","name":"긴 이메일"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$longEmail","name":"긴 이메일"}"""
+            }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_INVITATION_EMAIL") }
                 jsonPath("$.status") { value(400) }
             }
 
-        val count = jdbcTemplate.queryForObject(
-            "select count(*) from invitations where invited_email = ?",
-            Long::class.java,
-            longEmail,
-        ) ?: 0L
+        val count =
+            jdbcTemplate.queryForObject(
+                "select count(*) from invitations where invited_email = ?",
+                Long::class.java,
+                longEmail,
+            ) ?: 0L
         assertEquals(0L, count)
     }
 
     @Test
     fun `host invitation malformed short email does not return length validation message`() {
-        mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"not-an-email","name":"잘못된 이메일"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"not-an-email","name":"잘못된 이메일"}"""
+            }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("INVALID_INVITATION_EMAIL") }
                 jsonPath("$.message") { value("Invalid invitation email") }
@@ -123,12 +125,12 @@ class HostInvitationControllerTest(
             """.trimIndent(),
         )
 
-        mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"primary.domain.invite@example.com","name":"도메인 초대"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"primary.domain.invite@example.com","name":"도메인 초대"}"""
+            }.andExpect {
                 status { isCreated() }
                 jsonPath("$.acceptUrl", startsWith("https://reading.example.test/invite/"))
             }
@@ -136,22 +138,22 @@ class HostInvitationControllerTest(
 
     @Test
     fun `host creates invitation with current session intent disabled`() {
-        mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"invite.apply@example.com","name":"초대 적용","applyToCurrentSession":false}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"invite.apply@example.com","name":"초대 적용","applyToCurrentSession":false}"""
+            }.andExpect {
                 status { isCreated() }
                 jsonPath("$.email") { value("invite.apply@example.com") }
                 jsonPath("$.name") { value("초대 적용") }
                 jsonPath("$.applyToCurrentSession") { value(false) }
             }
 
-        mockMvc.get("/api/host/invitations") {
-            with(user("host@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/host/invitations") {
+                with(user("host@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[0].email") { value("invite.apply@example.com") }
                 jsonPath("$.items[0].applyToCurrentSession") { value(false) }
@@ -164,11 +166,11 @@ class HostInvitationControllerTest(
         createInvitation("paged.invite.2@example.com")
         createInvitation("paged.invite.3@example.com")
 
-        mockMvc.get("/api/host/invitations") {
-            with(user("host@example.com"))
-            param("limit", "2")
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/host/invitations") {
+                with(user("host@example.com"))
+                param("limit", "2")
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(2) }
                 jsonPath("$.items[0].email") { value("paged.invite.3@example.com") }
@@ -178,12 +180,12 @@ class HostInvitationControllerTest(
 
     @Test
     fun `member cannot create invitations`() {
-        mockMvc.post("/api/host/invitations") {
-            with(user("member5@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"blocked@example.com","name":"차단멤버"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("member5@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"blocked@example.com","name":"차단멤버"}"""
+            }.andExpect {
                 status { isForbidden() }
             }
     }
@@ -195,17 +197,18 @@ class HostInvitationControllerTest(
 
         assertNotEquals(firstUrl, secondUrl)
 
-        val counts = jdbcTemplate.queryForMap(
-            """
-            select
-              count(*) as total_count,
-              sum(case when status = 'PENDING' then 1 else 0 end) as pending_count,
-              sum(case when status = 'REVOKED' then 1 else 0 end) as revoked_count,
-              sum(case when status = 'PENDING' and expires_at >= utc_timestamp(6) then 1 else 0 end) as live_pending_count
-            from invitations
-            where invited_email = 'repeat@example.com'
-            """.trimIndent(),
-        )
+        val counts =
+            jdbcTemplate.queryForMap(
+                """
+                select
+                  count(*) as total_count,
+                  sum(case when status = 'PENDING' then 1 else 0 end) as pending_count,
+                  sum(case when status = 'REVOKED' then 1 else 0 end) as revoked_count,
+                  sum(case when status = 'PENDING' and expires_at >= utc_timestamp(6) then 1 else 0 end) as live_pending_count
+                from invitations
+                where invited_email = 'repeat@example.com'
+                """.trimIndent(),
+            )
         assertEquals(2L, numberValue(counts["total_count"]).toLong())
         assertEquals(1L, numberValue(counts["pending_count"]).toLong())
         assertEquals(1L, numberValue(counts["revoked_count"]).toLong())
@@ -218,29 +221,31 @@ class HostInvitationControllerTest(
         try {
             val barrier = CyclicBarrier(2)
             val executor = Executors.newFixedThreadPool(2)
-            val results = executor.invokeAll(
-                List(2) {
-                    Callable {
-                        barrier.await(5, TimeUnit.SECONDS)
-                        createInvitation("race@example.com")
-                    }
-                },
-            )
+            val results =
+                executor.invokeAll(
+                    List(2) {
+                        Callable {
+                            barrier.await(5, TimeUnit.SECONDS)
+                            createInvitation("race@example.com")
+                        }
+                    },
+                )
             executor.shutdown()
             assertEquals(true, executor.awaitTermination(5, TimeUnit.SECONDS))
             results.forEach { it.get() }
 
-            val counts = jdbcTemplate.queryForMap(
-                """
-                select
-                  count(*) as total_count,
-                  sum(case when status = 'PENDING' then 1 else 0 end) as pending_count,
-                  sum(case when status = 'REVOKED' then 1 else 0 end) as revoked_count,
-                  sum(case when status = 'PENDING' and expires_at >= utc_timestamp(6) then 1 else 0 end) as live_pending_count
-                from invitations
-                where invited_email = 'race@example.com'
-                """.trimIndent(),
-            )
+            val counts =
+                jdbcTemplate.queryForMap(
+                    """
+                    select
+                      count(*) as total_count,
+                      sum(case when status = 'PENDING' then 1 else 0 end) as pending_count,
+                      sum(case when status = 'REVOKED' then 1 else 0 end) as revoked_count,
+                      sum(case when status = 'PENDING' and expires_at >= utc_timestamp(6) then 1 else 0 end) as live_pending_count
+                    from invitations
+                    where invited_email = 'race@example.com'
+                    """.trimIndent(),
+                )
             assertEquals(2L, numberValue(counts["total_count"]).toLong())
             assertEquals(1L, numberValue(counts["pending_count"]).toLong())
             assertEquals(1L, numberValue(counts["revoked_count"]).toLong())
@@ -254,26 +259,26 @@ class HostInvitationControllerTest(
     fun `host lists and revokes invitations`() {
         createInvitation("list.member@example.com")
 
-        val invitationId = mockMvc.get("/api/host/invitations") {
-            with(user("host@example.com"))
-        }
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.items[0].email") { value("list.member@example.com") }
-                jsonPath("$.items[0].effectiveStatus") { value("PENDING") }
-                jsonPath("$.items[0].canRevoke") { value(true) }
-                jsonPath("$.items[0].canReissue") { value(true) }
-            }
-            .andReturn()
-            .response
-            .contentAsString
-            .substringAfter("\"invitationId\":\"")
-            .substringBefore("\"")
+        val invitationId =
+            mockMvc
+                .get("/api/host/invitations") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.items[0].email") { value("list.member@example.com") }
+                    jsonPath("$.items[0].effectiveStatus") { value("PENDING") }
+                    jsonPath("$.items[0].canRevoke") { value(true) }
+                    jsonPath("$.items[0].canReissue") { value(true) }
+                }.andReturn()
+                .response
+                .contentAsString
+                .substringAfter("\"invitationId\":\"")
+                .substringBefore("\"")
 
-        mockMvc.post("/api/host/invitations/$invitationId/revoke") {
-            with(user("host@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations/$invitationId/revoke") {
+                with(user("host@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.effectiveStatus") { value("REVOKED") }
                 jsonPath("$.canRevoke") { value(false) }
@@ -285,10 +290,10 @@ class HostInvitationControllerTest(
         createInvitation("accepted.list.member@example.com")
         acceptInvitationInDatabase("accepted.list.member@example.com")
 
-        mockMvc.get("/api/host/invitations") {
-            with(user("host@example.com"))
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/host/invitations") {
+                with(user("host@example.com"))
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[0].email") { value("accepted.list.member@example.com") }
                 jsonPath("$.items[0].effectiveStatus") { value("ACCEPTED") }
@@ -299,33 +304,31 @@ class HostInvitationControllerTest(
 
     @Test
     fun `host cannot invite an already active member`() {
-        mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"member5@example.com","name":"이멤버5"}"""
-        }
-            .andExpect {
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"member5@example.com","name":"이멤버5"}"""
+            }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("MEMBER_ALREADY_ACTIVE") }
             }
     }
 
-    private fun createInvitation(email: String): String {
-        return mockMvc.post("/api/host/invitations") {
-            with(user("host@example.com"))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"email":"$email","name":"초대 멤버"}"""
-        }
-            .andExpect { status { isCreated() } }
+    private fun createInvitation(email: String): String =
+        mockMvc
+            .post("/api/host/invitations") {
+                with(user("host@example.com"))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"email":"$email","name":"초대 멤버"}"""
+            }.andExpect { status { isCreated() } }
             .andReturn()
             .response
             .contentAsString
             .substringAfter("\"acceptUrl\":\"")
             .substringBefore("\"")
-    }
 
-    private fun numberValue(value: Any?): Number =
-        value as? Number ?: error("Expected numeric value but was $value")
+    private fun numberValue(value: Any?): Number = value as? Number ?: error("Expected numeric value but was $value")
 
     private fun acceptInvitationInDatabase(email: String) {
         jdbcTemplate.update(

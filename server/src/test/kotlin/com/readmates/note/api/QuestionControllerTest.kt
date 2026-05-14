@@ -106,84 +106,88 @@ class QuestionControllerTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `accepts a fifth priority question`() {
-        mockMvc.post("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "priority": 5,
-                  "text": "다섯 번째 질문까지 준비할 수 있나요?",
-                  "draftThought": "실제 모임 질문 수에 맞춘 검증"
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isCreated() }
-            jsonPath("$.priority") { value(5) }
-        }
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "priority": 5,
+                      "text": "다섯 번째 질문까지 준비할 수 있나요?",
+                      "draftThought": "실제 모임 질문 수에 맞춘 검증"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isCreated() }
+                jsonPath("$.priority") { value(5) }
+            }
     }
 
     @Test
     fun `rejects a question with an invalid priority`() {
-        mockMvc.post("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "priority": 6,
-                  "text": "우선순위가 범위를 벗어난 질문",
-                  "draftThought": null
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "priority": 6,
+                      "text": "우선순위가 범위를 벗어난 질문",
+                      "draftThought": null
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `rejects a question with blank text`() {
-        mockMvc.post("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "priority": 1,
-                  "text": " ",
-                  "draftThought": null
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .post("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "priority": 1,
+                      "text": " ",
+                      "draftThought": null
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `replaces current questions as an ordered list`() {
-        mockMvc.put("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "questions": [
-                    { "text": " 첫 번째 질문 " },
-                    { "text": "두 번째 질문" }
-                  ]
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.questions[0].priority") { value(1) }
-            jsonPath("$.questions[0].text") { value("첫 번째 질문") }
-            jsonPath("$.questions[1].priority") { value(2) }
-            jsonPath("$.questions[1].text") { value("두 번째 질문") }
-        }
+        mockMvc
+            .put("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "questions": [
+                        { "text": " 첫 번째 질문 " },
+                        { "text": "두 번째 질문" }
+                      ]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.questions[0].priority") { value(1) }
+                jsonPath("$.questions[0].text") { value("첫 번째 질문") }
+                jsonPath("$.questions[1].priority") { value(2) }
+                jsonPath("$.questions[1].text") { value("두 번째 질문") }
+            }
 
         val rows = savedQuestions()
         require(rows.size == 2)
@@ -197,48 +201,50 @@ class QuestionControllerTest(
 
     @Test
     fun `accepts five replacement questions`() {
-        mockMvc.put("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "questions": [
-                    { "text": "질문 1" },
-                    { "text": "질문 2" },
-                    { "text": "질문 3" },
-                    { "text": "질문 4" },
-                    { "text": "질문 5" }
-                  ]
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.questions[4].priority") { value(5) }
-            jsonPath("$.questions[4].text") { value("질문 5") }
-        }
+        mockMvc
+            .put("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "questions": [
+                        { "text": "질문 1" },
+                        { "text": "질문 2" },
+                        { "text": "질문 3" },
+                        { "text": "질문 4" },
+                        { "text": "질문 5" }
+                      ]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.questions[4].priority") { value(5) }
+                jsonPath("$.questions[4].text") { value("질문 5") }
+            }
     }
 
     @Test
     fun `accepts a single replacement question while preserving its priority`() {
-        mockMvc.put("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "questions": [
-                    { "priority": 2, "text": "질문 2" }
-                  ]
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.questions[0].priority") { value(2) }
-            jsonPath("$.questions[0].text") { value("질문 2") }
-        }
+        mockMvc
+            .put("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "questions": [
+                        { "priority": 2, "text": "질문 2" }
+                      ]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.questions[0].priority") { value(2) }
+                jsonPath("$.questions[0].text") { value("질문 2") }
+            }
 
         val rows = savedQuestions()
         require(rows.size == 1)
@@ -250,20 +256,21 @@ class QuestionControllerTest(
     fun `accepts an empty replacement question list`() {
         seedFiveQuestions()
 
-        mockMvc.put("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "questions": []
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.questions.length()") { value(0) }
-        }
+        mockMvc
+            .put("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "questions": []
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.questions.length()") { value(0) }
+            }
 
         val rows = savedQuestions()
         require(rows.isEmpty())
@@ -271,68 +278,71 @@ class QuestionControllerTest(
 
     @Test
     fun `rejects blank replacement questions`() {
-        mockMvc.put("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "questions": [
-                    { "text": "질문 1" },
-                    { "text": " " }
-                  ]
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .put("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "questions": [
+                        { "text": "질문 1" },
+                        { "text": " " }
+                      ]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `rejects more than five replacement questions`() {
-        mockMvc.put("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "questions": [
-                    { "text": "질문 1" },
-                    { "text": "질문 2" },
-                    { "text": "질문 3" },
-                    { "text": "질문 4" },
-                    { "text": "질문 5" },
-                    { "text": "질문 6" }
-                  ]
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isBadRequest() }
-        }
+        mockMvc
+            .put("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "questions": [
+                        { "text": "질문 1" },
+                        { "text": "질문 2" },
+                        { "text": "질문 3" },
+                        { "text": "질문 4" },
+                        { "text": "질문 5" },
+                        { "text": "질문 6" }
+                      ]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
     }
 
     @Test
     fun `replacement removes stale higher priority questions`() {
         seedFiveQuestions()
 
-        mockMvc.put("/api/sessions/current/questions") {
-            with(user("member5@example.com"))
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "questions": [
-                    { "text": "남길 질문 1" },
-                    { "text": "남길 질문 2" }
-                  ]
-                }
-                """.trimIndent()
-        }.andExpect {
-            status { isOk() }
-        }
+        mockMvc
+            .put("/api/sessions/current/questions") {
+                with(user("member5@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "questions": [
+                        { "text": "남길 질문 1" },
+                        { "text": "남길 질문 2" }
+                      ]
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+            }
 
         val rows = savedQuestions()
         require(rows.size == 2)

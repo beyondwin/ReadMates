@@ -1,12 +1,11 @@
 package com.readmates.auth.api
 
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
-import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
-import javax.sql.DataSource
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -17,9 +16,10 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.UUID
+import javax.sql.DataSource
 
 @SpringBootTest(
     properties = [
@@ -71,12 +71,12 @@ class HostMemberLifecycleControllerTest(
         val activeMembershipId = insertLifecycleMember("active.list", "ACTIVE")
         addParticipant(sessionId, activeMembershipId, "ACTIVE")
 
-        mockMvc.get("/api/host/members") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/host/members") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].status") { value("ACTIVE") }
                 jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].currentSessionParticipationStatus") {
@@ -94,13 +94,13 @@ class HostMemberLifecycleControllerTest(
             insertLifecycleMember("paged.members.$index", "ACTIVE")
         }
 
-        mockMvc.get("/api/host/members") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            param("limit", "2")
-        }
-            .andExpect {
+        mockMvc
+            .get("/api/host/members") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                param("limit", "2")
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.items.length()") { value(2) }
                 jsonPath("$.nextCursor") { exists() }
@@ -114,17 +114,18 @@ class HostMemberLifecycleControllerTest(
         val membershipId = insertLifecycleMember("suspend.now", "ACTIVE")
         addParticipant(sessionId, membershipId, "ACTIVE")
 
-        mockMvc.post("/api/host/members/$membershipId/suspend") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.member.status") { value("SUSPENDED") }
-            jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/suspend") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.status") { value("SUSPENDED") }
+                jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
+            }
 
         assertEquals("SUSPENDED", membershipStatus(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
@@ -137,18 +138,19 @@ class HostMemberLifecycleControllerTest(
         val membershipId = insertLifecycleMember("suspend.next", "ACTIVE")
         addParticipant(sessionId, membershipId, "ACTIVE")
 
-        mockMvc.post("/api/host/members/$membershipId/suspend") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"NEXT_SESSION"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.member.status") { value("SUSPENDED") }
-            jsonPath("$.currentSessionPolicyResult") { value("DEFERRED") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/suspend") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"NEXT_SESSION"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.status") { value("SUSPENDED") }
+                jsonPath("$.currentSessionPolicyResult") { value("DEFERRED") }
+            }
 
         assertEquals("SUSPENDED", membershipStatus(membershipId))
         assertEquals("ACTIVE", participationStatus(sessionId, membershipId))
@@ -160,17 +162,18 @@ class HostMemberLifecycleControllerTest(
         val sessionId = createOpenSession()
         val membershipId = insertLifecycleMember("restore", "SUSPENDED")
 
-        mockMvc.post("/api/host/members/$membershipId/restore") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.member.status") { value("ACTIVE") }
-            jsonPath("$.member.currentSessionParticipationStatus") { doesNotExist() }
-            jsonPath("$.currentSessionPolicyResult") { value("NOT_APPLICABLE") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/restore") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.status") { value("ACTIVE") }
+                jsonPath("$.member.currentSessionParticipationStatus") { doesNotExist() }
+                jsonPath("$.currentSessionPolicyResult") { value("NOT_APPLICABLE") }
+            }
 
         assertEquals("ACTIVE", membershipStatus(membershipId))
         assertEquals(null, participationStatusOrNull(sessionId, membershipId))
@@ -183,18 +186,19 @@ class HostMemberLifecycleControllerTest(
         val membershipId = insertLifecycleMember("deactivate.now", "ACTIVE")
         addParticipant(sessionId, membershipId, "ACTIVE")
 
-        mockMvc.post("/api/host/members/$membershipId/deactivate") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.member.status") { value("LEFT") }
-            jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/deactivate") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.status") { value("LEFT") }
+                jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
+            }
 
         assertEquals("LEFT", membershipStatus(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
@@ -205,17 +209,18 @@ class HostMemberLifecycleControllerTest(
         val hostCookie = sessionCookieForEmail("host@example.com")
         val membershipId = insertLifecycleMember("deactivate.viewer", "VIEWER")
 
-        mockMvc.post("/api/host/members/$membershipId/deactivate") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.member.status") { value("LEFT") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/deactivate") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.status") { value("LEFT") }
+            }
 
         assertEquals("LEFT", membershipStatus(membershipId))
     }
@@ -228,16 +233,17 @@ class HostMemberLifecycleControllerTest(
         addParticipant(sessionId, membershipId, "REMOVED")
 
         repeat(2) {
-            mockMvc.post("/api/host/members/$membershipId/current-session/add") {
-                cookie(hostCookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.member.currentSessionParticipationStatus") { value("ACTIVE") }
-                jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
-            }
+            mockMvc
+                .post("/api/host/members/$membershipId/current-session/add") {
+                    cookie(hostCookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.member.currentSessionParticipationStatus") { value("ACTIVE") }
+                    jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
+                }
         }
 
         assertEquals(1, participantCount(sessionId, membershipId))
@@ -252,16 +258,17 @@ class HostMemberLifecycleControllerTest(
         addParticipant(sessionId, membershipId, "ACTIVE")
 
         repeat(2) {
-            mockMvc.post("/api/host/members/$membershipId/current-session/remove") {
-                cookie(hostCookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.member.currentSessionParticipationStatus") { value("REMOVED") }
-                jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
-            }
+            mockMvc
+                .post("/api/host/members/$membershipId/current-session/remove") {
+                    cookie(hostCookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.member.currentSessionParticipationStatus") { value("REMOVED") }
+                    jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
+                }
         }
 
         assertEquals(1, participantCount(sessionId, membershipId))
@@ -276,16 +283,17 @@ class HostMemberLifecycleControllerTest(
 
         assertEquals(null, participationStatusOrNull(sessionId, membershipId))
 
-        mockMvc.post("/api/host/members/$membershipId/current-session/remove") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.member.currentSessionParticipationStatus") { value("REMOVED") }
-            jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/current-session/remove") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.currentSessionParticipationStatus") { value("REMOVED") }
+                jsonPath("$.currentSessionPolicyResult") { value("APPLIED") }
+            }
 
         assertEquals(1, participantCount(sessionId, membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
@@ -300,14 +308,15 @@ class HostMemberLifecycleControllerTest(
         val inactiveMembershipId = insertLifecycleMember("session.add.inactive", "INACTIVE")
 
         listOf(suspendedMembershipId, leftMembershipId, inactiveMembershipId).forEach { membershipId ->
-            mockMvc.post("/api/host/members/$membershipId/current-session/add") {
-                cookie(hostCookie)
-                header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("Origin", "http://localhost:3000")
-                with(csrf())
-            }.andExpect {
-                status { isConflict() }
-            }
+            mockMvc
+                .post("/api/host/members/$membershipId/current-session/add") {
+                    cookie(hostCookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                }.andExpect {
+                    status { isConflict() }
+                }
         }
     }
 
@@ -316,16 +325,17 @@ class HostMemberLifecycleControllerTest(
         val memberCookie = sessionCookieForEmail("member5@example.com")
         val membershipId = insertLifecycleMember("member.blocked.lifecycle", "ACTIVE")
 
-        mockMvc.post("/api/host/members/$membershipId/suspend") {
-            cookie(memberCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/suspend") {
+                cookie(memberCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isForbidden() }
+            }
 
         assertEquals("ACTIVE", membershipStatus(membershipId))
     }
@@ -335,16 +345,17 @@ class HostMemberLifecycleControllerTest(
         val hostCookie = sessionCookieForEmail("host@example.com")
         val membershipId = insertLifecycleMemberOutsideClub("outside.lifecycle", "ACTIVE")
 
-        mockMvc.post("/api/host/members/$membershipId/suspend") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isNotFound() }
-        }
+        mockMvc
+            .post("/api/host/members/$membershipId/suspend") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isNotFound() }
+            }
 
         assertEquals("ACTIVE", membershipStatus(membershipId))
     }
@@ -354,16 +365,17 @@ class HostMemberLifecycleControllerTest(
         val hostCookie = sessionCookieForEmail("host@example.com")
         val hostMembershipId = membershipIdForEmail("host@example.com")
 
-        mockMvc.post("/api/host/members/$hostMembershipId/deactivate") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/members/$hostMembershipId/deactivate") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
         assertEquals("ACTIVE", membershipStatus(hostMembershipId))
     }
@@ -373,27 +385,29 @@ class HostMemberLifecycleControllerTest(
         val hostCookie = sessionCookieForEmail("host@example.com")
         val hostMembershipId = membershipIdForEmail("host@example.com")
 
-        mockMvc.post("/api/host/members/$hostMembershipId/suspend") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/members/$hostMembershipId/suspend") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
-        mockMvc.post("/api/host/members/$hostMembershipId/deactivate") {
-            cookie(hostCookie)
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            with(csrf())
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"currentSessionPolicy":"APPLY_NOW"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/host/members/$hostMembershipId/deactivate") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
         assertEquals("ACTIVE", membershipStatus(hostMembershipId))
     }
@@ -409,40 +423,45 @@ class HostMemberLifecycleControllerTest(
         dataSource.connection.use { connection ->
             connection.autoCommit = false
             try {
-                connection.prepareStatement(
-                    """
-                    select id
-                    from memberships
-                    where id = ?
-                    for update
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, membershipId)
-                    statement.executeQuery().use { resultSet ->
-                        resultSet.next()
+                connection
+                    .prepareStatement(
+                        """
+                        select id
+                        from memberships
+                        where id = ?
+                        for update
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, membershipId)
+                        statement.executeQuery().use { resultSet ->
+                            resultSet.next()
+                        }
                     }
-                }
 
-                val addStatus = executor.submit<Int> {
-                    mockMvc.post("/api/host/members/$membershipId/current-session/add") {
-                        cookie(hostCookie)
-                        header("X-Readmates-Bff-Secret", "test-bff-secret")
-                        header("Origin", "http://localhost:3000")
-                    }.andReturn().response.status
-                }
+                val addStatus =
+                    executor.submit<Int> {
+                        mockMvc
+                            .post("/api/host/members/$membershipId/current-session/add") {
+                                cookie(hostCookie)
+                                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                                header("Origin", "http://localhost:3000")
+                            }.andReturn()
+                            .response.status
+                    }
 
                 Thread.sleep(200)
-                connection.prepareStatement(
-                    """
-                    update memberships
-                    set status = 'SUSPENDED',
-                        updated_at = utc_timestamp(6)
-                    where id = ?
-                    """.trimIndent(),
-                ).use { statement ->
-                    statement.setString(1, membershipId)
-                    statement.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        """
+                        update memberships
+                        set status = 'SUSPENDED',
+                            updated_at = utc_timestamp(6)
+                        where id = ?
+                        """.trimIndent(),
+                    ).use { statement ->
+                        statement.setString(1, membershipId)
+                        statement.executeUpdate()
+                    }
                 connection.commit()
 
                 assertEquals(409, addStatus.get(5, TimeUnit.SECONDS))
@@ -456,7 +475,11 @@ class HostMemberLifecycleControllerTest(
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
     }
 
-    private fun insertLifecycleMember(prefix: String, status: String, role: String = "MEMBER"): String {
+    private fun insertLifecycleMember(
+        prefix: String,
+        status: String,
+        role: String = "MEMBER",
+    ): String {
         val userId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
         val email = uniqueEmail(prefix)
@@ -488,7 +511,10 @@ class HostMemberLifecycleControllerTest(
         return membershipId
     }
 
-    private fun insertLifecycleMemberOutsideClub(prefix: String, status: String): String {
+    private fun insertLifecycleMemberOutsideClub(
+        prefix: String,
+        status: String,
+    ): String {
         val clubId = UUID.randomUUID().toString()
         val slug = "outside-lifecycle-${UUID.randomUUID()}"
         jdbcTemplate.update(
@@ -533,14 +559,15 @@ class HostMemberLifecycleControllerTest(
 
     private fun createOpenSession(): String {
         val sessionId = UUID.randomUUID().toString()
-        val nextNumber = jdbcTemplate.queryForObject(
-            """
-            select coalesce(max(number), 0) + 1000
-            from sessions
-            where club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-            Int::class.java,
-        ) ?: 1000
+        val nextNumber =
+            jdbcTemplate.queryForObject(
+                """
+                select coalesce(max(number), 0) + 1000
+                from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                """.trimIndent(),
+                Int::class.java,
+            ) ?: 1000
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -589,7 +616,11 @@ class HostMemberLifecycleControllerTest(
         return sessionId
     }
 
-    private fun addParticipant(sessionId: String, membershipId: String, participationStatus: String) {
+    private fun addParticipant(
+        sessionId: String,
+        membershipId: String,
+        participationStatus: String,
+    ) {
         jdbcTemplate.update(
             """
             insert into session_participants (
@@ -619,22 +650,23 @@ class HostMemberLifecycleControllerTest(
     }
 
     private fun sessionCookieForEmail(email: String): Cookie {
-        val userId = jdbcTemplate.queryForObject(
-            "select id from users where email = ?",
-            String::class.java,
-            email,
-        ) ?: error("Expected seeded user for $email")
-        val issuedSession = authSessionService.issueSession(
-            userId = userId,
-            userAgent = "HostMemberLifecycleControllerTest",
-            ipAddress = "127.0.0.1",
-        )
+        val userId =
+            jdbcTemplate.queryForObject(
+                "select id from users where email = ?",
+                String::class.java,
+                email,
+            ) ?: error("Expected seeded user for $email")
+        val issuedSession =
+            authSessionService.issueSession(
+                userId = userId,
+                userAgent = "HostMemberLifecycleControllerTest",
+                ipAddress = "127.0.0.1",
+            )
         createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
     }
 
-    private fun uniqueEmail(prefix: String): String =
-        "$prefix.${UUID.randomUUID()}@example.com"
+    private fun uniqueEmail(prefix: String): String = "$prefix.${UUID.randomUUID()}@example.com"
 
     private fun membershipIdForEmail(email: String): String =
         jdbcTemplate.queryForObject(
@@ -655,24 +687,34 @@ class HostMemberLifecycleControllerTest(
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
 
-    private fun participationStatus(sessionId: String, membershipId: String): String =
+    private fun participationStatus(
+        sessionId: String,
+        membershipId: String,
+    ): String =
         participationStatusOrNull(sessionId, membershipId)
             ?: error("Expected participant for $sessionId and $membershipId")
 
-    private fun participationStatusOrNull(sessionId: String, membershipId: String): String? =
-        jdbcTemplate.query(
-            """
-            select participation_status
-            from session_participants
-            where session_id = ?
-              and membership_id = ?
-            """.trimIndent(),
-            { resultSet, _ -> resultSet.getString("participation_status") },
-            sessionId,
-            membershipId,
-        ).firstOrNull()
+    private fun participationStatusOrNull(
+        sessionId: String,
+        membershipId: String,
+    ): String? =
+        jdbcTemplate
+            .query(
+                """
+                select participation_status
+                from session_participants
+                where session_id = ?
+                  and membership_id = ?
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getString("participation_status") },
+                sessionId,
+                membershipId,
+            ).firstOrNull()
 
-    private fun participantCount(sessionId: String, membershipId: String): Int =
+    private fun participantCount(
+        sessionId: String,
+        membershipId: String,
+    ): Int =
         jdbcTemplate.queryForObject(
             """
             select count(*)
@@ -685,7 +727,11 @@ class HostMemberLifecycleControllerTest(
             membershipId,
         ) ?: 0
 
-    private fun deleteWhereIn(tableName: String, columnName: String, values: Set<String>) {
+    private fun deleteWhereIn(
+        tableName: String,
+        columnName: String,
+        values: Set<String>,
+    ) {
         if (values.isEmpty()) {
             return
         }

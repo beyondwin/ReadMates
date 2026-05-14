@@ -24,55 +24,62 @@ class ArchiveQueryService(
     ListMyArchiveQuestionsUseCase,
     ListMyArchiveReviewsUseCase,
     GetMyPageSummaryUseCase {
-    override fun listArchiveSessions(currentMember: CurrentMember, pageRequest: PageRequest) =
-        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadArchiveSessions(currentMember, pageRequest) }
+    override fun listArchiveSessions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ) = withMemberAppAccess(currentMember) { loadArchiveDataPort.loadArchiveSessions(currentMember, pageRequest) }
 
     override fun getArchiveSessionDetail(
         currentMember: CurrentMember,
         sessionId: UUID,
-    ): MemberArchiveSessionDetailResult? = withMemberAppAccess(currentMember) {
-        val header = loadArchiveDataPort.loadArchiveSessionDetail(currentMember, sessionId) ?: return@withMemberAppAccess null
-        val fragments = archiveDetailBatchReadPort.loadDetail(
-            currentMember = currentMember,
-            sessionId = sessionId,
-            sessionNumber = header.sessionNumber,
-            myAttendanceStatus = header.myAttendanceStatus,
-        )
-        MemberArchiveSessionDetailResult(
-            sessionId = header.sessionId,
-            sessionNumber = header.sessionNumber,
-            title = header.title,
-            bookTitle = header.bookTitle,
-            bookAuthor = header.bookAuthor,
-            bookImageUrl = header.bookImageUrl,
-            date = header.date,
-            locationLabel = header.locationLabel,
-            attendance = header.attendance,
-            total = header.total,
-            state = header.state,
-            myAttendanceStatus = header.myAttendanceStatus,
-            isHost = header.isHost,
-            publicSummary = header.publicSummary,
-            publicHighlights = fragments.publicHighlights,
-            clubQuestions = fragments.clubQuestions,
-            clubOneLiners = fragments.clubOneLiners,
-            publicOneLiners = fragments.publicOneLiners,
-            myQuestions = fragments.myQuestions,
-            myCheckin = fragments.myCheckin,
-            myOneLineReview = fragments.myOneLineReview,
-            myLongReview = fragments.myLongReview,
-            feedbackDocument = fragments.feedbackDocument,
-        )
-    }
+    ): MemberArchiveSessionDetailResult? =
+        withMemberAppAccess(currentMember) {
+            val header = loadArchiveDataPort.loadArchiveSessionDetail(currentMember, sessionId) ?: return@withMemberAppAccess null
+            val fragments =
+                archiveDetailBatchReadPort.loadDetail(
+                    currentMember = currentMember,
+                    sessionId = sessionId,
+                    sessionNumber = header.sessionNumber,
+                    myAttendanceStatus = header.myAttendanceStatus,
+                )
+            MemberArchiveSessionDetailResult(
+                sessionId = header.sessionId,
+                sessionNumber = header.sessionNumber,
+                title = header.title,
+                bookTitle = header.bookTitle,
+                bookAuthor = header.bookAuthor,
+                bookImageUrl = header.bookImageUrl,
+                date = header.date,
+                locationLabel = header.locationLabel,
+                attendance = header.attendance,
+                total = header.total,
+                state = header.state,
+                myAttendanceStatus = header.myAttendanceStatus,
+                isHost = header.isHost,
+                publicSummary = header.publicSummary,
+                publicHighlights = fragments.publicHighlights,
+                clubQuestions = fragments.clubQuestions,
+                clubOneLiners = fragments.clubOneLiners,
+                publicOneLiners = fragments.publicOneLiners,
+                myQuestions = fragments.myQuestions,
+                myCheckin = fragments.myCheckin,
+                myOneLineReview = fragments.myOneLineReview,
+                myLongReview = fragments.myLongReview,
+                feedbackDocument = fragments.feedbackDocument,
+            )
+        }
 
-    override fun listMyQuestions(currentMember: CurrentMember, pageRequest: PageRequest) =
-        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyQuestions(currentMember, pageRequest) }
+    override fun listMyQuestions(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ) = withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyQuestions(currentMember, pageRequest) }
 
-    override fun listMyReviews(currentMember: CurrentMember, pageRequest: PageRequest) =
-        withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyReviews(currentMember, pageRequest) }
+    override fun listMyReviews(
+        currentMember: CurrentMember,
+        pageRequest: PageRequest,
+    ) = withMemberAppAccess(currentMember) { loadArchiveDataPort.loadMyReviews(currentMember, pageRequest) }
 
-    override fun getMyPageSummary(currentMember: CurrentMember) =
-        loadArchiveDataPort.loadMyPage(currentMember)
+    override fun getMyPageSummary(currentMember: CurrentMember) = loadArchiveDataPort.loadMyPage(currentMember)
 
     private fun <T> withMemberAppAccess(
         currentMember: CurrentMember,

@@ -9,18 +9,20 @@ import java.util.UUID
 
 internal class NotificationDeliveryBacklogQueries {
     fun deliveryBacklog(jdbcTemplate: JdbcTemplate): NotificationDeliveryBacklog {
-        val counts = jdbcTemplate.query(
-            """
-            select status, count(*) as status_count
-            from notification_deliveries
-            where channel = 'EMAIL'
-              and status in ('PENDING', 'FAILED', 'DEAD', 'SENDING')
-            group by status
-            """.trimIndent(),
-            { resultSet, _ ->
-                NotificationDeliveryStatus.valueOf(resultSet.getString("status")) to resultSet.getInt("status_count")
-            },
-        ).toMap()
+        val counts =
+            jdbcTemplate
+                .query(
+                    """
+                    select status, count(*) as status_count
+                    from notification_deliveries
+                    where channel = 'EMAIL'
+                      and status in ('PENDING', 'FAILED', 'DEAD', 'SENDING')
+                    group by status
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        NotificationDeliveryStatus.valueOf(resultSet.getString("status")) to resultSet.getInt("status_count")
+                    },
+                ).toMap()
 
         return NotificationDeliveryBacklog(
             pending = counts[NotificationDeliveryStatus.PENDING] ?: 0,

@@ -27,8 +27,9 @@ class MemberArchiveReviewService(
             throw ArchiveApplicationException(ArchiveApplicationError.REVIEW_BODY_REQUIRED, "Review body is required")
         }
 
-        val result = writePort.saveLongReview(command)
-            ?: throw ArchiveApplicationException(ArchiveApplicationError.SESSION_NOT_FOUND, "Archive session not found")
+        val result =
+            writePort.saveLongReview(command)
+                ?: throw ArchiveApplicationException(ArchiveApplicationError.SESSION_NOT_FOUND, "Archive session not found")
 
         if (result.newlyPublic) {
             recordNotificationEventUseCase.recordReviewPublished(

@@ -9,12 +9,12 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class CachedNotificationBacklogProviderTest {
-
     @Test
     fun `initial snapshot is EMPTY before any refresh`() {
-        val provider = CachedNotificationBacklogProvider(
-            StubNotificationDeliveryBacklogPort(NotificationDeliveryBacklog(pending = 3, failed = 1, dead = 2, sending = 5)),
-        )
+        val provider =
+            CachedNotificationBacklogProvider(
+                StubNotificationDeliveryBacklogPort(NotificationDeliveryBacklog(pending = 3, failed = 1, dead = 2, sending = 5)),
+            )
 
         val snapshot = provider.snapshot()
 
@@ -34,12 +34,16 @@ class CachedNotificationBacklogProviderTest {
 
         assertThat(provider.snapshot()).isEqualTo(backlog)
     }
-
 }
 
 private class StubNotificationDeliveryBacklogPort(
     private val backlog: NotificationDeliveryBacklog,
 ) : NotificationDeliveryBacklogPort {
     override fun deliveryBacklog(): NotificationDeliveryBacklog = backlog
-    override fun countByStatus(clubId: UUID, channel: NotificationChannel?, status: NotificationDeliveryStatus): Int = 0
+
+    override fun countByStatus(
+        clubId: UUID,
+        channel: NotificationChannel?,
+        status: NotificationDeliveryStatus,
+    ): Int = 0
 }

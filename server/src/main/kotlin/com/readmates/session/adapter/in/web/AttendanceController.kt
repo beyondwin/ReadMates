@@ -19,8 +19,7 @@ data class AttendanceEntry(
     @field:Pattern(regexp = "ATTENDED|ABSENT") val attendanceStatus: String,
 )
 
-fun AttendanceEntry.toCommand(): AttendanceEntryCommand =
-    AttendanceEntryCommand(membershipId, attendanceStatus)
+fun AttendanceEntry.toCommand(): AttendanceEntryCommand = AttendanceEntryCommand(membershipId, attendanceStatus)
 
 @RestController
 @RequestMapping("/api/host/sessions/{sessionId}/attendance")

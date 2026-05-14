@@ -12,7 +12,6 @@ import java.util.UUID
 class JdbcPlatformAuditEventAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : WritePlatformAuditEventPort {
-
     override fun writeEvent(
         actorUserId: UUID,
         actorPlatformRole: String,

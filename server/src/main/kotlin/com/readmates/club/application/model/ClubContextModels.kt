@@ -6,25 +6,28 @@ import com.readmates.club.domain.PlatformAdminRole
 import java.util.UUID
 
 @JvmInline
-value class ClubSlug private constructor(val value: String) {
+value class ClubSlug private constructor(
+    val value: String,
+) {
     companion object {
         private val pattern = Regex("^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$")
-        private val reserved = setOf(
-            "admin",
-            "api",
-            "app",
-            "auth",
-            "login",
-            "logout",
-            "oauth2",
-            "www",
-            "mail",
-            "support",
-            "static",
-            "assets",
-            "pages",
-            "readmates",
-        )
+        private val reserved =
+            setOf(
+                "admin",
+                "api",
+                "app",
+                "auth",
+                "login",
+                "logout",
+                "oauth2",
+                "www",
+                "mail",
+                "support",
+                "static",
+                "assets",
+                "pages",
+                "readmates",
+            )
 
         fun parse(raw: String): ClubSlug {
             val normalized = raw.trim()

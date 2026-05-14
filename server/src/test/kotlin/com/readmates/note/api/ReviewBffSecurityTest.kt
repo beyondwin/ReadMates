@@ -25,52 +25,56 @@ class ReviewBffSecurityTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `one-line review bff request reaches controller without spring csrf token`() {
-        mockMvc.post("/api/sessions/current/one-line-reviews") {
-            with(user("member5@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"text":"BFF 한줄평"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/sessions/current/one-line-reviews") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"text":"BFF 한줄평"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `long review bff request reaches controller without spring csrf token`() {
-        mockMvc.post("/api/sessions/current/reviews") {
-            with(user("member5@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "http://localhost:3000")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"body":"BFF 장문 서평"}"""
-        }.andExpect {
-            status { isConflict() }
-        }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":"BFF 장문 서평"}"""
+            }.andExpect {
+                status { isConflict() }
+            }
     }
 
     @Test
     fun `review bff request without origin is rejected before controller`() {
-        mockMvc.post("/api/sessions/current/reviews") {
-            with(user("member5@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"body":"missing origin"}"""
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":"missing origin"}"""
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 
     @Test
     fun `review bff request with disallowed origin is rejected before controller`() {
-        mockMvc.post("/api/sessions/current/reviews") {
-            with(user("member5@example.com"))
-            header("X-Readmates-Bff-Secret", "test-bff-secret")
-            header("Origin", "https://attacker.example")
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"body":"bad origin"}"""
-        }.andExpect {
-            status { isForbidden() }
-        }
+        mockMvc
+            .post("/api/sessions/current/reviews") {
+                with(user("member5@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "https://attacker.example")
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"body":"bad origin"}"""
+            }.andExpect {
+                status { isForbidden() }
+            }
     }
 }

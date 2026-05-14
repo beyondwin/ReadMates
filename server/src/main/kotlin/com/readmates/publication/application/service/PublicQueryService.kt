@@ -15,7 +15,8 @@ class PublicQueryService(
     private val loadPublishedPublicDataPort: LoadPublishedPublicDataPort,
     private val cache: PublicReadCachePort = PublicReadCachePort.Noop(),
     private val resolveClubContextUseCase: ResolveClubContextUseCase? = null,
-) : GetPublicClubUseCase, GetPublicSessionUseCase {
+) : GetPublicClubUseCase,
+    GetPublicSessionUseCase {
     override fun getClub(clubSlug: String): PublicClubResult? {
         val clubId = resolveClubId(clubSlug)
         if (clubId != null) {
@@ -29,7 +30,10 @@ class PublicQueryService(
         }
     }
 
-    override fun getSession(clubSlug: String, sessionId: UUID): PublicSessionDetailResult? {
+    override fun getSession(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicSessionDetailResult? {
         val clubId = resolveClubId(clubSlug)
         if (clubId != null) {
             return cache.getSession(clubId, sessionId) ?: loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)?.also {

@@ -16,15 +16,16 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 
 class BffSecretFilterDynamicOriginTest {
-
     @Test
     fun `static origin is always allowed`() {
-        val allowedOriginPort = staticAndClubAllowedOriginPort(
-            allowedOrigins = "https://static.example.com",
-            activeClubDomainPort = object : ActiveClubDomainPort {
-                override fun isActiveOrigin(origin: String) = false
-            },
-        )
+        val allowedOriginPort =
+            staticAndClubAllowedOriginPort(
+                allowedOrigins = "https://static.example.com",
+                activeClubDomainPort =
+                    object : ActiveClubDomainPort {
+                        override fun isActiveOrigin(origin: String) = false
+                    },
+            )
 
         assertTrue(allowedOriginPort.isAllowed("https://static.example.com"))
         assertFalse(allowedOriginPort.isAllowed("https://unknown.example.com"))
@@ -42,10 +43,11 @@ class BffSecretFilterDynamicOriginTest {
 
         val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
         val activeClubDomainPort = JdbcActiveClubDomainAdapter(jdbcTemplate, clock)
-        val allowedOriginPort = staticAndClubAllowedOriginPort(
-            allowedOrigins = "",
-            activeClubDomainPort = activeClubDomainPort,
-        )
+        val allowedOriginPort =
+            staticAndClubAllowedOriginPort(
+                allowedOrigins = "",
+                activeClubDomainPort = activeClubDomainPort,
+            )
 
         assertTrue(allowedOriginPort.isAllowed("https://club.example.com"))
     }
@@ -59,18 +61,23 @@ class BffSecretFilterDynamicOriginTest {
             .thenReturn(listOf())
 
         val start = Instant.now()
-        val fixedClock = object : Clock() {
-            var now = start
-            override fun getZone() = ZoneOffset.UTC
-            override fun withZone(zone: ZoneId) = this
-            override fun instant() = now
-        }
+        val fixedClock =
+            object : Clock() {
+                var now = start
+
+                override fun getZone() = ZoneOffset.UTC
+
+                override fun withZone(zone: ZoneId) = this
+
+                override fun instant() = now
+            }
 
         val activeClubDomainPort = JdbcActiveClubDomainAdapter(jdbcTemplate, fixedClock)
-        val allowedOriginPort = staticAndClubAllowedOriginPort(
-            allowedOrigins = "",
-            activeClubDomainPort = activeClubDomainPort,
-        )
+        val allowedOriginPort =
+            staticAndClubAllowedOriginPort(
+                allowedOrigins = "",
+                activeClubDomainPort = activeClubDomainPort,
+            )
 
         assertTrue(allowedOriginPort.isAllowed("https://club.example.com"))
 

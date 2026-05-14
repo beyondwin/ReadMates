@@ -1,11 +1,11 @@
 package com.readmates.auth.application.service
 
-import com.readmates.auth.domain.MembershipStatus
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
 import com.readmates.auth.application.port.out.MemberApprovalStorePort
 import com.readmates.auth.application.port.out.ViewerMemberRow
+import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
@@ -28,7 +28,10 @@ data class ViewerMemberResponse(
 class MemberApprovalService(
     private val memberApprovalStore: MemberApprovalStorePort,
 ) : ManageMemberApprovalsUseCase {
-    override fun listViewers(host: CurrentMember, pageRequest: PageRequest): CursorPage<ViewerMemberResponse> {
+    override fun listViewers(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): CursorPage<ViewerMemberResponse> {
         requireHost(host)
         val page = memberApprovalStore.listPendingViewers(host.clubId, pageRequest)
         return CursorPage(
@@ -38,7 +41,10 @@ class MemberApprovalService(
     }
 
     @Transactional
-    override fun activateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
+    override fun activateViewer(
+        host: CurrentMember,
+        membershipId: UUID,
+    ): ViewerMemberResponse {
         requireHost(host)
         if (!memberApprovalStore.activateViewer(host.clubId, membershipId)) {
             throw viewerMemberNotFound()
@@ -49,7 +55,10 @@ class MemberApprovalService(
     }
 
     @Transactional
-    override fun deactivateViewer(host: CurrentMember, membershipId: UUID): ViewerMemberResponse {
+    override fun deactivateViewer(
+        host: CurrentMember,
+        membershipId: UUID,
+    ): ViewerMemberResponse {
         requireHost(host)
         if (!memberApprovalStore.deactivateViewer(host.clubId, membershipId)) {
             throw viewerMemberNotFound()

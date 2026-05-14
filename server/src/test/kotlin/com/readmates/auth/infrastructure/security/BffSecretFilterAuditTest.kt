@@ -15,11 +15,11 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 
 class BffSecretFilterAuditTest {
-
     // AllowedOriginPort is a regular interface (NOT fun interface) — must use object literal
-    private fun noopAllowedOriginPort(): AllowedOriginPort = object : AllowedOriginPort {
-        override fun isAllowed(origin: String) = false
-    }
+    private fun noopAllowedOriginPort(): AllowedOriginPort =
+        object : AllowedOriginPort {
+            override fun isAllowed(origin: String) = false
+        }
 
     /**
      * Creates a BffSecretRotationAuditPort spy that records calls to recordUsage
@@ -27,7 +27,11 @@ class BffSecretFilterAuditTest {
      */
     private fun capturingAuditPort(capturedAlias: AtomicReference<String>): BffSecretRotationAuditPort =
         object : BffSecretRotationAuditPort {
-            override fun recordUsage(secretAlias: String, clientIpHash: String?, requestPath: String?) {
+            override fun recordUsage(
+                secretAlias: String,
+                clientIpHash: String?,
+                requestPath: String?,
+            ) {
                 capturedAlias.set(secretAlias)
             }
         }
@@ -37,20 +41,22 @@ class BffSecretFilterAuditTest {
     @Test
     fun `successful match calls audit port once with correct alias`() {
         val capturedAlias = AtomicReference<String>()
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "secret1,secret2",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "test-base-secret"),
-            auditPort = capturingAuditPort(capturedAlias),
-            auditExecutor = directAuditExecutor(),
-        )
-        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
-            servletPath = "/api/auth/me"
-            remoteAddr = "127.0.0.1"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret2")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "secret1,secret2",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "test-base-secret"),
+                auditPort = capturingAuditPort(capturedAlias),
+                auditExecutor = directAuditExecutor(),
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/auth/me").apply {
+                servletPath = "/api/auth/me"
+                remoteAddr = "127.0.0.1"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret2")
+            }
 
         filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
 
@@ -61,19 +67,21 @@ class BffSecretFilterAuditTest {
     @Test
     fun `default audit mode skips primary secret`() {
         val capturedAlias = AtomicReference<String>()
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = capturingAuditPort(capturedAlias),
-            auditExecutor = directAuditExecutor(),
-        )
-        val request = MockHttpServletRequest("GET", "/api/something").apply {
-            servletPath = "/api/something"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "primary-bff-test")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = capturingAuditPort(capturedAlias),
+                auditExecutor = directAuditExecutor(),
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/something").apply {
+                servletPath = "/api/something"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "primary-bff-test")
+            }
 
         filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
 
@@ -84,20 +92,22 @@ class BffSecretFilterAuditTest {
     @Test
     fun `all audit mode records primary secret`() {
         val capturedAlias = AtomicReference<String>()
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = capturingAuditPort(capturedAlias),
-            auditModeRaw = "all",
-            auditExecutor = directAuditExecutor(),
-        )
-        val request = MockHttpServletRequest("GET", "/api/something").apply {
-            servletPath = "/api/something"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "primary-bff-test")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = capturingAuditPort(capturedAlias),
+                auditModeRaw = "all",
+                auditExecutor = directAuditExecutor(),
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/something").apply {
+                servletPath = "/api/something"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "primary-bff-test")
+            }
 
         filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
 
@@ -108,20 +118,22 @@ class BffSecretFilterAuditTest {
     @Test
     fun `off audit mode skips secondary secret`() {
         val capturedAlias = AtomicReference<String>()
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = capturingAuditPort(capturedAlias),
-            auditModeRaw = "off",
-            auditExecutor = directAuditExecutor(),
-        )
-        val request = MockHttpServletRequest("GET", "/api/something").apply {
-            servletPath = "/api/something"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = capturingAuditPort(capturedAlias),
+                auditModeRaw = "off",
+                auditExecutor = directAuditExecutor(),
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/something").apply {
+                servletPath = "/api/something"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
+            }
 
         filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
 
@@ -132,18 +144,20 @@ class BffSecretFilterAuditTest {
     @Test
     fun `failed auth does not call audit port`() {
         val auditPort = Mockito.mock(BffSecretRotationAuditPort::class.java)
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "secret1",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = auditPort,
-        )
-        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
-            servletPath = "/api/auth/me"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "wrong-secret")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "secret1",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = auditPort,
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/auth/me").apply {
+                servletPath = "/api/auth/me"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "wrong-secret")
+            }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, MockFilterChain())
@@ -156,24 +170,29 @@ class BffSecretFilterAuditTest {
 
     @Test
     fun `audit port exception does not affect response`() {
-        val auditPort: BffSecretRotationAuditPort = object : BffSecretRotationAuditPort {
-            override fun recordUsage(secretAlias: String, clientIpHash: String?, requestPath: String?) {
-                throw RuntimeException("db down")
+        val auditPort: BffSecretRotationAuditPort =
+            object : BffSecretRotationAuditPort {
+                override fun recordUsage(
+                    secretAlias: String,
+                    clientIpHash: String?,
+                    requestPath: String?,
+                ): Unit = throw RuntimeException("db down")
             }
-        }
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "secret1,secret2",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = auditPort,
-            auditExecutor = directAuditExecutor(),
-        )
-        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
-            servletPath = "/api/auth/me"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret2")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "secret1,secret2",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = auditPort,
+                auditExecutor = directAuditExecutor(),
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/auth/me").apply {
+                servletPath = "/api/auth/me"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret2")
+            }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, MockFilterChain())
@@ -183,21 +202,25 @@ class BffSecretFilterAuditTest {
 
     @Test
     fun `audit executor rejection does not affect response`() {
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = capturingAuditPort(AtomicReference()),
-            auditExecutor = org.springframework.core.task.TaskExecutor {
-                throw org.springframework.core.task.TaskRejectedException("queue full")
-            },
-        )
-        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
-            servletPath = "/api/auth/me"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = capturingAuditPort(AtomicReference()),
+                auditExecutor =
+                    org.springframework.core.task.TaskExecutor {
+                        throw org.springframework.core.task
+                            .TaskRejectedException("queue full")
+                    },
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/auth/me").apply {
+                servletPath = "/api/auth/me"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
+            }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, MockFilterChain())
@@ -208,18 +231,20 @@ class BffSecretFilterAuditTest {
     @Test
     fun `missing audit executor skips recordable audit and preserves response`() {
         val capturedAlias = AtomicReference<String>()
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = capturingAuditPort(capturedAlias),
-        )
-        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
-            servletPath = "/api/auth/me"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "primary-bff-test,secondary-bff-test",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = capturingAuditPort(capturedAlias),
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/auth/me").apply {
+                servletPath = "/api/auth/me"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secondary-bff-test")
+            }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, MockFilterChain())
@@ -231,18 +256,20 @@ class BffSecretFilterAuditTest {
 
     @Test
     fun `no audit port bean - filter still works normally`() {
-        val filter = BffSecretFilter(
-            configuredSecretsRaw = "secret1",
-            legacyExpectedSecret = "",
-            bffSecretRequired = true,
-            allowedOriginPort = noopAllowedOriginPort(),
-            ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
-            auditPort = null,
-        )
-        val request = MockHttpServletRequest("GET", "/api/auth/me").apply {
-            servletPath = "/api/auth/me"
-            addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret1")
-        }
+        val filter =
+            BffSecretFilter(
+                configuredSecretsRaw = "secret1",
+                legacyExpectedSecret = "",
+                bffSecretRequired = true,
+                allowedOriginPort = noopAllowedOriginPort(),
+                ipHashingProperties = ClientIpHashingProperties(baseSecret = "", allowEmptySecret = true),
+                auditPort = null,
+            )
+        val request =
+            MockHttpServletRequest("GET", "/api/auth/me").apply {
+                servletPath = "/api/auth/me"
+                addHeader(BffSecretFilter.BFF_SECRET_HEADER, "secret1")
+            }
         val response = MockHttpServletResponse()
 
         filter.doFilter(request, response, MockFilterChain())

@@ -88,45 +88,63 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/admin/support-access-grants$")),
                     methodAndPath("DELETE", Regex("^/api/admin/support-access-grants/[^/]+$")),
                 )
-            }
-            .authorizeHttpRequests {
-                it.requestMatchers(
-                    "/error",
-                    "/internal/health",
-                    "/api/auth/login",
-                    "/api/auth/logout",
-                    "/api/dev/login",
-                    "/api/dev/logout",
-                    "/oauth2/**",
-                    "/login/oauth2/**",
-                ).permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/auth/me").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
-                    .requestMatchers("/api/invitations/**").permitAll()
-                    .requestMatchers(methodAndPath("GET", Regex("^/api/clubs/[^/]+/invitations/[^/]+$"))).permitAll()
-                    .requestMatchers(methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$"))).permitAll()
-                    .requestMatchers(methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$"))).permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/sessions/current").hasRole("VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/sessions/upcoming").hasRole("VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/archive/**").hasRole("VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/notes/**").hasRole("VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/app/me").hasRole("VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer").hasAuthority("ROLE_VIEWER")
-                    .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$"))).authenticated()
-                    .requestMatchers(methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$"))).authenticated()
-                    .requestMatchers("/api/admin/**").hasRole("PLATFORM_ADMIN")
-                    .requestMatchers("/api/host/**").hasRole("HOST")
-                    .requestMatchers(HttpMethod.GET, "/api/feedback-documents/me").hasRole("VIEWER")
+            }.authorizeHttpRequests {
+                it
+                    .requestMatchers(
+                        "/error",
+                        "/internal/health",
+                        "/api/auth/login",
+                        "/api/auth/logout",
+                        "/api/dev/login",
+                        "/api/dev/logout",
+                        "/oauth2/**",
+                        "/login/oauth2/**",
+                    ).permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/auth/me")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/public/**")
+                    .permitAll()
+                    .requestMatchers("/api/invitations/**")
+                    .permitAll()
+                    .requestMatchers(methodAndPath("GET", Regex("^/api/clubs/[^/]+/invitations/[^/]+$")))
+                    .permitAll()
+                    .requestMatchers(methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$")))
+                    .permitAll()
+                    .requestMatchers(methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$")))
+                    .permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/sessions/current")
+                    .hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/sessions/upcoming")
+                    .hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/archive/**")
+                    .hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/notes/**")
+                    .hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/app/me")
+                    .hasRole("VIEWER")
+                    .requestMatchers(HttpMethod.GET, "/api/app/pending", "/api/app/viewer")
+                    .hasAuthority("ROLE_VIEWER")
+                    .requestMatchers(methodAndPath("PATCH", Regex("^/api/me/profile$")))
+                    .authenticated()
+                    .requestMatchers(methodAndPath("PATCH", Regex("^/api/host/members/[^/]+/profile$")))
+                    .authenticated()
+                    .requestMatchers("/api/admin/**")
+                    .hasRole("PLATFORM_ADMIN")
+                    .requestMatchers("/api/host/**")
+                    .hasRole("HOST")
+                    .requestMatchers(HttpMethod.GET, "/api/feedback-documents/me")
+                    .hasRole("VIEWER")
                     .requestMatchers(RegexRequestMatcher("^/api/sessions/[^/]+/feedback-document$", "GET"))
                     .hasRole("VIEWER")
-                    .requestMatchers(HttpMethod.GET, "/api/**").hasRole("MEMBER")
-                    .requestMatchers("/api/**").hasRole("MEMBER")
-                    .anyRequest().authenticated()
-            }
-            .exceptionHandling {
+                    .requestMatchers(HttpMethod.GET, "/api/**")
+                    .hasRole("MEMBER")
+                    .requestMatchers("/api/**")
+                    .hasRole("MEMBER")
+                    .anyRequest()
+                    .authenticated()
+            }.exceptionHandling {
                 it.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
-            }
-            .addFilterBefore(bffSecretFilter, AnonymousAuthenticationFilter::class.java)
+            }.addFilterBefore(bffSecretFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterBefore(sessionCookieAuthenticationFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterAfter(platformAdminAuthoritiesFilter, SessionCookieAuthenticationFilter::class.java)
             .addFilterAfter(rateLimitFilter, SessionCookieAuthenticationFilter::class.java)
@@ -170,5 +188,7 @@ class SecurityConfig(
         }
 }
 
-private fun methodAndPath(method: String, pathPattern: Regex): RequestMatcher =
-    RequestMatcher { request -> request.method == method && pathPattern.matches(request.requestURI) }
+private fun methodAndPath(
+    method: String,
+    pathPattern: Regex,
+): RequestMatcher = RequestMatcher { request -> request.method == method && pathPattern.matches(request.requestURI) }

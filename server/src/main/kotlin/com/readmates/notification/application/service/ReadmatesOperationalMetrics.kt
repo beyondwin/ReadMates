@@ -30,7 +30,8 @@ class ReadmatesOperationalMetrics(
      * @see <a href="../../../../../../../../../../../docs/development/technical-decisions.md">technical-decisions.md — Prometheus metric tag에는 enum/low-cardinality 값만 사용한다</a>
      */
     fun sent(eventType: NotificationEventType) {
-        Counter.builder("readmates.notifications.sent")
+        Counter
+            .builder("readmates.notifications.sent")
             .tag("event_type", eventType.name)
             .register(meterRegistry)
             .increment()
@@ -48,7 +49,8 @@ class ReadmatesOperationalMetrics(
      * @see <a href="../../../../../../../../../../../docs/development/technical-decisions.md">technical-decisions.md — Prometheus metric tag에는 enum/low-cardinality 값만 사용한다</a>
      */
     fun failed(eventType: NotificationEventType) {
-        Counter.builder("readmates.notifications.failed")
+        Counter
+            .builder("readmates.notifications.failed")
             .tag("event_type", eventType.name)
             .register(meterRegistry)
             .increment()
@@ -66,7 +68,8 @@ class ReadmatesOperationalMetrics(
      * @see <a href="../../../../../../../../../../../docs/development/technical-decisions.md">technical-decisions.md — Prometheus metric tag에는 enum/low-cardinality 값만 사용한다</a>
      */
     fun dead(eventType: NotificationEventType) {
-        Counter.builder("readmates.notifications.dead")
+        Counter
+            .builder("readmates.notifications.dead")
             .tag("event_type", eventType.name)
             .register(meterRegistry)
             .increment()
@@ -124,17 +127,19 @@ class ReadmatesOperationalMetrics(
     private fun registerOutboxBacklogGauges() {
         val provider = cachedBacklogProvider ?: return
         OutboxBacklogStatus.entries.forEach { status ->
-            Gauge.builder("readmates.notifications.outbox.backlog") {
-                provider.snapshot().count(status).toDouble()
-            }
-                .description("Current email notification delivery rows by status")
+            Gauge
+                .builder("readmates.notifications.outbox.backlog") {
+                    provider.snapshot().count(status).toDouble()
+                }.description("Current email notification delivery rows by status")
                 .tag("status", status.tag)
                 .register(meterRegistry)
         }
     }
 }
 
-private enum class OutboxBacklogStatus(val tag: String) {
+private enum class OutboxBacklogStatus(
+    val tag: String,
+) {
     PENDING("pending"),
     FAILED("failed"),
     DEAD("dead"),
