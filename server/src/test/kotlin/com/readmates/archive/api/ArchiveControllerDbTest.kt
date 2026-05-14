@@ -450,9 +450,8 @@ class ArchiveControllerDbTest(
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
-                jsonPath("$.items[0].attendance") { value(2) }
-                jsonPath("$.items[0].total") { value(5) }
+                jsonPath("$.items[?(@.sessionId == '00000000-0000-0000-0000-000000000306')].attendance") { value(hasItem(2)) }
+                jsonPath("$.items[?(@.sessionId == '00000000-0000-0000-0000-000000000306')].total") { value(hasItem(5)) }
             }
 
         mockMvc

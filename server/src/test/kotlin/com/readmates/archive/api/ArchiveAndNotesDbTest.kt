@@ -63,13 +63,13 @@ class ArchiveAndNotesDbTest(
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items.length()") { value(6) }
-                jsonPath("$.items[0].sessionNumber") { value(6) }
-                jsonPath("$.items[0].bookTitle") { value("가난한 찰리의 연감") }
-                jsonPath("$.items[0].bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
+                jsonPath("$.items.length()") { value(7) }
+                jsonPath("$.items[0].sessionNumber") { value(7) }
+                jsonPath("$.items[0].bookTitle") { value("괴테는 모든 것을 말했다") }
+                jsonPath("$.items[0].bookImageUrl") { value("https://image.aladin.co.kr/product/37676/59/cover500/s612137162_1.jpg") }
                 jsonPath("$.items[0].state") { value("PUBLISHED") }
-                jsonPath("$.items[5].sessionNumber") { value(1) }
-                jsonPath("$.items[5].bookTitle") { value("팩트풀니스") }
+                jsonPath("$.items[6].sessionNumber") { value(1) }
+                jsonPath("$.items[6].bookTitle") { value("팩트풀니스") }
             }
     }
 
@@ -97,7 +97,7 @@ class ArchiveAndNotesDbTest(
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items.length()") { value(6) }
+                jsonPath("$.items.length()") { value(7) }
                 jsonPath("$.items[*].bookTitle") { value(hasItem("가난한 찰리의 연감")) }
                 jsonPath("$.items[*].bookTitle") { value(not(hasItem("샘플 클럽 아카이브 테스트 책"))) }
             }
@@ -261,17 +261,21 @@ class ArchiveAndNotesDbTest(
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items.length()") { value(6) }
-                jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000306") }
-                jsonPath("$.items[0].sessionNumber") { value(6) }
-                jsonPath("$.items[0].bookTitle") { value("가난한 찰리의 연감") }
-                jsonPath("$.items[0].date") { value("2026-04-15") }
-                jsonPath("$.items[0].questionCount") { value(6) }
-                jsonPath("$.items[0].oneLinerCount") { value(3) }
-                jsonPath("$.items[0].highlightCount") { value(3) }
+                jsonPath("$.items.length()") { value(7) }
+                jsonPath("$.items[0].sessionId") { value("00000000-0000-0000-0000-000000000307") }
+                jsonPath("$.items[0].sessionNumber") { value(7) }
+                jsonPath("$.items[0].bookTitle") { value("괴테는 모든 것을 말했다") }
+                jsonPath("$.items[0].date") { value("2026-05-14") }
+                jsonPath("$.items[0].questionCount") { value(0) }
+                jsonPath("$.items[0].oneLinerCount") { value(0) }
+                jsonPath("$.items[0].highlightCount") { value(0) }
                 jsonPath(removedJsonPath("$.items[0].", "check", "inCount")) { doesNotExist() }
-                jsonPath("$.items[0].totalCount") { value(12) }
-                jsonPath("$.items[5].sessionNumber") { value(1) }
+                jsonPath("$.items[0].totalCount") { value(0) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].questionCount") { value(hasItem(6)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].oneLinerCount") { value(hasItem(3)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].highlightCount") { value(hasItem(3)) }
+                jsonPath("$.items[?(@.sessionNumber == 6)].totalCount") { value(hasItem(12)) }
+                jsonPath("$.items[6].sessionNumber") { value(1) }
             }
     }
 
@@ -826,14 +830,18 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.clubName") { value("읽는사이") }
                 jsonPath("$.sessionCount") { value(4) }
-                jsonPath("$.totalSessionCount") { value(6) }
+                jsonPath("$.totalSessionCount") { value(7) }
                 jsonPath("$.recentAttendances.length()") { value(6) }
-                jsonPath("$.recentAttendances[0].sessionNumber") { value(1) }
+                jsonPath("$.recentAttendances[0].sessionNumber") { value(2) }
                 jsonPath("$.recentAttendances[0].attended") { value(true) }
-                jsonPath("$.recentAttendances[3].sessionNumber") { value(4) }
+                jsonPath("$.recentAttendances[2].sessionNumber") { value(4) }
+                jsonPath("$.recentAttendances[2].attended") { value(false) }
+                jsonPath("$.recentAttendances[3].sessionNumber") { value(5) }
                 jsonPath("$.recentAttendances[3].attended") { value(false) }
-                jsonPath("$.recentAttendances[5].sessionNumber") { value(6) }
-                jsonPath("$.recentAttendances[5].attended") { value(true) }
+                jsonPath("$.recentAttendances[4].sessionNumber") { value(6) }
+                jsonPath("$.recentAttendances[4].attended") { value(true) }
+                jsonPath("$.recentAttendances[5].sessionNumber") { value(7) }
+                jsonPath("$.recentAttendances[5].attended") { value(false) }
             }
     }
 

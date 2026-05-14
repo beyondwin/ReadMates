@@ -384,8 +384,8 @@ class PublicControllerDbTest(
             values (
               ?,
               '00000000-0000-0000-0000-000000000001',
-              7,
-              '7회차 · 공개 전환 테스트 책',
+              8,
+              '8회차 · 공개 전환 테스트 책',
               '공개 전환 테스트 책',
               '공개 전환 테스트 저자',
               'https://example.com/books/publication-test',
