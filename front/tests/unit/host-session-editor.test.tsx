@@ -11,6 +11,7 @@ import type {
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
+  SessionImportRequest,
 } from "@/features/host/api/host-contracts";
 import {
   feedbackDocumentContractFixture,
@@ -76,6 +77,27 @@ const hostSessionEditorTestActions = {
       body: formData,
       cache: "no-store",
     }) as Promise<Response & { json(): Promise<FeedbackDocumentResponse> }>,
+  previewSessionImport: async (_sessionId, request: SessionImportRequest) => ({
+    valid: true,
+    session: { sessionNumber: request.session.number, bookTitle: request.session.bookTitle, meetingDate: request.session.meetingDate },
+    publication: { summary: request.publication.summary },
+    highlights: [],
+    oneLineReviews: [],
+    feedbackDocument: { fileName: request.feedbackDocument.fileName, title: "독서모임 7차 피드백", valid: true },
+    issues: [],
+  }),
+  commitSessionImport: async (sessionId, request: SessionImportRequest) => ({
+    sessionId,
+    publication: { summary: request.publication.summary },
+    highlights: [],
+    oneLineReviews: [],
+    feedbackDocument: {
+      uploaded: true,
+      fileName: request.feedbackDocument.fileName,
+      title: "독서모임 7차 피드백",
+      uploadedAt: "2026-05-15T00:00:00Z",
+    },
+  }),
 } satisfies HostSessionEditorActions;
 
 type HostSessionEditorProps = Parameters<typeof HostSessionEditor>[0];
@@ -130,6 +152,26 @@ const deletionPreview: HostSessionDeletionPreviewResponse = {
     feedbackDocuments: 8,
   },
 };
+
+function sessionImportJson() {
+  return JSON.stringify({
+    format: "readmates-session-import:v1",
+    session: {
+      number: session.sessionNumber,
+      bookTitle: session.bookTitle,
+      meetingDate: session.date,
+    },
+    publication: {
+      summary: "Import summary.",
+    },
+    highlights: [{ authorName: "호스트", text: "Import highlight." }],
+    oneLineReviews: [{ authorName: "호스트", text: "Import one line." }],
+    feedbackDocument: {
+      fileName: "session-import.md",
+      markdown: "<!-- readmates-feedback:v1 -->",
+    },
+  });
+}
 
 afterEach(() => {
   cleanup();
@@ -463,6 +505,46 @@ describe("HostSessionEditor", () => {
     expect(json).toHaveBeenCalled();
     expect(screen.queryByText("local-draft.md")).not.toBeInTheDocument();
     expect(input.value).toBe("");
+  });
+
+  it("previews a selected session import json before commit", async () => {
+    const user = userEvent.setup();
+    const previewSessionImport = vi.fn(hostSessionEditorTestActions.previewSessionImport);
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        actions={{ ...hostSessionEditorTestActions, previewSessionImport }}
+      />,
+    );
+
+    const file = new File([sessionImportJson()], "session-import.json", { type: "application/json" });
+    await user.upload(screen.getByLabelText("AI 결과 JSON 가져오기"), file);
+
+    await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
+    expect(screen.getByText("Import summary.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "가져온 기록 저장" })).toBeEnabled();
+  });
+
+  it("commits a valid session import preview and refreshes editor state", async () => {
+    const user = userEvent.setup();
+    const commitSessionImport = vi.fn(hostSessionEditorTestActions.commitSessionImport);
+
+    render(
+      <HostSessionEditorForTest
+        session={session}
+        actions={{ ...hostSessionEditorTestActions, commitSessionImport }}
+      />,
+    );
+
+    await user.upload(
+      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
+    );
+    await user.click(await screen.findByRole("button", { name: "가져온 기록 저장" }));
+
+    await waitFor(() => expect(commitSessionImport).toHaveBeenCalledTimes(1));
+    expect(screen.getByText(/가져온 세션 기록을 저장했습니다/)).toBeVisible();
   });
 
   it("shows the upload failure toast when the feedback document request rejects", async () => {

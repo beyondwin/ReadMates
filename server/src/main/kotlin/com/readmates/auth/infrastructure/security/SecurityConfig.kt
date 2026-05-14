@@ -62,6 +62,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/attendance$")),
                     methodAndPath("PUT", Regex("^/api/host/sessions/[^/]+/publication$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/feedback-document$")),
+                    methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/session-import/(preview|commit)$")),
                     methodAndPath("POST", Regex("^/api/host/invitations/[^/]+/revoke$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/(activate|deactivate-viewer)$")),
                     methodAndPath("POST", Regex("^/api/host/members/[^/]+/approve$")),

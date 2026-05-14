@@ -35,6 +35,9 @@ import type {
   NotificationTestMailAuditItem,
   NotificationTestMailAuditPage,
   SendNotificationTestMailRequest,
+  SessionImportCommitResponse,
+  SessionImportPreviewResponse,
+  SessionImportRequest,
   UpdateHostMemberProfileRequest,
   ViewerMember,
 } from "./host-contracts";
@@ -42,6 +45,7 @@ import {
   parseHostSessionDetailResponse,
   parseHostNotificationDeliveryListResponse,
   parseHostInvitationListPage,
+  parseSessionImportPreviewResponse,
 } from "./host-contracts";
 import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
 
@@ -270,6 +274,28 @@ export function uploadHostSessionFeedbackDocument(sessionId: string, formData: F
     method: "POST",
     body: formData,
   }) as Promise<Response & { json(): Promise<FeedbackDocumentResponse> }>;
+}
+
+export function previewHostSessionImport(sessionId: string, request: SessionImportRequest) {
+  return readmatesFetch<SessionImportPreviewResponse>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/session-import/preview`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    },
+  ).then(parseSessionImportPreviewResponse);
+}
+
+export function commitHostSessionImport(sessionId: string, request: SessionImportRequest) {
+  return readmatesFetch<SessionImportCommitResponse>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/session-import/commit`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(request),
+    },
+  );
 }
 
 export function fetchHostMembers(context?: ReadmatesApiContext, page?: PageRequest) {
