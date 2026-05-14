@@ -63,7 +63,12 @@ class RedisReadCacheInvalidationAdapter(
     }
 
     private fun scanKeys(pattern: String): Set<String> {
-        val options = ScanOptions.scanOptions().match(pattern).count(SCAN_BATCH_SIZE).build()
+        val options =
+            ScanOptions
+                .scanOptions()
+                .match(pattern)
+                .count(SCAN_BATCH_SIZE)
+                .build()
         val collected = mutableSetOf<String>()
         redisTemplate.execute<Unit> { connection ->
             connection.keyCommands().scan(options).use { cursor ->

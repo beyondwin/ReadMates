@@ -109,15 +109,19 @@ class RedisReadCacheInvalidationAdapterTest(
         val scenarioClubId = UUID.fromString("00000000-0000-0000-0000-000000000A01")
         val otherClubId = UUID.fromString("00000000-0000-0000-0000-000000000A02")
 
-        val clubKeys = (1..50).map { i ->
-            val sessionId = UUID.fromString("00000000-0000-0000-0000-%012d".format(i))
-            "public:club:$scenarioClubId:session:$sessionId:v1"
-        }.toSet() + setOf("public:club:$scenarioClubId:home:v1")
+        val clubKeys =
+            (1..50)
+                .map { i ->
+                    val sessionId = UUID.fromString("00000000-0000-0000-0000-%012d".format(i))
+                    "public:club:$scenarioClubId:session:$sessionId:v1"
+                }.toSet() + setOf("public:club:$scenarioClubId:home:v1")
 
-        val otherClubKeys = (1..5).map { i ->
-            val sessionId = UUID.fromString("00000000-0000-0000-0000-%012d".format(i + 100))
-            "public:club:$otherClubId:session:$sessionId:v1"
-        }.toSet()
+        val otherClubKeys =
+            (1..5)
+                .map { i ->
+                    val sessionId = UUID.fromString("00000000-0000-0000-0000-%012d".format(i + 100))
+                    "public:club:$otherClubId:session:$sessionId:v1"
+                }.toSet()
 
         (clubKeys + otherClubKeys).forEach { key -> redisTemplate.opsForValue().set(key, "cached") }
         try {
@@ -142,15 +146,18 @@ class RedisReadCacheInvalidationAdapterTest(
     fun `scenario B - evicts 30 notes session feed keys plus fixed notes keys for clubId`() {
         val scenarioClubId = UUID.fromString("00000000-0000-0000-0000-000000000B01")
 
-        val notesSessionKeys = (1..30).map { i ->
-            val sessionId = UUID.fromString("00000000-0000-0000-0000-%012d".format(i + 200))
-            "notes:club:$scenarioClubId:session:$sessionId:feed:v1"
-        }.toSet()
+        val notesSessionKeys =
+            (1..30)
+                .map { i ->
+                    val sessionId = UUID.fromString("00000000-0000-0000-0000-%012d".format(i + 200))
+                    "notes:club:$scenarioClubId:session:$sessionId:feed:v1"
+                }.toSet()
 
-        val fixedNotesKeys = setOf(
-            "notes:club:$scenarioClubId:feed:v1",
-            "notes:club:$scenarioClubId:sessions:v1",
-        )
+        val fixedNotesKeys =
+            setOf(
+                "notes:club:$scenarioClubId:feed:v1",
+                "notes:club:$scenarioClubId:sessions:v1",
+            )
 
         val allScenarioKeys = notesSessionKeys + fixedNotesKeys
         allScenarioKeys.forEach { key -> redisTemplate.opsForValue().set(key, "cached") }
@@ -180,7 +187,10 @@ class RedisReadCacheInvalidationAdapterTest(
 
     private fun failingRedisTemplate() =
         object : StringRedisTemplate() {
-            override fun <T : Any?> execute(action: RedisCallback<T>): T? = throw IllegalStateException("redis unavailable")
+            @Suppress("ktlint:standard:function-expression-body")
+            override fun <T : Any?> execute(action: RedisCallback<T>): T? {
+                throw IllegalStateException("redis unavailable")
+            }
         }
 
     private fun metrics(meterRegistry: MeterRegistry) =
