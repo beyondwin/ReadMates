@@ -1,0 +1,540 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>ComplexCondition:DefaultAuthoritySynthesisService.kt$DefaultAuthoritySynthesisService$PLATFORM_ADMIN_AUTHORITY in request.incomingAuthorities &amp;&amp; request.clubContext.supplied &amp;&amp; request.clubContext.clubId != null &amp;&amp; request.supportSynthesis != null</ID>
+    <ID>ComplexCondition:FeedbackDocumentParser.kt$FeedbackDocumentParser$listOf(styleIndex, contributionIndex, problemsIndex, actionIndex, quoteIndex).any { it &lt; 0 } || styleIndex &gt; contributionIndex || contributionIndex &gt; problemsIndex || problemsIndex &gt; actionIndex || actionIndex &gt; quoteIndex</ID>
+    <ID>ComplexCondition:FeedbackDocumentParser.kt$FeedbackDocumentParser$styleParagraphs.isEmpty() || contributionBullets.isEmpty() || problems.isEmpty() || actionItems.isEmpty()</ID>
+    <ID>ComplexCondition:FeedbackDocumentUploadValidator.kt$FeedbackDocumentUploadValidator$fileName.length &gt; MAX_FILE_NAME_LENGTH || fileName.contains('/') || fileName.contains('\\') || fileName.contains(NUL)</ID>
+    <ID>ComplexCondition:JdbcSessionParticipationWriteAdapter.kt$JdbcSessionParticipationWriteAdapter$questions.size &gt; 5 || questions.any { it.priority !in 1..5 || it.text.isEmpty() } || questions.map { it.priority }.distinct().size != questions.size</ID>
+    <ID>ComplexCondition:MemberAuthoritiesFilter.kt$MemberAuthoritiesFilter$userId != null &amp;&amp; resolvedClubContext != null &amp;&amp; requestedClubContext.supplied &amp;&amp; member == null</ID>
+    <ID>ComplexCondition:MemberProfileService.kt$MemberProfileService$displayName.any { it.isISOControl() } || EMAIL_SHAPED.matches(displayName) || URL_PREFIX.containsMatchIn(displayName) || DOMAIN_LIKE.matches(displayName)</ID>
+    <ID>ComplexCondition:PlatformAdminService.kt$PlatformAdminService$hostname.contains("://") || hostname.contains("/") || hostname.contains(":") || hostname.contains("*") || hostname.any(Char::isWhitespace) || hostname == "localhost" || hostname.length &gt; 253 || IPV4_LITERAL.matches(hostname)</ID>
+    <ID>ComplexCondition:PlatformAdminService.kt$PlatformAdminService$labels.size &lt; 2 || labels.any { label -&gt; label.isBlank() || label.length &gt; 63 || !HOSTNAME_LABEL.matches(label) }</ID>
+    <ID>CyclomaticComplexMethod:AuthMeController.kt$AuthMeController$@GetMapping fun me( authentication: Authentication?, request: HttpServletRequest, ): AuthMemberResponse</ID>
+    <ID>CyclomaticComplexMethod:JdbcArchiveDetailBatchReadAdapter.kt$JdbcArchiveDetailBatchReadAdapter$override fun loadDetail( currentMember: CurrentMember, sessionId: UUID, sessionNumber: Int, myAttendanceStatus: String?, ): ArchiveDetailFragments</ID>
+    <ID>CyclomaticComplexMethod:PlatformAdminService.kt$PlatformAdminService$private fun validateHostname(hostname: String)</ID>
+    <ID>CyclomaticComplexMethod:RateLimitFilter.kt$RateLimitFilter$private fun HttpServletRequest.toRateLimitCheck(): RateLimitCheck?</ID>
+    <ID>CyclomaticComplexMethod:SessionCookieAuthenticationFilter.kt$SessionCookieAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain, )</ID>
+    <ID>FunctionParameterNaming:DevInvitationController.kt$DevInvitationController$@PathVariable("token") _token: String</ID>
+    <ID>FunctionParameterNaming:InvitationController.kt$InvitationController$@PathVariable("clubSlug") _clubSlug: String</ID>
+    <ID>FunctionParameterNaming:InvitationController.kt$InvitationController$@PathVariable("token") _token: String</ID>
+    <ID>InstanceOfCheckForException:ReadmatesOAuthSuccessHandler.kt$ReadmatesOAuthSuccessHandler$exception !is GoogleLoginException</ID>
+    <ID>InstanceOfCheckForException:ReadmatesOAuthSuccessHandler.kt$ReadmatesOAuthSuccessHandler$exception !is InvitationDomainException</ID>
+    <ID>InstanceOfCheckForException:ReadmatesOAuthSuccessHandler.kt$ReadmatesOAuthSuccessHandler$exception is GoogleLoginException</ID>
+    <ID>InvalidPackageDeclaration:AcceptInvitationUseCaseTest.kt$package com.readmates.auth.application.service</ID>
+    <ID>InvalidPackageDeclaration:ArchiveErrorHandlerTest.kt$package com.readmates.archive.adapter.`in`.web</ID>
+    <ID>InvalidPackageDeclaration:AuthSessionServiceTest.kt$package com.readmates.auth.application.service</ID>
+    <ID>InvalidPackageDeclaration:CheckinControllerTest.kt$package com.readmates.note.adapter.`in`.web</ID>
+    <ID>InvalidPackageDeclaration:GoogleLoginServiceTest.kt$package com.readmates.auth.application.service</ID>
+    <ID>InvalidPackageDeclaration:InvitationErrorHandlerTest.kt$package com.readmates.auth.adapter.`in`.web</ID>
+    <ID>InvalidPackageDeclaration:InvitationTokenServiceTest.kt$package com.readmates.auth.application.service</ID>
+    <ID>InvalidPackageDeclaration:MemberLifecycleServiceTest.kt$package com.readmates.auth.application.service</ID>
+    <ID>InvalidPackageDeclaration:QuestionControllerTest.kt$package com.readmates.note.adapter.`in`.web</ID>
+    <ID>InvalidPackageDeclaration:ReviewControllerTest.kt$package com.readmates.note.adapter.`in`.web</ID>
+    <ID>InvalidPackageDeclaration:RsvpControllerTest.kt$package com.readmates.session.adapter.`in`.web</ID>
+    <ID>InvalidPackageDeclaration:SessionApplicationErrorHandlerTest.kt$package com.readmates.session.adapter.`in`.web</ID>
+    <ID>LargeClass:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$Companion</ID>
+    <ID>LargeClass:FeedbackDocumentControllerTest.kt$FeedbackDocumentControllerTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:GoogleOAuthLoginSessionTest.kt$GoogleOAuthLoginSessionTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:HostDashboardControllerTest.kt$HostDashboardControllerTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:HostMemberLifecycleControllerTest.kt$HostMemberLifecycleControllerTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:HostNotificationControllerTest.kt$HostNotificationControllerTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:HostSessionControllerDbTest.kt$HostSessionControllerDbTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter : ManualNotificationDispatchPort</ID>
+    <ID>LargeClass:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LargeClass:MySqlFlywayMigrationTest.kt$MySqlFlywayMigrationTest : ReadmatesMySqlIntegrationTestSupport</ID>
+    <ID>LongMethod:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$@Test @Sql( statements = [ CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL, INSERT_VIEWER_DRAFT_SESSION_SQL, INSERT_VIEWER_OPEN_SESSION_SQL, INSERT_VIEWER_CLOSED_SESSION_SQL, ], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, ) @Sql( statements = [ CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL, ], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD, ) fun `viewer can list and read preserved sessions but cannot read feedback document`()</ID>
+    <ID>LongMethod:ArchiveDetailQueries.kt$ArchiveDetailQueries$fun loadArchiveSessionDetail( jdbcTemplate: JdbcTemplate, currentMember: CurrentMember, sessionId: UUID, ): ArchiveSessionDetailHeader?</ID>
+    <ID>LongMethod:ArchiveListQueries.kt$ArchiveListQueries$fun loadArchiveSessions( jdbcTemplate: JdbcTemplate, currentMember: CurrentMember, pageRequest: PageRequest, ): CursorPage&lt;ArchiveSessionResult&gt;</ID>
+    <ID>LongMethod:ArchiveListQueries.kt$ArchiveListQueries$fun loadMyPage( jdbcTemplate: JdbcTemplate, currentMember: CurrentMember, ): MyPageResult</ID>
+    <ID>LongMethod:AuthMeController.kt$AuthMeController$@GetMapping fun me( authentication: Authentication?, request: HttpServletRequest, ): AuthMemberResponse</ID>
+    <ID>LongMethod:FeedbackDocumentParserTest.kt$FeedbackDocumentParserTest$@Test fun `parses feedback document into typed fields after normalizing CRLF`()</ID>
+    <ID>LongMethod:FeedbackDocumentParserTest.kt$FeedbackDocumentParserTest$private fun validFeedbackMarkdown(): String</ID>
+    <ID>LongMethod:GoogleOAuthLoginSessionTest.kt$GoogleOAuthLoginSessionTest$@Test fun `successful google invite login accepts invitation and issues readmates session`()</ID>
+    <ID>LongMethod:HostDashboardControllerTest.kt$HostDashboardControllerTest$@Test fun `dashboard counts one pending feedback document per attended closed session`()</ID>
+    <ID>LongMethod:HostDashboardControllerTest.kt$HostDashboardControllerTest$@Test fun `host can fetch update publish and confirm attendance for session seven`()</ID>
+    <ID>LongMethod:HostDashboardControllerTest.kt$HostDashboardControllerTest$@Test fun `legacy host session patch preserves existing metadata fields`()</ID>
+    <ID>LongMethod:HostManualNotificationService.kt$HostManualNotificationService$override fun confirm( host: CurrentMember, command: ManualNotificationConfirmCommand, ): ManualNotificationConfirmResult</ID>
+    <ID>LongMethod:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$fun listHostEmailItems( jdbcTemplate: JdbcTemplate, clubId: UUID, query: HostNotificationItemQuery, pageRequest: PageRequest, ): HostNotificationItemList</ID>
+    <ID>LongMethod:HostSessionControllerDbTest.kt$HostSessionControllerDbTest$@Test fun `host saves session record visibility and compatibility publication columns`()</ID>
+    <ID>LongMethod:HostSessionControllerDbTest.kt$HostSessionControllerDbTest$private fun createOutsideClubSession( state: String = "OPEN", visibility: String = "HOST_ONLY", )</ID>
+    <ID>LongMethod:HostSessionControllerDbTest.kt$HostSessionControllerDbTest$private fun seedNonSessionRows()</ID>
+    <ID>LongMethod:HostSessionControllerDbTest.kt$HostSessionControllerDbTest$private fun seedSessionOwnedRows()</ID>
+    <ID>LongMethod:HostSessionDeletionQueries.kt$HostSessionDeletionQueries$private fun countSessionDeletionRows( jdbcTemplate: JdbcTemplate, clubId: UUID, sessionId: UUID, ): HostSessionDeletionCounts</ID>
+    <ID>LongMethod:HostSessionQueries.kt$HostSessionQueries$fun hostDashboard( jdbcTemplate: JdbcTemplate, member: CurrentMember, ): HostDashboardResult</ID>
+    <ID>LongMethod:HostSessionWriteOperations.kt$HostSessionWriteOperations$fun createDraftSession( jdbcTemplate: JdbcTemplate, host: CurrentMember, request: HostSessionCommand, ): CreatedSessionResponse</ID>
+    <ID>LongMethod:HostSessionWriteOperations.kt$HostSessionWriteOperations$fun updateHostSession( jdbcTemplate: JdbcTemplate, member: CurrentMember, sessionId: UUID, request: HostSessionCommand, ): HostSessionDetailResponse</ID>
+    <ID>LongMethod:JdbcArchiveDetailBatchReadAdapter.kt$JdbcArchiveDetailBatchReadAdapter$override fun loadDetail( currentMember: CurrentMember, sessionId: UUID, sessionNumber: Int, myAttendanceStatus: String?, ): ArchiveDetailFragments</ID>
+    <ID>LongMethod:JdbcArchiveDetailBatchReadAdapter.kt$JdbcArchiveDetailBatchReadAdapter$private fun loadPersonalBatch( currentMember: CurrentMember, sessionId: UUID, ): List&lt;PersonalBatchRow&gt;</ID>
+    <ID>LongMethod:JdbcArchiveDetailBatchReadAdapter.kt$JdbcArchiveDetailBatchReadAdapter$private fun loadPublicBatch( clubId: UUID, sessionId: UUID, ): List&lt;PublicBatchRow&gt;</ID>
+    <ID>LongMethod:JdbcFeedbackDocumentStoreAdapter.kt$JdbcFeedbackDocumentStoreAdapter$override fun listLatestReadableDocuments( currentMember: CurrentMember, pageRequest: PageRequest, ): CursorPage&lt;StoredFeedbackDocumentListResult&gt;</ID>
+    <ID>LongMethod:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$@Transactional override fun confirmManualDispatch( previewId: UUID, clubId: UUID, hostMembershipId: UUID, selectionHash: String, now: OffsetDateTime, selection: ManualNotificationSelection, payload: NotificationEventPayload, targetSnapshot: ManualNotificationTargetSnapshot, resend: Boolean, ): ManualNotificationConfirmedDispatch?</ID>
+    <ID>LongMethod:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$override fun listDispatches( clubId: UUID, sessionId: UUID?, eventType: NotificationEventType?, pageRequest: PageRequest, ): ManualNotificationDispatchList</ID>
+    <ID>LongMethod:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$override fun listMembers( clubId: UUID, sessionId: UUID?, search: String?, pageRequest: PageRequest, ): CursorPage&lt;ManualNotificationMemberOption&gt;</ID>
+    <ID>LongMethod:JdbcManualNotificationDispatchAdapterTest.kt$JdbcManualNotificationDispatchAdapterTest$@Test fun `confirmManualDispatch consumes preview once and returns existing dispatch on retry`()</ID>
+    <ID>LongMethod:JdbcMemberLifecycleStoreAdapter.kt$JdbcMemberLifecycleStoreAdapter$override fun listMembers( clubId: UUID, pageRequest: PageRequest, ): CursorPage&lt;HostMemberListRow&gt;</ID>
+    <ID>LongMethod:JdbcNotesFeedAdapter.kt$JdbcNotesFeedAdapter$override fun loadNoteSessions( clubId: UUID, pageRequest: PageRequest, ): CursorPage&lt;NoteSessionResult&gt;</ID>
+    <ID>LongMethod:JdbcNotesFeedAdapter.kt$JdbcNotesFeedAdapter$override fun loadNotesFeed( clubId: UUID, pageRequest: PageRequest, ): CursorPage&lt;NoteFeedResult&gt;</ID>
+    <ID>LongMethod:JdbcNotesFeedAdapter.kt$JdbcNotesFeedAdapter$override fun loadNotesFeedForSession( clubId: UUID, sessionId: UUID, pageRequest: PageRequest, ): CursorPage&lt;NoteFeedResult&gt;</ID>
+    <ID>LongMethod:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$override fun listHostEvents( clubId: UUID, status: NotificationEventOutboxStatus?, pageRequest: PageRequest, ): CursorPage&lt;HostNotificationEvent&gt;</ID>
+    <ID>LongMethod:JdbcNotificationEventOutboxAdapterTest.kt$JdbcNotificationEventOutboxAdapterTest$@Test fun `claim publishable reclaims stale publishing rows but not fresh publishing rows`()</ID>
+    <ID>LongMethod:JdbcNotificationTestMailAuditAdapter.kt$JdbcNotificationTestMailAuditAdapter$@Transactional override fun reserveTestMailAuditAttempt( clubId: UUID, hostMembershipId: UUID, recipientMaskedEmail: String, recipientEmailHash: String, cooldownStartedAfter: OffsetDateTime, ): NotificationTestMailAuditItem?</ID>
+    <ID>LongMethod:JdbcPublicQueryAdapter.kt$JdbcPublicQueryAdapter$private fun publicSessions( jdbcTemplate: JdbcTemplate, clubId: UUID, ): List&lt;PublicSessionSummaryResult&gt;</ID>
+    <ID>LongMethod:JdbcSessionParticipationWriteAdapter.kt$JdbcSessionParticipationWriteAdapter$@Transactional private fun replaceMemberQuestions( member: CurrentMember, replacements: List&lt;ReplaceQuestionCommandItem&gt;, ): Map&lt;String, Any&gt;</ID>
+    <ID>LongMethod:JdbcSessionParticipationWriteAdapter.kt$JdbcSessionParticipationWriteAdapter$private fun saveMemberLongReview( member: CurrentMember, body: String, ): Map&lt;String, String&gt;</ID>
+    <ID>LongMethod:KafkaNotificationEventPublisherAdapterTest.kt$KafkaNotificationEventPublisherAdapterTest$@Test fun `dead letter recoverer publishes to configured notification dlq topic`()</ID>
+    <ID>LongMethod:MemberActionControllerDbTest.kt$MemberActionControllerDbTest$@Test @Sql( statements = [ CLEANUP_OPEN_SESSION_WITH_PARTICIPANTS_SQL, OPEN_SESSION_WITH_PARTICIPANTS_SQL, ], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, ) @Sql( statements = [ CLEANUP_OPEN_SESSION_WITH_PARTICIPANTS_SQL, ], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD, ) fun `persists one-line and long reviews for current member`()</ID>
+    <ID>LongMethod:MemberAuthoritiesFilter.kt$MemberAuthoritiesFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain, )</ID>
+    <ID>LongMethod:MemberNotificationBffSecurityTest.kt$MemberNotificationBffSecurityTest$private fun insertUnreadNotification( notificationId: String = MEMBER_NOTIFICATION_BFF_ID, eventId: String = MEMBER_NOTIFICATION_BFF_EVENT_ID, deliveryId: String = MEMBER_NOTIFICATION_BFF_DELIVERY_ID, dedupeSuffix: String = "first", )</ID>
+    <ID>LongMethod:MemberProfileControllerTest.kt$MemberProfileControllerTest$@Test fun `own profile duplicate check waits for club profile name lock`()</ID>
+    <ID>LongMethod:MemberProfileControllerTest.kt$MemberProfileControllerTest$@Test fun `own profile update rejects membership status changed to left while waiting for profile name lock`()</ID>
+    <ID>LongMethod:MySqlFlywayMigrationTest.kt$MySqlFlywayMigrationTest$@Test fun `mysql baseline creates auth session and feedback document tables`()</ID>
+    <ID>LongMethod:MySqlFlywayMigrationTest.kt$MySqlFlywayMigrationTest$@Test fun `mysql creates multi club platform metadata tables`()</ID>
+    <ID>LongMethod:MySqlFlywayMigrationTest.kt$MySqlFlywayMigrationTest$@Test fun `mysql creates notification preference and test mail audit tables`()</ID>
+    <ID>LongMethod:MySqlFlywayMigrationTest.kt$MySqlFlywayMigrationTest$@Test fun `mysql notification pipeline prevents cross club ledger rows`()</ID>
+    <ID>LongMethod:MySqlQueryPlanTest.kt$MySqlQueryPlanTest$@Test fun `archive paged sessions query uses indexed access on sessions`()</ID>
+    <ID>LongMethod:MySqlQueryPlanTest.kt$MySqlQueryPlanTest$@Test fun `host member paged query uses indexed access on memberships`()</ID>
+    <ID>LongMethod:MySqlQueryPlanTest.kt$MySqlQueryPlanTest$@Test fun `notes paged session query uses indexed access on sessions`()</ID>
+    <ID>LongMethod:NotificationEmailTemplatePreview.kt$NotificationEmailTemplatePreview$private fun renderReport(samples: List&lt;EmailPreviewSample&gt;): String</ID>
+    <ID>LongMethod:NotificationEmailTemplatePreview.kt$NotificationEmailTemplatePreview$private fun samples(): List&lt;EmailPreviewSample&gt;</ID>
+    <ID>LongMethod:NotificationEmailTemplates.kt$NotificationEmailTemplates$private fun htmlEmail( label: String, brandName: String, title: String, memberName: String?, summary: String, contextRows: List&lt;Pair&lt;String, String&gt;&gt;, ctaLabel: String?, ctaUrl: String?, closing: String, footer: String, ): String</ID>
+    <ID>LongMethod:NotificationEmailTemplatesTest.kt$NotificationEmailTemplatesTest$@Test fun `renders all event subjects actions and links`()</ID>
+    <ID>LongMethod:PendingApprovalControllerTest.kt$PendingApprovalControllerTest$private fun memberSessionCookie( email: String, membershipStatus: String, withSessions: Boolean = true, ): Cookie</ID>
+    <ID>LongMethod:RateLimitFilter.kt$RateLimitFilter$private fun HttpServletRequest.toRateLimitCheck(): RateLimitCheck?</ID>
+    <ID>LongMethod:ReadmatesOAuthSuccessHandler.kt$ReadmatesOAuthSuccessHandler$override fun onAuthenticationSuccess( request: HttpServletRequest, response: HttpServletResponse, authentication: Authentication, )</ID>
+    <ID>LongMethod:SecurityConfig.kt$SecurityConfig$@Bean fun securityFilterChain(http: HttpSecurity): SecurityFilterChain</ID>
+    <ID>LongMethod:SelfMembershipControllerTest.kt$SelfMembershipControllerTest$private fun createOpenSessionWithMember(email: String): String</ID>
+    <ID>LongMethod:SessionCookieAuthenticationFilter.kt$SessionCookieAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain, )</ID>
+    <ID>LongParameterList:BffSecretFilter.kt$BffSecretFilter$( @param:Value("\${readmates.security.bff.secrets:}") private val configuredSecretsRaw: String, @param:Value("\${readmates.bff-secret:}") private val legacyExpectedSecret: String, @param:Value("\${readmates.bff-secret-required:true}") private val bffSecretRequired: Boolean, private val allowedOriginPort: AllowedOriginPort, private val ipHashingProperties: ClientIpHashingProperties = ClientIpHashingProperties(), @param:Autowired(required = false) private val auditPort: BffSecretRotationAuditPort? = null, @param:Value("\${readmates.security.bff.audit-mode:rotation-only}") private val auditModeRaw: String = "rotation-only", @param:Qualifier("bffSecretAuditExecutor") @param:Autowired(required = false) private val auditExecutor: TaskExecutor? = null, )</ID>
+    <ID>LongParameterList:HostNotificationControllerTest.kt$HostNotificationControllerTest$( id: String, clubId: String, status: NotificationOutboxStatus, dedupeKey: String, lastError: String? = null, attemptCount: Int = 0, )</ID>
+    <ID>LongParameterList:HostNotificationControllerTest.kt$HostNotificationControllerTest$( id: String, eventId: String, clubId: String, recipientMembershipId: String, channel: NotificationChannel, status: NotificationDeliveryStatus, dedupeKey: String, )</ID>
+    <ID>LongParameterList:InvitationService.kt$InvitationService$( rawToken: String, googleSubjectId: String, email: String, displayName: String?, profileImageUrl: String?, expectedClubSlug: String? = null, )</ID>
+    <ID>LongParameterList:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest$( eventId: UUID, requestedChannels: String, audience: String, excludedMembershipIds: List&lt;UUID&gt; = emptyList(), includedMembershipIds: List&lt;UUID&gt; = emptyList(), targetMembershipIds: List&lt;UUID&gt; = emptyList(), inAppMembershipIds: List&lt;UUID&gt; = emptyList(), emailMembershipIds: List&lt;UUID&gt; = emptyList(), )</ID>
+    <ID>LongParameterList:ManualNotificationDispatchPort.kt$ManualNotificationDispatchPort$( clubId: UUID, hostMembershipId: UUID, selection: ManualNotificationSelection, payload: NotificationEventPayload, targetSnapshot: ManualNotificationTargetSnapshot, resend: Boolean, )</ID>
+    <ID>LongParameterList:ManualNotificationDispatchPort.kt$ManualNotificationDispatchPort$( previewId: UUID, clubId: UUID, hostMembershipId: UUID, selectionHash: String, now: OffsetDateTime, selection: ManualNotificationSelection, payload: NotificationEventPayload, targetSnapshot: ManualNotificationTargetSnapshot, resend: Boolean, )</ID>
+    <ID>LongParameterList:NotificationDeliveryRowMappers.kt$NotificationDeliveryRowMappers$( eventType: NotificationEventType, aggregateId: UUID, payload: NotificationEventPayload, clubSlug: String, clubName: String, displayName: String?, )</ID>
+    <ID>LongParameterList:NotificationDeliveryRowMappers.kt$NotificationDeliveryRowMappers$( eventType: NotificationEventType, sessionId: UUID, sessionNumber: Int, bookTitle: String, clubName: String, clubSlug: String, displayName: String?, )</ID>
+    <ID>LongParameterList:NotificationDispatchServiceTest.kt$NotificationDispatchServiceTest$( deliveryPort: FakeDeliveryPort, mailPort: MailDeliveryPort, metrics: ReadmatesOperationalMetrics = dispatchTestMetrics(), maxAttempts: Int = 5, retryDelayMinutesConfig: List&lt;Long&gt; = listOf(5L, 15L, 60L, 240L), meterRegistry: io.micrometer.core.instrument.MeterRegistry = SimpleMeterRegistry(), )</ID>
+    <ID>LongParameterList:NotificationDispatchServiceTest.kt$NotificationDispatchServiceTest.FakeDeliveryPort$( private val deliveries: List&lt;NotificationDeliveryItem&gt;, private val claimable: Boolean = true, private val unclaimableIds: Set&lt;UUID&gt; = emptySet(), private val markSentResult: Boolean = true, private val markFailedResult: Boolean = true, private val markDeadResult: Boolean = true, private val eventType: NotificationEventType = NotificationEventType.NEXT_BOOK_PUBLISHED, private val findDeliveryStatusOverride: ((UUID) -&gt; NotificationDeliveryStatus?)? = null, )</ID>
+    <ID>LongParameterList:NotificationEmailTemplatePreview.kt$NotificationEmailTemplatePreview$( eventType: NotificationEventType, bookTitle: String, clubName: String, clubSlug: String, displayName: String, appBaseUrl: String, )</ID>
+    <ID>LongParameterList:NotificationEmailTemplates.kt$NotificationEmailTemplates$( eventType: NotificationEventType, sessionId: UUID, sessionNumber: Int, bookTitle: String, clubName: String, clubSlug: String, displayName: String?, appBaseUrl: String, )</ID>
+    <ID>LongParameterList:NotificationEmailTemplates.kt$NotificationEmailTemplates$( label: String, brandName: String, title: String, memberName: String?, summary: String, contextRows: List&lt;Pair&lt;String, String&gt;&gt;, ctaLabel: String?, ctaUrl: String?, closing: String, footer: String, )</ID>
+    <ID>LongParameterList:NotificationEmailTemplates.kt$NotificationEmailTemplates$( memberName: String, summary: String, contextRows: List&lt;Pair&lt;String, String&gt;&gt;, ctaUrl: String, brandName: String, footer: String, )</ID>
+    <ID>LongParameterList:NotificationEventOutboxPort.kt$NotificationEventOutboxPort$( clubId: UUID, eventType: NotificationEventType, aggregateType: String, aggregateId: UUID, payload: NotificationEventPayload, dedupeKey: String, )</ID>
+    <ID>LongParameterList:PendingApprovalControllerTest.kt$PendingApprovalControllerTest$( clubId: String, number: Int, title: String, bookTitle: String, bookAuthor: String, sessionDate: String, locationLabel: String, state: String, )</ID>
+    <ID>LongParameterList:SecurityConfig.kt$SecurityConfig$( private val bffSecretFilter: BffSecretFilter, private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter, private val rateLimitFilter: RateLimitFilter, private val memberAuthoritiesFilter: MemberAuthoritiesFilter, private val platformAdminAuthoritiesFilter: PlatformAdminAuthoritiesFilter, private val oAuthInviteTokenCaptureFilter: OAuthInviteTokenCaptureFilter, private val googleOidcUserService: GoogleOidcUserService, private val readmatesOAuthSuccessHandler: ReadmatesOAuthSuccessHandler, private val clientRegistrationRepository: ObjectProvider&lt;ClientRegistrationRepository&gt;, @param:Value("\${readmates.auth.auth-base-url:\${readmates.app-base-url:http://localhost:3000}}") private val authBaseUrl: String, )</ID>
+    <ID>LongParameterList:SupportAccessGrantPorts.kt$CreateSupportAccessGrantPort$( clubId: UUID, grantedByUserId: UUID, granteeUserId: UUID, scope: SupportAccessGrantScope, reason: String, expiresAt: OffsetDateTime, )</ID>
+    <ID>MagicNumber:AuthSessionService.kt$AuthSessionService$32</ID>
+    <ID>MagicNumber:BffSecretAuditExecutorConfig.kt$BffSecretAuditExecutorConfig$1_000</ID>
+    <ID>MagicNumber:BffSecretAuditExecutorConfig.kt$BffSecretAuditExecutorConfig$5</ID>
+    <ID>MagicNumber:CheckinController.kt$CheckinRequest$100</ID>
+    <ID>MagicNumber:ClientIpHashing.kt$ClientIpHashing$32</ID>
+    <ID>MagicNumber:HostManualNotificationService.kt$HostManualNotificationService$5</ID>
+    <ID>MagicNumber:HostSessionQueries.kt$3</ID>
+    <ID>MagicNumber:HostSessionWriteOperations.kt$HostSessionWriteOperations$23</ID>
+    <ID>MagicNumber:HostSessionWriteOperations.kt$HostSessionWriteOperations$59</ID>
+    <ID>MagicNumber:HostSessionWriteOperations.kt$HostSessionWriteOperations$9</ID>
+    <ID>MagicNumber:HostSessionWriteOperations.kt$HostSessionWriteOperations.&lt;no name provided&gt;$3</ID>
+    <ID>MagicNumber:HostSessionWriteOperations.kt$HostSessionWriteOperations.&lt;no name provided&gt;$4</ID>
+    <ID>MagicNumber:HttpClubDomainActualStateChecker.kt$HttpClubDomainActualStateChecker$0xfc</ID>
+    <ID>MagicNumber:HttpClubDomainActualStateChecker.kt$HttpClubDomainActualStateChecker$0xfe</ID>
+    <ID>MagicNumber:HttpClubDomainActualStateChecker.kt$HttpClubDomainActualStateChecker$200</ID>
+    <ID>MagicNumber:HttpClubDomainActualStateChecker.kt$HttpClubDomainActualStateChecker$300</ID>
+    <ID>MagicNumber:HttpClubDomainActualStateChecker.kt$HttpClubDomainActualStateChecker$399</ID>
+    <ID>MagicNumber:InvitationService.kt$InvitationService$120</ID>
+    <ID>MagicNumber:InvitationService.kt$InvitationService$16</ID>
+    <ID>MagicNumber:InvitationService.kt$InvitationService$30</ID>
+    <ID>MagicNumber:InvitationTokenService.kt$InvitationTokenService$32</ID>
+    <ID>MagicNumber:JdbcBffSecretRotationAuditAdapter.kt$JdbcBffSecretRotationAuditAdapter$255</ID>
+    <ID>MagicNumber:JdbcMemberLifecycleStoreAdapter.kt$3</ID>
+    <ID>MagicNumber:JdbcMemberLifecycleStoreAdapter.kt$4</ID>
+    <ID>MagicNumber:JdbcMemberLifecycleStoreAdapter.kt$5</ID>
+    <ID>MagicNumber:JdbcPlatformAdminAdapter.kt$JdbcPlatformAdminAdapter$100</ID>
+    <ID>MagicNumber:JdbcSessionParticipationWriteAdapter.kt$JdbcSessionParticipationWriteAdapter$5</ID>
+    <ID>MagicNumber:MemberProfileService.kt$MemberProfileService$20</ID>
+    <ID>MagicNumber:NotificationDeliveryEngine.kt$15L</ID>
+    <ID>MagicNumber:NotificationDeliveryEngine.kt$240L</ID>
+    <ID>MagicNumber:NotificationDeliveryEngine.kt$5L</ID>
+    <ID>MagicNumber:NotificationDeliveryEngine.kt$60L</ID>
+    <ID>MagicNumber:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$3</ID>
+    <ID>MagicNumber:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$4</ID>
+    <ID>MagicNumber:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$5</ID>
+    <ID>MagicNumber:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$6</ID>
+    <ID>MagicNumber:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$7</ID>
+    <ID>MagicNumber:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$8</ID>
+    <ID>MagicNumber:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$9</ID>
+    <ID>MagicNumber:NotificationKafkaConfiguration.kt$NotificationKafkaConfiguration$5</ID>
+    <ID>MagicNumber:NotificationKafkaConfiguration.kt$NotificationKafkaProperties$10</ID>
+    <ID>MagicNumber:NotificationKafkaConfiguration.kt$NotificationKafkaProperties$5</ID>
+    <ID>MagicNumber:NotificationRelayService.kt$15L</ID>
+    <ID>MagicNumber:NotificationRelayService.kt$240L</ID>
+    <ID>MagicNumber:NotificationRelayService.kt$5L</ID>
+    <ID>MagicNumber:NotificationRelayService.kt$60L</ID>
+    <ID>MagicNumber:OAuthReturnState.kt$OAuthReturnState$3</ID>
+    <ID>MagicNumber:PlatformAdminService.kt$PlatformAdminService$253</ID>
+    <ID>MagicNumber:PlatformAdminService.kt$PlatformAdminService$63</ID>
+    <ID>MagicNumber:QuestionWebDtos.kt$CreateQuestionRequest$5</ID>
+    <ID>MagicNumber:RateLimitFilter.kt$RateLimitFilter$10</ID>
+    <ID>MagicNumber:RateLimitFilter.kt$RateLimitFilter$12</ID>
+    <ID>MagicNumber:RateLimitFilter.kt$RateLimitFilter$20</ID>
+    <ID>MagicNumber:RateLimitFilter.kt$RateLimitFilter$30</ID>
+    <ID>MagicNumber:RedisCacheProperties.kt$AuthSessionCacheProperties$10</ID>
+    <ID>MagicNumber:RedisCacheProperties.kt$AuthSessionCacheProperties$5</ID>
+    <ID>MagicNumber:RedisCacheProperties.kt$NotesCacheProperties$3</ID>
+    <ID>MagicNumber:RedisCacheProperties.kt$PublicCacheProperties$15</ID>
+    <ID>MagicNumber:RequestIdFilter.kt$RequestIdFilter$12</ID>
+    <ID>MatchingDeclarationName:AuthSessionModels.kt$StoredAuthSession</ID>
+    <ID>MatchingDeclarationName:AuthSessionUseCases.kt$LogoutAuthSessionUseCase</ID>
+    <ID>MatchingDeclarationName:ClubContextPorts.kt$LoadClubContextPort</ID>
+    <ID>MatchingDeclarationName:ClubContextUseCases.kt$ResolveClubContextUseCase</ID>
+    <ID>MatchingDeclarationName:FeedbackDocumentCommands.kt$FeedbackDocumentUploadCommand</ID>
+    <ID>MatchingDeclarationName:HostSessionWebDtos.kt$HostSessionRequest</ID>
+    <ID>MatchingDeclarationName:MySqlExplainTestSupport.kt$MySqlExplainRow</ID>
+    <ID>MaxLineLength:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$jsonPath("$.items[0].bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }</ID>
+    <ID>MaxLineLength:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }</ID>
+    <ID>MaxLineLength:ArchiveAndNotesDbTest.kt$ArchiveAndNotesDbTest$value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?")))</ID>
+    <ID>MaxLineLength:ArchiveControllerDbTest.kt$ArchiveControllerDbTest$jsonPath("$.bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }</ID>
+    <ID>MaxLineLength:ArchiveControllerDbTest.kt$ArchiveControllerDbTest$jsonPath("$.items[?(@.sessionNumber == 6)].feedbackDocument.lockedReason") { value(hasItem("NOT_ATTENDED")) }</ID>
+    <ID>MaxLineLength:ArchiveControllerDbTest.kt$ArchiveControllerDbTest$value(not(hasItem("찰리는 왜 전기 애호가가 되었을까? 책 제목도 전기의 형태이고, 작중 몇차례 언급된다. 전기가 다른 형태의 문학과 달리 뛰어난 점은 무엇일까?")))</ID>
+    <ID>MaxLineLength:ArchiveQueryService.kt$ArchiveQueryService$val header = loadArchiveDataPort.loadArchiveSessionDetail(currentMember, sessionId) ?: return@withMemberAppAccess null</ID>
+    <ID>MaxLineLength:AuthMeController.kt$AuthMeController$?.</ID>
+    <ID>MaxLineLength:AuthSessionService.kt$AuthSessionService$override fun clearedServletSessionCookie(): String</ID>
+    <ID>MaxLineLength:AuthSessionStorePort.kt$AuthSessionStorePort.InMemoryForTest$sessions.replaceAll { _, session -&gt; if (session.userId == userId) session.copy(revoked = true) else session }</ID>
+    <ID>MaxLineLength:CachedNotificationBacklogProviderTest.kt$CachedNotificationBacklogProviderTest$StubNotificationDeliveryBacklogPort(NotificationDeliveryBacklog(pending = 3, failed = 1, dead = 2, sending = 5))</ID>
+    <ID>MaxLineLength:CheckinController.kt$CheckinRequest$fun toCommand(member: CurrentMember): SaveCheckinCommand</ID>
+    <ID>MaxLineLength:CurrentMemberArgumentResolver.kt$CurrentMemberArgumentResolver$override fun supportsParameter(parameter: MethodParameter): Boolean</ID>
+    <ID>MaxLineLength:CurrentMemberArgumentResolver.kt$CurrentMemberArgumentResolver$val cached = request.getAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR) as? SupportMemberSynthesis</ID>
+    <ID>MaxLineLength:CurrentMemberArgumentResolverTest.kt$CurrentMemberArgumentResolverTest$val resolver = CurrentMemberArgumentResolver(FakeResolveCurrentMemberUseCase(legacyMember), FakeResolveClubContextUseCase())</ID>
+    <ID>MaxLineLength:CurrentPlatformAdminArgumentResolver.kt$CurrentPlatformAdminArgumentResolver$override fun supportsParameter(parameter: MethodParameter): Boolean</ID>
+    <ID>MaxLineLength:DbColumns.kt$fun ResultSet.utcOffsetDateTime(column: String): OffsetDateTime</ID>
+    <ID>MaxLineLength:DbColumns.kt$fun ResultSet.utcOffsetDateTimeOrNull(column: String): OffsetDateTime?</ID>
+    <ID>MaxLineLength:DevLoginMemberService.kt$DevLoginMemberService$override fun findDevSeedActiveMemberByEmail(email: String): CurrentMember?</ID>
+    <ID>MaxLineLength:FeedbackDocumentService.kt$FeedbackDocumentService$override fun authorizeHostFeedbackDocumentUpload(currentMember: CurrentMember)</ID>
+    <ID>MaxLineLength:GoogleLoginService.kt$GoogleLoginService$private fun CurrentMember.toLoginResult(): GoogleLoginResult</ID>
+    <ID>MaxLineLength:HostDashboardController.kt$HostDashboardController$fun</ID>
+    <ID>MaxLineLength:HostManualNotificationService.kt$HostManualNotificationService$if</ID>
+    <ID>MaxLineLength:HostManualNotificationService.kt$HostManualNotificationService$throw NotificationApplicationException(NotificationApplicationError.MANUAL_NOTIFICATION_TEMPLATE_UNAVAILABLE, it)</ID>
+    <ID>MaxLineLength:HostManualNotificationService.kt$HostManualNotificationService$val session = manualDispatchPort.findSessionContext(currentHost.clubId, command.selection.sessionId) ?: throw notFound()</ID>
+    <ID>MaxLineLength:HostManualNotificationServiceTest.kt$HostManualNotificationServiceTest$fun</ID>
+    <ID>MaxLineLength:HostManualNotificationServiceTest.kt$HostManualNotificationServiceTest$val first = service.confirm(host(), ManualNotificationConfirmCommand(previewId, selection(), resendConfirmed = false))</ID>
+    <ID>MaxLineLength:HostManualNotificationServiceTest.kt$HostManualNotificationServiceTest$val options = service.options(host(), SESSION_ID, null, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))</ID>
+    <ID>MaxLineLength:HostManualNotificationServiceTest.kt$HostManualNotificationServiceTest$val result = service.confirm(host(), ManualNotificationConfirmCommand(previewId, selection(), resendConfirmed = true))</ID>
+    <ID>MaxLineLength:HostManualNotificationServiceTest.kt$HostManualNotificationServiceTest$val second = service.confirm(host(), ManualNotificationConfirmCommand(previewId, selection(), resendConfirmed = false))</ID>
+    <ID>MaxLineLength:HostMemberApprovalControllerTest.kt$HostMemberApprovalControllerTest$val outsideDeactivateMembershipId = insertViewerMemberOutsideClub(uniqueEmail("outside.deactivate"), "Outside Deactivate")</ID>
+    <ID>MaxLineLength:HostMemberLifecycleControllerTest.kt$HostMemberLifecycleControllerTest$jsonPath("$.items[?(@.membershipId == '$activeMembershipId')].canRemoveFromCurrentSession") { value(true) }</ID>
+    <ID>MaxLineLength:HostNotificationController.kt$HostNotificationController$)</ID>
+    <ID>MaxLineLength:HostNotificationController.kt$HostNotificationController$.</ID>
+    <ID>MaxLineLength:HostNotificationController.kt$HostNotificationController$return mapOf("processed" to processNotificationDeliveriesUseCase.processPendingForClub(host.clubId, PROCESS_BATCH_SIZE))</ID>
+    <ID>MaxLineLength:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$dead = backlogQueries.countByStatus(jdbcTemplate, clubId, NotificationChannel.EMAIL, NotificationDeliveryStatus.DEAD)</ID>
+    <ID>MaxLineLength:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$failed = backlogQueries.countByStatus(jdbcTemplate, clubId, NotificationChannel.EMAIL, NotificationDeliveryStatus.FAILED)</ID>
+    <ID>MaxLineLength:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$pending = backlogQueries.countByStatus(jdbcTemplate, clubId, NotificationChannel.EMAIL, NotificationDeliveryStatus.PENDING)</ID>
+    <ID>MaxLineLength:HostNotificationOperationsService.kt$HostNotificationOperationsService$?.</ID>
+    <ID>MaxLineLength:HostNotificationOperationsServiceTest.kt$NoopDeliveryPlanningPort$override fun persistPlannedDeliveries(message: NotificationEventMessage): List&lt;NotificationDeliveryItem&gt;</ID>
+    <ID>MaxLineLength:HostSessionAttendanceService.kt$HostSessionAttendanceService$attendancePort.confirmAttendance(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }</ID>
+    <ID>MaxLineLength:HostSessionControllerDbTest.kt$HostSessionCloseRaceProbe$val isHostSessionCloseUpdate = normalizedSql.startsWith("update sessions set state = 'CLOSED', updated_at = utc_timestamp(6)")</ID>
+    <ID>MaxLineLength:HostSessionControllerDbTest.kt$HostSessionControllerDbTest$"email in ('host@example.com', 'member1@example.com', 'member2@example.com', 'member3@example.com', 'member4@example.com', 'member5@example.com')"</ID>
+    <ID>MaxLineLength:HostSessionControllerDbTest.kt$HostSessionControllerDbTest$// OPEN→CLOSED to maintain valid state, then set visibility before PUBLISHED (PUBLISHED+HOST_ONLY violates invariant)</ID>
+    <ID>MaxLineLength:HostSessionDeletionQueries.kt$HostSessionDeletionQueries$jdbcTemplate.update("delete from feedback_reports where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())</ID>
+    <ID>MaxLineLength:HostSessionDeletionQueries.kt$HostSessionDeletionQueries$jdbcTemplate.update("delete from highlights where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())</ID>
+    <ID>MaxLineLength:HostSessionDeletionQueries.kt$HostSessionDeletionQueries$jdbcTemplate.update("delete from long_reviews where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())</ID>
+    <ID>MaxLineLength:HostSessionDeletionQueries.kt$HostSessionDeletionQueries$jdbcTemplate.update("delete from one_line_reviews where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())</ID>
+    <ID>MaxLineLength:HostSessionDeletionQueries.kt$HostSessionDeletionQueries$jdbcTemplate.update("delete from questions where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())</ID>
+    <ID>MaxLineLength:HostSessionDeletionQueries.kt$HostSessionDeletionQueries$jdbcTemplate.update("delete from reading_checkins where club_id = ? and session_id = ?", clubId.dbString(), sessionId.dbString())</ID>
+    <ID>MaxLineLength:HostSessionServicesTest.kt$HostSessionServicesTest.RecordingHostSessionPorts$hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" }</ID>
+    <ID>MaxLineLength:HttpClubDomainActualStateCheckerTest.kt$HttpClubDomainActualStateCheckerTest$val result = checkerWithFetcher(MarkerHttpResult(statusCode = 200, bodyTooLarge = true)).check("club.example.test")</ID>
+    <ID>MaxLineLength:InvitationService.kt$InvitationService$?:</ID>
+    <ID>MaxLineLength:InvitationService.kt$InvitationService$private fun findInvitationByToken(rawToken: String): InvitationTokenRow</ID>
+    <ID>MaxLineLength:InvitationService.kt$InvitationService$return toHostInvitationResponse(created).copy(acceptUrl = acceptUrl(created.clubSlug, token, created.primaryHost))</ID>
+    <ID>MaxLineLength:InvitationService.kt$InvitationService$throw InvitationDomainException("INVALID_INVITATION_EMAIL", InvitationDomainError.BAD_REQUEST, "Email is required")</ID>
+    <ID>MaxLineLength:InvitationService.kt$InvitationService$throw InvitationDomainException("INVITATION_CLUB_MISMATCH", InvitationDomainError.NOT_FOUND, "Invitation not found")</ID>
+    <ID>MaxLineLength:InvitationService.kt$InvitationService$throw InvitationDomainException("MEMBER_ALREADY_ACTIVE", InvitationDomainError.CONFLICT, "Member is already active")</ID>
+    <ID>MaxLineLength:JdbcArchiveQueryAdapter.kt$JdbcArchiveQueryAdapter$override fun loadMyPage(currentMember: CurrentMember): MyPageResult</ID>
+    <ID>MaxLineLength:JdbcCurrentMemberAdapter.kt$JdbcCurrentMemberAdapter$override fun loadActiveMemberByEmail(email: String): CurrentMember?</ID>
+    <ID>MaxLineLength:JdbcHostSessionWriteAdapter.kt$JdbcHostSessionWriteAdapter$override</ID>
+    <ID>MaxLineLength:JdbcHostSessionWriteAdapter.kt$JdbcHostSessionWriteAdapter$override fun detail(command: HostSessionIdCommand)</ID>
+    <ID>MaxLineLength:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$@param:Value("\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}") private val eventsTopic: String</ID>
+    <ID>MaxLineLength:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$emailMissingCount = if (selection.requestedChannels != ManualNotificationRequestedChannels.IN_APP) eligibility.missing else 0</ID>
+    <ID>MaxLineLength:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$val inAppIds = if (selection.requestedChannels != ManualNotificationRequestedChannels.EMAIL) finalIds else emptyList()</ID>
+    <ID>MaxLineLength:JdbcManualNotificationDispatchAdapterTest.kt$JdbcManualNotificationDispatchAdapterTest$val page = adapter.listMembers(clubId, sessionId, "member", PageRequest.cursor(1, null, defaultLimit = 50, maxLimit = 100))</ID>
+    <ID>MaxLineLength:JdbcMemberAccountAdapter.kt$JdbcMemberAccountAdapter$private fun java.sql.ResultSet.getStringOrNull(columnLabel: String): String?</ID>
+    <ID>MaxLineLength:JdbcMemberNotificationAdapter.kt$JdbcMemberNotificationAdapter$cursor?.createdAt?.let { java.sql.Timestamp.valueOf(it.atZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime()) }</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapter.kt$JdbcNotificationDeliveryAdapter$)</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapter.kt$JdbcNotificationDeliveryAdapter$override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem?</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapter.kt$JdbcNotificationDeliveryAdapter$override fun findDeliveryStatus(id: UUID): NotificationDeliveryStatus?</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest$assertThat(claimed.bodyHtml).contains("feedback document", "피드백 문서 확인하기", "/clubs/reading-sai/app/feedback/$sessionId")</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest$assertThat(it).contains("feedback document", "피드백 문서 확인하기", "/clubs/reading-sai/app/feedback/$sessionId")</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest$deliveryAdapter.persistPlannedDeliveries(message(feedbackEventId, NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED))</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest$deliveryAdapter.persistPlannedDeliveries(message(nextBookEventId, NotificationEventType.NEXT_BOOK_PUBLISHED))</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest$deliveryRowsFor(newlyJoinedMember.membershipId, NotificationChannel.EMAIL, NotificationDeliveryStatus.PENDING)</ID>
+    <ID>MaxLineLength:JdbcNotificationDeliveryAdapterTest.kt$JdbcNotificationDeliveryAdapterTest$deliveryRowsFor(newlyJoinedMember.membershipId, NotificationChannel.IN_APP, NotificationDeliveryStatus.SENT)</ID>
+    <ID>MaxLineLength:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$@param:Value("\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}") private val eventsTopic: String</ID>
+    <ID>MaxLineLength:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$private fun parsePayload(rawPayload: String): NotificationEventPayload</ID>
+    <ID>MaxLineLength:JdbcNotificationPreferencesAdapter.kt$JdbcNotificationPreferencesAdapter$NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to getBoolean("feedback_document_published_enabled")</ID>
+    <ID>MaxLineLength:JdbcPublicQueryAdapter.kt$JdbcPublicQueryAdapter$override fun loadSession(sessionId: UUID): PublicSessionDetailResult?</ID>
+    <ID>MaxLineLength:KafkaNotificationEventPublisherAdapter.kt$KafkaNotificationEventPublisherAdapter$throw NotificationKafkaPublishException("Failed publishing notification event ${message.eventId}", ex.cause ?: ex)</ID>
+    <ID>MaxLineLength:KafkaNotificationEventPublisherAdapter.kt$KafkaNotificationEventPublisherAdapter$throw NotificationKafkaPublishException("Interrupted publishing notification event ${message.eventId}", ex)</ID>
+    <ID>MaxLineLength:LoggingMailDeliveryAdapter.kt$LoggingMailDeliveryAdapter$logger.info("Notification delivery disabled; skipped email to recipient domain {}", command.to.recipientDomain())</ID>
+    <ID>MaxLineLength:MemberArchiveReviewService.kt$MemberArchiveReviewService$?:</ID>
+    <ID>MaxLineLength:MemberLifecycleService.kt$MemberLifecycleService$?:</ID>
+    <ID>MaxLineLength:MemberLifecycleService.kt$MemberLifecycleService$if</ID>
+    <ID>MaxLineLength:MemberNotificationController.kt$MemberNotificationController$fun</ID>
+    <ID>MaxLineLength:MemberNotificationController.kt$MemberNotificationPreferenceController$)</ID>
+    <ID>MaxLineLength:MemberNotificationControllerTest.kt$MemberNotificationControllerTest$)</ID>
+    <ID>MaxLineLength:MemberNotificationPort.kt$MemberNotificationPort$listForMembership(clubId, membershipId, PageRequest.cursor(limit, null, defaultLimit = limit, maxLimit = 100)).items</ID>
+    <ID>MaxLineLength:MemberNotificationService.kt$MemberNotificationService$override fun markAllRead(member: CurrentMember): Int</ID>
+    <ID>MaxLineLength:MemberNotificationService.kt$MemberNotificationService$override fun unreadCount(member: CurrentMember): Int</ID>
+    <ID>MaxLineLength:MemberProfileController.kt$MemberProfileController$private fun MemberProfileUpdateRequest.toCommand(): UpdateMemberProfileCommand</ID>
+    <ID>MaxLineLength:MemberProfileControllerTest.kt$MemberProfileControllerTest$.</ID>
+    <ID>MaxLineLength:MemberProfileControllerTest.kt$MemberProfileControllerTest$org.hamcrest.MatcherAssert.assertThat(body, org.hamcrest.Matchers.containsString("MEMBERSHIP_NOT_ALLOWED"))</ID>
+    <ID>MaxLineLength:MemberProfileControllerTest.kt$MemberProfileControllerTest$private fun jsonString(value: String): String</ID>
+    <ID>MaxLineLength:MemberProfileControllerTest.kt$MemberProfileControllerTest$val targetMembershipId = membershipIdForEmail(insertProfileMember("host.anonymous", "ACTIVE", shortName = "Blocked"))</ID>
+    <ID>MaxLineLength:MemberProfileControllerTest.kt$MemberProfileControllerTest$val targetMembershipId = membershipIdForEmail(insertProfileMember("host.blocked", "ACTIVE", shortName = "Blocked"))</ID>
+    <ID>MaxLineLength:MemberProfileService.kt$MemberProfileService.Companion$"^(?i)(www\\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?:[:/].*)?$"</ID>
+    <ID>MaxLineLength:MembershipStatusTest.kt$MembershipStatusTest$MembershipStatus.ACTIVE to setOf(MembershipStatus.SUSPENDED, MembershipStatus.INACTIVE, MembershipStatus.LEFT)</ID>
+    <ID>MaxLineLength:MembershipStatusTest.kt$MembershipStatusTest$MembershipStatus.SUSPENDED to setOf(MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT)</ID>
+    <ID>MaxLineLength:MembershipStatusTest.kt$MembershipStatusTest$setOf(MembershipStatus.VIEWER, MembershipStatus.ACTIVE, MembershipStatus.INACTIVE, MembershipStatus.LEFT)</ID>
+    <ID>MaxLineLength:MyPageController.kt$MyPageController$fun</ID>
+    <ID>MaxLineLength:MySqlFlywayMigrationTest.kt$MySqlFlywayMigrationTest$assertEquals("actor_user_id,created_at", indexColumns("club_audit_events", "club_audit_events_actor_created_idx"))</ID>
+    <ID>MaxLineLength:NoopNotesReadCacheAdapter.kt$NoopNotesReadCacheCondition$val notesCacheEnabled = context.environment.getProperty("readmates.notes-cache.enabled", Boolean::class.java, false)</ID>
+    <ID>MaxLineLength:NoopPublicReadCacheAdapter.kt$NoopPublicReadCacheCondition$val publicCacheEnabled = context.environment.getProperty("readmates.public-cache.enabled", Boolean::class.java, false)</ID>
+    <ID>MaxLineLength:NoopRateLimitAdapter.kt$NoopRateLimitCondition$val rateLimitEnabled = context.environment.getProperty("readmates.rate-limit.enabled", Boolean::class.java, false)</ID>
+    <ID>MaxLineLength:NotificationDeliveryBacklogQueries.kt$NotificationDeliveryBacklogQueries$NotificationDeliveryStatus.valueOf(resultSet.getString("status")) to resultSet.getInt("status_count")</ID>
+    <ID>MaxLineLength:NotificationDeliveryEngine.kt$NotificationDeliveryEngine$)</ID>
+    <ID>MaxLineLength:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$sessionViewerRecipients(jdbcTemplate, message, "next_book_published_enabled", "sessions.state = 'DRAFT'")</ID>
+    <ID>MaxLineLength:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$sessionViewerRecipients(jdbcTemplate, message, "session_reminder_due_enabled", "sessions.state in ('DRAFT', 'OPEN')")</ID>
+    <ID>MaxLineLength:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations.&lt;no name provided&gt;$ps.setString(7, notificationDeliveryDedupeKey(message.eventId, row.recipient.membershipId, row.channel))</ID>
+    <ID>MaxLineLength:NotificationDeliveryProcessingServiceTest.kt$NotificationDeliveryProcessingServiceTest$assertThat(event.message).isEqualTo("Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}")</ID>
+    <ID>MaxLineLength:NotificationDeliveryProcessingServiceTest.kt$NotificationDeliveryProcessingServiceTest$assertThat(event.message).isEqualTo("Notification email delivery failed deliveryId={} eventType={} attemptCount={} error={}")</ID>
+    <ID>MaxLineLength:NotificationDeliveryProcessingServiceTest.kt$NotificationDeliveryProcessingServiceTest$transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryTransactionPort, NoopDeliveryTransactionPort)</ID>
+    <ID>MaxLineLength:NotificationDispatchService.kt$NotificationDispatchService$val claimed = transactionalOps.claimEmailDelivery(delivery.id) ?: return handleUnclaimedEmailDelivery(delivery.id)</ID>
+    <ID>MaxLineLength:NotificationDispatchServiceTest.kt$NotificationDispatchServiceTest$assertThat(event.message).isEqualTo("Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}")</ID>
+    <ID>MaxLineLength:NotificationDispatchServiceTest.kt$NotificationDispatchServiceTest$assertThat(event.message).isEqualTo("Notification email delivery failed deliveryId={} eventType={} attemptCount={} error={}")</ID>
+    <ID>MaxLineLength:NotificationDispatchServiceTest.kt$NotificationDispatchServiceTest$private</ID>
+    <ID>MaxLineLength:NotificationErrorSanitizer.kt$"""(?i)\b(?:password|passwd|pwd|passcode|secret|api[-_ ]?key|access[-_ ]?key|secret[-_ ]?key|client[-_ ]?secret|private[-_ ]?key|token|credential)\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)"""</ID>
+    <ID>MaxLineLength:NotificationErrorSanitizer.kt$"""(?i)\b(?:password|passwd|pwd|passcode|secret|api[-_ ]?key|access[-_ ]?key|secret[-_ ]?key|client[-_ ]?secret|private[-_ ]?key|token|credential)\s+(?:is\s+|was\s+)?(?:"[^"]*"|'[^']*'|[^\s,;]+)"""</ID>
+    <ID>MaxLineLength:NotificationErrorSanitizer.kt$"""(?is)-----BEGIN [^-]*(?:PRIVATE KEY|OPENSSH PRIVATE KEY|RSA PRIVATE KEY)[\s\S]*?(?:-----END [^-]*(?:PRIVATE KEY|OPENSSH PRIVATE KEY|RSA PRIVATE KEY)-----|$)"""</ID>
+    <ID>MaxLineLength:NotificationEventKafkaListenerTest.kt$NotificationEventKafkaListenerTest$assertThat(KafkaNotificationEventPublisherAdapter::class.java.requiredEnabledProperties())</ID>
+    <ID>MaxLineLength:NotificationKafkaConfiguration.kt$NotificationKafkaConfiguration$"readmates.notifications.kafka.bootstrap-servers must be set when readmates.notifications.kafka.enabled=true"</ID>
+    <ID>MaxLineLength:NotificationKafkaConfiguration.kt$NotificationKafkaConfiguration$fun</ID>
+    <ID>MaxLineLength:NotificationPreferencesService.kt$NotificationPreferencesService$override fun getPreferences(member: CurrentMember): NotificationPreferences</ID>
+    <ID>MaxLineLength:NotificationRelayServiceTest.kt$NotificationRelayServiceTest$assertThat(event.argumentArray.toList()).containsExactly(item.id, item.attemptCount + 1, "broker unavailable")</ID>
+    <ID>MaxLineLength:NotificationRelayServiceTest.kt$NotificationRelayServiceTest$assertThat(event.message).isEqualTo("Notification event publish dead eventId={} attemptCount={} error={}")</ID>
+    <ID>MaxLineLength:NotificationRelayServiceTest.kt$NotificationRelayServiceTest$assertThat(event.message).isEqualTo("Notification event publish failed eventId={} attemptCount={} error={}")</ID>
+    <ID>MaxLineLength:NotificationRelayServiceTest.kt$NotificationRelayServiceTest$assertThat(publisher.publishedMessages).containsExactly(PublishedMessage(message, item.kafkaTopic, item.kafkaKey))</ID>
+    <ID>MaxLineLength:OAuthReturnState.kt$OAuthReturnState$if</ID>
+    <ID>MaxLineLength:PlatformAdminControllerTest.kt$private inline</ID>
+    <ID>MaxLineLength:PlatformAdminService.kt$PlatformAdminService$if</ID>
+    <ID>MaxLineLength:PrimaryOriginOAuthAuthorizationRequestResolver.kt$PrimaryOriginOAuthAuthorizationRequestResolver$private</ID>
+    <ID>MaxLineLength:PublicControllerDbTest.kt$PublicControllerDbTest$jsonPath("$.bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }</ID>
+    <ID>MaxLineLength:PublicQueryService.kt$PublicQueryService$return</ID>
+    <ID>MaxLineLength:PublicReadCachePort.kt$PublicReadCachePort$)</ID>
+    <ID>MaxLineLength:PublicReadCachePort.kt$PublicReadCachePort$fun getClub(clubId: UUID): PublicClubResult?</ID>
+    <ID>MaxLineLength:PublicReadCachePort.kt$PublicReadCachePort$fun getClubId(clubSlug: String): UUID?</ID>
+    <ID>MaxLineLength:QuestionWebDtos.kt$CreateQuestionRequest$fun toCommand(member: CurrentMember): SaveQuestionCommand</ID>
+    <ID>MaxLineLength:ReadmatesMySqlSeedTest.kt$ReadmatesMySqlSeedTest$assertEquals(1, jdbcTemplate.queryForObject("select count(*) from clubs where slug = 'reading-sai'", Int::class.java))</ID>
+    <ID>MaxLineLength:ReadmatesMySqlSeedTest.kt$ReadmatesMySqlSeedTest$assertEquals(6, jdbcTemplate.queryForObject("select count(*) from sessions where state = 'PUBLISHED'", Int::class.java))</ID>
+    <ID>MaxLineLength:ReadmatesMySqlSeedTest.kt$ReadmatesMySqlSeedTest$jdbcTemplate.queryForObject("select count(*) from memberships where role = 'HOST' and status = 'ACTIVE'", Int::class.java)</ID>
+    <ID>MaxLineLength:ReadmatesOAuthSuccessHandler.kt$ReadmatesOAuthSuccessHandler$expectedClubSlug = oauthReturnState.inviteClubSlugFromReturnState(signedReturnState, inviteToken)</ID>
+    <ID>MaxLineLength:ReadmatesOperationalMetrics.kt$ReadmatesOperationalMetrics$*</ID>
+    <ID>MaxLineLength:ReadmatesSeedDataTest.kt$ReadmatesSeedDataTest$assertEquals(6, jdbcTemplate.queryForObject("select count(*) from memberships where club_id = ?", Int::class.java, CLUB_ID))</ID>
+    <ID>MaxLineLength:ReadmatesSeedDataTest.kt$ReadmatesSeedDataTest$assertEquals(6, jdbcTemplate.queryForObject("select count(*) from users where email in ($SEEDED_EMAILS)", Int::class.java))</ID>
+    <ID>MaxLineLength:ReadmatesSeedDataTest.kt$ReadmatesSeedDataTest$require((checkinsBySession[sessionNumber] ?: 0) &gt;= 2) { "session $sessionNumber should have at least two check-ins" }</ID>
+    <ID>MaxLineLength:ReadmatesSeedDataTest.kt$ReadmatesSeedDataTest$require((highlightsBySession[sessionNumber] ?: 0) &gt;= 2) { "session $sessionNumber should have at least two highlights" }</ID>
+    <ID>MaxLineLength:ReadmatesSeedDataTest.kt$ReadmatesSeedDataTest$require((oneLinersBySession[sessionNumber] ?: 0) &gt;= 2) { "session $sessionNumber should have at least two one-line reviews" }</ID>
+    <ID>MaxLineLength:ReadmatesSeedDataTest.kt$ReadmatesSeedDataTest.Companion$"'host@example.com','member1@example.com','member2@example.com','member3@example.com','member4@example.com','member5@example.com'"</ID>
+    <ID>MaxLineLength:RedisAuthSessionCacheAdapter.kt$RedisAuthSessionCacheAdapter$@ConditionalOnProperty(prefix = "readmates", name = ["redis.enabled", "auth-session-cache.enabled"], havingValue = "true")</ID>
+    <ID>MaxLineLength:RedisAuthSessionCacheAdapter.kt$RedisAuthSessionCacheAdapter$redisTemplate.opsForValue().set(sessionKey(tokenHash), CachedAuthSession.from(snapshot).let(codec::encode), ttl)</ID>
+    <ID>MaxLineLength:RedisNotesReadCacheAdapter.kt$RedisNotesReadCacheAdapter$)</ID>
+    <ID>MaxLineLength:RedisNotesReadCacheAdapter.kt$RedisNotesReadCacheAdapter$override fun getFeed(clubId: UUID): List&lt;NoteFeedResult&gt;?</ID>
+    <ID>MaxLineLength:RedisNotesReadCacheAdapter.kt$RedisNotesReadCacheAdapter$private val feedListType = objectMapper.typeFactory.constructCollectionType(List::class.java, NoteFeedResult::class.java)</ID>
+    <ID>MaxLineLength:RedisNotesReadCacheAdapter.kt$RedisNotesReadCacheAdapter$private val sessionListType = objectMapper.typeFactory.constructCollectionType(List::class.java, NoteSessionResult::class.java)</ID>
+    <ID>MaxLineLength:RedisPublicReadCacheAdapter.kt$RedisPublicReadCacheAdapter$override fun getClub(clubSlug: String): PublicClubResult?</ID>
+    <ID>MaxLineLength:RedisPublicReadCacheAdapter.kt$RedisPublicReadCacheAdapter$store(sessionKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID), sessionId), result, properties.sessionTtl, "put-session")</ID>
+    <ID>MaxLineLength:RedisRateLimitAdapterTest.kt$RedisRateLimitAdapterTest$RateLimitAdapterCase(redisEnabled = false, rateLimitEnabled = false, expectedAdapter = NoopRateLimitAdapter::class.java)</ID>
+    <ID>MaxLineLength:RedisRateLimitAdapterTest.kt$RedisRateLimitAdapterTest$RateLimitAdapterCase(redisEnabled = false, rateLimitEnabled = true, expectedAdapter = NoopRateLimitAdapter::class.java)</ID>
+    <ID>MaxLineLength:RedisRateLimitAdapterTest.kt$RedisRateLimitAdapterTest$RateLimitAdapterCase(redisEnabled = true, rateLimitEnabled = false, expectedAdapter = NoopRateLimitAdapter::class.java)</ID>
+    <ID>MaxLineLength:RedisRateLimitAdapterTest.kt$RedisRateLimitAdapterTest$RateLimitAdapterCase(redisEnabled = true, rateLimitEnabled = true, expectedAdapter = RedisRateLimitAdapter::class.java)</ID>
+    <ID>MaxLineLength:ServerArchitectureBoundaryTest.kt$ServerArchitectureBoundaryTest$"Outbound ports must not hide unsupported behavior behind default runtime failures:\n${violations.joinToString("\n")}"</ID>
+    <ID>MaxLineLength:ServerArchitectureBoundaryTest.kt$ServerArchitectureBoundaryTest$javaClass.packageName == "com.readmates.auth" || javaClass.packageName.startsWith("com.readmates.auth.")</ID>
+    <ID>MaxLineLength:ServerArchitectureBoundaryTest.kt$ServerArchitectureBoundaryTest$private</ID>
+    <ID>MaxLineLength:ServerArchitectureBoundaryTest.kt$ServerArchitectureBoundaryTest$val classViolation = if (javaClass.simpleName == forbiddenTypeName) listOf(javaClass.name) else emptyList()</ID>
+    <ID>MaxLineLength:SessionCookieAuthenticationFilter.kt$SessionCookieAuthenticationFilter$private fun HttpServletRequest.isAdminApi(): Boolean</ID>
+    <ID>MaxLineLength:SessionCookieAuthenticationFilter.kt$SessionCookieAuthenticationFilter$private fun HttpServletRequest.isHostApi(): Boolean</ID>
+    <ID>MaxLineLength:SessionMemberWriteService.kt$SessionMemberWriteService$writePort.replaceQuestions(command).also { cacheInvalidation.evictClubContentAfterCommit(command.member.clubId) }</ID>
+    <ID>MaxLineLength:SessionMemberWriteService.kt$SessionMemberWriteService$writePort.saveOneLineReview(command).also { cacheInvalidation.evictClubContentAfterCommit(command.member.clubId) }</ID>
+    <ID>MaxLineLength:SessionMemberWriteServiceTest.kt$SessionMemberWriteServiceTest.RecordingSessionParticipationWritePort$calls += "replaceQuestions:${command.questions.joinToString("|") { question -&gt; "${question.priority}:${question.text}" }}"</ID>
+    <ID>MaxLineLength:SmtpMailDeliveryAdapterTest.kt$CapturingJavaMailSender$override fun createMimeMessage(contentStream: InputStream): MimeMessage</ID>
+    <ID>MaxLineLength:SupportAccessGrantControllerTest.kt$SupportAccessGrantControllerTest$"select count(*) from platform_audit_events where actor_user_id = ? and event_type = 'SUPPORT_ACCESS_GRANT_CREATED'"</ID>
+    <ID>MaxLineLength:SupportAccessGrantControllerTest.kt$SupportAccessGrantControllerTest$"select count(*) from platform_audit_events where actor_user_id = ? and event_type = 'SUPPORT_ACCESS_GRANT_REVOKED'"</ID>
+    <ID>MaxLineLength:SupportAccessGrantControllerTest.kt$private inline</ID>
+    <ID>NestedBlockDepth:HostMemberLifecycleControllerTest.kt$HostMemberLifecycleControllerTest$@Test fun `current session add waits for membership lifecycle lock before activating participant`()</ID>
+    <ID>NestedBlockDepth:JdbcHostInvitationStoreAdapter.kt$JdbcHostInvitationStoreAdapter$private fun releaseInvitationLock( connection: Connection, lockKey: String, )</ID>
+    <ID>NestedBlockDepth:MemberProfileControllerTest.kt$MemberProfileControllerTest$@Test fun `own profile duplicate check waits for club profile name lock`()</ID>
+    <ID>NestedBlockDepth:MemberProfileControllerTest.kt$MemberProfileControllerTest$@Test fun `own profile update rejects membership status changed to left while waiting for profile name lock`()</ID>
+    <ID>NestedBlockDepth:SessionCookieAuthenticationFilter.kt$SessionCookieAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain, )</ID>
+    <ID>ReturnCount:ArchiveListQueries.kt$ArchiveSessionCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): ArchiveSessionCursor?</ID>
+    <ID>ReturnCount:ArchiveListQueries.kt$MyQuestionCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): MyQuestionCursor?</ID>
+    <ID>ReturnCount:ArchiveListQueries.kt$MyReviewCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): MyReviewCursor?</ID>
+    <ID>ReturnCount:AuthMeController.kt$AuthMeController$@GetMapping fun me( authentication: Authentication?, request: HttpServletRequest, ): AuthMemberResponse</ID>
+    <ID>ReturnCount:AuthMeController.kt$AuthMeController$private fun authenticatedWithoutMembership( email: String?, knownUserId: UUID? = null, ): AuthMemberResponse</ID>
+    <ID>ReturnCount:AuthSessionCachePort.kt$AuthSessionCachePort.InMemoryForTest$override fun find(tokenHash: String): AuthSessionCacheSnapshot?</ID>
+    <ID>ReturnCount:AuthSessionCachePort.kt$AuthSessionCachePort.InMemoryForTest$override fun shouldTouch( tokenHash: String, ttl: Duration, ): Boolean</ID>
+    <ID>ReturnCount:BffSecretFilter.kt$BffSecretFilter$private fun auditAsync( alias: String, request: HttpServletRequest, )</ID>
+    <ID>ReturnCount:ClubContextResolver.kt$fun HttpServletRequest.resolveClubContext(resolveClubContextUseCase: ResolveClubContextUseCase): RequestedClubContext</ID>
+    <ID>ReturnCount:CurrentMember.kt$fun Authentication?.googleOidcIdentityOrNull(): GoogleOidcIdentity?</ID>
+    <ID>ReturnCount:CurrentMemberArgumentResolver.kt$CurrentMemberArgumentResolver$override fun resolveArgument( parameter: MethodParameter, mavContainer: ModelAndViewContainer?, webRequest: NativeWebRequest, binderFactory: WebDataBinderFactory?, ): CurrentMember</ID>
+    <ID>ReturnCount:CursorCodec.kt$CursorCodec$fun decode(rawCursor: String?): Map&lt;String, String&gt;?</ID>
+    <ID>ReturnCount:DefaultAuthoritySynthesisService.kt$DefaultAuthoritySynthesisService$override fun synthesize(request: AuthoritySynthesisRequest): AuthoritySynthesisResult</ID>
+    <ID>ReturnCount:FeedbackDocumentService.kt$FeedbackDocumentService$override fun getReadableFeedbackDocument( currentMember: CurrentMember, sessionId: UUID, ): FeedbackDocumentResult?</ID>
+    <ID>ReturnCount:GoogleLoginService.kt$GoogleLoginService$private fun connectExistingEmailUser( googleSubjectId: String, normalizedEmail: String, profileImageUrl: String?, ): GoogleLoginResult?</ID>
+    <ID>ReturnCount:HostManualNotificationServiceTest.kt$HostManualNotificationServiceTest.FakeManualPort$override fun findConsumedManualDispatch( previewId: UUID, clubId: UUID, hostMembershipId: UUID, selectionHash: String, now: OffsetDateTime, ): ManualNotificationConfirmedDispatch?</ID>
+    <ID>ReturnCount:HostNotificationLedgerQueries.kt$NotificationDeliveryUpdatedAtDescCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): NotificationDeliveryUpdatedAtDescCursor?</ID>
+    <ID>ReturnCount:HostSessionControllerDbTest.kt$HostSessionCloseRaceProbe$fun consumeIfMatches( sql: String, args: Array&lt;out Any?&gt;, ): String?</ID>
+    <ID>ReturnCount:HostSessionQueries.kt$HostSessionCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): HostSessionCursor?</ID>
+    <ID>ReturnCount:HostSessionWebDtos.kt$HostSessionRequest$@AssertTrue(message = "startTime and endTime must be valid local times") fun hasValidTimeRange(): Boolean</ID>
+    <ID>ReturnCount:HostSessionWebDtos.kt$private fun isHttpsUrlOrBlank(value: String?): Boolean</ID>
+    <ID>ReturnCount:HttpClubDomainActualStateChecker.kt$HttpClubDomainActualStateChecker$override fun check(hostname: String): ClubDomainActualCheckResult</ID>
+    <ID>ReturnCount:JdbcFeedbackDocumentStoreAdapter.kt$JdbcFeedbackDocumentStoreAdapter.FeedbackDocumentCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): FeedbackDocumentCursor?</ID>
+    <ID>ReturnCount:JdbcHostInvitationStoreAdapter.kt$HostInvitationCreatedAtDescCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): HostInvitationCreatedAtDescCursor?</ID>
+    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$@Transactional override fun confirmManualDispatch( previewId: UUID, clubId: UUID, hostMembershipId: UUID, selectionHash: String, now: OffsetDateTime, selection: ManualNotificationSelection, payload: NotificationEventPayload, targetSnapshot: ManualNotificationTargetSnapshot, resend: Boolean, ): ManualNotificationConfirmedDispatch?</ID>
+    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$private fun maskEmail(email: String?): String</ID>
+    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter.ManualDispatchCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): ManualDispatchCursor?</ID>
+    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter.ManualMemberCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): ManualMemberCursor?</ID>
+    <ID>ReturnCount:JdbcMemberApprovalStoreAdapter.kt$MemberApprovalCreatedAtDescCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): MemberApprovalCreatedAtDescCursor?</ID>
+    <ID>ReturnCount:JdbcMemberArchiveReviewWriteAdapter.kt$JdbcMemberArchiveReviewWriteAdapter$override fun saveLongReview(command: SaveMemberArchiveLongReviewCommand): SaveMemberArchiveLongReviewResult?</ID>
+    <ID>ReturnCount:JdbcMemberLifecycleStoreAdapter.kt$HostMemberCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): HostMemberCursor?</ID>
+    <ID>ReturnCount:JdbcMemberNotificationAdapter.kt$MemberNotificationCreatedAtDescCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): MemberNotificationCreatedAtDescCursor?</ID>
+    <ID>ReturnCount:JdbcNotesFeedAdapter.kt$JdbcNotesFeedAdapter.NoteFeedCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): NoteFeedCursor?</ID>
+    <ID>ReturnCount:JdbcNotesFeedAdapter.kt$JdbcNotesFeedAdapter.NoteSessionCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): NoteSessionCursor?</ID>
+    <ID>ReturnCount:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$@Transactional override fun claimPublishable(limit: Int): List&lt;NotificationEventOutboxItem&gt;</ID>
+    <ID>ReturnCount:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$private fun maskEmail(email: String?): String</ID>
+    <ID>ReturnCount:JdbcNotificationEventOutboxAdapter.kt$NotificationEventUpdatedAtDescCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): NotificationEventUpdatedAtDescCursor?</ID>
+    <ID>ReturnCount:JdbcNotificationTestMailAuditAdapter.kt$JdbcNotificationTestMailAuditAdapter$@Transactional override fun reserveTestMailAuditAttempt( clubId: UUID, hostMembershipId: UUID, recipientMaskedEmail: String, recipientEmailHash: String, cooldownStartedAfter: OffsetDateTime, ): NotificationTestMailAuditItem?</ID>
+    <ID>ReturnCount:JdbcNotificationTestMailAuditAdapter.kt$TestMailAuditCreatedAtDescCursor.Companion$fun from(cursor: Map&lt;String, String&gt;): TestMailAuditCreatedAtDescCursor?</ID>
+    <ID>ReturnCount:JdbcPlatformAdminAdapter.kt$JdbcPlatformAdminAdapter$@Transactional override fun createClubDomain( clubId: UUID, hostname: String, kind: ClubDomainKind, @Suppress("UNUSED_PARAMETER") isPrimary: Boolean, ): CreateClubDomainResult</ID>
+    <ID>ReturnCount:MemberLifecycleService.kt$MemberLifecycleService$private fun applyCurrentSessionPolicy( clubId: UUID, membershipId: UUID, policy: CurrentSessionPolicy, ): CurrentSessionPolicyResult</ID>
+    <ID>ReturnCount:NotesFeedService.kt$NotesFeedService$override fun getNotesFeed( member: CurrentMember, sessionId: String?, pageRequest: PageRequest, ): CursorPage&lt;NoteFeedResult&gt;</ID>
+    <ID>ReturnCount:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$fun claimEmailDeliveries( jdbcTemplate: JdbcTemplate, limit: Int, ): List&lt;ClaimedNotificationDeliveryItem&gt;</ID>
+    <ID>ReturnCount:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$fun claimEmailDeliveriesForClub( jdbcTemplate: JdbcTemplate, clubId: UUID, limit: Int, ): List&lt;ClaimedNotificationDeliveryItem&gt;</ID>
+    <ID>ReturnCount:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$fun claimEmailDelivery( jdbcTemplate: JdbcTemplate, id: UUID, ): ClaimedNotificationDeliveryItem?</ID>
+    <ID>ReturnCount:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$fun claimHostEmailDelivery( jdbcTemplate: JdbcTemplate, clubId: UUID, id: UUID, ): ClaimedNotificationDeliveryItem?</ID>
+    <ID>ReturnCount:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$fun persistPlannedDeliveries( jdbcTemplate: JdbcTemplate, message: NotificationEventMessage, ): List&lt;NotificationDeliveryItem&gt;</ID>
+    <ID>ReturnCount:NotificationDispatchService.kt$NotificationDispatchService$private fun handleUnclaimedEmailDelivery(deliveryId: UUID): NotificationDeliveryRetryableException?</ID>
+    <ID>ReturnCount:NotificationDispatchServiceTest.kt$NotificationDispatchServiceTest.FakeDeliveryPort$override fun claimEmailDelivery(id: UUID): ClaimedNotificationDeliveryItem?</ID>
+    <ID>ReturnCount:NotificationWebDtos.kt$private fun maskEmail(email: String): String</ID>
+    <ID>ReturnCount:OAuthReturnState.kt$OAuthReturnState$private fun inviteClubSlug( returnTarget: String, inviteToken: String, ): String?</ID>
+    <ID>ReturnCount:OAuthReturnState.kt$OAuthReturnState$private fun inviteReturnTargetMatchesClub( returnTarget: String, clubSlug: String, inviteToken: String, ): Boolean</ID>
+    <ID>ReturnCount:OAuthReturnState.kt$OAuthReturnState$private fun trustedAbsoluteReturnTarget(candidate: String): String?</ID>
+    <ID>ReturnCount:OAuthReturnState.kt$OAuthReturnState$private fun verifiedReturnTarget(signedState: String?): String?</ID>
+    <ID>ReturnCount:RateLimitFilter.kt$RateLimitFilter$private fun HttpServletRequest.trustedClientIp(): String?</ID>
+    <ID>ReturnCount:RedisAuthSessionCacheAdapter.kt$RedisAuthSessionCacheAdapter$override fun find(tokenHash: String): AuthSessionCacheSnapshot?</ID>
+    <ID>SpreadOperator:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$( """ select notification_deliveries.id, notification_deliveries.event_id, notification_deliveries.channel, notification_deliveries.status, case when notification_deliveries.channel = 'EMAIL' then users.email else null end as recipient_email, notification_deliveries.attempt_count, notification_deliveries.created_at, notification_deliveries.updated_at from notification_deliveries join memberships on memberships.id = notification_deliveries.recipient_membership_id and memberships.club_id = notification_deliveries.club_id join users on users.id = memberships.user_id where notification_deliveries.club_id = ? $statusPredicate $channelPredicate $cursorPredicate order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc limit ? """.trimIndent(), { resultSet, _ -&gt; with(rowMappers) { resultSet.toHostNotificationDelivery() } }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:HostNotificationLedgerQueries.kt$HostNotificationLedgerQueries$( """ select notification_deliveries.id, notification_event_outbox.event_type, notification_deliveries.status, users.email as recipient_email, notification_deliveries.attempt_count, notification_deliveries.next_attempt_at, notification_deliveries.created_at, notification_deliveries.updated_at from notification_deliveries join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id and notification_event_outbox.club_id = notification_deliveries.club_id join memberships on memberships.id = notification_deliveries.recipient_membership_id and memberships.club_id = notification_deliveries.club_id join users on users.id = memberships.user_id where ${predicates.joinToString(" and ")} order by notification_deliveries.updated_at desc, notification_deliveries.created_at desc, notification_deliveries.id desc limit ? """.trimIndent(), { resultSet, _ -&gt; with(rowMappers) { resultSet.toHostNotificationItem() } }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcCurrentSessionAdapter.kt$JdbcCurrentSessionAdapter$( """ select questions.priority, questions.text, questions.draft_thought, case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_name, case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name from questions join memberships on memberships.id = questions.membership_id and memberships.club_id = questions.club_id join users on users.id = memberships.user_id join session_participants on session_participants.session_id = questions.session_id and session_participants.club_id = questions.club_id and session_participants.membership_id = questions.membership_id and session_participants.participation_status = 'ACTIVE' where questions.session_id = ? and questions.club_id = ? $membershipFilter order by questions.priority, questions.created_at, users.name """.trimIndent(), { resultSet, _ -&gt; CurrentSessionQuestion( priority = resultSet.getInt("priority"), text = resultSet.getString("text"), draftThought = resultSet.getString("draft_thought"), authorName = resultSet.getString("author_name"), authorShortName = resultSet.getString("author_short_name"), ) }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcFeedbackDocumentStoreAdapter.kt$JdbcFeedbackDocumentStoreAdapter$(sql, { resultSet, _ -&gt; resultSet.toStoredFeedbackDocumentList() }, *args)</ID>
+    <ID>SpreadOperator:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$( """ select count(*) from memberships where club_id = ? and status = 'ACTIVE' and id in ($placeholders) """.trimIndent(), Int::class.java, *(listOf(clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any }).toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$( """ select id from memberships where club_id = ? and status = 'ACTIVE' and id in ($placeholders) """.trimIndent(), { rs, _ -&gt; rs.uuid("id") }, *(listOf(clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any }).toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$( """ select memberships.id as membership_id, coalesce(memberships.short_name, users.name) as display_name, users.email, memberships.role, memberships.status, session_participants.participation_status, session_participants.attendance_status, coalesce(notification_preferences.email_enabled, true) as email_enabled from memberships join users on users.id = memberships.user_id $sessionJoin left join notification_preferences on notification_preferences.membership_id = memberships.id and notification_preferences.club_id = memberships.club_id where memberships.club_id = ? and memberships.status = 'ACTIVE' $searchPredicate $cursorPredicate order by display_name, memberships.id limit ? """.trimIndent(), { rs, _ -&gt; rs.toMemberOption() }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$( """ select memberships.id, users.email, coalesce(notification_preferences.email_enabled, true) as email_enabled, coalesce(notification_preferences.$preferenceColumn, true) as event_enabled from memberships join users on users.id = memberships.user_id left join notification_preferences on notification_preferences.membership_id = memberships.id and notification_preferences.club_id = memberships.club_id where memberships.club_id = ? and memberships.id in ($placeholders) """.trimIndent(), { rs, _ -&gt; EmailEligibilityRow( membershipId = rs.uuid("id"), email = rs.getString("email"), emailEnabled = rs.getBoolean("email_enabled"), eventEnabled = rs.getBoolean("event_enabled"), ) }, *(listOf(clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any }).toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$( """ select notification_manual_dispatches.id as manual_dispatch_id, notification_manual_dispatches.event_id, notification_manual_dispatches.event_type, notification_manual_dispatches.session_id, sessions.number as session_number, sessions.book_title, notification_manual_dispatches.requested_channels, notification_manual_dispatches.audience, notification_manual_dispatches.resend, users.email as requested_by_email, notification_manual_dispatches.target_count, notification_manual_dispatches.expected_in_app_count, notification_manual_dispatches.expected_email_count, notification_event_outbox.status as event_status, notification_manual_dispatches.created_at from notification_manual_dispatches join notification_event_outbox on notification_event_outbox.id = notification_manual_dispatches.event_id and notification_event_outbox.club_id = notification_manual_dispatches.club_id join sessions on sessions.id = notification_manual_dispatches.session_id and sessions.club_id = notification_manual_dispatches.club_id join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id and memberships.club_id = notification_manual_dispatches.club_id join users on users.id = memberships.user_id where ${predicates.joinToString(" and ")} order by notification_manual_dispatches.created_at desc, notification_manual_dispatches.id desc limit ? """.trimIndent(), { rs, _ -&gt; rs.toDispatchListItem() }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter$(sql, { rs, _ -&gt; rs.uuid("id") }, *args)</ID>
+    <ID>SpreadOperator:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$( """ select id, club_id, event_type, aggregate_type, aggregate_id, payload_json, status, kafka_topic, kafka_key, attempt_count, locked_at from notification_event_outbox where id in ($placeholders) order by field(id, $placeholders) """.trimIndent(), { resultSet, _ -&gt; resultSet.toNotificationEventOutboxItem() }, *orderedArgs, )</ID>
+    <ID>SpreadOperator:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$( """ select notification_event_outbox.id, notification_event_outbox.event_type, notification_event_outbox.status, notification_event_outbox.attempt_count, case when notification_manual_dispatches.id is null then 'AUTOMATIC' else 'MANUAL' end as source, notification_manual_dispatches.id as manual_dispatch_id, notification_manual_dispatches.requested_channels, notification_manual_dispatches.audience, notification_manual_dispatches.resend, notification_manual_dispatches.target_count, notification_manual_dispatches.expected_in_app_count, notification_manual_dispatches.expected_email_count, users.email as requested_by_email, notification_event_outbox.created_at, notification_event_outbox.updated_at from notification_event_outbox left join notification_manual_dispatches on notification_manual_dispatches.event_id = notification_event_outbox.id and notification_manual_dispatches.club_id = notification_event_outbox.club_id left join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id and memberships.club_id = notification_manual_dispatches.club_id left join users on users.id = memberships.user_id where notification_event_outbox.club_id = ? $statusPredicate $cursorPredicate order by notification_event_outbox.updated_at desc, notification_event_outbox.created_at desc, notification_event_outbox.id desc limit ? """.trimIndent(), { resultSet, _ -&gt; resultSet.toHostNotificationEvent() }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter$( """ update notification_event_outbox set status = 'PUBLISHING', locked_at = utc_timestamp(6), updated_at = utc_timestamp(6) where id in ($placeholders) and status in ('PENDING', 'FAILED') """.trimIndent(), *idArgs, )</ID>
+    <ID>SpreadOperator:NotificationDeliveryBacklogQueries.kt$NotificationDeliveryBacklogQueries$( """ select count(*) from notification_deliveries where club_id = ? and status = ? $channelPredicate """.trimIndent(), Int::class.java, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$( """ select notification_deliveries.id, notification_deliveries.event_id, notification_deliveries.club_id, notification_deliveries.recipient_membership_id, notification_deliveries.channel, notification_deliveries.status, notification_deliveries.attempt_count, notification_deliveries.locked_at, notification_event_outbox.event_type, notification_event_outbox.aggregate_id, notification_event_outbox.payload_json, clubs.slug as club_slug, clubs.name as club_name, users.email as recipient_email, coalesce(memberships.short_name, users.name) as display_name from notification_deliveries join notification_event_outbox on notification_event_outbox.id = notification_deliveries.event_id and notification_event_outbox.club_id = notification_deliveries.club_id join clubs on clubs.id = notification_event_outbox.club_id join memberships on memberships.id = notification_deliveries.recipient_membership_id and memberships.club_id = notification_deliveries.club_id join users on users.id = memberships.user_id where notification_deliveries.id in ($placeholders) order by field(notification_deliveries.id, $placeholders) """.trimIndent(), { resultSet, _ -&gt; with(rowMappers) { resultSet.toClaimedNotificationDeliveryItem() } }, *orderedArgs, )</ID>
+    <ID>SpreadOperator:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$( """ update notification_deliveries set status = 'PENDING', locked_at = null, next_attempt_at = utc_timestamp(6), updated_at = utc_timestamp(6) where channel = 'EMAIL' and status = 'SENDING' and locked_at &lt; timestampadd(MINUTE, ?, utc_timestamp(6)) $clubPredicate """.trimIndent(), -DELIVERY_LEASE_TIMEOUT_MINUTES, *args, )</ID>
+    <ID>SpreadOperator:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$( """ update notification_deliveries set status = 'SENDING', locked_at = utc_timestamp(6), updated_at = utc_timestamp(6) where club_id = ? and id in ($placeholders) and channel = 'EMAIL' and status in ('PENDING', 'FAILED') """.trimIndent(), *(listOf(clubId.dbString() as Any) + ids.map { it.dbString() as Any }).toTypedArray(), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryClaimOperations.kt$NotificationDeliveryClaimOperations$( """ update notification_deliveries set status = 'SENDING', locked_at = utc_timestamp(6), updated_at = utc_timestamp(6) where id in ($placeholders) and channel = 'EMAIL' and status in ('PENDING', 'FAILED') """.trimIndent(), *ids.map { it.dbString() as Any }.toTypedArray(), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$( """ select id from memberships where club_id = ? and status = 'ACTIVE' and id in ($placeholders) """.trimIndent(), { rs, _ -&gt; rs.uuid("id") }, *(listOf(clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any }).toTypedArray(), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$( """ select memberships.id as recipient_membership_id, coalesce(memberships.short_name, users.name) as display_name, ( users.email is not null and users.email &lt;&gt; '' and $emailPredicate ) as email_allowed from memberships join users on users.id = memberships.user_id where memberships.club_id = ? and memberships.status = 'ACTIVE' and memberships.id in ($placeholders) """.trimIndent(), { resultSet, _ -&gt; with(rowMappers) { resultSet.toDeliveryRecipient() } }, *args.toTypedArray(), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$( """ select memberships.id as recipient_membership_id, coalesce(memberships.short_name, users.name) as display_name, ( users.email is not null and users.email &lt;&gt; '' and coalesce(notification_preferences.email_enabled, true) and coalesce(notification_preferences.$preferenceColumn, true) ) as email_allowed from memberships join users on users.id = memberships.user_id left join notification_preferences on notification_preferences.membership_id = memberships.id and notification_preferences.club_id = memberships.club_id where memberships.club_id = ? and memberships.status = 'ACTIVE' and memberships.id in ($placeholders) """.trimIndent(), { resultSet, _ -&gt; with(rowMappers) { resultSet.toDeliveryRecipient() } }, *(listOf(message.clubId.dbString() as Any) + finalIds.map { it.dbString() as Any }).toTypedArray(), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$( """ select notification_deliveries.id, notification_deliveries.recipient_membership_id, coalesce(memberships.short_name, users.name) as display_name from notification_deliveries join memberships on memberships.id = notification_deliveries.recipient_membership_id and memberships.club_id = notification_deliveries.club_id join users on users.id = memberships.user_id where notification_deliveries.event_id = ? and notification_deliveries.club_id = ? and notification_deliveries.channel = 'IN_APP' and notification_deliveries.recipient_membership_id in ($placeholders) """.trimIndent(), { resultSet, _ -&gt; MemberNotificationDeliveryRow( id = resultSet.uuid("id"), recipientMembershipId = resultSet.uuid("recipient_membership_id"), displayName = resultSet.getString("display_name"), ) }, *( listOf(message.eventId.dbString() as Any, message.clubId.dbString() as Any) + membershipIds.map { it.dbString() as Any } ).toTypedArray(), )</ID>
+    <ID>SpreadOperator:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations$(sql, { rs, _ -&gt; rs.uuid("id") }, *args)</ID>
+    <ID>SpreadOperator:ReadmatesApplication.kt$(*args)</ID>
+    <ID>SwallowedException:FeedbackDocumentUploadValidator.kt$FeedbackDocumentUploadValidator$ex: CharacterCodingException</ID>
+    <ID>ThrowsCount:FeedbackDocumentUploadValidator.kt$FeedbackDocumentUploadValidator$private fun decodeUtf8(file: MultipartFile): String</ID>
+    <ID>ThrowsCount:FeedbackDocumentUploadValidator.kt$FeedbackDocumentUploadValidator$private fun validatedFileName(originalFilename: String?): String</ID>
+    <ID>ThrowsCount:HostManualNotificationService.kt$HostManualNotificationService$private fun validateSelection( host: CurrentMember, selection: ManualNotificationSelection, )</ID>
+    <ID>ThrowsCount:HostSessionWriteOperations.kt$HostSessionWriteOperations$fun open( jdbcTemplate: JdbcTemplate, command: HostSessionIdCommand, ): HostSessionTransitionResult</ID>
+    <ID>ThrowsCount:InvitationService.kt$InvitationService$@Transactional fun acceptGoogleInvitation( rawToken: String, googleSubjectId: String, email: String, displayName: String?, profileImageUrl: String?, expectedClubSlug: String? = null, ): CurrentMember</ID>
+    <ID>ThrowsCount:InvitationService.kt$InvitationService$private fun connectOrCreateInvitedGoogleUser( googleSubjectId: String, normalizedEmail: String, displayName: String?, profileImageUrl: String?, ): UUID</ID>
+    <ID>ThrowsCount:MemberLifecycleService.kt$MemberLifecycleService$private fun ensureMutableMembership( host: CurrentMember, membershipId: UUID, ): LifecycleMembershipRow</ID>
+    <ID>ThrowsCount:MemberProfileService.kt$MemberProfileService$private fun updateHostDisplayName( clubId: UUID, membershipId: UUID, displayName: String, )</ID>
+    <ID>ThrowsCount:MemberProfileService.kt$MemberProfileService$private fun updateOwnDisplayName( clubId: UUID, membershipId: UUID, displayName: String, )</ID>
+    <ID>ThrowsCount:MemberProfileService.kt$MemberProfileService$private fun validateDisplayName(rawDisplayName: String?): String</ID>
+    <ID>ThrowsCount:PlatformAdminService.kt$PlatformAdminService$private fun validateHostname(hostname: String)</ID>
+    <ID>TooGenericExceptionCaught:BffSecretFilter.kt$BffSecretFilter$ex: Exception</ID>
+    <ID>TooGenericExceptionCaught:JdbcBffSecretRotationAuditAdapter.kt$JdbcBffSecretRotationAuditAdapter$ex: Exception</ID>
+    <ID>TooGenericExceptionCaught:JdbcHostInvitationStoreAdapter.kt$JdbcHostInvitationStoreAdapter$error: Exception</ID>
+    <ID>TooGenericExceptionCaught:KafkaNotificationEventPublisherAdapter.kt$KafkaNotificationEventPublisherAdapter$ex: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:NotificationDeliveryEngine.kt$NotificationDeliveryEngine$exception: Exception</ID>
+    <ID>TooGenericExceptionCaught:NotificationRelayService.kt$NotificationRelayService$exception: Exception</ID>
+    <ID>TooGenericExceptionCaught:NotificationTestMailService.kt$NotificationTestMailService$exception: Exception</ID>
+    <ID>TooGenericExceptionCaught:ReadmatesOAuthSuccessHandler.kt$ReadmatesOAuthSuccessHandler$exception: RuntimeException</ID>
+    <ID>TooGenericExceptionThrown:BffSecretFilterAuditTest.kt$BffSecretFilterAuditTest.&lt;no name provided&gt;$throw RuntimeException("db down")</ID>
+    <ID>TooManyFunctions:ArchiveWebMapper.kt$com.readmates.archive.adapter.in.web.ArchiveWebMapper.kt</ID>
+    <ID>TooManyFunctions:AuthSessionService.kt$AuthSessionService : LogoutAuthSessionUseCase</ID>
+    <ID>TooManyFunctions:FeedbackDocumentParser.kt$FeedbackDocumentParser</ID>
+    <ID>TooManyFunctions:FeedbackDocumentService.kt$FeedbackDocumentService : ListMyReadableFeedbackDocumentsUseCaseGetReadableFeedbackDocumentUseCaseGetHostFeedbackDocumentStatusUseCaseAuthorizeHostFeedbackDocumentUploadUseCaseUploadHostFeedbackDocumentUseCase</ID>
+    <ID>TooManyFunctions:HostInvitationStorePort.kt$HostInvitationStorePort</ID>
+    <ID>TooManyFunctions:HostManualNotificationService.kt$HostManualNotificationService : ManageManualHostNotificationsUseCase</ID>
+    <ID>TooManyFunctions:HostMemberApprovalController.kt$HostMemberApprovalController</ID>
+    <ID>TooManyFunctions:HostNotificationController.kt$HostNotificationController</ID>
+    <ID>TooManyFunctions:HostSessionQueries.kt$HostSessionQueries</ID>
+    <ID>TooManyFunctions:HostSessionWriteOperations.kt$HostSessionWriteOperations</ID>
+    <ID>TooManyFunctions:InvitationService.kt$InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCase</ID>
+    <ID>TooManyFunctions:JdbcCurrentSessionAdapter.kt$JdbcCurrentSessionAdapter : LoadCurrentSessionPort</ID>
+    <ID>TooManyFunctions:JdbcFeedbackDocumentStoreAdapter.kt$JdbcFeedbackDocumentStoreAdapter : FeedbackDocumentStorePort</ID>
+    <ID>TooManyFunctions:JdbcHostInvitationStoreAdapter.kt$JdbcHostInvitationStoreAdapter : HostInvitationStorePort</ID>
+    <ID>TooManyFunctions:JdbcHostSessionWriteAdapter.kt$JdbcHostSessionWriteAdapter : HostSessionQueryPortHostSessionDraftPortHostSessionLifecyclePortHostSessionDeletionPortHostSessionAttendancePortHostSessionPublicationPort</ID>
+    <ID>TooManyFunctions:JdbcManualNotificationDispatchAdapter.kt$JdbcManualNotificationDispatchAdapter : ManualNotificationDispatchPort</ID>
+    <ID>TooManyFunctions:JdbcMemberAccountAdapter.kt$JdbcMemberAccountAdapter : MemberIdentityLookupPortGoogleAccountStorePortPlatformAdminLookupPortDevSeedMemberLookupPort</ID>
+    <ID>TooManyFunctions:JdbcMemberLifecycleStoreAdapter.kt$JdbcMemberLifecycleStoreAdapter : MemberLifecycleStorePort</ID>
+    <ID>TooManyFunctions:JdbcNotificationDeliveryAdapter.kt$JdbcNotificationDeliveryAdapter : NotificationDeliveryPlanningPortNotificationDeliveryClaimPortNotificationDeliveryStatusPortNotificationDeliveryBacklogPortHostNotificationDeliveryLedgerPort</ID>
+    <ID>TooManyFunctions:JdbcNotificationEventOutboxAdapter.kt$JdbcNotificationEventOutboxAdapter : NotificationEventOutboxPort</ID>
+    <ID>TooManyFunctions:JdbcSessionParticipationWriteAdapter.kt$JdbcSessionParticipationWriteAdapter : SessionParticipationWritePort</ID>
+    <ID>TooManyFunctions:ManualNotificationDispatchPort.kt$ManualNotificationDispatchPort</ID>
+    <ID>TooManyFunctions:MemberLifecycleService.kt$MemberLifecycleService : ManageMemberLifecycleUseCaseLeaveMembershipUseCase</ID>
+    <ID>TooManyFunctions:MemberLifecycleStorePort.kt$MemberLifecycleStorePort</ID>
+    <ID>TooManyFunctions:NotificationDeliveryPlanningOperations.kt$NotificationDeliveryPlanningOperations</ID>
+    <ID>TooManyFunctions:NotificationDeliveryRowMappers.kt$NotificationDeliveryRowMappers</ID>
+    <ID>TooManyFunctions:NotificationEmailTemplates.kt$NotificationEmailTemplates</ID>
+    <ID>TooManyFunctions:NotificationKafkaConfiguration.kt$NotificationKafkaConfiguration</ID>
+    <ID>TooManyFunctions:NotificationWebDtos.kt$com.readmates.notification.adapter.in.web.NotificationWebDtos.kt</ID>
+    <ID>TooManyFunctions:OAuthReturnState.kt$OAuthReturnState</ID>
+    <ID>TooManyFunctions:PublicReadCachePort.kt$PublicReadCachePort</ID>
+    <ID>TooManyFunctions:RedisAuthSessionCacheAdapter.kt$RedisAuthSessionCacheAdapter : AuthSessionCachePort</ID>
+    <ID>TooManyFunctions:RedisNotesReadCacheAdapter.kt$RedisNotesReadCacheAdapter : NotesReadCachePort</ID>
+    <ID>TooManyFunctions:RedisPublicReadCacheAdapter.kt$RedisPublicReadCacheAdapter : PublicReadCachePort</ID>
+    <ID>UnusedParameter:AuthMeControllerTest.kt$AuthMeControllerTest$password: String</ID>
+    <ID>UnusedParameter:DevInvitationController.kt$DevInvitationController$@PathVariable("token") _token: String</ID>
+    <ID>UnusedParameter:InvitationController.kt$InvitationController$@PathVariable("clubSlug") _clubSlug: String</ID>
+    <ID>UnusedParameter:InvitationController.kt$InvitationController$@PathVariable("token") _token: String</ID>
+    <ID>UnusedParameter:SharedApplicationErrorHandler.kt$SharedApplicationErrorHandler$error: AccessDeniedException</ID>
+    <ID>UnusedPrivateMember:CurrentMemberArgumentResolverTest.kt$CurrentMemberArgumentResolverTest$private fun currentMemberEndpoint(member: CurrentMember)</ID>
+    <ID>UnusedPrivateMember:CurrentMemberArgumentResolverTest.kt$CurrentMemberArgumentResolverTest$private fun stringEndpoint(value: String)</ID>
+    <ID>UnusedPrivateMember:JdbcCurrentSessionAdapter.kt$JdbcCurrentSessionAdapter$private fun findBoardHighlights( jdbcTemplate: JdbcTemplate, sessionId: UUID, clubId: UUID, ): List&lt;BoardHighlight&gt;</ID>
+    <ID>UnusedPrivateMember:JdbcCurrentSessionAdapter.kt$JdbcCurrentSessionAdapter$private fun findBoardOneLineReviews( jdbcTemplate: JdbcTemplate, sessionId: UUID, member: CurrentMember, ): List&lt;BoardOneLineReview&gt;</ID>
+    <ID>UnusedPrivateMember:JdbcNotesFeedAdapter.kt$JdbcNotesFeedAdapter$private fun &lt;T&gt; List&lt;T&gt;.toCursorPage(): CursorPage&lt;T&gt;</ID>
+    <ID>UnusedPrivateProperty:FrontendFixtureContractTest.kt$FrontendFixtureContractTest$private val jdbcTemplate: JdbcTemplate</ID>
+    <ID>UnusedPrivateProperty:NotesFeedService.kt$NotesFeedService$private val cache: NotesReadCachePort = NotesReadCachePort.Noop()</ID>
+    <ID>UseCheckOrError:HostSessionServicesTest.kt$HostSessionServicesTest.RecordingHostSessionPorts$throw IllegalStateException("write failed")</ID>
+    <ID>UseCheckOrError:HostSessionServicesTest.kt$HostSessionServicesTest.ThrowingReadCacheInvalidationPort$throw IllegalStateException("invalidation failed")</ID>
+    <ID>UseCheckOrError:JdbcMemberAccountAdapter.kt$JdbcMemberAccountAdapter$throw IllegalStateException("Created Google user has no membership")</ID>
+    <ID>UseCheckOrError:JdbcNotificationTestMailAuditAdapter.kt$JdbcNotificationTestMailAuditAdapter$throw IllegalStateException("Notification test mail audit row not found")</ID>
+    <ID>UseCheckOrError:NotificationDeliveryEngine.kt$NotificationDeliveryEngine$throw IllegalStateException("Claimed email delivery $deliveryId missing $name")</ID>
+    <ID>UseCheckOrError:ReadCacheInvalidationPortTest.kt$ReadCacheInvalidationPortTest.ThrowingReadCacheInvalidationPort$throw IllegalStateException("invalidation failed")</ID>
+    <ID>UseCheckOrError:RedisAuthSessionCacheAdapterTest.kt$RedisAuthSessionCacheAdapterTest.&lt;no name provided&gt;$throw IllegalStateException("redis unavailable")</ID>
+    <ID>UseCheckOrError:RedisPublicReadCacheAdapterTest.kt$RedisPublicReadCacheAdapterTest.&lt;no name provided&gt;$throw IllegalStateException("redis unavailable")</ID>
+    <ID>UseCheckOrError:RedisRateLimitAdapterTest.kt$RedisRateLimitAdapterTest.&lt;no name provided&gt;$throw IllegalStateException("redis unavailable")</ID>
+    <ID>UseCheckOrError:RedisReadCacheInvalidationAdapterTest.kt$RedisReadCacheInvalidationAdapterTest.&lt;no name provided&gt;$throw IllegalStateException("redis unavailable")</ID>
+    <ID>UseCheckOrError:SessionMemberWriteServiceTest.kt$SessionMemberWriteServiceTest.RecordingSessionParticipationWritePort$throw IllegalStateException("write failed")</ID>
+    <ID>UseCheckOrError:SessionMemberWriteServiceTest.kt$SessionMemberWriteServiceTest.ThrowingReadCacheInvalidationPort$throw IllegalStateException("invalidation failed")</ID>
+    <ID>UtilityClassWithPublicConstructor:AcceptInvitationUseCase.kt$AcceptInvitationUseCase</ID>
+    <ID>UtilityClassWithPublicConstructor:ReadmatesSpringTestSupport.kt$ReadmatesKafkaIntegrationTestSupport</ID>
+    <ID>UtilityClassWithPublicConstructor:ReadmatesSpringTestSupport.kt$ReadmatesMySqlIntegrationTestSupport</ID>
+  </CurrentIssues>
+</SmellBaseline>
