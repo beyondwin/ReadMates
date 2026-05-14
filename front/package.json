@@ -8,6 +8,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:watch": "vitest",
     "zod:export-fixtures": "tsx scripts/export-zod-fixtures.ts"
