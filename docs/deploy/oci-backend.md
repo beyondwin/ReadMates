@@ -319,6 +319,7 @@ Kafka relay/consumer와 실제 SMTP 발송은 아래 조건이 모두 맞을 때
 - 호스트가 예정 세션 공개 범위를 `MEMBER` 또는 `PUBLIC`으로 바꾸면 활성 멤버 대상으로 `NEXT_BOOK_PUBLISHED` 알림을 생성합니다.
 - `SESSION_REMINDER_DUE` 이벤트 타입, `recordSessionReminderDue(targetDate)` API, 기본 켜짐 선호도는 지원하지만 현재 운영 코드에는 이 이벤트를 매일 생성하는 production scheduler/caller가 없습니다.
 - 멤버가 발행된 공개 회차에 공개 서평을 저장하면 `REVIEW_PUBLISHED` 알림을 생성합니다. 이 알림은 멤버가 직접 켜야 하는 opt-in 알림입니다.
+- 호스트가 `/app/host/notifications`에서 수동 발송을 확정하면 선택한 세션과 대상 그룹 기준으로 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED` 이벤트를 만들 수 있습니다. 이 경우에도 최종 발송은 `notification_event_outbox` → Kafka relay/consumer → `notification_deliveries`/`member_notifications` 파이프라인을 사용합니다.
 
 멤버 알림 설정 기본값:
 
@@ -342,11 +343,12 @@ Email delivery dispatch/worker retry 간격은 `READMATES_NOTIFICATION_RETRY_DEL
 - Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인합니다.
 - 호스트 알림 운영 페이지는 `/app/host/notifications`입니다.
 - 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인하고, pending/failed email delivery를 처리하며, `DEAD` email delivery를 retry 가능한 상태로 복구할 수 있습니다.
+- 같은 페이지의 수동 발송 영역에서 세션, 템플릿, 대상 그룹, 채널, 멤버별 포함/제외를 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. Preview는 10분 TTL로 저장되며, 같은 세션/템플릿의 최근 수동 발송이 있으면 재발송 확인이 필요합니다.
 - 호스트 알림 운영 페이지에서 redesigned template helper를 쓰는 테스트 메일을 보낼 수 있습니다. 테스트 메일 copy는 별도 문구를 사용하고 CTA/deep link는 포함하지 않습니다. 테스트 메일 audit은 masked recipient email과 hash만 저장하고 raw recipient email은 저장하지 않습니다.
 - Host dashboard의 수동 처리 action은 현재 host club의 pending/failed 알림만 처리합니다.
 - Kafka consumer retry를 기다리지 않고 즉시 확인이 필요할 때만 수동 처리를 사용합니다.
 
-Host 알림 detail API는 subject, masked recipient, deep link, allowlist metadata와 delivery 상태를 노출합니다. Plain/HTML 이메일 본문은 API 응답에 포함하지 않습니다.
+Host 알림 detail API는 subject, masked recipient, deep link, allowlist metadata와 delivery 상태를 노출합니다. Plain/HTML 이메일 본문은 API 응답에 포함하지 않습니다. 수동 발송 감사 원장은 `notification_manual_dispatch_previews`와 `notification_manual_dispatches`를 사용하며, host-facing 응답에는 요청자 표시명, 대상 수, 예상 채널별 건수, 재발송 여부 같은 운영 metadata만 노출합니다.
 
 ## 검증
 

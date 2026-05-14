@@ -143,6 +143,12 @@ mutation과 outbox row 삽입이 동일 트랜잭션이므로:
 
 `CachedNotificationBacklogProvider`가 outbox backlog를 Prometheus metric으로 노출한다. backlog가 threshold를 넘으면 알람 트리거 가능. 운영 화면에서 발송 상태를 확인하고 DEAD row를 수동으로 재처리할 수 있다.
 
+### 수동 발송도 같은 outbox를 사용
+
+호스트가 운영 화면에서 세션, 템플릿, 대상 그룹, 채널을 고르는 수동 발송은 별도 즉시 SMTP 경로를 만들지 않는다. Preview 단계는 `notification_manual_dispatch_previews`에 selection hash와 만료 시각을 저장하고, confirm 단계는 `notification_manual_dispatches`와 `notification_event_outbox` row를 같은 트랜잭션에서 생성한다. 이후 Kafka relay/consumer와 `NotificationDeliveryEngine`이 자동 알림과 같은 방식으로 channel delivery와 멤버 알림함 row를 만든다.
+
+이 경로는 수동 조작의 편의성보다 감사성과 일관성을 우선한다. 같은 세션/템플릿의 최근 수동 발송이 있으면 `resendConfirmed`가 없을 때 confirm을 막아 중복 발송을 운영자가 명시적으로 확인하게 한다. 수동 발송 대상 편집은 club membership 안에서만 허용하고, `REVIEW_PUBLISHED`는 사용자 작성 이벤트에 묶인 자동 알림으로 유지한다.
+
 ## 대안
 
 | 대안 | 기각 이유 |
@@ -187,6 +193,8 @@ schema 검증:
 - `V16__notification_outbox.sql` — 초기 outbox 테이블
 - `V19__notification_outbox_metadata.sql` — metadata 컬럼 추가
 - `V20__kafka_notification_pipeline.sql` — 전체 notification 파이프라인 재설계, status constraint 포함
+- `V27__manual_notification_dispatch.sql` — 수동 발송 preview와 dispatch 감사 원장 추가
+- `V28__manual_notification_dispatch_hardening.sql` — preview 소비 상태와 preview-dispatch 1:1 제약 추가
 
 outbox 상태 확인:
 ```sql

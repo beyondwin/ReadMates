@@ -28,6 +28,8 @@ Unit test:
 pnpm --dir front test
 ```
 
+Vitest는 `front/vitest.config.ts`의 project split으로 순수 Node 단위 테스트와 `jsdom`/React/BFF 성격 테스트를 나눠 실행합니다. 새 테스트를 추가할 때 DOM, Web API, Testing Library가 필요하면 `jsdom` project include 대상에 두고, 순수 model/contract 계산이면 Node project에 남깁니다.
+
 Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, `shared/ui`의 `src/app` import 금지, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import 금지, route-owned action type 노출 여부를 확인합니다. Legacy boundary exception 목록은 비어 있어야 합니다.
 
 Frontend 경계만 빠르게 확인하려면 Vitest를 직접 실행합니다.
@@ -116,7 +118,7 @@ Backend fast lanes:
 ./server/gradlew -p server architectureTest
 ```
 
-이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. Backend 변경을 ship하기 전에는 여전히 전체 backend test를 실행합니다.
+이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 여전히 전체 backend test를 실행합니다.
 
 Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
@@ -135,9 +137,16 @@ Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관
 ./server/gradlew -p server clean test
 pnpm --dir front exec vitest run tests/unit/host-dashboard.test.tsx
 pnpm --dir front exec vitest run tests/unit/host-notifications.test.tsx
+pnpm --dir front exec vitest run tests/unit/host-session-notifications.test.tsx
 pnpm --dir front exec vitest run tests/unit/member-notifications.test.tsx
 pnpm --dir front exec vitest run tests/unit/my-page.test.tsx
 pnpm --dir front lint
+```
+
+수동 알림 발송의 세션 선택, preview/confirm, duplicate resend, 멤버별 포함/제외, in-app 수신 확인까지 바꿨다면 아래 E2E spec도 함께 확인합니다. 이 spec은 Playwright가 띄우는 dev backend와 E2E MySQL schema가 필요합니다.
+
+```bash
+pnpm --dir front test:e2e -- manual-notifications
 ```
 
 ## Redis-Backed Server Features

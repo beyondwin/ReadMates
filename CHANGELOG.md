@@ -6,7 +6,37 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
-릴리즈 대기 항목 없음.
+### Highlights
+
+v1.8.3 이후 누적된 변경은 호스트 알림 운영을 "상태 조회/재처리"에서 "세션별 수동 발송 계획, 미리보기, 확정, 감사"까지 확장하고, 테스트/빌드 runtime을 빠른 피드백 lane과 release baseline으로 분리하는 데 초점을 둡니다. DB migration V27, V28이 포함됩니다.
+
+### Added
+
+- **호스트 수동 알림 발송 워크벤치**: `/app/host/notifications`에서 세션을 선택하고 `NEXT_BOOK_PUBLISHED`, `SESSION_REMINDER_DUE`, `FEEDBACK_DOCUMENT_PUBLISHED` 템플릿을 고른 뒤 대상 그룹(`ALL_ACTIVE_MEMBERS`, `SESSION_PARTICIPANTS`, `CONFIRMED_ATTENDEES`), 채널(`IN_APP`, `EMAIL`, `BOTH`), 멤버별 포함/제외를 조합해 알림을 발송할 수 있습니다.
+- **수동 발송 preview/confirm 계약**: `GET /api/host/notifications/manual/options`, `POST /api/host/notifications/manual/preview`, `POST /api/host/notifications/manual`, `GET /api/host/notifications/manual/dispatches`를 추가했습니다. Preview는 대상 수, in-app/email 예상 건수, 이메일 선호도 skip, 이메일 누락, 중복 발송 여부를 반환합니다.
+- **수동 발송 감사 원장**: `notification_manual_dispatch_previews`, `notification_manual_dispatches` 테이블을 추가했습니다. Confirm은 preview selection hash와 10분 TTL을 확인하고, 같은 preview로 중복 confirm해도 기존 dispatch 결과를 반환하도록 hardened path를 둡니다.
+- **수동 발송 E2E 커버리지**: Playwright `manual-notifications.spec.ts`가 세션 선택, preview/confirm, 중복 재발송 확인, 피드백 문서 알림 조건, in-app 수신 확인을 검증합니다.
+- **Backend test fast lanes**: Gradle `unitTest`, `integrationTest`, `architectureTest` task를 추가하고, Gradle test JVM을 Java 21 toolchain으로 고정했습니다.
+
+### Changed
+
+- **알림 event ledger metadata 확장**: host event/delivery 목록에서 `source=AUTOMATIC|MANUAL`과 manual dispatch metadata를 구분합니다. Host-facing 응답은 요청자 표시명, 대상 수, 예상 채널별 건수, 재발송 여부만 노출하고 raw email body는 계속 노출하지 않습니다.
+- **프런트 테스트 runtime 분리**: Vitest config를 Node project와 `jsdom` project로 나눠 순수 model/contract 테스트가 DOM 환경을 불필요하게 띄우지 않도록 했습니다.
+- **Playwright worker opt-in**: 기본 worker는 seeded DB 공유 때문에 1로 유지하고, `PLAYWRIGHT_WORKERS` 환경 변수로만 병렬 실행을 실험할 수 있게 했습니다.
+- **E2E DB reset 통합**: E2E helper가 generated session, invited member, Google login, manual notification artifact cleanup을 한 번의 SQL batch로 묶을 수 있게 했습니다.
+- **서버 Docker image layer 최적화**: `server/Dockerfile`과 `server/Dockerfile.release`가 Spring Boot layertools로 dependency/application layer를 분리하고 `JarLauncher` entrypoint를 사용합니다.
+- **서버 Docker build 메모리 제한**: local Dockerfile builder 단계에서 Gradle max worker와 JVM 메모리 옵션을 명시해 작은 빌드 환경의 OOM 가능성을 낮췄습니다.
+
+### Deployment Notes
+
+- **DB migration**: V27(`notification_manual_dispatch_previews`, `notification_manual_dispatches`), V28(preview consumed 상태와 preview-dispatch 1:1 제약) 적용 필요.
+- **새 환경 변수**: 없음.
+- **배포 순서**: 서버 먼저 배포해 새 API와 migration을 적용한 뒤 프론트엔드를 배포합니다. 구버전 프론트는 새 수동 발송 API를 호출하지 않으므로 서버 선배포가 안전합니다.
+- **운영 확인**: 배포 후 호스트 알림 운영 페이지에서 수동 발송 preview가 대상 수와 경고를 반환하는지, confirm 후 event ledger에 `source=MANUAL` row가 생기는지, Kafka/SMTP가 꺼진 환경이면 `notification_event_outbox`에 `PENDING` row가 남는지 확인합니다.
+
+### Verification
+
+- 릴리즈 baseline 검증은 아직 이 Unreleased 묶음에 대해 확정 기록하지 않았습니다. Ship 전 `pnpm --dir front lint`, `pnpm --dir front test`, `pnpm --dir front build`, `pnpm --dir front test:e2e`, `./server/gradlew -p server clean test`, 공개 release 후보 검사를 실행하고 결과를 이 섹션에 갱신해야 합니다.
 
 ## v1.8.3 - 2026-05-13
 
