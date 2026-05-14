@@ -81,46 +81,50 @@ class JdbcPublicQueryAdapter(
                 sessionId.dbString(),
             ).firstOrNull()
 
+    // for_next_tasks: task_3 will rewrite publicSessions() — do not touch lines 125-188
     private fun publicStats(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
     ): PublicClubStatsResult =
-        PublicClubStatsResult(
-            sessions =
-                jdbcTemplate.queryForObject(
-                    """
-                    select count(*)
-                    from sessions
-                    join public_session_publications on public_session_publications.session_id = sessions.id
-                      and public_session_publications.club_id = sessions.club_id
-                    where sessions.club_id = ?
-                      and sessions.state = 'PUBLISHED'
-                      and public_session_publications.visibility = 'PUBLIC'
-                    """.trimIndent(),
-                    Int::class.java,
-                    clubId.dbString(),
-                ) ?: 0,
-            books =
-                jdbcTemplate.queryForObject(
-                    """
-                    select count(distinct sessions.book_title)
-                    from sessions
-                    join public_session_publications on public_session_publications.session_id = sessions.id
-                      and public_session_publications.club_id = sessions.club_id
-                    where sessions.club_id = ?
-                      and sessions.state = 'PUBLISHED'
-                      and public_session_publications.visibility = 'PUBLIC'
-                    """.trimIndent(),
-                    Int::class.java,
-                    clubId.dbString(),
-                ) ?: 0,
-            members =
-                jdbcTemplate.queryForObject(
-                    "select count(*) from memberships where club_id = ? and status = 'ACTIVE'",
-                    Int::class.java,
-                    clubId.dbString(),
-                ) ?: 0,
-        )
+        jdbcTemplate.queryForObject(
+            """
+            select
+              (
+                select count(*)
+                from sessions
+                join public_session_publications on public_session_publications.session_id = sessions.id
+                  and public_session_publications.club_id = sessions.club_id
+                where sessions.club_id = ?
+                  and sessions.state = 'PUBLISHED'
+                  and public_session_publications.visibility = 'PUBLIC'
+              ) as session_count,
+              (
+                select count(distinct sessions.book_title)
+                from sessions
+                join public_session_publications on public_session_publications.session_id = sessions.id
+                  and public_session_publications.club_id = sessions.club_id
+                where sessions.club_id = ?
+                  and sessions.state = 'PUBLISHED'
+                  and public_session_publications.visibility = 'PUBLIC'
+              ) as book_count,
+              (
+                select count(*)
+                from memberships
+                where club_id = ?
+                  and status = 'ACTIVE'
+              ) as member_count
+            """.trimIndent(),
+            { rs, _ ->
+                PublicClubStatsResult(
+                    sessions = rs.getInt("session_count"),
+                    books = rs.getInt("book_count"),
+                    members = rs.getInt("member_count"),
+                )
+            },
+            clubId.dbString(),
+            clubId.dbString(),
+            clubId.dbString(),
+        ) ?: PublicClubStatsResult(sessions = 0, books = 0, members = 0)
 
     private fun publicSessions(
         jdbcTemplate: JdbcTemplate,
