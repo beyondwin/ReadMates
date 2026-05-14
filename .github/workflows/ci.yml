@@ -130,8 +130,24 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Test
-        run: ./server/gradlew -p server clean test
+      - name: Server quality gates (ktlint + detekt + tests + JaCoCo)
+        working-directory: server
+        run: ./gradlew check
+
+      - name: Architecture tests
+        working-directory: server
+        run: ./gradlew architectureTest
+
+      - name: Upload server reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: server-reports
+          path: |
+            server/build/reports/detekt/
+            server/build/reports/jacoco/
+            server/build/reports/ktlint/
+          retention-days: 14
 
       - name: Upload backend reports
         if: failure()
