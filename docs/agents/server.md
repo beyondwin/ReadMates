@@ -35,6 +35,8 @@ Persistence adapters own JDBC SQL, DB rows, and column mapping. New persistence 
 
 Operational Flyway migrations live under `server/src/main/resources/db/mysql/migration`. Do not add new production migrations under `server/src/main/resources/db/migration`.
 
+CQRS read/write package split: write-side feature(`auth`, `club`, `session`, `notification`)는 entity와 도메인 invariant를 갖는 `domain/` 패키지와 트랜잭션 mutation을 수행하는 application service를 둡니다. Read-side feature(`note`, `publication`, `archive`)는 `domain/` 없이 `application/model/`의 read DTO와 `JdbcXxxAdapter` 직접 query만 두고, application service에 `@ReadOnlyApplicationService` 마커(`com.readmates.shared.architecture`)를 부착합니다. `feedback`은 mixed(업로드 mutation + 조회)로 marker 미부착. Read-only service는 mutation port(`*SavePort`/`*UpdatePort`/`*DeletePort`/`*WriterPort`/`*StorePort`/`*WritePort` suffix in `*.port.out.*`)와 `@Transactional`을 모두 금지합니다 — `ServerArchitectureBoundaryTest`가 강제합니다. 자세한 컨벤션은 [docs/development/architecture.md](../development/architecture.md)의 "CQRS Read vs Write Package Split" 섹션을 참고합니다.
+
 Security boundaries:
 
 - Browser traffic should go through Cloudflare/Vite same-origin BFF routes.
@@ -54,6 +56,20 @@ Checks:
 
 ```bash
 ./server/gradlew -p server clean test
+```
+
+PR-level quality gate(ktlint baseline + detekt baseline + tests + JaCoCo line coverage ≥ 0.23)는 `check` task로 통합되어 있고 CI backend job이 이를 호출합니다. 정적 분석/coverage가 영향받는 변경에서는 로컬에서도 함께 실행합니다. ArchUnit boundary는 별도 fast lane으로 분리되어 있습니다.
+
+```bash
+./server/gradlew -p server check
+./server/gradlew -p server architectureTest
+```
+
+개발 중 빠른 피드백이 필요하면 fast lane을 사용할 수 있습니다 (release baseline을 대체하지 않음).
+
+```bash
+./server/gradlew -p server unitTest
+./server/gradlew -p server integrationTest
 ```
 
 For API, auth, BFF, or user-flow changes, also run:

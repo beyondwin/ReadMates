@@ -30,6 +30,16 @@ pnpm --dir front test
 
 Vitest는 `front/vitest.config.ts`의 project split으로 순수 Node 단위 테스트와 `jsdom`/React/BFF 성격 테스트를 나눠 실행합니다. 새 테스트를 추가할 때 DOM, Web API, Testing Library가 필요하면 `jsdom` project include 대상에 두고, 순수 model/contract 계산이면 Node project에 남깁니다.
 
+신규 단위 테스트는 source 파일 옆에 `*.test.{ts,tsx}` 형식으로 co-locate합니다(예: `features/host/ui/host-foo.tsx` → `features/host/ui/host-foo.test.tsx`). `vitest.config.ts`의 `include`가 `src/**/*.test.{ts,tsx}`, `features/**/*.test.{ts,tsx}`, `shared/**/*.test.{ts,tsx}`와 기존 `tests/unit/**`를 모두 매치합니다. 기존 `front/tests/unit/`는 server testcontainer가 `readmates.frontend.fixtures.dir` system property로 참조하므로 이동하지 않습니다. 새 fixture가 서버에서도 사용되는 경우에만 `tests/unit/__fixtures__/`에 둡니다.
+
+Coverage 게이트:
+
+```bash
+pnpm --dir front test:coverage
+```
+
+`@vitest/coverage-v8`로 측정하며, threshold는 현재 baseline에서 정수 -2pp floor로 고정합니다(lines/statements 87, functions 83, branches 84). CI front job은 `pnpm test:coverage`로 게이트를 강제하고 `front-coverage` 아티팩트를 always upload(14일 보존)합니다. Threshold를 올릴 때는 안정적으로 통과하는 측정치 -2pp(정수 floor)를 기준으로 갱신합니다.
+
 Frontend unit suite에는 `front/tests/unit/frontend-boundaries.test.ts`도 포함됩니다. 이 테스트는 route-first 구조의 shared/feature/model/route/ui import 경계, `shared/ui`의 `src/app` import 금지, 제거된 `shared/api/readmates` compatibility import, `ui`가 있는 feature의 `components` public import 금지, route-owned action type 노출 여부를 확인합니다. Legacy boundary exception 목록은 비어 있어야 합니다.
 
 Frontend 경계만 빠르게 확인하려면 Vitest를 직접 실행합니다.
@@ -119,6 +129,20 @@ Backend fast lanes:
 ```
 
 이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 여전히 전체 backend test를 실행합니다.
+
+PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
+
+```bash
+./server/gradlew -p server check
+```
+
+`check`는 다음 게이트를 한 번에 검증합니다.
+
+- **ktlint baseline gate**: `org.jlleitschuh.gradle.ktlint` 12.1.1 + ktlint tool 1.7.1. 기존 위반은 `server/config/ktlint/baseline.xml`로 grandfather, 신규 위반만 차단합니다. Auto-format은 `./server/gradlew -p server ktlintFormat`로 적용합니다.
+- **detekt baseline gate**: detekt 1.23.7 + `server/config/detekt/detekt.yml`. 기존 위반은 `server/config/detekt/baseline.xml`로 grandfather. detekt 1.23.x가 호스트 JDK 25에서 동작하도록 `server/gradle/gradle-daemon-jvm.properties`에서 daemon JVM을 Java 21로 pin하고, detekt classpath는 Kotlin 2.0.10으로 고정합니다.
+- **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.23(측정치 -2pp)을 강제합니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때는 측정치 -2pp baseline rule을 유지합니다.
+
+CI backend job은 `./gradlew check` 단일 호출 + 별도 `architectureTest` step으로 구성되어 있고, ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
 
 Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
