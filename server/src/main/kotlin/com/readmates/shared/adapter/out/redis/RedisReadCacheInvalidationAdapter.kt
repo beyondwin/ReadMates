@@ -3,6 +3,7 @@ package com.readmates.shared.adapter.out.redis
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.data.redis.core.ScanOptions
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -21,7 +22,7 @@ class RedisReadCacheInvalidationAdapter(
     private fun evictPublicContent(clubId: UUID) {
         runCatching {
             val publicKeys = mutableSetOf("public:club:$clubId:home:v1")
-            redisTemplate.keys("public:club:$clubId:session:*:v1")?.let(publicKeys::addAll)
+            publicKeys.addAll(scanKeys("public:club:$clubId:session:*:v1"))
             delete(publicKeys)
             metrics.increment("readmates.public_cache.evicted", "scope", "club")
         }.onFailure {
@@ -36,7 +37,7 @@ class RedisReadCacheInvalidationAdapter(
                     "notes:club:$clubId:feed:v1",
                     "notes:club:$clubId:sessions:v1",
                 )
-            redisTemplate.keys("notes:club:$clubId:session:*:feed:v1")?.let(notesKeys::addAll)
+            notesKeys.addAll(scanKeys("notes:club:$clubId:session:*:feed:v1"))
             delete(notesKeys)
             metrics.increment("readmates.notes_cache.evicted", "scope", "club")
         }.onFailure {
@@ -59,5 +60,23 @@ class RedisReadCacheInvalidationAdapter(
             "operation",
             operation,
         )
+    }
+
+    private fun scanKeys(pattern: String): Set<String> {
+        val options = ScanOptions.scanOptions().match(pattern).count(SCAN_BATCH_SIZE).build()
+        val collected = mutableSetOf<String>()
+        redisTemplate.execute<Unit> { connection ->
+            connection.keyCommands().scan(options).use { cursor ->
+                while (cursor.hasNext()) {
+                    collected.add(String(cursor.next(), Charsets.UTF_8))
+                }
+            }
+            null
+        }
+        return collected
+    }
+
+    private companion object {
+        private const val SCAN_BATCH_SIZE = 256L
     }
 }
