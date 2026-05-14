@@ -14,6 +14,8 @@ import type {
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
   ManualNotificationDispatchListItem,
+  SessionImportPreviewResponse,
+  SessionImportRequest,
 } from "@/features/host/model/host-view-types";
 import {
   buildHostSessionRequest,
@@ -21,6 +23,7 @@ import {
   getDestructiveActionAvailability,
   questionDeadlineLabelForForm,
 } from "@/features/host/model/host-session-editor-model";
+import { buildSessionImportRequest } from "@/features/host/model/session-import-model";
 import {
   hostSessionEditorReducer,
   initialHostSessionEditorState,
@@ -56,6 +59,7 @@ import {
   type MobileEditorSection,
 } from "./session-editor/mobile-editor-tabs";
 import { PublicationPanel } from "./session-editor/publication-panel";
+import { SessionImportPanel } from "./session-editor/session-import-panel";
 import { Panel } from "./session-editor/session-editor-panel";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
@@ -138,6 +142,10 @@ export default function HostSessionEditor({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletePreviewLoading, setDeletePreviewLoading] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [sessionImportRequest, setSessionImportRequest] = useState<SessionImportRequest | null>(null);
+  const [sessionImportPreview, setSessionImportPreview] = useState<SessionImportPreviewResponse | null>(null);
+  const [sessionImportStatus, setSessionImportStatus] = useState<"idle" | "previewing" | "ready" | "committing" | "error">("idle");
+  const [sessionImportError, setSessionImportError] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------------
   // Refs
@@ -202,11 +210,13 @@ export default function HostSessionEditor({
   const onMeetingUrlChange = useCallback((value: string) => setField("meetingUrl", value), [setField]);
   const onMeetingPasscodeChange = useCallback((value: string) => setField("meetingPasscode", value), [setField]);
 
-  const onRecordVisibilityChange = useCallback(
-    (visibility: typeof recordVisibility) =>
-      dispatch({ type: "SET_RECORD_VISIBILITY", visibility }),
-    [],
-  );
+  const onRecordVisibilityChange = useCallback((visibility: typeof recordVisibility) => {
+    dispatch({ type: "SET_RECORD_VISIBILITY", visibility });
+    setSessionImportRequest(null);
+    setSessionImportPreview(null);
+    setSessionImportError(null);
+    setSessionImportStatus("idle");
+  }, []);
   const onSummaryChange = useCallback(
     (value: string) => setField("summary", value),
     [setField],
@@ -617,6 +627,76 @@ export default function HostSessionEditor({
     [session, actions, flash],
   );
 
+  const previewSessionImport = useCallback(
+    async (event: ChangeEvent<HTMLInputElement>) => {
+      const input = event.currentTarget;
+      const file = input.files?.[0];
+      if (!file) {
+        return;
+      }
+      if (!session) {
+        input.value = "";
+        return;
+      }
+
+      setSessionImportStatus("previewing");
+      setSessionImportError(null);
+      setSessionImportPreview(null);
+      setSessionImportRequest(null);
+
+      try {
+        const sourceJson = await readTextFile(file);
+        const request = buildSessionImportRequest(sourceJson, recordVisibility);
+        const preview = await actions.previewSessionImport(session.sessionId, request);
+        setSessionImportRequest(request);
+        setSessionImportPreview(preview);
+        setSessionImportStatus(preview.valid ? "ready" : "error");
+        if (!preview.valid) {
+          setSessionImportError("가져온 JSON에서 수정할 항목이 있습니다.");
+        }
+      } catch (error) {
+        setSessionImportError(error instanceof Error ? error.message : "가져온 JSON을 확인할 수 없습니다.");
+        setSessionImportStatus("error");
+      } finally {
+        input.value = "";
+      }
+    },
+    [session, recordVisibility, actions],
+  );
+
+  const commitSessionImport = useCallback(async () => {
+    if (!session || !sessionImportRequest || !sessionImportPreview?.valid || sessionImportStatus === "committing") {
+      return;
+    }
+
+    setSessionImportStatus("committing");
+    setSessionImportError(null);
+
+    try {
+      const committed = await actions.commitSessionImport(session.sessionId, sessionImportRequest);
+      dispatch({
+        type: "PUBLICATION_SAVED",
+        publicSummary: committed.publication.summary,
+        visibility: sessionImportRequest.recordVisibility,
+      });
+      dispatch({
+        type: "FEEDBACK_DOCUMENT_UPDATED",
+        feedbackDocument: {
+          uploaded: committed.feedbackDocument.uploaded,
+          fileName: committed.feedbackDocument.fileName,
+          uploadedAt: committed.feedbackDocument.uploadedAt,
+        },
+      });
+      setSessionImportStatus("idle");
+      setSessionImportPreview(null);
+      setSessionImportRequest(null);
+      flash("가져온 세션 기록을 저장했습니다");
+    } catch {
+      setSessionImportStatus("error");
+      setSessionImportError("가져온 세션 기록 저장에 실패했습니다. 파일과 권한을 확인해 주세요.");
+    }
+  }, [session, sessionImportRequest, sessionImportPreview, sessionImportStatus, actions, flash]);
+
   const feedbackDocumentForPanel = feedbackDocumentUploadStatus(feedbackDocument);
 
   return (
@@ -789,6 +869,17 @@ export default function HostSessionEditor({
                 onUpdateAttendance={updateAttendance}
               />
 
+              <SessionImportPanel
+                activeMobileSection={activeMobileSection}
+                sessionId={session?.sessionId}
+                recordVisibility={recordVisibility}
+                preview={sessionImportPreview}
+                status={sessionImportStatus}
+                error={sessionImportError}
+                onFileSelected={previewSessionImport}
+                onCommit={commitSessionImport}
+              />
+
               <Panel
                 eyebrow="피드백 문서 · 민감"
                 title="피드백 문서"
@@ -895,4 +986,17 @@ export default function HostSessionEditor({
       ) : null}
     </main>
   );
+}
+
+function readTextFile(file: File): Promise<string> {
+  if (typeof file.text === "function") {
+    return file.text();
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error ?? new Error("File read failed"));
+    reader.readAsText(file);
+  });
 }

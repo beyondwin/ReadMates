@@ -1,0 +1,35 @@
+{
+  "format": "readmates-session-import:v1",
+  "session": {
+    "number": 7,
+    "bookTitle": "Example Book",
+    "meetingDate": "2026-05-14"
+  },
+  "publication": {
+    "summary": "Members compared how one idea changes when it moves from a private reading note into a shared discussion. The conversation stayed focused on the book and ended with one practical question for the next meeting."
+  },
+  "highlights": [
+    {
+      "authorName": "Host",
+      "text": "A useful question needs a boundary before it needs more examples."
+    },
+    {
+      "authorName": "Reader A",
+      "text": "The group separated what the book claims from what the readers wanted it to claim."
+    }
+  ],
+  "oneLineReviews": [
+    {
+      "authorName": "Host",
+      "text": "The book worked best when we treated its examples as prompts rather than answers."
+    },
+    {
+      "authorName": "Reader A",
+      "text": "I left with a clearer standard for testing my first interpretation."
+    }
+  ],
+  "feedbackDocument": {
+    "fileName": "session-7-feedback.md",
+    "markdown": "<!-- readmates-feedback:v1 -->\n\n# 독서모임 7차 피드백\n\nExample Book · 2026.05.14\n\n## 메타\n\n- 일시: 2026.05.14 (목) · 20:00\n- 소요시간: 2시간\n- 책: Example Book · Example Author\n- 참여자: Host, Reader A\n\n## 관찰자 노트\n\nThe discussion stayed within the book and avoided private background details.\n\n## 참여자별 피드백\n\n### 01. Host\n\n역할: 진행자\n\n#### 참여 스타일\n\nThe host kept the conversation structured and returned broad examples to one shared question.\n\n#### 실질 기여\n\n- Clarified the boundary of the main question.\n\n#### 문제점과 자기모순\n\n##### 1. The opening frame was broad\n\n- 핵심: The first question invited too many directions.\n- 근거: Several examples appeared before the group chose a standard.\n- 해석: The next session will benefit from a narrower opening frame.\n\n#### 실천 과제\n\n1. State the question boundary before inviting examples.\n\n#### 드러난 한 문장\n\n> A useful question needs a boundary.\n\n맥락: Closing the first discussion block\n\n주석: This captured the host's facilitation role.\n\n### 02. Reader A\n\n역할: 해석자\n\n#### 참여 스타일\n\nReader A connected the book's examples to the group's working question.\n\n#### 실질 기여\n\n- Distinguished the book's claim from the reader's preferred conclusion.\n\n#### 문제점과 자기모순\n\n##### 1. The conclusion came late\n\n- 핵심: The strongest interpretation arrived after several examples.\n- 근거: The final summary was clearer than the opening explanation.\n- 해석: Leading with the conclusion would help the group respond faster.\n\n#### 실천 과제\n\n1. Say the conclusion first, then add examples.\n\n#### 드러난 한 문장\n\n> I need to test my first interpretation.\n\n맥락: Reflecting on the final question\n\n주석: This showed a practical reading habit."
+  }
+}

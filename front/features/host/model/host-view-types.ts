@@ -326,6 +326,75 @@ export type HostSessionPublication = {
   visibility: SessionRecordVisibility;
 };
 
+export type SessionImportRecordRequest = {
+  authorName: string;
+  text: string;
+};
+
+export type SessionImportRequest = {
+  recordVisibility: SessionRecordVisibility;
+  format: "readmates-session-import:v1";
+  session: {
+    number: number;
+    bookTitle: string;
+    meetingDate: string;
+  };
+  publication: {
+    summary: string;
+  };
+  highlights: SessionImportRecordRequest[];
+  oneLineReviews: SessionImportRecordRequest[];
+  feedbackDocument: {
+    fileName: string;
+    markdown: string;
+  };
+};
+
+export type SessionImportRecordPreview = {
+  authorName: string;
+  text: string;
+  authorMatched: boolean;
+  membershipId: string | null;
+};
+
+export type SessionImportPreviewResponse = {
+  valid: boolean;
+  session: {
+    sessionNumber: number | null;
+    bookTitle: string | null;
+    meetingDate: string | null;
+  };
+  publication: {
+    summary: string;
+  };
+  highlights: SessionImportRecordPreview[];
+  oneLineReviews: SessionImportRecordPreview[];
+  feedbackDocument: {
+    fileName: string;
+    title: string | null;
+    valid: boolean;
+  };
+  issues: Array<{
+    code: string;
+    message: string;
+  }>;
+};
+
+export type SessionImportCommitResponse = {
+  sessionId: string;
+  publication: {
+    summary: string;
+  };
+  highlights: SessionImportRecordPreview[];
+  oneLineReviews: SessionImportRecordPreview[];
+  feedbackDocument: {
+    uploaded: boolean;
+    fileName: string;
+    title: string;
+    uploadedAt: string | null;
+  };
+};
+
 export type HostSessionDetailResponse = {
   sessionId: string;
   sessionNumber: number;

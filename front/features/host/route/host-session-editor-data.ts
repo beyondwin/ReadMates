@@ -1,11 +1,13 @@
 import type { LoaderFunctionArgs } from "react-router-dom";
 import {
   closeHostSession,
+  commitHostSessionImport,
   createHostSession,
   deleteHostSession,
   fetchManualNotificationDispatches,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
+  previewHostSessionImport,
   publishHostSession,
   saveHostSessionAttendance,
   saveHostSessionPublication,
@@ -43,4 +45,6 @@ export const hostSessionEditorActions = {
   savePublication: saveHostSessionPublication,
   updateAttendance: saveHostSessionAttendance,
   uploadFeedbackDocument: uploadHostSessionFeedbackDocument,
+  previewSessionImport: previewHostSessionImport,
+  commitSessionImport: commitHostSessionImport,
 } satisfies HostSessionEditorActions;

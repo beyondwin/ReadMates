@@ -9,6 +9,7 @@ ReadMates를 로컬에서 실행하고, 테스트하고, 구조를 이해하기 
 | 로컬 실행 | [local-setup.md](local-setup.md) |
 | 테스트, 공개 릴리즈, 배포 smoke 점검 | [test-guide.md](test-guide.md) |
 | 제품/기술 구조와 frontend route-first 경계 | [architecture.md](architecture.md) |
+| 세션 기록 JSON 생성과 가져오기 | [session-import-generator.md](session-import-generator.md) |
 | 주요 기술적 의사결정 | [technical-decisions.md](technical-decisions.md) |
 | Architecture Decision Records | [adr/README.md](adr/README.md) |
 | 버저닝 source of truth와 release tag 기준 | [versioning.md](versioning.md) |

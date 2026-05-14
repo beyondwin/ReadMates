@@ -3,6 +3,9 @@ import type {
   FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
+  SessionImportCommitResponse,
+  SessionImportPreviewResponse,
+  SessionImportRequest,
 } from "@/features/host/api/host-contracts";
 import type {
   HostSessionPublicationRequest,
@@ -23,4 +26,6 @@ export type HostSessionEditorActions = {
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
   ) => Promise<Response>;
   uploadFeedbackDocument: (sessionId: string, formData: FormData) => Promise<JsonResponse<FeedbackDocumentResponse>>;
+  previewSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportPreviewResponse>;
+  commitSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportCommitResponse>;
 };

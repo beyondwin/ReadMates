@@ -495,6 +495,80 @@ export type HostSessionPublicationRequest = {
   visibility: SessionRecordVisibility;
 };
 
+export type SessionImportRecordRequest = {
+  authorName: string;
+  text: string;
+};
+
+export type SessionImportFileRequest = {
+  format: "readmates-session-import:v1";
+  session: {
+    number: number;
+    bookTitle: string;
+    meetingDate: string;
+  };
+  publication: {
+    summary: string;
+  };
+  highlights: SessionImportRecordRequest[];
+  oneLineReviews: SessionImportRecordRequest[];
+  feedbackDocument: {
+    fileName: string;
+    markdown: string;
+  };
+};
+
+export type SessionImportRequest = SessionImportFileRequest & {
+  recordVisibility: SessionRecordVisibility;
+};
+
+export type SessionImportIssue = {
+  code: string;
+  message: string;
+};
+
+export type SessionImportRecordPreview = {
+  authorName: string;
+  text: string;
+  authorMatched: boolean;
+  membershipId: string | null;
+};
+
+export type SessionImportPreviewResponse = {
+  valid: boolean;
+  session: {
+    sessionNumber: number | null;
+    bookTitle: string | null;
+    meetingDate: string | null;
+  };
+  publication: {
+    summary: string;
+  };
+  highlights: SessionImportRecordPreview[];
+  oneLineReviews: SessionImportRecordPreview[];
+  feedbackDocument: {
+    fileName: string;
+    title: string | null;
+    valid: boolean;
+  };
+  issues: SessionImportIssue[];
+};
+
+export type SessionImportCommitResponse = {
+  sessionId: string;
+  publication: {
+    summary: string;
+  };
+  highlights: SessionImportRecordPreview[];
+  oneLineReviews: SessionImportRecordPreview[];
+  feedbackDocument: {
+    uploaded: boolean;
+    fileName: string;
+    title: string;
+    uploadedAt: string | null;
+  };
+};
+
 export type HostSessionDetailResponse = {
   sessionId: string;
   sessionNumber: number;
@@ -659,6 +733,47 @@ export const HostNotificationDeliveryListResponseSchema = import.meta.env.DEV
     })
   : (null as never);
 
+export const SessionImportPreviewResponseSchema = import.meta.env.DEV
+  ? z.object({
+      valid: z.boolean(),
+      session: z.object({
+        sessionNumber: z.number().nullable(),
+        bookTitle: z.string().nullable(),
+        meetingDate: z.string().nullable(),
+      }),
+      publication: z.object({
+        summary: z.string(),
+      }),
+      highlights: z.array(
+        z.object({
+          authorName: z.string(),
+          text: z.string(),
+          authorMatched: z.boolean(),
+          membershipId: z.string().nullable(),
+        }),
+      ),
+      oneLineReviews: z.array(
+        z.object({
+          authorName: z.string(),
+          text: z.string(),
+          authorMatched: z.boolean(),
+          membershipId: z.string().nullable(),
+        }),
+      ),
+      feedbackDocument: z.object({
+        fileName: z.string(),
+        title: z.string().nullable(),
+        valid: z.boolean(),
+      }),
+      issues: z.array(
+        z.object({
+          code: z.string(),
+          message: z.string(),
+        }),
+      ),
+    })
+  : (null as never);
+
 export const HostInvitationListPageSchema = import.meta.env.DEV
   ? z.object({
       items: z.array(
@@ -685,6 +800,7 @@ export const HostInvitationListPageSchema = import.meta.env.DEV
 export type HostSessionDetailResponseParsed = z.infer<typeof HostSessionDetailResponseSchema>;
 export type HostNotificationDeliveryListResponseParsed = z.infer<typeof HostNotificationDeliveryListResponseSchema>;
 export type HostInvitationListPageParsed = z.infer<typeof HostInvitationListPageSchema>;
+export type SessionImportPreviewResponseParsed = z.infer<typeof SessionImportPreviewResponseSchema>;
 
 export function parseHostSessionDetailResponse(value: unknown): HostSessionDetailResponse {
   if (import.meta.env.DEV) {
@@ -705,4 +821,11 @@ export function parseHostInvitationListPage(value: unknown): HostInvitationListP
     return HostInvitationListPageSchema.parse(value) as HostInvitationListPage;
   }
   return value as HostInvitationListPage;
+}
+
+export function parseSessionImportPreviewResponse(value: unknown): SessionImportPreviewResponse {
+  if (import.meta.env.DEV) {
+    return SessionImportPreviewResponseSchema.parse(value) as SessionImportPreviewResponse;
+  }
+  return value as SessionImportPreviewResponse;
 }
