@@ -1,3 +1,5 @@
+import type { QueryClient } from "@tanstack/react-query";
+import type { LoaderFunctionArgs } from "react-router-dom";
 import {
   createHostInvitation,
   fetchHostInvitations,
@@ -7,14 +9,28 @@ import {
   revokeHostInvitation,
 } from "@/features/host/api/host-api";
 import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
-import type { LoaderFunctionArgs } from "react-router-dom";
-import { requireHostLoaderAuth } from "./host-loader-auth";
+import { hostInvitationListQuery } from "@/features/host/queries/host-invitation-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
+import { requireHostLoaderAuth } from "./host-loader-auth";
 
-export async function hostInvitationsLoader(args?: LoaderFunctionArgs) {
-  await requireHostLoaderAuth(args);
+const HOST_INVITATIONS_PAGE_LIMIT = 50;
 
-  return fetchHostInvitations({ clubSlug: clubSlugFromLoaderArgs(args) });
+export function hostInvitationsLoaderFactory(client: QueryClient) {
+  return async (args?: LoaderFunctionArgs) => {
+    await requireHostLoaderAuth(args);
+
+    const page = await fetchHostInvitations(
+      { clubSlug: clubSlugFromLoaderArgs(args) },
+      { limit: HOST_INVITATIONS_PAGE_LIMIT },
+    );
+
+    client.setQueryData(
+      hostInvitationListQuery({ limit: HOST_INVITATIONS_PAGE_LIMIT }).queryKey,
+      page,
+    );
+
+    return page;
+  };
 }
 
 export const hostInvitationsActions = {

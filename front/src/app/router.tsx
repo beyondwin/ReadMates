@@ -1,3 +1,4 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import type { InternalLinkComponent } from "@/features/current-session";
 import {
@@ -10,6 +11,7 @@ import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { AppRouteLayout, PublicRouteLayout } from "@/src/app/layouts";
+import { createReadmatesQueryClient } from "@/src/app/query-client";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireHost, RequireMemberApp, RequirePlatformAdmin } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
@@ -160,7 +162,7 @@ function memberAppRoutes(options: { includeIndex?: boolean } = {}): RouteObject[
   ];
 }
 
-function hostAppRoutes(): RouteObject[] {
+function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
   return [
     {
       index: true,
@@ -191,11 +193,14 @@ function hostAppRoutes(): RouteObject[] {
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="초대 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostInvitationsRouteElement }, { hostInvitationsLoader }] = await Promise.all([
+        const [{ HostInvitationsRouteElement }, { hostInvitationsLoaderFactory }] = await Promise.all([
           import("@/src/app/host-route-elements"),
           import("@/features/host/route/host-invitations-data"),
         ]);
-        return { Component: HostInvitationsRouteElement, loader: hostInvitationsLoader };
+        return {
+          Component: HostInvitationsRouteElement,
+          loader: hostInvitationsLoaderFactory(queryClient),
+        };
       },
     },
     {
@@ -238,7 +243,8 @@ function hostAppRoutes(): RouteObject[] {
   ];
 }
 
-export const routes: RouteObject[] = [
+export function buildRoutes(queryClient: QueryClient): RouteObject[] {
+  return [
   {
     element: <PublicRouteLayout />,
     errorElement: <RouteErrorBoundary variant="public" />,
@@ -489,7 +495,7 @@ export const routes: RouteObject[] = [
     loader: requireHostLoaderAuth,
     errorElement: <RouteErrorBoundary variant="host" />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
-    children: hostAppRoutes(),
+    children: hostAppRoutes(queryClient),
   },
   {
     id: "club-app-host",
@@ -502,10 +508,15 @@ export const routes: RouteObject[] = [
     loader: requireHostLoaderAuth,
     errorElement: <RouteErrorBoundary variant="host" />,
     hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 권한을 확인하는 중" variant="host" />,
-    children: hostAppRoutes(),
+    children: hostAppRoutes(queryClient),
   },
-];
+  ];
+}
+
+export const routes: RouteObject[] = buildRoutes(createReadmatesQueryClient());
 
 export function createReadmatesRouter() {
-  return createBrowserRouter(routes);
+  const queryClient = createReadmatesQueryClient();
+  const router = createBrowserRouter(buildRoutes(queryClient));
+  return { router, queryClient };
 }

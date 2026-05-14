@@ -6,10 +6,11 @@ import type { HostDashboardActions } from "@/features/host/route/host-dashboard-
 import HostDashboard from "@/features/host/ui/host-dashboard";
 import {
   hostDashboardLoader,
-  hostInvitationsLoader,
+  hostInvitationsLoaderFactory,
   hostMembersLoader,
   hostSessionEditorLoader,
 } from "@/features/host";
+import { QueryClient } from "@tanstack/react-query";
 import type {
   CurrentSessionResponse,
   HostDashboardResponse,
@@ -328,7 +329,7 @@ function hostSessionEditorLoaderForTest() {
 const hostLoaderCases: Array<[string, () => Promise<unknown>, string]> = [
   ["dashboard", () => hostDashboardLoader(), "/login"],
   ["members", () => hostMembersLoader(), "/login"],
-  ["invitations", () => hostInvitationsLoader(), "/login"],
+  ["invitations", () => hostInvitationsLoaderFactory(new QueryClient())(), "/login"],
   ["session editor", hostSessionEditorLoaderForTest, "/login?returnTo=%2Fapp%2Fhost%2Fsessions%2Fsession-7%2Fedit"],
 ];
 
