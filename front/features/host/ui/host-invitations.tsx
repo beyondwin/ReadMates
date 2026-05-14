@@ -1,5 +1,6 @@
 
 import { type CSSProperties, type FormEvent, type InvalidEvent, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type {
   CreateHostInvitationRequest,
   HostInvitationListPage,
@@ -7,6 +8,7 @@ import type {
   HostInvitationResponse,
   InvitationStatus,
 } from "@/features/host/model/host-view-types";
+import { hostInvitationListQuery } from "@/features/host/queries/host-invitation-queries";
 import type { PageRequest } from "@/shared/model/paging";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
@@ -75,8 +77,21 @@ export default function HostInvitations({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [applyToCurrentSession, setApplyToCurrentSession] = useState(true);
-  const [invitations, setInvitations] = useState(initialPage.items);
+  const listQuery = useQuery({
+    ...hostInvitationListQuery({ limit: 50 }),
+    queryFn: async () => {
+      const response = await actions.listInvitations({ limit: 50 });
+      if (!response.ok) {
+        throw new Error("Failed to load invitation list");
+      }
+      return normalizeInvitationPage(await actions.parseInvitationList(response));
+    },
+    initialData: initialPage,
+  });
+  const queryItems = listQuery.data?.items ?? [];
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
+  const [appendedInvitations, setAppendedInvitations] = useState<HostInvitationListItem[]>([]);
+  const invitations = appendedInvitations.length > 0 ? [...queryItems, ...appendedInvitations] : queryItems;
   const [lastCreated, setLastCreated] = useState<HostInvitationResponse | null>(null);
   const [message, setMessage] = useState<HostMessage | null>(null);
   const [nameTouched, setNameTouched] = useState(false);
@@ -124,15 +139,13 @@ export default function HostInvitations({
   };
 
   const refreshInvitations = async () => {
-    const response = await actions.listInvitations({ limit: 50 });
-    if (!response.ok) {
+    const result = await listQuery.refetch();
+    if (result.isError || !result.data) {
       showAlert("초대 목록 새로고침에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.");
       return false;
     }
-
-    const page = normalizeInvitationPage(await actions.parseInvitationList(response));
-    setInvitations(page.items);
-    setNextCursor(page.nextCursor);
+    setAppendedInvitations([]);
+    setNextCursor(result.data.nextCursor);
     return true;
   };
 
@@ -150,7 +163,7 @@ export default function HostInvitations({
         return;
       }
       const page = normalizeInvitationPage(await actions.parseInvitationList(response));
-      setInvitations((current) => [...current, ...page.items]);
+      setAppendedInvitations((current) => [...current, ...page.items]);
       setNextCursor(page.nextCursor);
     } catch {
       showAlert("초대 목록을 더 불러오지 못했습니다.");

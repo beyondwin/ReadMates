@@ -1,10 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { HostInvitationsActions } from "@/features/host/route/host-invitations-actions";
 import HostInvitations from "@/features/host/ui/host-invitations";
 import { hostInvitationsActions } from "@/features/host";
-import type { HostInvitationListItem } from "@/features/host/api/host-contracts";
+import type { HostInvitationListItem, HostInvitationListPage } from "@/features/host/api/host-contracts";
+import { createTestQueryWrapper } from "./helpers/query-test-wrapper";
 
 const invitations: HostInvitationListItem[] = [
   {
@@ -61,7 +63,17 @@ function HostInvitationsForTest({
   actions,
   ...props
 }: Omit<HostInvitationsProps, "actions"> & { actions?: HostInvitationsActions }) {
-  return <HostInvitations {...props} actions={actions ?? hostInvitationsTestActions} />;
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Number.POSITIVE_INFINITY, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <HostInvitations {...props} actions={actions ?? hostInvitationsTestActions} />
+    </QueryClientProvider>
+  );
 }
 
 function deferred<T>() {
@@ -82,6 +94,32 @@ afterEach(() => {
 });
 
 describe("HostInvitations", () => {
+  it("loads invitation list via useQuery (override queryFn)", async () => {
+    const { Wrapper } = createTestQueryWrapper();
+    const listInvitations = vi.fn(
+      () => Promise.resolve(new Response(JSON.stringify({ items: invitations, nextCursor: null }), { status: 200 })),
+    );
+    const parseInvitationList = vi.fn(
+      async (response: Response) => (await response.json()) as HostInvitationListPage,
+    );
+    const actions = {
+      listInvitations,
+      createInvitation: vi.fn(),
+      revokeInvitation: vi.fn(),
+      parseInvitation: vi.fn(),
+      parseInvitationList,
+    };
+    render(
+      <HostInvitations
+        initialInvitations={{ items: [], nextCursor: null }}
+        actions={actions as unknown as HostInvitationsActions}
+      />,
+      { wrapper: Wrapper },
+    );
+    await screen.findByText("대기 멤버");
+    expect(listInvitations).toHaveBeenCalled();
+  });
+
   it("renders invitation list statuses and actions", () => {
     render(<HostInvitationsForTest initialInvitations={invitations} />);
 
