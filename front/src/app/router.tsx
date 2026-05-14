@@ -10,10 +10,11 @@ import { requireHostLoaderAuth } from "@/features/host/route/host-loader-auth";
 import { HostRouteError } from "@/features/host/route/host-route-error";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { AppRouteLayout } from "@/src/app/layouts";
+import { authRoutes } from "@/src/app/routes/auth";
 import { publicRoutes } from "@/src/app/routes/public";
 import { createReadmatesQueryClient } from "@/src/app/query-client";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
-import { RequireAuth, RequireHost, RequireMemberApp, RequirePlatformAdmin } from "@/src/app/route-guards";
+import { RequireAuth, RequireHost, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 
@@ -246,61 +247,7 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
 export function buildRoutes(queryClient: QueryClient): RouteObject[] {
   return [
   publicRoutes(),
-  {
-    path: "/admin",
-    errorElement: <RouteErrorBoundary variant="auth" />,
-    hydrateFallbackElement: <ReadmatesRouteLoading label="플랫폼 관리를 불러오는 중" variant="member" />,
-    lazy: async () => {
-      const [{ PlatformAdminRoute }, { platformAdminLoader }] = await Promise.all([
-        import("@/features/platform-admin/route/platform-admin-route"),
-        import("@/features/platform-admin/route/platform-admin-data"),
-      ]);
-
-      function PlatformAdminRouteElement() {
-        return (
-          <RequirePlatformAdmin>
-            <PlatformAdminRoute />
-          </RequirePlatformAdmin>
-        );
-      }
-
-      return { Component: PlatformAdminRouteElement, loader: platformAdminLoader };
-    },
-  },
-  {
-    path: "/app/pending",
-    hydrateFallbackElement: <ReadmatesRouteLoading label="승인 상태를 확인하는 중" variant="member" />,
-    lazy: async () => {
-      const { default: PendingApprovalPage } = await import("@/src/pages/pending-approval");
-
-      function PendingApprovalRouteElement() {
-        return (
-          <RequireAuth>
-            <PendingApprovalPage />
-          </RequireAuth>
-        );
-      }
-
-      return { Component: PendingApprovalRouteElement };
-    },
-  },
-  {
-    path: "/clubs/:clubSlug/app/pending",
-    hydrateFallbackElement: <ReadmatesRouteLoading label="승인 상태를 확인하는 중" variant="member" />,
-    lazy: async () => {
-      const { default: PendingApprovalPage } = await import("@/src/pages/pending-approval");
-
-      function PendingApprovalRouteElement() {
-        return (
-          <RequireAuth>
-            <PendingApprovalPage />
-          </RequireAuth>
-        );
-      }
-
-      return { Component: PendingApprovalRouteElement };
-    },
-  },
+  ...authRoutes(),
   {
     path: "/app",
     errorElement: <RouteErrorBoundary variant="member" />,
