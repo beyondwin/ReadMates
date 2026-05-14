@@ -26,13 +26,14 @@ class JdbcPublicQueryAdapterTest(
         val spy = spy(jdbcTemplate)
         val adapter = JdbcPublicQueryAdapter(spy)
 
-        val result = adapter.loadClub("reading-sai")
+        val result = adapter.loadClub(CLUB_SLUG)
 
-        // behavioural correctness — seed data has 6 published PUBLIC sessions (6 distinct books)
+        // behavioural correctness — seed has 6 PUBLISHED PUBLIC sessions / 6 distinct books / 6 ACTIVE memberships
+        // (HOST id_suffix=201 + member1..5 id_suffix=202..206; see R__readmates_dev_seed.sql).
         assertThat(result).isNotNull()
         assertThat(result!!.stats.sessions).isEqualTo(6)
         assertThat(result.stats.books).isEqualTo(6)
-        assertThat(result.stats.members).isGreaterThan(0)
+        assertThat(result.stats.members).isEqualTo(6)
 
         // structural: publicStats must use exactly one queryForObject(sql, RowMapper, ...) call
         // The overload queryForObject(String, RowMapper<T>, vararg Any) is the consolidated path.
@@ -69,7 +70,7 @@ class JdbcPublicQueryAdapterTest(
         // one_line_reviews for session 6: host, member5, member2 — all PUBLIC and all ACTIVE.
         val adapter = JdbcPublicQueryAdapter(jdbcTemplate)
 
-        val result = adapter.loadClub("reading-sai")
+        val result = adapter.loadClub(CLUB_SLUG)
 
         assertThat(result).isNotNull()
         val session6 = result!!.recentSessions.firstOrNull { it.sessionNumber == 6 }
@@ -98,7 +99,7 @@ class JdbcPublicQueryAdapterTest(
         // After marking participation_status = REMOVED, both counts must drop from 3 to 2.
         val adapter = JdbcPublicQueryAdapter(jdbcTemplate)
 
-        val result = adapter.loadClub("reading-sai")
+        val result = adapter.loadClub(CLUB_SLUG)
 
         assertThat(result).isNotNull()
         val session6 = result!!.recentSessions.firstOrNull { it.sessionNumber == 6 }
@@ -129,7 +130,7 @@ class JdbcPublicQueryAdapterTest(
         // Inserting one such row for session 6 should raise highlight_count from 3 to 4.
         val adapter = JdbcPublicQueryAdapter(jdbcTemplate)
 
-        val result = adapter.loadClub("reading-sai")
+        val result = adapter.loadClub(CLUB_SLUG)
 
         assertThat(result).isNotNull()
         val session6 = result!!.recentSessions.firstOrNull { it.sessionNumber == 6 }
@@ -146,6 +147,8 @@ class JdbcPublicQueryAdapterTest(
     }
 
     companion object {
+        private const val CLUB_SLUG = "reading-sai"
+
         private const val MARK_MEMBER2_SESSION_SIX_REMOVED_SQL = """
             update session_participants
             join memberships on memberships.id = session_participants.membership_id

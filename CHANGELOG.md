@@ -14,6 +14,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - perf: consolidate `publicStats` SELECTs into a single round-trip and replace correlated EXISTS subqueries in `publicSessions` with pre-aggregated joins (server/publication).
 - perf: replace Redis `KEYS` with SCAN-based iteration in read-cache invalidation (server/shared/redis).
 
+### Post-deploy verification (v1.9 perf follow-up)
+- Staging EXPLAIN check (deferred from PR time — local docker MySQL was unavailable): run `EXPLAIN` against the rewritten `publicStats` (single SELECT with 3 scalar subqueries) and `publicSessions` (CTE `active_participants` + LEFT JOIN `highlight_counts` + INNER JOIN `one_liner_counts`) with realistic row counts. Confirm existing indexes are used — no full scans on `sessions`, `highlights`, or `one_line_reviews`.
+
 ## v1.9.0 - 2026-05-15
 
 ### Highlights
