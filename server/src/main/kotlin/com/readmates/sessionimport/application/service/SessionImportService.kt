@@ -15,19 +15,23 @@ import com.readmates.sessionimport.application.model.SessionImportSessionPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.`in`.CommitSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.PreviewSessionImportUseCase
+import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AccessDeniedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
-class InvalidSessionImportException(val issues: List<SessionImportIssue>) : RuntimeException("Invalid session import")
+class InvalidSessionImportException(
+    val issues: List<SessionImportIssue>,
+) : RuntimeException("Invalid session import")
 
 @Service
 class SessionImportService(
     private val writePort: SessionImportWritePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
-) : PreviewSessionImportUseCase, CommitSessionImportUseCase {
+) : PreviewSessionImportUseCase,
+    CommitSessionImportUseCase {
     private val parser = FeedbackDocumentParser()
 
     override fun preview(command: SessionImportCommand): SessionImportPreviewResult {
@@ -52,14 +56,16 @@ class SessionImportService(
 
         val storedFeedback =
             writePort.replaceRecords(
-                host = command.host,
-                sessionId = command.sessionId,
-                visibility = command.recordVisibility,
-                publicationSummary = preview.publication.summary,
-                highlights = preview.highlights,
-                oneLineReviews = preview.oneLineReviews,
-                feedbackDocument = command.feedbackDocument,
-                feedbackTitle = feedbackTitle,
+                SessionImportRecordReplacement(
+                    host = command.host,
+                    sessionId = command.sessionId,
+                    visibility = command.recordVisibility,
+                    publicationSummary = preview.publication.summary,
+                    highlights = preview.highlights,
+                    oneLineReviews = preview.oneLineReviews,
+                    feedbackDocument = command.feedbackDocument,
+                    feedbackTitle = feedbackTitle,
+                ),
             )
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
 
@@ -83,6 +89,48 @@ class SessionImportService(
         target: SessionImportTarget,
     ): SessionImportPreviewResult {
         val issues = mutableListOf<SessionImportIssue>()
+        validateSessionMetadata(command, target, issues)
+        validateImportContent(command, issues)
+
+        val highlights =
+            command.highlights.map {
+                matchRecord(it.authorName, it.text, target, issues, "HIGHLIGHT_AUTHOR_NOT_FOUND")
+            }
+        val oneLineReviews =
+            command.oneLineReviews.map {
+                matchRecord(it.authorName, it.text, target, issues, "ONE_LINE_AUTHOR_NOT_FOUND")
+            }
+        validateOneLineReviewAuthors(command, issues)
+
+        val parsedFeedback =
+            parseFeedbackDocument(command.feedbackDocument.markdown, issues)
+
+        return SessionImportPreviewResult(
+            valid = issues.isEmpty(),
+            session =
+                SessionImportSessionPreview(
+                    command.session.number,
+                    command.session.bookTitle,
+                    command.session.meetingDate.toString(),
+                ),
+            publication = SessionImportPublicationPreview(command.publication.summary.trim()),
+            highlights = highlights,
+            oneLineReviews = oneLineReviews,
+            feedbackDocument =
+                SessionImportFeedbackDocumentPreview(
+                    command.feedbackDocument.fileName.trim(),
+                    parsedFeedback?.title,
+                    parsedFeedback != null,
+                ),
+            issues = issues,
+        )
+    }
+
+    private fun validateSessionMetadata(
+        command: SessionImportCommand,
+        target: SessionImportTarget,
+        issues: MutableList<SessionImportIssue>,
+    ) {
         if (command.format != FORMAT) {
             issues += SessionImportIssue("INVALID_FORMAT", "이 파일은 readmates-session-import:v1 형식이 아닙니다.")
         }
@@ -102,10 +150,16 @@ class SessionImportService(
         if (!command.session.meetingDate.isEqual(target.meetingDate)) {
             issues += SessionImportIssue("MEETING_DATE_MISMATCH", "모임 날짜가 현재 세션과 일치하지 않습니다.")
         }
+    }
+
+    private fun validateImportContent(
+        command: SessionImportCommand,
+        issues: MutableList<SessionImportIssue>,
+    ) {
         if (command.publication.summary.isBlank()) {
             issues += SessionImportIssue("SUMMARY_REQUIRED", "공개 요약을 입력해 주세요.")
         }
-        if (command.highlights.isEmpty() || command.highlights.size > 6) {
+        if (command.highlights.isEmpty() || command.highlights.size > MAX_HIGHLIGHT_COUNT) {
             issues += SessionImportIssue("HIGHLIGHT_COUNT_INVALID", "하이라이트는 1개 이상 6개 이하로 입력해 주세요.")
         }
         if (command.oneLineReviews.isEmpty()) {
@@ -114,15 +168,12 @@ class SessionImportService(
         if (!isSafeFeedbackFileName(command.feedbackDocument.fileName)) {
             issues += SessionImportIssue("INVALID_FEEDBACK_FILE_NAME", "피드백 문서 파일 이름은 .md 또는 .txt 파일이어야 합니다.")
         }
+    }
 
-        val highlights =
-            command.highlights.map {
-                matchRecord(it.authorName, it.text, target, issues, "HIGHLIGHT_AUTHOR_NOT_FOUND")
-            }
-        val oneLineReviews =
-            command.oneLineReviews.map {
-                matchRecord(it.authorName, it.text, target, issues, "ONE_LINE_AUTHOR_NOT_FOUND")
-            }
+    private fun validateOneLineReviewAuthors(
+        command: SessionImportCommand,
+        issues: MutableList<SessionImportIssue>,
+    ) {
         command.oneLineReviews
             .groupBy { it.authorName.trim() }
             .filterValues { it.size > 1 }
@@ -130,29 +181,16 @@ class SessionImportService(
             .forEach { authorName ->
                 issues += SessionImportIssue("DUPLICATE_ONE_LINE_AUTHOR", "한줄평 작성자 '$authorName'가 중복되었습니다.")
             }
-
-        val parsedFeedback =
-            runCatching { parser.parse(command.feedbackDocument.markdown) }
-                .getOrElse {
-                    issues += SessionImportIssue("INVALID_FEEDBACK_DOCUMENT", "피드백 문서가 ReadMates 피드백 템플릿 형식이 아닙니다.")
-                    null
-                }
-
-        return SessionImportPreviewResult(
-            valid = issues.isEmpty(),
-            session = SessionImportSessionPreview(command.session.number, command.session.bookTitle, command.session.meetingDate.toString()),
-            publication = SessionImportPublicationPreview(command.publication.summary.trim()),
-            highlights = highlights,
-            oneLineReviews = oneLineReviews,
-            feedbackDocument =
-                SessionImportFeedbackDocumentPreview(
-                    command.feedbackDocument.fileName.trim(),
-                    parsedFeedback?.title,
-                    parsedFeedback != null,
-                ),
-            issues = issues,
-        )
     }
+
+    private fun parseFeedbackDocument(
+        markdown: String,
+        issues: MutableList<SessionImportIssue>,
+    ) = runCatching { parser.parse(markdown) }
+        .getOrElse {
+            issues += SessionImportIssue("INVALID_FEEDBACK_DOCUMENT", "피드백 문서가 ReadMates 피드백 템플릿 형식이 아닙니다.")
+            null
+        }
 
     private fun matchRecord(
         authorName: String,
@@ -170,7 +208,12 @@ class SessionImportService(
         if (attendee == null) {
             issues += SessionImportIssue(issueCode, "작성자 '$trimmedAuthorName'를 이 회차 참석자에서 찾을 수 없습니다.")
         }
-        return SessionImportRecordPreview(trimmedAuthorName, trimmedText, attendee != null, attendee?.membershipId?.toString())
+        return SessionImportRecordPreview(
+            trimmedAuthorName,
+            trimmedText,
+            attendee != null,
+            attendee?.membershipId?.toString(),
+        )
     }
 
     private fun requireHost(host: com.readmates.shared.security.CurrentMember) {
@@ -189,5 +232,6 @@ class SessionImportService(
 
     private companion object {
         private const val FORMAT = "readmates-session-import:v1"
+        private const val MAX_HIGHLIGHT_COUNT = 6
     }
 }

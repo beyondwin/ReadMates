@@ -450,8 +450,8 @@ class ArchiveControllerDbTest(
                 with(user("member5@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.items[?(@.sessionId == '00000000-0000-0000-0000-000000000306')].attendance") { value(hasItem(2)) }
-                jsonPath("$.items[?(@.sessionId == '00000000-0000-0000-0000-000000000306')].total") { value(hasItem(5)) }
+                jsonPath(SESSION6_ARCHIVE_ATTENDANCE_PATH) { value(hasItem(2)) }
+                jsonPath(SESSION6_ARCHIVE_TOTAL_PATH) { value(hasItem(5)) }
             }
 
         mockMvc
@@ -462,7 +462,7 @@ class ArchiveControllerDbTest(
                 jsonPath("$.attendance") { value(2) }
                 jsonPath("$.total") { value(5) }
                 jsonPath("$.publicHighlights[*].text") {
-                    value(not(hasItem("왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다.")))
+                    value(not(hasItem(REMOVED_PARTICIPANT_HIGHLIGHT)))
                 }
                 jsonPath("$.clubQuestions[*].authorName") { value(not(hasItem("멤버2"))) }
                 jsonPath(removedJsonPath("$.", "club", "Checkins")) { doesNotExist() }
@@ -478,6 +478,13 @@ class ArchiveControllerDbTest(
 
     companion object {
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
+
+        private const val SESSION6_ARCHIVE_ATTENDANCE_PATH =
+            "$.items[?(@.sessionId == '00000000-0000-0000-0000-000000000306')].attendance"
+        private const val SESSION6_ARCHIVE_TOTAL_PATH =
+            "$.items[?(@.sessionId == '00000000-0000-0000-0000-000000000306')].total"
+        private const val REMOVED_PARTICIPANT_HIGHLIGHT =
+            "왜곡된 인센티브와 보상 구조는 투자뿐 아니라 일상 조직에서도 판단을 흔들 수 있었다."
 
         private const val CLEANUP_SAMPLE_CLUB_ARCHIVE_DETAIL_ISOLATION_SQL = """
             delete from public_session_publications

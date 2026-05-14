@@ -8,6 +8,27 @@
 
 `gitleaks` 미설치 fallback이나 current-tree historical finding처럼 검증 강도가 낮거나 해석이 필요한 경우에는 그 한계를 결과에 남깁니다. 이 스크립트 통과만으로 secret rotation, GitHub 공개 전환, branch protection 설정, production 배포가 끝났다고 판단하지 않습니다.
 
+## `server-ci-check.sh`
+
+서버 코드를 수정한 뒤 GitHub Actions Backend job과 같은 품질 게이트를 로컬에서 먼저 확인합니다.
+
+```bash
+./scripts/server-ci-check.sh
+```
+
+실행 순서는 다음과 같습니다.
+
+- `./server/gradlew -p server check`
+- `./server/gradlew -p server architectureTest`
+
+`check`는 ktlint baseline, detekt baseline, 서버 테스트, JaCoCo coverage를 함께 실행합니다. `architectureTest`는 CI처럼 별도 단계로 실행해 clean architecture boundary 회귀를 확인합니다.
+
+스크립트 자체나 문서 변경만 빠르게 검증할 때는 dry-run으로 실행 명령만 확인할 수 있습니다.
+
+```bash
+READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
+```
+
 ## `build-public-release-candidate.sh`
 
 아래 명령은 저장소 루트에서 실행하는 것을 기준으로 합니다. 스크립트 자체는 저장소 내부 어디에서든 실행할 수 있지만, 이 문서의 `./scripts/...` 경로는 저장소 루트에서 그대로 복사해 실행할 수 있습니다.
@@ -41,6 +62,7 @@
 - `docs/operations/README.md`와 `docs/operations/runbooks/`
 - `docs/superpowers/`의 sanitized historical design and implementation records
 - 공개 릴리즈 보조 스크립트: `scripts/build-public-release-candidate.sh`, `scripts/README.md`, `scripts/public-release-check.sh`, `scripts/verify-public-release-fixtures.sh`
+- 서버 CI 사전 점검 스크립트: `scripts/server-ci-check.sh`
 - 배포 후 공개 연동 smoke script: `scripts/smoke-production-integrations.sh`
 
 디렉터리를 복사할 때 `copy_dir` 공통 exclude는 `.env*`, `*.env`, key material, dump, `.DS_Store`를 제외합니다. manifest별 exclude는 `front/output`, `front/node_modules`, `front/dist`, `front/test-results`, `front/playwright-report`, `front/coverage`, `front/.nyc_output`, `server/build`, `server/.gradle`, `server/.kotlin`, `deploy/oci/.deploy-state`, `deploy/oci/*.state`를 복사하지 않습니다. sanitized `docs/superpowers/` historical docs는 공개 후보에 포함하지만, sanitization을 거치지 않은 private historical planning docs는 공개 후보에 남길 수 없습니다. provider state, screenshot, `design`, `.gstack`, `.superpowers`, `.idea`, `.playwright-cli`, `.tmp`, `recode`처럼 공개 후보 금지 경로로 분류되는 항목은 복사 중 조용히 제외된다고 가정하지 않고, staging 후보 검증에서 발견되면 거부되어 빌드가 실패합니다.

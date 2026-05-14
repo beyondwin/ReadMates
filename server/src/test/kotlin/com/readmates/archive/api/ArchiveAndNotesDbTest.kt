@@ -66,7 +66,9 @@ class ArchiveAndNotesDbTest(
                 jsonPath("$.items.length()") { value(7) }
                 jsonPath("$.items[0].sessionNumber") { value(7) }
                 jsonPath("$.items[0].bookTitle") { value("괴테는 모든 것을 말했다") }
-                jsonPath("$.items[0].bookImageUrl") { value("https://image.aladin.co.kr/product/37676/59/cover500/s612137162_1.jpg") }
+                jsonPath("$.items[0].bookImageUrl") {
+                    value("https://image.aladin.co.kr/product/37676/59/cover500/s612137162_1.jpg")
+                }
                 jsonPath("$.items[0].state") { value("PUBLISHED") }
                 jsonPath("$.items[6].sessionNumber") { value(1) }
                 jsonPath("$.items[6].bookTitle") { value("팩트풀니스") }

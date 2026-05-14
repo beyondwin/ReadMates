@@ -13,17 +13,19 @@ interface SessionImportWritePort {
         sessionId: UUID,
     ): SessionImportTarget?
 
-    fun replaceRecords(
-        host: CurrentMember,
-        sessionId: UUID,
-        visibility: SessionRecordVisibility,
-        publicationSummary: String,
-        highlights: List<SessionImportRecordPreview>,
-        oneLineReviews: List<SessionImportRecordPreview>,
-        feedbackDocument: SessionImportFeedbackDocumentCommand,
-        feedbackTitle: String,
-    ): SessionImportStoredFeedbackDocument
+    fun replaceRecords(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument
 }
+
+data class SessionImportRecordReplacement(
+    val host: CurrentMember,
+    val sessionId: UUID,
+    val visibility: SessionRecordVisibility,
+    val publicationSummary: String,
+    val highlights: List<SessionImportRecordPreview>,
+    val oneLineReviews: List<SessionImportRecordPreview>,
+    val feedbackDocument: SessionImportFeedbackDocumentCommand,
+    val feedbackTitle: String,
+)
 
 data class SessionImportStoredFeedbackDocument(
     val fileName: String,

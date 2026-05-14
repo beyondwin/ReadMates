@@ -242,6 +242,18 @@
     <file name="src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/application/port/in/SessionImportUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
     <file name="src/main/kotlin/com/readmates/publication/adapter/in/web/PublicController.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>

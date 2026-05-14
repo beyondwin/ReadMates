@@ -420,6 +420,7 @@ copy_manifest() {
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/README.md"
   copy_optional_file "scripts/public-release-check.sh"
+  copy_optional_file "scripts/server-ci-check.sh"
   copy_optional_file "scripts/smoke-production-integrations.sh"
   copy_optional_file "scripts/verify-public-release-fixtures.sh"
 }

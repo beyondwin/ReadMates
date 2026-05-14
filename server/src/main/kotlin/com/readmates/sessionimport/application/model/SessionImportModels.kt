@@ -23,7 +23,9 @@ data class SessionImportSessionCommand(
     val meetingDate: LocalDate,
 )
 
-data class SessionImportPublicationCommand(val summary: String)
+data class SessionImportPublicationCommand(
+    val summary: String,
+)
 
 data class SessionImportRecordCommand(
     val authorName: String,
@@ -71,7 +73,9 @@ data class SessionImportSessionPreview(
     val meetingDate: String?,
 )
 
-data class SessionImportPublicationPreview(val summary: String)
+data class SessionImportPublicationPreview(
+    val summary: String,
+)
 
 data class SessionImportRecordPreview(
     val authorName: String,

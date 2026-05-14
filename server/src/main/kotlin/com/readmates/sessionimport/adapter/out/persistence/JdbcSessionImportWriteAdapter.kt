@@ -2,9 +2,9 @@ package com.readmates.sessionimport.adapter.out.persistence
 
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportAttendee
-import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
+import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.shared.db.dbString
@@ -25,31 +25,32 @@ class JdbcSessionImportWriteAdapter(
         sessionId: UUID,
     ): SessionImportTarget? {
         val session =
-            jdbcTemplate.query(
-                """
-                select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.session_date
-                from sessions
-                join memberships on memberships.club_id = sessions.club_id
-                where sessions.id = ?
-                  and sessions.club_id = ?
-                  and memberships.user_id = ?
-                  and memberships.role = 'HOST'
-                  and memberships.status = 'ACTIVE'
-                """.trimIndent(),
-                { rs, _ ->
-                    SessionImportTarget(
-                        sessionId = rs.uuid("id"),
-                        clubId = rs.uuid("club_id"),
-                        sessionNumber = rs.getInt("number"),
-                        bookTitle = rs.getString("book_title"),
-                        meetingDate = rs.getObject("session_date", LocalDate::class.java),
-                        attendees = emptyList(),
-                    )
-                },
-                sessionId.dbString(),
-                host.clubId.dbString(),
-                host.userId.dbString(),
-            ).firstOrNull() ?: return null
+            jdbcTemplate
+                .query(
+                    """
+                    select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.session_date
+                    from sessions
+                    join memberships on memberships.club_id = sessions.club_id
+                    where sessions.id = ?
+                      and sessions.club_id = ?
+                      and memberships.user_id = ?
+                      and memberships.role = 'HOST'
+                      and memberships.status = 'ACTIVE'
+                    """.trimIndent(),
+                    { rs, _ ->
+                        SessionImportTarget(
+                            sessionId = rs.uuid("id"),
+                            clubId = rs.uuid("club_id"),
+                            sessionNumber = rs.getInt("number"),
+                            bookTitle = rs.getString("book_title"),
+                            meetingDate = rs.getObject("session_date", LocalDate::class.java),
+                            attendees = emptyList(),
+                        )
+                    },
+                    sessionId.dbString(),
+                    host.clubId.dbString(),
+                    host.userId.dbString(),
+                ).firstOrNull() ?: return null
 
         val attendees =
             jdbcTemplate.query(
@@ -76,16 +77,16 @@ class JdbcSessionImportWriteAdapter(
         return session.copy(attendees = attendees)
     }
 
-    override fun replaceRecords(
-        host: CurrentMember,
-        sessionId: UUID,
-        visibility: SessionRecordVisibility,
-        publicationSummary: String,
-        highlights: List<SessionImportRecordPreview>,
-        oneLineReviews: List<SessionImportRecordPreview>,
-        feedbackDocument: SessionImportFeedbackDocumentCommand,
-        feedbackTitle: String,
-    ): SessionImportStoredFeedbackDocument {
+    override fun replaceRecords(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument {
+        lockSession(command)
+        updateSessionVisibility(command)
+        upsertPublication(command)
+        replaceHighlights(command)
+        replaceOneLineReviews(command)
+        return storeFeedbackDocument(command)
+    }
+
+    private fun lockSession(command: SessionImportRecordReplacement) {
         jdbcTemplate.queryForObject(
             """
             select id
@@ -95,11 +96,12 @@ class JdbcSessionImportWriteAdapter(
             for update
             """.trimIndent(),
             String::class.java,
-            sessionId.dbString(),
-            host.clubId.dbString(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
         )
+    }
 
-        val publicationIsPublic = visibility == SessionRecordVisibility.PUBLIC
+    private fun updateSessionVisibility(command: SessionImportRecordReplacement) {
         jdbcTemplate.update(
             """
             update sessions
@@ -108,10 +110,14 @@ class JdbcSessionImportWriteAdapter(
             where id = ?
               and club_id = ?
             """.trimIndent(),
-            visibility.name,
-            sessionId.dbString(),
-            host.clubId.dbString(),
+            command.visibility.name,
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
         )
+    }
+
+    private fun upsertPublication(command: SessionImportRecordReplacement) {
+        val publicationIsPublic = command.visibility == SessionRecordVisibility.PUBLIC
         jdbcTemplate.update(
             """
             insert into public_session_publications (
@@ -126,55 +132,61 @@ class JdbcSessionImportWriteAdapter(
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
-            host.clubId.dbString(),
-            sessionId.dbString(),
-            publicationSummary,
+            command.host.clubId.dbString(),
+            command.sessionId.dbString(),
+            command.publicationSummary,
             publicationIsPublic,
-            visibility.name,
+            command.visibility.name,
             publicationIsPublic,
         )
+    }
 
+    private fun replaceHighlights(command: SessionImportRecordReplacement) {
         jdbcTemplate.update(
             "delete from highlights where club_id = ? and session_id = ?",
-            host.clubId.dbString(),
-            sessionId.dbString(),
+            command.host.clubId.dbString(),
+            command.sessionId.dbString(),
         )
-        highlights.forEachIndexed { index, highlight ->
+        command.highlights.forEachIndexed { index, highlight ->
             jdbcTemplate.update(
                 """
                 insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
                 values (?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 UUID.randomUUID().dbString(),
-                host.clubId.dbString(),
-                sessionId.dbString(),
+                command.host.clubId.dbString(),
+                command.sessionId.dbString(),
                 requiredMembershipId(highlight).dbString(),
                 highlight.text,
                 index,
             )
         }
+    }
 
+    private fun replaceOneLineReviews(command: SessionImportRecordReplacement) {
         jdbcTemplate.update(
             "delete from one_line_reviews where club_id = ? and session_id = ?",
-            host.clubId.dbString(),
-            sessionId.dbString(),
+            command.host.clubId.dbString(),
+            command.sessionId.dbString(),
         )
-        val oneLineVisibility = if (visibility == SessionRecordVisibility.PUBLIC) "PUBLIC" else "SESSION"
-        oneLineReviews.forEach { review ->
+        val oneLineVisibility = if (command.visibility == SessionRecordVisibility.PUBLIC) "PUBLIC" else "SESSION"
+        command.oneLineReviews.forEach { review ->
             jdbcTemplate.update(
                 """
                 insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
                 values (?, ?, ?, ?, ?, ?)
                 """.trimIndent(),
                 UUID.randomUUID().dbString(),
-                host.clubId.dbString(),
-                sessionId.dbString(),
+                command.host.clubId.dbString(),
+                command.sessionId.dbString(),
                 requiredMembershipId(review).dbString(),
                 review.text,
                 oneLineVisibility,
             )
         }
+    }
 
+    private fun storeFeedbackDocument(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument {
         val nextVersion =
             jdbcTemplate.queryForObject(
                 """
@@ -184,12 +196,16 @@ class JdbcSessionImportWriteAdapter(
                   and session_id = ?
                 """.trimIndent(),
                 Int::class.java,
-                host.clubId.dbString(),
-                sessionId.dbString(),
+                command.host.clubId.dbString(),
+                command.sessionId.dbString(),
             ) ?: 1
-        val fileName = feedbackDocument.fileName.trim()
+        val fileName = command.feedbackDocument.fileName.trim()
         val contentType = if (fileName.endsWith(".txt")) "text/plain" else "text/markdown"
-        val fileSize = feedbackDocument.markdown.toByteArray(StandardCharsets.UTF_8).size.toLong()
+        val fileSize =
+            command.feedbackDocument.markdown
+                .toByteArray(StandardCharsets.UTF_8)
+                .size
+                .toLong()
         val documentId = UUID.randomUUID()
         jdbcTemplate.update(
             """
@@ -199,11 +215,11 @@ class JdbcSessionImportWriteAdapter(
             values (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
             documentId.dbString(),
-            host.clubId.dbString(),
-            sessionId.dbString(),
+            command.host.clubId.dbString(),
+            command.sessionId.dbString(),
             nextVersion,
-            feedbackDocument.markdown,
-            feedbackTitle,
+            command.feedbackDocument.markdown,
+            command.feedbackTitle,
             fileName,
             contentType,
             fileSize,
@@ -221,7 +237,7 @@ class JdbcSessionImportWriteAdapter(
 
         return SessionImportStoredFeedbackDocument(
             fileName = fileName,
-            title = feedbackTitle,
+            title = command.feedbackTitle,
             uploadedAt = uploadedAt,
         )
     }

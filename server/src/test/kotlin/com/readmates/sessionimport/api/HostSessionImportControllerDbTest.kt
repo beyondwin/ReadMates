@@ -1,9 +1,9 @@
 package com.readmates.sessionimport.api
 
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -162,8 +162,18 @@ class HostSessionImportControllerDbTest(
                 jsonPath("$.feedbackDocument.title") { value("독서모임 7951차 피드백") }
             }
 
-        assertEquals("Import summary.", scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"))
-        assertEquals("PUBLIC", scalar("select visibility from public_session_publications where session_id = '$SESSION_ID'"))
+        assertCommittedImportRecords()
+    }
+
+    private fun assertCommittedImportRecords() {
+        assertEquals(
+            "Import summary.",
+            scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"),
+        )
+        assertEquals(
+            "PUBLIC",
+            scalar("select visibility from public_session_publications where session_id = '$SESSION_ID'"),
+        )
         assertEquals(2, countRows("highlights"))
         assertEquals(2, countRows("one_line_reviews"))
         assertEquals(
@@ -215,7 +225,10 @@ class HostSessionImportControllerDbTest(
                 jsonPath("$.code") { value("INVALID_SESSION_IMPORT") }
             }
 
-        assertEquals("Existing summary.", scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"))
+        assertEquals(
+            "Existing summary.",
+            scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"),
+        )
         assertEquals(1, countRows("session_feedback_documents"))
     }
 
@@ -258,9 +271,10 @@ private fun validImportJson(
             "markdown": $markdown
           }
         }
-    """.trimIndent()
+        """.trimIndent()
 }
 
+@Suppress("LongMethod")
 private fun importFeedbackMarkdown() =
     """
     <!-- readmates-feedback:v1 -->

@@ -41,7 +41,9 @@ data class SessionImportSessionRequest(
     val meetingDate: String,
 )
 
-data class SessionImportPublicationRequest(val summary: String)
+data class SessionImportPublicationRequest(
+    val summary: String,
+)
 
 data class SessionImportRecordRequest(
     val authorName: String,
