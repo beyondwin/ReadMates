@@ -141,29 +141,26 @@ pnpm --dir front exec vitest run --coverage
 
 Expected: PASS (현재 측정치가 임계값 + 2%p 이상이므로 통과).
 
-- [ ] **Step 4: 의도적 회귀로 실패 확인**
+- [ ] **Step 4: 게이트 활성 확인 (임계값 일시 상향)**
 
-`front/shared/api/client.ts` 끝에 미사용 함수 추가:
+> 작은 미사용 함수 한 개로는 -2pp 버퍼를 절대 못 깨므로, 게이트가 실제로 동작하는지는 임계값을 일시적으로 현재 측정치보다 높게 올려 확인한다. 검증 후 즉시 원복.
 
-```ts
-export function __coverageProbeUnused() {
-  let x = 0;
-  if (Math.random() > 1) x = 1;
-  return x;
-}
-```
+임시로 임계값을 측정치보다 위로 변경 (예: 모두 100으로 세팅):
 
 ```bash
+# vitest.config.ts thresholds 를 100/100/100/100 으로 일시 변경
 pnpm --dir front exec vitest run --coverage
 ```
 
-Expected: FAIL (branches 또는 lines 임계 미달).
+Expected: FAIL (모든 지표가 100% 미만이므로 임계 미달).
 
 원복:
 
 ```bash
-git checkout front/shared/api/client.ts
+git checkout front/vitest.config.ts
 ```
+
+그 후 Step 1~3에서 결정한 baseline 값 (`87/87/83/84`) 으로 다시 반영하고 다시 한 번 PASS 확인.
 
 - [ ] **Step 5: Commit**
 
