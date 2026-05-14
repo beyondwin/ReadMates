@@ -15,7 +15,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - perf: replace Redis `KEYS` with SCAN-based iteration in read-cache invalidation (server/shared/redis).
 
 ### Post-deploy verification (v1.9 perf follow-up)
-- Staging EXPLAIN check (deferred from PR time — local docker MySQL was unavailable): run `EXPLAIN` against the rewritten `publicStats` (single SELECT with 3 scalar subqueries) and `publicSessions` (CTE `active_participants` + LEFT JOIN `highlight_counts` + INNER JOIN `one_liner_counts`) with realistic row counts. Confirm existing indexes are used — no full scans on `sessions`, `highlights`, or `one_line_reviews`.
+- Local docker MySQL EXPLAIN 검증 완료 (2026-05-15): rewritten `publicStats`/`publicSessions`에 대해 `sessions`는 PRIMARY `eq_ref`, `session_participants`는 `session_participants_club_session_status_member_idx` covering index lookup, `one_line_reviews`는 unique `session_id` `eq_ref`로 핵심 path에 full scan 없음. 운영(OCI MySQL HeatWave) row 수 기준 재확인은 [docs/reports/2026-05-15-v19-perf-explain-verification.md](docs/reports/2026-05-15-v19-perf-explain-verification.md)의 운영 DB 재현 절차로 별도 실행.
 
 ## v1.9.0 - 2026-05-15
 
