@@ -44,6 +44,12 @@ replay_pid*
 *.sqlite
 *.sqlite3
 
+# Local session import drafts
+/readmates-session-*-import.json
+/readmates-session-*-import.txt
+/session-*-feedback.md
+/session-*-feedback.txt
+
 # Local-only Spring profiles
 application-local.*
 application-*.local.*

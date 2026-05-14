@@ -49,6 +49,7 @@
 - `session.number`, `session.bookTitle`, `session.meetingDate`는 현재 편집 중인 세션과 일치해야 합니다.
 - `publication.summary`와 `highlights`는 공개 가능 문장만 사용합니다.
 - `authorName`은 참석자 표시 이름과 정확히 일치해야 합니다.
+- 로컬 demo/seed 데이터는 실제 참석자 실명 대신 alias 표시 이름을 사용할 수 있습니다. import 전에 호스트 편집기 참석자 목록에 보이는 이름을 그대로 넣습니다.
 - `highlights`는 1개 이상 6개 이하입니다.
 - `oneLineReviews`는 1개 이상이고, 같은 작성자를 중복하지 않습니다.
 - `feedbackDocument.fileName`은 `/` 또는 `\`를 포함하지 않는 `.md` 또는 `.txt` 파일명입니다.
