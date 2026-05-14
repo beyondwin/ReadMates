@@ -44,7 +44,12 @@ export default defineConfig({
         test: {
           name: "node",
           environment: "node",
-          include: ["tests/unit/**/*.test.ts"],
+          include: [
+            "tests/unit/**/*.test.ts",
+            "src/**/*.test.ts",
+            "features/**/*.test.ts",
+            "shared/**/*.test.ts",
+          ],
           exclude: [
             "tests/unit/**/*.test.tsx",
             "tests/unit/cloudflare-*.test.ts",
@@ -73,6 +78,9 @@ export default defineConfig({
             "tests/unit/proxy-bff-secret.test.ts",
             "tests/unit/readmates-fetch.test.ts",
             "tests/unit/route-continuity.test.ts",
+            "src/**/*.test.tsx",
+            "features/**/*.test.tsx",
+            "shared/**/*.test.tsx",
           ],
           setupFiles: ["./tests/setup.ts"],
         },

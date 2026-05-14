@@ -25,3 +25,15 @@ pnpm --dir front test:e2e
 ```
 
 If a check is skipped, report the exact command and reason in the final response.
+
+## Test Co-location Convention
+
+신규 단위 테스트는 source 파일과 동일 디렉토리에 co-locate 합니다.
+
+- 새 파일: `features/host/ui/host-foo.tsx` → `features/host/ui/host-foo.test.tsx`
+- 모듈 import: 동일 디렉토리이므로 `./host-foo` 로 import.
+- vitest.config.ts 가 두 위치 모두 매치하도록 `include` 패턴이 `tests/unit/**` + `**/*.test.{ts,tsx}` 를 모두 커버.
+
+기존 `front/tests/unit/` 테스트는 fixture 공유를 위해 이동하지 않습니다. 서버 testcontainer가 `readmates.frontend.fixtures.dir` system property로 해당 경로를 참조합니다.
+
+신규 fixture가 서버에서 사용되는 경우에 한해 `tests/unit/__fixtures__/` 에 둡니다.
