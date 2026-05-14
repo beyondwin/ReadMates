@@ -538,6 +538,64 @@ describe("HostInvitations", () => {
     expect(screen.queryByRole("button", { name: "초대 링크 복사" })).not.toBeInTheDocument();
   });
 
+  it("invalidates list after successful revoke", async () => {
+    const { Wrapper } = createTestQueryWrapper();
+    const pendingInvitation: HostInvitationListItem = {
+      invitationId: "invite-revoke-1",
+      email: "revoke-target@example.com",
+      name: "취소 대상",
+      role: "MEMBER",
+      status: "PENDING",
+      effectiveStatus: "PENDING",
+      expiresAt: "2026-05-20T12:00:00Z",
+      acceptedAt: null,
+      createdAt: "2026-04-20T12:00:00Z",
+      canRevoke: true,
+      canReissue: true,
+      applyToCurrentSession: true,
+    };
+    const listInvitations = vi.fn(
+      () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ items: [pendingInvitation], nextCursor: null }), { status: 200 }),
+        ),
+    );
+    const revokeInvitation = vi.fn(
+      () =>
+        Promise.resolve(
+          new Response(JSON.stringify({ ...pendingInvitation, status: "REVOKED", effectiveStatus: "REVOKED" }), {
+            status: 200,
+          }),
+        ),
+    );
+    const parseInvitationList = vi.fn(async (response: Response) => (await response.json()) as HostInvitationListPage);
+    const parseInvitation = vi.fn(async (response: Response) => response.json());
+    const actions = {
+      listInvitations,
+      createInvitation: vi.fn(),
+      revokeInvitation,
+      parseInvitation,
+      parseInvitationList,
+    };
+
+    render(
+      <HostInvitations
+        initialInvitations={{ items: [pendingInvitation], nextCursor: null }}
+        actions={actions as unknown as HostInvitationsActions}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    const baselineListCalls = listInvitations.mock.calls.length;
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "revoke-target@example.com 초대 취소" }),
+    );
+
+    await waitFor(() => expect(revokeInvitation).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(listInvitations.mock.calls.length).toBeGreaterThan(baselineListCalls));
+  });
+
   it("refreshes invitations after reissue and keeps historical rows", async () => {
     const revokedInvitation = {
       ...invitations[1],
