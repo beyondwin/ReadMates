@@ -6,6 +6,7 @@ plugins {
     id("org.flywaydb.flyway") version "11.7.2"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
     id("io.gitlab.arturbosch.detekt") version "1.23.7"
+    id("jacoco")
 }
 
 group = "com.readmates"
@@ -184,4 +185,76 @@ tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configure
 
 tasks.named("check") {
     dependsOn("detekt")
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+val unitTestTask = tasks.named<Test>("unitTest")
+
+unitTestTask.configure {
+    extensions.configure<JacocoTaskExtension> {
+        destinationFile =
+            layout.buildDirectory
+                .file("jacoco/unitTest.exec")
+                .get()
+                .asFile
+    }
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(unitTestTask)
+    executionData.setFrom(fileTree(layout.buildDirectory).include("/jacoco/unitTest.exec"))
+    sourceSets(sourceSets["main"])
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(
+                        "**/*Application*",
+                        "**/dto/**",
+                        "**/config/**",
+                    )
+                }
+            },
+        ),
+    )
+}
+
+tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn(tasks.named("jacocoTestReport"))
+    executionData.setFrom(fileTree(layout.buildDirectory).include("/jacoco/unitTest.exec"))
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(
+                        "**/*Application*",
+                        "**/dto/**",
+                        "**/config/**",
+                    )
+                }
+            },
+        ),
+    )
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                // baseline 0.2504 (measured 2026-05-14) -2pp; raised in Task 4 if needed.
+                minimum = "0.23".toBigDecimal()
+            }
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn("jacocoTestCoverageVerification")
 }
