@@ -1,14 +1,13 @@
 package com.readmates.notification.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.put
@@ -38,9 +37,10 @@ private const val CLEANUP_MEMBER_NOTIFICATION_BFF_PREFERENCES_SQL = """
     ],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class MemberNotificationPreferenceBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `member notification preference bff request reaches controller without spring csrf token`() {
         mockMvc.put("/api/me/notifications/preferences") {
@@ -64,14 +64,6 @@ class MemberNotificationPreferenceBffSecurityTest(
             jsonPath("$.emailEnabled") { value(false) }
             jsonPath("$.events.SESSION_REMINDER_DUE") { value(false) }
             jsonPath("$.events.REVIEW_PUBLISHED") { value(true) }
-        }
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
         }
     }
 }

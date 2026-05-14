@@ -1,6 +1,7 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ServletRequest
 import jakarta.servlet.ServletResponse
@@ -13,8 +14,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.Instant
 import java.util.UUID
@@ -29,11 +28,12 @@ import java.util.UUID
 )
 @Sql(statements = [InviteAwareOAuthTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [InviteAwareOAuthTest.CLEANUP_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Tag("integration")
 class InviteAwareOAuthTest(
     @param:Autowired private val oauthReturnState: OAuthReturnState,
     @param:Autowired private val captureFilter: OAuthInviteTokenCaptureFilter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `authorization capture signs trusted relative return target`() {
         val request = MockHttpServletRequest("GET", "/oauth2/authorization/google")
@@ -124,11 +124,5 @@ class InviteAwareOAuthTest(
               'disabled-oauth-return.example.test'
             );
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

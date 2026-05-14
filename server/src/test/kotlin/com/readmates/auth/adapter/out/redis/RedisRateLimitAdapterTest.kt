@@ -1,11 +1,11 @@
 package com.readmates.auth.adapter.out.redis
 
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.port.out.RateLimitCheck
 import com.readmates.auth.application.port.out.RateLimitPort
 import com.readmates.shared.cache.RateLimitProperties
 import com.readmates.shared.cache.RedisCacheMetrics
-import com.readmates.support.MySqlTestContainer
-import com.readmates.support.RedisTestContainer
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -24,8 +24,6 @@ import org.springframework.context.annotation.Import
 import org.springframework.context.support.StaticApplicationContext
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.data.redis.core.script.RedisScript
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
 import java.time.Duration
@@ -38,10 +36,12 @@ import java.time.Duration
         "readmates.rate-limit.enabled=true",
     ],
 )
+@Tag("integration")
+@Tag("container")
 class RedisRateLimitAdapterTest(
     @param:Autowired private val adapter: RedisRateLimitAdapter,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
-) {
+) : ReadmatesRedisIntegrationTestSupport() {
     private val contextRunner = ApplicationContextRunner()
         .withUserConfiguration(RateLimitAdapterBeanTestConfiguration::class.java)
 
@@ -221,15 +221,6 @@ class RedisRateLimitAdapterTest(
         name: String,
         vararg tags: String,
     ) = meterRegistry.counter(name, *tags).count()
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun testProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-            RedisTestContainer.registerRedisProperties(registry)
-        }
-    }
 }
 
 private data class RateLimitAdapterCase(

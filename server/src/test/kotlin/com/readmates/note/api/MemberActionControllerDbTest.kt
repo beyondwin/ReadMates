@@ -1,6 +1,7 @@
 package com.readmates.note.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -11,8 +12,6 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.patch
@@ -25,10 +24,11 @@ import org.springframework.test.web.servlet.put
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class MemberActionControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @BeforeEach
     fun resetSeedMemberLifecycle() {
         jdbcTemplate.update(RESET_MEMBER5_ACTIVE_SQL)
@@ -776,11 +776,5 @@ class MemberActionControllerDbTest(
             set memberships.status = 'ACTIVE'
             where users.email = 'member5@example.com';
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

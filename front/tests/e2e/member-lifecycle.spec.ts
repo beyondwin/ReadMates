@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { cleanupGeneratedSessions, loginWithGoogleFixture, resetSeedGoogleLogins, setMembershipStatus } from "./readmates-e2e-db";
+import { loginWithGoogleFixture, resetE2eState, setMembershipStatus } from "./readmates-e2e-db";
 
 test.describe.configure({ mode: "serial" });
 
@@ -7,9 +7,11 @@ const lifecycleMemberEmail = "member5@example.com";
 const lifecycleBookTitle = "생명주기 테스트 책";
 
 function resetLifecycleState() {
-  cleanupGeneratedSessions();
+  resetE2eState({
+    cleanupGeneratedSessions: true,
+    googleLoginEmails: ["host@example.com", lifecycleMemberEmail],
+  });
   setMembershipStatus(lifecycleMemberEmail, "ACTIVE");
-  resetSeedGoogleLogins(["host@example.com", lifecycleMemberEmail]);
 }
 
 async function createOpenSessionThroughUi(page: Page) {

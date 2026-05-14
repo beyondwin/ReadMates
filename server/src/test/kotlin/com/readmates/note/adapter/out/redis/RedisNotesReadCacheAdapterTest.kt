@@ -1,12 +1,12 @@
 package com.readmates.note.adapter.out.redis
 
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.note.application.model.NoteFeedResult
 import com.readmates.note.application.model.NoteSessionResult
 import com.readmates.note.application.port.out.NotesReadCachePort
 import com.readmates.shared.cache.NotesCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
-import com.readmates.support.MySqlTestContainer
-import com.readmates.support.RedisTestContainer
 import io.micrometer.core.instrument.MeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -22,8 +22,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import tools.jackson.databind.ObjectMapper
 import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
@@ -38,11 +36,13 @@ import java.util.concurrent.TimeUnit
         "readmates.notes-cache.enabled=true",
     ],
 )
+@Tag("integration")
+@Tag("container")
 class RedisNotesReadCacheAdapterTest(
     @param:Autowired private val adapter: RedisNotesReadCacheAdapter,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val meterRegistry: MeterRegistry,
-) {
+) : ReadmatesRedisIntegrationTestSupport() {
     private val contextRunner = ApplicationContextRunner()
         .withUserConfiguration(NotesReadCacheAdapterBeanTestConfiguration::class.java)
 
@@ -191,13 +191,6 @@ class RedisNotesReadCacheAdapterTest(
         private fun feedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
         private fun sessionFeedKey(clubId: UUID, sessionId: UUID) = "notes:club:$clubId:session:$sessionId:feed:v1"
         private fun sessionsKey(clubId: UUID) = "notes:club:$clubId:sessions:v1"
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun testProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-            RedisTestContainer.registerRedisProperties(registry)
-        }
     }
 }
 

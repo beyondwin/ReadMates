@@ -1,8 +1,9 @@
 package com.readmates.club.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.jayway.jsonpath.JsonPath
 import com.readmates.auth.application.service.AuthSessionService
-import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -13,8 +14,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import java.util.UUID
@@ -28,11 +27,12 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class PlatformAdminBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
@@ -165,11 +165,5 @@ class PlatformAdminBffSecurityTest(
 
     companion object {
         private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

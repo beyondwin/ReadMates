@@ -1,7 +1,8 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
-import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
@@ -10,8 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import java.util.UUID
@@ -23,11 +22,12 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class SecurityRoleHierarchyTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
@@ -152,13 +152,5 @@ class SecurityRoleHierarchyTest(
             "delete from $tableName where $columnName in ($placeholders)",
             *values.toTypedArray(),
         )
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

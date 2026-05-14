@@ -1,5 +1,7 @@
 package com.readmates.publication.adapter.out.redis
 
+import com.readmates.support.ReadmatesRedisIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicSessionDetailResult
@@ -7,8 +9,6 @@ import com.readmates.publication.application.port.out.PublicReadCachePort
 import com.readmates.shared.cache.CacheJsonCodec
 import com.readmates.shared.cache.PublicCacheProperties
 import com.readmates.shared.cache.RedisCacheMetrics
-import com.readmates.support.MySqlTestContainer
-import com.readmates.support.RedisTestContainer
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -27,8 +27,6 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.support.StaticApplicationContext
 import org.springframework.data.redis.core.StringRedisTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import tools.jackson.databind.json.JsonMapper
 import java.time.Duration
 import java.util.UUID
@@ -42,11 +40,13 @@ import java.util.concurrent.TimeUnit
         "readmates.public-cache.enabled=true",
     ],
 )
+@Tag("integration")
+@Tag("container")
 class RedisPublicReadCacheAdapterTest(
     @param:Autowired private val adapter: RedisPublicReadCacheAdapter,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val meterRegistry: MeterRegistry,
-) {
+) : ReadmatesRedisIntegrationTestSupport() {
     private val contextRunner = ApplicationContextRunner()
         .withUserConfiguration(PublicReadCacheAdapterBeanTestConfiguration::class.java)
 
@@ -254,13 +254,6 @@ class RedisPublicReadCacheAdapterTest(
         private val CLUB_KEY = "public:club:$BASELINE_CLUB_ID:home:v1"
 
         private fun sessionKey(sessionId: UUID) = "public:club:$BASELINE_CLUB_ID:session:$sessionId:v1"
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun testProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-            RedisTestContainer.registerRedisProperties(registry)
-        }
     }
 }
 

@@ -1,6 +1,7 @@
 package com.readmates.publication.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.hasItems
 import org.hamcrest.Matchers.not
@@ -12,8 +13,6 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -26,10 +25,11 @@ import org.springframework.test.web.servlet.put
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class PublicControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `public club returns real published sessions`() {
         mockMvc.get("/api/public/club")
@@ -695,11 +695,5 @@ class PublicControllerDbTest(
               '2026-04-25 00:00:00.000000'
             );
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

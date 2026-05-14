@@ -1,7 +1,8 @@
 package com.readmates.archive.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.archive.adapter.`in`.web.ArchiveController
-import com.readmates.support.MySqlTestContainer
 import org.hamcrest.Matchers.emptyOrNullString
 import org.hamcrest.Matchers.everyItem
 import org.hamcrest.Matchers.greaterThan
@@ -15,8 +16,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get as requestGet
@@ -31,10 +30,11 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class ArchiveControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdArchiveVisibilitySessionIds = linkedSetOf<String>()
 
     @AfterEach
@@ -853,11 +853,5 @@ class ArchiveControllerDbTest(
               '2026-04-25 00:00:00.000000'
             );
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

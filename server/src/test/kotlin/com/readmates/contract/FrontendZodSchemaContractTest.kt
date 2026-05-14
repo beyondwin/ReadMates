@@ -1,14 +1,13 @@
 package com.readmates.contract
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import tools.jackson.databind.JsonNode
@@ -31,10 +30,11 @@ import java.nio.file.Paths
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class FrontendZodSchemaContractTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val objectMapper: ObjectMapper,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val zodFixturesDir = Paths.get(
         System.getProperty("readmates.frontend.zod.fixtures.dir")
             ?: error("System property 'readmates.frontend.zod.fixtures.dir' is not set"),
@@ -98,13 +98,5 @@ class FrontendZodSchemaContractTest @Autowired constructor(
                     "Keys in zod fixture but not in server response: ${expectedKeys - actualKeys}",
             )
             .isEqualTo(expectedKeys)
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

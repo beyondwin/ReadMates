@@ -3,7 +3,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { resolveE2eDatabaseName } from "../e2e/readmates-e2e-config";
 
@@ -15,6 +15,30 @@ async function backendWebServerCommand() {
 
   expect(backend).toBeDefined();
   return backend?.command ?? "";
+}
+
+async function loadPlaywrightConfigWithWorkers(workers: string | undefined) {
+  const previousWorkers = process.env.PLAYWRIGHT_WORKERS;
+
+  if (workers === undefined) {
+    delete process.env.PLAYWRIGHT_WORKERS;
+  } else {
+    process.env.PLAYWRIGHT_WORKERS = workers;
+  }
+
+  vi.resetModules();
+
+  try {
+    const { default: playwrightConfig } = await import("../../playwright.config");
+    return playwrightConfig;
+  } finally {
+    if (previousWorkers === undefined) {
+      delete process.env.PLAYWRIGHT_WORKERS;
+    } else {
+      process.env.PLAYWRIGHT_WORKERS = previousWorkers;
+    }
+    vi.resetModules();
+  }
 }
 
 describe("Playwright E2E database config", () => {
@@ -53,5 +77,10 @@ describe("Playwright E2E backend web server config", () => {
     await expect(backendWebServerCommand()).resolves.toContain(
       "READMATES_IP_HASH_BASE_SECRET='test-secret'",
     );
+  });
+
+  it("keeps one worker by default and supports explicit worker opt-in", async () => {
+    await expect(loadPlaywrightConfigWithWorkers(undefined)).resolves.toMatchObject({ workers: 1 });
+    await expect(loadPlaywrightConfigWithWorkers("2")).resolves.toMatchObject({ workers: 2 });
   });
 });

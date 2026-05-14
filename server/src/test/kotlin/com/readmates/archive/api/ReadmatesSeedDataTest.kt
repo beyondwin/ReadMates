@@ -1,14 +1,13 @@
 package com.readmates.archive.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 
 @SpringBootTest(
     properties = [
@@ -16,9 +15,10 @@ import org.springframework.test.context.DynamicPropertySource
     ],
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+@Tag("integration")
 class ReadmatesSeedDataTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `seed creates exactly six readmates users and memberships`() {
         assertEquals(6, jdbcTemplate.queryForObject("select count(*) from users where email in ($SEEDED_EMAILS)", Int::class.java))
@@ -162,11 +162,5 @@ class ReadmatesSeedDataTest(
             5 to setOf("host@example.com", "member4@example.com", "member2@example.com", "member1@example.com"),
             6 to setOf("host@example.com", "member5@example.com", "member2@example.com"),
         )
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

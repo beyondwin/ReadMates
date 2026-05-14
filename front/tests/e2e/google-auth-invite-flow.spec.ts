@@ -1,9 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
-  cleanupGeneratedSessions,
   createOpenSessionFixture,
   loginWithGoogleFixture,
-  resetSeedGoogleLogins,
+  resetE2eState,
 } from "./readmates-e2e-db";
 
 test.describe.configure({ mode: "serial" });
@@ -12,8 +11,11 @@ const invitedEmail = "e2e.google.invited@example.com";
 const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 
 function cleanupGoogleInviteFlowState() {
-  cleanupGeneratedSessions([invitedEmail]);
-  resetSeedGoogleLogins(["host@example.com"]);
+  resetE2eState({
+    cleanupGeneratedSessions: true,
+    invitedEmails: [invitedEmail],
+    googleLoginEmails: ["host@example.com"],
+  });
 }
 
 function inviteTokenFromUrl(inviteUrl: string) {

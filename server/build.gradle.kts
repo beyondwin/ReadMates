@@ -71,8 +71,15 @@ tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
 
 val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
 
-tasks.withType<Test> {
+val serverTestJavaLauncher = javaToolchains.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(21))
+}
+
+val testSourceSet = sourceSets.named("test")
+
+fun Test.configureReadmatesTestRuntime() {
     useJUnitPlatform()
+    javaLauncher.set(serverTestJavaLauncher)
     filter {
         excludeTestsMatching("*\$*")
     }
@@ -89,5 +96,46 @@ tasks.withType<Test> {
     if (System.getenv("DOCKER_HOST").isNullOrBlank() && colimaDockerSocket.exists()) {
         environment("DOCKER_HOST", "unix://${colimaDockerSocket.absolutePath}")
         environment("TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE", "/var/run/docker.sock")
+    }
+}
+
+fun Test.useReadmatesTestClasses() {
+    testClassesDirs = testSourceSet.get().output.classesDirs
+    classpath = testSourceSet.get().runtimeClasspath
+}
+
+tasks.withType<Test>().configureEach {
+    configureReadmatesTestRuntime()
+}
+
+tasks.register<Test>("unitTest") {
+    description = "Runs ReadMates unit tests without Spring/Testcontainers integration tags."
+    group = "verification"
+    configureReadmatesTestRuntime()
+    useReadmatesTestClasses()
+    useJUnitPlatform {
+        excludeTags("integration", "container", "architecture")
+    }
+}
+
+tasks.register<Test>("integrationTest") {
+    description = "Runs ReadMates Spring Boot and Testcontainers integration tests."
+    group = "verification"
+    configureReadmatesTestRuntime()
+    useReadmatesTestClasses()
+    shouldRunAfter("unitTest")
+    useJUnitPlatform {
+        includeTags("integration", "container")
+    }
+}
+
+tasks.register<Test>("architectureTest") {
+    description = "Runs ReadMates ArchUnit architecture boundary tests."
+    group = "verification"
+    configureReadmatesTestRuntime()
+    useReadmatesTestClasses()
+    shouldRunAfter("unitTest")
+    useJUnitPlatform {
+        includeTags("architecture")
     }
 }

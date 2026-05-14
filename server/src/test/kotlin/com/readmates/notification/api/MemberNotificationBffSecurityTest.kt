@@ -1,6 +1,7 @@
 package com.readmates.notification.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -8,8 +9,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
@@ -61,10 +60,11 @@ private const val CLEANUP_MEMBER_NOTIFICATION_BFF_SECURITY_SQL = """
     ],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class MemberNotificationBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `mark notification read without bff secret is rejected`() {
         insertUnreadNotification()
@@ -279,13 +279,5 @@ class MemberNotificationBffSecurityTest(
             MEMBER_NOTIFICATION_BFF_CLUB_ID,
             MEMBER_NOTIFICATION_BFF_MEMBERSHIP_ID,
         ) ?: 0
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

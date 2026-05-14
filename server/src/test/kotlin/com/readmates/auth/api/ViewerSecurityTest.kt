@@ -1,11 +1,12 @@
 package com.readmates.auth.api
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.feedback.application.FeedbackDocumentError
 import com.readmates.feedback.application.FeedbackDocumentException
 import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
-import com.readmates.support.MySqlTestContainer
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -18,8 +19,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
@@ -32,13 +31,14 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class ViewerSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val resolveCurrentMemberUseCase: ResolveCurrentMemberUseCase,
     @param:Autowired private val getReadableFeedbackDocumentUseCase: GetReadableFeedbackDocumentUseCase,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdSessionIds = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
@@ -283,13 +283,5 @@ class ViewerSecurityTest(
             "delete from $tableName where $columnName in ($placeholders)",
             *values.toTypedArray(),
         )
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

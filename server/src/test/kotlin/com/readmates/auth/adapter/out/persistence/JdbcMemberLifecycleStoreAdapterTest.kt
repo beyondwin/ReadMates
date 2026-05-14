@@ -1,17 +1,16 @@
 package com.readmates.auth.adapter.out.persistence
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.auth.domain.IllegalMemberStateTransitionException
 import com.readmates.auth.domain.MemberLifecycleStatus
 import com.readmates.shared.db.dbString
-import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.util.UUID
 
@@ -35,10 +34,11 @@ private const val CLEANUP_LIFECYCLE_ADAPTER_SQL = """
     statements = [CLEANUP_LIFECYCLE_ADAPTER_SQL],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class JdbcMemberLifecycleStoreAdapterTest(
     @param:Autowired private val adapter: JdbcMemberLifecycleStoreAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
     // ---- invalid transition: LEFT → restore ----
@@ -202,12 +202,4 @@ class JdbcMemberLifecycleStoreAdapterTest(
             String::class.java,
             membershipId.dbString(),
         )!!
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
-    }
 }

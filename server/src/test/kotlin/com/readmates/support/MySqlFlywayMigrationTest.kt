@@ -1,5 +1,6 @@
 package com.readmates.support
 
+import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -10,8 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.UncategorizedSQLException
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.TestPropertySource
 import java.util.UUID
 
@@ -21,9 +20,10 @@ import java.util.UUID
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
     ],
 )
+@Tag("integration")
 class MySqlFlywayMigrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `mysql baseline creates auth session and feedback document tables`() {
         val tableCount = jdbcTemplate.queryForObject(
@@ -841,13 +841,5 @@ class MySqlFlywayMigrationTest(
             "delete from $tableName where $columnName in ($placeholders)",
             *values.toTypedArray(),
         )
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

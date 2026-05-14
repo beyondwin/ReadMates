@@ -1,6 +1,7 @@
 package com.readmates.contract
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -8,8 +9,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -31,11 +30,12 @@ import java.nio.file.Paths
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class FrontendFixtureContractTest @Autowired constructor(
     private val mockMvc: MockMvc,
     private val objectMapper: ObjectMapper,
     private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val fixturesDir = Paths.get(
         System.getProperty("readmates.frontend.fixtures.dir")
             ?: error("System property 'readmates.frontend.fixtures.dir' is not set"),
@@ -108,13 +108,5 @@ class FrontendFixtureContractTest @Autowired constructor(
                     "Keys in fixture but not in server response: ${expectedKeys - actualKeys}",
             )
             .isEqualTo(expectedKeys)
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

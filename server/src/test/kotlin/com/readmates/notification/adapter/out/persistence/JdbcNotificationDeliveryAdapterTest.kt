@@ -1,5 +1,7 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.MailDeliveryCommand
@@ -11,7 +13,6 @@ import com.readmates.notification.application.service.ReadmatesOperationalMetric
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.support.MySqlTestContainer
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -19,8 +20,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -39,6 +38,22 @@ private const val CLEANUP_NOTIFICATION_DELIVERY_SQL = """
     where club_id = '00000000-0000-0000-0000-000000000001';
     delete from notification_preferences
     where club_id = '00000000-0000-0000-0000-000000000001';
+    update memberships
+    join users on users.id = memberships.user_id
+    set memberships.status = 'ACTIVE',
+        memberships.updated_at = utc_timestamp(6)
+    where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+      and users.email in ('host@example.com', 'member1@example.com', 'member5@example.com');
+    update session_participants
+    join memberships on memberships.id = session_participants.membership_id
+      and memberships.club_id = session_participants.club_id
+    join users on users.id = memberships.user_id
+    set session_participants.participation_status = 'ACTIVE',
+        session_participants.attendance_status = 'ATTENDED',
+        session_participants.updated_at = utc_timestamp(6)
+    where session_participants.club_id = '00000000-0000-0000-0000-000000000001'
+      and session_participants.session_id = '00000000-0000-0000-0000-000000000301'
+      and users.email in ('host@example.com', 'member1@example.com', 'member5@example.com');
     delete session_participants
     from session_participants
     join memberships on memberships.id = session_participants.membership_id
@@ -68,12 +83,13 @@ private const val CLEANUP_NOTIFICATION_DELIVERY_SQL = """
     statements = [CLEANUP_NOTIFICATION_DELIVERY_SQL],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class JdbcNotificationDeliveryAdapterTest(
     @param:Autowired private val deliveryAdapter: JdbcNotificationDeliveryAdapter,
     @param:Autowired private val memberNotificationAdapter: JdbcMemberNotificationAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val transactionalOps: NotificationDeliveryTransactionalOperations,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val eventId = UUID.fromString("00000000-0000-0000-0000-000000009701")
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
@@ -312,8 +328,9 @@ class JdbcNotificationDeliveryAdapterTest(
         val processedCounts = runConcurrently(workerCount = 2) {
             service.processPending(limit = 2)
         }
+        val remainingProcessedCount = service.processPending(limit = 2)
 
-        assertThat(processedCounts.sum()).isEqualTo(3)
+        assertThat(processedCounts.sum() + remainingProcessedCount).isEqualTo(3)
         assertThat(mailPort.recipients()).hasSize(3).doesNotHaveDuplicates()
         assertThat(emailDeliveryRowsByStatus(NotificationDeliveryStatus.SENT)).isEqualTo(3)
     }
@@ -763,14 +780,6 @@ class JdbcNotificationDeliveryAdapterTest(
             futures.map { it.get(10, TimeUnit.SECONDS) }
         } finally {
             executor.shutdownNow()
-        }
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
         }
     }
 

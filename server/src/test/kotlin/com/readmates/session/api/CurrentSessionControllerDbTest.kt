@@ -1,6 +1,7 @@
 package com.readmates.session.api
 
-import com.readmates.support.MySqlTestContainer
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import org.hamcrest.Matchers.greaterThan
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
@@ -10,8 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
@@ -23,10 +22,11 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
+@Tag("integration")
 class CurrentSessionControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `returns empty current session when only seeded sessions exist`() {
         mockMvc.get("/api/sessions/current") {
@@ -470,11 +470,5 @@ class CurrentSessionControllerDbTest(
             where club_id = '00000000-0000-0000-0000-000000000001'
               and number >= 7;
         """
-
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
-        }
     }
 }

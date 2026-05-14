@@ -1,5 +1,7 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import org.junit.jupiter.api.Tag
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
@@ -7,14 +9,11 @@ import com.readmates.notification.application.port.out.NotificationEventPublishe
 import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.support.MySqlTestContainer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.test.context.DynamicPropertyRegistry
-import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -52,10 +51,11 @@ private const val TEST_NOTIFICATION_EVENTS_TOPIC = "readmates.notification.event
     statements = [CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL],
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
+@Tag("integration")
 class JdbcNotificationEventOutboxAdapterTest(
     @param:Autowired private val adapter: JdbcNotificationEventOutboxAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) {
+) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000101")
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000201")
 
@@ -585,14 +585,6 @@ class JdbcNotificationEventOutboxAdapterTest(
             futures.map { it.get(10, TimeUnit.SECONDS) }
         } finally {
             executor.shutdownNow()
-        }
-    }
-
-    companion object {
-        @JvmStatic
-        @DynamicPropertySource
-        fun registerDatasourceProperties(registry: DynamicPropertyRegistry) {
-            MySqlTestContainer.registerDatasourceProperties(registry)
         }
     }
 
