@@ -106,19 +106,27 @@ git commit -m "feat(server): add ReadOnlyApplicationService marker annotation"
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/note/application/service/NotesFeedService.kt`
 - Modify: `server/src/main/kotlin/com/readmates/publication/application/service/PublicQueryService.kt`
-- Modify: `server/src/main/kotlin/com/readmates/archive/application/service/` 하위 service들
+- Modify: `server/src/main/kotlin/com/readmates/archive/application/service/ArchiveQueryService.kt`
 
-- [ ] **Step 1: 대상 식별**
+- [ ] **Step 1: 대상 식별 + 분류**
 
 ```bash
 find server/src/main/kotlin/com/readmates/{note,publication,archive}/application/service -name "*.kt"
 ```
 
-Expected: 각 패키지 service 클래스 목록 출력.
+Expected 결과 — annotation 적용 **대상 (read-only)**:
+- `note/application/service/NotesFeedService.kt`
+- `publication/application/service/PublicQueryService.kt`
+- `archive/application/service/ArchiveQueryService.kt`
 
-- [ ] **Step 2: 각 클래스 파일에 annotation 추가**
+Expected 결과 — annotation **비대상 (write-side, 절대 부착 금지)**:
+- `archive/application/service/MemberArchiveReviewService.kt` — `MemberArchiveReviewWritePort` 의존 + `@Transactional` mutation. Task 4 ArchUnit 규칙(read-only service의 mutation port / @Transactional 차단)을 위반하게 됨.
 
-각 service 파일의 클래스 선언 직전에 다음 import + annotation 추가:
+검증 방법: 각 후보 service 파일에 대해 `grep -E 'WritePort|SavePort|UpdatePort|DeletePort|@Transactional' <file>` 결과가 비어 있어야만 read-only 대상.
+
+- [ ] **Step 2: 각 read-only 클래스 파일에 annotation 추가**
+
+위 "대상" 3개 파일에 한해 클래스 선언 직전에 다음 import + annotation 추가:
 
 ```kotlin
 import com.readmates.shared.architecture.ReadOnlyApplicationService
@@ -130,7 +138,9 @@ class NotesFeedService(
 ) { ... }
 ```
 
-> 주의: `feedback` 은 mixed → annotation 부착하지 않음.
+> 주의:
+> - `feedback` 은 mixed → annotation 부착하지 않음.
+> - `archive/application/service/MemberArchiveReviewService.kt` 는 write-side → annotation 부착하지 않음.
 
 - [ ] **Step 3: 단위 테스트 실행**
 
