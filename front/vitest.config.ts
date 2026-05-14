@@ -30,12 +30,12 @@ export default defineConfig({
         "node_modules/**",
         "dist/**",
       ],
-      // baseline. 측정 후 Task 4에서 실측치로 조정.
+      // baseline: 현재 측정치 -2pp (정수 내림). 회귀 차단 게이트.
       thresholds: {
-        lines: 0,
-        statements: 0,
-        functions: 0,
-        branches: 0,
+        lines: 87,
+        statements: 87,
+        functions: 83,
+        branches: 84,
       },
     },
     projects: [
