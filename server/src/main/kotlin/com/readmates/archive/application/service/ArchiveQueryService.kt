@@ -10,11 +10,13 @@ import com.readmates.archive.application.port.`in`.ListMyArchiveQuestionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveReviewsUseCase
 import com.readmates.archive.application.port.out.ArchiveDetailBatchReadPort
 import com.readmates.archive.application.port.out.LoadArchiveDataPort
+import com.readmates.shared.architecture.ReadOnlyApplicationService
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import java.util.UUID
 
+@ReadOnlyApplicationService
 @Service
 class ArchiveQueryService(
     private val loadArchiveDataPort: LoadArchiveDataPort,
