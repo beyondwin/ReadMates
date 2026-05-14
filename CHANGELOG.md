@@ -10,6 +10,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Changed
+- perf: consolidate `publicStats` SELECTs into a single round-trip and replace correlated EXISTS subqueries in `publicSessions` with pre-aggregated joins (server/publication).
+- perf: replace Redis `KEYS` with SCAN-based iteration in read-cache invalidation (server/shared/redis).
+
 ## v1.9.0 - 2026-05-15
 
 ### Highlights
