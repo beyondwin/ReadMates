@@ -125,11 +125,15 @@ feature 폴더 하나에 `api/model/route/ui`가 함께 있으면:
 ### 실제 폴더 구조 (현재)
 
 ```
-front/src/app/      — auth-context.tsx, router.tsx, route-guards.tsx 등
+front/src/app/      — auth-context.tsx, router.tsx, route-guards.tsx, routes/{public,auth,member,host}.tsx 등
 front/src/pages/    — route compatibility shells
 front/features/     — host/, session/, archive/, member/, club/, ...
 front/shared/       — api/, auth/, config/, ui/, model/, security/, routing/
 ```
+
+## Update 2026-05-14
+
+`front/src/app/router.tsx`는 더 이상 모든 route 정의를 한 파일에 모으지 않는다. variant별 sub-tree가 `front/src/app/routes/{public,auth,member,host}.tsx`로 분리되었고, `router.tsx`는 `createReadmatesRouter()`에서 `QueryClient`를 만들고 `publicRoutes()`/`authRoutes()`/`memberRoutes()`/`hostRoutes(queryClient)` 결과를 합성하는 composition root다. 이 분리는 ADR-0003의 route-first 원칙을 바꾸지 않으며, URL routing matrix, guard wiring, `errorElement`, `lazy()` 경계는 그대로 유지된다. 단지 `src/app` 내부에서도 같은 route-first cohesion을 적용해 변경 영향 범위를 variant 단위로 좁힌다.
 
 ## 대안
 
