@@ -642,4 +642,166 @@ describe("stripCookieDomain", () => {
     expect(setCookieHeader).toContain("session=abc");
     expect(setCookieHeader).toContain("pref=dark");
   });
+
+  it("forwards POST /api/host/sessions/{id}/ai-generate/jobs multipart with preserved boundary", async () => {
+    const payload = new Uint8Array([
+      0x2d, 0x2d, 0x72, 0x6d, 0x2d, 0x62, 0x6f, 0x75, 0x6e, 0x64, 0x0d, 0x0a,
+      0xc3, 0x28, 0xff, 0x00,
+    ]);
+    let forwardedInit: RequestInit | undefined;
+    let forwardedUrl: string | undefined;
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input, init) => {
+        forwardedUrl = typeof input === "string" ? input : (input as Request).url;
+        forwardedInit = init;
+        return new Response(JSON.stringify({ jobId: "j-1" }), {
+          status: 202,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/sessions/12345/ai-generate/jobs",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "multipart/form-data; boundary=----ReadMatesAiGenBoundary-XYZ",
+              Cookie: "readmates.sid=current",
+              Origin: "https://readmates.pages.dev",
+            },
+            body: payload,
+          },
+        ),
+        {
+          path: [
+            "api",
+            "host",
+            "sessions",
+            "12345",
+            "ai-generate",
+            "jobs",
+          ],
+        },
+      ),
+    );
+
+    expect(forwardedUrl).toBe(
+      "https://api.example.com/api/host/sessions/12345/ai-generate/jobs",
+    );
+    expect(forwardedInit?.method).toBe("POST");
+    expect((forwardedInit?.headers as Headers).get("Content-Type")).toBe(
+      "multipart/form-data; boundary=----ReadMatesAiGenBoundary-XYZ",
+    );
+    expect((forwardedInit?.headers as Headers).get("X-Readmates-Bff-Secret")).toBe(
+      "secret",
+    );
+    expect(forwardedInit?.body).toBeInstanceOf(ArrayBuffer);
+    expect(new Uint8Array(forwardedInit?.body as ArrayBuffer)).toEqual(payload);
+    expect(response.status).toBe(202);
+  });
+
+  it("forwards GET /api/host/sessions/{id}/ai-generate/jobs/{jobId} unchanged", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/sessions/42/ai-generate/jobs/job-abc",
+        ),
+        {
+          path: [
+            "api",
+            "host",
+            "sessions",
+            "42",
+            "ai-generate",
+            "jobs",
+            "job-abc",
+          ],
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/host/sessions/42/ai-generate/jobs/job-abc",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("forwards GET /api/host/clubs/{clubSlug}/ai-defaults unchanged", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ defaultModel: "gpt-x" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/clubs/my-club/ai-defaults",
+        ),
+        { path: ["api", "host", "clubs", "my-club", "ai-defaults"] },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/api/host/clubs/my-club/ai-defaults",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("forwards PUT /api/host/clubs/{clubSlug}/ai-defaults with JSON body", async () => {
+    let forwardedInit: RequestInit | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_input, init) => {
+        forwardedInit = init;
+        return new Response(null, { status: 204 });
+      }),
+    );
+
+    const body = JSON.stringify({ defaultModel: "gpt-x" });
+    const response = await onRequest(
+      context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/host/clubs/my-club/ai-defaults",
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              Origin: "https://readmates.pages.dev",
+            },
+            body,
+          },
+        ),
+        { path: ["api", "host", "clubs", "my-club", "ai-defaults"] },
+      ),
+    );
+
+    expect(response.status).toBe(204);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "https://api.example.com/api/host/clubs/my-club/ai-defaults",
+      expect.any(Object),
+    );
+    expect(forwardedInit?.method).toBe("PUT");
+    expect((forwardedInit?.headers as Headers).get("Content-Type")).toBe(
+      "application/json",
+    );
+    expect((forwardedInit?.headers as Headers).get("X-Readmates-Bff-Secret")).toBe(
+      "secret",
+    );
+    expect(new TextDecoder().decode(forwardedInit?.body as ArrayBuffer)).toBe(body);
+  });
 });
