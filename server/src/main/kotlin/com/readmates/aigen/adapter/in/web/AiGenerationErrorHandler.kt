@@ -2,9 +2,8 @@ package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
-import com.readmates.aigen.application.port.`in`.JobNotFoundException
-import com.readmates.aigen.application.port.`in`.JobSessionMismatchException
 import com.readmates.shared.security.AccessDeniedException
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
@@ -14,17 +13,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.multipart.MaxUploadSizeExceededException
 
-/**
- * Exception thrown by the AI generation controller / use cases that
- * carries a stable [ErrorCode]. The handler maps each code to an HTTP
- * status per spec §9.2 and emits an RFC 7807 problem-detail body.
- */
-class AiGenerationException(
-    val code: ErrorCode,
-    message: String? = null,
-) : RuntimeException(message ?: code.name)
-
 private const val INTERNAL_ERROR_DETAIL = "internal error"
+
+private const val PROBLEM_JOB_NOT_FOUND = "/problems/aigen/job-not-found"
+private const val PROBLEM_JOB_SESSION_MISMATCH = "/problems/aigen/job-session-mismatch"
+private const val PROBLEM_ILLEGAL_GENERATION_STATE = "/problems/aigen/illegal-generation-state"
 
 /**
  * REST advice scoped to [AiGenerationController]. Translates domain
@@ -36,21 +29,44 @@ private const val INTERNAL_ERROR_DETAIL = "internal error"
  */
 @RestControllerAdvice(basePackageClasses = [AiGenerationController::class])
 @Order(0)
+@Suppress("TooManyFunctions")
 class AiGenerationErrorHandler {
-    @ExceptionHandler(AiGenerationException::class)
-    fun handleAiGenerationException(error: AiGenerationException): ResponseEntity<ProblemDetail> {
+    @ExceptionHandler(AiGenerationException.Coded::class)
+    fun handleCoded(error: AiGenerationException.Coded): ResponseEntity<ProblemDetail> {
         val status = error.code.toHttpStatus()
         return problem(status, error.code.name, error.message)
     }
 
-    @ExceptionHandler(JobNotFoundException::class)
-    fun handleJobNotFound(error: JobNotFoundException): ResponseEntity<ProblemDetail> =
-        problem(HttpStatus.GONE, ErrorCode.JOB_EXPIRED.name, "Job ${error.jobId} not found or expired")
+    @ExceptionHandler(AiGenerationException.JobNotFound::class)
+    fun handleJobNotFound(error: AiGenerationException.JobNotFound): ResponseEntity<ProblemDetail> =
+        problem(
+            status = HttpStatus.GONE,
+            code = ErrorCode.JOB_EXPIRED.name,
+            detail = "Job ${error.jobId} not found or expired",
+            type = PROBLEM_JOB_NOT_FOUND,
+        )
 
-    @ExceptionHandler(JobSessionMismatchException::class)
+    @ExceptionHandler(AiGenerationException.JobSessionMismatch::class)
     fun handleJobSessionMismatch(
-        @Suppress("UNUSED_PARAMETER") error: JobSessionMismatchException,
-    ): ResponseEntity<ProblemDetail> = problem(HttpStatus.NOT_FOUND, "JOB_NOT_FOUND", "Job not found for this session")
+        @Suppress("UNUSED_PARAMETER") error: AiGenerationException.JobSessionMismatch,
+    ): ResponseEntity<ProblemDetail> =
+        problem(
+            status = HttpStatus.NOT_FOUND,
+            code = "JOB_NOT_FOUND",
+            detail = "Job not found for this session",
+            type = PROBLEM_JOB_SESSION_MISMATCH,
+        )
+
+    @ExceptionHandler(AiGenerationException.IllegalGenerationState::class)
+    fun handleIllegalGenerationState(
+        error: AiGenerationException.IllegalGenerationState,
+    ): ResponseEntity<ProblemDetail> =
+        problem(
+            status = HttpStatus.CONFLICT,
+            code = "ILLEGAL_GENERATION_STATE",
+            detail = error.message,
+            type = PROBLEM_ILLEGAL_GENERATION_STATE,
+        )
 
     @ExceptionHandler(AiGenerationJobPublishException::class)
     fun handleQueueFailure(
@@ -79,9 +95,7 @@ class AiGenerationErrorHandler {
         problem(HttpStatus.BAD_REQUEST, "TRANSCRIPT_TOO_LARGE", error.message)
 
     @ExceptionHandler(RuntimeException::class)
-    fun handleUnknown(
-        error: RuntimeException,
-    ): ResponseEntity<ProblemDetail> {
+    fun handleUnknown(error: RuntimeException): ResponseEntity<ProblemDetail> {
         val log = org.slf4j.LoggerFactory.getLogger(AiGenerationErrorHandler::class.java)
         if (error is com.readmates.sessionimport.application.service.InvalidSessionImportException) {
             log.error("Unhandled AI generation exception. Issues: {}", error.issues, error)
@@ -95,12 +109,13 @@ class AiGenerationErrorHandler {
         status: HttpStatus,
         code: String,
         detail: String?,
+        type: String = "about:blank",
     ): ResponseEntity<ProblemDetail> =
         ResponseEntity
             .status(status)
             .body(
                 ProblemDetail(
-                    type = "about:blank",
+                    type = type,
                     title = status.reasonPhrase,
                     status = status.value(),
                     detail = detail,
@@ -117,6 +132,7 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.CLUB_MONTHLY_CAP_EXCEEDED,
         -> HttpStatus.BAD_REQUEST
         ErrorCode.RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS
+        ErrorCode.MAX_CALLS_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS
         ErrorCode.QUEUE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE
         ErrorCode.PROVIDER_UNAVAILABLE,
         ErrorCode.PROVIDER_RATE_LIMITED,

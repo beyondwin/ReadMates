@@ -8,8 +8,8 @@ import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.shared.security.CurrentMember
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
+import com.readmates.shared.security.CurrentMember
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID
@@ -42,7 +42,10 @@ data class StartGenerationResult(
 )
 
 interface GetJobUseCase {
-    fun get(sessionId: UUID, jobId: UUID): JobView
+    fun get(
+        sessionId: UUID,
+        jobId: UUID,
+    ): JobView
 }
 
 interface RegenerateItemUseCase {
@@ -74,21 +77,20 @@ interface CommitGenerationUseCase {
 }
 
 interface CancelGenerationUseCase {
-    fun cancel(sessionId: UUID, jobId: UUID, hostUserId: UUID)
+    fun cancel(
+        sessionId: UUID,
+        jobId: UUID,
+        hostUserId: UUID,
+    )
 }
 
 /**
- * Thrown when a job lookup misses (Redis TTL expired or never existed).
- * Phase 2 controllers map this to the `JOB_EXPIRED` HTTP error response.
+ * Backwards-compatible alias for [com.readmates.aigen.application.AiGenerationException.JobNotFound]
+ * (task_1_7 finding #9). The new sealed [com.readmates.aigen.application.AiGenerationException]
+ * hierarchy is the source of truth — these typealiases let existing callers/tests keep their
+ * imports without churn.
  */
-class JobNotFoundException(val jobId: UUID) : RuntimeException("Job $jobId not found or expired")
+typealias JobNotFoundException = com.readmates.aigen.application.AiGenerationException.JobNotFound
 
-/**
- * Thrown when sessionId in the URL path does not match the sessionId stored on the job.
- * Phase 2 controllers map this to 404.
- */
-class JobSessionMismatchException(
-    val jobId: UUID,
-    val expectedSessionId: UUID,
-    val actualSessionId: UUID,
-) : RuntimeException("Job $jobId belongs to session $actualSessionId, not $expectedSessionId")
+/** Backwards-compatible alias for [com.readmates.aigen.application.AiGenerationException.JobSessionMismatch]. */
+typealias JobSessionMismatchException = com.readmates.aigen.application.AiGenerationException.JobSessionMismatch

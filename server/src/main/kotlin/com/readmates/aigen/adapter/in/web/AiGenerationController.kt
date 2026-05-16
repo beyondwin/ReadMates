@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.`in`.web
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
@@ -184,7 +185,7 @@ class AiGenerationController(
 
     private fun ensureEnabled() {
         if (!props.enabled) {
-            throw AiGenerationException(ErrorCode.AI_DISABLED, "AI generation is disabled")
+            throw AiGenerationException.Coded(ErrorCode.AI_DISABLED, "AI generation is disabled")
         }
     }
 
@@ -192,7 +193,7 @@ class AiGenerationController(
         when (value.lowercase()) {
             "real" -> AuthorNameMode.REAL
             "alias" -> AuthorNameMode.ALIAS
-            else -> throw AiGenerationException(
+            else -> throw AiGenerationException.Coded(
                 ErrorCode.SCHEMA_INVALID,
                 "Unknown authorNameMode: $value",
             )
@@ -201,7 +202,7 @@ class AiGenerationController(
     private fun parseGenerationItem(value: String): GenerationItem =
         runCatching { GenerationItem.valueOf(value.uppercase()) }
             .getOrElse {
-                throw AiGenerationException(
+                throw AiGenerationException.Coded(
                     ErrorCode.SCHEMA_INVALID,
                     "Unknown regeneration item: $value",
                 )

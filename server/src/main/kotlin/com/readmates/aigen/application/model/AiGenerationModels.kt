@@ -7,7 +7,10 @@ import java.util.UUID
 
 enum class Provider { CLAUDE, OPENAI, GEMINI }
 
-data class ModelId(val provider: Provider, val name: String) {
+data class ModelId(
+    val provider: Provider,
+    val name: String,
+) {
     override fun toString(): String = name
 }
 
@@ -28,10 +31,14 @@ enum class GenerationItem { SUMMARY, HIGHLIGHTS, ONE_LINE_REVIEWS, FEEDBACK_DOCU
 enum class JobStatus { PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED }
 
 enum class JobStage {
-    QUEUED, TRANSCRIPT_LOADED,
-    GENERATING_SUMMARY, GENERATING_HIGHLIGHTS,
-    GENERATING_ONE_LINE_REVIEWS, GENERATING_FEEDBACK_DOCUMENT,
-    VALIDATING, READY,
+    QUEUED,
+    TRANSCRIPT_LOADED,
+    GENERATING_SUMMARY,
+    GENERATING_HIGHLIGHTS,
+    GENERATING_ONE_LINE_REVIEWS,
+    GENERATING_FEEDBACK_DOCUMENT,
+    VALIDATING,
+    READY,
 }
 
 enum class AuthorNameMode { REAL, ALIAS }
@@ -63,8 +70,16 @@ data class RegenerationInput(
     val instructions: String?,
 )
 
-data class GenerationOutput(val result: SessionImportV1Snapshot, val usage: TokenUsage)
-data class RegenerationOutput(val patchedItem: GenerationItem, val patchedValue: Any, val usage: TokenUsage)
+data class GenerationOutput(
+    val result: SessionImportV1Snapshot,
+    val usage: TokenUsage,
+)
+
+data class RegenerationOutput(
+    val patchedItem: GenerationItem,
+    val patchedValue: Any,
+    val usage: TokenUsage,
+)
 
 /**
  * In-memory snapshot mirroring the readmates-session-import:v1 JSON.
@@ -72,7 +87,7 @@ data class RegenerationOutput(val patchedItem: GenerationItem, val patchedValue:
  * but lives in aigen for module independence. Conversion is in AiGenerationCommitService.
  */
 data class SessionImportV1Snapshot(
-    val format: String,                                    // "readmates-session-import:v1"
+    val format: String, // "readmates-session-import:v1"
     val sessionNumber: Int,
     val bookTitle: String,
     val meetingDate: LocalDate,
@@ -82,19 +97,41 @@ data class SessionImportV1Snapshot(
     val feedbackDocumentFileName: String,
     val feedbackDocumentMarkdown: String,
 ) {
-    data class AuthoredText(val authorName: String, val text: String)
+    data class AuthoredText(
+        val authorName: String,
+        val text: String,
+    )
 }
 
 enum class ErrorCode {
-    PROVIDER_UNAVAILABLE, PROVIDER_RATE_LIMITED,
-    SCHEMA_INVALID, AUTHOR_NAME_MISMATCH,
-    HIGHLIGHTS_OUT_OF_RANGE, ONE_LINE_REVIEWS_DUPLICATE, FEEDBACK_TEMPLATE_INVALID,
-    HOST_DAILY_CAP_EXCEEDED, CLUB_MONTHLY_CAP_EXCEEDED, RATE_LIMITED,
-    AI_DISABLED, JOB_EXPIRED, QUEUE_UNAVAILABLE,
+    PROVIDER_UNAVAILABLE,
+    PROVIDER_RATE_LIMITED,
+    SCHEMA_INVALID,
+    AUTHOR_NAME_MISMATCH,
+    HIGHLIGHTS_OUT_OF_RANGE,
+    ONE_LINE_REVIEWS_DUPLICATE,
+    FEEDBACK_TEMPLATE_INVALID,
+    HOST_DAILY_CAP_EXCEEDED,
+    CLUB_MONTHLY_CAP_EXCEEDED,
+    RATE_LIMITED,
+    AI_DISABLED,
+    JOB_EXPIRED,
+    QUEUE_UNAVAILABLE,
+
+    /**
+     * The per-job hard cap on LLM calls (start + validation retry + regenerations) has
+     * been exceeded. See spec §9.2 ("총 LLM 호출 ≤ 3회/job") and
+     * `AiGenerationProperties.Job.maxLlmCallsPerJob`. Surfaces to clients as 429.
+     */
+    MAX_CALLS_EXCEEDED,
+
     UNKNOWN,
 }
 
-data class GenerationError(val code: ErrorCode, val message: String)
+data class GenerationError(
+    val code: ErrorCode,
+    val message: String,
+)
 
 data class JobView(
     val jobId: UUID,

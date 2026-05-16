@@ -1,6 +1,9 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.JobView
@@ -58,12 +61,14 @@ class AiGenerationOrchestrator(
     private val properties: AiGenerationProperties,
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
-) : StartGenerationUseCase, GetJobUseCase, CancelGenerationUseCase {
-
+) : StartGenerationUseCase,
+    GetJobUseCase,
+    CancelGenerationUseCase {
     override fun start(command: StartGenerationCommand): StartGenerationResult {
         metrics.recordJobStarted()
-        val modelId = resolveModelId(command.model, command.clubId)
-            ?: failStart(command, ErrorCode.AI_DISABLED, "Requested model is not enabled")
+        val modelId =
+            resolveModelId(command.model, command.clubId)
+                ?: failStart(command, ErrorCode.AI_DISABLED, "Requested model is not enabled")
 
         if (!modelCatalog.isEnabled(modelId)) {
             failStart(command, modelId, ErrorCode.AI_DISABLED, "Model not enabled")
@@ -77,39 +82,93 @@ class AiGenerationOrchestrator(
         val now = clock.instant()
         val jobId = UUID.randomUUID()
         val expiresAt = now.plus(properties.job.redisTtl)
-        val record = JobRecord(
-            jobId = jobId,
-            sessionId = command.sessionId,
-            clubId = command.clubId,
-            hostUserId = command.hostUserId,
-            model = modelId,
-            authorNameMode = command.authorNameMode,
-            instructions = command.instructions,
-            transcript = command.transcript,
-            sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
-            status = JobStatus.PENDING,
-            stage = JobStage.QUEUED,
-            progressPct = 0,
-            result = null,
-            error = null,
-            tokens = TokenUsage(0, 0, 0),
-            costAccumulatedUsd = BigDecimal.ZERO,
-            expiresAt = expiresAt,
-        )
+        val record =
+            JobRecord(
+                jobId = jobId,
+                sessionId = command.sessionId,
+                clubId = command.clubId,
+                hostUserId = command.hostUserId,
+                model = modelId,
+                authorNameMode = command.authorNameMode,
+                instructions = command.instructions,
+                transcript = command.transcript,
+                sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
+                status = JobStatus.PENDING,
+                stage = JobStage.QUEUED,
+                progressPct = 0,
+                result = null,
+                error = null,
+                tokens = TokenUsage(0, 0, 0),
+                costAccumulatedUsd = BigDecimal.ZERO,
+                expiresAt = expiresAt,
+            )
         jobStore.save(record)
-        queue.publish(
-            jobId = jobId,
-            sessionId = command.sessionId,
-            clubId = command.clubId,
-            hostUserId = command.hostUserId,
-            provider = modelId.provider,
-            model = modelId.name,
-            kind = JobKind.FULL,
-        )
+        try {
+            queue.publish(
+                jobId = jobId,
+                sessionId = command.sessionId,
+                clubId = command.clubId,
+                hostUserId = command.hostUserId,
+                provider = modelId.provider,
+                model = modelId.name,
+                kind = JobKind.FULL,
+            )
+        } catch (
+            // Compensate: a PENDING JobRecord lives in Redis for TTL hours otherwise
+            // (task_1_7 finding #5). Audit QUEUE_UNAVAILABLE, transition the record to
+            // FAILED so /get returns the correct state, then rethrow a wrapped
+            // LlmGenerationException so the caller sees the failure code. We catch
+            // Throwable on purpose so a producer-thread Error doesn't leak an
+            // orphaned PENDING record.
+            @Suppress("TooGenericExceptionCaught") failure: Throwable,
+        ) {
+            compensateQueuePublishFailure(record, failure)
+        }
         return StartGenerationResult(jobId, JobStatus.PENDING, expiresAt)
     }
 
-    override fun get(sessionId: UUID, jobId: UUID): JobView {
+    private fun compensateQueuePublishFailure(
+        record: JobRecord,
+        failure: Throwable,
+    ): Nothing {
+        val message = "Failed publishing AI generation job ${record.jobId} to queue"
+        val error = GenerationError(ErrorCode.QUEUE_UNAVAILABLE, message)
+        runCatching {
+            jobStore.updateStatus(
+                jobId = record.jobId,
+                status = JobStatus.FAILED,
+                stage = null,
+                progressPct = 0,
+                error = error,
+            )
+        }
+        auditPort.insert(
+            AuditLogEntry(
+                jobId = record.jobId,
+                sessionId = record.sessionId,
+                clubId = record.clubId,
+                hostUserId = record.hostUserId,
+                kind = AuditKind.FULL,
+                item = null,
+                provider = record.model.provider,
+                model = record.model.name,
+                transcriptSha256 = sha256(record.transcript),
+                usage = TokenUsage(0, 0, 0),
+                costEstimateUsd = BigDecimal.ZERO,
+                status = AuditStatus.FAILED,
+                errorCode = ErrorCode.QUEUE_UNAVAILABLE,
+                errorMessage = message,
+                latencyMs = 0,
+                createdAt = clock.instant(),
+            ),
+        )
+        throw LlmGenerationException(error, failure)
+    }
+
+    override fun get(
+        sessionId: UUID,
+        jobId: UUID,
+    ): JobView {
         val record = jobStore.load(jobId) ?: throw JobNotFoundException(jobId)
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
@@ -138,13 +197,21 @@ class AiGenerationOrchestrator(
         )
     }
 
-    override fun cancel(sessionId: UUID, jobId: UUID, hostUserId: UUID) {
+    override fun cancel(
+        sessionId: UUID,
+        jobId: UUID,
+        hostUserId: UUID,
+    ) {
         val record = jobStore.load(jobId) ?: throw JobNotFoundException(jobId)
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
         if (record.hostUserId != hostUserId) {
-            throw IllegalStateException("Host $hostUserId is not the owner of job $jobId")
+            throw AiGenerationException.IllegalGenerationState(
+                jobId = jobId,
+                currentStatus = record.status.name,
+                attemptedAction = "cancel (host mismatch)",
+            )
         }
         jobStore.delete(jobId)
         auditPort.insert(
@@ -169,23 +236,28 @@ class AiGenerationOrchestrator(
         )
     }
 
-    private fun resolveModelId(commandModel: String?, clubId: UUID): ModelId? {
-        val candidate = commandModel
-            ?: clubDefaultPort.load(clubId)?.defaultModel
-            ?: properties.fallbackDefaultModel
+    private fun resolveModelId(
+        commandModel: String?,
+        clubId: UUID,
+    ): ModelId? {
+        val candidate =
+            commandModel
+                ?: clubDefaultPort.load(clubId)?.defaultModel
+                ?: properties.fallbackDefaultModel
         // Prefer an allowlisted resolution via the catalog. If catalog rejects, return null
         // so the caller can audit AI_DISABLED with the same code path used for explicit deny.
         return modelCatalog.resolveAlias(candidate)
             ?: providerFromName(candidate)?.let { ModelId(it, candidate) }
     }
 
-    private fun providerFromName(name: String): Provider? = when {
-        name.startsWith("claude-") -> Provider.CLAUDE
-        name.startsWith("gemini-") -> Provider.GEMINI
-        name.startsWith("gpt-") -> Provider.OPENAI
-        OPENAI_O_SERIES_REGEX.matches(name) -> Provider.OPENAI
-        else -> null
-    }
+    private fun providerFromName(name: String): Provider? =
+        when {
+            name.startsWith("claude-") -> Provider.CLAUDE
+            name.startsWith("gemini-") -> Provider.GEMINI
+            name.startsWith("gpt-") -> Provider.OPENAI
+            OPENAI_O_SERIES_REGEX.matches(name) -> Provider.OPENAI
+            else -> null
+        }
 
     private fun failStart(
         command: StartGenerationCommand,
@@ -218,14 +290,22 @@ class AiGenerationOrchestrator(
 
     /**
      * Failure path used when model resolution itself produced no [ModelId] (e.g. the configured
-     * fallback isn't allowlisted and the name prefix matches no known provider). Audited with a
-     * synthetic provider/model since we don't have a parsed [ModelId] to extract from.
+     * fallback isn't allowlisted and the name prefix matches no known provider). The provider
+     * audit field is best-effort: we try the name prefix first, then fall back to the first
+     * allowlisted provider from the catalog, instead of hardcoding [Provider.CLAUDE]. If no
+     * providers are allowlisted at all, we surface [Provider.CLAUDE] as a last resort so the
+     * audit row still records a value of the right type.
      */
     private fun failStart(
         command: StartGenerationCommand,
         code: ErrorCode,
         message: String,
     ): Nothing {
+        val candidateModel = command.model ?: properties.fallbackDefaultModel
+        val provider =
+            providerFromName(candidateModel)
+                ?: modelCatalog.allowlisted().firstOrNull()?.provider
+                ?: Provider.CLAUDE
         auditPort.insert(
             AuditLogEntry(
                 jobId = UUID.randomUUID(),
@@ -234,8 +314,8 @@ class AiGenerationOrchestrator(
                 hostUserId = command.hostUserId,
                 kind = AuditKind.FULL,
                 item = null,
-                provider = Provider.CLAUDE,
-                model = command.model ?: properties.fallbackDefaultModel,
+                provider = provider,
+                model = candidateModel,
                 transcriptSha256 = sha256(command.transcript),
                 usage = TokenUsage(0, 0, 0),
                 costEstimateUsd = BigDecimal.ZERO,

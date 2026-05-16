@@ -9,7 +9,6 @@ import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
-import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
@@ -23,6 +22,7 @@ import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SessionContentGenerator
 import com.readmates.aigen.config.AiGenerationProperties
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
@@ -69,6 +69,7 @@ class AiGenerationWorker(
     private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
 ) {
+    private val logger = LoggerFactory.getLogger(AiGenerationWorker::class.java)
 
     fun process(jobId: UUID) {
         val record = jobStore.load(jobId) ?: return // expired / already cleaned
@@ -81,11 +82,12 @@ class AiGenerationWorker(
 
         jobStore.updateStatus(jobId, JobStatus.RUNNING, JobStage.TRANSCRIPT_LOADED, 5, null)
 
-        val generator = generators[record.model.provider]
-            ?: run {
-                failJob(record, ErrorCode.AI_DISABLED, "No generator for provider ${record.model.provider}", start)
-                return
-            }
+        val generator =
+            generators[record.model.provider]
+                ?: run {
+                    failJob(record, ErrorCode.AI_DISABLED, "No generator for provider ${record.model.provider}", start)
+                    return
+                }
 
         when (val outcome = runGenerationWithValidationRetry(record, generator)) {
             is Outcome.Success -> succeed(record, outcome.snapshot, outcome.usage, start)
@@ -94,95 +96,160 @@ class AiGenerationWorker(
     }
 
     private sealed class Outcome {
-        data class Success(val snapshot: SessionImportV1Snapshot, val usage: TokenUsage) : Outcome()
-        data class Failure(val error: GenerationError) : Outcome()
+        data class Success(
+            val snapshot: SessionImportV1Snapshot,
+            val usage: TokenUsage,
+        ) : Outcome()
+
+        data class Failure(
+            val error: GenerationError,
+        ) : Outcome()
     }
 
     private fun runGenerationWithValidationRetry(
         record: JobRecord,
         generator: SessionContentGenerator,
     ): Outcome {
-        val baseInput = GenerationInput(
-            transcript = record.transcript,
-            sessionMeta = buildSessionMeta(record),
-            model = record.model,
-            instructions = record.instructions,
-        )
+        val baseInput =
+            GenerationInput(
+                transcript = record.transcript,
+                sessionMeta = record.toSessionMeta(),
+                model = record.model,
+                instructions = record.instructions,
+            )
         // First generator attempt with provider-error retry.
-        val firstAttempt = callGeneratorWithRetry(generator, baseInput) ?: return Outcome.Failure(
-            GenerationError(ErrorCode.UNKNOWN, "Generator failed with no error"),
-        )
+        val firstAttempt = callGeneratorWithRetry(record, generator, baseInput)
         if (firstAttempt is CallResult.Failure) {
             return Outcome.Failure(firstAttempt.error)
         }
         val successOutput = (firstAttempt as CallResult.Success).output
         return when (val validation = validator.validate(successOutput.result, baseInput.sessionMeta)) {
             is ValidationResult.Ok -> Outcome.Success(successOutput.result, successOutput.usage)
-            is ValidationResult.Violation -> retryAfterValidationFailure(
-                generator = generator,
-                baseInput = baseInput,
-                violation = validation,
-            )
+            is ValidationResult.Violation ->
+                retryAfterValidationFailure(
+                    record = record,
+                    generator = generator,
+                    baseInput = baseInput,
+                    violation = validation,
+                )
         }
     }
 
     private fun retryAfterValidationFailure(
+        record: JobRecord,
         generator: SessionContentGenerator,
         baseInput: GenerationInput,
         violation: ValidationResult.Violation,
     ): Outcome {
-        val strengthenedInput = baseInput.copy(
-            instructions = strengthenInstructions(baseInput.instructions, violation.code),
-        )
-        val retry = try {
-            generator.generateFull(strengthenedInput)
-        } catch (failure: LlmGenerationException) {
-            return Outcome.Failure(failure.error)
-        }
+        val strengthenedInput =
+            baseInput.copy(
+                instructions = strengthenInstructions(baseInput.instructions, violation.code),
+            )
+        val retry =
+            when (val callResult = callGeneratorRaw(record, generator, strengthenedInput)) {
+                is CallResult.Success -> callResult.output
+                is CallResult.Failure -> return Outcome.Failure(callResult.error)
+            }
         return when (val validation = validator.validate(retry.result, baseInput.sessionMeta)) {
             is ValidationResult.Ok -> Outcome.Success(retry.result, retry.usage)
-            is ValidationResult.Violation -> Outcome.Failure(
-                GenerationError(validation.code, validation.message),
-            )
+            is ValidationResult.Violation ->
+                Outcome.Failure(
+                    GenerationError(validation.code, validation.message),
+                )
         }
     }
 
     private sealed class CallResult {
-        data class Success(val output: GenerationOutput) : CallResult()
-        data class Failure(val error: GenerationError) : CallResult()
+        data class Success(
+            val output: GenerationOutput,
+        ) : CallResult()
+
+        data class Failure(
+            val error: GenerationError,
+        ) : CallResult()
     }
 
-    private fun callGeneratorWithRetry(
+    /**
+     * Invoke the generator after incrementing the per-job LLM call counter. If the
+     * increment crosses [AiGenerationProperties.Job.maxLlmCallsPerJob], we short-circuit
+     * with [ErrorCode.MAX_CALLS_EXCEEDED] WITHOUT calling the provider, per spec §9.2
+     * ("총 LLM 호출 ≤ 3회/job").
+     */
+    private fun callGeneratorRaw(
+        record: JobRecord,
         generator: SessionContentGenerator,
-        baseInput: GenerationInput,
+        input: GenerationInput,
     ): CallResult {
+        val cap = properties.job.maxLlmCallsPerJob
+        val next = jobStore.incrementLlmCallCount(record.jobId)
+        if (next > cap) {
+            return CallResult.Failure(
+                GenerationError(
+                    ErrorCode.MAX_CALLS_EXCEEDED,
+                    "Per-job LLM call cap exceeded ($next > $cap)",
+                ),
+            )
+        }
         return try {
-            CallResult.Success(generator.generateFull(baseInput))
-        } catch (firstFailure: LlmGenerationException) {
-            val backoff = backoffFor(firstFailure.error.code)
-                ?: return CallResult.Failure(firstFailure.error)
-            sleeper.sleep(backoff)
-            try {
-                CallResult.Success(generator.generateFull(baseInput))
-            } catch (secondFailure: LlmGenerationException) {
-                CallResult.Failure(secondFailure.error)
-            }
+            CallResult.Success(generator.generateFull(input))
+        } catch (failure: LlmGenerationException) {
+            CallResult.Failure(failure.error)
         }
     }
 
-    private fun backoffFor(code: ErrorCode): Duration? = when (code) {
-        ErrorCode.PROVIDER_UNAVAILABLE -> Duration.ofSeconds(1)
-        ErrorCode.PROVIDER_RATE_LIMITED -> Duration.ofSeconds(5)
-        else -> null
+    @Suppress("ReturnCount")
+    private fun callGeneratorWithRetry(
+        record: JobRecord,
+        generator: SessionContentGenerator,
+        baseInput: GenerationInput,
+    ): CallResult {
+        val first = callGeneratorRaw(record, generator, baseInput)
+        if (first is CallResult.Success) return first
+        val firstFailure = (first as CallResult.Failure).error
+        val strategy =
+            retryStrategyFor(firstFailure.code)
+                ?: return CallResult.Failure(firstFailure)
+        sleeper.sleep(strategy.backoff)
+        // Per §9.2: SCHEMA_INVALID / AUTHOR_NAME_MISMATCH /
+        // HIGHLIGHTS_OUT_OF_RANGE / ONE_LINE_REVIEWS_DUPLICATE /
+        // FEEDBACK_TEMPLATE_INVALID get a single retry with the prompt
+        // augmented to "strictly adhere to the schema and constraints".
+        // Provider-side retries (PROVIDER_UNAVAILABLE / PROVIDER_RATE_LIMITED)
+        // re-send the same prompt unchanged.
+        val retryInput =
+            if (strategy.strengthen) {
+                baseInput.copy(instructions = strengthenInstructions(baseInput.instructions, firstFailure.code))
+            } else {
+                baseInput
+            }
+        return callGeneratorRaw(record, generator, retryInput)
     }
 
-    private fun strengthenInstructions(base: String?, code: ErrorCode): String {
+    private data class RetryStrategy(
+        val backoff: Duration,
+        val strengthen: Boolean,
+    )
+
+    private fun retryStrategyFor(code: ErrorCode): RetryStrategy? =
+        when (code) {
+            ErrorCode.PROVIDER_UNAVAILABLE -> RetryStrategy(Duration.ofSeconds(1), strengthen = false)
+            ErrorCode.PROVIDER_RATE_LIMITED -> RetryStrategy(Duration.ofSeconds(5), strengthen = false)
+            ErrorCode.SCHEMA_INVALID,
+            ErrorCode.AUTHOR_NAME_MISMATCH,
+            ErrorCode.HIGHLIGHTS_OUT_OF_RANGE,
+            ErrorCode.ONE_LINE_REVIEWS_DUPLICATE,
+            ErrorCode.FEEDBACK_TEMPLATE_INVALID,
+            -> RetryStrategy(Duration.ZERO, strengthen = true)
+            else -> null
+        }
+
+    private fun strengthenInstructions(
+        base: String?,
+        code: ErrorCode,
+    ): String {
         val prefix = "Strict: $code"
         return if (base.isNullOrBlank()) prefix else "$prefix\n$base"
     }
-
-    private fun buildSessionMeta(record: JobRecord): SessionMeta =
-        record.sessionMeta.copy(authorNameMode = record.authorNameMode)
 
     private fun succeed(
         record: JobRecord,
@@ -192,8 +259,23 @@ class AiGenerationWorker(
     ) {
         val cost = CostCalculator.estimate(usage, modelCatalog.pricing(record.model))
         jobStore.saveResult(record.jobId, snapshot, usage, cost)
+        // Record cost BEFORE the visible status flip so a cost-guard
+        // counter outage cannot leave a SUCCEEDED job without its
+        // accumulated cost recorded (task_1_7 finding #8). recordUsage
+        // failures must not fail the job — log and swallow so the
+        // host still sees the result.
+        try {
+            costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+        } catch (
+            @Suppress("TooGenericExceptionCaught") failure: RuntimeException,
+        ) {
+            logger.warn(
+                "costGuard.recordUsage failed for jobId={}; status flip will proceed",
+                record.jobId,
+                failure,
+            )
+        }
         jobStore.updateStatus(record.jobId, JobStatus.SUCCEEDED, JobStage.READY, 100, null)
-        costGuard.recordUsage(record.hostUserId, record.clubId, cost)
         emitJobMetrics(record, JobStatus.SUCCEEDED, usage, cost, start)
         auditPort.insert(
             AuditLogEntry(
@@ -256,7 +338,10 @@ class AiGenerationWorker(
         maybeNotifyLong(record, start)
     }
 
-    private fun maybeNotifyLong(record: JobRecord, start: Instant) {
+    private fun maybeNotifyLong(
+        record: JobRecord,
+        start: Instant,
+    ) {
         val elapsed = Duration.between(start, clock.instant())
         if (elapsed > properties.job.notificationLatencyThreshold) {
             latencyNotification.notifyLongGeneration(
@@ -269,7 +354,11 @@ class AiGenerationWorker(
     }
 
     private fun elapsedMillis(start: Instant): Int =
-        Duration.between(start, clock.instant()).toMillis().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        Duration
+            .between(start, clock.instant())
+            .toMillis()
+            .coerceAtMost(Int.MAX_VALUE.toLong())
+            .toInt()
 
     private fun emitJobMetrics(
         record: JobRecord,

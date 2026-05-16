@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
@@ -56,7 +57,7 @@ import java.util.UUID
  */
 @Service
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions")
 class AiGenerationRegenerationService(
     private val jobStore: AiGenerationJobStore,
     private val regenerators: Map<Provider, SessionContentRegenerator>,
@@ -69,7 +70,6 @@ class AiGenerationRegenerationService(
     private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
 ) : RegenerateItemUseCase {
-
     override fun regenerate(
         sessionId: UUID,
         jobId: UUID,
@@ -81,8 +81,13 @@ class AiGenerationRegenerationService(
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
-        val currentSnapshot = record.result
-            ?: throw IllegalStateException("Cannot regenerate before initial generation produced a result")
+        val currentSnapshot =
+            record.result
+                ?: throw AiGenerationException.IllegalGenerationState(
+                    jobId = jobId,
+                    currentStatus = record.status.name,
+                    attemptedAction = "regenerate",
+                )
 
         val modelId = resolveModelId(model, record)
 
@@ -91,17 +96,26 @@ class AiGenerationRegenerationService(
             is GuardDecision.Deny -> failRegen(record, item, modelId, decision.code, "Cost guard denied call")
         }
 
-        val sessionMeta = buildSessionMeta(record)
-        val output = callWithRetry(
-            regenerator = regenerators[modelId.provider]
-                ?: error("No regenerator wired for provider ${modelId.provider}"),
-            recordedInstructions = instructions ?: record.instructions,
-            currentSnapshot = currentSnapshot,
-            sessionMeta = sessionMeta,
-            modelId = modelId,
-            record = record,
-            item = item,
-        )
+        val sessionMeta = record.toSessionMeta()
+        val regenerator =
+            regenerators[modelId.provider]
+                ?: failRegen(
+                    record,
+                    item,
+                    modelId,
+                    ErrorCode.AI_DISABLED,
+                    "No regenerator wired for provider ${modelId.provider}",
+                )
+        val output =
+            callWithRetry(
+                regenerator = regenerator,
+                recordedInstructions = instructions ?: record.instructions,
+                currentSnapshot = currentSnapshot,
+                sessionMeta = sessionMeta,
+                modelId = modelId,
+                record = record,
+                item = item,
+            )
 
         val cost = CostCalculator.estimate(output.usage, modelCatalog.pricing(modelId))
         // Build the patched snapshot and validate it BEFORE persisting so a bad LLM
@@ -111,14 +125,24 @@ class AiGenerationRegenerationService(
         val patchedSnapshot = patchSnapshot(currentSnapshot, item, output.patchedValue)
         when (val validation = validator.validate(patchedSnapshot, sessionMeta)) {
             is ValidationResult.Ok -> Unit
-            is ValidationResult.Violation -> failRegen(
-                record, item, modelId, validation.code, validation.message,
-            )
+            is ValidationResult.Violation ->
+                failRegen(record, item, modelId, validation.code, validation.message)
         }
-        jobStore.patchItem(jobId, item, patchedSnapshot, output.usage, cost)
+        return persistAndAuditRegenSuccess(record, item, modelId, output, patchedSnapshot, cost)
+    }
+
+    @Suppress("LongParameterList")
+    private fun persistAndAuditRegenSuccess(
+        record: JobRecord,
+        item: GenerationItem,
+        modelId: ModelId,
+        output: com.readmates.aigen.application.model.RegenerationOutput,
+        patchedSnapshot: SessionImportV1Snapshot,
+        cost: BigDecimal,
+    ): RegenerationResult {
+        jobStore.patchItem(record.jobId, item, patchedSnapshot, output.usage, cost)
         costGuard.recordUsage(record.hostUserId, record.clubId, cost)
         emitRegenMetrics(modelId, item, output.usage, cost, JobStatus.SUCCEEDED)
-
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -139,7 +163,6 @@ class AiGenerationRegenerationService(
                 createdAt = clock.instant(),
             ),
         )
-
         val warnings = computeWarnings(record.clubId)
         return RegenerationResult(item, output.patchedValue, output.usage, cost, warnings)
     }
@@ -154,48 +177,80 @@ class AiGenerationRegenerationService(
         record: JobRecord,
         item: GenerationItem,
     ): com.readmates.aigen.application.model.RegenerationOutput {
-        val baseInput = RegenerationInput(
-            transcript = record.transcript,
-            currentResult = currentSnapshot,
-            item = item,
-            sessionMeta = sessionMeta,
-            model = modelId,
-            instructions = recordedInstructions,
-        )
+        val baseInput =
+            RegenerationInput(
+                transcript = record.transcript,
+                currentResult = currentSnapshot,
+                item = item,
+                sessionMeta = sessionMeta,
+                model = modelId,
+                instructions = recordedInstructions,
+            )
         return try {
-            regenerator.regenerateItem(baseInput)
+            callRegeneratorRaw(record, regenerator, baseInput)
         } catch (firstFailure: LlmGenerationException) {
             val retryStrategy = retryStrategyFor(firstFailure.error.code)
             if (retryStrategy == null) {
                 failRegen(record, item, modelId, firstFailure.error.code, firstFailure.error.message)
             }
             sleeper.sleep(retryStrategy.backoff)
-            val retryInput = baseInput.copy(
-                instructions = strengthenInstructions(recordedInstructions, firstFailure.error.code),
-            )
+            val retryInput =
+                baseInput.copy(
+                    instructions = strengthenInstructions(recordedInstructions, firstFailure.error.code),
+                )
             try {
-                regenerator.regenerateItem(retryInput)
+                callRegeneratorRaw(record, regenerator, retryInput)
             } catch (secondFailure: LlmGenerationException) {
                 failRegen(record, item, modelId, secondFailure.error.code, secondFailure.error.message)
             }
         }
     }
 
-    private data class RetryStrategy(val backoff: Duration)
-
-    private fun retryStrategyFor(code: ErrorCode): RetryStrategy? = when (code) {
-        ErrorCode.PROVIDER_UNAVAILABLE -> RetryStrategy(Duration.ofSeconds(1))
-        ErrorCode.PROVIDER_RATE_LIMITED -> RetryStrategy(Duration.ofSeconds(5))
-        ErrorCode.SCHEMA_INVALID,
-        ErrorCode.AUTHOR_NAME_MISMATCH,
-        ErrorCode.HIGHLIGHTS_OUT_OF_RANGE,
-        ErrorCode.ONE_LINE_REVIEWS_DUPLICATE,
-        ErrorCode.FEEDBACK_TEMPLATE_INVALID,
-        -> RetryStrategy(Duration.ZERO)
-        else -> null
+    /**
+     * Invoke the regenerator after incrementing the per-job LLM call counter. If the
+     * increment crosses [AiGenerationProperties.Job.maxLlmCallsPerJob], we throw
+     * [LlmGenerationException] with [ErrorCode.MAX_CALLS_EXCEEDED] WITHOUT calling
+     * the provider, per spec §9.2.
+     */
+    private fun callRegeneratorRaw(
+        record: JobRecord,
+        regenerator: SessionContentRegenerator,
+        input: RegenerationInput,
+    ): com.readmates.aigen.application.model.RegenerationOutput {
+        val cap = properties.job.maxLlmCallsPerJob
+        val next = jobStore.incrementLlmCallCount(record.jobId)
+        if (next > cap) {
+            throw LlmGenerationException(
+                com.readmates.aigen.application.model.GenerationError(
+                    ErrorCode.MAX_CALLS_EXCEEDED,
+                    "Per-job LLM call cap exceeded ($next > $cap)",
+                ),
+            )
+        }
+        return regenerator.regenerateItem(input)
     }
 
-    private fun strengthenInstructions(base: String?, code: ErrorCode): String {
+    private data class RetryStrategy(
+        val backoff: Duration,
+    )
+
+    private fun retryStrategyFor(code: ErrorCode): RetryStrategy? =
+        when (code) {
+            ErrorCode.PROVIDER_UNAVAILABLE -> RetryStrategy(Duration.ofSeconds(1))
+            ErrorCode.PROVIDER_RATE_LIMITED -> RetryStrategy(Duration.ofSeconds(5))
+            ErrorCode.SCHEMA_INVALID,
+            ErrorCode.AUTHOR_NAME_MISMATCH,
+            ErrorCode.HIGHLIGHTS_OUT_OF_RANGE,
+            ErrorCode.ONE_LINE_REVIEWS_DUPLICATE,
+            ErrorCode.FEEDBACK_TEMPLATE_INVALID,
+            -> RetryStrategy(Duration.ZERO)
+            else -> null
+        }
+
+    private fun strengthenInstructions(
+        base: String?,
+        code: ErrorCode,
+    ): String {
         val prefix = "Strict: $code"
         return if (base.isNullOrBlank()) prefix else "$prefix\n$base"
     }
@@ -205,30 +260,30 @@ class AiGenerationRegenerationService(
         snapshot: SessionImportV1Snapshot,
         item: GenerationItem,
         value: Any,
-    ): SessionImportV1Snapshot = when (item) {
-        GenerationItem.SUMMARY -> snapshot.copy(summary = value as String)
-        GenerationItem.HIGHLIGHTS -> snapshot.copy(
-            highlights = value as List<SessionImportV1Snapshot.AuthoredText>,
-        )
-        GenerationItem.ONE_LINE_REVIEWS -> snapshot.copy(
-            oneLineReviews = value as List<SessionImportV1Snapshot.AuthoredText>,
-        )
-        GenerationItem.FEEDBACK_DOCUMENT -> snapshot.copy(
-            feedbackDocumentMarkdown = value as String,
-        )
-    }
+    ): SessionImportV1Snapshot =
+        when (item) {
+            GenerationItem.SUMMARY -> snapshot.copy(summary = value as String)
+            GenerationItem.HIGHLIGHTS ->
+                snapshot.copy(
+                    highlights = value as List<SessionImportV1Snapshot.AuthoredText>,
+                )
+            GenerationItem.ONE_LINE_REVIEWS ->
+                snapshot.copy(
+                    oneLineReviews = value as List<SessionImportV1Snapshot.AuthoredText>,
+                )
+            GenerationItem.FEEDBACK_DOCUMENT ->
+                snapshot.copy(
+                    feedbackDocumentMarkdown = value as String,
+                )
+        }
 
-    private fun resolveModelId(commandModel: String?, record: JobRecord): ModelId {
+    private fun resolveModelId(
+        commandModel: String?,
+        record: JobRecord,
+    ): ModelId {
         val candidate = commandModel ?: record.model.name
         return modelCatalog.resolveAlias(candidate) ?: record.model
     }
-
-    private fun buildSessionMeta(record: JobRecord): SessionMeta =
-        // Prefer the stored SessionMeta (authoritative for validation); fall back to
-        // derivation from the snapshot for any legacy job records that predate the
-        // sessionMeta field. The validator uses sessionNumber/bookTitle/meetingDate
-        // and expectedAuthorNames from this meta.
-        record.sessionMeta.copy(authorNameMode = record.authorNameMode)
 
     private fun computeWarnings(clubId: UUID): List<String> {
         val monthly = costGuard.clubMonthlyCost(clubId)
@@ -259,12 +314,13 @@ class AiGenerationRegenerationService(
         }
     }
 
-    private fun regenKindFor(item: GenerationItem): JobKind = when (item) {
-        GenerationItem.SUMMARY -> JobKind.REGENERATE_SUMMARY
-        GenerationItem.HIGHLIGHTS -> JobKind.REGENERATE_HIGHLIGHTS
-        GenerationItem.ONE_LINE_REVIEWS -> JobKind.REGENERATE_ONE_LINE_REVIEWS
-        GenerationItem.FEEDBACK_DOCUMENT -> JobKind.REGENERATE_FEEDBACK_DOCUMENT
-    }
+    private fun regenKindFor(item: GenerationItem): JobKind =
+        when (item) {
+            GenerationItem.SUMMARY -> JobKind.REGENERATE_SUMMARY
+            GenerationItem.HIGHLIGHTS -> JobKind.REGENERATE_HIGHLIGHTS
+            GenerationItem.ONE_LINE_REVIEWS -> JobKind.REGENERATE_ONE_LINE_REVIEWS
+            GenerationItem.FEEDBACK_DOCUMENT -> JobKind.REGENERATE_FEEDBACK_DOCUMENT
+        }
 
     private fun failRegen(
         record: JobRecord,
@@ -304,8 +360,11 @@ class AiGenerationRegenerationService(
             ErrorCode.QUEUE_UNAVAILABLE,
             -> throw IllegalStateException("$code: $message")
             else -> throw LlmGenerationException(
-                com.readmates.aigen.application.model.GenerationError(code, message),
+                com.readmates.aigen.application.model
+                    .GenerationError(code, message),
             )
         }
+        // MAX_CALLS_EXCEEDED takes the LlmGenerationException branch so the
+        // RFC 7807 mapping surfaces a 429 with the typed error code, not a 500.
     }
 }

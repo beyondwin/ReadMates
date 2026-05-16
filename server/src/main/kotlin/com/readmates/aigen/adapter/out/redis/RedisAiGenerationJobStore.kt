@@ -36,6 +36,7 @@ import java.util.UUID
  */
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["redis.enabled", "aigen.enabled"], havingValue = "true")
+@Suppress("TooManyFunctions")
 class RedisAiGenerationJobStore(
     private val redisTemplate: StringRedisTemplate,
     private val properties: AiGenerationProperties,
@@ -150,6 +151,18 @@ class RedisAiGenerationJobStore(
         }.onFailure { recordFailure("updateStatus") }.getOrThrow()
     }
 
+    override fun incrementLlmCallCount(jobId: UUID): Int =
+        runCatching {
+            val hashKey = hashKey(jobId)
+            val ops = redisTemplate.opsForHash<String, String>()
+            val next = ops.increment(hashKey, "llmCallCount", 1L) ?: 1L
+            // Refresh TTL so the counter doesn't outlast the hash (the field shares the
+            // 6h job TTL with the rest of the record). EXPIRE is a no-op if the key is
+            // already gone, so we don't need a guard.
+            redisTemplate.expire(hashKey, properties.job.redisTtl)
+            next.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+        }.onFailure { recordFailure("incrementLlmCallCount") }.getOrThrow()
+
     override fun delete(jobId: UUID) {
         runCatching {
             redisTemplate.execute(
@@ -176,6 +189,7 @@ class RedisAiGenerationJobStore(
                 "tokensCached" to job.tokens.cachedInputTokens.toString(),
                 "tokensOutput" to job.tokens.outputTokens.toString(),
                 "costAccumulatedUsd" to job.costAccumulatedUsd.toPlainString(),
+                "llmCallCount" to job.llmCallCount.toString(),
             )
         job.stage?.let { map["stage"] = it.name }
         job.instructions?.let { map["instructions"] = it }
@@ -226,6 +240,7 @@ class RedisAiGenerationJobStore(
                 ),
             costAccumulatedUsd = BigDecimal(hash.getValue("costAccumulatedUsd")),
             expiresAt = expiresAt,
+            llmCallCount = hash["llmCallCount"]?.toIntOrNull() ?: 0,
         )
     }
 

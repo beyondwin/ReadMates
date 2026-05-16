@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.port.`in`.GetClubAiDefaultsUseCase
 import com.readmates.aigen.application.port.`in`.UpdateClubAiDefaultsUseCase
@@ -54,11 +55,15 @@ class ClubAiDefaultsController(
 
     private fun ensureEnabled() {
         if (!props.enabled) {
-            throw AiGenerationException(ErrorCode.AI_DISABLED, "AI generation is disabled")
+            throw AiGenerationException.Coded(ErrorCode.AI_DISABLED, "AI generation is disabled")
         }
     }
 }
 
-data class ClubAiDefaultsResponse(val defaultModel: String?)
+data class ClubAiDefaultsResponse(
+    val defaultModel: String?,
+)
 
-data class UpdateClubAiDefaultsRequest(val defaultModel: String)
+data class UpdateClubAiDefaultsRequest(
+    val defaultModel: String,
+)

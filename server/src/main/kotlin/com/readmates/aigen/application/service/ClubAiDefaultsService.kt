@@ -1,6 +1,6 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.adapter.`in`.web.AiGenerationException
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
@@ -35,21 +35,29 @@ import org.springframework.stereotype.Service
 class ClubAiDefaultsService(
     private val clubDefaultPort: AiGenerationClubDefaultPort,
     private val modelCatalog: ModelCatalog,
-) : GetClubAiDefaultsUseCase, UpdateClubAiDefaultsUseCase {
-
-    override fun get(clubSlug: String, member: CurrentMember): ClubAiDefaultsView {
+) : GetClubAiDefaultsUseCase,
+    UpdateClubAiDefaultsUseCase {
+    override fun get(
+        clubSlug: String,
+        member: CurrentMember,
+    ): ClubAiDefaultsView {
         requireHostOfClub(clubSlug, member)
         val row = clubDefaultPort.load(member.clubId)
         return ClubAiDefaultsView(defaultModel = row?.defaultModel)
     }
 
-    override fun update(clubSlug: String, defaultModel: String, member: CurrentMember) {
+    override fun update(
+        clubSlug: String,
+        defaultModel: String,
+        member: CurrentMember,
+    ) {
         requireHostOfClub(clubSlug, member)
-        val resolved = resolveAllowlistedModel(defaultModel)
-            ?: throw AiGenerationException(
-                ErrorCode.AI_DISABLED,
-                "model '$defaultModel' is not allowlisted",
-            )
+        val resolved =
+            resolveAllowlistedModel(defaultModel)
+                ?: throw AiGenerationException.Coded(
+                    ErrorCode.AI_DISABLED,
+                    "model '$defaultModel' is not allowlisted",
+                )
         clubDefaultPort.upsert(
             clubId = member.clubId,
             defaultModel = resolved.name,
@@ -57,7 +65,10 @@ class ClubAiDefaultsService(
         )
     }
 
-    private fun requireHostOfClub(clubSlug: String, member: CurrentMember) {
+    private fun requireHostOfClub(
+        clubSlug: String,
+        member: CurrentMember,
+    ) {
         if (member.clubSlug != clubSlug || !member.isHost) {
             throw AccessDeniedException("Host of '$clubSlug' required")
         }
@@ -76,13 +87,14 @@ class ClubAiDefaultsService(
         return candidate.takeIf { modelCatalog.isEnabled(it) }
     }
 
-    private fun providerFromName(name: String): Provider? = when {
-        name.startsWith("claude-") -> Provider.CLAUDE
-        name.startsWith("gemini-") -> Provider.GEMINI
-        name.startsWith("gpt-") -> Provider.OPENAI
-        OPENAI_O_SERIES_REGEX.matches(name) -> Provider.OPENAI
-        else -> null
-    }
+    private fun providerFromName(name: String): Provider? =
+        when {
+            name.startsWith("claude-") -> Provider.CLAUDE
+            name.startsWith("gemini-") -> Provider.GEMINI
+            name.startsWith("gpt-") -> Provider.OPENAI
+            OPENAI_O_SERIES_REGEX.matches(name) -> Provider.OPENAI
+            else -> null
+        }
 
     private companion object {
         private val OPENAI_O_SERIES_REGEX = Regex("^o\\d.*")

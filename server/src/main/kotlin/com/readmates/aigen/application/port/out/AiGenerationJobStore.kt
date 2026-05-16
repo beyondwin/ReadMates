@@ -53,6 +53,18 @@ interface AiGenerationJobStore {
         error: GenerationError?,
     ): Unit
 
+    /**
+     * Atomically increment the per-job LLM call counter and return the new value.
+     * Used by [com.readmates.aigen.application.service.AiGenerationWorker] and
+     * [com.readmates.aigen.application.service.AiGenerationRegenerationService] to
+     * enforce the spec §9.2 hard cap (`maxLlmCallsPerJob`).
+     *
+     * The counter increments per LLM call ATTEMPT — including provider-side retries
+     * and validator-driven strengthened-instruction retries — so a job that triggers
+     * many retries can still hit the cap mid-flight.
+     */
+    fun incrementLlmCallCount(jobId: UUID): Int
+
     /** Delete all 3 job keys (hash, transcript, result) atomically. Used on commit/cancel. */
     fun delete(jobId: UUID): Unit
 }
@@ -81,4 +93,23 @@ data class JobRecord(
     val tokens: TokenUsage,
     val costAccumulatedUsd: BigDecimal,
     val expiresAt: Instant,
-)
+    /**
+     * Running count of LLM calls attempted for this job (start + worker retries +
+     * regenerations). Compared against
+     * [com.readmates.aigen.config.AiGenerationProperties.Job.maxLlmCallsPerJob]
+     * to enforce the spec §9.2 hard cap.
+     */
+    val llmCallCount: Int = 0,
+) {
+    /**
+     * The [SessionMeta] for downstream generator / regenerator prompts and validator
+     * checks. Pulls from the persisted [sessionMeta] (authoritative) and overlays the
+     * current [authorNameMode] so the host's REAL vs ALIAS choice always takes effect,
+     * even if the original meta was constructed before that distinction existed.
+     *
+     * Centralizes the worker/regen duplication called out in task_1_7 finding #11.
+     * The commit service intentionally builds a different SessionMeta derived from
+     * the snapshot, so it does not call this.
+     */
+    fun toSessionMeta(): SessionMeta = sessionMeta.copy(authorNameMode = authorNameMode)
+}

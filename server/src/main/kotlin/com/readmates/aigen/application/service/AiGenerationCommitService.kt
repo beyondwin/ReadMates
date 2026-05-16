@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
@@ -52,7 +53,6 @@ class AiGenerationCommitService(
     private val commitDelegate: CommitValidatedSessionImportUseCase,
     private val clock: Clock,
 ) : CommitGenerationUseCase {
-
     override fun commit(
         host: CurrentMember,
         sessionId: UUID,
@@ -64,9 +64,14 @@ class AiGenerationCommitService(
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
-        val snapshot = overrideResult
-            ?: record.result
-            ?: throw IllegalStateException("Job $jobId has no result to commit")
+        val snapshot =
+            overrideResult
+                ?: record.result
+                ?: throw AiGenerationException.IllegalGenerationState(
+                    jobId = jobId,
+                    currentStatus = record.status.name,
+                    attemptedAction = "commit",
+                )
 
         // Validate BEFORE persisting any override. Otherwise a bad client-supplied
         // override would pollute the Redis result before validation could reject it.
@@ -114,26 +119,32 @@ class AiGenerationCommitService(
         snapshot: SessionImportV1Snapshot,
         sessionId: UUID,
         visibility: SessionRecordVisibility,
-    ): SessionImportCommand = SessionImportCommand(
-        host = host,
-        sessionId = sessionId,
-        recordVisibility = visibility,
-        format = snapshot.format,
-        session = SessionImportSessionCommand(
-            number = snapshot.sessionNumber,
-            bookTitle = snapshot.bookTitle,
-            meetingDate = snapshot.meetingDate,
-        ),
-        publication = SessionImportPublicationCommand(summary = snapshot.summary),
-        highlights = snapshot.highlights.map { SessionImportRecordCommand(it.authorName, it.text) },
-        oneLineReviews = snapshot.oneLineReviews.map { SessionImportRecordCommand(it.authorName, it.text) },
-        feedbackDocument = SessionImportFeedbackDocumentCommand(
-            fileName = snapshot.feedbackDocumentFileName,
-            markdown = snapshot.feedbackDocumentMarkdown,
-        ),
-    )
+    ): SessionImportCommand =
+        SessionImportCommand(
+            host = host,
+            sessionId = sessionId,
+            recordVisibility = visibility,
+            format = snapshot.format,
+            session =
+                SessionImportSessionCommand(
+                    number = snapshot.sessionNumber,
+                    bookTitle = snapshot.bookTitle,
+                    meetingDate = snapshot.meetingDate,
+                ),
+            publication = SessionImportPublicationCommand(summary = snapshot.summary),
+            highlights = snapshot.highlights.map { SessionImportRecordCommand(it.authorName, it.text) },
+            oneLineReviews = snapshot.oneLineReviews.map { SessionImportRecordCommand(it.authorName, it.text) },
+            feedbackDocument =
+                SessionImportFeedbackDocumentCommand(
+                    fileName = snapshot.feedbackDocumentFileName,
+                    markdown = snapshot.feedbackDocumentMarkdown,
+                ),
+        )
 
-    private fun buildSessionMeta(record: JobRecord, snapshot: SessionImportV1Snapshot): SessionMeta =
+    private fun buildSessionMeta(
+        record: JobRecord,
+        snapshot: SessionImportV1Snapshot,
+    ): SessionMeta =
         SessionMeta(
             sessionId = record.sessionId,
             clubId = record.clubId,
@@ -141,13 +152,17 @@ class AiGenerationCommitService(
             bookTitle = snapshot.bookTitle,
             bookAuthor = null,
             meetingDate = snapshot.meetingDate,
-            expectedAuthorNames = (snapshot.highlights + snapshot.oneLineReviews)
-                .map { it.authorName }
-                .distinct(),
+            expectedAuthorNames =
+                (snapshot.highlights + snapshot.oneLineReviews)
+                    .map { it.authorName }
+                    .distinct(),
             authorNameMode = record.authorNameMode,
         )
 
-    private fun failCommit(record: JobRecord, violation: ValidationResult.Violation): Nothing {
+    private fun failCommit(
+        record: JobRecord,
+        violation: ValidationResult.Violation,
+    ): Nothing {
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
