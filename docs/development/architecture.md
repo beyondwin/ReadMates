@@ -386,17 +386,57 @@ Commit은 활성 호스트만 사용할 수 있고, `HOST_ONLY` 공개 범위에
 
 ## AI-assisted 콘텐츠 운영
 
-ReadMates 서버와 프론트엔드에는 현재 AI API 호출 경로가 없습니다. 서버와 프론트엔드는 AI API client나 in-app generation path를 갖고 있지 않습니다.
+ReadMates 호스트 세션 편집기는 세션 기록을 채우는 두 가지 모드를 같은 commit 경로(`SessionImportService.commitValidated`)로 흘려 보냅니다.
 
-AI-assisted라고 설명하는 부분은 앱 외부 운영 워크플로우입니다. 독서모임 대화에서 나온 피드백, 하이라이트, 한줄평 재료를 외부에서 정리하고, ReadMates는 그 결과물을 세션 기록과 피드백 문서로 저장, 파싱, 권한 검증, 공개합니다.
+| 모드 | 입력 | LLM 호출 위치 | 운영 게이트 |
+| --- | --- | --- | --- |
+| 외부 정리된 산출물 (legacy) | 호스트가 앱 밖에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
+| In-app AI 생성 (Phase 0-7) | 호스트가 업로드한 transcript (.txt ≤ 1 MB) + 모델 선택 | 서버 측 provider adapter | `readmates.aigen.enabled` + `enabled-providers` + provider API key |
 
-역할 분담은 다음과 같습니다.
+외부 JSON 흐름은 [세션 기록 JSON 가져오기](#세션-기록-json-가져오기) 섹션에서 설명하고, in-app AI 생성의 컴포넌트와 데이터 경계는 다음 [In-app AI 세션 생성 컴포넌트](#in-app-ai-세션-생성-컴포넌트) 섹션에서 다룹니다. 운영 절차는 [docs/operations/runbooks/ai-session-generation.md](../operations/runbooks/ai-session-generation.md), 설계 spec은 [in-app AI session generation design](../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md)입니다.
 
-| 단계 | 책임 |
-| --- | --- |
-| 외부 운영 워크플로우 | 피드백, 하이라이트, 한줄평 재료를 정리하고 Markdown 피드백 문서나 공개 기록 데이터를 준비합니다. |
-| ReadMates backend | 문서를 저장하고, 파싱하고, membership/attendance/host 권한을 검증합니다. |
-| ReadMates frontend | 공개 기록, 멤버 기록, 피드백 문서를 역할과 상태에 맞게 보여줍니다. |
-| Public route/API | 공개로 발행된 기록만 노출합니다. |
+## In-app AI 세션 생성 컴포넌트
 
-따라서 문서에서는 ReadMates가 앱 안에서 AI 콘텐츠를 만들어낸다고 쓰지 않습니다. 정확한 표현은 "외부 워크플로우가 피드백, 하이라이트, 한줄평 자료를 정리하고, ReadMates가 저장, 파싱, 권한 검증, 공개한다"입니다.
+In-app AI 생성은 `com.readmates.aigen` feature 모듈에 응집됩니다. 다른 feature module과 같은 hexagonal 경계 (`adapter.in.* → application.port.in → application.service → application.port.out → adapter.out.*`)를 따르며, 외부 도메인(`session`, `sessionimport`, `notification`)과는 commit/notification 경계에서만 만납니다.
+
+```text
+Browser (host editor AI 모드)
+  | multipart POST /api/host/sessions/{id}/ai-generate/start
+  v
+Cloudflare Pages BFF (forward, multipart preserved)
+  v
+Spring  com.readmates.aigen.adapter.in.web.AiGenerationController
+  v
+AiGenerationOrchestrator (cap check → Redis job create → Kafka publish)
+  |                                                      |
+  v                                                      v
+Redis  aigen:job:<jobId>            Kafka  readmates.aigen.jobs.v1
+  ^                                                      |
+  |                                                      v
+AiGenerationCommitService          AiGenerationJobConsumer
+       |                                  v
+       v                          AiGenerationWorker
+SessionImportService                |
+.commitValidated(...)               |  provider adapter selection by ModelCatalog
+       |                            v
+       v                  adapter.out.llm.{claude,openai,gemini}
+MySQL publication / highlights / one-line reviews / feedback
+       |
+       v
+ai_generation_audit_log row (PII-safe: provider/model/status/token/cost — no transcript body)
+```
+
+- **Feature module 위치**: `server/src/main/kotlin/com/readmates/aigen/`. 도메인 model, port, service, controller, Redis/JDBC adapter, Kafka adapter, LLM adapter가 한 패키지 트리 안에 있습니다.
+- **Provider adapter (3종)**: `adapter.out.llm.claude.ClaudeContentGenerator/Regenerator`, `adapter.out.llm.openai.OpenAiContentGenerator/Regenerator`, `adapter.out.llm.gemini.GeminiContentGenerator/Regenerator`. 모두 `SessionContentGenerator`/`SessionContentRegenerator` outbound port를 구현하고, `LlmPromptBuilder`로 동일한 system + USER_PRELUDE를 만들며, `LlmErrorMapper`로 provider 예외를 사용자 안전 메시지로 마스킹합니다. 등록은 `AiGenerationBeansConfig`의 `associateBy { it.provider }` 패턴으로 자동 와이어링됩니다.
+- **Kafka topic**: `readmates.aigen.jobs.v1` (partition key=`clubId`, payload=`AiGenerationJobMessage{jobId, sessionId, clubId, hostUserId, provider, model, kind}`). Transcript 본문은 페이로드에 절대 포함되지 않습니다 (PII invariant; `scripts/aigen-pii-check.sh`로 PR마다 검증).
+- **Redis 키**:
+  - `aigen:job:<jobId>` (Hash, TTL 6h) — job state, provider/model, item snapshot.
+  - `aigen:cost:club:<clubId>:<YYYY-MM>` (String, TTL 31d) — 월별 클럽 누적 비용 BigDecimal scale=4 USD.
+  - `aigen:cost:host:<userId>:<YYYY-MM-DD>` (String, TTL 24h) — 호스트 일일 생성 횟수 카운터.
+  - `aigen:cost:host:<userId>:<YYYY-MM>` (String, TTL 31d) — 호스트 월별 누적 비용 (감사 보조).
+- **MySQL 테이블** (Flyway V30/V31):
+  - `ai_generation_audit_log` — job/session/club/host_user 인덱스 + provider/model/status/token_usage/cost_estimate_usd. **transcript 본문 컬럼 없음** (감사 invariant).
+  - `ai_generation_club_defaults` — 클럽별 default provider/model. `clubs(id)` FK.
+- **Frontend 모듈**: `front/features/host/aigen/` — `api/` (BFF 호출 + DTO), `hooks/useAiGenerationJob.ts` (TanStack Query v5 adaptive polling), `ui/` (TranscriptUploadForm, GenerationProgressView, PreviewView + 4개 section, RegenerateModal), `storage/aigen-draft-storage.ts` (PREVIEW 수동 편집 localStorage 저장). 호스트 세션 편집기는 `host-session-editor.tsx`의 `[ 외부 도구 JSON 업로드 ]` / `[ AI 결과 가져오기 ]` 토글로 두 모드를 분기합니다.
+- **운영 표면**: Micrometer meter는 `com.readmates.aigen.observability.AiGenerationMetrics`의 8개 (spec §11.1; cardinality 통제용 `MetricLabel` allowlist 적용, `club_id`/`user_id` 금지). Prometheus alert는 `ops/prometheus/alerts/aigen-rules.yml`, Grafana 대시보드는 `ops/grafana/dashboards/aigen.json`. 운영 절차와 alert response anchor는 [ai-session-generation runbook](../operations/runbooks/ai-session-generation.md).
+- **Kill switch**: `readmates.aigen.enabled=false`이면 controller bean과 Kafka consumer가 `@ConditionalOnProperty`로 컨텍스트에서 빠집니다. `enabled-providers`에서 provider를 제외하면 catalog 단계에서 해당 provider 모델 전체가 사라집니다. 두 flag 모두 기본 off.

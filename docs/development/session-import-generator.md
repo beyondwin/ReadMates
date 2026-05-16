@@ -4,6 +4,17 @@
 
 이 흐름은 production 앱에서 LLM을 호출하지 않습니다. 모델 선택, API key, 원본 녹취록, 중간 산출물은 로컬 작업 공간에만 두고, 앱에는 최종 검토한 JSON만 업로드합니다.
 
+## 모드 병존 안내 (in-app AI 생성과의 관계)
+
+ReadMates 호스트 세션 편집기는 이 외부 JSON 업로드 흐름과 **in-app AI 생성** (Phase 0-7) 두 모드를 함께 제공합니다. 편집기 상단의 `[ 외부 도구 JSON 업로드 ]` / `[ AI 결과 가져오기 ]` 토글로 모드를 전환하며, 모드 선택은 `?aigen=1` URL query로 보존됩니다.
+
+| 모드 | 입력 | LLM 호출 위치 | 운영 게이트 |
+| --- | --- | --- | --- |
+| 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
+| In-app AI 생성 | 호스트가 업로드한 transcript (≤ 1 MB .txt) + 모델 선택 | 서버 측 provider adapter (Claude/OpenAI/Gemini) | `readmates.aigen.enabled` + `readmates.aigen.enabled-providers` + provider API key |
+
+두 모드의 commit 경로는 같은 `SessionImportService.commitValidated(...)`를 사용하므로 저장 후의 데이터 형태와 권한 경계는 동일합니다. In-app AI 생성 모드의 흐름, 컴포넌트, 운영 절차는 spec §7 ([docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md](../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md))과 runbook ([docs/operations/runbooks/ai-session-generation.md](../operations/runbooks/ai-session-generation.md))을 참고합니다. CHANGELOG `Phase 3 frontend AI 모드` 항목이 두 모드 토글의 frontend 변경을 정리합니다.
+
 ## 출력 형식
 
 파일은 UTF-8 JSON 하나입니다.
