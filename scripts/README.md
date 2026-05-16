@@ -29,6 +29,14 @@
 READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ```
 
+## `lint-grafana-dashboards.sh`
+
+`ops/grafana/dashboards/*.json` JSON 유효성과 필수 필드(`title`, `schemaVersion`, `panels`)를 검사합니다. CI backend job에서 실행됩니다.
+
+```bash
+./scripts/lint-grafana-dashboards.sh
+```
+
 ## `build-public-release-candidate.sh`
 
 아래 명령은 저장소 루트에서 실행하는 것을 기준으로 합니다. 스크립트 자체는 저장소 내부 어디에서든 실행할 수 있지만, 이 문서의 `./scripts/...` 경로는 저장소 루트에서 그대로 복사해 실행할 수 있습니다.
