@@ -1,7 +1,19 @@
 <configuration>
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{ISO8601} [%X{requestId:-no-req}] %-5level %logger{36} - %msg%n</pattern>
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>requestId</includeMdcKeyName>
+            <includeMdcKeyName>clubSlug</includeMdcKeyName>
+            <includeMdcKeyName>sessionId</includeMdcKeyName>
+            <includeMdcKeyName>actorId</includeMdcKeyName>
+            <includeMdcKeyName>source</includeMdcKeyName>
+            <includeMdcKeyName>eventType</includeMdcKeyName>
+            <fieldNames>
+                <timestamp>ts</timestamp>
+                <message>msg</message>
+                <logger>logger</logger>
+                <thread>thread</thread>
+                <levelValue>[ignore]</levelValue>
+            </fieldNames>
         </encoder>
     </appender>
 
