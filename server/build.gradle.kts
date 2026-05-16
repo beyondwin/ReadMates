@@ -72,6 +72,15 @@ tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
     enabled = false
 }
 
+// The default :test task has no tag filter, so it would run every unit,
+// integration, container, and architecture test exactly the way the explicit
+// :unitTest / :integrationTest / :architectureTest tasks already do. Disabling
+// it makes `./gradlew check` run each tagged group exactly once.
+// Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.1
+tasks.named<Test>("test") {
+    enabled = false
+}
+
 val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
 
 val serverTestJavaLauncher =
@@ -185,6 +194,8 @@ tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configure
 
 tasks.named("check") {
     dependsOn("detekt")
+    dependsOn("unitTest")
+    dependsOn("architectureTest")
 }
 
 jacoco {
