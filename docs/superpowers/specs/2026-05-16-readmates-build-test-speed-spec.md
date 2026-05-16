@@ -185,9 +185,18 @@ A3/A4 미달 시: 어느 변경이 효과가 없었는지 데이터로 식별하
 ### 7.2 로컬 (Warm, 2회차)
 | 측정 ID | Before | Task1 | Task2 | Task3 | Task4 | Task5 | Final | Δ% |
 |--------|--------|-------|-------|-------|-------|-------|-------|----|
-| L1     |        |       |       |       |       |       |       |    |
-| L2     |        |       |       |       |       |       |       |    |
-| L3     |        |       |       |       |       |       |       |    |
+| L1     | 69.47  | n/a   | n/a   | n/a   | n/a   | n/a   | 20.25 | **-70.85%** |
+| L2     | 14.26  | n/a   | n/a   | n/a   | n/a   | n/a   | 14.05 | -1.47% |
+| L3     | n/m    | n/m   | n/m   | n/m   | n/m   | n/m   | n/m   | n/m  |
+
+L1/L2 medians from N=3 runs (`--rerun-tasks` to force test re-execution
+with compile cache preserved). Per-task attribution columns are `n/a` —
+the autonomous pass did not measure each intermediate commit, only
+before (main @ 55407e6) and after (`readmates-build-test-speed-20260516-123042` @ b20cd08).
+Detail: `docs/superpowers/reports/2026-05-16-baseline-warm.md` and
+`docs/superpowers/reports/2026-05-16-after-final-warm.md`.
+
+Apple Silicon host. CI numbers (C1/C2/C3) come from the PR push.
 
 ### 7.3 CI (GitHub Actions duration, sec)
 | 잡 / 측정 ID | Before (3-run median) | After (3-run median) | Δ% | 비고 |
@@ -199,9 +208,33 @@ A3/A4 미달 시: 어느 변경이 효과가 없었는지 데이터로 식별하
 ### 7.4 프론트엔드 (변경 적용한 경우)
 | 측정 ID | Before | After | Δ% |
 |--------|--------|-------|----|
-| L5     |        |       |    |
-| L6     |        |       |    |
-| L7     |        |       |    |
+| L5     | n/m    | n/m   | n/m |
+| L6     | n/m    | n/m   | n/m |
+| L7     | n/m    | n/m   | n/m |
+
+Front-end Task 6 was skipped (entry condition `L5 ≥ 30s` not evaluated
+because L5 baseline was not captured in this pass). Front-end pool
+tuning remains a follow-up after a baseline confirms the entry gate.
+
+### Acceptance check (2026-05-16, autonomous pass)
+
+- **A1** [PASS] — `./gradlew check --dry-run` shows `:test` in the graph
+  but `enabled=false` at runtime. `./gradlew :test` executes 4
+  compile-chain tasks and produces no JUnit XML (see L1 verification).
+- **A2** [PASS] — 58 unit-tagged test class XMLs after `./gradlew unitTest`,
+  matches the audit count of 58 (`grep -rL '@Tag("integration|container|architecture")'`).
+- **A3** [DEFERRED] — Needs CI numbers from the PR push.
+- **A4** [PASS] — **-70.85%** on L1 warm median (69.47s → 20.25s), far
+  exceeding the ≥25% target.
+- **A5** [PASS] — 294 tests across 58 classes, 0 failures / 0 errors;
+  JaCoCo gate runs as part of `:check` and was green in all 3 measurement
+  iterations.
+- **A6** [PASS for architecture; DEFERRED for integration] — `:check`
+  pulls `:architectureTest` (3 ArchUnit boundary tests, all green).
+  `:integrationTest` requires Docker — exercised in CI.
+- **A7** [DEFERRED] — Needs CI run.
+- **A8** [PARTIAL] — §7.2 (warm) and §7.4 (front) populated by this pass;
+  §7.1 (cold) and §7.3 (CI) deferred.
 
 ## 8. 비용/위험 요약
 
