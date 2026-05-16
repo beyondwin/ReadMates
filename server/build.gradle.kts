@@ -121,6 +121,15 @@ tasks.withType<Test>().configureEach {
     configureReadmatesTestRuntime()
 }
 
+// Shared fork-count resolution for :unitTest and :integrationTest.
+// Override priority: -PmaxForks=N (sweep harness) > READMATES_TEST_FORKS env
+// (CI workflow) > availableProcessors()/2 default (min 1).
+// Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §§4.3, 7.3 (followup 1)
+val configuredTestForks: Int =
+    (project.findProperty("maxForks") as String?)?.toIntOrNull()
+        ?: System.getenv("READMATES_TEST_FORKS")?.toIntOrNull()
+        ?: (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+
 tasks.register<Test>("unitTest") {
     description = "Runs ReadMates unit tests without Spring/Testcontainers integration tags."
     group = "verification"
@@ -130,14 +139,8 @@ tasks.register<Test>("unitTest") {
         excludeTags("integration", "container", "architecture")
     }
     // Adjustable parallelism for unitTest (no shared state across classes).
-    // Override priority: -PmaxForks=N (sweep harness) > READMATES_TEST_FORKS
-    // env (CI workflow) > availableProcessors()/2 default (min 1).
-    // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.3
-    val requestedForks =
-        (project.findProperty("maxForks") as String?)?.toIntOrNull()
-            ?: System.getenv("READMATES_TEST_FORKS")?.toIntOrNull()
-            ?: (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
-    maxParallelForks = requestedForks
+    // See configuredTestForks declaration above for override priority.
+    maxParallelForks = configuredTestForks
     forkEvery = 0
 
     // JUnit5 class-level parallel execution, scoped to :unitTest only via
@@ -164,6 +167,16 @@ tasks.register<Test>("integrationTest") {
     useJUnitPlatform {
         includeTags("integration", "container")
     }
+    // Spec §7.3 followup option 1: parallel forks for integrationTest.
+    // Each fork = isolated JVM = independent Testcontainers singleton, so
+    // MySQL/Redis/Kafka starts per-fork. On CI (fresh runner) Testcontainers
+    // .withReuse(true) does not short-circuit cross-fork startup, but the
+    // forks run in parallel so 2 forks ≈ 1× startup cost + 1/2× test time.
+    // NO JUnit5 class-level parallel here — class-level concurrency on top
+    // of forks would create N×M concurrency on Spring contexts which share
+    // DB state via Testcontainers; fork-level isolation is the safer level.
+    maxParallelForks = configuredTestForks
+    forkEvery = 0
 }
 
 tasks.register<Test>("architectureTest") {
