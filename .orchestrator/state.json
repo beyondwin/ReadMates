@@ -3897,6 +3897,80 @@
           11
         ]
       }
+    },
+    "task_8_5": {
+      "status": "COMPLETE",
+      "risk": "mid",
+      "complexity": "MEDIUM",
+      "phase": 8,
+      "files": [],
+      "files_test": [],
+      "commits": [],
+      "commit": null,
+      "pre_task_sha": "5ced29f0",
+      "escalations": 0,
+      "review_retries": 0,
+      "verifier_retries": 0,
+      "spec_clarifications": 0,
+      "spec_score": 1.0,
+      "quality_score": 0.95,
+      "review_tier": "WARN",
+      "verification_results": {
+        "compileKotlin compileTestKotlin": "PASS",
+        "unitTest": "PASS (539 tests, 0 failures)",
+        "architectureTest": "PASS (UP-TO-DATE)",
+        "ktlintCheck": "FAIL \u2014 pre-existing (605 violations at f4da2d14 pre-Phase8 \u2192 447 at current HEAD; Phase 8 REDUCED by 158)",
+        "detekt": "FAIL \u2014 pre-existing (51 weighted at f4da2d14 \u2192 46 at HEAD; Phase 8 REDUCED by 5)",
+        "integrationTest": "FAIL \u2014 pre-existing (Testcontainers + ObjectMapper autoconfig issue documented in state.test_command_note since plan start)",
+        "frontend pnpm test (front/)": "PASS (830 tests, 0 failures)"
+      },
+      "review_notes": [
+        "All Phase 8-relevant checks GREEN: compile, unitTest (539), architectureTest, frontend pnpm test (830).",
+        "ktlint failures are pre-existing baseline lint debt across the repo; Phase 8 work reduced violation count by 158 (605 \u2192 447).",
+        "detekt failures are pre-existing baseline issues; Phase 8 work reduced weighted issues by 5 (51 \u2192 46).",
+        "integrationTest failures are pre-existing Testcontainers/ObjectMapper bean autoconfig issue documented in state.test_command_note since plan start \u2014 explicitly noted as unrelated to this plan.",
+        "No Phase 8 regressions identified."
+      ],
+      "method_audit": {
+        "required": [
+          "verification-before-completion"
+        ],
+        "applied": [
+          {
+            "skill": "verification-before-completion",
+            "evidence": {
+              "commands_run": [
+                "./server/gradlew -p server compileKotlin compileTestKotlin",
+                "./server/gradlew -p server unitTest",
+                "./server/gradlew -p server architectureTest",
+                "./server/gradlew -p server ktlintCheck",
+                "./server/gradlew -p server detekt",
+                "./server/gradlew -p server integrationTest",
+                "cd front && pnpm test",
+                "git checkout f4da2d14 && ./server/gradlew -p server ktlintCheck (baseline diff: 605 \u2192 447 violations)",
+                "git checkout f4da2d14 && ./server/gradlew -p server detekt (baseline diff: 51 \u2192 46 weighted issues)"
+              ]
+            }
+          },
+          {
+            "skill": "code-review-pass",
+            "evidence": {
+              "findings_count": 0,
+              "verdict": "PASS",
+              "reviewer": "orchestrator_inline",
+              "reviewer_reason": "verification-only-no-code-diff"
+            }
+          }
+        ],
+        "missing": [],
+        "waived": [
+          {
+            "skill": "test-driven-development",
+            "reason": "verification-pass-no-code-changes"
+          }
+        ],
+        "review_dispatch": "orchestrator_inline"
+      }
     }
   },
   "task_summaries": {
@@ -4520,8 +4594,8 @@
   },
   "low_tasks_pending_verification": [],
   "last_compaction_after_task": 36,
-  "last_completed_task": "task_8_4",
-  "last_completed_at": "2026-05-16T21:10:30Z",
+  "last_completed_task": "task_8_5",
+  "last_completed_at": "2026-05-16T21:17:18Z",
   "current_task": "task_8_4",
   "current_step_within_task": 1,
   "current_pre_task_sha": null,
