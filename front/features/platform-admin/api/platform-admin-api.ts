@@ -2,13 +2,56 @@ import { readmatesFetch } from "@/shared/api/client";
 import type {
   CreatePlatformAdminDomainRequest,
   CreateSupportAccessGrantRequest,
+  PlatformAdminClub,
+  PlatformAdminClubListResponse,
   PlatformAdminDomainResponse,
+  PlatformAdminOnboardingPreviewResponse,
+  PlatformAdminOnboardingRequest,
+  PlatformAdminOnboardingResultResponse,
   PlatformAdminSummaryResponse,
   SupportAccessGrantResponse,
+  UpdatePlatformAdminClubRequest,
 } from "@/features/platform-admin/api/platform-admin-contracts";
 
 export function fetchPlatformAdminSummary() {
   return readmatesFetch<PlatformAdminSummaryResponse>("/api/admin/summary", undefined, { clubSlug: undefined });
+}
+
+export function fetchPlatformAdminClubs() {
+  return readmatesFetch<PlatformAdminClubListResponse>("/api/admin/clubs", undefined, { clubSlug: undefined });
+}
+
+export function updatePlatformAdminClub(clubId: string, request: UpdatePlatformAdminClubRequest) {
+  return readmatesFetch<PlatformAdminClub>(
+    `/api/admin/clubs/${encodeURIComponent(clubId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(request),
+    },
+    { clubSlug: undefined },
+  );
+}
+
+export function previewPlatformAdminOnboarding(request: PlatformAdminOnboardingRequest) {
+  return readmatesFetch<PlatformAdminOnboardingPreviewResponse>(
+    "/api/admin/clubs/onboarding/preview",
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
+    { clubSlug: undefined },
+  );
+}
+
+export function commitPlatformAdminOnboarding(request: PlatformAdminOnboardingRequest) {
+  return readmatesFetch<PlatformAdminOnboardingResultResponse>(
+    "/api/admin/clubs/onboarding",
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
+    { clubSlug: undefined },
+  );
 }
 
 export function createPlatformAdminDomain(clubId: string, request: CreatePlatformAdminDomainRequest) {

@@ -60,3 +60,82 @@ export type PlatformAdminSummaryResponse = {
   domains?: PlatformAdminDomainResponse[];
   domainsRequiringAction: PlatformAdminDomainResponse[];
 };
+
+export type PlatformAdminClubStatus = "SETUP_REQUIRED" | "ACTIVE" | "SUSPENDED" | "ARCHIVED";
+export type PlatformAdminClubPublicVisibility = "PRIVATE" | "PUBLIC";
+export type FirstHostOnboardingState = "MISSING" | "INVITED" | "ASSIGNED";
+
+export type PlatformAdminClub = {
+  clubId: string;
+  slug: string;
+  name: string;
+  tagline: string;
+  about: string;
+  status: PlatformAdminClubStatus;
+  publicVisibility: PlatformAdminClubPublicVisibility;
+  domainCount: number;
+  domainActionRequiredCount: number;
+  firstHostOnboardingState: FirstHostOnboardingState;
+};
+
+export type PlatformAdminClubListResponse = {
+  items: PlatformAdminClub[];
+};
+
+export type UpdatePlatformAdminClubRequest = {
+  name?: string;
+  tagline?: string;
+  about?: string;
+  publicVisibility?: PlatformAdminClubPublicVisibility;
+};
+
+export type PlatformAdminOnboardingRequest = {
+  club: {
+    name: string;
+    slug: string;
+    tagline: string;
+    about: string;
+  };
+  firstHost: {
+    email: string;
+    name: string;
+  };
+  domain?: {
+    hostname: string;
+    kind: PlatformAdminDomainKind;
+  };
+  existingUserConfirmation?: string;
+};
+
+export type PlatformAdminOnboardingPreviewResponse = {
+  club: {
+    slug: string;
+    available: boolean;
+  };
+  firstHost: {
+    kind: "EXISTING_USER" | "NEW_USER";
+    email: string;
+    existingUserId: string | null;
+    existingUserName: string | null;
+    requiredConfirmation: string | null;
+  };
+  domain: null | {
+    hostname: string;
+    available: boolean;
+  };
+};
+
+export type PlatformAdminOnboardingResultResponse = {
+  club: PlatformAdminClub;
+  hostOnboarding: {
+    kind: "EXISTING_USER_ASSIGNED" | "INVITATION_CREATED";
+    email: string;
+    userId: string | null;
+    invitationId: string | null;
+    acceptUrl: string | null;
+    emailDelivery: {
+      status: "SENT" | "FAILED" | "SKIPPED";
+    };
+  };
+  domain: PlatformAdminDomainResponse | null;
+};

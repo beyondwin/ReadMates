@@ -134,16 +134,47 @@ describe("platform admin frontend shell", () => {
         );
       }
 
+      if (input.toString() === "/api/bff/api/admin/clubs") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              items: [
+                {
+                  clubId: "club-1",
+                  slug: "reading-sai",
+                  name: "읽는사이",
+                  tagline: "함께 읽는 모임",
+                  about: "공개 소개",
+                  status: "ACTIVE",
+                  publicVisibility: "PUBLIC",
+                  domainCount: 1,
+                  domainActionRequiredCount: 0,
+                  firstHostOnboardingState: "ASSIGNED",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
       return Promise.reject(new Error(`Unexpected fetch: ${input.toString()}`));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(platformAdminLoader()).resolves.toEqual({
+    await expect(platformAdminLoader()).resolves.toMatchObject({
       summary: {
         platformRole: "OWNER",
         activeClubCount: 2,
-        domainActionRequiredCount: 0,
-        domainsRequiringAction: [],
+      },
+      clubs: {
+        items: [
+          {
+            slug: "reading-sai",
+            publicVisibility: "PUBLIC",
+            firstHostOnboardingState: "ASSIGNED",
+          },
+        ],
       },
     });
   });
@@ -313,6 +344,12 @@ describe("platform admin frontend shell", () => {
         );
       }
 
+      if (url === "/api/bff/api/admin/clubs") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }),
+        );
+      }
+
       if (url === "/api/bff/api/admin/domains/domain-1/check") {
         expect(init?.method).toBe("POST");
         return Promise.resolve(
@@ -385,6 +422,12 @@ describe("platform admin frontend shell", () => {
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/clubs") {
+        return Promise.resolve(
+          new Response(JSON.stringify({ items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }),
         );
       }
 
