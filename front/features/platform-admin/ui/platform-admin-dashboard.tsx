@@ -1,8 +1,20 @@
 import { SupportAccessGrantsPanel } from "@/features/platform-admin/ui/support-access-grants-panel";
+import {
+  PlatformAdminClubRegistry,
+  type PlatformAdminClubRegistryItem,
+} from "@/features/platform-admin/ui/platform-admin-club-registry";
+import { PlatformAdminClubDetail } from "@/features/platform-admin/ui/platform-admin-club-detail";
+import {
+  PlatformAdminOnboardingWizard,
+  type PlatformAdminOnboardingPreviewResponse,
+  type PlatformAdminOnboardingRequest,
+  type PlatformAdminOnboardingResultResponse,
+} from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
 import type {
   CreateSupportAccessGrantFields,
   SupportAccessGrantView,
 } from "@/features/platform-admin/ui/support-access-grants-panel";
+import { useState } from "react";
 
 type PlatformAdminDomainStatus =
   | "REQUESTED"
@@ -36,9 +48,21 @@ type PlatformAdminSummaryView = {
 
 type PlatformAdminDashboardProps = {
   summary: PlatformAdminSummaryView;
+  clubs?: { items: PlatformAdminClubRegistryItem[] };
   checkingDomainIds?: ReadonlySet<string>;
   domainCheckErrors?: Record<string, string>;
   onCheckDomain?: (domainId: string) => void;
+  onPreviewOnboarding?: (request: PlatformAdminOnboardingRequest) => Promise<PlatformAdminOnboardingPreviewResponse>;
+  onCommitOnboarding?: (request: PlatformAdminOnboardingRequest) => Promise<PlatformAdminOnboardingResultResponse>;
+  onUpdateClub?: (
+    clubId: string,
+    request: {
+      name?: string;
+      tagline?: string;
+      about?: string;
+      publicVisibility?: "PRIVATE" | "PUBLIC";
+    },
+  ) => Promise<PlatformAdminClubRegistryItem>;
   activeGrants?: SupportAccessGrantView[];
   onCreateGrant?: (fields: CreateSupportAccessGrantFields) => Promise<void>;
   onRevokeGrant?: (grantId: string) => Promise<void>;
@@ -46,14 +70,20 @@ type PlatformAdminDashboardProps = {
 
 export function PlatformAdminDashboard({
   summary,
+  clubs = { items: [] },
   checkingDomainIds = new Set<string>(),
   domainCheckErrors = {},
   onCheckDomain,
+  onPreviewOnboarding,
+  onCommitOnboarding,
+  onUpdateClub,
   activeGrants = [],
   onCreateGrant,
   onRevokeGrant,
 }: PlatformAdminDashboardProps) {
   const domains = summary.domains ?? summary.domainsRequiringAction ?? [];
+  const [selectedClub, setSelectedClub] = useState<PlatformAdminClubRegistryItem | null>(clubs.items[0] ?? null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   return (
     <main className="platform-admin-page">
@@ -70,6 +100,38 @@ export function PlatformAdminDashboard({
           <MetricCard label="활성 클럽" value={summary.activeClubCount.toLocaleString("ko-KR")} />
           <MetricCard label="도메인 조치 필요" value={summary.domainActionRequiredCount.toLocaleString("ko-KR")} />
         </section>
+
+        <PlatformAdminClubRegistry
+          clubs={clubs}
+          onNewClub={() => setShowOnboarding((current) => !current)}
+          onSelectClub={(club) => {
+            setSelectedClub(club);
+            setShowOnboarding(false);
+          }}
+        />
+
+        {showOnboarding && onPreviewOnboarding != null && onCommitOnboarding != null ? (
+          <PlatformAdminOnboardingWizard
+            onPreview={onPreviewOnboarding}
+            onCommit={onCommitOnboarding}
+            onCreated={(result) => {
+              setSelectedClub(result.club);
+              setShowOnboarding(false);
+            }}
+          />
+        ) : null}
+
+        <PlatformAdminClubDetail
+          club={selectedClub}
+          onUpdateClub={async (clubId, request) => {
+            const updated = await onUpdateClub?.(clubId, request);
+            if (updated == null) {
+              throw new Error("Platform admin club update handler is not configured");
+            }
+            setSelectedClub(updated);
+            return updated;
+          }}
+        />
 
         <section className="platform-admin-domains" aria-labelledby="platform-admin-domains-title">
           <div className="platform-admin-domains__header">

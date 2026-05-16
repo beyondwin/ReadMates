@@ -227,6 +227,74 @@
   margin: 0;
 }
 
+.platform-admin-clubs,
+.platform-admin-onboarding,
+.platform-admin-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.platform-admin-club-list {
+  display: grid;
+  gap: 10px;
+}
+
+.platform-admin-club-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 18px;
+  text-align: left;
+  border: 0;
+  cursor: pointer;
+}
+
+.platform-admin-club-row__main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.platform-admin-onboarding__grid,
+.platform-admin-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.platform-admin-onboarding__about,
+.platform-admin-detail__about {
+  grid-column: 1 / -1;
+}
+
+.platform-admin-onboarding__about textarea,
+.platform-admin-detail__about textarea {
+  min-height: 120px;
+}
+
+.platform-admin-onboarding__preview,
+.platform-admin-onboarding__actions,
+.platform-admin-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.platform-admin-onboarding__actions,
+.platform-admin-detail__actions {
+  justify-content: flex-end;
+}
+
+.platform-admin-onboarding__confirmation,
+.platform-admin-onboarding__result {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
 .rm-route-stage {
   min-height: inherit;
 }
@@ -1227,6 +1295,12 @@
   }
 
   .platform-admin-domain-row {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-admin-club-row,
+  .platform-admin-onboarding__grid,
+  .platform-admin-detail__grid {
     grid-template-columns: 1fr;
   }
 

@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
 import { PlatformAdminDashboard } from "@/features/platform-admin/ui/platform-admin-dashboard";
+import { PlatformAdminOnboardingWizard } from "@/features/platform-admin/ui/platform-admin-onboarding-wizard";
 import { platformAdminLoader } from "@/features/platform-admin/route/platform-admin-data";
 import { AuthContext, type AuthState } from "@/src/app/auth-state";
 import { AuthProvider } from "@/src/app/auth-context";
@@ -297,6 +298,68 @@ describe("platform admin frontend shell", () => {
     expect(screen.getByText("failed.example.test")).toBeInTheDocument();
     expect(screen.getByText("FAILED")).toBeInTheDocument();
     expect(screen.getByText("DNS_NOT_CONNECTED")).toBeInTheDocument();
+  });
+
+  it("renders the platform club registry", () => {
+    render(
+      <PlatformAdminDashboard
+        summary={{
+          platformRole: "OWNER",
+          activeClubCount: 1,
+          domainActionRequiredCount: 0,
+          domainsRequiringAction: [],
+        }}
+        clubs={{
+          items: [
+            {
+              clubId: "club-1",
+              slug: "reading-sai",
+              name: "읽는사이",
+              tagline: "함께 읽는 모임",
+              about: "공개 소개",
+              status: "ACTIVE",
+              publicVisibility: "PUBLIC",
+              domainCount: 1,
+              domainActionRequiredCount: 0,
+              firstHostOnboardingState: "ASSIGNED",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "클럽 레지스트리" })).toBeInTheDocument();
+    expect(screen.getByText("reading-sai")).toBeInTheDocument();
+    expect(screen.getByText("PUBLIC")).toBeInTheDocument();
+  });
+
+  it("shows existing user confirmation in onboarding wizard", async () => {
+    const user = userEvent.setup();
+    const onPreview = vi.fn().mockResolvedValue({
+      club: { slug: "new-club", available: true },
+      firstHost: {
+        kind: "EXISTING_USER",
+        email: "host@example.com",
+        existingUserId: "user-1",
+        existingUserName: "Host User",
+        requiredConfirmation: "ASSIGN_EXISTING_USER_AS_HOST",
+      },
+      domain: null,
+    });
+    const onCommit = vi.fn();
+
+    render(<PlatformAdminOnboardingWizard onPreview={onPreview} onCommit={onCommit} />);
+
+    await user.type(screen.getByLabelText("클럽 이름"), "New Club");
+    await user.type(screen.getByLabelText("Slug"), "new-club");
+    await user.type(screen.getByLabelText("Tagline"), "A reading club");
+    await user.type(screen.getByLabelText("About"), "A detailed public introduction");
+    await user.type(screen.getByLabelText("첫 호스트 이메일"), "host@example.com");
+    await user.type(screen.getByLabelText("첫 호스트 이름"), "Host User");
+    await user.click(screen.getByRole("button", { name: "미리 확인" }));
+
+    expect(await screen.findByText("기존 사용자 확인 필요")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "기존 사용자에게 HOST 권한 부여" })).toBeDisabled();
   });
 
   it("runs domain status check from the platform admin route", async () => {

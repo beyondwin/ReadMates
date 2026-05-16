@@ -4,11 +4,15 @@ import type { PlatformAdminRouteData } from "@/features/platform-admin/route/pla
 import { PlatformAdminDashboard } from "@/features/platform-admin/ui/platform-admin-dashboard";
 import {
   checkPlatformAdminDomainProvisioning,
+  commitPlatformAdminOnboarding,
   createSupportAccessGrant,
+  previewPlatformAdminOnboarding,
   revokeSupportAccessGrant,
+  updatePlatformAdminClub,
 } from "@/features/platform-admin/api/platform-admin-api";
 import type {
   CreateSupportAccessGrantRequest,
+  PlatformAdminClubListResponse,
   PlatformAdminDomainResponse,
   PlatformAdminSummaryResponse,
   SupportAccessGrantResponse,
@@ -18,6 +22,7 @@ import type { CreateSupportAccessGrantFields } from "@/features/platform-admin/u
 export function PlatformAdminRoute() {
   const data = useLoaderData() as PlatformAdminRouteData;
   const [summary, setSummary] = useState(data.summary);
+  const [clubs, setClubs] = useState(data.clubs);
   const [checkingDomainIds, setCheckingDomainIds] = useState<ReadonlySet<string>>(new Set());
   const [checkErrorByDomainId, setCheckErrorByDomainId] = useState<Record<string, string>>({});
   const [activeGrants, setActiveGrants] = useState<SupportAccessGrantResponse[]>([]);
@@ -42,6 +47,7 @@ export function PlatformAdminRoute() {
   return (
     <PlatformAdminDashboard
       summary={summary}
+      clubs={clubs}
       checkingDomainIds={checkingDomainIds}
       domainCheckErrors={checkErrorByDomainId}
       onCheckDomain={async (domainId) => {
@@ -59,11 +65,41 @@ export function PlatformAdminRoute() {
           setCheckingDomainIds((current) => withoutSetValue(current, domainId));
         }
       }}
+      onPreviewOnboarding={previewPlatformAdminOnboarding}
+      onCommitOnboarding={async (request) => {
+        const result = await commitPlatformAdminOnboarding(request);
+        setClubs((current) => prependOrReplaceClub(current, result.club));
+        return result;
+      }}
+      onUpdateClub={async (clubId, request) => {
+        const updated = await updatePlatformAdminClub(clubId, request);
+        setClubs((current) => replaceClub(current, updated));
+        return updated;
+      }}
       activeGrants={activeGrants}
       onCreateGrant={handleCreateGrant}
       onRevokeGrant={handleRevokeGrant}
     />
   );
+}
+
+function prependOrReplaceClub(
+  clubs: PlatformAdminClubListResponse,
+  club: PlatformAdminClubListResponse["items"][number],
+): PlatformAdminClubListResponse {
+  if (clubs.items.some((candidate) => candidate.clubId === club.clubId)) {
+    return replaceClub(clubs, club);
+  }
+  return { items: [club, ...clubs.items] };
+}
+
+function replaceClub(
+  clubs: PlatformAdminClubListResponse,
+  club: PlatformAdminClubListResponse["items"][number],
+): PlatformAdminClubListResponse {
+  return {
+    items: clubs.items.map((candidate) => (candidate.clubId === club.clubId ? club : candidate)),
+  };
 }
 
 function summaryWithUpdatedDomain(
