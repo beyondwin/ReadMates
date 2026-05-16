@@ -37,20 +37,26 @@ class PlatformAdminBffSecurityTest(
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
     private val createdClubDomainIds = linkedSetOf<String>()
+    private val createdClubIds = linkedSetOf<String>()
+    private val createdInvitationIds = linkedSetOf<String>()
 
     @AfterEach
     fun cleanupCreatedRows() {
         try {
+            deleteWhereIn("invitations", "id", createdInvitationIds)
             deleteWhereIn("club_domains", "id", createdClubDomainIds)
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
             deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
             deleteWhereIn("users", "id", createdUserIds)
+            deleteWhereIn("clubs", "id", createdClubIds)
         } finally {
             createdSessionTokenHashes.clear()
             createdPlatformAdminUserIds.clear()
             createdUserIds.clear()
             createdClubDomainIds.clear()
+            createdClubIds.clear()
+            createdInvitationIds.clear()
             SecurityContextHolder.clearContext()
         }
     }
@@ -114,6 +120,43 @@ class PlatformAdminBffSecurityTest(
         assertEquals(1, countDomainRows(hostname))
     }
 
+    @Test
+    fun `admin onboarding preview bff request reaches controller without spring csrf token`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+
+        mockMvc
+            .post("/api/admin/clubs/onboarding/preview") {
+                contentType = MediaType.APPLICATION_JSON
+                content = onboardingRequestJson("bff.preview.${UUID.randomUUID()}@example.com")
+                cookie(sessionCookieForUser(operator))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.firstHost.kind") { value("NEW_USER") }
+            }
+    }
+
+    @Test
+    fun `admin onboarding commit bff request reaches controller without spring csrf token`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+
+        val result =
+            mockMvc
+                .post("/api/admin/clubs/onboarding") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = onboardingRequestJson("bff.commit.${UUID.randomUUID()}@example.com")
+                    cookie(sessionCookieForUser(operator))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.hostOnboarding.kind") { value("INVITATION_CREATED") }
+                }.andReturn()
+        createdInvitationIds += JsonPath.read<String>(result.response.contentAsString, "$.hostOnboarding.invitationId")
+        createdClubIds += JsonPath.read<String>(result.response.contentAsString, "$.club.clubId")
+    }
+
     private fun createPlatformAdminUser(
         role: String,
         status: String,
@@ -159,6 +202,24 @@ class PlatformAdminBffSecurityTest(
             Int::class.java,
             hostname,
         ) ?: 0
+
+    private fun onboardingRequestJson(hostEmail: String): String {
+        val slug = "bff-club-${UUID.randomUUID().toString().take(8)}"
+        return """
+            {
+              "club": {
+                "name": "BFF Platform Club",
+                "slug": "$slug",
+                "tagline": "A private reading club",
+                "about": "A new club created through the platform BFF boundary."
+              },
+              "firstHost": {
+                "email": "$hostEmail",
+                "name": "First Host"
+              }
+            }
+            """.trimIndent()
+    }
 
     private fun deleteWhereIn(
         tableName: String,

@@ -26,6 +26,8 @@ class PlatformAdminErrorHandler {
             PlatformAdminError.CLUB_NOT_FOUND -> HttpStatus.NOT_FOUND
             PlatformAdminError.CLUB_PUBLISH_NOT_ALLOWED -> HttpStatus.CONFLICT
             PlatformAdminError.CLUB_HOST_REQUIRED -> HttpStatus.CONFLICT
+            PlatformAdminError.CLUB_SLUG_CONFLICT -> HttpStatus.CONFLICT
+            PlatformAdminError.EXISTING_USER_CONFIRMATION_REQUIRED -> HttpStatus.CONFLICT
             PlatformAdminError.CLUB_DOMAIN_NOT_FOUND -> HttpStatus.NOT_FOUND
             PlatformAdminError.CLUB_DOMAIN_CONFLICT -> HttpStatus.CONFLICT
             PlatformAdminError.GRANT_NOT_FOUND -> HttpStatus.NOT_FOUND

@@ -75,3 +75,58 @@ interface UpdatePlatformAdminClubPort {
         publicVisibility: ClubPublicVisibility?,
     ): PlatformAdminClubListItem?
 }
+
+data class PlatformAdminExistingUser(
+    val userId: UUID,
+    val email: String,
+    val name: String,
+)
+
+data class CreatePlatformAdminClubCommand(
+    val clubId: UUID,
+    val slug: String,
+    val name: String,
+    val tagline: String,
+    val about: String,
+)
+
+data class CreatePlatformAdminHostInvitationCommand(
+    val invitationId: UUID,
+    val clubId: UUID,
+    val invitedByPlatformAdminUserId: UUID,
+    val email: String,
+    val name: String,
+    val tokenHash: String,
+    val expiresAt: OffsetDateTime,
+)
+
+data class CreatePlatformAdminHostInvitationResult(
+    val invitationId: UUID,
+    val token: String,
+)
+
+interface PlatformAdminOnboardingPort {
+    fun slugExists(slug: String): Boolean
+
+    fun domainHostnameExists(hostname: String): Boolean
+
+    fun findUserByEmail(email: String): PlatformAdminExistingUser?
+
+    fun createClub(command: CreatePlatformAdminClubCommand): UUID
+
+    fun upsertHostMembership(
+        clubId: UUID,
+        userId: UUID,
+        displayName: String,
+    ): UUID
+
+    fun createHostInvitation(command: CreatePlatformAdminHostInvitationCommand)
+}
+
+interface SendPlatformAdminHostInvitationEmailPort {
+    fun send(
+        to: String,
+        clubName: String,
+        acceptUrl: String,
+    )
+}

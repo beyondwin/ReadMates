@@ -94,3 +94,86 @@ data class UpdatePlatformAdminClubCommand(
     val about: String?,
     val publicVisibility: ClubPublicVisibility?,
 )
+
+data class PlatformAdminOnboardingClubInput(
+    val name: String,
+    val slug: String,
+    val tagline: String,
+    val about: String,
+)
+
+data class PlatformAdminOnboardingHostInput(
+    val email: String,
+    val name: String,
+)
+
+data class PlatformAdminOnboardingDomainInput(
+    val hostname: String,
+    val kind: ClubDomainKind,
+)
+
+data class PlatformAdminOnboardingCommand(
+    val club: PlatformAdminOnboardingClubInput,
+    val firstHost: PlatformAdminOnboardingHostInput,
+    val domain: PlatformAdminOnboardingDomainInput?,
+    val existingUserConfirmation: String?,
+)
+
+data class PlatformAdminOnboardingPreview(
+    val club: PlatformAdminOnboardingClubPreview,
+    val firstHost: PlatformAdminFirstHostPreview,
+    val domain: PlatformAdminDomainPreview?,
+)
+
+data class PlatformAdminOnboardingClubPreview(
+    val slug: String,
+    val available: Boolean,
+)
+
+data class PlatformAdminFirstHostPreview(
+    val kind: FirstHostPreviewKind,
+    val email: String,
+    val existingUserId: UUID?,
+    val existingUserName: String?,
+    val requiredConfirmation: String?,
+)
+
+enum class FirstHostPreviewKind {
+    EXISTING_USER,
+    NEW_USER,
+}
+
+data class PlatformAdminDomainPreview(
+    val hostname: String,
+    val available: Boolean,
+)
+
+data class PlatformAdminOnboardingResult(
+    val club: PlatformAdminClubListItem,
+    val hostOnboarding: PlatformAdminHostOnboardingResult,
+    val domain: PlatformAdminClubDomain?,
+)
+
+data class PlatformAdminHostOnboardingResult(
+    val kind: HostOnboardingResultKind,
+    val email: String,
+    val userId: UUID?,
+    val invitationId: UUID?,
+    val acceptUrl: String?,
+    val emailDelivery: PlatformAdminEmailDeliveryResult,
+)
+
+enum class HostOnboardingResultKind {
+    EXISTING_USER_ASSIGNED,
+    INVITATION_CREATED,
+}
+
+data class PlatformAdminEmailDeliveryResult(
+    val status: PlatformAdminEmailDeliveryStatus,
+)
+
+enum class PlatformAdminEmailDeliveryStatus {
+    SENT,
+    FAILED,
+    SKIPPED,
+}

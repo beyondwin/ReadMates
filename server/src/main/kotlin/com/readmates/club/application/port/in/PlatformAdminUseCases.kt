@@ -5,6 +5,9 @@ import com.readmates.club.application.model.PlatformAdminClubList
 import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminDashboardSummary
+import com.readmates.club.application.model.PlatformAdminOnboardingCommand
+import com.readmates.club.application.model.PlatformAdminOnboardingPreview
+import com.readmates.club.application.model.PlatformAdminOnboardingResult
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
 import com.readmates.shared.security.CurrentPlatformAdmin
 import java.util.UUID
@@ -38,4 +41,18 @@ interface UpdatePlatformAdminClubUseCase {
         clubId: UUID,
         command: UpdatePlatformAdminClubCommand,
     ): PlatformAdminClubListItem
+}
+
+interface PreviewPlatformAdminClubOnboardingUseCase {
+    fun preview(
+        admin: CurrentPlatformAdmin,
+        command: PlatformAdminOnboardingCommand,
+    ): PlatformAdminOnboardingPreview
+}
+
+interface CommitPlatformAdminClubOnboardingUseCase {
+    fun commit(
+        admin: CurrentPlatformAdmin,
+        command: PlatformAdminOnboardingCommand,
+    ): PlatformAdminOnboardingResult
 }

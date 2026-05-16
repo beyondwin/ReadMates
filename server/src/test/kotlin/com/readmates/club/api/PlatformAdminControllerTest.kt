@@ -45,10 +45,12 @@ class PlatformAdminControllerTest(
     private val createdClubDomainIds = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdClubIds = linkedSetOf<String>()
+    private val createdInvitationIds = linkedSetOf<String>()
 
     @AfterEach
     fun cleanupCreatedRows() {
         try {
+            deleteWhereIn("invitations", "id", createdInvitationIds)
             deleteWhereIn("club_domains", "id", createdClubDomainIds)
             deleteWhereIn("memberships", "id", createdMembershipIds)
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
@@ -63,6 +65,7 @@ class PlatformAdminControllerTest(
             createdClubDomainIds.clear()
             createdMembershipIds.clear()
             createdClubIds.clear()
+            createdInvitationIds.clear()
             SecurityContextHolder.clearContext()
             domainActualStateChecker.reset()
         }
@@ -344,6 +347,73 @@ class PlatformAdminControllerTest(
     }
 
     @Test
+    fun `preview reports existing first host user and required confirmation`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val hostUserId = createGoogleUser("existing.host.${UUID.randomUUID()}@example.com", "Existing Host")
+
+        mockMvc
+            .post("/api/admin/clubs/onboarding/preview") {
+                contentType = MediaType.APPLICATION_JSON
+                content = onboardingRequestJson(hostEmail = emailForUser(hostUserId))
+                cookie(sessionCookieForUser(operator))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.firstHost.kind") { value("EXISTING_USER") }
+                jsonPath("$.firstHost.existingUserId") { value(hostUserId) }
+                jsonPath("$.firstHost.requiredConfirmation") { value("ASSIGN_EXISTING_USER_AS_HOST") }
+            }
+    }
+
+    @Test
+    fun `operator creates private setup club and assigns existing user as host after confirmation`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val hostUserId = createGoogleUser("assign.host.${UUID.randomUUID()}@example.com", "Assign Host")
+        val hostEmail = emailForUser(hostUserId)
+
+        val result =
+            mockMvc
+                .post("/api/admin/clubs/onboarding") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        onboardingRequestJson(
+                            hostEmail = hostEmail,
+                            existingUserConfirmation = "ASSIGN_EXISTING_USER_AS_HOST",
+                        )
+                    cookie(sessionCookieForUser(operator))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.club.publicVisibility") { value("PRIVATE") }
+                    jsonPath("$.club.status") { value("SETUP_REQUIRED") }
+                    jsonPath("$.hostOnboarding.kind") { value("EXISTING_USER_ASSIGNED") }
+                    jsonPath("$.hostOnboarding.emailDelivery.status") { value("SKIPPED") }
+                }.andReturn()
+        val clubId = checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
+        createdClubIds += clubId
+        createdMembershipIds += membershipIdsForClub(clubId)
+    }
+
+    @Test
+    fun `operator creates host invitation and returns accept url for new host email`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val hostEmail = "new.host.${UUID.randomUUID()}@example.com"
+
+        val result =
+            mockMvc
+                .post("/api/admin/clubs/onboarding") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = onboardingRequestJson(hostEmail = hostEmail)
+                    cookie(sessionCookieForUser(operator))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.hostOnboarding.kind") { value("INVITATION_CREATED") }
+                    jsonPath("$.hostOnboarding.acceptUrl") { exists() }
+                    jsonPath("$.hostOnboarding.emailDelivery.status") { exists() }
+                }.andReturn()
+        createdInvitationIds += checkNotNull(result.response.jsonPathValue<String>("$.hostOnboarding.invitationId"))
+        createdClubIds += checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
+    }
+
+    @Test
     fun `operator can check custom domain provisioning and activate verified domain`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
         val hostname = "verified-${UUID.randomUUID()}.example.test"
@@ -490,6 +560,58 @@ class PlatformAdminControllerTest(
         createdMembershipIds += membershipId
         return clubId
     }
+
+    private fun onboardingRequestJson(
+        hostEmail: String,
+        existingUserConfirmation: String? = null,
+    ): String {
+        val slug = "club-${UUID.randomUUID().toString().take(8)}"
+        val confirmationJson =
+            existingUserConfirmation?.let { ""","existingUserConfirmation":"$it"""" } ?: ""
+        return """
+            {
+              "club": {
+                "name": "New Platform Club",
+                "slug": "$slug",
+                "tagline": "A private reading club",
+                "about": "A new club created from the platform admin console."
+              },
+              "firstHost": {
+                "email": "$hostEmail",
+                "name": "First Host"
+              }
+              $confirmationJson
+            }
+            """.trimIndent()
+    }
+
+    private fun createGoogleUser(
+        email: String,
+        name: String,
+    ): String {
+        val userId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into users (id, email, name, short_name, auth_provider)
+            values (?, ?, ?, ?, 'GOOGLE')
+            """.trimIndent(),
+            userId,
+            email,
+            name,
+            name.take(20),
+        )
+        createdUserIds += userId
+        return userId
+    }
+
+    private fun emailForUser(userId: String): String =
+        jdbcTemplate.queryForObject("select email from users where id = ?", String::class.java, userId)
+            ?: error("Missing user email")
+
+    private fun membershipIdsForClub(clubId: String): Set<String> =
+        jdbcTemplate
+            .queryForList("select id from memberships where club_id = ?", String::class.java, clubId)
+            .toSet()
 
     private fun sessionCookieForUser(userId: String): Cookie {
         val issuedSession =
