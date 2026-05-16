@@ -1,6 +1,8 @@
 .DS_Store
 .worktrees/
-design/
+# Tracked design-system source lives under /design.
+# Keep generated local design exports out of Git if a future task recreates them.
+/design/standalone/
 recode
 .env
 .env.*
