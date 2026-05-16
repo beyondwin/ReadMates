@@ -1,14 +1,12 @@
 package com.readmates.aigen.adapter.out.llm.common
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class SessionImportSchemaResourceTest {
-    private val mapper = ObjectMapper()
-    private val resource = SessionImportSchemaResource(mapper)
+    private val resource = SessionImportSchemaResource()
 
     @Test
     fun `loads schema from classpath as object node`() {

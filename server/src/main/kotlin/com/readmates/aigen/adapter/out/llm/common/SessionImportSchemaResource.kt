@@ -2,6 +2,7 @@ package com.readmates.aigen.adapter.out.llm.common
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.module.kotlin.KotlinModule
 import org.springframework.core.io.ClassPathResource
 import org.springframework.stereotype.Component
 
@@ -11,7 +12,10 @@ import org.springframework.stereotype.Component
  * (Claude tool input_schema, OpenAI response_format.json_schema, Gemini responseSchema).
  */
 @Component
-class SessionImportSchemaResource(private val objectMapper: ObjectMapper) {
+class SessionImportSchemaResource {
+    private val objectMapper: ObjectMapper =
+        ObjectMapper().registerModule(KotlinModule.Builder().build())
+
     private val cached: ObjectNode by lazy { loadFromClasspath() }
 
     fun schema(): ObjectNode = cached.deepCopy()
