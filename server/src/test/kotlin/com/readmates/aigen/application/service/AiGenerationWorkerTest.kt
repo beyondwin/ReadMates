@@ -168,6 +168,115 @@ class AiGenerationWorkerTest {
     }
 
     @Test
+    fun `process retries once on generator SCHEMA_INVALID with strengthened instructions`() {
+        // task_1_7 #4: generator-thrown SCHEMA_INVALID (and AUTHOR_NAME_MISMATCH /
+        // HIGHLIGHTS_OUT_OF_RANGE / ONE_LINE_REVIEWS_DUPLICATE / FEEDBACK_TEMPLATE_INVALID)
+        // get a single retry with strengthened instructions — same semantics as the
+        // validator-side retry, but emanating from the adapter via LlmGenerationException.
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.generator.enqueueFailure(AiGenerationTestFixtures.providerError(ErrorCode.SCHEMA_INVALID))
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot("after retry"),
+                usage = TokenUsage(20, 0, 30),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        assertThat(ctx.generator.calls).hasSize(2)
+        val allCalls = ctx.generator.calls
+        val lastCall = allCalls[allCalls.lastIndex]
+        val lastInstructions = lastCall.instructions
+        assertThat(lastInstructions).contains("Strict: SCHEMA_INVALID")
+        val updated = ctx.jobStore.load(record.jobId)!!
+        assertThat(updated.status).isEqualTo(JobStatus.SUCCEEDED)
+    }
+
+    @Test
+    fun `process retries once on generator AUTHOR_NAME_MISMATCH with strengthened instructions`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.generator.enqueueFailure(
+            AiGenerationTestFixtures.providerError(ErrorCode.AUTHOR_NAME_MISMATCH),
+        )
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot("after retry"),
+                usage = TokenUsage(1, 0, 1),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        val allCalls = ctx.generator.calls
+        val lastCall = allCalls[allCalls.lastIndex]
+        val lastInstructions = lastCall.instructions
+        assertThat(lastInstructions).contains("Strict: AUTHOR_NAME_MISMATCH")
+        val updated = ctx.jobStore.load(record.jobId)!!
+        assertThat(updated.status).isEqualTo(JobStatus.SUCCEEDED)
+    }
+
+    @Test
+    fun `process increments LLM call counter and caps at maxLlmCallsPerJob`() {
+        // task_1_7 #10: counter increments per LLM call attempt including retries;
+        // when the counter would exceed maxLlmCallsPerJob, the worker short-circuits
+        // with MAX_CALLS_EXCEEDED instead of calling the generator again.
+        val ctx = TestContext()
+        // Pre-populate the record with llmCallCount = maxLlmCallsPerJob (3) so the
+        // first generator call attempt would push it to 4 — over the cap.
+        val base = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+        )
+        val record = base.copy(llmCallCount = 3)
+        ctx.jobStore.save(record)
+
+        ctx.worker.process(record.jobId)
+
+        // Generator must NOT have been called once the cap is reached.
+        assertThat(ctx.generator.calls).isEmpty()
+        val updated = ctx.jobStore.load(record.jobId)!!
+        assertThat(updated.status).isEqualTo(JobStatus.FAILED)
+        assertThat(updated.error!!.code).isEqualTo(ErrorCode.MAX_CALLS_EXCEEDED)
+    }
+
+    @Test
+    fun `process counts both initial call and retry against maxLlmCallsPerJob`() {
+        // task_1_7 #10: increment per ATTEMPT, INCLUDING retries.
+        val ctx = TestContext()
+        // initial + 1 retry would push counter to 4 -> over cap of 3
+        val base = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+        )
+        val record = base.copy(llmCallCount = 2)
+        ctx.jobStore.save(record)
+        ctx.generator.enqueueFailure(
+            AiGenerationTestFixtures.providerError(ErrorCode.PROVIDER_RATE_LIMITED),
+        )
+        // The retry attempt would itself increment the counter to 4 — over cap — so
+        // the worker must short-circuit BEFORE invoking the generator a second time.
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot(),
+                usage = TokenUsage(1, 0, 1),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        // First call happened (counter went 2 -> 3, still <= cap); retry was blocked (would push to 4).
+        assertThat(ctx.generator.calls).hasSize(1)
+        val updated = ctx.jobStore.load(record.jobId)!!
+        assertThat(updated.status).isEqualTo(JobStatus.FAILED)
+        assertThat(updated.error!!.code).isEqualTo(ErrorCode.MAX_CALLS_EXCEEDED)
+    }
+
+    @Test
     fun `process audits FAILED AI_DISABLED when model is no longer enabled`() {
         val ctx = TestContext(modelEnabled = emptySet())
         val record = ctx.savedRecord()

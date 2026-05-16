@@ -1,6 +1,6 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.adapter.`in`.web.AiGenerationException
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.ModelPricing
@@ -94,7 +94,7 @@ class ClubAiDefaultsServiceTest {
     fun `update with non-allowlisted model throws AI_DISABLED`() {
         // gpt model name prefix is known but the catalog hasn't allowed it.
         assertThatThrownBy { service.update(clubSlug, "gpt-4o", hostMember) }
-            .isInstanceOfSatisfying(AiGenerationException::class.java) {
+            .isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
                 assertThat(it.code).isEqualTo(ErrorCode.AI_DISABLED)
             }
         assertThat(clubDefaultPort.load(clubId)).isNull()
@@ -103,7 +103,7 @@ class ClubAiDefaultsServiceTest {
     @Test
     fun `update with unknown model name prefix throws AI_DISABLED`() {
         assertThatThrownBy { service.update(clubSlug, "unknownmodel-1", hostMember) }
-            .isInstanceOfSatisfying(AiGenerationException::class.java) {
+            .isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
                 assertThat(it.code).isEqualTo(ErrorCode.AI_DISABLED)
             }
         assertThat(clubDefaultPort.load(clubId)).isNull()

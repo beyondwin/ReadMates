@@ -205,6 +205,38 @@ class AiGenerationRegenerationServiceTest {
     }
 
     @Test
+    fun `regenerate blocks call when llmCallCount already at maxLlmCallsPerJob`() {
+        // task_1_7 #10: counter persisted on JobRecord; incrementing past the
+        // cap (3) short-circuits with MAX_CALLS_EXCEEDED without calling the
+        // provider.
+        val ctx = TestContext()
+        val base = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+            status = JobStatus.SUCCEEDED,
+            result = AiGenerationTestFixtures.snapshot(),
+        )
+        val record = base.copy(llmCallCount = 3)
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.service.regenerate(
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                item = GenerationItem.SUMMARY,
+                model = null,
+                instructions = null,
+            )
+        }.isInstanceOf(LlmGenerationException::class.java)
+
+        assertThat(ctx.regenerator.calls).isEmpty()
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(audit.errorCode).isEqualTo(ErrorCode.MAX_CALLS_EXCEEDED)
+    }
+
+    @Test
     fun `regenerate appends CLUB_BUDGET_80PCT to warnings when monthly cost crosses soft ratio`() {
         val ctx = TestContext()
         ctx.costGuard.clubMonthly = BigDecimal("16.50")

@@ -106,6 +106,13 @@ internal class FakeJobStore : AiGenerationJobStore {
         )
     }
 
+    override fun incrementLlmCallCount(jobId: UUID): Int {
+        val current = records.getValue(jobId)
+        val next = current.llmCallCount + 1
+        records[jobId] = current.copy(llmCallCount = next)
+        return next
+    }
+
     override fun delete(jobId: UUID) {
         records.remove(jobId)
         deleted += jobId
@@ -125,6 +132,12 @@ internal class FakeJobQueue : AiGenerationJobQueue {
 
     val published: MutableList<Published> = mutableListOf()
 
+    /**
+     * When non-null, [publish] will throw this exception instead of recording.
+     * Used by the queue-compensation regression test.
+     */
+    var throwOnPublish: Throwable? = null
+
     override fun publish(
         jobId: UUID,
         sessionId: UUID,
@@ -134,6 +147,7 @@ internal class FakeJobQueue : AiGenerationJobQueue {
         model: String,
         kind: JobKind,
     ) {
+        throwOnPublish?.let { throw it }
         published += Published(jobId, sessionId, clubId, hostUserId, provider, model, kind)
     }
 }

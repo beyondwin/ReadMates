@@ -2,10 +2,9 @@ package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
-import com.readmates.aigen.application.port.`in`.JobNotFoundException
-import com.readmates.aigen.application.port.`in`.JobSessionMismatchException
 import com.readmates.shared.security.AccessDeniedException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -19,13 +18,13 @@ class AiGenerationErrorHandlerTest {
 
     @ParameterizedTest
     @MethodSource("errorCodeToStatus")
-    fun `maps each AiGenerationException error code to expected HTTP status and problem detail`(
+    fun `maps each AiGenerationException Coded error code to expected HTTP status and problem detail`(
         code: ErrorCode,
         expectedStatus: HttpStatus,
     ) {
         val response =
-            handler.handleAiGenerationException(
-                AiGenerationException(code, "context message"),
+            handler.handleCoded(
+                AiGenerationException.Coded(code, "context message"),
             )
 
         assertThat(response.statusCode).isEqualTo(expectedStatus)
@@ -37,18 +36,19 @@ class AiGenerationErrorHandlerTest {
     }
 
     @Test
-    fun `maps JobNotFoundException to 410 JOB_EXPIRED`() {
-        val response = handler.handleJobNotFound(JobNotFoundException(UUID.randomUUID()))
+    fun `maps JobNotFound to 410 JOB_EXPIRED with typed problem URI`() {
+        val response = handler.handleJobNotFound(AiGenerationException.JobNotFound(UUID.randomUUID()))
         assertThat(response.statusCode).isEqualTo(HttpStatus.GONE)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.JOB_EXPIRED.name)
         assertThat(response.body!!.status).isEqualTo(410)
+        assertThat(response.body!!.type).isEqualTo("/problems/aigen/job-not-found")
     }
 
     @Test
-    fun `maps JobSessionMismatchException to 404`() {
+    fun `maps JobSessionMismatch to 404 with typed problem URI`() {
         val response =
             handler.handleJobSessionMismatch(
-                JobSessionMismatchException(
+                AiGenerationException.JobSessionMismatch(
                     jobId = UUID.randomUUID(),
                     expectedSessionId = UUID.randomUUID(),
                     actualSessionId = UUID.randomUUID(),
@@ -56,6 +56,22 @@ class AiGenerationErrorHandlerTest {
             )
         assertThat(response.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
         assertThat(response.body!!.status).isEqualTo(404)
+        assertThat(response.body!!.type).isEqualTo("/problems/aigen/job-session-mismatch")
+    }
+
+    @Test
+    fun `maps IllegalGenerationState to 409 CONFLICT with typed problem URI`() {
+        val response =
+            handler.handleIllegalGenerationState(
+                AiGenerationException.IllegalGenerationState(
+                    jobId = UUID.randomUUID(),
+                    currentStatus = "PENDING",
+                    attemptedAction = "commit",
+                ),
+            )
+        assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(response.body!!.code).isEqualTo("ILLEGAL_GENERATION_STATE")
+        assertThat(response.body!!.type).isEqualTo("/problems/aigen/illegal-generation-state")
     }
 
     @Test
@@ -108,7 +124,7 @@ class AiGenerationErrorHandlerTest {
 
     @Test
     fun `produces RFC 7807 fields (type, title, status, detail, code)`() {
-        val response = handler.handleAiGenerationException(AiGenerationException(ErrorCode.AI_DISABLED))
+        val response = handler.handleCoded(AiGenerationException.Coded(ErrorCode.AI_DISABLED))
         val body = response.body!!
         assertThat(body.type).isEqualTo("about:blank")
         assertThat(body.title).isNotBlank()
@@ -126,6 +142,7 @@ class AiGenerationErrorHandlerTest {
                 arrayOf(ErrorCode.HOST_DAILY_CAP_EXCEEDED, HttpStatus.BAD_REQUEST),
                 arrayOf(ErrorCode.CLUB_MONTHLY_CAP_EXCEEDED, HttpStatus.BAD_REQUEST),
                 arrayOf(ErrorCode.RATE_LIMITED, HttpStatus.TOO_MANY_REQUESTS),
+                arrayOf(ErrorCode.MAX_CALLS_EXCEEDED, HttpStatus.TOO_MANY_REQUESTS),
                 arrayOf(ErrorCode.QUEUE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE),
                 arrayOf(ErrorCode.PROVIDER_UNAVAILABLE, HttpStatus.BAD_GATEWAY),
                 arrayOf(ErrorCode.PROVIDER_RATE_LIMITED, HttpStatus.BAD_GATEWAY),

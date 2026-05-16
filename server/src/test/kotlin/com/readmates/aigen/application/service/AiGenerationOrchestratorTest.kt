@@ -1,5 +1,7 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.JobStage
@@ -40,6 +42,28 @@ class AiGenerationOrchestratorTest {
 
         val saved = ctx.jobStore.records.values.single()
         assertThat(saved.model.name).isEqualTo(AiGenerationTestFixtures.CLAUDE_FALLBACK.name)
+    }
+
+    @Test
+    fun `start compensates JobRecord and audits when queue publish fails`() {
+        // task_1_7 #5: a Kafka producer outage must NOT leave a PENDING JobRecord
+        // hanging in Redis for the TTL. The orchestrator should transition the
+        // record to FAILED, audit QUEUE_UNAVAILABLE, and rethrow as
+        // LlmGenerationException so the controller surfaces 503.
+        val ctx = TestContext()
+        ctx.queue.throwOnPublish = RuntimeException("kafka down")
+
+        val thrown = assertThatThrownBy {
+            ctx.orchestrator.start(ctx.command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name))
+        }
+        thrown.isInstanceOf(LlmGenerationException::class.java)
+
+        val saved = ctx.jobStore.records.values.single()
+        assertThat(saved.status).isEqualTo(JobStatus.FAILED)
+        assertThat(saved.error!!.code).isEqualTo(ErrorCode.QUEUE_UNAVAILABLE)
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(audit.errorCode).isEqualTo(ErrorCode.QUEUE_UNAVAILABLE)
     }
 
     @Test
@@ -199,7 +223,7 @@ class AiGenerationOrchestratorTest {
         val intruder = UUID.randomUUID()
         assertThatThrownBy {
             ctx.orchestrator.cancel(ctx.sessionId, record.jobId, intruder)
-        }.isInstanceOf(IllegalStateException::class.java)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
 
         assertThat(ctx.jobStore.deleted).isEmpty()
         assertThat(ctx.auditPort.entries).isEmpty()

@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.port.`in`.ClubAiDefaultsView
 import com.readmates.aigen.application.port.`in`.GetClubAiDefaultsUseCase
@@ -125,7 +126,7 @@ class ClubAiDefaultsControllerTest {
     fun `PUT with non-allowlisted model returns 503 AI_DISABLED`() {
         // Service-level rule: non-allowlisted models surface as AI_DISABLED
         // per spec; error handler maps that to 503.
-        updateUseCase.error = AiGenerationException(ErrorCode.AI_DISABLED, "model not allowlisted")
+        updateUseCase.error = AiGenerationException.Coded(ErrorCode.AI_DISABLED, "model not allowlisted")
 
         mockMvc
             .put("/api/host/clubs/$clubSlug/ai-defaults") {
