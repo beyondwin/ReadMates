@@ -172,6 +172,8 @@ A3/A4 미달 시: 어느 변경이 효과가 없었는지 데이터로 식별하
 ## 7. 효과 합산 표 (구현 후 채움)
 
 > 모든 시간은 `/usr/bin/time -p` real(초), N=3 median. min/max는 plan 각 Task 결과 섹션에 보관.
+>
+> **상태 (2026-05-16):** Task 1–5 코드 변경은 branch `readmates-build-test-speed-20260516-123042`에 적용되어 있습니다. 본 표의 Before/After 셀은 휴먼 측정 패스에서 `scripts/bench/measure-local.sh`로 채취해 채웁니다 — 자세한 절차는 [`docs/superpowers/reports/2026-05-16-handoff.md`](../reports/2026-05-16-handoff.md). 측정 데이터가 채워지기 전까지 §5 A3 / A4 게이트는 미검증 상태입니다.
 
 ### 7.1 로컬 (Cold)
 | 측정 ID | Before | Task1 | Task2 | Task3 | Task4 | Task5 | Final | Δ% |

@@ -13,6 +13,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Changed
 - perf: consolidate `publicStats` SELECTs into a single round-trip and replace correlated EXISTS subqueries in `publicSessions` with pre-aggregated joins (server/publication).
 - perf: replace Redis `KEYS` with SCAN-based iteration in read-cache invalidation (server/shared/redis).
+- build: 빌드/테스트 속도 최적화 1차 셋. (a) 기본 `:test` task 비활성화로 CI backend 중복 테스트 제거 — `:unitTest`/`:architectureTest`/`:integrationTest`가 태그별로 정확히 1회 실행. (b) `server/gradle.properties`에 build cache·daemon·JVM heap(`-Xmx4g`) 설정. (c) `:unitTest` `maxParallelForks=availableProcessors()/2`(env `READMATES_TEST_FORKS` override) + JUnit5 클래스 단위 병렬. (d) Testcontainers `withReuse(true)` 표기(로컬 옵트인). (e) `.github/workflows/ci.yml`의 중복 `architectureTest` step 제거. Before/after 측정 수치는 휴먼 측정 패스에서 채워 [spec §7](docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md#7-효과-합산-표-구현-후-채움)에 기록.
 
 ### Post-deploy verification (v1.9 perf follow-up)
 - Local docker MySQL EXPLAIN 검증 완료 (2026-05-15): rewritten `publicStats`/`publicSessions`에 대해 `sessions`는 PRIMARY `eq_ref`, `session_participants`는 `session_participants_club_session_status_member_idx` covering index lookup, `one_line_reviews`는 unique `session_id` `eq_ref`로 핵심 path에 full scan 없음. 운영(OCI MySQL HeatWave) row 수 기준 재확인은 [docs/reports/2026-05-15-v19-perf-explain-verification.md](docs/reports/2026-05-15-v19-perf-explain-verification.md)의 운영 DB 재현 절차로 별도 실행.
