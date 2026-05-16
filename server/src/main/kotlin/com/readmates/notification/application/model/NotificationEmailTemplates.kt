@@ -170,6 +170,24 @@ object NotificationEmailTemplates {
                     deepLinkPath = clubScopedAppPath(clubSlug, "/notes?sessionId=$sessionId"),
                     inAppBody = "${sessionNumber}회차 $bookTitle 에 새 서평이 공개되었습니다.",
                 )
+
+            // AI_GENERATION_READY (task 6.3): in-app only — title / inAppBody / deepLinkPath
+            // are read by `insertMemberNotifications` for the IN_APP delivery copy. Email
+            // copy fields are required by the data class but never delivered because
+            // `NotificationDeliveryPlanningOperations` does not emit an EMAIL row for this
+            // event type. Intentionally generic — no transcript-derived text (PII invariant).
+            NotificationEventType.AI_GENERATION_READY ->
+                EventEmailDetail(
+                    label = "ai generation ready",
+                    subject = "AI 회차 초안 준비가 완료되었습니다",
+                    title = "AI 회차 초안 준비가 완료되었습니다",
+                    summary = "AI 회차 초안 생성이 끝났습니다. 호스트 화면에서 결과를 확인해 주세요.",
+                    contextLabel = "확인",
+                    context = "AI 회차 초안",
+                    ctaLabel = "초안 확인하기",
+                    deepLinkPath = clubScopedAppPath(clubSlug, "/session/$sessionId"),
+                    inAppBody = "AI 회차 초안 준비가 완료되었습니다. 결과를 확인해 주세요.",
+                )
         }
 
     private fun textEmail(

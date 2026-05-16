@@ -91,9 +91,12 @@ MySQL
 
 ## AI-assisted 운영 콘텐츠
 
-ReadMates의 피드백, 하이라이트, 한줄평은 앱 외부 운영 워크플로우에서 AI로 정리된 운영 산출물입니다. ReadMates는 그 산출물을 저장, 파싱, 권한 검증, 공개하고 세션 기록과 피드백 문서로 보여줍니다.
+ReadMates 호스트 도구는 세션 기록을 채우는 두 가지 모드를 함께 제공합니다.
 
-현재 ReadMates 앱, 서버, 프론트엔드는 AI API를 직접 호출하지 않습니다. 즉, 제품 기능은 in-app AI generation이 아니라 외부에서 정리된 콘텐츠를 안전하게 운영하고 노출하는 흐름입니다.
+- **외부 정리된 산출물 (legacy)**: 호스트가 앱 밖에서 정리한 `readmates-session-import:v1` JSON을 호스트 세션 편집기로 가져옵니다. 이 흐름은 server/frontend에서 AI API를 호출하지 않고, 앱은 검증과 commit만 담당합니다. 형식 정의는 [docs/development/session-import-generator.md](docs/development/session-import-generator.md).
+- **In-app AI 생성 (Phase 0-7)**: 호스트 세션 편집기 안에서 LLM이 transcript로부터 공개 요약/하이라이트/한줄평/피드백 문서를 직접 생성합니다. Provider adapter는 Claude, OpenAI, Gemini를 지원하며, Kafka job queue + Redis job state + MySQL audit log로 PII-safe하게 운영합니다.
+
+In-app AI 생성은 `readmates.aigen.enabled`와 `readmates.aigen.enabled-providers` 두 flag로 운영 단위에서 feature-gate됩니다. 두 flag 모두 기본 off이며, 운영자가 provider API key(`READMATES_AIGEN_{ANTHROPIC|OPENAI|GEMINI}_API_KEY`)를 프로비저닝하고 명시적으로 enable한 환경에서만 동작합니다. 운영 절차(모델 allowlist, cap 관리, key 회전, alert 대응, kill switch)는 [docs/operations/runbooks/ai-session-generation.md](docs/operations/runbooks/ai-session-generation.md), 설계 spec은 [docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md](docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md)를 따릅니다.
 
 ## 개발 계획과 스펙 기록
 

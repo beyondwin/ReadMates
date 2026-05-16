@@ -3,11 +3,13 @@ import {
   type CSSProperties,
   type FormEvent,
   useCallback,
+  useEffect,
   useMemo,
   useReducer,
   useRef,
   useState,
 } from "react";
+import { AiGenerateTab } from "@/features/host/aigen/ui/AiGenerateTab";
 import type {
   AttendanceStatus,
   FeedbackDocumentResponse,
@@ -82,11 +84,45 @@ function scopedHostRedirectHref(href: string) {
   return scopedAppLinkTarget(globalThis.location.pathname, href);
 }
 
+type ImportMode = "json" | "aigen";
+
+function readInitialImportMode(): ImportMode {
+  if (typeof window === "undefined") {
+    return "json";
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("aigen") === "1" ? "aigen" : "json";
+  } catch {
+    return "json";
+  }
+}
+
+function writeImportModeToUrl(mode: ImportMode) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (mode === "aigen") {
+      params.set("aigen", "1");
+    } else {
+      params.delete("aigen");
+    }
+    const search = params.toString();
+    const nextUrl = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash ?? ""}`;
+    window.history.replaceState(window.history.state, "", nextUrl);
+  } catch {
+    // Best-effort — URL persistence is non-critical to functionality.
+  }
+}
+
 export default function HostSessionEditor({
   session,
   notificationDispatches = [],
   returnTarget = defaultHostDashboardReturnTarget,
   actions,
+  clubSlug,
   LinkComponent = DefaultLinkComponent,
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
   readmatesReturnState = defaultReadmatesReturnState,
@@ -95,6 +131,7 @@ export default function HostSessionEditor({
   notificationDispatches?: ManualNotificationDispatchListItem[];
   returnTarget?: ReadmatesReturnTarget;
   actions: HostSessionEditorActions;
+  clubSlug?: string;
   LinkComponent?: HostSessionEditorLinkComponent;
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
@@ -146,6 +183,36 @@ export default function HostSessionEditor({
   const [sessionImportPreview, setSessionImportPreview] = useState<SessionImportPreviewResponse | null>(null);
   const [sessionImportStatus, setSessionImportStatus] = useState<"idle" | "previewing" | "ready" | "committing" | "error">("idle");
   const [sessionImportError, setSessionImportError] = useState<string | null>(null);
+  const [importMode, setImportMode] = useState<ImportMode>(() => readInitialImportMode());
+
+  const sessionIdForAigen = session?.sessionId;
+  const canShowImportModeToggle = Boolean(sessionIdForAigen) && Boolean(clubSlug);
+  // If we landed on ?aigen=1 but can't actually show the AI tab (no session yet
+  // or missing clubSlug), fall back to JSON mode so the panel area renders.
+  const effectiveImportMode: ImportMode = canShowImportModeToggle ? importMode : "json";
+
+  const handleImportModeChange = useCallback((next: ImportMode) => {
+    setImportMode(next);
+    writeImportModeToUrl(next);
+  }, []);
+
+  // If the toggle was hidden (e.g. session not yet created) and the URL still
+  // has ?aigen=1, scrub it so reload after creation doesn't surprise the host.
+  useEffect(() => {
+    if (!canShowImportModeToggle) {
+      writeImportModeToUrl("json");
+    }
+  }, [canShowImportModeToggle]);
+
+  const handleAigenCommitted = useCallback(() => {
+    // After an AI commit the session document picks up the publication +
+    // feedback document the server wrote; the simplest correct refresh is a
+    // full reload (mirrors what the JSON commit flow effectively achieves by
+    // dispatching PUBLICATION_SAVED + FEEDBACK_DOCUMENT_UPDATED).
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Refs
@@ -869,16 +936,61 @@ export default function HostSessionEditor({
                 onUpdateAttendance={updateAttendance}
               />
 
-              <SessionImportPanel
-                activeMobileSection={activeMobileSection}
-                sessionId={session?.sessionId}
-                recordVisibility={recordVisibility}
-                preview={sessionImportPreview}
-                status={sessionImportStatus}
-                error={sessionImportError}
-                onFileSelected={previewSessionImport}
-                onCommit={commitSessionImport}
-              />
+              {canShowImportModeToggle ? (
+                <div
+                  className="row"
+                  role="tablist"
+                  aria-label="세션 기록 가져오기 방식"
+                  data-testid="host-editor-import-mode-toggle"
+                  style={{ gap: 8, flexWrap: "wrap" }}
+                >
+                  {([
+                    { mode: "json" as const, label: "외부 도구 JSON 업로드" },
+                    { mode: "aigen" as const, label: "AI 결과 가져오기" },
+                  ]).map(({ mode, label }) => {
+                    const selected = effectiveImportMode === mode;
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        className={`btn btn-sm${selected ? " btn-primary" : " btn-quiet"}`}
+                        onClick={() => handleImportModeChange(mode)}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
+              {effectiveImportMode === "aigen" && sessionIdForAigen && clubSlug ? (
+                <Panel
+                  eyebrow="AI 생성"
+                  title="AI로 세션 기록 가져오기"
+                  mobileSection="report"
+                  panelId="host-editor-panel-aigen"
+                  activeMobileSection={activeMobileSection}
+                >
+                  <AiGenerateTab
+                    sessionId={sessionIdForAigen}
+                    clubSlug={clubSlug}
+                    onCommitted={handleAigenCommitted}
+                  />
+                </Panel>
+              ) : (
+                <SessionImportPanel
+                  activeMobileSection={activeMobileSection}
+                  sessionId={session?.sessionId}
+                  recordVisibility={recordVisibility}
+                  preview={sessionImportPreview}
+                  status={sessionImportStatus}
+                  error={sessionImportError}
+                  onFileSelected={previewSessionImport}
+                  onCommit={commitSessionImport}
+                />
+              )}
 
               <Panel
                 eyebrow="피드백 문서 · 민감"

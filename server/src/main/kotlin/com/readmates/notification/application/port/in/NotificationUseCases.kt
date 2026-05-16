@@ -52,6 +52,20 @@ interface RecordNotificationEventUseCase {
     )
 
     fun recordSessionReminderDue(targetDate: LocalDate)
+
+    /**
+     * AI session generation finished (task 6.3 / spec §10.x). Emits a
+     * NotificationEventType.AI_GENERATION_READY event into the notification
+     * outbox addressed to [hostUserId] only. PII invariant: payload carries
+     * jobId / sessionId / hostUserId — never transcript text, author names,
+     * or book title content.
+     */
+    fun recordAiGenerationReady(
+        jobId: UUID,
+        sessionId: UUID,
+        clubId: UUID,
+        hostUserId: UUID,
+    )
 }
 
 interface ProcessNotificationDeliveriesUseCase {

@@ -9,6 +9,7 @@ import java.time.LocalDate
 import java.util.UUID
 
 private const val SESSION_AGGREGATE_TYPE = "SESSION"
+private const val AI_GENERATION_JOB_AGGREGATE_TYPE = "AI_GENERATION_JOB"
 
 @Service
 class NotificationEventService(
@@ -94,5 +95,32 @@ class NotificationEventService(
 
     override fun recordSessionReminderDue(targetDate: LocalDate) {
         eventOutboxPort.enqueueSessionReminderDue(targetDate)
+    }
+
+    /**
+     * AI session generation completed (task 6.3 / spec §10.x). Dedupe policy: one
+     * notification per job — the same generation is never announced twice. Payload
+     * carries jobId / sessionId / hostUserId only (PII invariant — no transcript text,
+     * author names, or book title content).
+     */
+    override fun recordAiGenerationReady(
+        jobId: UUID,
+        sessionId: UUID,
+        clubId: UUID,
+        hostUserId: UUID,
+    ) {
+        eventOutboxPort.enqueueEvent(
+            clubId = clubId,
+            eventType = NotificationEventType.AI_GENERATION_READY,
+            aggregateType = AI_GENERATION_JOB_AGGREGATE_TYPE,
+            aggregateId = jobId,
+            payload =
+                NotificationEventPayload(
+                    sessionId = sessionId,
+                    jobId = jobId,
+                    hostUserId = hostUserId,
+                ),
+            dedupeKey = "ai-generation-ready:$jobId",
+        )
     }
 }

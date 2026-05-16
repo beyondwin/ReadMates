@@ -1,0 +1,130 @@
+# AI session generation alert rules (spec §11.2).
+#
+# NOTES (spec → implementation mapping):
+#   * Spec §11.1 forbids `club_id` as a metric label (PII + cardinality). The
+#     `AiGenBudgetExhaustion` rule therefore CANNOT express the spec's
+#     per-club $20/month threshold directly — operators must drill down via
+#     SQL against `ai_generation_audit_log` (see runbook anchor). The alert
+#     here fires on aggregate spend instead and serves as an early warning.
+#   * Provider-level error code labels (`PROVIDER_*`) are not exported as
+#     metric labels; the provider adapter records them in the audit log only.
+#     `AiGenProviderErrorBurst` uses `status="FAILED"` as the closest proxy.
+#   * `readmates_aigen_queue_depth` is currently a placeholder gauge (always
+#     0) pending Kafka consumer-lag wiring; `AiGenQueueLagHigh` will not fire
+#     until that integration lands.
+#   * `redis_up` metric name follows the Spring Boot Actuator / Micrometer
+#     health convention; confirm exported series name with ops before
+#     enabling in production.
+#   * All `runbook_url` anchors target the runbook created in task 6.5; the
+#     URLs are forward references and resolve once that task lands.
+#   * Thresholds are baseline values per the spec — re-tune after one
+#     operating cycle.
+
+groups:
+  - name: aigen
+    interval: 30s
+    rules:
+      - alert: AiGenProviderErrorBurst
+        # Spec: error_code ~= PROVIDER_* 비율 10m 임계 초과.
+        # We don't export error_code as a label, so use FAILED status ratio
+        # per provider as a proxy. >10% failed jobs over 10m → warn.
+        expr: |
+          sum(rate(readmates_aigen_jobs_completed_total{status="FAILED"}[10m])) by (provider)
+            /
+          sum(rate(readmates_aigen_jobs_completed_total[10m])) by (provider)
+            > 0.10
+        for: 10m
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI generation provider error burst ({{ $labels.provider }})"
+          description: >-
+            Provider {{ $labels.provider }} FAILED job ratio is
+            {{ $value | humanizePercentage }} over the last 10m
+            (threshold: 10%). Inspect audit log for PROVIDER_* error codes.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#provider-error-burst"
+
+      - alert: AiGenSchemaFailureSpike
+        # Spec: SCHEMA_INVALID 비율 > 20% 1h.
+        # Numerator: validation failures with reason=SCHEMA_INVALID.
+        # Denominator: completed jobs (proxy for "validation attempts").
+        expr: |
+          sum(rate(readmates_aigen_validation_failures_total{reason="SCHEMA_INVALID"}[1h]))
+            /
+          sum(rate(readmates_aigen_jobs_completed_total[1h]))
+            > 0.20
+        for: 1h
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI generation schema-invalid rate above 20%"
+          description: >-
+            SCHEMA_INVALID validation failures are
+            {{ $value | humanizePercentage }} of completed jobs over the
+            last 1h (threshold: 20%). Likely upstream prompt/model drift
+            or post-processor regression.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#schema-failure-spike"
+
+      - alert: AiGenBudgetExhaustion
+        # Spec: 특정 club_id 월 cost ≥ $20.
+        # club_id is not a metric label (spec §11.1, PII/cardinality), so we
+        # cannot express per-club budget in Prometheus. This alert fires on
+        # aggregate 30d cost as an early warning; for per-club drill-down,
+        # query ai_generation_audit_log (see runbook).
+        # Baseline aggregate threshold: $1000/30d — tune after first month.
+        expr: sum(increase(readmates_aigen_cost_usd_total[30d])) > 1000
+        for: 10m
+        labels:
+          severity: info
+          component: aigen
+        annotations:
+          summary: "AI generation aggregate 30d cost above $1000"
+          description: >-
+            Aggregate AI generation spend over the last 30 days is
+            ${{ $value | printf \"%.2f\" }} (threshold: $1000).
+            Per-club budget enforcement (spec $20/club/month) lives in app
+            code; this alert is the aggregate early warning. Drill down
+            per-club via ai_generation_audit_log SQL query in runbook.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#budget-exhaustion"
+
+      - alert: AiGenQueueLagHigh
+        # Spec: consumer lag > 50 5m.
+        # Backed by readmates_aigen_queue_depth gauge (task 6.1).
+        # NOTE: gauge is a placeholder (0L) until Kafka consumer-lag wiring
+        # lands; alert will not fire until then.
+        expr: readmates_aigen_queue_depth > 50
+        for: 5m
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI generation queue lag above 50 for 5m"
+          description: >-
+            readmates_aigen_queue_depth = {{ $value }} (threshold: 50)
+            sustained for 5m. Check worker pool saturation and provider
+            latency.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-lag-high"
+
+      - alert: AiGenRedisDown
+        # Spec: Redis ping 실패 + 503 비율 상승.
+        # Uses Spring Boot Actuator-exposed redis_up gauge AND an elevated
+        # 5xx rate on the HTTP server. Adjust metric names to match the
+        # actual exported series in this environment.
+        expr: |
+          (redis_up == 0)
+          and on()
+          (sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) > 1)
+        for: 1m
+        labels:
+          severity: critical
+          component: aigen
+        annotations:
+          summary: "Redis down and 5xx rate elevated — aigen at risk"
+          description: >-
+            redis_up == 0 and HTTP 5xx rate is
+            {{ with query "sum(rate(http_server_requests_seconds_count{status=~\"5..\"}[5m]))" }}{{ . | first | value | printf "%.2f" }}{{ end }} req/s
+            sustained for 1m. AI generation depends on Redis for cap
+            tracking and idempotency — expect cascading failures.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#redis-down"

@@ -674,3 +674,35 @@ v1 출시는 Phase 0 ~ 7 전체를 포함한다. Critical path(Claude만으로 e
 | 검증 | 3단계(입력·LLM 결과·commit), 1회 자동 재시도, 총 호출 ≤ 3 |
 | 테스트 | 단위·통합·E2E(mock)·PII 회귀(CI), 실제 provider 호출은 수동 smoke |
 | 출시 | 8 phase, Claude critical path, kill switch off 배포 후 dogfood |
+
+## 부록 — Phase 8 Risk Resolution (2026-05-17)
+
+플랜의 Phase 0–7가 모두 끝난 직후 실행한 risk-resolution 라운드의 결과입니다. 본문 §1–§15의 설계 의도를 그대로 유지하면서, 본문 작성 시점에 SDK 라이브 호출이 `NotImplementedError`로 deferred 되어 있던 항목과 task_1_7 리뷰에서 보고된 outstanding 11건을 닫았습니다.
+
+| Sub-task | 결과 | Commits | 비고 |
+|---|---|---|---|
+| task_8_1 — Claude SDK 라이브 와이어 | COMPLETE | `8baecd9f` | `com.anthropic:anthropic-java`의 `messages.create(...)` + `Tool` `input_schema` + `ToolChoiceTool` + `TextBlockParam.cacheControl` 실호출 완료. |
+| task_8_2 — OpenAI SDK 라이브 와이어 | COMPLETE | `4f6e493d` | `com.openai:openai-java`의 `chat().completions().create(...)` 실호출 + `strict: true` + `store: false` 정합. |
+| task_8_3 — Gemini SDK 라이브 와이어 | COMPLETE | `49f7cb90`, `3c1afc02` | `com.google.genai:google-genai`의 `client.models.generateContent(...)` + `responseSchema` 실호출. Gemini 데이터 보관 정책은 SDK 옵션이 아닌 운영자 측 paid-tier project 프로비저닝으로 enforcement (runbook §9에 절차 명시; `x-goog-data-policy` 헤더는 best-effort signal). |
+| task_8_4 — task_1_7 outstanding 11건 해소 | COMPLETE (WARN) | `bd800b24`, `fde3caa6`, `275b0130`, `58095a7e` | #1–#3은 task_2_5 (`600ab00e`)에서 이미 닫혔고 본 task에서 재검증; #4–#11 8건을 본 task에서 closure. 비차단 잔여 2건은 `.orchestrator/state.json:task_8_4.review_notes` 기록. |
+| task_8_5 — 전체 검증 스위트 | COMPLETE (WARN) | (검증 전용, 코드 변경 없음) | `compileKotlin`/`compileTestKotlin`/`unitTest` (539) / `architectureTest` / 프론트 `pnpm test` (830) 전부 GREEN. `ktlintCheck` (605→447, ‑158) · `detekt` (51→46, ‑5) · `integrationTest` (Testcontainers + ObjectMapper bean autoconfig issue) 는 Phase 8 진입 직전 (`f4da2d14`) 에 이미 존재하던 baseline 실패로, 본 플랜의 회귀 아님 (PRE-Phase8 baseline 대비 모든 지표가 개선되었음을 confirm). |
+| task_8_6 — CHANGELOG + spec close-out | COMPLETE | (본 commit) | CHANGELOG `Risk resolution (Phase 8)` 서브섹션에 모든 sub-task 와 commit SHA를 기재하고, 본 부록을 추가. |
+
+본문에 “라이브 SDK 와이어는 후속 단계에서 채운다”고 적힌 task_1_6 / task_4_2 / task_5_3 deferred 항목은 위 task_8_1 / task_8_2 / task_8_3 에 의해 Phase 8에서 종결되었습니다 — 해당 본문 단락의 결정 자체는 변경되지 않으며, 단지 실행 완료 시점이 본 부록으로 확정됩니다.
+
+### 부록 — Phase 9 Residual Risk Cleanup (2026-05-17)
+
+Phase 8 직후 Final Summary가 "비차단" 으로 분류했던 6건 중 4건을 닫은 추가 라운드입니다. 나머지 2건 (Live SDK smoke, repo-wide ktlint/detekt baseline) 은 본 브랜치 범위 밖이라 의도적으로 제외했습니다.
+
+| Sub-task | 결과 | Commits | 비고 |
+|---|---|---|---|
+| task_9_1 — Regen `callWithRetry` strengthen 플래그 일관성 | COMPLETE | `7950263b` | Worker의 `RetryStrategy(backoff, strengthen)` 패턴을 regen에도 적용해 §9.2 "provider 가용성 retry 는 동일 prompt, schema/author retry 만 strengthened" 규칙을 코드 차원에서 정렬. 추가 단위 테스트가 PROVIDER_RATE_LIMITED retry input 의 instruction 이 원본 그대로임을 핀. |
+| task_9_2 — Worker SCHEMA_INVALID retry audit 카운트 검증 | COMPLETE | `ba51a8b1` | 동 테스트가 묵시적으로만 보장하던 §9.2 per-call audit invariant 를 SCHEMA_INVALID 경로에도 명시적 `audit.entries.hasSize(2)` + FAILED/SUCCESS 상태 검증으로 핀. |
+| task_9_3 — Kill switch 503 필터 | COMPLETE | `6b619f9c`, `94ba266c` | `readmates.aigen.enabled=false` 일 때 controller `@ConditionalOnProperty` 가 등록되지 않아 운영자가 보던 404 를 운영 의도에 맞는 503 + RFC 7807 problem+json (`code: AI_DISABLED`) 로 교정. `AiGenerationKillSwitchFilter` 는 `aigen.enabled` 와 무관하게 항상 등록되며 `/api/host/sessions/*/ai-generate/**` 와 `/api/host/clubs/*/ai-defaults` 두 경로만 가로챔. |
+| task_9_4 — Redis 통합 테스트 ApplicationContext 로드 실패 | COMPLETE | `be8b6a78` | `readmates.aigen.enabled=true` 만 켜고 `kafka.enabled=true` 가 없는 Redis 어댑터 통합 테스트가 `AiGenerationJobProducer` (Kafka 게이트) 부재로 autowire 실패했던 사전 회귀를, 테스트 측에 `@MockitoBean AiGenerationJobQueue` 를 추가하는 mechanical 픽스로 닫음. 운영 코드의 게이트 자체는 그대로 유지. |
+| task_9_5 — CHANGELOG + spec close-out | COMPLETE | (본 commit) | unitTest + architectureTest + 프론트 `pnpm test` (830) GREEN. ktlint/detekt 는 Phase 8 baseline 유지 (신규 파일이 도입한 유일한 위반은 `in/` 패키지의 path-level 규칙 위반으로, 동 패키지의 모든 기존 파일이 공유하는 사전 위반). |
+
+본 부록이 닫지 않은 잔여 항목:
+
+- **Live SDK smoke harness**: `READMATES_AIGEN_{ANTHROPIC,OPENAI,GEMINI}_API_KEY` 환경변수가 본 실행 환경에 없어 실행 불가. 키가 프로비저닝된 환경에서는 `./server/gradlew unitTest --tests '*LiveContract*'` 와 `scripts/aigen-smoke-{claude,openai,gemini}.sh` 로 검증.
+- **Repo-wide ktlint/detekt baseline 정리**: aigen feature 범위 밖의 사전 lint 부채. 별도 lint-debt sweep PR 로 분리.

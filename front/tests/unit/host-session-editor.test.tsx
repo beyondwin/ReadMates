@@ -2,6 +2,13 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
+
+vi.mock("@/features/host/aigen/ui/AiGenerateTab", () => ({
+  AiGenerateTab: ({ sessionId, clubSlug }: { sessionId: string; clubSlug: string }) => (
+    <div data-testid="aigen-tab" data-session-id={sessionId} data-club-slug={clubSlug} />
+  ),
+}));
+
 import HostSessionEditor from "@/features/host/ui/host-session-editor";
 import {
   buildHostSessionRequest,
@@ -1420,5 +1427,122 @@ describe("HostSessionEditor", () => {
 
     expect(await screen.findByText("세션 삭제에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
     expect(dialog).toBeInTheDocument();
+  });
+
+  describe("import mode toggle (task_3_5)", () => {
+    const originalLocation = window.location;
+    const originalReplaceState = window.history.replaceState;
+
+    function stubLocationSearch(search: string) {
+      const url = new URL(`https://example.com/clubs/club-a/app/host/sessions/${session.sessionId}/edit${search}`);
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: {
+          ...originalLocation,
+          href: url.href,
+          search: url.search,
+          pathname: url.pathname,
+          origin: url.origin,
+        },
+      });
+    }
+
+    function restoreLocation() {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+      window.history.replaceState = originalReplaceState;
+    }
+
+    afterEach(() => {
+      restoreLocation();
+    });
+
+    it("renders the JSON upload panel by default and hides the AI tab", () => {
+      stubLocationSearch("");
+
+      render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
+
+      // Toggle exists with two options
+      const toggle = screen.getByRole("tablist", { name: "세션 기록 가져오기 방식" });
+      expect(toggle).toBeInTheDocument();
+      expect(within(toggle).getByRole("tab", { name: "외부 도구 JSON 업로드" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(within(toggle).getByRole("tab", { name: "AI 결과 가져오기" })).toHaveAttribute(
+        "aria-selected",
+        "false",
+      );
+
+      // JSON panel is rendered
+      expect(screen.getByText("AI 결과 JSON")).toBeInTheDocument();
+      // AI tab is not in tree
+      expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
+    });
+
+    it("swaps to the AI tab when '" + "AI 결과 가져오기" + "' is clicked and updates the URL", async () => {
+      stubLocationSearch("");
+      const replaceStateSpy = vi.fn();
+      window.history.replaceState = replaceStateSpy as typeof window.history.replaceState;
+      const user = userEvent.setup();
+
+      render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
+
+      await user.click(screen.getByRole("tab", { name: "AI 결과 가져오기" }));
+
+      expect(screen.getByTestId("aigen-tab")).toBeInTheDocument();
+      expect(screen.getByTestId("aigen-tab")).toHaveAttribute("data-club-slug", "club-a");
+      expect(screen.getByTestId("aigen-tab")).toHaveAttribute("data-session-id", session.sessionId);
+      // JSON panel no longer in tree
+      expect(screen.queryByText("AI 결과 JSON")).not.toBeInTheDocument();
+      // URL updated
+      expect(replaceStateSpy).toHaveBeenCalled();
+      const callArgs = replaceStateSpy.mock.calls[replaceStateSpy.mock.calls.length - 1];
+      const urlArg = String(callArgs[2]);
+      expect(urlArg).toMatch(/[?&]aigen=1\b/);
+    });
+
+    it("initially renders the AI tab when the URL has ?aigen=1", () => {
+      stubLocationSearch("?aigen=1");
+
+      render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
+
+      expect(screen.getByRole("tab", { name: "AI 결과 가져오기" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      expect(screen.getByTestId("aigen-tab")).toBeInTheDocument();
+      expect(screen.queryByText("AI 결과 JSON")).not.toBeInTheDocument();
+    });
+
+    it("clears the aigen query param when switching back to JSON mode", async () => {
+      stubLocationSearch("?aigen=1");
+      const replaceStateSpy = vi.fn();
+      window.history.replaceState = replaceStateSpy as typeof window.history.replaceState;
+      const user = userEvent.setup();
+
+      render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
+
+      await user.click(screen.getByRole("tab", { name: "외부 도구 JSON 업로드" }));
+
+      expect(screen.getByText("AI 결과 JSON")).toBeInTheDocument();
+      expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
+      const callArgs = replaceStateSpy.mock.calls[replaceStateSpy.mock.calls.length - 1];
+      const urlArg = String(callArgs[2]);
+      expect(urlArg).not.toMatch(/[?&]aigen=/);
+    });
+
+    it("does not render the toggle for a not-yet-created session", () => {
+      stubLocationSearch("");
+
+      render(<HostSessionEditorForTest session={null} clubSlug="club-a" />);
+
+      expect(screen.queryByRole("tablist", { name: "세션 기록 가져오기 방식" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
+    });
   });
 });

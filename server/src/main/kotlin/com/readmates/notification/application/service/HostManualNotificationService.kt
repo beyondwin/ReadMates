@@ -291,6 +291,7 @@ class HostManualNotificationService(
                     null
                 }
             NotificationEventType.REVIEW_PUBLISHED -> "서평 공개 알림은 수동 발송하지 않습니다."
+            NotificationEventType.AI_GENERATION_READY -> "AI 회차 초안 완료 알림은 수동 발송하지 않습니다."
         }
 
     private fun templatePreview(eventType: NotificationEventType): ManualNotificationTemplatePreview =
@@ -304,6 +305,7 @@ class HostManualNotificationService(
                     NotificationEventType.SESSION_REMINDER_DUE -> "모임 전 질문과 읽은 분량, 참석 상태를 확인해 주세요."
                     NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "참석한 회차의 피드백 문서를 확인해 주세요."
                     NotificationEventType.REVIEW_PUBLISHED -> "새 서평을 확인해 주세요."
+                    NotificationEventType.AI_GENERATION_READY -> "AI 회차 초안 결과를 확인해 주세요."
                 },
         )
 
@@ -333,6 +335,7 @@ class HostManualNotificationService(
             NotificationEventType.SESSION_REMINDER_DUE -> "모임 전날 리마인더"
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "피드백 문서 등록"
             NotificationEventType.REVIEW_PUBLISHED -> "서평 공개"
+            NotificationEventType.AI_GENERATION_READY -> "AI 회차 초안 완료"
         }
 
     private fun selectionHash(selection: ManualNotificationSelection): String {

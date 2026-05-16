@@ -1,0 +1,159 @@
+{
+  "title": "AI Session Generation",
+  "uid": "aigen-overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "tags": ["readmates", "aigen"],
+  "timezone": "browser",
+  "templating": {
+    "list": [
+      {
+        "name": "provider",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(readmates_aigen_jobs_completed_total, provider)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*"
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(readmates_aigen_jobs_completed_total{provider=~\"$provider\"}, model)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99 by provider (s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(readmates_aigen_latency_seconds_bucket{provider=~\"$provider\",model=~\"$model\"}[5m])) by (le, provider))",
+          "legendFormat": "p50 {{provider}}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(readmates_aigen_latency_seconds_bucket{provider=~\"$provider\",model=~\"$model\"}[5m])) by (le, provider))",
+          "legendFormat": "p95 {{provider}}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(readmates_aigen_latency_seconds_bucket{provider=~\"$provider\",model=~\"$model\"}[5m])) by (le, provider))",
+          "legendFormat": "p99 {{provider}}",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Cost rate by provider/model (USD/s, 5m)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(readmates_aigen_cost_usd_total{provider=~\"$provider\",model=~\"$model\"}[5m])) by (provider, model)",
+          "legendFormat": "{{provider}} / {{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "text",
+      "title": "Top-N club cost (drill down via SQL)",
+      "options": {
+        "mode": "markdown",
+        "content": "**`club_id` is intentionally not exported as a Prometheus label** (spec §11.1 — PII + cardinality).\n\nTop-N per-club cost is unavailable from Prometheus. Query the `ai_generation_audit_log` table instead:\n\n```sql\nSELECT\n  club_id,\n  SUM(cost_usd) AS total_cost,\n  COUNT(*) AS jobs\nFROM ai_generation_audit_log\nWHERE created_at >= now() - INTERVAL '30 days'\nGROUP BY club_id\nORDER BY total_cost DESC\nLIMIT 20;\n```\n\nSee the runbook (`docs/operations/runbooks/ai-session-generation.md`) for the canonical operator drill-down procedure."
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Validation failures by reason (5m rate)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(readmates_aigen_validation_failures_total[5m])) by (reason)",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "stacking": { "mode": "normal" } } } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Queue lag (readmates_aigen_queue_depth)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "readmates_aigen_queue_depth",
+          "legendFormat": "queue_depth",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Jobs by status/provider (5m rate)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(readmates_aigen_jobs_completed_total{provider=~\"$provider\",model=~\"$model\"}[5m])) by (status, provider)",
+          "legendFormat": "{{status}} / {{provider}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "stacking": { "mode": "normal" } } } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Tokens by direction (5m rate)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(readmates_aigen_tokens_total{provider=~\"$provider\",model=~\"$model\"}[5m])) by (direction)",
+          "legendFormat": "{{direction}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Cap denials by reason (5m rate)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(readmates_aigen_cap_denials_total[5m])) by (reason)",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
+    }
+  ]
+}

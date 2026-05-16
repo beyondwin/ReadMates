@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.readmates.com/aigen/session-import-v1.json",
+  "title": "ReadMates Session Import v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "sessionNumber",
+    "bookTitle",
+    "meetingDate",
+    "summary",
+    "highlights",
+    "oneLineReviews",
+    "feedbackDocumentFileName",
+    "feedbackDocumentMarkdown"
+  ],
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "readmates-session-import:v1"
+    },
+    "sessionNumber": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "bookTitle": {
+      "type": "string",
+      "minLength": 1
+    },
+    "meetingDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "highlights": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authorName", "text"],
+        "properties": {
+          "authorName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "oneLineReviews": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authorName", "text"],
+        "properties": {
+          "authorName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "feedbackDocumentFileName": {
+      "type": "string",
+      "pattern": "^[^/\\\\]+\\.(md|txt)$"
+    },
+    "feedbackDocumentMarkdown": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

@@ -16,6 +16,9 @@ readmates:
     enabled: false
   notes-cache:
     enabled: false
+  aigen:
+    enabled: false
+    mock: false
   dev:
     login-enabled: true
     google-oauth-auto-member-enabled: false

@@ -33,6 +33,9 @@ jobs:
       - name: ShellCheck
         run: shellcheck scripts/*.sh deploy/oci/*.sh
 
+      - name: aigen PII regression check
+        run: bash scripts/aigen-pii-check.sh
+
   public-release:
     name: Public release safety
     runs-on: ubuntu-latest

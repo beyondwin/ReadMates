@@ -88,3 +88,56 @@ readmates:
   notes-cache:
     enabled: ${READMATES_NOTES_CACHE_ENABLED:false}
     feed-ttl: ${READMATES_NOTES_FEED_CACHE_TTL:3m}
+  aigen:
+    # Provider API keys (set by ops; read by SDK clients per provider):
+    #   READMATES_AIGEN_ANTHROPIC_API_KEY (Claude)
+    #   READMATES_AIGEN_OPENAI_API_KEY    (OpenAI - task 4.2)
+    #   READMATES_AIGEN_GEMINI_API_KEY    (Gemini - task 5.1)
+    enabled: ${READMATES_AIGEN_ENABLED:false}
+    mock: ${READMATES_AIGEN_MOCK:false}
+    # Canonical provider names: CLAUDE, OPENAI, GEMINI. Empty default = kill switch.
+    enabled-providers: ${READMATES_AIGEN_ENABLED_PROVIDERS:}
+    fallback-default-model: ${READMATES_AIGEN_FALLBACK_DEFAULT_MODEL:claude-sonnet-4-6}
+    caps:
+      host-daily-calls: ${READMATES_AIGEN_HOST_DAILY_CALLS:10}
+      club-monthly-cost-usd: ${READMATES_AIGEN_CLUB_MONTHLY_COST_USD:20.00}
+      host-per-minute-calls: ${READMATES_AIGEN_HOST_PER_MINUTE_CALLS:5}
+      soft-warning-ratio: ${READMATES_AIGEN_SOFT_WARNING_RATIO:0.80}
+    job:
+      redis-ttl: ${READMATES_AIGEN_REDIS_TTL:6h}
+      notification-latency-threshold: ${READMATES_AIGEN_NOTIFICATION_LATENCY_THRESHOLD:60s}
+      max-llm-calls-per-job: ${READMATES_AIGEN_MAX_LLM_CALLS_PER_JOB:3}
+    pricing:
+      claude-sonnet-4-6:
+        input-per-m-token-usd: 3.00
+        cached-input-per-m-token-usd: 0.30
+        output-per-m-token-usd: 15.00
+      claude-opus-4-7:
+        input-per-m-token-usd: 15.00
+        cached-input-per-m-token-usd: 1.50
+        output-per-m-token-usd: 75.00
+      # OpenAI public API pricing (gpt-4.1 family, per-million-token, USD).
+      # Source: openai.com/api/pricing (verified at task 4.1 implementation).
+      openai-gpt-4-1:
+        input-per-m-token-usd: 2.00
+        cached-input-per-m-token-usd: 0.50
+        output-per-m-token-usd: 8.00
+      openai-gpt-4-1-mini:
+        input-per-m-token-usd: 0.40
+        cached-input-per-m-token-usd: 0.10
+        output-per-m-token-usd: 1.60
+      # Gemini public API pricing (2.5 family, per-million-token, USD).
+      # Source: ai.google.dev/pricing (verified at task 5.1 implementation; for <=200K input tokens).
+      gemini-2-5-pro:
+        input-per-m-token-usd: 1.25
+        cached-input-per-m-token-usd: 0.31
+        output-per-m-token-usd: 10.00
+      gemini-2-5-flash:
+        input-per-m-token-usd: 0.30
+        cached-input-per-m-token-usd: 0.075
+        output-per-m-token-usd: 2.50
+    kafka:
+      enabled: ${READMATES_AIGEN_KAFKA_ENABLED:false}
+      bootstrap-servers: ${READMATES_AIGEN_KAFKA_BOOTSTRAP_SERVERS:}
+      topic-jobs: ${READMATES_AIGEN_KAFKA_TOPIC_JOBS:readmates.aigen.jobs.v1}
+      consumer-group: ${READMATES_AIGEN_KAFKA_CONSUMER_GROUP:readmates-aigen-worker}
