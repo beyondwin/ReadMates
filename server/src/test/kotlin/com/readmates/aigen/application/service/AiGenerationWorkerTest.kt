@@ -96,6 +96,14 @@ class AiGenerationWorkerTest {
         assertThat(ctx.generator.calls.last().instructions).contains("Strict: SCHEMA_INVALID")
         val updated = ctx.jobStore.load(record.jobId)!!
         assertThat(updated.status).isEqualTo(JobStatus.SUCCEEDED)
+        // Spec §9.2: every LLM call (including the validator-driven retry) gets its own
+        // audit row. Closes a coverage gap previously implicit via the PROVIDER_RATE_LIMITED
+        // path: the failed first attempt + the SUCCESS final attempt must both audit.
+        val auditEntries = ctx.auditPort.entries
+        assertThat(auditEntries).hasSize(2)
+        assertThat(auditEntries.first().errorCode).isEqualTo(ErrorCode.SCHEMA_INVALID)
+        assertThat(auditEntries.first().status).isEqualTo(AuditStatus.FAILED)
+        assertThat(auditEntries.last().status).isEqualTo(AuditStatus.SUCCESS)
     }
 
     @Test
