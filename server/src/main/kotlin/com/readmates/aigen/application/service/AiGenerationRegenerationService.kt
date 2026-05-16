@@ -198,10 +198,17 @@ class AiGenerationRegenerationService(
             // retry trigger code even when the second call succeeds.
             auditRetryAttempt(record, item, modelId, firstFailure.error)
             sleeper.sleep(retryStrategy.backoff)
+            // Per spec §9.2: schema/author/highlights/oneLineReview/feedback errors retry
+            // with strengthened instructions; provider-availability errors retry with the
+            // same prompt. Mirrors AiGenerationWorker.callGeneratorWithRetry.
             val retryInput =
-                baseInput.copy(
-                    instructions = strengthenInstructions(recordedInstructions, firstFailure.error.code),
-                )
+                if (retryStrategy.strengthen) {
+                    baseInput.copy(
+                        instructions = strengthenInstructions(recordedInstructions, firstFailure.error.code),
+                    )
+                } else {
+                    baseInput
+                }
             try {
                 callRegeneratorRaw(record, regenerator, retryInput)
             } catch (secondFailure: LlmGenerationException) {
@@ -236,18 +243,19 @@ class AiGenerationRegenerationService(
 
     private data class RetryStrategy(
         val backoff: Duration,
+        val strengthen: Boolean,
     )
 
     private fun retryStrategyFor(code: ErrorCode): RetryStrategy? =
         when (code) {
-            ErrorCode.PROVIDER_UNAVAILABLE -> RetryStrategy(Duration.ofSeconds(1))
-            ErrorCode.PROVIDER_RATE_LIMITED -> RetryStrategy(Duration.ofSeconds(5))
+            ErrorCode.PROVIDER_UNAVAILABLE -> RetryStrategy(Duration.ofSeconds(1), strengthen = false)
+            ErrorCode.PROVIDER_RATE_LIMITED -> RetryStrategy(Duration.ofSeconds(5), strengthen = false)
             ErrorCode.SCHEMA_INVALID,
             ErrorCode.AUTHOR_NAME_MISMATCH,
             ErrorCode.HIGHLIGHTS_OUT_OF_RANGE,
             ErrorCode.ONE_LINE_REVIEWS_DUPLICATE,
             ErrorCode.FEEDBACK_TEMPLATE_INVALID,
-            -> RetryStrategy(Duration.ZERO)
+            -> RetryStrategy(Duration.ZERO, strengthen = true)
             else -> null
         }
 

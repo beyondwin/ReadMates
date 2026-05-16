@@ -240,6 +240,45 @@ class AiGenerationRegenerationServiceTest {
     }
 
     @Test
+    fun `regenerate provider rate limited retry does not strengthen instruction`() {
+        // Spec §9.2: provider-availability retries (PROVIDER_UNAVAILABLE /
+        // PROVIDER_RATE_LIMITED) re-send the same prompt; only schema/author/etc.
+        // codes trigger strengthened instructions on retry. Mirrors the Worker
+        // contract in AiGenerationWorker.retryStrategyFor.
+        val ctx = TestContext()
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+            status = JobStatus.SUCCEEDED,
+            result = AiGenerationTestFixtures.snapshot(),
+            instructions = "tighten the summary",
+        )
+        ctx.jobStore.save(record)
+        ctx.regenerator.enqueueFailure(AiGenerationTestFixtures.providerError(ErrorCode.PROVIDER_RATE_LIMITED))
+        ctx.regenerator.enqueueSuccess(
+            RegenerationOutput(
+                patchedItem = GenerationItem.SUMMARY,
+                patchedValue = "summary after retry",
+                usage = TokenUsage(7, 0, 3),
+            ),
+        )
+
+        ctx.service.regenerate(
+            sessionId = ctx.sessionId,
+            jobId = record.jobId,
+            item = GenerationItem.SUMMARY,
+            model = null,
+            instructions = null,
+        )
+
+        assertThat(ctx.regenerator.calls).hasSize(2)
+        val retryInstructions = ctx.regenerator.calls.last().instructions
+        assertThat(retryInstructions).isEqualTo("tighten the summary")
+        assertThat(retryInstructions).doesNotContain("Strict:")
+    }
+
+    @Test
     fun `regenerate appends CLUB_BUDGET_80PCT to warnings when monthly cost crosses soft ratio`() {
         val ctx = TestContext()
         ctx.costGuard.clubMonthly = BigDecimal("16.50")
