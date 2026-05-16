@@ -1,0 +1,27 @@
+# Phase 0 카탈로그. PromQL은 *제안*이며 실제 metric 이름이 다르면 dashboard에서 NaN으로 노출된다.
+# metric 추가/이름 정리는 Phase 3 이전 별도 spec.
+version: 1
+slos:
+  - id: notification_dispatch_success_ratio
+    description: 알림 outbox publish 성공률 (DEAD 미포함)
+    objective: 0.99
+    window: 7d
+    sli:
+      type: prometheus
+      query_good: sum(rate(readmates_outbox_publish_total{result="success"}[5m]))
+      query_total: sum(rate(readmates_outbox_publish_total[5m]))
+  - id: bff_api_p95
+    description: BFF → Spring API 응답 p95 latency (ms)
+    objective_ms: 800
+    window: 7d
+    sli:
+      type: prometheus
+      query_latency_p95: histogram_quantile(0.95, sum(rate(readmates_bff_api_latency_seconds_bucket[5m])) by (le)) * 1000
+  - id: login_success_ratio
+    description: Google OAuth 로그인 성공률
+    objective: 0.99
+    window: 7d
+    sli:
+      type: prometheus
+      query_good: sum(rate(readmates_login_total{result="success"}[5m]))
+      query_total: sum(rate(readmates_login_total[5m]))

@@ -55,6 +55,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.kafka:spring-kafka")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    // SLO catalog yaml parsing (com.fasterxml.jackson.dataformat.yaml.YAMLFactory).
+    // Pinned to match jackson-module-kotlin 2.21.2 already resolved transitively.
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.2")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")
