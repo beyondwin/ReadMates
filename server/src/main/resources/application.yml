@@ -92,7 +92,7 @@ readmates:
     # Provider API keys (set by ops; read by SDK clients per provider):
     #   READMATES_AIGEN_ANTHROPIC_API_KEY (Claude)
     #   READMATES_AIGEN_OPENAI_API_KEY    (OpenAI - task 4.2)
-    #   READMATES_AIGEN_GEMINI_API_KEY    (Gemini - task 5.x)
+    #   READMATES_AIGEN_GEMINI_API_KEY    (Gemini - task 5.1)
     enabled: ${READMATES_AIGEN_ENABLED:false}
     mock: ${READMATES_AIGEN_MOCK:false}
     # Canonical provider names: CLAUDE, OPENAI, GEMINI. Empty default = kill switch.
@@ -126,6 +126,16 @@ readmates:
         input-per-m-token-usd: 0.40
         cached-input-per-m-token-usd: 0.10
         output-per-m-token-usd: 1.60
+      # Gemini public API pricing (2.5 family, per-million-token, USD).
+      # Source: ai.google.dev/pricing (verified at task 5.1 implementation; for <=200K input tokens).
+      gemini-2-5-pro:
+        input-per-m-token-usd: 1.25
+        cached-input-per-m-token-usd: 0.31
+        output-per-m-token-usd: 10.00
+      gemini-2-5-flash:
+        input-per-m-token-usd: 0.30
+        cached-input-per-m-token-usd: 0.075
+        output-per-m-token-usd: 2.50
     kafka:
       enabled: ${READMATES_AIGEN_KAFKA_ENABLED:false}
       bootstrap-servers: ${READMATES_AIGEN_KAFKA_BOOTSTRAP_SERVERS:}

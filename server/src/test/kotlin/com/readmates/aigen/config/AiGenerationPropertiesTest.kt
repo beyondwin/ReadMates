@@ -12,8 +12,9 @@ import java.math.BigDecimal
 
 /**
  * Verifies that application.yml binds correctly into AiGenerationProperties,
- * specifically that OpenAI pricing entries added in task 4.1 are present and
- * structurally identical to existing Claude entries.
+ * specifically that OpenAI pricing entries added in task 4.1 and Gemini pricing
+ * entries added in task 5.1 are present and structurally identical to existing
+ * Claude entries.
  */
 class AiGenerationPropertiesTest {
 
@@ -56,5 +57,22 @@ class AiGenerationPropertiesTest {
 
         assertTrue(pricing.containsKey("claude-sonnet-4-6"))
         assertTrue(pricing.containsKey("claude-opus-4-7"))
+    }
+
+    @Test
+    fun `application_yml binds Gemini pricing entries with input cached and output rates`() {
+        val pricing = loadPricing()
+
+        val geminiPro = pricing["gemini-2-5-pro"]
+        assertNotNull(geminiPro, "gemini-2-5-pro pricing must be present in application.yml")
+        assertEquals(0, BigDecimal("1.25").compareTo(geminiPro!!.inputPerMTokenUsd))
+        assertEquals(0, BigDecimal("0.31").compareTo(geminiPro.cachedInputPerMTokenUsd))
+        assertEquals(0, BigDecimal("10.00").compareTo(geminiPro.outputPerMTokenUsd))
+
+        val geminiFlash = pricing["gemini-2-5-flash"]
+        assertNotNull(geminiFlash, "gemini-2-5-flash pricing must be present in application.yml")
+        assertEquals(0, BigDecimal("0.30").compareTo(geminiFlash!!.inputPerMTokenUsd))
+        assertEquals(0, BigDecimal("0.075").compareTo(geminiFlash.cachedInputPerMTokenUsd))
+        assertEquals(0, BigDecimal("2.50").compareTo(geminiFlash.outputPerMTokenUsd))
     }
 }
