@@ -667,6 +667,7 @@ class JdbcNotificationEventOutboxAdapterTest(
             message: NotificationEventMessage,
             topic: String,
             key: String,
+            requestId: String?,
         ) {
             eventIds += message.eventId
         }

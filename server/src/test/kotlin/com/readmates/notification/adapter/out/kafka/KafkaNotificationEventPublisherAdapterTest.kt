@@ -442,7 +442,12 @@ class KafkaNotificationEventPublisherAdapterTest {
         val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(250))
         val message = notificationEventMessage()
 
-        adapter.publish(message, topic = "readmates.notification.events.v1", key = "club-key")
+        adapter.publish(
+            message,
+            topic = "readmates.notification.events.v1",
+            key = "club-key",
+            requestId = "req-abc-123",
+        )
 
         assertThat(sendFuture.timeout).isEqualTo(250)
         assertThat(sendFuture.unit).isEqualTo(TimeUnit.MILLISECONDS)
@@ -457,6 +462,46 @@ class KafkaNotificationEventPublisherAdapterTest {
     }
 
     @Test
+    fun `publish sets readmates-request-id header when requestId is provided`() {
+        val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
+        Mockito
+            .`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
+            .thenReturn(RecordingKafkaSendFuture())
+        val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(250))
+
+        adapter.publish(
+            notificationEventMessage(),
+            topic = "readmates.notification.events.v1",
+            key = "club-key",
+            requestId = "test-req-1234",
+        )
+
+        val captor = ArgumentCaptor.forClass(Message::class.java) as ArgumentCaptor<Message<NotificationEventMessage>>
+        Mockito.verify(kafkaTemplate).send(captor.capture())
+        assertThat(captor.value.headers["readmates-request-id"]).isEqualTo("test-req-1234")
+    }
+
+    @Test
+    fun `publish sets readmates-request-id to unknown when requestId is null`() {
+        val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
+        Mockito
+            .`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>()))
+            .thenReturn(RecordingKafkaSendFuture())
+        val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(250))
+
+        adapter.publish(
+            notificationEventMessage(),
+            topic = "readmates.notification.events.v1",
+            key = "club-key",
+            requestId = null,
+        )
+
+        val captor = ArgumentCaptor.forClass(Message::class.java) as ArgumentCaptor<Message<NotificationEventMessage>>
+        Mockito.verify(kafkaTemplate).send(captor.capture())
+        assertThat(captor.value.headers["readmates-request-id"]).isEqualTo("unknown")
+    }
+
+    @Test
     fun `publisher wraps send timeout in meaningful exception`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
         Mockito
@@ -465,7 +510,7 @@ class KafkaNotificationEventPublisherAdapterTest {
         val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(10))
 
         assertThatThrownBy {
-            adapter.publish(notificationEventMessage(), topic = "topic", key = "key")
+            adapter.publish(notificationEventMessage(), topic = "topic", key = "key", requestId = "req-1")
         }.isInstanceOf(NotificationKafkaPublishException::class.java)
             .hasMessageContaining("Timed out publishing notification event")
             .hasCauseInstanceOf(TimeoutException::class.java)
@@ -480,7 +525,7 @@ class KafkaNotificationEventPublisherAdapterTest {
         val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(10))
 
         assertThatThrownBy {
-            adapter.publish(notificationEventMessage(), topic = "topic", key = "key")
+            adapter.publish(notificationEventMessage(), topic = "topic", key = "key", requestId = "req-1")
         }.isInstanceOf(NotificationKafkaPublishException::class.java)
             .hasMessageContaining("Failed publishing notification event")
             .hasCauseInstanceOf(IllegalStateException::class.java)
@@ -495,7 +540,7 @@ class KafkaNotificationEventPublisherAdapterTest {
         val adapter = KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(10))
 
         assertThatThrownBy {
-            adapter.publish(notificationEventMessage(), topic = "topic", key = "key")
+            adapter.publish(notificationEventMessage(), topic = "topic", key = "key", requestId = "req-1")
         }.isInstanceOf(NotificationKafkaPublishException::class.java)
             .hasMessageContaining("Interrupted publishing notification event")
             .hasCauseInstanceOf(InterruptedException::class.java)

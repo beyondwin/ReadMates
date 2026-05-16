@@ -76,7 +76,7 @@ class NotificationKafkaPipelineIntegrationTest(
         val message = notificationEventMessage()
         waitForListenerAssignment()
 
-        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString())
+        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString(), requestId = null)
 
         await()
             .atMost(Duration.ofSeconds(20))
@@ -90,7 +90,7 @@ class NotificationKafkaPipelineIntegrationTest(
         val message = manualNotificationEventMessage()
         waitForListenerAssignment()
 
-        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString())
+        notificationEventPublisherPort.publish(message, eventsTopic, message.clubId.toString(), requestId = null)
 
         await()
             .atMost(Duration.ofSeconds(20))

@@ -33,6 +33,7 @@ class KafkaNotificationEventPublisherAdapter
             message: NotificationEventMessage,
             topic: String,
             key: String,
+            requestId: String?,
         ) {
             val kafkaMessage =
                 MessageBuilder
@@ -42,6 +43,7 @@ class KafkaNotificationEventPublisherAdapter
                     .setHeader("readmates-schema-version", message.schemaVersion.toString())
                     .setHeader("readmates-event-id", message.eventId.toString())
                     .setHeader("readmates-event-type", message.eventType.name)
+                    .setHeader("readmates-request-id", requestId ?: "unknown")
                     .build()
 
             try {
