@@ -60,6 +60,8 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.21.2")
     // Official Anthropic Java SDK for the Claude provider adapter (aigen task 1.6).
     implementation("com.anthropic:anthropic-java:2.27.0")
+    // Official OpenAI Java SDK for the OpenAI provider adapter (aigen task 4.2).
+    implementation("com.openai:openai-java:4.32.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("org.flywaydb:flyway-mysql")
     runtimeOnly("com.mysql:mysql-connector-j")

@@ -89,8 +89,13 @@ readmates:
     enabled: ${READMATES_NOTES_CACHE_ENABLED:false}
     feed-ttl: ${READMATES_NOTES_FEED_CACHE_TTL:3m}
   aigen:
+    # Provider API keys (set by ops; read by SDK clients per provider):
+    #   READMATES_AIGEN_ANTHROPIC_API_KEY (Claude)
+    #   READMATES_AIGEN_OPENAI_API_KEY    (OpenAI - task 4.2)
+    #   READMATES_AIGEN_GEMINI_API_KEY    (Gemini - task 5.x)
     enabled: ${READMATES_AIGEN_ENABLED:false}
     mock: ${READMATES_AIGEN_MOCK:false}
+    # Canonical provider names: CLAUDE, OPENAI, GEMINI. Empty default = kill switch.
     enabled-providers: ${READMATES_AIGEN_ENABLED_PROVIDERS:}
     fallback-default-model: ${READMATES_AIGEN_FALLBACK_DEFAULT_MODEL:claude-sonnet-4-6}
     caps:
@@ -111,6 +116,16 @@ readmates:
         input-per-m-token-usd: 15.00
         cached-input-per-m-token-usd: 1.50
         output-per-m-token-usd: 75.00
+      # OpenAI public API pricing (gpt-4.1 family, per-million-token, USD).
+      # Source: openai.com/api/pricing (verified at task 4.1 implementation).
+      openai-gpt-4-1:
+        input-per-m-token-usd: 2.00
+        cached-input-per-m-token-usd: 0.50
+        output-per-m-token-usd: 8.00
+      openai-gpt-4-1-mini:
+        input-per-m-token-usd: 0.40
+        cached-input-per-m-token-usd: 0.10
+        output-per-m-token-usd: 1.60
     kafka:
       enabled: ${READMATES_AIGEN_KAFKA_ENABLED:false}
       bootstrap-servers: ${READMATES_AIGEN_KAFKA_BOOTSTRAP_SERVERS:}
