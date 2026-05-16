@@ -88,3 +88,26 @@ readmates:
   notes-cache:
     enabled: ${READMATES_NOTES_CACHE_ENABLED:false}
     feed-ttl: ${READMATES_NOTES_FEED_CACHE_TTL:3m}
+  aigen:
+    enabled: ${READMATES_AIGEN_ENABLED:false}
+    mock: ${READMATES_AIGEN_MOCK:false}
+    enabled-providers: ${READMATES_AIGEN_ENABLED_PROVIDERS:}
+    fallback-default-model: ${READMATES_AIGEN_FALLBACK_DEFAULT_MODEL:claude-sonnet-4-6}
+    caps:
+      host-daily-calls: ${READMATES_AIGEN_HOST_DAILY_CALLS:10}
+      club-monthly-cost-usd: ${READMATES_AIGEN_CLUB_MONTHLY_COST_USD:20.00}
+      host-per-minute-calls: ${READMATES_AIGEN_HOST_PER_MINUTE_CALLS:5}
+      soft-warning-ratio: ${READMATES_AIGEN_SOFT_WARNING_RATIO:0.80}
+    job:
+      redis-ttl: ${READMATES_AIGEN_REDIS_TTL:6h}
+      notification-latency-threshold: ${READMATES_AIGEN_NOTIFICATION_LATENCY_THRESHOLD:60s}
+      max-llm-calls-per-job: ${READMATES_AIGEN_MAX_LLM_CALLS_PER_JOB:3}
+    pricing:
+      claude-sonnet-4-6:
+        input-per-m-token-usd: 3.00
+        cached-input-per-m-token-usd: 0.30
+        output-per-m-token-usd: 15.00
+      claude-opus-4-7:
+        input-per-m-token-usd: 15.00
+        cached-input-per-m-token-usd: 1.50
+        output-per-m-token-usd: 75.00
