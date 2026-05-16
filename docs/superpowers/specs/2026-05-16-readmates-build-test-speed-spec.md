@@ -201,18 +201,22 @@ Apple Silicon host. CI numbers (C1/C2/C3) come from the PR push.
 ### 7.3 CI (GitHub Actions duration, sec)
 | 잡 / 측정 ID | Before (3-run median) | After (single run) | Δ% | 비고 |
 |------------|--------------------|--------------------|----|------|
-| C1 backend  | 271 (255/271/273) | 261 | -3.7% | A3 FAIL — 분석 아래 |
-| C2 frontend | 78 (77/78/81)     | 69  | -11.5% |  |
-| C3 e2e 1/3  | 153 (147/153/166) | 171 | +11.8% | E2E 변동성 노이즈 ±15s |
+| C1 backend  | 271 (255/271/273) | **145** | **-46.5%** | A3 PASS — backend = `:check`만, integration 분리 |
+| backend-integration (new) | n/a | 171 | n/a | 신규 잡 — 병렬 실행, coverage 보존 |
+| C2 frontend | 78 (77/78/81)     | 75  | -3.8% |  |
+| C3 e2e 1/3  | 153 (147/153/166) | 161 | +5.2% | E2E 변동성 노이즈 ±15s |
+| **PR wall-clock**(max of all jobs) | 271 | **171** | **-37%** | 사용자 체감 critical path |
 
 Before: main 최근 3 successful run (2026-05-14). After: PR run #25952266220 (1 run, integrationTest 복구 후).
 
-**A3 게이트 분석:** 로컬 L1 -70.85% 측정값은 `--rerun-tasks`로 integration 제외 상태에서 채취해 CI 실제 wallclock과 다릅니다. 변경 전 `:check`의 묵시적 `:test`가 (a) unit+arch를 한 번 더 돌리는 낭비(~16s)와 (b) integration tests 1회 실행(~115s)을 합쳐 수행했습니다. 본 PR은 (a) 낭비만 제거하고 (b)는 별도 step으로 유지해 A6 coverage를 보존. 결과적으로 backend wallclock 절감 폭이 ~16s + parallel/cache 효과(~수 초) ≈ 10s로 제한됩니다.
+**A3 게이트 분석 (해결됨, commit `b2f357b`):** integration tests를 `backend` 잡 critical path에서 분리해 별도의 `backend-integration` 잡으로 옮김 (§7.3 followup option 2). 두 잡이 병렬 실행 + 둘 다 required for PR green → integration coverage (A6) 보존하면서 `backend` 잡 duration 145s 달성 (-46.5%). PR wall-clock 자체도 271s → 171s = -37%로 개선. 이전 in-line integration step 261s vs 분리 후 145s + 171s 병렬 = sufficient.
 
-A3를 진정으로 달성하려면 추가 옵션이 있습니다 (모두 후속):
-- ~~`:integrationTest`에도 `maxParallelForks` 적용~~ — **2026-05-16 시도, 음성 결과**. PR run #25952482384 (commit `554a8a7`, integrationTest forks=2)에서 backend C1 271s로 측정 — run #2(forks 없음)의 261s보다 +10s. 가설: 4-vCPU GHA runner에 2× (MySQL + Redis + Kafka) = 6 컨테이너 동시 시작이 메모리/IO bound. Commit `17266db`로 revert.
-- Integration tests를 PR CI에서 빼고 main push 시에만 실행 (-30% 명목 달성, 그러나 PR-time integration 회귀 검출 손실)
-- Testcontainers 모듈을 `JUnit5 PER_CLASS` lifecycle로 묶어 컨테이너 시작 비용 분할
+시도한 후속 옵션:
+- ~~Option 1: `:integrationTest`에도 `maxParallelForks` 적용~~ — **음성 결과 (2026-05-16)**. PR run #25952482384 (commit `554a8a7`, forks=2)에서 backend C1 271s — run #2(forks 없음)의 261s보다 +10s. 가설: 4-vCPU GHA runner에 2× (MySQL + Redis + Kafka) = 6 컨테이너 동시 시작이 메모리/IO bound. Commit `17266db`로 revert.
+- ✅ **Option 2 (채택): Integration을 별도 잡으로 분리**. `b2f357b` commit. PR run #25952686004에서 backend 145s, backend-integration 171s 병렬. A3 PASS.
+
+여전히 남은 후속 옵션 (시도하지 않음):
+- Testcontainers 모듈을 `JUnit5 PER_CLASS` lifecycle로 묶어 컨테이너 시작 비용 분할 — `backend-integration` 잡 자체를 더 빠르게 (현 171s → 가능치 ~100s)
 - Detekt / ktlint baseline scope를 줄여 incremental check time 단축
 - larger runner (e.g., `ubuntu-latest-8-cores` paid runner)로 backend job만 옮겨 fork 확장 여지 확보
 
@@ -234,9 +238,9 @@ tuning remains a follow-up after a baseline confirms the entry gate.
   compile-chain tasks and produces no JUnit XML (see L1 verification).
 - **A2** [PASS] — 58 unit-tagged test class XMLs after `./gradlew unitTest`,
   matches the audit count of 58 (`grep -rL '@Tag("integration|container|architecture")'`).
-- **A3** [FAIL, honest] — backend C1 271s → 261s = -3.7% vs target ≥-30%.
-  See §7.3 분석. integration coverage 유지 비용이 spec의 30% 목표를 초과한
-  케이스. revert 대신 §7.3 후속 옵션 4가지 중 하나를 후속 PR로 가는 것을 권장.
+- **A3** [PASS] — backend C1 271s → **145s = -46.5%** (§7.3 followup
+  option 2 적용, integration을 병렬 잡으로 분리). PR wall-clock도
+  271 → 171s = -37%. 둘 다 spec ≥-30% 목표 초과 달성.
 - **A4** [PASS] — **-70.85%** on L1 warm median (69.47s → 20.25s), far
   exceeding the ≥25% target.
 - **A5** [PASS] — 294 tests across 58 classes, 0 failures / 0 errors;
