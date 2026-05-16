@@ -1,0 +1,28 @@
+{
+  "name": "@readmates/design-system-docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "test": "vitest run",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@readmates/design-system": "workspace:*",
+    "react": "19.2.5",
+    "react-dom": "19.2.5"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "6.0.1",
+    "jsdom": "^26.1.0",
+    "typescript": "^5.8.0",
+    "vite": "8.0.9",
+    "vitest": "^3.2.4"
+  }
+}

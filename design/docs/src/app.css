@@ -1,0 +1,128 @@
+.rm-docs {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.rm-docs__sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 28px 22px;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sub);
+}
+
+.rm-docs__sidebar a {
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.rm-docs__content {
+  width: min(100%, 1120px);
+  padding: 56px 32px 88px;
+}
+
+.rm-docs__hero,
+.rm-docs__section {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 48px;
+}
+
+.rm-docs__hero {
+  max-width: 760px;
+}
+
+.rm-docs__preview {
+  padding: 24px;
+}
+
+.rm-docs__preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.rm-docs__form-grid,
+.rm-docs__responsive-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.rm-docs__desktop-preview,
+.rm-docs__mobile-preview {
+  padding: 18px;
+}
+
+.rm-docs__mobile-preview {
+  width: min(100%, 330px);
+  justify-self: center;
+  display: grid;
+  gap: 10px;
+  border-radius: 18px;
+}
+
+.rm-docs__mobile-preview .btn {
+  width: 100%;
+  min-height: 44px;
+}
+
+.rm-docs__component-list {
+  display: grid;
+  gap: 10px;
+}
+
+.rm-docs__component-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px;
+}
+
+.rm-docs__component-meta {
+  display: grid;
+  justify-items: end;
+  align-content: start;
+  gap: 8px;
+}
+
+.rm-docs__component-meta code {
+  font-family: var(--f-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+@media (max-width: 820px) {
+  .rm-docs {
+    display: block;
+  }
+
+  .rm-docs__sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rm-docs__content {
+    padding: 32px 16px 72px;
+  }
+
+  .rm-docs__form-grid,
+  .rm-docs__responsive-grid,
+  .rm-docs__component-row {
+    grid-template-columns: 1fr;
+  }
+
+  .rm-docs__component-meta {
+    justify-items: start;
+  }
+}
