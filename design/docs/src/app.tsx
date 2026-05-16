@@ -1,5 +1,15 @@
-import { Badge, Button, Divider, Surface, TextArea, TextField } from "@readmates/design-system";
+import {
+  AvatarChip,
+  Badge,
+  BookCover,
+  Button,
+  Divider,
+  DocumentPanel,
+  EmptyState,
+  LockedState,
+} from "@readmates/design-system";
 import { componentDocs } from "./docs-data";
+import { memberSample, overviewCopy, patternDocs, type PatternDoc } from "./gallery-data";
 
 function StatusBadge({ status }: { status: "stable" | "experimental" | "legacy" | "deprecated" }) {
   const tone =
@@ -8,96 +18,143 @@ function StatusBadge({ status }: { status: "stable" | "experimental" | "legacy" 
   return <Badge tone={tone}>{status}</Badge>;
 }
 
+function SectionNav() {
+  return (
+    <aside className="rm-docs__sidebar" aria-label="Design system sections">
+      <strong>ReadMates DS</strong>
+      <a href="#overview">Overview</a>
+      <a href="#public">Public</a>
+      <a href="#member">Member</a>
+      <a href="#components">Components</a>
+      <a href="#migration">Migration</a>
+    </aside>
+  );
+}
+
+function PatternPreview({ pattern }: { pattern: PatternDoc }) {
+  const isPublic = pattern.key === "public";
+
+  return (
+    <section
+      className={`rm-docs__pattern rm-docs__pattern--${pattern.key}`}
+      id={pattern.key}
+      aria-label={pattern.title}
+    >
+      <div className="rm-docs__pattern-copy">
+        <p className="eyebrow">{pattern.eyebrow}</p>
+        <h2 className="h2">{pattern.title}</h2>
+        <p className="body">{pattern.description}</p>
+        <div className="rm-docs__chips" aria-label={`${pattern.title} states`}>
+          {pattern.states.map((state) => (
+            <Badge key={state} tone={isPublic ? "accent" : "success"} dot>
+              {state}
+            </Badge>
+          ))}
+        </div>
+      </div>
+
+      <div className="rm-docs__pattern-canvas">
+        <BookCover title={pattern.book.title} author={pattern.book.author} size={isPublic ? "lg" : "md"} />
+        <DocumentPanel
+          eyebrow={isPublic ? "Invitation" : "Reading Desk"}
+          title={isPublic ? "읽기를 함께 여는 공개 장면" : "나의 이번 읽기"}
+          meta={isPublic ? "Public-safe sample" : "Member sample"}
+          divided
+        >
+          <p>
+            {isPublic
+              ? "공개 페이지는 분위기를 먼저 전달하고 행동은 절제합니다."
+              : "멤버 책상은 책, 상태, 다음 행동을 한 흐름으로 보여줍니다."}
+          </p>
+          {isPublic ? (
+            <LockedState
+              title="멤버 전용 콘텐츠"
+              description="읽기 노트와 세션 기록은 멤버에게만 공개됩니다."
+              reason="memberOnly"
+              compact
+            />
+          ) : (
+            <div className="rm-docs__member-row">
+              <AvatarChip name={memberSample.name} meta={memberSample.meta} />
+              <Button variant="primary">다음 세션 보기</Button>
+            </div>
+          )}
+        </DocumentPanel>
+      </div>
+
+      <div className="rm-docs__pattern-components">
+        {pattern.components.map((component) => (
+          <code key={component}>{component}</code>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function App() {
+  const publicPattern = patternDocs.find((pattern) => pattern.key === "public");
+  const memberPattern = patternDocs.find((pattern) => pattern.key === "member");
+
+  if (!publicPattern || !memberPattern) {
+    throw new Error("Design gallery requires public and member pattern docs.");
+  }
+
   return (
     <main className="rm-docs">
-      <aside className="rm-docs__sidebar" aria-label="Design system sections">
-        <strong>ReadMates DS</strong>
-        <a href="#foundations">Foundations</a>
-        <a href="#components">Components</a>
-        <a href="#responsive">Responsive</a>
-        <a href="#migration">Migration</a>
-      </aside>
+      <SectionNav />
 
       <section className="rm-docs__content">
-        <header className="rm-docs__hero" id="foundations">
-          <p className="eyebrow">ReadMates Design System</p>
-          <h1 className="h1">조용한 읽는 방과 정밀한 운영 원장을 같은 코드로 유지합니다.</h1>
-          <p className="body-lg">
-            이 문서 사이트는 실제 `@readmates/design-system` 컴포넌트를 렌더링합니다. 제품 앱도 같은 package를
-            import해야 합니다.
-          </p>
+        <header className="rm-docs__overview" id="overview">
+          <p className="eyebrow">{overviewCopy.eyebrow}</p>
+          <h1 className="h1">{overviewCopy.title}</h1>
+          <p className="body-lg">{overviewCopy.description}</p>
+          <div className="rm-docs__overview-actions">
+            <a className="btn btn-primary" href="#public">
+              Public 보기
+            </a>
+            <a className="btn btn-secondary" href="#member">
+              Member 보기
+            </a>
+          </div>
         </header>
 
-        <section className="rm-docs__section" id="components" aria-labelledby="components-heading">
-          <div className="row-between">
-            <div>
-              <p className="eyebrow">Components</p>
-              <h2 className="h2" id="components-heading">
-                Primitives
-              </h2>
-            </div>
-            <Badge tone="success" dot>
-              first pass
-            </Badge>
+        <section className="rm-docs__section" aria-labelledby="patterns-heading">
+          <div className="rm-docs__section-heading">
+            <p className="eyebrow">Pattern Gallery</p>
+            <h2 className="h2" id="patterns-heading">
+              Public and member scenes
+            </h2>
           </div>
-
-          <Surface tone="documentPanel" className="rm-docs__preview">
-            <div className="rm-docs__preview-row">
-              <Button variant="primary">저장</Button>
-              <Button variant="secondary">취소</Button>
-              <Button variant="ghost" size="sm">
-                미리보기
-              </Button>
-              <Button variant="quiet" size="sm">
-                자세히
-              </Button>
-            </div>
-            <div className="rm-docs__preview-row">
-              <Badge tone="pending" dot>
-                준비 중
-              </Badge>
-              <Badge tone="success" dot>
-                발행됨
-              </Badge>
-              <Badge tone="warning" dot>
-                확인 필요
-              </Badge>
-              <Badge tone="locked">권한 제한</Badge>
-            </div>
-            <div className="rm-docs__form-grid">
-              <TextField label="표시 이름" placeholder="읽는사이 멤버" />
-              <TextArea label="세션 메모" placeholder="모임에서 남길 질문이나 메모" />
-            </div>
-          </Surface>
+          <div className="rm-docs__pattern-grid">
+            <PatternPreview pattern={publicPattern} />
+            <PatternPreview pattern={memberPattern} />
+          </div>
         </section>
 
-        <section className="rm-docs__section" id="responsive" aria-labelledby="responsive-heading">
-          <p className="eyebrow">Responsive</p>
-          <h2 className="h2" id="responsive-heading">
-            Desktop and mobile preview
-          </h2>
-          <div className="rm-docs__responsive-grid">
-            <Surface className="rm-docs__desktop-preview">
-              <p className="small">Desktop</p>
-              <div className="rm-docs__preview-row">
-                <Button variant="primary">세션 저장</Button>
-                <Button variant="secondary">초안 유지</Button>
-              </div>
-            </Surface>
-            <Surface className="rm-docs__mobile-preview">
-              <p className="small">Mobile</p>
-              <Button variant="primary">세션 저장</Button>
-              <Button variant="secondary">초안 유지</Button>
-            </Surface>
+        <section className="rm-docs__section" id="components" aria-labelledby="components-heading">
+          <div className="rm-docs__section-heading">
+            <p className="eyebrow">Components</p>
+            <h2 className="h2" id="components-heading">
+              Components used by the gallery
+            </h2>
+          </div>
+          <div className="rm-docs__component-samples">
+            <EmptyState
+              title="아직 공개된 읽기가 없습니다"
+              description="공개 예정 세션이 생기면 이 자리에 표시됩니다."
+              action={<Button variant="secondary">초안 보기</Button>}
+            />
+            <LockedState title="승인 대기 중입니다" description="호스트가 승인하면 멤버 책상이 열립니다." reason="pending" />
           </div>
         </section>
 
         <section className="rm-docs__section" id="migration" aria-labelledby="migration-heading">
-          <p className="eyebrow">Migration</p>
-          <h2 className="h2" id="migration-heading">
-            Component status
-          </h2>
+          <div className="rm-docs__section-heading">
+            <p className="eyebrow">Migration</p>
+            <h2 className="h2" id="migration-heading">
+              Component status
+            </h2>
+          </div>
           <div className="rm-docs__component-list">
             {componentDocs.map((component) => (
               <article key={component.name} className="rm-ledger-row rm-docs__component-row">
