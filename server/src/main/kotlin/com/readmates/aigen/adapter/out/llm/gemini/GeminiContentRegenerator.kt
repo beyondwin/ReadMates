@@ -25,9 +25,11 @@ import org.springframework.stereotype.Component
  * the narrowed schema to Gemini's OpenAPI 3.0 subset via
  * [GeminiSchemaCompatAdapter], and passes it to Gemini via
  * `generationConfig.responseSchema` so the model can only return that
- * subset (spec design doc §9.2). The port implementation is
- * responsible for setting `disablePromptLogging = true` (no data
- * retention — spec §5.7).
+ * subset (spec design doc §9.2). Data retention (spec §5.7) is
+ * enforced operator-side by provisioning
+ * `READMATES_AIGEN_GEMINI_API_KEY` in a paid-tier Google AI Studio
+ * project; see [GeminiApiClient] KDoc and
+ * `docs/operations/runbooks/ai-session-generation.md` §9.
  *
  * Parses the resulting JSON object into the appropriate typed value:
  *

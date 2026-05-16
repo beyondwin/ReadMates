@@ -9,8 +9,10 @@ import com.google.genai.types.HttpOptions
 import com.google.genai.types.Part
 import com.google.genai.types.Schema
 import com.readmates.aigen.application.model.TokenUsage
+import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Live [GeminiApiPort] adapter backed by `com.google.genai:google-genai:1.53.0`.
@@ -34,15 +36,29 @@ import org.springframework.stereotype.Component
  *  - `maxOutputTokens = 4096`, matching the Claude/OpenAI ceiling.
  *
  * Retention contract (spec §5.7 — "retention 최소 옵션을 강제한다"):
+ *  - The PRIMARY retention mechanism for the public Gemini Developer
+ *    API is the **Google AI Studio project tier**, not a request flag.
+ *    A project with Gemini API billing enabled (paid tier) is
+ *    contractually guaranteed not to use prompts/responses for product
+ *    improvement; a free-tier project does NOT carry that guarantee
+ *    and Google may use the traffic for training.
+ *  - Operator requirement: `READMATES_AIGEN_GEMINI_API_KEY` MUST be
+ *    provisioned in a paid-tier Google AI Studio project. This is
+ *    enforced at the operator/runbook layer (see
+ *    `docs/operations/runbooks/ai-session-generation.md` §9 "Gemini
+ *    retention policy") because there is no programmatic way for the
+ *    SDK to assert the tier of the project behind a given API key.
  *  - `com.google.genai:google-genai:1.53.0` exposes NO request-level
  *    `disablePromptLogging` / `dataPolicy` flag on
  *    [GenerateContentConfig.Builder] (verified by jar inspection +
- *    context7 docs at implementation time). The only API-level lever
- *    available in this SDK release is the HTTP header
- *    `x-goog-data-policy: no-retention`, which we set via
- *    `Client.builder().httpOptions(...)` at the client level so every
- *    outbound request carries it. If a later SDK release exposes a
- *    typed flag, this should switch to use it.
+ *    context7 docs at implementation time). We send the HTTP header
+ *    `x-goog-data-policy: no-retention` on every outbound request via
+ *    `Client.builder().httpOptions(...)` as a **best-effort,
+ *    belt-and-suspenders** signal — it costs nothing to send, and if a
+ *    future server-side change ever honours it on the public Gemini
+ *    Developer API we benefit immediately. It is NOT a documented
+ *    public-API contract and MAY be silently dropped today; the
+ *    paid-tier project provisioning above is the actual enforcement.
  *
  * Provider exceptions are NOT caught here — callers
  * ([GeminiContentGenerator] / [GeminiContentRegenerator]) wrap them
@@ -63,6 +79,7 @@ import org.springframework.stereotype.Component
 )
 open class GeminiApiClient : GeminiApiPort {
     private val objectMapper = ObjectMapper()
+    private val retentionNoticeLogged = AtomicBoolean(false)
 
     @Suppress("LongParameterList")
     override fun callResponseSchema(
@@ -77,13 +94,20 @@ open class GeminiApiClient : GeminiApiPort {
             "$API_KEY_ENV not set; required when readmates.aigen.enabled=true and mock=false"
         }
 
+        if (retentionNoticeLogged.compareAndSet(false, true)) {
+            logger.info(RETENTION_POLICY_LOG_MESSAGE)
+        }
+
         val httpOptions =
             HttpOptions
                 .builder()
-                // spec §5.7: data retention minimisation. No SDK-level flag is
-                // available in google-genai 1.53.0; the `x-goog-data-policy`
-                // header is the API-level lever and applies to every request
-                // issued by this client.
+                // spec §5.7: data retention minimisation. The PRIMARY mechanism
+                // is the paid-tier Google AI Studio project the API key is
+                // provisioned in (see KDoc + runbook). The `x-goog-data-policy:
+                // no-retention` header below is a best-effort, belt-and-
+                // suspenders signal — it is NOT a documented public Gemini API
+                // contract and MAY be silently dropped today, so it does NOT
+                // replace the tier requirement.
                 .headers(mapOf(DATA_POLICY_HEADER to DATA_POLICY_NO_RETENTION))
                 .build()
 
@@ -171,5 +195,10 @@ open class GeminiApiClient : GeminiApiPort {
         private const val USER_ROLE: String = "user"
         private const val DATA_POLICY_HEADER: String = "x-goog-data-policy"
         private const val DATA_POLICY_NO_RETENTION: String = "no-retention"
+        private const val RETENTION_POLICY_LOG_MESSAGE: String =
+            "GeminiApiClient: retention policy depends on Google AI Studio project tier — " +
+                "confirm paid-tier provisioning; see " +
+                "docs/operations/runbooks/ai-session-generation.md"
+        private val logger = LoggerFactory.getLogger(GeminiApiClient::class.java)
     }
 }

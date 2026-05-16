@@ -22,14 +22,24 @@ import com.readmates.aigen.application.model.TokenUsage
  *   `generationConfig.responseMimeType = "application/json"`.
  *
  * Retention contract (spec §5.7):
- * - The implementation MUST configure the SDK so that prompt/response
- *   data is NOT retained for product improvement. Concretely, the
- *   request MUST be issued with `disablePromptLogging = true` (or the
- *   equivalent flag exposed by the current `com.google.genai` Java SDK
- *   release — for example, the `data_policy.no_retention` request-level
- *   option, or the `x-goog-data-policy: no-retention` header). The
- *   spec requirement is "retention 최소 옵션을 강제한다" — no opt-in,
- *   no per-call override.
+ * - The spec requirement is "retention 최소 옵션을 강제한다" — no
+ *   opt-in, no per-call override. For the public Gemini Developer API
+ *   this is enforced at the **operator layer**, not via a typed SDK
+ *   flag: `READMATES_AIGEN_GEMINI_API_KEY` MUST be provisioned in a
+ *   paid-tier Google AI Studio project (Gemini API billing enabled),
+ *   which is contractually guaranteed not to use prompts/responses for
+ *   product improvement. Free-tier projects are NOT acceptable. See
+ *   `docs/operations/runbooks/ai-session-generation.md` §9 "Gemini
+ *   retention policy" for the provisioning checklist.
+ * - Implementations MAY additionally send the
+ *   `x-goog-data-policy: no-retention` HTTP header on every request as
+ *   a best-effort, belt-and-suspenders signal. That header is NOT a
+ *   documented public Gemini API contract today and the server MAY
+ *   silently drop it, so it does NOT replace the paid-tier project
+ *   requirement above.
+ * - The port returns provider exceptions raw — callers wrap them via
+ *   [com.readmates.aigen.adapter.out.llm.common.LlmErrorMapper] so the
+ *   surfaced message never echoes transcript text.
  *
  * - The returned [GeminiToolResult] carries the parsed JSON object
  *   (Jackson 2 `ObjectNode`, matching

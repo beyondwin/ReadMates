@@ -24,10 +24,12 @@ import java.time.LocalDate
  * `readmates-session-import:v1` JSON Schema to Gemini's OpenAPI 3.0
  * subset via [GeminiSchemaCompatAdapter], and passes it to Gemini via
  * `generationConfig.responseSchema` so the model can only return that
- * shape. The port implementation is responsible for setting
- * `disablePromptLogging = true` (no data retention — spec §5.7).
- * Caller is responsible for downstream validation (author-name match,
- * highlights count, etc.).
+ * shape. Data retention (spec §5.7) is enforced operator-side by
+ * provisioning `READMATES_AIGEN_GEMINI_API_KEY` in a paid-tier Google
+ * AI Studio project; see [GeminiApiClient] KDoc and
+ * `docs/operations/runbooks/ai-session-generation.md` §9. Caller is
+ * responsible for downstream validation (author-name match, highlights
+ * count, etc.).
  *
  * All provider exceptions are wrapped via [LlmErrorMapper] +
  * [LlmGenerationException] so the surfaced message never echoes
