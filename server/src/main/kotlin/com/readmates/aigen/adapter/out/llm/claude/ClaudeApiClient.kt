@@ -1,6 +1,17 @@
 package com.readmates.aigen.adapter.out.llm.claude
 
+import com.anthropic.client.AnthropicClient
+import com.anthropic.client.okhttp.AnthropicOkHttpClient
+import com.anthropic.core.JsonValue
+import com.anthropic.models.messages.CacheControlEphemeral
+import com.anthropic.models.messages.ContentBlockParam
+import com.anthropic.models.messages.MessageCreateParams
+import com.anthropic.models.messages.TextBlockParam
+import com.anthropic.models.messages.Tool
+import com.anthropic.models.messages.ToolChoiceTool
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.readmates.aigen.application.model.TokenUsage
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 
@@ -9,23 +20,36 @@ import org.springframework.stereotype.Component
  *
  * Resolves the API key from `READMATES_AIGEN_ANTHROPIC_API_KEY` at the
  * first call site so the bean still loads in test contexts where the
- * env var is unset. The actual `client.messages().create(...)` wiring
- * (Tool with custom `input_schema` JsonValue, `ToolChoiceTool` to force
- * the named tool, `TextBlockParam.cacheControl(CacheControlEphemeral)`
- * on the transcript block, and `content().toolUse()` parsing) is
- * deferred to a follow-up task that introduces an integration test
- * with a real API key — Phase 0 unit tests exercise the contract via
- * [FakeClaudeApi] against [ClaudeApiPort] directly. See task 1.6
- * STATUS for SDK_STATUS notes.
+ * env var is unset.
+ *
+ * Wire shape (per spec §5 and ClaudeApiPort KDoc):
+ *  - `system` carries the prompt verbatim.
+ *  - User message has two text blocks: `userText` first (no
+ *    cache_control), `transcriptText` second (with
+ *    `cache_control: { type: "ephemeral" }` when `expectCacheControl`).
+ *  - One `Tool` with `name=toolName` and our `ObjectNode` schema mapped
+ *    to `Tool.InputSchema` (`type` lifted to the typed field, the rest
+ *    of the schema's top-level properties piped through
+ *    `putAdditionalProperty` so the on-wire JSON exactly mirrors the
+ *    incoming schema).
+ *  - `tool_choice = { type: "tool", name: toolName }` forces a single
+ *    `tool_use` block in the response.
+ *
+ * Provider exceptions are NOT caught here — callers
+ * ([ClaudeContentGenerator] / [ClaudeContentRegenerator]) wrap them via
+ * `LlmErrorMapper.mapException(t, Provider.CLAUDE)` so the surfaced
+ * message never echoes transcript text (PII protection).
  *
  * Gated behind `readmates.aigen.enabled=true` to match the rest of the
- * adapter beans; this also ensures the integration test context
+ * adapter beans; ensures the integration test context
  * (`application-test.yml`, `aigen.enabled=false`) does not require the
  * API key to bootstrap the Spring application context.
  */
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
 open class ClaudeApiClient : ClaudeApiPort {
+    private val objectMapper = ObjectMapper()
+
     @Suppress("LongParameterList")
     override fun callTool(
         model: String,
@@ -40,17 +64,114 @@ open class ClaudeApiClient : ClaudeApiPort {
         check(!apiKey.isNullOrBlank()) {
             "$API_KEY_ENV not set; required when readmates.aigen.enabled=true"
         }
-        // Live SDK call wiring (Tool input_schema JsonValue,
-        // ToolChoiceTool, TextBlockParam.cacheControl, Usage parsing)
-        // is intentionally TODO until a Phase 1 integration test lands.
-        // Unit tests in task 1.6 cover the generator/regenerator
-        // contract via a fake ClaudeApiPort.
-        throw NotImplementedError(
-            "Live Anthropic SDK call wiring TODO; covered by FakeClaudeApi in unit tests.",
+
+        val client: AnthropicClient =
+            AnthropicOkHttpClient
+                .builder()
+                .apiKey(apiKey)
+                .build()
+
+        val tool = buildTool(toolName, toolSchema)
+        val userBlocks = buildUserBlocks(userText, transcriptText, expectCacheControl)
+
+        val params =
+            MessageCreateParams
+                .builder()
+                .model(model)
+                // Follow-up: move maxTokens to AiGenerationProperties when a per-call
+                // budget knob is introduced. No existing config today; 4096 is a
+                // conservative ceiling for the structured tool_use payload.
+                .maxTokens(DEFAULT_MAX_TOKENS)
+                .system(systemPrompt)
+                .addUserMessageOfBlockParams(userBlocks)
+                .addTool(tool)
+                .toolChoice(
+                    ToolChoiceTool
+                        .builder()
+                        .name(toolName)
+                        .build(),
+                ).build()
+
+        val message = client.messages().create(params)
+
+        val toolUse =
+            message
+                .content()
+                .firstNotNullOfOrNull { block -> block.toolUse().orElse(null) }
+                ?: error("Claude response did not contain a tool_use block; tool=$toolName")
+
+        val inputNode = objectMapper.valueToTree<com.fasterxml.jackson.databind.JsonNode>(toolUse._input())
+        val inputObject =
+            (inputNode as? ObjectNode)
+                ?: error("Claude tool_use input was not a JSON object; tool=$toolName")
+
+        val usage = message.usage()
+        // Per Anthropic billing model: `input_tokens` is the count of non-cached
+        // input tokens for this call; `cache_creation_input_tokens` are new
+        // input tokens that were just written to the prompt cache (billed at
+        // input price + write premium) and are NOT included in `input_tokens`;
+        // `cache_read_input_tokens` are input tokens served from cache and
+        // also NOT included in `input_tokens`. Our domain TokenUsage has 3
+        // fields; we add cache_creation to inputTokens so total billable
+        // input is preserved, and map cache_read to cachedInputTokens.
+        val cacheCreation = usage.cacheCreationInputTokens().orElse(0L)
+        val cacheRead = usage.cacheReadInputTokens().orElse(0L)
+        val tokenUsage =
+            TokenUsage(
+                inputTokens = usage.inputTokens() + cacheCreation,
+                cachedInputTokens = cacheRead,
+                outputTokens = usage.outputTokens(),
+            )
+
+        return ClaudeToolResult(input = inputObject, usage = tokenUsage)
+    }
+
+    private fun buildTool(
+        toolName: String,
+        toolSchema: ObjectNode,
+    ): Tool {
+        val inputSchemaBuilder = Tool.InputSchema.builder()
+        val typeNode = toolSchema.get("type")
+        if (typeNode != null) {
+            inputSchemaBuilder.type(JsonValue.fromJsonNode(typeNode))
+        }
+        for ((key, value) in toolSchema.properties()) {
+            if (key == "type") continue
+            inputSchemaBuilder.putAdditionalProperty(key, JsonValue.fromJsonNode(value))
+        }
+
+        return Tool
+            .builder()
+            .name(toolName)
+            .inputSchema(inputSchemaBuilder.build())
+            .build()
+    }
+
+    private fun buildUserBlocks(
+        userText: String,
+        transcriptText: String,
+        expectCacheControl: Boolean,
+    ): List<ContentBlockParam> {
+        val userBlock =
+            TextBlockParam
+                .builder()
+                .text(userText)
+                .build()
+        val transcriptBuilder =
+            TextBlockParam
+                .builder()
+                .text(transcriptText)
+        if (expectCacheControl) {
+            transcriptBuilder.cacheControl(CacheControlEphemeral.builder().build())
+        }
+        return listOf(
+            ContentBlockParam.ofText(userBlock),
+            ContentBlockParam.ofText(transcriptBuilder.build()),
         )
     }
 
     companion object {
         const val API_KEY_ENV: String = "READMATES_AIGEN_ANTHROPIC_API_KEY"
+        private const val DEFAULT_MAX_TOKENS: Long = 4096L
     }
 }
