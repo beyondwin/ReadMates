@@ -17,10 +17,15 @@ interface AiGenerationJobQueue {
     /**
      * Publishes a job-routing message. Implementations MUST NOT include the transcript body.
      * The worker rehydrates the transcript via [AiGenerationJobStore.load] using [jobId].
+     *
+     * [clubId] is used as the partition key so jobs for the same club process in order.
+     * [hostUserId] is carried in the payload so downstream observability can correlate.
      */
     fun publish(
         jobId: UUID,
         sessionId: UUID,
+        clubId: UUID,
+        hostUserId: UUID,
         provider: Provider,
         model: String,
         kind: JobKind,

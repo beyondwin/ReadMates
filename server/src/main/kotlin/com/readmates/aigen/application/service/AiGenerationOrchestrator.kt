@@ -97,6 +97,8 @@ class AiGenerationOrchestrator(
         queue.publish(
             jobId = jobId,
             sessionId = command.sessionId,
+            clubId = command.clubId,
+            hostUserId = command.hostUserId,
             provider = modelId.provider,
             model = modelId.name,
             kind = JobKind.FULL,

@@ -131,6 +131,8 @@ internal class FakeJobQueue : AiGenerationJobQueue {
     data class Published(
         val jobId: UUID,
         val sessionId: UUID,
+        val clubId: UUID,
+        val hostUserId: UUID,
         val provider: Provider,
         val model: String,
         val kind: JobKind,
@@ -141,11 +143,13 @@ internal class FakeJobQueue : AiGenerationJobQueue {
     override fun publish(
         jobId: UUID,
         sessionId: UUID,
+        clubId: UUID,
+        hostUserId: UUID,
         provider: Provider,
         model: String,
         kind: JobKind,
     ) {
-        published += Published(jobId, sessionId, provider, model, kind)
+        published += Published(jobId, sessionId, clubId, hostUserId, provider, model, kind)
     }
 }
 

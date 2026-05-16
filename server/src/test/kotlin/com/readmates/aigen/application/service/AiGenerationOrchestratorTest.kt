@@ -51,6 +51,8 @@ class AiGenerationOrchestratorTest {
         val published = ctx.queue.published.single()
         assertThat(published.jobId).isEqualTo(result.jobId)
         assertThat(published.sessionId).isEqualTo(ctx.sessionId)
+        assertThat(published.clubId).isEqualTo(ctx.clubId)
+        assertThat(published.hostUserId).isEqualTo(ctx.hostUserId)
         assertThat(published.provider.name).isEqualTo("CLAUDE")
         assertThat(published.model).isEqualTo(AiGenerationTestFixtures.CLAUDE_MODEL.name)
         assertThat(published.kind).isEqualTo(JobKind.FULL)

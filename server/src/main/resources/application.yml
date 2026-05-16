@@ -111,3 +111,8 @@ readmates:
         input-per-m-token-usd: 15.00
         cached-input-per-m-token-usd: 1.50
         output-per-m-token-usd: 75.00
+    kafka:
+      enabled: ${READMATES_AIGEN_KAFKA_ENABLED:false}
+      bootstrap-servers: ${READMATES_AIGEN_KAFKA_BOOTSTRAP_SERVERS:}
+      topic-jobs: ${READMATES_AIGEN_KAFKA_TOPIC_JOBS:readmates.aigen.jobs.v1}
+      consumer-group: ${READMATES_AIGEN_KAFKA_CONSUMER_GROUP:readmates-aigen-worker}

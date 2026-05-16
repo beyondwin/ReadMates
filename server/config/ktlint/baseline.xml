@@ -170,6 +170,9 @@
     <file name="src/main/kotlin/com/readmates/note/application/port/in/NotesFeedUseCases.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumer.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
     <file name="src/main/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListener.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
@@ -307,6 +310,9 @@
         <error line="1" column="9" source="standard:package-name" />
     </file>
     <file name="src/main/kotlin/com/readmates/shared/adapter/in/web/SharedApplicationErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumerIntegrationTest.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
     <file name="src/test/kotlin/com/readmates/archive/api/ArchiveErrorHandlerTest.kt">
