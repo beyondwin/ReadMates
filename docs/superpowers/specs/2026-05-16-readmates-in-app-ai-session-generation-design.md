@@ -689,3 +689,20 @@ v1 출시는 Phase 0 ~ 7 전체를 포함한다. Critical path(Claude만으로 e
 | task_8_6 — CHANGELOG + spec close-out | COMPLETE | (본 commit) | CHANGELOG `Risk resolution (Phase 8)` 서브섹션에 모든 sub-task 와 commit SHA를 기재하고, 본 부록을 추가. |
 
 본문에 “라이브 SDK 와이어는 후속 단계에서 채운다”고 적힌 task_1_6 / task_4_2 / task_5_3 deferred 항목은 위 task_8_1 / task_8_2 / task_8_3 에 의해 Phase 8에서 종결되었습니다 — 해당 본문 단락의 결정 자체는 변경되지 않으며, 단지 실행 완료 시점이 본 부록으로 확정됩니다.
+
+### 부록 — Phase 9 Residual Risk Cleanup (2026-05-17)
+
+Phase 8 직후 Final Summary가 "비차단" 으로 분류했던 6건 중 4건을 닫은 추가 라운드입니다. 나머지 2건 (Live SDK smoke, repo-wide ktlint/detekt baseline) 은 본 브랜치 범위 밖이라 의도적으로 제외했습니다.
+
+| Sub-task | 결과 | Commits | 비고 |
+|---|---|---|---|
+| task_9_1 — Regen `callWithRetry` strengthen 플래그 일관성 | COMPLETE | `7950263b` | Worker의 `RetryStrategy(backoff, strengthen)` 패턴을 regen에도 적용해 §9.2 "provider 가용성 retry 는 동일 prompt, schema/author retry 만 strengthened" 규칙을 코드 차원에서 정렬. 추가 단위 테스트가 PROVIDER_RATE_LIMITED retry input 의 instruction 이 원본 그대로임을 핀. |
+| task_9_2 — Worker SCHEMA_INVALID retry audit 카운트 검증 | COMPLETE | `ba51a8b1` | 동 테스트가 묵시적으로만 보장하던 §9.2 per-call audit invariant 를 SCHEMA_INVALID 경로에도 명시적 `audit.entries.hasSize(2)` + FAILED/SUCCESS 상태 검증으로 핀. |
+| task_9_3 — Kill switch 503 필터 | COMPLETE | `6b619f9c`, `94ba266c` | `readmates.aigen.enabled=false` 일 때 controller `@ConditionalOnProperty` 가 등록되지 않아 운영자가 보던 404 를 운영 의도에 맞는 503 + RFC 7807 problem+json (`code: AI_DISABLED`) 로 교정. `AiGenerationKillSwitchFilter` 는 `aigen.enabled` 와 무관하게 항상 등록되며 `/api/host/sessions/*/ai-generate/**` 와 `/api/host/clubs/*/ai-defaults` 두 경로만 가로챔. |
+| task_9_4 — Redis 통합 테스트 ApplicationContext 로드 실패 | COMPLETE | `be8b6a78` | `readmates.aigen.enabled=true` 만 켜고 `kafka.enabled=true` 가 없는 Redis 어댑터 통합 테스트가 `AiGenerationJobProducer` (Kafka 게이트) 부재로 autowire 실패했던 사전 회귀를, 테스트 측에 `@MockitoBean AiGenerationJobQueue` 를 추가하는 mechanical 픽스로 닫음. 운영 코드의 게이트 자체는 그대로 유지. |
+| task_9_5 — CHANGELOG + spec close-out | COMPLETE | (본 commit) | unitTest + architectureTest + 프론트 `pnpm test` (830) GREEN. ktlint/detekt 는 Phase 8 baseline 유지 (신규 파일이 도입한 유일한 위반은 `in/` 패키지의 path-level 규칙 위반으로, 동 패키지의 모든 기존 파일이 공유하는 사전 위반). |
+
+본 부록이 닫지 않은 잔여 항목:
+
+- **Live SDK smoke harness**: `READMATES_AIGEN_{ANTHROPIC,OPENAI,GEMINI}_API_KEY` 환경변수가 본 실행 환경에 없어 실행 불가. 키가 프로비저닝된 환경에서는 `./server/gradlew unitTest --tests '*LiveContract*'` 와 `scripts/aigen-smoke-{claude,openai,gemini}.sh` 로 검증.
+- **Repo-wide ktlint/detekt baseline 정리**: aigen feature 범위 밖의 사전 lint 부채. 별도 lint-debt sweep PR 로 분리.

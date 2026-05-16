@@ -10,6 +10,17 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Risk resolution (Phase 9)
+- fix(aigen): regen `callWithRetry` strengthens instructions only on schema/author error codes per spec §9.2 — mirrors Worker `RetryStrategy(strengthen)` pattern so provider-availability retries (PROVIDER_UNAVAILABLE / PROVIDER_RATE_LIMITED) re-send the original prompt; regression test asserts the rate-limited retry preserves the original instruction text (task_9_1 — commit 7950263b)
+- test(aigen): worker SCHEMA_INVALID retry path explicitly asserts `audit.entries.hasSize(2)` with FAILED + SUCCESS rows, closing the coverage gap that was previously only implicit via the PROVIDER_RATE_LIMITED test (task_9_2 — commit ba51a8b1)
+- feat(aigen): `AiGenerationKillSwitchFilter` returns 503 + RFC 7807 `application/problem+json` (code `AI_DISABLED`) for `/api/host/sessions/*/ai-generate/**` and `/api/host/clubs/*/ai-defaults` when `readmates.aigen.enabled=false` — operators previously saw 404 because the `@ConditionalOnProperty`-gated controllers were never registered (task_9_3 — commits 6b619f9c, 94ba266c)
+- fix(test): wire `@MockitoBean AiGenerationJobQueue` into `RedisAiGenerationJobStoreTest` and `RedisGenerationCostCountersTest` — the orchestrator's queue dependency comes from the Kafka adapter (gated on `readmates.aigen.kafka.enabled`), so the Redis-only integration tests couldn't load the context with `readmates.aigen.enabled=true` alone (task_9_4 — commit be8b6a78)
+- chore(aigen): full verification — unitTest + architectureTest + frontend pnpm test (830) green; ktlint/detekt baseline preserved (only the unavoidable `in/` package-name pattern shared by every file in that package) (task_9_5)
+
+### Risks NOT closed in Phase 9 (out of scope for this branch)
+- Live SDK smoke harness — requires `READMATES_AIGEN_{ANTHROPIC,OPENAI,GEMINI}_API_KEY` env vars not present in this environment; runnable via `./server/gradlew unitTest --tests '*LiveContract*'` plus `scripts/aigen-smoke-{claude,openai,gemini}.sh` when keys are provisioned.
+- Repo-wide ktlint/detekt baseline cleanup — pre-existing lint debt across non-aigen modules; tracked separately as a lint-debt sweep PR.
+
 ### Risk resolution (Phase 8)
 - feat(aigen): wire live Claude SDK calls in ClaudeApiClient (task_8_1 — commit 8baecd9f)
 - feat(aigen): wire live OpenAI SDK calls in OpenAiApiClient (task_8_2 — commit 4f6e493d)
