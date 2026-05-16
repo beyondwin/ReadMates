@@ -164,6 +164,22 @@ Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관
 
 로컬 image 재현성 검증은 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다.
 
+### Testcontainers 재사용 (로컬 전용)
+
+MySQL / Redis / Kafka Testcontainer는 모두 `withReuse(true)`로 표시되어 있어, 개발자가 한 번 옵트인하면 후속 backend test 실행에서 컨테이너 시작 단계를 건너뜁니다. 다음 줄을 추가해 활성화합니다.
+
+```bash
+echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
+```
+
+이 설정은 holder 머신 단위라 CI에는 영향이 없습니다(매 runner가 새 환경). 컨테이너 상태가 stale로 의심되면 다음으로 수동 정리합니다.
+
+```bash
+docker rm -f $(docker ps -a --filter "label=org.testcontainers.session-id" -q)
+```
+
+Refs: `docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md` §4.5.
+
 ## Notification Operations
 
 알림 event outbox, Kafka relay/consumer, OCI Email Delivery adapter 설정, retry delay 설정, 운영 metrics, host dashboard/notification operations UI, 멤버 알림 설정과 알림함을 바꿨다면 아래 targeted command를 먼저 실행합니다. Kafka notification integration test는 Testcontainers Kafka를 사용하므로 Docker 또는 Colima가 실행 중이어야 합니다.
