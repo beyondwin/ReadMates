@@ -432,7 +432,9 @@ ai_generation_audit_log row (PII-safe: provider/model/status/token/cost — no t
 - **Provider adapter (3종)**: `adapter.out.llm.claude.ClaudeContentGenerator/Regenerator`, `adapter.out.llm.openai.OpenAiContentGenerator/Regenerator`, `adapter.out.llm.gemini.GeminiContentGenerator/Regenerator`. 모두 `SessionContentGenerator`/`SessionContentRegenerator` outbound port를 구현하고, `LlmPromptBuilder`로 동일한 system + USER_PRELUDE를 만들며, `LlmErrorMapper`로 provider 예외를 사용자 안전 메시지로 마스킹합니다. 등록은 `AiGenerationBeansConfig`의 `associateBy { it.provider }` 패턴으로 자동 와이어링됩니다.
 - **Kafka topic**: `readmates.aigen.jobs.v1` (partition key=`clubId`, payload=`AiGenerationJobMessage{jobId, sessionId, clubId, hostUserId, provider, model, kind}`). Transcript 본문은 페이로드에 절대 포함되지 않습니다 (PII invariant; `scripts/aigen-pii-check.sh`로 PR마다 검증).
 - **Redis 키**:
-  - `aigen:job:<jobId>` (Hash, TTL 6h) — job state, provider/model, item snapshot.
+  - `aigen:job:<jobId>` (Hash, TTL 6h) — job state, provider/model, item snapshot. Transcript 본문은 이 hash에 넣지 않습니다.
+  - `aigen:job:<jobId>:transcript` (String, TTL 6h) — raw transcript body. Kafka/MySQL/metrics로 보내지 않고 worker/regeneration이 Redis에서만 rehydrate합니다. Commit/cancel 시 `aigen:job:<jobId>`/`:transcript`/`:result` 세 키를 함께 삭제합니다.
+  - `aigen:job:<jobId>:result` (String, TTL 6h) — validated `SessionImportV1Snapshot` JSON.
   - `aigen:cost:club:<clubId>:<YYYY-MM>` (String, TTL 31d) — 월별 클럽 누적 비용 BigDecimal scale=4 USD.
   - `aigen:cost:host:<userId>:<YYYY-MM-DD>` (String, TTL 24h) — 호스트 일일 생성 횟수 카운터.
   - `aigen:cost:host:<userId>:<YYYY-MM>` (String, TTL 31d) — 호스트 월별 누적 비용 (감사 보조).
