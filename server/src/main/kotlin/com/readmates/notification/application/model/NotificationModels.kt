@@ -93,6 +93,7 @@ data class NotificationEventOutboxItem(
     val kafkaKey: String,
     val attemptCount: Int,
     val lockedAt: OffsetDateTime,
+    val requestId: String? = null,
 )
 
 data class NotificationEventMessage(
