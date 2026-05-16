@@ -14,7 +14,9 @@ import com.readmates.sessionimport.application.model.SessionImportRecordPreview
 import com.readmates.sessionimport.application.model.SessionImportSessionPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.`in`.CommitSessionImportUseCase
+import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.PreviewSessionImportUseCase
+import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
@@ -31,7 +33,8 @@ class SessionImportService(
     private val writePort: SessionImportWritePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : PreviewSessionImportUseCase,
-    CommitSessionImportUseCase {
+    CommitSessionImportUseCase,
+    CommitValidatedSessionImportUseCase {
     private val parser = FeedbackDocumentParser()
 
     override fun preview(command: SessionImportCommand): SessionImportPreviewResult {
@@ -48,6 +51,35 @@ class SessionImportService(
         if (!preview.valid) {
             throw InvalidSessionImportException(preview.issues)
         }
+        return commitVerifiedTarget(command, preview)
+    }
+
+    /**
+     * Commits a session import command whose caller has already validated it. Skips the
+     * standard [validate] step but still loads the target, replaces records, and triggers
+     * post-commit cache invalidation. Trust boundary: callers (e.g. the AI generation flow,
+     * which re-runs SessionImportV1Validator) MUST validate the command first.
+     */
+    @Transactional
+    override fun commitValidated(input: ValidatedSessionImportInput): SessionImportCommitResult {
+        val command = input.command
+        requireHost(command.host)
+        val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        // The caller has already validated, but we still build the preview projection so we
+        // reuse the same SessionImportRecordReplacement payload shape as commit(...). If the
+        // caller passed an invalid command, surface InvalidSessionImportException — same as
+        // commit(...). This preserves the security invariant.
+        val preview = validate(command, target)
+        if (!preview.valid) {
+            throw InvalidSessionImportException(preview.issues)
+        }
+        return commitVerifiedTarget(command, preview)
+    }
+
+    private fun commitVerifiedTarget(
+        command: SessionImportCommand,
+        preview: SessionImportPreviewResult,
+    ): SessionImportCommitResult {
         val feedbackTitle =
             preview.feedbackDocument.title
                 ?: throw InvalidSessionImportException(
