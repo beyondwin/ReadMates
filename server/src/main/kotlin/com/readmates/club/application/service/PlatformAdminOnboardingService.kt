@@ -34,6 +34,14 @@ import java.util.Locale
 import java.util.UUID
 
 private const val EXISTING_USER_CONFIRMATION = "ASSIGN_EXISTING_USER_AS_HOST"
+private const val HOST_INVITATION_TTL_DAYS = 30L
+private const val HOSTNAME_MAX_LENGTH = 253
+private const val HOSTNAME_MIN_LABEL_COUNT = 2
+private val CLUB_SLUG = Regex("^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$")
+private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
+private val HOSTNAME_LABEL = Regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+private val IPV4_LITERAL = Regex("^\\d{1,3}(?:\\.\\d{1,3}){3}$")
+private val FORBIDDEN_HOSTNAME_PARTS = listOf("://", "/", ":", "*")
 
 @Service
 class PlatformAdminOnboardingService(
@@ -54,7 +62,11 @@ class PlatformAdminOnboardingService(
         val normalized = normalize(command)
         val existingUser = onboardingPort.findUserByEmail(normalized.firstHost.email)
         return PlatformAdminOnboardingPreview(
-            club = PlatformAdminOnboardingClubPreview(normalized.club.slug, !onboardingPort.slugExists(normalized.club.slug)),
+            club =
+                PlatformAdminOnboardingClubPreview(
+                    normalized.club.slug,
+                    !onboardingPort.slugExists(normalized.club.slug),
+                ),
             firstHost =
                 existingUser?.let {
                     PlatformAdminFirstHostPreview(
@@ -162,7 +174,7 @@ class PlatformAdminOnboardingService(
                 email = command.firstHost.email,
                 name = command.firstHost.name,
                 tokenHash = invitationTokenService.hashToken(token),
-                expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(30),
+                expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(HOST_INVITATION_TTL_DAYS),
             ),
         )
         val acceptUrl = "${appBaseUrl.trimEnd('/')}/clubs/${command.club.slug}/invite/$token"
@@ -199,49 +211,36 @@ class PlatformAdminOnboardingService(
         val club =
             command.club.copy(
                 name = command.club.name.trim(),
-                slug = command.club.slug.trim().lowercase(Locale.ROOT),
+                slug =
+                    command.club.slug
+                        .trim()
+                        .lowercase(Locale.ROOT),
                 tagline = command.club.tagline.trim(),
                 about = command.club.about.trim(),
             )
         val firstHost =
             command.firstHost.copy(
-                email = command.firstHost.email.trim().lowercase(Locale.ROOT),
+                email =
+                    command.firstHost.email
+                        .trim()
+                        .lowercase(Locale.ROOT),
                 name = command.firstHost.name.trim(),
             )
         val domain =
-            command.domain?.copy(hostname = command.domain.hostname.trim().removeSuffix(".").lowercase(Locale.ROOT))
-        if (club.name.isBlank() || club.tagline.isBlank() || club.about.isBlank() || firstHost.name.isBlank()) {
-            throw PlatformAdminException(PlatformAdminError.INVALID_CLUB, "Club and host fields are required")
-        }
-        if (!CLUB_SLUG.matches(club.slug)) {
-            throw PlatformAdminException(PlatformAdminError.INVALID_CLUB, "Invalid club slug")
-        }
-        if (!EMAIL.matches(firstHost.email)) {
-            throw PlatformAdminException(PlatformAdminError.INVALID_CLUB, "Invalid host email")
-        }
+            command.domain?.copy(
+                hostname =
+                    command.domain.hostname
+                        .trim()
+                        .removeSuffix(".")
+                        .lowercase(Locale.ROOT),
+            )
+        validateRequiredFields(club.name, club.tagline, club.about, firstHost.name)
+        validateSlug(club.slug)
+        validateEmail(firstHost.email)
         if (domain != null) {
             validateHostname(domain.hostname)
         }
         return command.copy(club = club, firstHost = firstHost, domain = domain)
-    }
-
-    private fun validateHostname(hostname: String) {
-        if (
-            hostname.isBlank() ||
-            hostname.contains("://") ||
-            hostname.contains("/") ||
-            hostname.contains(":") ||
-            hostname.contains("*") ||
-            hostname.any(Char::isWhitespace) ||
-            hostname.length > 253 ||
-            IPV4_LITERAL.matches(hostname)
-        ) {
-            throw PlatformAdminException(PlatformAdminError.INVALID_DOMAIN, "Invalid domain hostname")
-        }
-        val labels = hostname.split(".")
-        if (labels.size < 2 || labels.any { label -> !HOSTNAME_LABEL.matches(label) }) {
-            throw PlatformAdminException(PlatformAdminError.INVALID_DOMAIN, "Invalid domain hostname")
-        }
     }
 
     private fun requireOperator(admin: CurrentPlatformAdmin) {
@@ -249,11 +248,41 @@ class PlatformAdminOnboardingService(
             throw AccessDeniedException("Platform admin role cannot onboard clubs")
         }
     }
+}
 
-    private companion object {
-        private val CLUB_SLUG = Regex("^[a-z0-9][a-z0-9-]{1,78}[a-z0-9]$")
-        private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
-        private val HOSTNAME_LABEL = Regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
-        private val IPV4_LITERAL = Regex("^\\d{1,3}(?:\\.\\d{1,3}){3}$")
+private fun validateRequiredFields(vararg values: String) {
+    if (values.any(String::isBlank)) {
+        throw PlatformAdminException(PlatformAdminError.INVALID_CLUB, "Club and host fields are required")
     }
 }
+
+private fun validateSlug(slug: String) {
+    if (!CLUB_SLUG.matches(slug)) {
+        throw PlatformAdminException(PlatformAdminError.INVALID_CLUB, "Invalid club slug")
+    }
+}
+
+private fun validateEmail(email: String) {
+    if (!EMAIL.matches(email)) {
+        throw PlatformAdminException(PlatformAdminError.INVALID_CLUB, "Invalid host email")
+    }
+}
+
+private fun validateHostname(hostname: String) {
+    if (
+        hasForbiddenHostnameSyntax(hostname) ||
+        hostname.length > HOSTNAME_MAX_LENGTH ||
+        IPV4_LITERAL.matches(hostname)
+    ) {
+        throw PlatformAdminException(PlatformAdminError.INVALID_DOMAIN, "Invalid domain hostname")
+    }
+    val labels = hostname.split(".")
+    if (labels.size < HOSTNAME_MIN_LABEL_COUNT || labels.any { label -> !HOSTNAME_LABEL.matches(label) }) {
+        throw PlatformAdminException(PlatformAdminError.INVALID_DOMAIN, "Invalid domain hostname")
+    }
+}
+
+private fun hasForbiddenHostnameSyntax(hostname: String): Boolean =
+    hostname.isBlank() ||
+        FORBIDDEN_HOSTNAME_PARTS.any(hostname::contains) ||
+        hostname.any(Char::isWhitespace)

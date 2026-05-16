@@ -1,9 +1,9 @@
 package com.readmates.club.application.port.`in`
 
 import com.readmates.club.application.model.CreateClubDomainCommand
+import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubList
 import com.readmates.club.application.model.PlatformAdminClubListItem
-import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminDashboardSummary
 import com.readmates.club.application.model.PlatformAdminOnboardingCommand
 import com.readmates.club.application.model.PlatformAdminOnboardingPreview

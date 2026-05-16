@@ -1,8 +1,8 @@
 package com.readmates.club.application.port.out
 
 import com.readmates.club.application.model.ClubDomainActualCheckResult
-import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.PlatformAdminClubDomain
+import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.club.domain.ClubPublicVisibility
@@ -68,13 +68,17 @@ interface LoadPlatformAdminClubsPort {
 interface UpdatePlatformAdminClubPort {
     fun updateClub(
         clubId: UUID,
-        name: String?,
-        tagline: String?,
-        about: String?,
-        status: ClubStatus?,
-        publicVisibility: ClubPublicVisibility?,
+        patch: UpdatePlatformAdminClubPatch,
     ): PlatformAdminClubListItem?
 }
+
+data class UpdatePlatformAdminClubPatch(
+    val name: String?,
+    val tagline: String?,
+    val about: String?,
+    val status: ClubStatus?,
+    val publicVisibility: ClubPublicVisibility?,
+)
 
 data class PlatformAdminExistingUser(
     val userId: UUID,

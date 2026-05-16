@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.club.adapter.`in`.web
 
 import com.readmates.club.application.model.PlatformAdminClubList

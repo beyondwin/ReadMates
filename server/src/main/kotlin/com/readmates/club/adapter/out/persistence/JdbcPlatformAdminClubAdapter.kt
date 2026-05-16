@@ -7,6 +7,7 @@ import com.readmates.club.application.port.out.CreatePlatformAdminHostInvitation
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
 import com.readmates.club.application.port.out.PlatformAdminExistingUser
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
+import com.readmates.club.application.port.out.UpdatePlatformAdminClubPatch
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
@@ -26,11 +27,12 @@ class JdbcPlatformAdminClubAdapter(
     UpdatePlatformAdminClubPort,
     PlatformAdminOnboardingPort {
     override fun listClubs(limit: Int): List<PlatformAdminClubListItem> =
-        jdbcTemplate.query(CLUB_LIST_SQL, ::mapClub, limit.coerceIn(1, 100)) ?: emptyList()
+        jdbcTemplate.query(CLUB_LIST_SQL, ::mapPlatformAdminClub, limit.coerceIn(1, MAX_CLUB_LIST_LIMIT))
+            ?: emptyList()
 
     override fun loadClub(clubId: UUID): PlatformAdminClubListItem? =
         jdbcTemplate
-            .query("$CLUB_BASE_SQL where clubs.id = ? limit 1", ::mapClub, clubId.dbString())
+            .query("$CLUB_BASE_SQL where clubs.id = ? limit 1", ::mapPlatformAdminClub, clubId.dbString())
             .firstOrNull()
 
     override fun activeHostCount(clubId: UUID): Int =
@@ -49,11 +51,7 @@ class JdbcPlatformAdminClubAdapter(
     @Transactional
     override fun updateClub(
         clubId: UUID,
-        name: String?,
-        tagline: String?,
-        about: String?,
-        status: ClubStatus?,
-        publicVisibility: ClubPublicVisibility?,
+        patch: UpdatePlatformAdminClubPatch,
     ): PlatformAdminClubListItem? {
         val updated =
             jdbcTemplate.update(
@@ -67,13 +65,13 @@ class JdbcPlatformAdminClubAdapter(
                     updated_at = utc_timestamp(6)
                 where id = ?
                 """.trimIndent(),
-                name,
-                tagline,
-                about,
-                status?.name,
-                publicVisibility?.name,
+                patch.name,
+                patch.tagline,
+                patch.about,
+                patch.status?.name,
+                patch.publicVisibility?.name,
                 clubId.dbString(),
-        )
+            )
         return if (updated == 0) null else loadClub(clubId)
     }
 
@@ -147,7 +145,7 @@ class JdbcPlatformAdminClubAdapter(
                     updated_at = utc_timestamp(6)
                 where id = ?
                 """.trimIndent(),
-                displayName.take(50),
+                displayName.take(HOST_DISPLAY_NAME_MAX_LENGTH),
                 existing.dbString(),
             )
             return existing
@@ -162,7 +160,7 @@ class JdbcPlatformAdminClubAdapter(
             membershipId.dbString(),
             clubId.dbString(),
             userId.dbString(),
-            displayName.take(50),
+            displayName.take(HOST_DISPLAY_NAME_MAX_LENGTH),
         )
         return membershipId
     }
@@ -195,24 +193,10 @@ class JdbcPlatformAdminClubAdapter(
         )
     }
 
-    private fun mapClub(
-        resultSet: ResultSet,
-        @Suppress("UNUSED_PARAMETER") rowNumber: Int,
-    ): PlatformAdminClubListItem =
-        PlatformAdminClubListItem(
-            clubId = resultSet.uuid("id"),
-            slug = resultSet.getString("slug"),
-            name = resultSet.getString("name"),
-            tagline = resultSet.getString("tagline"),
-            about = resultSet.getString("about"),
-            status = ClubStatus.valueOf(resultSet.getString("status")),
-            publicVisibility = ClubPublicVisibility.valueOf(resultSet.getString("public_visibility")),
-            domainCount = resultSet.getInt("domain_count"),
-            domainActionRequiredCount = resultSet.getInt("domain_action_required_count"),
-            firstHostOnboardingState = FirstHostOnboardingState.valueOf(resultSet.getString("first_host_state")),
-        )
-
     private companion object {
+        private const val MAX_CLUB_LIST_LIMIT = 100
+        private const val HOST_DISPLAY_NAME_MAX_LENGTH = 50
+
         private const val CLUB_BASE_SQL = """
             select
               clubs.id,
@@ -258,3 +242,20 @@ class JdbcPlatformAdminClubAdapter(
         """
     }
 }
+
+private fun mapPlatformAdminClub(
+    resultSet: ResultSet,
+    @Suppress("UNUSED_PARAMETER") rowNumber: Int,
+): PlatformAdminClubListItem =
+    PlatformAdminClubListItem(
+        clubId = resultSet.uuid("id"),
+        slug = resultSet.getString("slug"),
+        name = resultSet.getString("name"),
+        tagline = resultSet.getString("tagline"),
+        about = resultSet.getString("about"),
+        status = ClubStatus.valueOf(resultSet.getString("status")),
+        publicVisibility = ClubPublicVisibility.valueOf(resultSet.getString("public_visibility")),
+        domainCount = resultSet.getInt("domain_count"),
+        domainActionRequiredCount = resultSet.getInt("domain_action_required_count"),
+        firstHostOnboardingState = FirstHostOnboardingState.valueOf(resultSet.getString("first_host_state")),
+    )

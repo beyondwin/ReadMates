@@ -501,8 +501,9 @@ class MySqlFlywayMigrationTest(
             foreignKeyColumns("invitations", "invitations_platform_admin_inviter_fk"),
         )
         assertEquals("users:id", foreignKeyReference("invitations", "invitations_platform_admin_inviter_fk"))
-        assertTrue(checkConstraintClause("invitations_inviter_source_check").contains("invited_by_membership_id"))
-        assertTrue(checkConstraintClause("invitations_inviter_source_check").contains("invited_by_platform_admin_user_id"))
+        val invitationSourceCheck = checkConstraintClause("invitations_inviter_source_check")
+        assertTrue(invitationSourceCheck.contains("invited_by_membership_id"))
+        assertTrue(invitationSourceCheck.contains("invited_by_platform_admin_user_id"))
 
         assertEquals("NO", columnValue("club_domains", "club_id", "is_nullable"))
         assertEquals("NO", columnValue("club_domains", "hostname", "is_nullable"))
