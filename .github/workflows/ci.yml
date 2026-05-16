@@ -114,6 +114,12 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    env:
+      # ubuntu-latest is 4 vCPU; matches the build.gradle.kts default of
+      # availableProcessors()/2. Set explicitly so the value is auditable
+      # and survives any future runner-spec change.
+      # Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.3
+      READMATES_TEST_FORKS: "2"
     steps:
       - name: Configure Git defaults
         run: git config --global init.defaultBranch main
@@ -130,13 +136,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Server quality gates (ktlint + detekt + tests + JaCoCo)
+      - name: Server quality gates (ktlint + detekt + tests + JaCoCo + architecture)
         working-directory: server
         run: ./gradlew check
-
-      - name: Architecture tests
-        working-directory: server
-        run: ./gradlew architectureTest
 
       - name: Upload server reports
         if: always()

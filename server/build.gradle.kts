@@ -129,6 +129,16 @@ tasks.register<Test>("unitTest") {
     useJUnitPlatform {
         excludeTags("integration", "container", "architecture")
     }
+    // Adjustable parallelism for unitTest (no shared state across classes).
+    // Override priority: -PmaxForks=N (sweep harness) > READMATES_TEST_FORKS
+    // env (CI workflow) > availableProcessors()/2 default (min 1).
+    // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.3
+    val requestedForks =
+        (project.findProperty("maxForks") as String?)?.toIntOrNull()
+            ?: System.getenv("READMATES_TEST_FORKS")?.toIntOrNull()
+            ?: (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    maxParallelForks = requestedForks
+    forkEvery = 0
 }
 
 tasks.register<Test>("integrationTest") {
