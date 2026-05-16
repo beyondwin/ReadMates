@@ -72,7 +72,7 @@
 
 .rm-docs__mobile-preview .btn {
   width: 100%;
-  min-height: 44px;
+  height: 44px;
 }
 
 .rm-docs__component-list {
@@ -120,6 +120,11 @@
   .rm-docs__responsive-grid,
   .rm-docs__component-row {
     grid-template-columns: 1fr;
+  }
+
+  .rm-docs__preview .btn,
+  .rm-docs__responsive-grid .btn {
+    height: 44px;
   }
 
   .rm-docs__component-meta {
