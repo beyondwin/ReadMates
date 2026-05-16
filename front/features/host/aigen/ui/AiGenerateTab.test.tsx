@@ -1,0 +1,381 @@
+/**
+ * State-machine tests for AiGenerateTab (design doc §10).
+ *
+ * The tab transitions IDLE → GENERATING → (PREVIEW | ERROR | IDLE) →
+ * COMMITTED. The polling, API calls, and snapshot patching are mocked at
+ * the aigen-api boundary; only the tab's transition logic is exercised.
+ */
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { PropsWithChildren } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  AiGenerationJobResponse,
+  AiGenerationStatus,
+  ClubAiDefaultResponse,
+  SessionImportV1,
+  StartGenerationResponse,
+} from "@/features/host/aigen/api/aigen-contracts";
+
+vi.mock("@/features/host/aigen/api/aigen-api", () => ({
+  startGeneration: vi.fn(),
+  getJob: vi.fn(),
+  regenerateItem: vi.fn(),
+  commitGeneration: vi.fn(),
+  cancelGeneration: vi.fn(),
+  getClubAiDefault: vi.fn(),
+  putClubAiDefault: vi.fn(),
+}));
+
+import {
+  cancelGeneration,
+  commitGeneration,
+  getClubAiDefault,
+  getJob,
+  startGeneration,
+} from "@/features/host/aigen/api/aigen-api";
+import { AiGenerateTab } from "./AiGenerateTab";
+
+const mockedStart = vi.mocked(startGeneration);
+const mockedGetJob = vi.mocked(getJob);
+const mockedCommit = vi.mocked(commitGeneration);
+const mockedCancel = vi.mocked(cancelGeneration);
+const mockedClubDefault = vi.mocked(getClubAiDefault);
+
+function sampleSnapshot(): SessionImportV1 {
+  return {
+    format: "readmates.session.v1",
+    sessionNumber: 5,
+    bookTitle: "테스트",
+    meetingDate: "2026-05-16",
+    summary: "요약",
+    highlights: [{ authorName: "A", text: "h1" }],
+    oneLineReviews: [{ authorName: "B", text: "r1" }],
+    feedbackDocumentFileName: "session-5-feedback.md",
+    feedbackDocumentMarkdown: "# 피드백",
+  };
+}
+
+function jobResponse(status: AiGenerationStatus, opts: Partial<AiGenerationJobResponse> = {}): AiGenerationJobResponse {
+  return {
+    jobId: "job-1",
+    status,
+    stage: status === "RUNNING" ? "GENERATING_SUMMARY" : null,
+    progressPct: status === "SUCCEEDED" ? 100 : 50,
+    model: "claude-sonnet-4-6",
+    result: status === "SUCCEEDED" ? sampleSnapshot() : null,
+    error: null,
+    tokens: null,
+    costEstimateUsd: "0.12",
+    warnings: [],
+    ...opts,
+  };
+}
+
+function clubDefaultResponse(model: string | null = "claude-sonnet-4-6"): ClubAiDefaultResponse {
+  return { defaultModel: model };
+}
+
+function createWrapper() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  function Wrapper({ children }: PropsWithChildren) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  }
+  return { client, Wrapper };
+}
+
+function installFakeLocalStorage(): void {
+  const data = new Map<string, string>();
+  const store: Storage = {
+    getItem: (key: string) => (data.has(key) ? data.get(key) ?? null : null),
+    setItem: (key: string, value: string) => {
+      data.set(key, String(value));
+    },
+    removeItem: (key: string) => {
+      data.delete(key);
+    },
+    clear: () => {
+      data.clear();
+    },
+    key: (index: number) => Array.from(data.keys())[index] ?? null,
+    get length() {
+      return data.size;
+    },
+  };
+  Object.defineProperty(window, "localStorage", { configurable: true, value: store });
+}
+
+describe("AiGenerateTab", () => {
+  beforeEach(() => {
+    mockedStart.mockReset();
+    mockedGetJob.mockReset();
+    mockedCommit.mockReset();
+    mockedCancel.mockReset();
+    mockedClubDefault.mockReset();
+    mockedClubDefault.mockResolvedValue(clubDefaultResponse());
+    installFakeLocalStorage();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("starts in IDLE and shows the TranscriptUploadForm", async () => {
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByText("AI로 세션 기록 생성")).toBeInTheDocument();
+    expect(screen.getByLabelText(/대본 파일/)).toBeInTheDocument();
+  });
+
+  it("transitions IDLE → GENERATING when start succeeds", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    } satisfies StartGenerationResponse);
+    mockedGetJob.mockResolvedValue(jobResponse("RUNNING"));
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    // Wait for club default to populate so submit is enabled.
+    await screen.findByText("AI로 세션 기록 생성");
+
+    const file = new File(["transcript body"], "transcript.txt", { type: "text/plain" });
+    const fileInput = screen.getByLabelText(/대본 파일/) as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(fileInput, { target: { files: [file] } });
+    });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await act(async () => {
+      fireEvent.click(submit);
+    });
+
+    await waitFor(() => {
+      expect(mockedStart).toHaveBeenCalledTimes(1);
+    });
+    // GENERATING state shows the progress bar.
+    await waitFor(() => {
+      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    });
+  });
+
+  it("transitions GENERATING → PREVIEW when poll returns SUCCEEDED", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(jobResponse("SUCCEEDED"));
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+    });
+
+    // After poll, PREVIEW shows summary section editor.
+    await waitFor(() => {
+      expect(screen.getByText(/AI가 생성한 기록 미리보기/)).toBeInTheDocument();
+    });
+  });
+
+  it("transitions GENERATING → ERROR when poll returns FAILED", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(
+      jobResponse("FAILED", { error: { code: "LLM_TIMEOUT", message: "LLM이 응답하지 않았습니다." } }),
+    );
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/LLM이 응답하지 않았습니다/)).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: /다시 시도/ })).toBeInTheDocument();
+  });
+
+  it("transitions GENERATING → IDLE when poll returns CANCELLED", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(jobResponse("CANCELLED"));
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+    });
+
+    // Back to IDLE: TranscriptUploadForm is shown again.
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /생성 시작/ })).toBeInTheDocument();
+    });
+  });
+
+  it("invokes cancelGeneration when the user clicks 취소", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    // Keep returning RUNNING so we stay in GENERATING.
+    mockedGetJob.mockResolvedValue(jobResponse("RUNNING"));
+    mockedCancel.mockResolvedValue(undefined);
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+    });
+
+    const cancelBtn = await screen.findByRole("button", { name: /^취소$/ });
+    await act(async () => {
+      fireEvent.click(cancelBtn);
+    });
+
+    await waitFor(() => {
+      expect(mockedCancel).toHaveBeenCalledWith("s1", "job-1");
+    });
+  });
+
+  it("transitions PREVIEW → COMMITTED and calls onCommitted on successful commit", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(jobResponse("SUCCEEDED"));
+    mockedCommit.mockResolvedValue({
+      sessionId: "s1",
+      session: { id: "s1" },
+    } as unknown as Awaited<ReturnType<typeof commitGeneration>>);
+
+    const onCommitted = vi.fn();
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={onCommitted} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+    });
+
+    const commitBtn = await screen.findByRole("button", { name: /기록 저장/ });
+    await act(async () => {
+      fireEvent.click(commitBtn);
+    });
+
+    await waitFor(() => {
+      expect(mockedCommit).toHaveBeenCalledTimes(1);
+      expect(onCommitted).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("returns ERROR → IDLE when retry is clicked", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(
+      jobResponse("FAILED", { error: { code: "LLM_TIMEOUT", message: "실패" } }),
+    );
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+    });
+
+    const retryBtn = await screen.findByRole("button", { name: /다시 시도/ });
+    await act(async () => {
+      fireEvent.click(retryBtn);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /생성 시작/ })).toBeInTheDocument();
+    });
+  });
+});
