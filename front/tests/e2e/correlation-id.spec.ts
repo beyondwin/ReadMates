@@ -7,6 +7,10 @@ import { expect, test } from "@playwright/test";
 const BFF_GET_ENDPOINT = "/api/bff/api/auth/me";
 
 test("BFF response exposes generated X-Readmates-Request-Id header for /api/bff/** calls", async ({ page }) => {
+  // page.evaluate(fetch) runs in the page context; a prior page.goto is required
+  // so relative URLs resolve against baseURL — matches prior art in
+  // multi-club-flow.spec.ts and public-auth-member-host.spec.ts.
+  await page.goto("/");
   const headerValue = await page.evaluate(async (url) => {
     const response = await fetch(url, { cache: "no-store" });
     return response.headers.get("x-readmates-request-id");
@@ -18,6 +22,7 @@ test("BFF response exposes generated X-Readmates-Request-Id header for /api/bff/
 });
 
 test("client-supplied X-Readmates-Request-Id is preserved end-to-end on /api/bff/** calls", async ({ page }) => {
+  await page.goto("/");
   const supplied = "client-correlation-abc1234";
   const headerValue = await page.evaluate(
     async ({ url, requestId }) => {
