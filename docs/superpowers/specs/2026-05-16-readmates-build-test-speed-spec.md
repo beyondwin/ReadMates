@@ -199,11 +199,21 @@ Detail: `docs/superpowers/reports/2026-05-16-baseline-warm.md` and
 Apple Silicon host. CI numbers (C1/C2/C3) come from the PR push.
 
 ### 7.3 CI (GitHub Actions duration, sec)
-| 잡 / 측정 ID | Before (3-run median) | After (3-run median) | Δ% | 비고 |
+| 잡 / 측정 ID | Before (3-run median) | After (single run) | Δ% | 비고 |
 |------------|--------------------|--------------------|----|------|
-| C1 backend  |                    |                    |    |      |
-| C2 frontend |                    |                    |    |      |
-| C3 e2e 1/3  |                    |                    |    |      |
+| C1 backend  | 271 (255/271/273) | 261 | -3.7% | A3 FAIL — 분석 아래 |
+| C2 frontend | 78 (77/78/81)     | 69  | -11.5% |  |
+| C3 e2e 1/3  | 153 (147/153/166) | 171 | +11.8% | E2E 변동성 노이즈 ±15s |
+
+Before: main 최근 3 successful run (2026-05-14). After: PR run #25952266220 (1 run, integrationTest 복구 후).
+
+**A3 게이트 분석:** 로컬 L1 -70.85% 측정값은 `--rerun-tasks`로 integration 제외 상태에서 채취해 CI 실제 wallclock과 다릅니다. 변경 전 `:check`의 묵시적 `:test`가 (a) unit+arch를 한 번 더 돌리는 낭비(~16s)와 (b) integration tests 1회 실행(~115s)을 합쳐 수행했습니다. 본 PR은 (a) 낭비만 제거하고 (b)는 별도 step으로 유지해 A6 coverage를 보존. 결과적으로 backend wallclock 절감 폭이 ~16s + parallel/cache 효과(~수 초) ≈ 10s로 제한됩니다.
+
+A3를 진정으로 달성하려면 추가 옵션이 있습니다 (모두 후속):
+- `:integrationTest`에도 `maxParallelForks` 적용 (Testcontainers reuse 결합 시 30~40% 추가 절감 잠재)
+- Integration tests를 PR CI에서 빼고 main push 시에만 실행 (-30% 명목 달성, 그러나 PR-time integration 회귀 검출 손실)
+- Testcontainers 모듈을 `JUnit5 PER_CLASS` lifecycle로 묶어 컨테이너 시작 비용 분할
+- Detekt / ktlint baseline scope를 줄여 incremental check time 단축
 
 ### 7.4 프론트엔드 (변경 적용한 경우)
 | 측정 ID | Before | After | Δ% |
@@ -223,16 +233,19 @@ tuning remains a follow-up after a baseline confirms the entry gate.
   compile-chain tasks and produces no JUnit XML (see L1 verification).
 - **A2** [PASS] — 58 unit-tagged test class XMLs after `./gradlew unitTest`,
   matches the audit count of 58 (`grep -rL '@Tag("integration|container|architecture")'`).
-- **A3** [DEFERRED] — Needs CI numbers from the PR push.
+- **A3** [FAIL, honest] — backend C1 271s → 261s = -3.7% vs target ≥-30%.
+  See §7.3 분석. integration coverage 유지 비용이 spec의 30% 목표를 초과한
+  케이스. revert 대신 §7.3 후속 옵션 4가지 중 하나를 후속 PR로 가는 것을 권장.
 - **A4** [PASS] — **-70.85%** on L1 warm median (69.47s → 20.25s), far
   exceeding the ≥25% target.
 - **A5** [PASS] — 294 tests across 58 classes, 0 failures / 0 errors;
   JaCoCo gate runs as part of `:check` and was green in all 3 measurement
   iterations.
-- **A6** [PASS for architecture; DEFERRED for integration] — `:check`
-  pulls `:architectureTest` (3 ArchUnit boundary tests, all green).
-  `:integrationTest` requires Docker — exercised in CI.
-- **A7** [DEFERRED] — Needs CI run.
+- **A6** [PASS] — `:check`가 `:architectureTest` 의존; integration은 CI
+  backend job의 explicit step(`./gradlew integrationTest`)에서 실행되어
+  PR run #25952266220에서 success.
+- **A7** [PASS] — E2E (1/3, 2/3, 3/3) 모두 success on PR run #25952266220.
+  E2E shard duration 변동(±15s)은 GHA 노이즈 범위 내.
 - **A8** [PARTIAL] — §7.2 (warm) and §7.4 (front) populated by this pass;
   §7.1 (cold) and §7.3 (CI) deferred.
 
