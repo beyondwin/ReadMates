@@ -2,6 +2,8 @@ import {
   apiBaseUrlFromEnv,
   copyUpstreamHeaders,
   forwardedOAuthRequestHeaders,
+  READMATES_REQUEST_ID_HEADER,
+  requestIdForUpstream,
   safeRouteSegment,
 } from "../../../_shared/proxy";
 import { bffErrorResponse } from "../../../_shared/errors";
@@ -28,15 +30,21 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env, params })
   const upstreamUrl = new URL(`/login/oauth2/code/${registrationId}`, apiBaseUrlFromEnv(env));
   upstreamUrl.search = sourceUrl.search;
 
+  const requestId = requestIdForUpstream(request);
+  const forwardHeaders = forwardedOAuthRequestHeaders(request, env);
+  forwardHeaders.set(READMATES_REQUEST_ID_HEADER, requestId);
+
   const upstream = await fetch(upstreamUrl.toString(), {
     method: "GET",
-    headers: forwardedOAuthRequestHeaders(request, env),
+    headers: forwardHeaders,
     redirect: "manual",
   });
 
   const responseBody = [204, 304].includes(upstream.status) ? null : upstream.body;
-  return new Response(responseBody, {
+  const outboundResponse = new Response(responseBody, {
     status: upstream.status,
     headers: copyUpstreamHeaders(upstream.headers),
   });
+  outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
+  return outboundResponse;
 };
