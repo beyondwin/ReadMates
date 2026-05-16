@@ -210,10 +210,11 @@ Before: main 최근 3 successful run (2026-05-14). After: PR run #25952266220 (1
 **A3 게이트 분석:** 로컬 L1 -70.85% 측정값은 `--rerun-tasks`로 integration 제외 상태에서 채취해 CI 실제 wallclock과 다릅니다. 변경 전 `:check`의 묵시적 `:test`가 (a) unit+arch를 한 번 더 돌리는 낭비(~16s)와 (b) integration tests 1회 실행(~115s)을 합쳐 수행했습니다. 본 PR은 (a) 낭비만 제거하고 (b)는 별도 step으로 유지해 A6 coverage를 보존. 결과적으로 backend wallclock 절감 폭이 ~16s + parallel/cache 효과(~수 초) ≈ 10s로 제한됩니다.
 
 A3를 진정으로 달성하려면 추가 옵션이 있습니다 (모두 후속):
-- `:integrationTest`에도 `maxParallelForks` 적용 (Testcontainers reuse 결합 시 30~40% 추가 절감 잠재)
+- ~~`:integrationTest`에도 `maxParallelForks` 적용~~ — **2026-05-16 시도, 음성 결과**. PR run #25952482384 (commit `554a8a7`, integrationTest forks=2)에서 backend C1 271s로 측정 — run #2(forks 없음)의 261s보다 +10s. 가설: 4-vCPU GHA runner에 2× (MySQL + Redis + Kafka) = 6 컨테이너 동시 시작이 메모리/IO bound. Commit `17266db`로 revert.
 - Integration tests를 PR CI에서 빼고 main push 시에만 실행 (-30% 명목 달성, 그러나 PR-time integration 회귀 검출 손실)
 - Testcontainers 모듈을 `JUnit5 PER_CLASS` lifecycle로 묶어 컨테이너 시작 비용 분할
 - Detekt / ktlint baseline scope를 줄여 incremental check time 단축
+- larger runner (e.g., `ubuntu-latest-8-cores` paid runner)로 backend job만 옮겨 fork 확장 여지 확보
 
 ### 7.4 프론트엔드 (변경 적용한 경우)
 | 측정 ID | Before | After | Δ% |
