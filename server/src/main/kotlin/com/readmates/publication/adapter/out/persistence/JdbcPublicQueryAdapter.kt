@@ -29,6 +29,7 @@ class JdbcPublicQueryAdapter(
                 from clubs
                 where slug = ?
                   and status = 'ACTIVE'
+                  and public_visibility = 'PUBLIC'
                 """.trimIndent(),
                 { rs, _ ->
                     val clubId = rs.uuid("id")
@@ -60,6 +61,7 @@ class JdbcPublicQueryAdapter(
                   and public_session_publications.club_id = sessions.club_id
                 where clubs.slug = ?
                   and clubs.status = 'ACTIVE'
+                  and clubs.public_visibility = 'PUBLIC'
                   and sessions.id = ?
                   and sessions.state = 'PUBLISHED'
                   and public_session_publications.visibility = 'PUBLIC'

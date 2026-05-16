@@ -490,6 +490,19 @@ class MySqlFlywayMigrationTest(
         assertEquals("NO", columnValue("clubs", "status", "is_nullable"))
         assertTrue(checkConstraintClause("clubs_status_check").contains("ACTIVE"))
         assertTrue(checkConstraintClause("clubs_status_check").contains("ARCHIVED"))
+        assertEquals("NO", columnValue("clubs", "public_visibility", "is_nullable"))
+        assertTrue(checkConstraintClause("clubs_public_visibility_check").contains("PRIVATE"))
+        assertTrue(checkConstraintClause("clubs_public_visibility_check").contains("PUBLIC"))
+        assertEquals("status,public_visibility", indexColumns("clubs", "clubs_status_public_visibility_idx"))
+        assertEquals("YES", columnValue("invitations", "invited_by_membership_id", "is_nullable"))
+        assertEquals("YES", columnValue("invitations", "invited_by_platform_admin_user_id", "is_nullable"))
+        assertEquals(
+            "invited_by_platform_admin_user_id",
+            foreignKeyColumns("invitations", "invitations_platform_admin_inviter_fk"),
+        )
+        assertEquals("users:id", foreignKeyReference("invitations", "invitations_platform_admin_inviter_fk"))
+        assertTrue(checkConstraintClause("invitations_inviter_source_check").contains("invited_by_membership_id"))
+        assertTrue(checkConstraintClause("invitations_inviter_source_check").contains("invited_by_platform_admin_user_id"))
 
         assertEquals("NO", columnValue("club_domains", "club_id", "is_nullable"))
         assertEquals("NO", columnValue("club_domains", "hostname", "is_nullable"))

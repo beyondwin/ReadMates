@@ -297,6 +297,36 @@ class PublicControllerDbTest(
 
     @Test
     @Sql(
+        statements = ["update clubs set public_visibility = 'PRIVATE' where slug = 'reading-sai'"],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = ["update clubs set public_visibility = 'PUBLIC' where slug = 'reading-sai'"],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public club endpoint hides private clubs`() {
+        mockMvc.get("/api/public/clubs/reading-sai").andExpect {
+            status { isNotFound() }
+        }
+    }
+
+    @Test
+    @Sql(
+        statements = ["update clubs set public_visibility = 'PRIVATE' where slug = 'reading-sai'"],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = ["update clubs set public_visibility = 'PUBLIC' where slug = 'reading-sai'"],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public session endpoint hides sessions for private clubs`() {
+        mockMvc.get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306").andExpect {
+            status { isNotFound() }
+        }
+    }
+
+    @Test
+    @Sql(
         statements = [
             CLEANUP_VISIBILITY_TEST_SESSIONS_SQL,
             INSERT_MEMBER_PUBLISHED_SESSION_SQL,
