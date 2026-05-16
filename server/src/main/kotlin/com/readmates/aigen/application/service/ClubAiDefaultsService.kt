@@ -1,0 +1,90 @@
+package com.readmates.aigen.application.service
+
+import com.readmates.aigen.adapter.`in`.web.AiGenerationException
+import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.ModelId
+import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.`in`.ClubAiDefaultsView
+import com.readmates.aigen.application.port.`in`.GetClubAiDefaultsUseCase
+import com.readmates.aigen.application.port.`in`.UpdateClubAiDefaultsUseCase
+import com.readmates.aigen.application.port.out.AiGenerationClubDefaultPort
+import com.readmates.aigen.application.port.out.ModelCatalog
+import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.CurrentMember
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.stereotype.Service
+
+/**
+ * Application service backing the `GET`/`PUT` `/api/host/clubs/{clubSlug}/ai-defaults`
+ * endpoints (spec §7.6).
+ *
+ * Authorization:
+ *  - The caller must be an active HOST.
+ *  - The caller's [CurrentMember.clubSlug] must match the path's `clubSlug`.
+ * Both checks throw [AccessDeniedException], which the REST advice maps to
+ * HTTP 403.
+ *
+ * Model validation:
+ *  - The candidate `defaultModel` must resolve to a [ModelId] whose name
+ *    prefix maps to a known [Provider] AND be flagged enabled by the
+ *    [ModelCatalog]. Otherwise an [AiGenerationException] with
+ *    [ErrorCode.AI_DISABLED] is raised (spec §7.6 + §9.2).
+ */
+@Service
+@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
+class ClubAiDefaultsService(
+    private val clubDefaultPort: AiGenerationClubDefaultPort,
+    private val modelCatalog: ModelCatalog,
+) : GetClubAiDefaultsUseCase, UpdateClubAiDefaultsUseCase {
+
+    override fun get(clubSlug: String, member: CurrentMember): ClubAiDefaultsView {
+        requireHostOfClub(clubSlug, member)
+        val row = clubDefaultPort.load(member.clubId)
+        return ClubAiDefaultsView(defaultModel = row?.defaultModel)
+    }
+
+    override fun update(clubSlug: String, defaultModel: String, member: CurrentMember) {
+        requireHostOfClub(clubSlug, member)
+        val resolved = resolveAllowlistedModel(defaultModel)
+            ?: throw AiGenerationException(
+                ErrorCode.AI_DISABLED,
+                "model '$defaultModel' is not allowlisted",
+            )
+        clubDefaultPort.upsert(
+            clubId = member.clubId,
+            defaultModel = resolved.name,
+            updatedBy = member.userId,
+        )
+    }
+
+    private fun requireHostOfClub(clubSlug: String, member: CurrentMember) {
+        if (member.clubSlug != clubSlug || !member.isHost) {
+            throw AccessDeniedException("Host of '$clubSlug' required")
+        }
+    }
+
+    /**
+     * Resolve `name` to an allowlisted [ModelId] or null. We try the catalog
+     * alias map first (in case future entries differ from the literal name),
+     * then derive the provider from the name prefix and consult
+     * [ModelCatalog.isEnabled] for the final allowlist decision.
+     */
+    private fun resolveAllowlistedModel(name: String): ModelId? {
+        modelCatalog.resolveAlias(name)?.let { return it }
+        val provider = providerFromName(name) ?: return null
+        val candidate = ModelId(provider, name)
+        return candidate.takeIf { modelCatalog.isEnabled(it) }
+    }
+
+    private fun providerFromName(name: String): Provider? = when {
+        name.startsWith("claude-") -> Provider.CLAUDE
+        name.startsWith("gemini-") -> Provider.GEMINI
+        name.startsWith("gpt-") -> Provider.OPENAI
+        OPENAI_O_SERIES_REGEX.matches(name) -> Provider.OPENAI
+        else -> null
+    }
+
+    private companion object {
+        private val OPENAI_O_SERIES_REGEX = Regex("^o\\d.*")
+    }
+}
