@@ -228,6 +228,10 @@ function isPackageImport(specifier: string, packageName: string) {
   return specifier === packageName || specifier.startsWith(`${packageName}/`);
 }
 
+function isDesignSystemImport(specifier: string) {
+  return isPackageImport(specifier, "@readmates/design-system");
+}
+
 function isFeatureModelFile(relativePath: string) {
   return /^features\/[^/]+\/model\//.test(relativePath);
 }
@@ -501,6 +505,10 @@ describe("frontend architecture boundaries", () => {
 
       for (const specifier of specifiers) {
         const importSpecifier = normalizeImportSpecifier(sourceFile, specifier);
+
+        if (isDesignSystemImport(importSpecifier.rawSpecifier)) {
+          continue;
+        }
 
         if (isSharedToFeaturePageOrAppImport(sourceFile, importSpecifier.projectPath)) {
           addImportViolation(

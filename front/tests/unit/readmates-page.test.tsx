@@ -23,6 +23,7 @@ describe("ReadmatesRouteLoading", () => {
   it("defines reduced-motion fallbacks for route reveal and skeleton movement", () => {
     const css = readFileSync("src/styles/globals.css", "utf8");
 
+    expect(css).toContain('@import "@readmates/design-system/styles.css";');
     expect(css).toContain("@media (prefers-reduced-motion: reduce)");
     expect(css).toContain(".rm-route-reveal");
     expect(css).toContain("animation: none !important");
