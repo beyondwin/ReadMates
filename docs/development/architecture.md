@@ -14,7 +14,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/notifications`, 등록된 club host의 `/app/**` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 본인 표시 이름과 알림 설정 변경, 클럽별 멤버 알림함 확인 |
 | 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 세션 기록 JSON 가져오기, 초대 관리, 멤버 상태와 표시 이름 관리, 피드백 문서 업로드, 알림 발송 운영 |
-| 플랫폼 관리 | `/admin` | platform admin | 클럽 생성, 클럽 목록 확인, 등록형 domain alias 요청과 상태 확인. 클럽 호스트/멤버 권한과 별도 권한으로 처리 |
+| 플랫폼 관리 | `/admin` | platform admin | 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인. 세션/멤버/알림 같은 클럽 내부 운영은 호스트 앱 책임 |
 
 ## 프런트엔드 route-first 경계
 
@@ -93,6 +93,8 @@ Feature-specific unavailable state는 feature가 계속 소유한다. 공개 세
 `clubs.slug`는 클럽의 내부 canonical key입니다. 무료 플랜에서도 항상 보장되는 공개 URL은 `https://readmates.pages.dev/clubs/:slug`이고, 같은 path 전략은 primary domain을 붙였을 때도 유지됩니다. `club_domains.hostname`은 외부 진입 alias입니다. 등록된 alias는 Cloudflare Pages custom domain에 연결된 뒤 `ACTIVE` 상태일 때 host 기반으로 같은 클럽을 resolve합니다. Primary domain path fallback은 slug로 resolve하며 별도 `club_domains` row를 만들지 않습니다.
 
 Platform admin의 domain 상태 확인은 `https://<hostname>/.well-known/readmates-domain-check.json` marker를 HTTPS로 가져와 `ACTIVE` 또는 `FAILED`로 저장합니다. Checker는 redirect를 따르지 않고, loopback/private/link-local/multicast/IPv6 ULA address와 4KB를 넘는 marker 응답을 실패로 처리합니다. 1차 구현은 Cloudflare account id, zone id, API token을 저장하지 않으며 Cloudflare API poller 대신 admin-triggered marker check를 사용합니다.
+
+`clubs.status`는 운영 lifecycle이고, `clubs.public_visibility`는 공개 페이지 노출 여부입니다. 새 클럽은 `SETUP_REQUIRED`와 `PRIVATE`로 생성되며, 플랫폼 운영자가 필수 공개 정보와 활성 호스트를 확인한 뒤 `ACTIVE`와 `PUBLIC`으로 전환합니다. Public API는 `clubs.status = ACTIVE`와 `clubs.public_visibility = PUBLIC`을 모두 만족하는 클럽만 반환합니다.
 
 클럽 context resolve 순서는 trusted `X-Readmates-Club-Slug`가 먼저이고, 없으면 trusted `X-Readmates-Club-Host`입니다. Spring은 BFF secret을 통과한 요청에서만 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 신뢰합니다. browser가 직접 보낸 같은 이름의 header는 Pages Functions 또는 Vite proxy에서 제거되며, Spring API origin을 직접 호출하는 요청은 운영에서 BFF secret 검증을 통과할 수 없습니다.
 
