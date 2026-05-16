@@ -7,7 +7,13 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
-@RestControllerAdvice(assignableTypes = [PlatformAdminController::class, SupportAccessGrantController::class])
+@RestControllerAdvice(
+    assignableTypes = [
+        PlatformAdminController::class,
+        PlatformAdminClubController::class,
+        SupportAccessGrantController::class,
+    ],
+)
 class PlatformAdminErrorHandler {
     @ExceptionHandler(PlatformAdminException::class)
     fun handlePlatformAdminException(exception: PlatformAdminException): ResponseEntity<Void> =
@@ -16,6 +22,10 @@ class PlatformAdminErrorHandler {
     private fun PlatformAdminError.toHttpStatus(): HttpStatus =
         when (this) {
             PlatformAdminError.INVALID_DOMAIN -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.INVALID_CLUB -> HttpStatus.BAD_REQUEST
+            PlatformAdminError.CLUB_NOT_FOUND -> HttpStatus.NOT_FOUND
+            PlatformAdminError.CLUB_PUBLISH_NOT_ALLOWED -> HttpStatus.CONFLICT
+            PlatformAdminError.CLUB_HOST_REQUIRED -> HttpStatus.CONFLICT
             PlatformAdminError.CLUB_DOMAIN_NOT_FOUND -> HttpStatus.NOT_FOUND
             PlatformAdminError.CLUB_DOMAIN_CONFLICT -> HttpStatus.CONFLICT
             PlatformAdminError.GRANT_NOT_FOUND -> HttpStatus.NOT_FOUND

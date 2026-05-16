@@ -84,6 +84,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/invitations/[^/]+/accept$")),
                     methodAndPath("POST", Regex("^/api/clubs/[^/]+/invitations/[^/]+/accept$")),
                     methodAndPath("POST", Regex("^/api/dev/invitations/[^/]+/accept$")),
+                    methodAndPath("PATCH", Regex("^/api/admin/clubs/[^/]+$")),
                     methodAndPath("POST", Regex("^/api/admin/clubs/[^/]+/domains$")),
                     methodAndPath("POST", Regex("^/api/admin/domains/[^/]+/check$")),
                     methodAndPath("POST", Regex("^/api/admin/support-access-grants$")),

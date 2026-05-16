@@ -2,6 +2,8 @@ package com.readmates.club.application.model
 
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
+import com.readmates.club.domain.ClubPublicVisibility
+import com.readmates.club.domain.ClubStatus
 import com.readmates.club.domain.PlatformAdminRole
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -62,3 +64,33 @@ val PlatformAdminClubDomain.manualAction: PlatformAdminDomainManualAction
         } else {
             PlatformAdminDomainManualAction.NONE
         }
+
+data class PlatformAdminClubList(
+    val items: List<PlatformAdminClubListItem>,
+)
+
+data class PlatformAdminClubListItem(
+    val clubId: UUID,
+    val slug: String,
+    val name: String,
+    val tagline: String,
+    val about: String,
+    val status: ClubStatus,
+    val publicVisibility: ClubPublicVisibility,
+    val domainCount: Int,
+    val domainActionRequiredCount: Int,
+    val firstHostOnboardingState: FirstHostOnboardingState,
+)
+
+enum class FirstHostOnboardingState {
+    MISSING,
+    INVITED,
+    ASSIGNED,
+}
+
+data class UpdatePlatformAdminClubCommand(
+    val name: String?,
+    val tagline: String?,
+    val about: String?,
+    val publicVisibility: ClubPublicVisibility?,
+)

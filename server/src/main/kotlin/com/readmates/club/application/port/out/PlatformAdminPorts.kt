@@ -1,9 +1,12 @@
 package com.readmates.club.application.port.out
 
 import com.readmates.club.application.model.ClubDomainActualCheckResult
+import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
+import com.readmates.club.domain.ClubPublicVisibility
+import com.readmates.club.domain.ClubStatus
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -52,4 +55,23 @@ interface UpdateClubDomainProvisioningPort {
 
 interface CheckClubDomainActualStatePort {
     fun check(hostname: String): ClubDomainActualCheckResult
+}
+
+interface LoadPlatformAdminClubsPort {
+    fun listClubs(limit: Int): List<PlatformAdminClubListItem>
+
+    fun loadClub(clubId: UUID): PlatformAdminClubListItem?
+
+    fun activeHostCount(clubId: UUID): Int
+}
+
+interface UpdatePlatformAdminClubPort {
+    fun updateClub(
+        clubId: UUID,
+        name: String?,
+        tagline: String?,
+        about: String?,
+        status: ClubStatus?,
+        publicVisibility: ClubPublicVisibility?,
+    ): PlatformAdminClubListItem?
 }

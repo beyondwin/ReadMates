@@ -21,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import java.util.UUID
 
@@ -42,20 +43,26 @@ class PlatformAdminControllerTest(
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
     private val createdClubDomainIds = linkedSetOf<String>()
+    private val createdMembershipIds = linkedSetOf<String>()
+    private val createdClubIds = linkedSetOf<String>()
 
     @AfterEach
     fun cleanupCreatedRows() {
         try {
             deleteWhereIn("club_domains", "id", createdClubDomainIds)
+            deleteWhereIn("memberships", "id", createdMembershipIds)
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
             deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
             deleteWhereIn("users", "id", createdUserIds)
+            deleteWhereIn("clubs", "id", createdClubIds)
         } finally {
             createdSessionTokenHashes.clear()
             createdPlatformAdminUserIds.clear()
             createdUserIds.clear()
             createdClubDomainIds.clear()
+            createdMembershipIds.clear()
+            createdClubIds.clear()
             SecurityContextHolder.clearContext()
             domainActualStateChecker.reset()
         }
@@ -288,6 +295,55 @@ class PlatformAdminControllerTest(
     }
 
     @Test
+    fun `operator can list platform admin clubs`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+
+        mockMvc
+            .get("/api/admin/clubs") {
+                cookie(sessionCookieForUser(operator))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.items[0].clubId") { exists() }
+                jsonPath("$.items[0].slug") { exists() }
+                jsonPath("$.items[0].publicVisibility") { exists() }
+                jsonPath("$.items[0].firstHostOnboardingState") { exists() }
+            }
+    }
+
+    @Test
+    fun `operator can make setup club public when active host exists`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val clubId = createSetupClubWithActiveHost()
+
+        mockMvc
+            .patch("/api/admin/clubs/$clubId") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"publicVisibility":"PUBLIC"}"""
+                cookie(sessionCookieForUser(operator))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.clubId") { value(clubId) }
+                jsonPath("$.status") { value("ACTIVE") }
+                jsonPath("$.publicVisibility") { value("PUBLIC") }
+            }
+    }
+
+    @Test
+    fun `support admin cannot make a club public`() {
+        val support = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+        val clubId = createSetupClubWithActiveHost()
+
+        mockMvc
+            .patch("/api/admin/clubs/$clubId") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"publicVisibility":"PUBLIC"}"""
+                cookie(sessionCookieForUser(support))
+            }.andExpect {
+                status { isForbidden() }
+            }
+    }
+
+    @Test
     fun `operator can check custom domain provisioning and activate verified domain`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
         val hostname = "verified-${UUID.randomUUID()}.example.test"
@@ -396,6 +452,43 @@ class PlatformAdminControllerTest(
         )
         createdPlatformAdminUserIds += userId
         return userId
+    }
+
+    private fun createSetupClubWithActiveHost(): String {
+        val clubId = UUID.randomUUID().toString()
+        val hostUserId = UUID.randomUUID().toString()
+        val membershipId = UUID.randomUUID().toString()
+        val slug = "setup-${UUID.randomUUID().toString().take(8)}"
+
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about, status, public_visibility)
+            values (?, ?, 'Setup Club', 'Setup tagline', 'Setup about', 'SETUP_REQUIRED', 'PRIVATE')
+            """.trimIndent(),
+            clubId,
+            slug,
+        )
+        createdClubIds += clubId
+        jdbcTemplate.update(
+            """
+            insert into users (id, email, name, short_name, auth_provider)
+            values (?, ?, 'Setup Host', 'Host', 'GOOGLE')
+            """.trimIndent(),
+            hostUserId,
+            "setup.host.${UUID.randomUUID()}@example.com",
+        )
+        createdUserIds += hostUserId
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name)
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Host')
+            """.trimIndent(),
+            membershipId,
+            clubId,
+            hostUserId,
+        )
+        createdMembershipIds += membershipId
+        return clubId
     }
 
     private fun sessionCookieForUser(userId: String): Cookie {
