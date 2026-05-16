@@ -74,34 +74,18 @@ internal class FakeJobStore : AiGenerationJobStore {
         usage: TokenUsage,
         cost: BigDecimal,
     ) {
+        require(value is SessionImportV1Snapshot) {
+            "FakeJobStore.patchItem requires value: SessionImportV1Snapshot (mirrors Redis contract)"
+        }
         val current = records.getValue(jobId)
-        val patched = patchSnapshot(current.result!!, item, value)
         records[jobId] = current.copy(
-            result = patched,
+            result = value,
             tokens = TokenUsage(
                 current.tokens.inputTokens + usage.inputTokens,
                 current.tokens.cachedInputTokens + usage.cachedInputTokens,
                 current.tokens.outputTokens + usage.outputTokens,
             ),
             costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
-        )
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun patchSnapshot(
-        snapshot: SessionImportV1Snapshot,
-        item: GenerationItem,
-        value: Any,
-    ): SessionImportV1Snapshot = when (item) {
-        GenerationItem.SUMMARY -> snapshot.copy(summary = value as String)
-        GenerationItem.HIGHLIGHTS -> snapshot.copy(
-            highlights = value as List<SessionImportV1Snapshot.AuthoredText>,
-        )
-        GenerationItem.ONE_LINE_REVIEWS -> snapshot.copy(
-            oneLineReviews = value as List<SessionImportV1Snapshot.AuthoredText>,
-        )
-        GenerationItem.FEEDBACK_DOCUMENT -> snapshot.copy(
-            feedbackDocumentMarkdown = value as String,
         )
     }
 
@@ -415,6 +399,7 @@ internal object AiGenerationTestFixtures {
         error: GenerationError? = null,
         instructions: String? = null,
         transcript: String = "transcript text",
+        sessionMeta: SessionMeta = sessionMeta(sessionId = sessionId, clubId = clubId),
         expiresAt: Instant = NOW.plusSeconds(21_600L),
     ): JobRecord = JobRecord(
         jobId = jobId,
@@ -425,6 +410,7 @@ internal object AiGenerationTestFixtures {
         authorNameMode = AuthorNameMode.REAL,
         instructions = instructions,
         transcript = transcript,
+        sessionMeta = sessionMeta,
         status = status,
         stage = stage,
         progressPct = if (status == JobStatus.SUCCEEDED) 100 else 0,

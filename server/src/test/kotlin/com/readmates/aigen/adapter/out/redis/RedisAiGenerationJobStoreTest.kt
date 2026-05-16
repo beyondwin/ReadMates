@@ -7,6 +7,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
+import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.JobRecord
@@ -156,15 +157,27 @@ class RedisAiGenerationJobStoreTest(
 
     private fun newRecord(): JobRecord {
         val ttl = properties.job.redisTtl
+        val sessionId = UUID.randomUUID()
+        val clubId = UUID.randomUUID()
         return JobRecord(
             jobId = UUID.randomUUID(),
-            sessionId = UUID.randomUUID(),
-            clubId = UUID.randomUUID(),
+            sessionId = sessionId,
+            clubId = clubId,
             hostUserId = UUID.randomUUID(),
             model = ModelId(Provider.CLAUDE, "claude-sonnet-4-6"),
             authorNameMode = AuthorNameMode.REAL,
             instructions = "be concise",
             transcript = "transcript body contents",
+            sessionMeta = SessionMeta(
+                sessionId = sessionId,
+                clubId = clubId,
+                sessionNumber = 7,
+                bookTitle = "Test Book",
+                bookAuthor = "Author",
+                meetingDate = LocalDate.of(2026, 5, 16),
+                expectedAuthorNames = listOf("Alice", "Bob"),
+                authorNameMode = AuthorNameMode.REAL,
+            ),
             status = JobStatus.PENDING,
             stage = JobStage.QUEUED,
             progressPct = 0,

@@ -10,6 +10,7 @@ import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GuardDecision
+import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -151,6 +152,59 @@ class AiGenerationRegenerationServiceTest {
     }
 
     @Test
+    fun `regenerate rolls back and audits FAILED when patched snapshot fails validation`() {
+        val ctx = TestContext()
+        ctx.validator.resultProvider = { snapshot ->
+            // Reject ONLY the patched snapshot (the one that contains the bad new summary).
+            if (snapshot.summary == "bad summary") {
+                ValidationResult.Violation(ErrorCode.SCHEMA_INVALID, "blank summary")
+            } else {
+                ValidationResult.Ok
+            }
+        }
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+            status = JobStatus.SUCCEEDED,
+            result = AiGenerationTestFixtures.snapshot("good original summary"),
+        )
+        ctx.jobStore.save(record)
+        ctx.regenerator.enqueueSuccess(
+            RegenerationOutput(
+                patchedItem = GenerationItem.SUMMARY,
+                patchedValue = "bad summary",
+                usage = TokenUsage(1, 0, 1),
+            ),
+        )
+        ctx.regenerator.enqueueSuccess(
+            RegenerationOutput(
+                patchedItem = GenerationItem.SUMMARY,
+                patchedValue = "bad summary",
+                usage = TokenUsage(1, 0, 1),
+            ),
+        )
+
+        assertThatThrownBy {
+            ctx.service.regenerate(
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                item = GenerationItem.SUMMARY,
+                model = null,
+                instructions = null,
+            )
+        }.isInstanceOf(LlmGenerationException::class.java)
+
+        // The job result must NOT have been mutated by the bad patch.
+        val current = ctx.jobStore.load(record.jobId)!!.result!!
+        assertThat(current.summary).isEqualTo("good original summary")
+        // Audit must record a FAILED entry with the validator's error code.
+        val failedAudit = ctx.auditPort.entries.firstOrNull { it.status == AuditStatus.FAILED }
+        assertThat(failedAudit).isNotNull
+        assertThat(failedAudit!!.errorCode).isEqualTo(ErrorCode.SCHEMA_INVALID)
+    }
+
+    @Test
     fun `regenerate appends CLUB_BUDGET_80PCT to warnings when monthly cost crosses soft ratio`() {
         val ctx = TestContext()
         ctx.costGuard.clubMonthly = BigDecimal("16.50")
@@ -191,6 +245,7 @@ class AiGenerationRegenerationServiceTest {
         val regenerator = FakeContentRegenerator(provider = Provider.CLAUDE)
         val auditPort = FakeAuditPort()
         val costGuard = FakeCostGuard()
+        val validator = FakeValidator()
         val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog()
         val properties = AiGenerationTestFixtures.defaultProperties()
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
@@ -200,6 +255,7 @@ class AiGenerationRegenerationServiceTest {
             jobStore = jobStore,
             regenerators = mapOf(Provider.CLAUDE to regenerator),
             modelCatalog = modelCatalog,
+            validator = validator,
             auditPort = auditPort,
             costGuard = costGuard,
             properties = properties,

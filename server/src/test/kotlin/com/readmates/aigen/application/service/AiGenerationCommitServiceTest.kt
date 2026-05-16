@@ -59,7 +59,7 @@ class AiGenerationCommitServiceTest {
     }
 
     @Test
-    fun `commit with overrideResult overwrites Redis snapshot before validation`() {
+    fun `commit with overrideResult validates and then overwrites Redis snapshot`() {
         val ctx = TestContext()
         val record = AiGenerationTestFixtures.jobRecord(
             sessionId = ctx.sessionId,
@@ -115,6 +115,38 @@ class AiGenerationCommitServiceTest {
         val audit = ctx.auditPort.entries.single()
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
         assertThat(audit.errorCode).isEqualTo(ErrorCode.AUTHOR_NAME_MISMATCH)
+    }
+
+    @Test
+    fun `commit does not persist override when validator rejects it`() {
+        val ctx = TestContext()
+        ctx.validator.result = ValidationResult.Violation(ErrorCode.AUTHOR_NAME_MISMATCH)
+        val original = AiGenerationTestFixtures.snapshot("auto-generated original")
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.host.clubId,
+            hostUserId = ctx.host.userId,
+            status = JobStatus.SUCCEEDED,
+            result = original,
+        )
+        ctx.jobStore.save(record)
+        val badOverride = AiGenerationTestFixtures.snapshot("user-edited bad summary")
+
+        assertThatThrownBy {
+            ctx.service.commit(
+                host = ctx.host,
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                recordVisibility = SessionRecordVisibility.MEMBER,
+                overrideResult = badOverride,
+            )
+        }.isInstanceOf(IllegalStateException::class.java)
+
+        // Redis result MUST be unchanged on failed validation — the trust boundary
+        // requires validation BEFORE we mutate the persisted snapshot.
+        val current = ctx.jobStore.load(record.jobId)!!.result!!
+        assertThat(current.summary).isEqualTo("auto-generated original")
+        assertThat(ctx.delegate.invocations).isEmpty()
     }
 
     @Test

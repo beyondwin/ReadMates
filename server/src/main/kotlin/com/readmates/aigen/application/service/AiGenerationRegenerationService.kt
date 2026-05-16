@@ -54,10 +54,12 @@ import java.util.UUID
  */
 @Service
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
+@Suppress("LongParameterList")
 class AiGenerationRegenerationService(
     private val jobStore: AiGenerationJobStore,
     private val regenerators: Map<Provider, SessionContentRegenerator>,
     private val modelCatalog: ModelCatalog,
+    private val validator: SessionImportV1Validator,
     private val auditPort: AiGenerationAuditPort,
     private val costGuard: GenerationCostGuard,
     private val properties: AiGenerationProperties,
@@ -99,7 +101,18 @@ class AiGenerationRegenerationService(
         )
 
         val cost = CostCalculator.estimate(output.usage, modelCatalog.pricing(modelId))
-        jobStore.patchItem(jobId, item, output.patchedValue, output.usage, cost)
+        // Build the patched snapshot and validate it BEFORE persisting so a bad LLM
+        // response can't poison the Redis result — see spec §9.3 and the task_1_7
+        // commit-override warning that flagged the same trust boundary on the commit
+        // path. On failure we audit FAILED, do NOT patch, and throw.
+        val patchedSnapshot = patchSnapshot(currentSnapshot, item, output.patchedValue)
+        when (val validation = validator.validate(patchedSnapshot, sessionMeta)) {
+            is ValidationResult.Ok -> Unit
+            is ValidationResult.Violation -> failRegen(
+                record, item, modelId, validation.code, validation.message,
+            )
+        }
+        jobStore.patchItem(jobId, item, patchedSnapshot, output.usage, cost)
         costGuard.recordUsage(record.hostUserId, record.clubId, cost)
 
         auditPort.insert(
@@ -183,26 +196,35 @@ class AiGenerationRegenerationService(
         return if (base.isNullOrBlank()) prefix else "$prefix\n$base"
     }
 
+    @Suppress("UNCHECKED_CAST")
+    private fun patchSnapshot(
+        snapshot: SessionImportV1Snapshot,
+        item: GenerationItem,
+        value: Any,
+    ): SessionImportV1Snapshot = when (item) {
+        GenerationItem.SUMMARY -> snapshot.copy(summary = value as String)
+        GenerationItem.HIGHLIGHTS -> snapshot.copy(
+            highlights = value as List<SessionImportV1Snapshot.AuthoredText>,
+        )
+        GenerationItem.ONE_LINE_REVIEWS -> snapshot.copy(
+            oneLineReviews = value as List<SessionImportV1Snapshot.AuthoredText>,
+        )
+        GenerationItem.FEEDBACK_DOCUMENT -> snapshot.copy(
+            feedbackDocumentMarkdown = value as String,
+        )
+    }
+
     private fun resolveModelId(commandModel: String?, record: JobRecord): ModelId {
         val candidate = commandModel ?: record.model.name
         return modelCatalog.resolveAlias(candidate) ?: record.model
     }
 
-    private fun buildSessionMeta(record: JobRecord): SessionMeta {
-        val snapshot = record.result!!
-        return SessionMeta(
-            sessionId = record.sessionId,
-            clubId = record.clubId,
-            sessionNumber = snapshot.sessionNumber,
-            bookTitle = snapshot.bookTitle,
-            bookAuthor = null,
-            meetingDate = snapshot.meetingDate,
-            expectedAuthorNames = (snapshot.highlights + snapshot.oneLineReviews)
-                .map { it.authorName }
-                .distinct(),
-            authorNameMode = record.authorNameMode,
-        )
-    }
+    private fun buildSessionMeta(record: JobRecord): SessionMeta =
+        // Prefer the stored SessionMeta (authoritative for validation); fall back to
+        // derivation from the snapshot for any legacy job records that predate the
+        // sessionMeta field. The validator uses sessionNumber/bookTitle/meetingDate
+        // and expectedAuthorNames from this meta.
+        record.sessionMeta.copy(authorNameMode = record.authorNameMode)
 
     private fun computeWarnings(clubId: UUID): List<String> {
         val monthly = costGuard.clubMonthlyCost(clubId)

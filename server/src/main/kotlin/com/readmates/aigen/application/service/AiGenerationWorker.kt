@@ -180,16 +180,7 @@ class AiGenerationWorker(
     }
 
     private fun buildSessionMeta(record: JobRecord): SessionMeta =
-        SessionMeta(
-            sessionId = record.sessionId,
-            clubId = record.clubId,
-            sessionNumber = 0, // unknown until generation produces it; SessionMeta on initial
-            bookTitle = "",
-            bookAuthor = null,
-            meetingDate = java.time.LocalDate.now(clock),
-            expectedAuthorNames = emptyList(),
-            authorNameMode = record.authorNameMode,
-        )
+        record.sessionMeta.copy(authorNameMode = record.authorNameMode)
 
     private fun succeed(
         record: JobRecord,

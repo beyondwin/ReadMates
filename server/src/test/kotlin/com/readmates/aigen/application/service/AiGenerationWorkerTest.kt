@@ -146,6 +146,28 @@ class AiGenerationWorkerTest {
     }
 
     @Test
+    fun `process passes session meta from JobRecord into the generator input`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot(),
+                usage = TokenUsage(5, 0, 5),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        val passed = ctx.generator.calls.single().sessionMeta
+        // The integration regression: the auth-supplied SessionMeta must reach the generator,
+        // not a degenerate (sessionNumber=0, bookTitle="") meta synthesized inside the worker.
+        assertThat(passed.sessionNumber).isEqualTo(record.sessionMeta.sessionNumber)
+        assertThat(passed.bookTitle).isEqualTo(record.sessionMeta.bookTitle)
+        assertThat(passed.expectedAuthorNames).isEqualTo(record.sessionMeta.expectedAuthorNames)
+        assertThat(passed.meetingDate).isEqualTo(record.sessionMeta.meetingDate)
+    }
+
+    @Test
     fun `process audits FAILED AI_DISABLED when model is no longer enabled`() {
         val ctx = TestContext(modelEnabled = emptySet())
         val record = ctx.savedRecord()

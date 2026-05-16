@@ -9,6 +9,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
+import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.JobRecord
@@ -168,6 +169,7 @@ class RedisAiGenerationJobStore(
                 "modelProvider" to job.model.provider.name,
                 "modelName" to job.model.name,
                 "authorNameMode" to job.authorNameMode.name,
+                "sessionMeta" to objectMapper.writeValueAsString(job.sessionMeta),
                 "status" to job.status.name,
                 "progressPct" to job.progressPct.toString(),
                 "tokensInput" to job.tokens.inputTokens.toString(),
@@ -204,6 +206,7 @@ class RedisAiGenerationJobStore(
             authorNameMode = AuthorNameMode.valueOf(hash.getValue("authorNameMode")),
             instructions = hash["instructions"],
             transcript = transcript,
+            sessionMeta = objectMapper.readValue(hash.getValue("sessionMeta"), SessionMeta::class.java),
             status = JobStatus.valueOf(hash.getValue("status")),
             stage = hash["stage"]?.let { JobStage.valueOf(it) },
             progressPct = hash.getValue("progressPct").toInt(),

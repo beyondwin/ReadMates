@@ -68,14 +68,18 @@ class AiGenerationCommitService(
             ?: record.result
             ?: throw IllegalStateException("Job $jobId has no result to commit")
 
-        if (overrideResult != null) {
-            jobStore.saveResult(jobId, overrideResult, TokenUsage(0, 0, 0), BigDecimal.ZERO)
-        }
-
+        // Validate BEFORE persisting any override. Otherwise a bad client-supplied
+        // override would pollute the Redis result before validation could reject it.
+        // See spec §9.3: validation is the trust boundary between aigen and
+        // sessionimport.commitValidated.
         val sessionMeta = buildSessionMeta(record, snapshot)
         when (val outcome = validator.validate(snapshot, sessionMeta)) {
             is ValidationResult.Ok -> Unit
             is ValidationResult.Violation -> failCommit(record, outcome)
+        }
+
+        if (overrideResult != null) {
+            jobStore.saveResult(jobId, overrideResult, TokenUsage(0, 0, 0), BigDecimal.ZERO)
         }
 
         val command = toSessionImportCommand(host, snapshot, sessionId, recordVisibility)

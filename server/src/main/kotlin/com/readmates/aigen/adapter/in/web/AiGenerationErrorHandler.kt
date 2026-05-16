@@ -80,8 +80,16 @@ class AiGenerationErrorHandler {
 
     @ExceptionHandler(RuntimeException::class)
     fun handleUnknown(
-        @Suppress("UNUSED_PARAMETER") error: RuntimeException,
-    ): ResponseEntity<ProblemDetail> = problem(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.UNKNOWN.name, INTERNAL_ERROR_DETAIL)
+        error: RuntimeException,
+    ): ResponseEntity<ProblemDetail> {
+        val log = org.slf4j.LoggerFactory.getLogger(AiGenerationErrorHandler::class.java)
+        if (error is com.readmates.sessionimport.application.service.InvalidSessionImportException) {
+            log.error("Unhandled AI generation exception. Issues: {}", error.issues, error)
+        } else {
+            log.error("Unhandled AI generation exception", error)
+        }
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.UNKNOWN.name, INTERNAL_ERROR_DETAIL)
+    }
 
     private fun problem(
         status: HttpStatus,

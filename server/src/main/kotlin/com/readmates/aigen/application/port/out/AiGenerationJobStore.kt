@@ -7,6 +7,7 @@ import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
+import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import java.math.BigDecimal
 import java.time.Instant
@@ -66,6 +67,12 @@ data class JobRecord(
     val instructions: String?,
     /** Transcript body. Persisted under the separate `aigen:job:{jobId}:transcript` key, never in the hash. */
     val transcript: String,
+    /**
+     * The session metadata the host supplied at job start, used by the Worker to drive
+     * generator prompts and validation. Persisted as a JSON-serialized hash field on the
+     * job record so the async Worker can recover it without re-running authorization.
+     */
+    val sessionMeta: SessionMeta,
     val status: JobStatus,
     val stage: JobStage?,
     val progressPct: Int,

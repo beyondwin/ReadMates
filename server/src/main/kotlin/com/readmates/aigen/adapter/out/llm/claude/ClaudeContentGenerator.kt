@@ -33,6 +33,12 @@ import java.time.LocalDate
  */
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
+@ConditionalOnProperty(
+    prefix = "readmates.aigen",
+    name = ["mock"],
+    havingValue = "false",
+    matchIfMissing = true,
+)
 class ClaudeContentGenerator(
     private val claudeApi: ClaudeApiPort,
     private val schemaResource: SessionImportSchemaResource,

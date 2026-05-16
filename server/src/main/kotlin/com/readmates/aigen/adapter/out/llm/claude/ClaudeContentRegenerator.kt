@@ -37,6 +37,12 @@ import org.springframework.stereotype.Component
  */
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
+@ConditionalOnProperty(
+    prefix = "readmates.aigen",
+    name = ["mock"],
+    havingValue = "false",
+    matchIfMissing = true,
+)
 class ClaudeContentRegenerator(
     private val claudeApi: ClaudeApiPort,
     private val schemaResource: SessionImportSchemaResource,

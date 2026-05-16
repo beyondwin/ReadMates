@@ -84,6 +84,7 @@ class AiGenerationOrchestrator(
             authorNameMode = command.authorNameMode,
             instructions = command.instructions,
             transcript = command.transcript,
+            sessionMeta = command.sessionMeta.copy(authorNameMode = command.authorNameMode),
             status = JobStatus.PENDING,
             stage = JobStage.QUEUED,
             progressPct = 0,
