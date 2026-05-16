@@ -1,7 +1,7 @@
 # ReadMates 디자인 시스템 갤러리 고도화 설계
 
-작성일: 2026-05-17  
-상태: USER-APPROVED DESIGN SPEC  
+작성일: 2026-05-17
+상태: USER-APPROVED DESIGN SPEC
 문서 목적: 첫 디자인 시스템 구현 이후, 디자인/기획자가 ReadMates의 제품 인상과 Public/Member 패턴을 빠르게 판단할 수 있도록 `design/docs` 카탈로그와 필요한 `design/system` 패턴 컴포넌트를 고도화하는 범위를 정의한다.
 
 ## 1. 배경
