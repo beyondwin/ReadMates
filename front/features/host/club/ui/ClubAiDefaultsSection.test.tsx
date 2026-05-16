@@ -60,7 +60,7 @@ describe("ClubAiDefaultsSection", () => {
   }
 
   it("renders the current default model from the GET response", async () => {
-    mockedGet.mockResolvedValue({ defaultModel: "openai-gpt-4-1" });
+    mockedGet.mockResolvedValue({ defaultModel: "gpt-4.1" });
     const { Wrapper } = createWrapper();
 
     render(
@@ -71,7 +71,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await waitFor(() => {
-      expect(select.value).toBe("openai-gpt-4-1");
+      expect(select.value).toBe("gpt-4.1");
     });
   });
 
@@ -92,7 +92,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "openai-gpt-4-1" } });
+      fireEvent.change(select, { target: { value: "gpt-4.1" } });
     });
 
     expect(saveBtn).not.toBeDisabled();
@@ -137,7 +137,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "openai-gpt-4-1" } });
+      fireEvent.change(select, { target: { value: "gpt-4.1" } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));
@@ -169,7 +169,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "openai-gpt-4-1" } });
+      fireEvent.change(select, { target: { value: "gpt-4.1" } });
     });
 
     const saveBtn = screen.getByRole("button", { name: /저장/ }) as HTMLButtonElement;
@@ -200,7 +200,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "openai-gpt-4-1" } });
+      fireEvent.change(select, { target: { value: "gpt-4.1" } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));

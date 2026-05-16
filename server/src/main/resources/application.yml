@@ -117,12 +117,12 @@ readmates:
         cached-input-per-m-token-usd: 1.50
         output-per-m-token-usd: 75.00
       # OpenAI public API pricing (gpt-4.1 family, per-million-token, USD).
-      # Source: openai.com/api/pricing (verified at task 4.1 implementation).
-      openai-gpt-4-1:
+      # Source: OpenAI model docs for gpt-4.1 and gpt-4.1-mini (verified 2026-05-17).
+      "[gpt-4.1]":
         input-per-m-token-usd: 2.00
         cached-input-per-m-token-usd: 0.50
         output-per-m-token-usd: 8.00
-      openai-gpt-4-1-mini:
+      "[gpt-4.1-mini]":
         input-per-m-token-usd: 0.40
         cached-input-per-m-token-usd: 0.10
         output-per-m-token-usd: 1.60

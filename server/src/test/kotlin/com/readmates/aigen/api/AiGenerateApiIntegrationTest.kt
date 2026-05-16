@@ -91,13 +91,9 @@ private const val SEED_SQL = """
         "readmates.aigen.pricing.claude-sonnet-4-6.input-per-m-token-usd=3.00",
         "readmates.aigen.pricing.claude-sonnet-4-6.cached-input-per-m-token-usd=0.30",
         "readmates.aigen.pricing.claude-sonnet-4-6.output-per-m-token-usd=15.00",
-        // task 4.3: add OpenAI matrix. The model name here uses the `gpt-` prefix that
-        // YamlModelCatalog already routes to Provider.OPENAI (the production
-        // application.yml entry `openai-gpt-4-1` requires a separate prefix-routing
-        // change that is out of scope for this test-only task).
-        "readmates.aigen.pricing.gpt-4-1.input-per-m-token-usd=2.00",
-        "readmates.aigen.pricing.gpt-4-1.cached-input-per-m-token-usd=0.50",
-        "readmates.aigen.pricing.gpt-4-1.output-per-m-token-usd=8.00",
+        "readmates.aigen.pricing[gpt-4.1].input-per-m-token-usd=2.00",
+        "readmates.aigen.pricing[gpt-4.1].cached-input-per-m-token-usd=0.50",
+        "readmates.aigen.pricing[gpt-4.1].output-per-m-token-usd=8.00",
         "readmates.aigen.kafka.enabled=true",
         "spring.kafka.consumer.auto-offset-reset=earliest",
     ],
@@ -238,7 +234,7 @@ class AiGenerateApiIntegrationTest(
     // is later expanded, both providers are exercised uniformly here.
 
     @ParameterizedTest(name = "full generation lifecycle - provider {0}")
-    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4-1"])
+    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4.1"])
     fun `full generation lifecycle - provider matrix`(model: String) {
         val transcript = MockMultipartFile(
             "transcript",
@@ -308,7 +304,7 @@ class AiGenerateApiIntegrationTest(
     }
 
     @ParameterizedTest(name = "regenerate updates stored result - provider {0}")
-    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4-1"])
+    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4.1"])
     fun `regenerate updates the stored result - provider matrix`(model: String) {
         val transcript = MockMultipartFile(
             "transcript",

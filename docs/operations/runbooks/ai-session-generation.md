@@ -24,20 +24,20 @@
 
 새 모델 ID를 enable하려면 (a) pricing 항목 추가, (b) provider 활성, (c) frontend 노출까지 함께 맞춰야 합니다.
 
-1. `server/src/main/resources/application.yml`의 `readmates.aigen.pricing` map에 단가 항목을 추가합니다. 예 (`gpt-4-1-mini`):
+1. `server/src/main/resources/application.yml`의 `readmates.aigen.pricing` map에 단가 항목을 추가합니다. 예 (`gpt-4.1-mini`):
    ```yaml
    readmates:
      aigen:
        enabled-providers: [CLAUDE, OPENAI, GEMINI]
        pricing:
-         gpt-4-1-mini:
-           input-per-mtok-usd: 0.40
-           cached-input-per-mtok-usd: 0.10
-           output-per-mtok-usd: 1.60
+         "[gpt-4.1-mini]":
+           input-per-m-token-usd: 0.40
+           cached-input-per-m-token-usd: 0.10
+           output-per-m-token-usd: 1.60
    ```
-   - Provider 접두사 매칭은 `YamlModelCatalog.providerFromName` (`claude-*`, `gpt-*`/`o\d+`, `gemini-*`). `openai-*` 접두사는 현재 inert이므로 `gpt-*`로 키를 통일합니다 (Phase 4 known follow-up).
+   - Provider 접두사 매칭은 `YamlModelCatalog.providerFromName` (`claude-*`, `gpt-*`/`o\d+`, `gemini-*`). OpenAI 모델 ID는 provider API가 받는 canonical alias (`gpt-4.1`, `gpt-4.1-mini`)를 그대로 사용합니다.
 2. 모델 제거는 같은 map에서 key를 삭제하고, `enabled-providers`에서 해당 provider 전체를 빼면 해당 provider 모델 전부가 한꺼번에 차단됩니다.
-3. Frontend `front/features/host/aigen/api/aigen-model-options.ts`의 하드코딩 allowlist를 함께 갱신합니다 (catalog endpoint로 교체될 때까지 임시).
+3. Frontend `front/features/host/aigen/ui/aigen-model-options.ts`의 하드코딩 allowlist를 함께 갱신합니다 (catalog endpoint로 교체될 때까지 임시).
 4. PR merge 후 deploy (server → frontend 순). Deploy 절차는 [post-deploy-watch.md](post-deploy-watch.md).
 5. Smoke: provider별 manual script 실행 — `scripts/aigen-smoke-claude.sh`, `scripts/aigen-smoke-openai.sh`, `scripts/aigen-smoke-gemini.sh`. 라이브 API key가 환경변수에 있는 노드에서만 실행합니다.
 

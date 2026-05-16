@@ -100,7 +100,7 @@ describe("RegenerateModal", () => {
     });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/모델 변경/), {
-        target: { value: "openai-gpt-4-1" },
+        target: { value: "gpt-4.1" },
       });
     });
     await act(async () => {
@@ -112,7 +112,7 @@ describe("RegenerateModal", () => {
     });
     const req = mockedRegenerate.mock.calls[0][2];
     expect(req.item).toBe("SUMMARY");
-    expect(req.model).toBe("openai-gpt-4-1");
+    expect(req.model).toBe("gpt-4.1");
     expect(req.instructions).toBe("더 짧게");
   });
 

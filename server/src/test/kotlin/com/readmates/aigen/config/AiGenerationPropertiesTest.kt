@@ -38,14 +38,14 @@ class AiGenerationPropertiesTest {
     fun `application_yml binds OpenAI pricing entries with input cached and output rates`() {
         val pricing = loadPricing()
 
-        val openai41 = pricing["openai-gpt-4-1"]
-        assertNotNull(openai41, "openai-gpt-4-1 pricing must be present in application.yml")
+        val openai41 = pricing["gpt-4.1"]
+        assertNotNull(openai41, "gpt-4.1 pricing must be present in application.yml")
         assertEquals(0, BigDecimal("2.00").compareTo(openai41!!.inputPerMTokenUsd))
         assertEquals(0, BigDecimal("0.50").compareTo(openai41.cachedInputPerMTokenUsd))
         assertEquals(0, BigDecimal("8.00").compareTo(openai41.outputPerMTokenUsd))
 
-        val openai41Mini = pricing["openai-gpt-4-1-mini"]
-        assertNotNull(openai41Mini, "openai-gpt-4-1-mini pricing must be present in application.yml")
+        val openai41Mini = pricing["gpt-4.1-mini"]
+        assertNotNull(openai41Mini, "gpt-4.1-mini pricing must be present in application.yml")
         assertEquals(0, BigDecimal("0.40").compareTo(openai41Mini!!.inputPerMTokenUsd))
         assertEquals(0, BigDecimal("0.10").compareTo(openai41Mini.cachedInputPerMTokenUsd))
         assertEquals(0, BigDecimal("1.60").compareTo(openai41Mini.outputPerMTokenUsd))
