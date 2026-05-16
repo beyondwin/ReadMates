@@ -139,6 +139,20 @@ tasks.register<Test>("unitTest") {
             ?: (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
     maxParallelForks = requestedForks
     forkEvery = 0
+
+    // JUnit5 class-level parallel execution, scoped to :unitTest only via
+    // systemProperty (NOT classpath junit-platform.properties — that would
+    // also affect :integrationTest and :architectureTest, both of which
+    // share Testcontainers fixtures and need sequential class execution).
+    // Methods inside a class stay on the same thread (default), classes
+    // run concurrently. Audit (docs/superpowers/reports/2026-05-16-stateful-audit.md)
+    // found 0 unit-tagged tests with @DirtiesContext / @MockBean / @SpyBean.
+    // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.4
+    systemProperty("junit.jupiter.execution.parallel.enabled", "true")
+    systemProperty("junit.jupiter.execution.parallel.mode.default", "same_thread")
+    systemProperty("junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
+    systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")
+    systemProperty("junit.jupiter.execution.parallel.config.dynamic.factor", "1.0")
 }
 
 tasks.register<Test>("integrationTest") {
