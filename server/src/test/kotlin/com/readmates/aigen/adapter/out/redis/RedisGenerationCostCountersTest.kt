@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.out.redis
 
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
 import com.readmates.aigen.application.service.AiGenerationMetrics
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.ObjectProvider
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -34,6 +36,12 @@ class RedisGenerationCostCountersTest(
     @param:Autowired private val guard: GenerationCostGuard,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
 ) : ReadmatesRedisIntegrationTestSupport() {
+    // The aigen Kafka adapter is gated on readmates.aigen.kafka.enabled; this integration
+    // test only exercises the Redis cost-counter adapter, so satisfy the orchestrator's
+    // queue dependency with a mock so the context can load.
+    @MockitoBean
+    private lateinit var jobQueue: AiGenerationJobQueue
+
     @Test
     fun `allow when daily and monthly under caps`() {
         val hostId = UUID.randomUUID()

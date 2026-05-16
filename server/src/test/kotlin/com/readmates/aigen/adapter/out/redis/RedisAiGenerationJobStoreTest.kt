@@ -9,6 +9,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.config.AiGenerationProperties
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -40,6 +42,12 @@ class RedisAiGenerationJobStoreTest(
     @param:Autowired private val redisTemplate: StringRedisTemplate,
     @param:Autowired private val properties: AiGenerationProperties,
 ) : ReadmatesRedisIntegrationTestSupport() {
+    // The aigen Kafka adapter is gated on readmates.aigen.kafka.enabled; this integration
+    // test only exercises the Redis JobStore adapter, so satisfy the orchestrator's queue
+    // dependency with a mock so the context can load.
+    @MockitoBean
+    private lateinit var jobQueue: AiGenerationJobQueue
+
     @Test
     fun `save stores hash, transcript, result keys with 6h TTL`() {
         val record = newRecord()
