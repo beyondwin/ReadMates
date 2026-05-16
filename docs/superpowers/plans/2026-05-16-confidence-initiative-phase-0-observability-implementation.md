@@ -44,7 +44,7 @@ grep -E "CREATE TABLE.*(outbox|manual_dispatch)" server/src/main/resources/db/my
 
 ---
 
-## Task 1: BFF가 `X-Readmates-Request-Id`를 생성·검증·forward·응답에 set
+### Task 1: BFF가 `X-Readmates-Request-Id`를 생성·검증·forward·응답에 set
 
 **Files:**
 - Modify: `front/functions/_shared/proxy.ts` (helper 추가)
@@ -186,7 +186,7 @@ git commit -m "feat(bff): forward X-Readmates-Request-Id and set on response"
 
 ---
 
-## Task 2: Flyway V29 — outbox/dispatch 테이블에 `request_id` 컬럼 추가
+### Task 2: Flyway V29 — outbox/dispatch 테이블에 `request_id` 컬럼 추가
 
 **Files:**
 - Create: `server/src/main/resources/db/mysql/migration/V29__correlation_request_id_columns.sql`
@@ -233,7 +233,7 @@ git commit -m "feat(db): add request_id columns to outbox and manual dispatch ta
 
 ---
 
-## Task 3: Outbox writer가 MDC `requestId`를 row에 저장
+### Task 3: Outbox writer가 MDC `requestId`를 row에 저장
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/notification/adapter/out/persistence/JdbcNotificationEventOutboxAdapter.kt`
@@ -319,7 +319,7 @@ git commit -m "feat(notification): persist MDC requestId into outbox row"
 
 ---
 
-## Task 4: Outbox relay/Kafka producer가 `readmates-request-id` header 설정
+### Task 4: Outbox relay/Kafka producer가 `readmates-request-id` header 설정
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/notification/application/service/NotificationRelayService.kt` (relay가 outbox row를 읽어 publisher에 전달)
@@ -415,7 +415,7 @@ git commit -m "feat(notification): propagate requestId via readmates-request-id 
 
 ---
 
-## Task 5: Kafka consumer가 `readmates-request-id` 헤더를 MDC에 바인딩
+### Task 5: Kafka consumer가 `readmates-request-id` 헤더를 MDC에 바인딩
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListener.kt`
@@ -507,7 +507,7 @@ git commit -m "feat(notification): bind readmates-request-id Kafka header into M
 
 ---
 
-## Task 6: Logback JSON encoder + 공통 MDC field 표준화
+### Task 6: Logback JSON encoder + 공통 MDC field 표준화
 
 **Files:**
 - Modify: `server/build.gradle.kts` (dependency 추가)
@@ -616,7 +616,7 @@ git commit -m "feat(server): switch logback to JSON encoder with standard MDC fi
 
 ---
 
-## Task 7: SLO catalog yaml + Kotlin loader + tests
+### Task 7: SLO catalog yaml + Kotlin loader + tests
 
 **Files:**
 - Create: `server/src/main/resources/slo/slos.yaml`
@@ -829,7 +829,7 @@ git commit -m "feat(server): add SLO catalog yaml + startup loader with schema v
 
 ---
 
-## Task 8: Grafana dashboards-as-code + lint
+### Task 8: Grafana dashboards-as-code + lint
 
 **Files:**
 - Create: `ops/grafana/dashboards/notification-dispatch.json`
@@ -1019,7 +1019,7 @@ git commit -m "feat(ops): add Phase 0 Grafana dashboards as code with CI lint"
 
 ---
 
-## Task 9: End-to-end correlation 회귀 테스트
+### Task 9: End-to-end correlation 회귀 테스트
 
 **Files:**
 - Create: `front/tests/e2e/correlation-id.spec.ts`
@@ -1133,7 +1133,7 @@ git commit -m "test(observability): assert requestId correlation across BFF, out
 
 ---
 
-## Task 10: 운영 docs + CHANGELOG Unreleased 업데이트
+### Task 10: 운영 docs + CHANGELOG Unreleased 업데이트
 
 **Files:**
 - Modify: `docs/operations/README.md` (또는 동일 hub) — correlation ID 사용법 단락 추가
@@ -1218,7 +1218,7 @@ git commit -m "docs(observability): add correlation id runbook and Phase 0 CHANG
 
 ---
 
-## Task 11: Phase 0 완료 점검 + overview 진행상태 업데이트
+### Task 11: Phase 0 완료 점검 + overview 진행상태 업데이트
 
 **Files:**
 - Modify: `docs/superpowers/specs/2026-05-16-confidence-initiative-overview-design.md`

@@ -46,7 +46,7 @@ class NotificationRelayService(
         }
 
         try {
-            notificationEventPublisherPort.publish(message, item.kafkaTopic, item.kafkaKey)
+            notificationEventPublisherPort.publish(message, item.kafkaTopic, item.kafkaKey, item.requestId)
             notificationEventOutboxPort.markPublished(item.id, item.lockedAt)
             logger.info(
                 "Notification event published eventId={} topic={} key={}",

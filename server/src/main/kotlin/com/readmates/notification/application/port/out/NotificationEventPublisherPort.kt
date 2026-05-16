@@ -7,5 +7,6 @@ interface NotificationEventPublisherPort {
         message: NotificationEventMessage,
         topic: String,
         key: String,
+        requestId: String?,
     )
 }

@@ -164,6 +164,8 @@ READMATES_AUTH_SESSION_COOKIE_SECURE=false \
 
 운영 migration은 `server/src/main/resources/db/mysql/migration`에만 추가합니다. `server/src/main/resources/db/migration`은 사용하지 않으며, 새 파일을 그 위치에 만들면 운영 Flyway가 읽지 않습니다.
 
+Server 로그는 JSON 형식이므로 `./server/gradlew bootRun 2>&1 | jq '.'`로 보기 좋게 볼 수 있습니다.
+
 Backend health check:
 
 ```bash

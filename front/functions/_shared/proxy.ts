@@ -154,3 +154,22 @@ export function safeRouteSegment(value: string | string[] | undefined) {
 
   return encodeURIComponent(decodedValue);
 }
+
+export const READMATES_REQUEST_ID_HEADER = "X-Readmates-Request-Id";
+
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9-]{12,64}$/;
+
+function generateRequestId(): string {
+  const hex = Array.from(crypto.getRandomValues(new Uint8Array(6)))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return hex;
+}
+
+export function requestIdForUpstream(request: Request): string {
+  const inbound = request.headers.get(READMATES_REQUEST_ID_HEADER)?.trim();
+  if (inbound && REQUEST_ID_PATTERN.test(inbound)) {
+    return inbound;
+  }
+  return generateRequestId();
+}

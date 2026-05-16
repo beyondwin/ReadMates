@@ -10,6 +10,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+### Added
+- **Observability backbone (Phase 0)**: BFF → Spring → Kafka producer → consumer → SMTP 경로에 동일한 `X-Readmates-Request-Id`를 전파하고, Logback을 JSON 인코더로 전환했습니다. `notification_event_outbox`, `notification_manual_dispatch_previews`, `notification_manual_dispatches`에 `request_id VARCHAR(64) NULL` 컬럼이 추가됐습니다(Flyway V29). SLO 카탈로그(`server/src/main/resources/slo/slos.yaml`)를 startup에서 schema 검증으로 로드하고, Grafana dashboard 2종을 `ops/grafana/dashboards/`에 코드로 보유합니다. 운영 조회 절차는 `docs/operations/runbooks/correlation-id-lookup.md` 참고.
+
 ### Changed
 - perf: consolidate `publicStats` SELECTs into a single round-trip and replace correlated EXISTS subqueries in `publicSessions` with pre-aggregated joins (server/publication).
 - perf: replace Redis `KEYS` with SCAN-based iteration in read-cache invalidation (server/shared/redis).

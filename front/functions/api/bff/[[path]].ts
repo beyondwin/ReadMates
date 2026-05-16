@@ -4,6 +4,8 @@ import {
   clientIpFromRequest,
   copyUpstreamHeaders,
   normalizedHostFromRequest,
+  requestIdForUpstream,
+  READMATES_REQUEST_ID_HEADER,
 } from "../../_shared/proxy";
 import { bffErrorResponse } from "../../_shared/errors";
 import {
@@ -148,6 +150,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     headers.set("Referer", origin);
   }
 
+  const requestId = requestIdForUpstream(context.request);
+  headers.set(READMATES_REQUEST_ID_HEADER, requestId);
+
   headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(context.request));
   if (clubSlug) {
     headers.set("X-Readmates-Club-Slug", clubSlug);
@@ -181,6 +186,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     status: upstream.status,
     headers: copyUpstreamHeaders(upstream.headers),
   });
+  outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
 
   if (isPublicCacheableRequest(context.request.method, upstreamPath) && isCacheableUpstreamResponse(upstream)) {
     const cacheKey = buildPublicCacheKey(context.request);

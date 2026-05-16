@@ -43,8 +43,24 @@ class NotificationRelayServiceTest {
             }
 
         assertThat(published).isEqualTo(1)
-        assertThat(publisher.publishedMessages).containsExactly(PublishedMessage(message, item.kafkaTopic, item.kafkaKey))
+        assertThat(publisher.publishedMessages)
+            .containsExactly(PublishedMessage(message, item.kafkaTopic, item.kafkaKey, requestId = null))
         assertThat(outbox.publishedIds).containsExactly(item.id)
+    }
+
+    @Test
+    fun `publish forwards outbox requestId to publisher`() {
+        val item = publishingItem(requestId = "req-relay-789")
+        val message = messageFor(item)
+        val outbox = FakeEventOutbox(claimedItems = listOf(item), messages = mapOf(item.id to message))
+        val publisher = RecordingPublisher()
+        val service = NotificationRelayService(outbox, publisher, maxAttempts = 5)
+
+        val published = service.publishPending(limit = 10)
+
+        assertThat(published).isEqualTo(1)
+        assertThat(publisher.publishedMessages)
+            .containsExactly(PublishedMessage(message, item.kafkaTopic, item.kafkaKey, requestId = "req-relay-789"))
     }
 
     @Test
@@ -194,9 +210,10 @@ private class RecordingPublisher(
         message: NotificationEventMessage,
         topic: String,
         key: String,
+        requestId: String?,
     ) {
         failure?.let { throw it }
-        publishedMessages += PublishedMessage(message, topic, key)
+        publishedMessages += PublishedMessage(message, topic, key, requestId)
     }
 }
 
@@ -204,6 +221,7 @@ private data class PublishedMessage(
     val message: NotificationEventMessage,
     val topic: String,
     val key: String,
+    val requestId: String? = null,
 )
 
 private data class FailedEvent(
@@ -222,6 +240,7 @@ private fun publishingItem(
     clubId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002"),
     aggregateId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000003"),
     attemptCount: Int = 0,
+    requestId: String? = null,
 ): NotificationEventOutboxItem =
     NotificationEventOutboxItem(
         id = id,
@@ -235,6 +254,7 @@ private fun publishingItem(
         kafkaKey = clubId.toString(),
         attemptCount = attemptCount,
         lockedAt = OffsetDateTime.parse("2026-04-29T00:00:00Z"),
+        requestId = requestId,
     )
 
 private fun messageFor(item: NotificationEventOutboxItem): NotificationEventMessage =

@@ -19,6 +19,7 @@ import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
@@ -57,6 +58,7 @@ class JdbcNotificationEventOutboxAdapter(
                   id,
                   club_id,
                   event_type,
+                  request_id,
                   aggregate_type,
                   aggregate_id,
                   payload_json,
@@ -65,11 +67,12 @@ class JdbcNotificationEventOutboxAdapter(
                   status,
                   dedupe_key
                 )
-                values (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
                 """.trimIndent(),
                 UUID.randomUUID().dbString(),
                 clubId.dbString(),
                 eventType.name,
+                currentRequestId(),
                 aggregateType,
                 aggregateId.dbString(),
                 objectMapper.writeValueAsString(payload),
@@ -89,6 +92,7 @@ class JdbcNotificationEventOutboxAdapter(
               id,
               club_id,
               event_type,
+              request_id,
               aggregate_type,
               aggregate_id,
               payload_json,
@@ -101,6 +105,7 @@ class JdbcNotificationEventOutboxAdapter(
               uuid(),
               sessions.club_id,
               'SESSION_REMINDER_DUE',
+              ?,
               'SESSION',
               sessions.id,
               json_object(
@@ -118,6 +123,7 @@ class JdbcNotificationEventOutboxAdapter(
               and sessions.state in ('DRAFT', 'OPEN')
               and sessions.visibility in ('MEMBER', 'PUBLIC')
             """.trimIndent(),
+            currentRequestId(),
             targetDate.toString(),
             eventsTopic,
             targetDate.toString(),
@@ -125,6 +131,7 @@ class JdbcNotificationEventOutboxAdapter(
         )
 
     @Transactional
+    @Suppress("SpreadOperator", "ReturnCount")
     override fun claimPublishable(limit: Int): List<NotificationEventOutboxItem> {
         if (limit <= 0) {
             return emptyList()
@@ -167,7 +174,7 @@ class JdbcNotificationEventOutboxAdapter(
         return jdbcTemplate.query(
             """
             select id, club_id, event_type, aggregate_type, aggregate_id, payload_json,
-                   status, kafka_topic, kafka_key, attempt_count, locked_at
+                   status, kafka_topic, kafka_key, attempt_count, locked_at, request_id
             from notification_event_outbox
             where id in ($placeholders)
             order by field(id, $placeholders)
@@ -352,6 +359,7 @@ class JdbcNotificationEventOutboxAdapter(
             kafkaKey = getString("kafka_key"),
             attemptCount = getInt("attempt_count"),
             lockedAt = utcOffsetDateTime("locked_at"),
+            requestId = getString("request_id"),
         )
 
     private fun ResultSet.toNotificationEventMessage(): NotificationEventMessage =
@@ -394,6 +402,8 @@ class JdbcNotificationEventOutboxAdapter(
     }
 
     private fun parsePayload(rawPayload: String): NotificationEventPayload = objectMapper.readValue(rawPayload, payloadType)
+
+    private fun currentRequestId(): String? = MDC.get("requestId")?.takeIf { it.isNotBlank() }
 
     private fun resetStalePublishingRows(jdbcTemplate: JdbcTemplate) {
         jdbcTemplate.update(

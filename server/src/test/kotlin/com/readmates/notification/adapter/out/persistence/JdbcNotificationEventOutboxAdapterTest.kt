@@ -11,6 +11,7 @@ import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.slf4j.MDC
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
@@ -394,6 +395,64 @@ class JdbcNotificationEventOutboxAdapterTest(
     }
 
     @Test
+    fun `enqueueEvent persists MDC requestId into request_id column`() {
+        insertClub()
+        MDC.put("requestId", "test-req-1234")
+        val dedupeKey = "event-outbox-adapter-test-mdc-req-${UUID.randomUUID()}"
+        try {
+            adapter.enqueueEvent(
+                clubId = clubId,
+                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                aggregateType = "SESSION",
+                aggregateId = sessionId,
+                payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "MDC Request"),
+                dedupeKey = dedupeKey,
+            )
+
+            val storedRequestId =
+                jdbcTemplate.queryForObject(
+                    """
+                    select request_id
+                    from notification_event_outbox
+                    where dedupe_key = ?
+                    """.trimIndent(),
+                    String::class.java,
+                    dedupeKey,
+                )
+            assertThat(storedRequestId).isEqualTo("test-req-1234")
+        } finally {
+            MDC.remove("requestId")
+        }
+    }
+
+    @Test
+    fun `enqueueEvent stores NULL request_id when MDC is empty`() {
+        insertClub()
+        MDC.remove("requestId")
+        val dedupeKey = "event-outbox-adapter-test-mdc-null-${UUID.randomUUID()}"
+        adapter.enqueueEvent(
+            clubId = clubId,
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+            aggregateType = "SESSION",
+            aggregateId = sessionId,
+            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = "No MDC"),
+            dedupeKey = dedupeKey,
+        )
+
+        val storedRequestId =
+            jdbcTemplate.queryForObject(
+                """
+                select request_id
+                from notification_event_outbox
+                where dedupe_key = ?
+                """.trimIndent(),
+                String::class.java,
+                dedupeKey,
+            )
+        assertThat(storedRequestId).isNull()
+    }
+
+    @Test
     fun `enqueueSessionReminderDue creates idempotent session reminder events with public-safe payload`() {
         val reminderSessionId = "00000000-0000-0000-0000-000000009501"
         insertReminderSession(reminderSessionId)
@@ -608,6 +667,7 @@ class JdbcNotificationEventOutboxAdapterTest(
             message: NotificationEventMessage,
             topic: String,
             key: String,
+            requestId: String?,
         ) {
             eventIds += message.eventId
         }
