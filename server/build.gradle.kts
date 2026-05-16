@@ -72,6 +72,15 @@ tasks.named<org.gradle.jvm.tasks.Jar>("jar") {
     enabled = false
 }
 
+// The default :test task has no tag filter, so it would run every unit,
+// integration, container, and architecture test exactly the way the explicit
+// :unitTest / :integrationTest / :architectureTest tasks already do. Disabling
+// it makes `./gradlew check` run each tagged group exactly once.
+// Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.1
+tasks.named<Test>("test") {
+    enabled = false
+}
+
 val colimaDockerSocket = file("${System.getProperty("user.home")}/.colima/default/docker.sock")
 
 val serverTestJavaLauncher =
@@ -120,6 +129,30 @@ tasks.register<Test>("unitTest") {
     useJUnitPlatform {
         excludeTags("integration", "container", "architecture")
     }
+    // Adjustable parallelism for unitTest (no shared state across classes).
+    // Override priority: -PmaxForks=N (sweep harness) > READMATES_TEST_FORKS
+    // env (CI workflow) > availableProcessors()/2 default (min 1).
+    // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.3
+    val requestedForks =
+        (project.findProperty("maxForks") as String?)?.toIntOrNull()
+            ?: System.getenv("READMATES_TEST_FORKS")?.toIntOrNull()
+            ?: (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    maxParallelForks = requestedForks
+    forkEvery = 0
+
+    // JUnit5 class-level parallel execution, scoped to :unitTest only via
+    // systemProperty (NOT classpath junit-platform.properties — that would
+    // also affect :integrationTest and :architectureTest, both of which
+    // share Testcontainers fixtures and need sequential class execution).
+    // Methods inside a class stay on the same thread (default), classes
+    // run concurrently. Audit (docs/superpowers/reports/2026-05-16-stateful-audit.md)
+    // found 0 unit-tagged tests with @DirtiesContext / @MockBean / @SpyBean.
+    // Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.4
+    systemProperty("junit.jupiter.execution.parallel.enabled", "true")
+    systemProperty("junit.jupiter.execution.parallel.mode.default", "same_thread")
+    systemProperty("junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
+    systemProperty("junit.jupiter.execution.parallel.config.strategy", "dynamic")
+    systemProperty("junit.jupiter.execution.parallel.config.dynamic.factor", "1.0")
 }
 
 tasks.register<Test>("integrationTest") {
@@ -185,6 +218,8 @@ tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configure
 
 tasks.named("check") {
     dependsOn("detekt")
+    dependsOn("unitTest")
+    dependsOn("architectureTest")
 }
 
 jacoco {

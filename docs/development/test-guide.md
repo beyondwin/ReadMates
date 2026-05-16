@@ -128,11 +128,13 @@ pnpm --dir front test:e2e -- member-profile-permissions
 
 Backend tests are expected to run on JDK 21. `server/build.gradle.kts` pins the Gradle `Test` JVM to the Java 21 toolchain so local shells using a newer current JVM do not change test runtime behavior. If Gradle cannot find a JDK 21 toolchain locally, install one or set `JAVA_HOME` to a JDK 21 installation before running backend tests.
 
-전체 backend test:
+전체 backend test (단위 + 아키텍처 + integration 묶음):
 
 ```bash
-./server/gradlew -p server clean test
+./server/gradlew -p server clean unitTest architectureTest integrationTest
 ```
+
+기본 `:test` task는 비활성화되어 있습니다 — 태그 필터가 없어 `:unitTest`, `:integrationTest`, `:architectureTest`와 동일 테스트를 중복 실행하기 때문입니다. `./gradlew check`는 `:unitTest + :architectureTest + :detekt + JaCoCo`를 의존성으로 한 번씩만 실행하며, integration은 Docker가 필요해 명시적으로 호출할 때만 돕니다.
 
 Backend fast lanes:
 
@@ -142,7 +144,9 @@ Backend fast lanes:
 ./server/gradlew -p server architectureTest
 ```
 
-이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 여전히 전체 backend test를 실행합니다.
+이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 위 세 lane을 모두 실행합니다.
+
+`:unitTest`는 JUnit5 클래스 단위 병렬 + Gradle `maxParallelForks=availableProcessors()/2`(기본)로 실행합니다. CI에서는 `READMATES_TEST_FORKS` env로 fork 수를 명시할 수 있고, sweep harness(`scripts/bench/sweep-forks.sh`)로 머신별 최적값을 측정할 수 있습니다.
 
 PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 
@@ -156,13 +160,29 @@ PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 - **detekt baseline gate**: detekt 1.23.7 + `server/config/detekt/detekt.yml`. 기존 위반은 `server/config/detekt/baseline.xml`로 grandfather. detekt 1.23.x가 호스트 JDK 25에서 동작하도록 `server/gradle/gradle-daemon-jvm.properties`에서 daemon JVM을 Java 21로 pin하고, detekt classpath는 Kotlin 2.0.10으로 고정합니다.
 - **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.23(측정치 -2pp)을 강제합니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때는 측정치 -2pp baseline rule을 유지합니다.
 
-CI backend job은 `./gradlew check` 단일 호출 + 별도 `architectureTest` step으로 구성되어 있고, ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
+CI backend job은 `./gradlew check` 단일 호출로 구성되어 있습니다 — `check`가 `:unitTest + :architectureTest + :detekt + :jacoco*`를 모두 의존하므로 별도 architectureTest step은 불필요(2026-05-16 제거). ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
 
 Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
 Backend Gradle test는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, `./server/gradlew -p server clean test`를 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
 
 로컬 image 재현성 검증은 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다.
+
+### Testcontainers 재사용 (로컬 전용)
+
+MySQL / Redis / Kafka Testcontainer는 모두 `withReuse(true)`로 표시되어 있어, 개발자가 한 번 옵트인하면 후속 backend test 실행에서 컨테이너 시작 단계를 건너뜁니다. 다음 줄을 추가해 활성화합니다.
+
+```bash
+echo "testcontainers.reuse.enable=true" >> ~/.testcontainers.properties
+```
+
+이 설정은 holder 머신 단위라 CI에는 영향이 없습니다(매 runner가 새 환경). 컨테이너 상태가 stale로 의심되면 다음으로 수동 정리합니다.
+
+```bash
+docker rm -f $(docker ps -a --filter "label=org.testcontainers.session-id" -q)
+```
+
+Refs: `docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md` §4.5.
 
 ## Notification Operations
 

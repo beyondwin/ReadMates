@@ -114,6 +114,12 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    env:
+      # ubuntu-latest is 4 vCPU; matches the build.gradle.kts default of
+      # availableProcessors()/2. Set explicitly so the value is auditable
+      # and survives any future runner-spec change.
+      # Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.3
+      READMATES_TEST_FORKS: "2"
     steps:
       - name: Configure Git defaults
         run: git config --global init.defaultBranch main
@@ -130,13 +136,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
 
-      - name: Server quality gates (ktlint + detekt + tests + JaCoCo)
+      - name: Server quality gates (ktlint + detekt + tests + JaCoCo + architecture)
         working-directory: server
         run: ./gradlew check
-
-      - name: Architecture tests
-        working-directory: server
-        run: ./gradlew architectureTest
 
       - name: Upload server reports
         if: always()
@@ -154,6 +156,46 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: backend-reports
+          path: |
+            server/build/reports/tests
+            server/build/test-results
+          if-no-files-found: ignore
+
+  backend-integration:
+    name: Backend Integration
+    runs-on: ubuntu-latest
+    # Spec §7.3 followup option 2: move Testcontainers-backed integration
+    # tests out of the `backend` critical path. This job runs in parallel
+    # with `backend` (and `e2e`), so PR wall-clock is max(backend,
+    # backend-integration, e2e) ≈ unchanged, but the metric job (C1
+    # backend) drops to unit + arch + detekt + jacoco only.
+    # Both jobs are required for PR green status — integration coverage
+    # is preserved (spec §A6).
+    steps:
+      - name: Configure Git defaults
+        run: git config --global init.defaultBranch main
+
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Java
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e # v6.1.0
+
+      - name: Integration tests (Testcontainers; Docker required)
+        working-directory: server
+        run: ./gradlew integrationTest
+
+      - name: Upload integration test results
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-integration-reports
           path: |
             server/build/reports/tests
             server/build/test-results
