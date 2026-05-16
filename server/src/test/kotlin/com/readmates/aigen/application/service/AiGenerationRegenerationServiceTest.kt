@@ -116,7 +116,10 @@ class AiGenerationRegenerationServiceTest {
             )
         }.isInstanceOf(com.readmates.aigen.adapter.out.llm.common.LlmGenerationException::class.java)
 
-        val audit = ctx.auditPort.entries.single()
+        // Two audit rows per spec §9.2: retry-attempt audit + final failure audit.
+        val auditEntries = ctx.auditPort.entries
+        assertThat(auditEntries).hasSize(2)
+        val audit = auditEntries.last()
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
         assertThat(audit.errorCode).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
         assertThat(ctx.sleeper.sleeps).containsExactly(Duration.ofSeconds(5))

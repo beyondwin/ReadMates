@@ -193,6 +193,10 @@ class AiGenerationRegenerationService(
             if (retryStrategy == null) {
                 failRegen(record, item, modelId, firstFailure.error.code, firstFailure.error.message)
             }
+            // Per spec §9.2 ("각 호출은 audit log row 별도"): audit the failed
+            // first attempt before retrying so the audit log captures the
+            // retry trigger code even when the second call succeeds.
+            auditRetryAttempt(record, item, modelId, firstFailure.error)
             sleeper.sleep(retryStrategy.backoff)
             val retryInput =
                 baseInput.copy(
@@ -321,6 +325,39 @@ class AiGenerationRegenerationService(
             GenerationItem.ONE_LINE_REVIEWS -> JobKind.REGENERATE_ONE_LINE_REVIEWS
             GenerationItem.FEEDBACK_DOCUMENT -> JobKind.REGENERATE_FEEDBACK_DOCUMENT
         }
+
+    /**
+     * Emit a FAILED audit row for a retry attempt with the [previousError] code
+     * (spec §9.2 — each LLM call gets its own audit row, so a successful retry
+     * still leaves the original failure visible in the trail).
+     */
+    private fun auditRetryAttempt(
+        record: JobRecord,
+        item: GenerationItem,
+        modelId: ModelId,
+        previousError: com.readmates.aigen.application.model.GenerationError,
+    ) {
+        auditPort.insert(
+            AuditLogEntry(
+                jobId = record.jobId,
+                sessionId = record.sessionId,
+                clubId = record.clubId,
+                hostUserId = record.hostUserId,
+                kind = AuditKind.REGENERATE,
+                item = item,
+                provider = modelId.provider,
+                model = modelId.name,
+                transcriptSha256 = null,
+                usage = TokenUsage(0, 0, 0),
+                costEstimateUsd = BigDecimal.ZERO,
+                status = AuditStatus.FAILED,
+                errorCode = previousError.code,
+                errorMessage = "Retry triggered: ${previousError.message}",
+                latencyMs = 0,
+                createdAt = clock.instant(),
+            ),
+        )
+    }
 
     private fun failRegen(
         record: JobRecord,

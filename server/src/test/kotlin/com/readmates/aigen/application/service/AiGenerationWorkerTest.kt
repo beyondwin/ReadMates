@@ -55,6 +55,16 @@ class AiGenerationWorkerTest {
         assertThat(ctx.sleeper.sleeps).containsExactly(Duration.ofSeconds(5))
         val updated = ctx.jobStore.load(record.jobId)!!
         assertThat(updated.status).isEqualTo(JobStatus.SUCCEEDED)
+        // Per spec §9.2: each LLM call gets its own audit row. The retry-attempt
+        // audit captures the first-attempt failure code BEFORE the successful retry
+        // erases it from the terminal status.
+        val auditEntries = ctx.auditPort.entries
+        assertThat(auditEntries).hasSize(2)
+        val retryAudit = auditEntries.first()
+        assertThat(retryAudit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(retryAudit.errorCode).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+        val finalAudit = auditEntries.last()
+        assertThat(finalAudit.status).isEqualTo(AuditStatus.SUCCESS)
     }
 
     @Test
@@ -100,7 +110,10 @@ class AiGenerationWorkerTest {
         val updated = ctx.jobStore.load(record.jobId)!!
         assertThat(updated.status).isEqualTo(JobStatus.FAILED)
         assertThat(updated.error!!.code).isEqualTo(ErrorCode.PROVIDER_UNAVAILABLE)
-        val audit = ctx.auditPort.entries.single()
+        // Two audit rows: the retry-attempt audit (per spec §9.2) + the final failure audit.
+        val auditEntries = ctx.auditPort.entries
+        assertThat(auditEntries).hasSize(2)
+        val audit = auditEntries.last()
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
     }
 

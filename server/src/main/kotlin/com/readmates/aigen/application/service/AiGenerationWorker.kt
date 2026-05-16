@@ -141,6 +141,9 @@ class AiGenerationWorker(
         baseInput: GenerationInput,
         violation: ValidationResult.Violation,
     ): Outcome {
+        // Audit the validator-driven retry attempt with the original violation
+        // code so the audit trail reflects each LLM call (spec §9.2).
+        auditRetryAttempt(record, GenerationError(violation.code, violation.message))
         val strengthenedInput =
             baseInput.copy(
                 instructions = strengthenInstructions(baseInput.instructions, violation.code),
@@ -209,6 +212,11 @@ class AiGenerationWorker(
         val strategy =
             retryStrategyFor(firstFailure.code)
                 ?: return CallResult.Failure(firstFailure)
+        // Per spec §9.2 ("각 호출은 audit log row 별도"): emit a FAILED audit row
+        // for the first attempt before we retry, so the audit trail records both
+        // the original failure code AND the retry. Without this the terminal-only
+        // audit erases the first-attempt failure when the retry succeeds.
+        auditRetryAttempt(record, firstFailure)
         sleeper.sleep(strategy.backoff)
         // Per §9.2: SCHEMA_INVALID / AUTHOR_NAME_MISMATCH /
         // HIGHLIGHTS_OUT_OF_RANGE / ONE_LINE_REVIEWS_DUPLICATE /
@@ -249,6 +257,35 @@ class AiGenerationWorker(
     ): String {
         val prefix = "Strict: $code"
         return if (base.isNullOrBlank()) prefix else "$prefix\n$base"
+    }
+
+    /**
+     * Emit a FAILED audit row for a retry attempt with the [previousError] code.
+     * Per spec §9.2 ("각 호출은 audit log row 별도") each LLM call deserves its
+     * own audit entry — without this, a successful retry would erase the fact
+     * that the first attempt failed.
+     */
+    private fun auditRetryAttempt(record: JobRecord, previousError: GenerationError) {
+        auditPort.insert(
+            AuditLogEntry(
+                jobId = record.jobId,
+                sessionId = record.sessionId,
+                clubId = record.clubId,
+                hostUserId = record.hostUserId,
+                kind = AuditKind.FULL,
+                item = null,
+                provider = record.model.provider,
+                model = record.model.name,
+                transcriptSha256 = null,
+                usage = TokenUsage(0, 0, 0),
+                costEstimateUsd = BigDecimal.ZERO,
+                status = AuditStatus.FAILED,
+                errorCode = previousError.code,
+                errorMessage = "Retry triggered: ${previousError.message}",
+                latencyMs = 0,
+                createdAt = clock.instant(),
+            ),
+        )
     }
 
     private fun succeed(
