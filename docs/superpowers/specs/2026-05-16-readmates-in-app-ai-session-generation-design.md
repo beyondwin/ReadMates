@@ -674,3 +674,18 @@ v1 출시는 Phase 0 ~ 7 전체를 포함한다. Critical path(Claude만으로 e
 | 검증 | 3단계(입력·LLM 결과·commit), 1회 자동 재시도, 총 호출 ≤ 3 |
 | 테스트 | 단위·통합·E2E(mock)·PII 회귀(CI), 실제 provider 호출은 수동 smoke |
 | 출시 | 8 phase, Claude critical path, kill switch off 배포 후 dogfood |
+
+## 부록 — Phase 8 Risk Resolution (2026-05-17)
+
+플랜의 Phase 0–7가 모두 끝난 직후 실행한 risk-resolution 라운드의 결과입니다. 본문 §1–§15의 설계 의도를 그대로 유지하면서, 본문 작성 시점에 SDK 라이브 호출이 `NotImplementedError`로 deferred 되어 있던 항목과 task_1_7 리뷰에서 보고된 outstanding 11건을 닫았습니다.
+
+| Sub-task | 결과 | Commits | 비고 |
+|---|---|---|---|
+| task_8_1 — Claude SDK 라이브 와이어 | COMPLETE | `8baecd9f` | `com.anthropic:anthropic-java`의 `messages.create(...)` + `Tool` `input_schema` + `ToolChoiceTool` + `TextBlockParam.cacheControl` 실호출 완료. |
+| task_8_2 — OpenAI SDK 라이브 와이어 | COMPLETE | `4f6e493d` | `com.openai:openai-java`의 `chat().completions().create(...)` 실호출 + `strict: true` + `store: false` 정합. |
+| task_8_3 — Gemini SDK 라이브 와이어 | COMPLETE | `49f7cb90`, `3c1afc02` | `com.google.genai:google-genai`의 `client.models.generateContent(...)` + `responseSchema` 실호출. Gemini 데이터 보관 정책은 SDK 옵션이 아닌 운영자 측 paid-tier project 프로비저닝으로 enforcement (runbook §9에 절차 명시; `x-goog-data-policy` 헤더는 best-effort signal). |
+| task_8_4 — task_1_7 outstanding 11건 해소 | COMPLETE (WARN) | `bd800b24`, `fde3caa6`, `275b0130`, `58095a7e` | #1–#3은 task_2_5 (`600ab00e`)에서 이미 닫혔고 본 task에서 재검증; #4–#11 8건을 본 task에서 closure. 비차단 잔여 2건은 `.orchestrator/state.json:task_8_4.review_notes` 기록. |
+| task_8_5 — 전체 검증 스위트 | COMPLETE (WARN) | (검증 전용, 코드 변경 없음) | `compileKotlin`/`compileTestKotlin`/`unitTest` (539) / `architectureTest` / 프론트 `pnpm test` (830) 전부 GREEN. `ktlintCheck` (605→447, ‑158) · `detekt` (51→46, ‑5) · `integrationTest` (Testcontainers + ObjectMapper bean autoconfig issue) 는 Phase 8 진입 직전 (`f4da2d14`) 에 이미 존재하던 baseline 실패로, 본 플랜의 회귀 아님 (PRE-Phase8 baseline 대비 모든 지표가 개선되었음을 confirm). |
+| task_8_6 — CHANGELOG + spec close-out | COMPLETE | (본 commit) | CHANGELOG `Risk resolution (Phase 8)` 서브섹션에 모든 sub-task 와 commit SHA를 기재하고, 본 부록을 추가. |
+
+본문에 “라이브 SDK 와이어는 후속 단계에서 채운다”고 적힌 task_1_6 / task_4_2 / task_5_3 deferred 항목은 위 task_8_1 / task_8_2 / task_8_3 에 의해 Phase 8에서 종결되었습니다 — 해당 본문 단락의 결정 자체는 변경되지 않으며, 단지 실행 완료 시점이 본 부록으로 확정됩니다.
