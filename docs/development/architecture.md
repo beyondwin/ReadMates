@@ -435,7 +435,7 @@ ai_generation_audit_log row (PII-safe: provider/model/status/token/cost — no t
   - `aigen:cost:host:<userId>:<YYYY-MM-DD>` (String, TTL 24h) — 호스트 일일 생성 횟수 카운터.
   - `aigen:cost:host:<userId>:<YYYY-MM>` (String, TTL 31d) — 호스트 월별 누적 비용 (감사 보조).
 - **MySQL 테이블** (Flyway V30/V31):
-  - `ai_generation_audit_log` — job/session/club/host_user 인덱스 + provider/model/status/token_usage/cost_estimate_usd. **transcript 본문 컬럼 없음** (감사 invariant).
+  - `ai_generation_audit_log` — job/session/club/host_user 인덱스 + provider/model/status/`input_tokens`/`cached_input_tokens`/`output_tokens`/`cost_estimate_usd`/`latency_ms`. **transcript 본문 컬럼 없음** (감사 invariant).
   - `ai_generation_club_defaults` — 클럽별 default provider/model. `clubs(id)` FK.
 - **Frontend 모듈**: `front/features/host/aigen/` — `api/` (BFF 호출 + DTO), `hooks/useAiGenerationJob.ts` (TanStack Query v5 adaptive polling), `ui/` (TranscriptUploadForm, GenerationProgressView, PreviewView + 4개 section, RegenerateModal), `storage/aigen-draft-storage.ts` (PREVIEW 수동 편집 localStorage 저장). 호스트 세션 편집기는 `host-session-editor.tsx`의 `[ 외부 도구 JSON 업로드 ]` / `[ AI 결과 가져오기 ]` 토글로 두 모드를 분기합니다.
 - **운영 표면**: Micrometer meter는 `com.readmates.aigen.observability.AiGenerationMetrics`의 8개 (spec §11.1; cardinality 통제용 `MetricLabel` allowlist 적용, `club_id`/`user_id` 금지). Prometheus alert는 `ops/prometheus/alerts/aigen-rules.yml`, Grafana 대시보드는 `ops/grafana/dashboards/aigen.json`. 운영 절차와 alert response anchor는 [ai-session-generation runbook](../operations/runbooks/ai-session-generation.md).
