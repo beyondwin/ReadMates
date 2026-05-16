@@ -117,6 +117,42 @@ class NotificationEventServiceTest {
 
         assertThat(outbox.reminderDates).containsExactly(targetDate)
     }
+
+    @Test
+    fun `ai generation ready event records job aggregate with PII-free payload`() {
+        val outbox = RecordingEventOutbox()
+        val service = NotificationEventService(outbox)
+        val clubId = UUID.randomUUID()
+        val sessionId = UUID.randomUUID()
+        val jobId = UUID.randomUUID()
+        val hostUserId = UUID.randomUUID()
+
+        service.recordAiGenerationReady(
+            jobId = jobId,
+            sessionId = sessionId,
+            clubId = clubId,
+            hostUserId = hostUserId,
+        )
+
+        val event = outbox.recorded.single()
+        assertThat(event.clubId).isEqualTo(clubId)
+        assertThat(event.eventType).isEqualTo(NotificationEventType.AI_GENERATION_READY)
+        assertThat(event.aggregateType).isEqualTo("AI_GENERATION_JOB")
+        assertThat(event.aggregateId).isEqualTo(jobId)
+        // Payload MUST carry only the three identifiers — never transcript / authorNames / book title (PII invariant).
+        assertThat(event.payload).isEqualTo(
+            NotificationEventPayload(
+                sessionId = sessionId,
+                jobId = jobId,
+                hostUserId = hostUserId,
+            ),
+        )
+        assertThat(event.payload.bookTitle).isNull()
+        assertThat(event.payload.sessionNumber).isNull()
+        assertThat(event.payload.documentVersion).isNull()
+        assertThat(event.payload.authorMembershipId).isNull()
+        assertThat(event.dedupeKey).isEqualTo("ai-generation-ready:$jobId")
+    }
 }
 
 private data class RecordedEvent(

@@ -126,4 +126,11 @@ private object NoopRecordNotificationEventUseCase : RecordNotificationEventUseCa
     ) = Unit
 
     override fun recordSessionReminderDue(targetDate: LocalDate) = Unit
+
+    override fun recordAiGenerationReady(
+        jobId: UUID,
+        sessionId: UUID,
+        clubId: UUID,
+        hostUserId: UUID,
+    ) = Unit
 }

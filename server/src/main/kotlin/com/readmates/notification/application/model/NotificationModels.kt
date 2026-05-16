@@ -17,6 +17,10 @@ data class NotificationEventPayload(
     val authorMembershipId: UUID? = null,
     val targetDate: LocalDate? = null,
     val manualDispatch: NotificationManualDispatchPayload? = null,
+    // AI generation ready (task 6.3) — PII invariant: jobId / hostUserId only,
+    // never carry transcript text, author names, or book title content here.
+    val jobId: UUID? = null,
+    val hostUserId: UUID? = null,
 )
 
 enum class NotificationDispatchSource {
@@ -69,6 +73,10 @@ fun defaultManualAudience(eventType: NotificationEventType): ManualNotificationA
         -> ManualNotificationAudience.ALL_ACTIVE_MEMBERS
         NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> ManualNotificationAudience.CONFIRMED_ATTENDEES
         NotificationEventType.REVIEW_PUBLISHED -> ManualNotificationAudience.SESSION_PARTICIPANTS
+        // AI_GENERATION_READY is system-triggered only; manual dispatch is disallowed
+        // (see allowedManualAudiences -> emptySet). Mirror REVIEW_PUBLISHED's default for
+        // the unreachable branch to keep `when` exhaustive without inventing semantics.
+        NotificationEventType.AI_GENERATION_READY -> ManualNotificationAudience.SESSION_PARTICIPANTS
     }
 
 fun allowedManualAudiences(eventType: NotificationEventType): Set<ManualNotificationAudience> =
@@ -79,6 +87,8 @@ fun allowedManualAudiences(eventType: NotificationEventType): Set<ManualNotifica
         NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
             setOf(ManualNotificationAudience.CONFIRMED_ATTENDEES, ManualNotificationAudience.SESSION_PARTICIPANTS)
         NotificationEventType.REVIEW_PUBLISHED -> emptySet()
+        // AI_GENERATION_READY is never offered via manual dispatch UI — host-only auto trigger.
+        NotificationEventType.AI_GENERATION_READY -> emptySet()
     }
 
 data class NotificationEventOutboxItem(
@@ -454,6 +464,10 @@ data class NotificationPreferences(
                 NotificationEventType.SESSION_REMINDER_DUE -> true
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> true
                 NotificationEventType.REVIEW_PUBLISHED -> false
+                // AI_GENERATION_READY is in-app only and gated on the host completing a
+                // generation — no per-user preference toggle in v1. Default true so it
+                // flows through the existing pipeline without a per-event preference column.
+                NotificationEventType.AI_GENERATION_READY -> true
             }
     }
 }

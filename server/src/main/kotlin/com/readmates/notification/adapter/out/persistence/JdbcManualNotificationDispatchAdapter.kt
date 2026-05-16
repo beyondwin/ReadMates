@@ -718,6 +718,10 @@ class JdbcManualNotificationDispatchAdapter(
                 NotificationEventType.SESSION_REMINDER_DUE -> "session_reminder_due_enabled"
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "feedback_document_published_enabled"
                 NotificationEventType.REVIEW_PUBLISHED -> "review_published_enabled"
+                // AI_GENERATION_READY never reaches manual dispatch (allowedManualAudiences=emptySet),
+                // but `when` must remain exhaustive. Fall back to feedback column so a code path that
+                // is unreachable in practice still type-checks; nothing reads this branch in v1.
+                NotificationEventType.AI_GENERATION_READY -> "feedback_document_published_enabled"
             }
         val placeholders = membershipIds.joinToString(",") { "?" }
         val rows =

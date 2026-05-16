@@ -85,6 +85,8 @@ internal class NotificationDeliveryPlanningOperations(
                 feedbackRecipients(jdbcTemplate, message)
             NotificationEventType.REVIEW_PUBLISHED ->
                 reviewRecipients(jdbcTemplate, message)
+            NotificationEventType.AI_GENERATION_READY ->
+                aiGenerationHostRecipient(jdbcTemplate, message)
         }
 
     private fun deliveryRowsForRecipient(
@@ -101,6 +103,9 @@ internal class NotificationDeliveryPlanningOperations(
                     manual.inAppMembershipIds.isNotEmpty() ||
                     manual.emailMembershipIds.isNotEmpty()
             )
+        // AI_GENERATION_READY (task 6.3) — v1 routes to in-app ONLY, never email.
+        // Suppress the EMAIL delivery row entirely (cleaner than emitting a SKIPPED row).
+        val emailSuppressedByEventType = message.eventType == NotificationEventType.AI_GENERATION_READY
         val includeInApp =
             if (hasFrozenSnapshot) {
                 recipient.membershipId in frozenInAppIds
@@ -110,7 +115,9 @@ internal class NotificationDeliveryPlanningOperations(
                     requested == ManualNotificationRequestedChannels.BOTH
             }
         val includeEmail =
-            if (hasFrozenSnapshot) {
+            if (emailSuppressedByEventType) {
+                false
+            } else if (hasFrozenSnapshot) {
                 recipient.membershipId in frozenEmailIds
             } else {
                 requested == null ||
@@ -251,6 +258,40 @@ internal class NotificationDeliveryPlanningOperations(
             (message.payload.authorMembershipId ?: UUID(0, 0)).dbString(),
         )
 
+    /**
+     * AI_GENERATION_READY (task 6.3) recipient lookup. Resolves the single host
+     * membership in this club from `payload.hostUserId` — never fan-outs to other
+     * members. In-app only: `emailAllowed=false` so even if a future change reroutes
+     * EMAIL inclusion it would be SKIPPED. No `notification_preferences.<column>`
+     * filter applies because v1 ships without a per-user preference toggle for this
+     * event (see [com.readmates.notification.application.model.NotificationPreferences]
+     * `defaultEventEnabled` -> AI_GENERATION_READY = true).
+     */
+    private fun aiGenerationHostRecipient(
+        jdbcTemplate: JdbcTemplate,
+        message: NotificationEventMessage,
+    ): List<DeliveryRecipient> {
+        val hostUserId =
+            message.payload.hostUserId
+                ?: return emptyList()
+        return jdbcTemplate.query(
+            """
+            select
+              memberships.id as recipient_membership_id,
+              coalesce(memberships.short_name, users.name) as display_name,
+              false as email_allowed
+            from memberships
+            join users on users.id = memberships.user_id
+            where memberships.club_id = ?
+              and memberships.status = 'ACTIVE'
+              and users.id = ?
+            """.trimIndent(),
+            { resultSet, _ -> with(rowMappers) { resultSet.toDeliveryRecipient() } },
+            message.clubId.dbString(),
+            hostUserId.dbString(),
+        )
+    }
+
     private fun manualRecipients(
         jdbcTemplate: JdbcTemplate,
         message: NotificationEventMessage,
@@ -284,6 +325,10 @@ internal class NotificationDeliveryPlanningOperations(
                 NotificationEventType.SESSION_REMINDER_DUE -> "session_reminder_due_enabled"
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "feedback_document_published_enabled"
                 NotificationEventType.REVIEW_PUBLISHED -> "review_published_enabled"
+                // AI_GENERATION_READY is never dispatched manually (allowedManualAudiences=emptySet
+                // — see NotificationModels.kt). The branch is required only for exhaustiveness;
+                // any column literal would do because this code path is unreachable for this event.
+                NotificationEventType.AI_GENERATION_READY -> "feedback_document_published_enabled"
             }
         return jdbcTemplate.query(
             """
