@@ -1,5 +1,5 @@
-/* Runtime style entry: keep app-only aliases here; add reusable tokens in shared/styles/tokens.css. */
-@import "../../shared/styles/tokens.css";
+/* Runtime style entry: keep app-only aliases here; add reusable tokens in @readmates/design-system. */
+@import "@readmates/design-system/styles.css";
 @import "../../shared/styles/mobile.css";
 
 :root {

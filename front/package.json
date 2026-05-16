@@ -13,12 +13,8 @@
     "test:watch": "vitest",
     "zod:export-fixtures": "tsx scripts/export-zod-fixtures.ts"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "dependencies": {
+    "@readmates/design-system": "workspace:*",
     "@tanstack/react-query": "^5.100.10",
     "react": "19.2.5",
     "react-dom": "19.2.5",

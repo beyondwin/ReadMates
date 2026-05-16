@@ -1,1 +1,1 @@
-/* Token imports are added after the existing front token file moves into this package. */
+@import "./styles/tokens.css";

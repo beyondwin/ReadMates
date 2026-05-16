@@ -2,6 +2,11 @@
   "name": "readmates",
   "private": true,
   "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  },
   "scripts": {
     "front:lint": "pnpm --dir front lint",
     "front:test": "pnpm --dir front test",
