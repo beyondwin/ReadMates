@@ -12,6 +12,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.slf4j.MDC
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.kafka.annotation.KafkaListener
@@ -27,6 +28,7 @@ class NotificationEventKafkaListenerTest {
             NotificationEventKafkaListener::class.java.getDeclaredMethod(
                 "onMessage",
                 NotificationEventMessage::class.java,
+                String::class.java,
             )
 
         val kafkaListener = listener.getAnnotation(KafkaListener::class.java)
@@ -86,11 +88,46 @@ class NotificationEventKafkaListenerTest {
         val message = notificationEventMessage(schemaVersion = 2)
 
         assertThatThrownBy {
-            listener.onMessage(message)
+            listener.onMessage(message, requestId = null)
         }.isInstanceOf(NotificationUnsupportedSchemaVersionException::class.java)
             .hasMessageContaining("Unsupported notification event schemaVersion 2")
 
         assertThat(recordingUseCase.dispatchedMessages).isEmpty()
+    }
+
+    @Test
+    fun `onMessage binds readmates-request-id header to MDC during dispatch`() {
+        val recordingUseCase = RecordingDispatchUseCase()
+        val listener = NotificationEventKafkaListener(recordingUseCase)
+        val message = notificationEventMessage(schemaVersion = 1)
+
+        try {
+            MDC.remove("requestId")
+            listener.onMessage(message, requestId = "test-req-1234")
+
+            assertThat(recordingUseCase.observedRequestIds).containsExactly("test-req-1234")
+            assertThat(MDC.get("requestId")).isNull()
+        } finally {
+            MDC.remove("requestId")
+        }
+    }
+
+    @Test
+    fun `onMessage uses 'unknown' MDC requestId when header is missing or blank`() {
+        val recordingUseCase = RecordingDispatchUseCase()
+        val listener = NotificationEventKafkaListener(recordingUseCase)
+        val message = notificationEventMessage(schemaVersion = 1)
+
+        try {
+            MDC.remove("requestId")
+            listener.onMessage(message, requestId = null)
+            listener.onMessage(message, requestId = "   ")
+
+            assertThat(recordingUseCase.observedRequestIds).containsExactly("unknown", "unknown")
+            assertThat(MDC.get("requestId")).isNull()
+        } finally {
+            MDC.remove("requestId")
+        }
     }
 
     private fun Class<*>.requiredEnabledProperties(): List<String> =
@@ -105,9 +142,11 @@ class NotificationEventKafkaListenerTest {
 
 private class RecordingDispatchUseCase : DispatchNotificationEventUseCase {
     val dispatchedMessages = mutableListOf<NotificationEventMessage>()
+    val observedRequestIds = mutableListOf<String?>()
 
     override fun dispatch(message: NotificationEventMessage) {
         dispatchedMessages += message
+        observedRequestIds += MDC.get("requestId")
     }
 }
 
