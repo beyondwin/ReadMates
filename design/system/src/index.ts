@@ -1,5 +1,9 @@
 export { Badge } from "./components/badge";
 export type { BadgeProps, BadgeTone } from "./components/badge";
+export { AvatarChip } from "./components/avatar-chip";
+export type { AvatarChipProps, AvatarChipSize, AvatarChipTone } from "./components/avatar-chip";
+export { BookCover } from "./components/book-cover";
+export type { BookCoverProps, BookCoverSize } from "./components/book-cover";
 export { Button } from "./components/button";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./components/button";
 export { cx } from "./components/classnames";
