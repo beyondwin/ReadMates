@@ -212,6 +212,7 @@ class AiGenerationWorkerTest {
             latencyNotification = latencyNotification,
             properties = properties,
             clock = clock,
+            metrics = fakeMetrics(),
             sleeper = sleeper,
         )
 

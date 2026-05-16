@@ -12,7 +12,7 @@ import java.util.UUID
 
 class DefaultSessionImportV1ValidatorTest {
 
-    private val validator = DefaultSessionImportV1Validator()
+    private val validator = DefaultSessionImportV1Validator(fakeMetrics())
 
     @Test
     fun `valid snapshot returns Ok`() {

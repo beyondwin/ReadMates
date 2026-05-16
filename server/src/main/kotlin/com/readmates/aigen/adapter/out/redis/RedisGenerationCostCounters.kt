@@ -3,6 +3,8 @@ package com.readmates.aigen.adapter.out.redis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
+import com.readmates.aigen.application.service.AiGenerationMetrics
+import com.readmates.aigen.application.service.CapDenialReason
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -29,6 +31,7 @@ class RedisGenerationCostCounters(
     private val redisTemplate: StringRedisTemplate,
     private val properties: AiGenerationProperties,
     private val metrics: RedisCacheMetrics,
+    private val aigenMetrics: AiGenerationMetrics,
 ) : GenerationCostGuard {
     override fun checkBeforeCall(
         hostId: UUID,
@@ -37,11 +40,13 @@ class RedisGenerationCostCounters(
         runCatching {
             val dailyCount = redisTemplate.opsForValue().get(dailyKey(hostId))?.toLongOrNull() ?: 0L
             if (dailyCount >= properties.caps.hostDailyCalls) {
+                aigenMetrics.recordCapDenial(CapDenialReason.HOST_DAILY)
                 return@runCatching GuardDecision.Deny(ErrorCode.HOST_DAILY_CAP_EXCEEDED)
             }
 
             val monthlyCost = readMonthlyCost(clubId)
             if (monthlyCost >= properties.caps.clubMonthlyCostUsd) {
+                aigenMetrics.recordCapDenial(CapDenialReason.CLUB_MONTHLY)
                 return@runCatching GuardDecision.Deny(ErrorCode.CLUB_MONTHLY_CAP_EXCEEDED)
             }
 

@@ -31,6 +31,7 @@ import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SessionContentGenerator
 import com.readmates.aigen.application.port.out.SessionContentRegenerator
 import com.readmates.aigen.config.AiGenerationProperties
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import java.math.BigDecimal
 import java.time.Clock
 import java.time.Duration
@@ -315,6 +316,13 @@ internal class FakeClock(
         return if (ticks.size > 1) ticks.removeFirst() else ticks.first()
     }
 }
+
+/**
+ * Returns a real [AiGenerationMetrics] backed by an in-memory [SimpleMeterRegistry]
+ * so the label-allowlist invariants in [AiGenerationMetrics.aigenMeter] run during
+ * each service-level test (no behaviour change, just observability).
+ */
+internal fun fakeMetrics(): AiGenerationMetrics = AiGenerationMetrics(SimpleMeterRegistry())
 
 internal object AiGenerationTestFixtures {
     val CLAUDE_MODEL = ModelId(Provider.CLAUDE, "claude-sonnet-4-6")

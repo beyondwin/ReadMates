@@ -1,7 +1,10 @@
 package com.readmates.aigen.adapter.out.redis
 
+import com.readmates.aigen.application.service.AiGenerationMetrics
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.shared.cache.RedisCacheMetrics
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito
@@ -65,9 +68,13 @@ class RedisAiGenerationConditionalLoadingTest {
         RedisAiGenerationJobStore::class,
         RedisGenerationCostCounters::class,
         RedisCacheMetrics::class,
+        AiGenerationMetrics::class,
     )
     class AdapterBeanTestConfiguration {
         @Bean
         fun redisTemplate(): StringRedisTemplate = Mockito.mock(StringRedisTemplate::class.java)
+
+        @Bean
+        fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
     }
 }

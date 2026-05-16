@@ -30,17 +30,23 @@ import org.springframework.stereotype.Component
  */
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
-class DefaultSessionImportV1Validator : SessionImportV1Validator {
+class DefaultSessionImportV1Validator(
+    private val metrics: AiGenerationMetrics,
+) : SessionImportV1Validator {
 
     override fun validate(
         snapshot: SessionImportV1Snapshot,
         sessionMeta: SessionMeta,
     ): ValidationResult {
-        checkSchema(snapshot, sessionMeta)?.let { return it }
-        checkAuthorNames(snapshot, sessionMeta)?.let { return it }
-        checkHighlightsRange(snapshot)?.let { return it }
-        checkOneLineReviewDuplicates(snapshot)?.let { return it }
-        checkFeedbackTemplate(snapshot, sessionMeta)?.let { return it }
+        val violation = checkSchema(snapshot, sessionMeta)
+            ?: checkAuthorNames(snapshot, sessionMeta)
+            ?: checkHighlightsRange(snapshot)
+            ?: checkOneLineReviewDuplicates(snapshot)
+            ?: checkFeedbackTemplate(snapshot, sessionMeta)
+        if (violation != null) {
+            metrics.recordValidationFailure(violation.code)
+            return violation
+        }
         return ValidationResult.Ok
     }
 

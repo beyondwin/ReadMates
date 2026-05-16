@@ -3,6 +3,7 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
+import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.RegenerationInput
@@ -20,6 +21,7 @@ import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
+import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SessionContentRegenerator
@@ -64,6 +66,7 @@ class AiGenerationRegenerationService(
     private val costGuard: GenerationCostGuard,
     private val properties: AiGenerationProperties,
     private val clock: Clock,
+    private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
 ) : RegenerateItemUseCase {
 
@@ -114,6 +117,7 @@ class AiGenerationRegenerationService(
         }
         jobStore.patchItem(jobId, item, patchedSnapshot, output.usage, cost)
         costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+        emitRegenMetrics(modelId, item, output.usage, cost, JobStatus.SUCCEEDED)
 
         auditPort.insert(
             AuditLogEntry(
@@ -232,6 +236,36 @@ class AiGenerationRegenerationService(
         return if (monthly >= threshold) listOf("CLUB_BUDGET_80PCT") else emptyList()
     }
 
+    private fun emitRegenMetrics(
+        modelId: ModelId,
+        item: GenerationItem,
+        usage: TokenUsage,
+        cost: BigDecimal,
+        status: JobStatus,
+    ) {
+        val kind = regenKindFor(item)
+        metrics.recordJobCompleted(status, modelId.provider, modelId, kind)
+        if (usage.inputTokens > 0) {
+            metrics.recordTokens(modelId.provider, modelId, TokenDirection.INPUT, usage.inputTokens)
+        }
+        if (usage.cachedInputTokens > 0) {
+            metrics.recordTokens(modelId.provider, modelId, TokenDirection.CACHED_INPUT, usage.cachedInputTokens)
+        }
+        if (usage.outputTokens > 0) {
+            metrics.recordTokens(modelId.provider, modelId, TokenDirection.OUTPUT, usage.outputTokens)
+        }
+        if (cost > BigDecimal.ZERO) {
+            metrics.recordCost(modelId.provider, modelId, cost)
+        }
+    }
+
+    private fun regenKindFor(item: GenerationItem): JobKind = when (item) {
+        GenerationItem.SUMMARY -> JobKind.REGENERATE_SUMMARY
+        GenerationItem.HIGHLIGHTS -> JobKind.REGENERATE_HIGHLIGHTS
+        GenerationItem.ONE_LINE_REVIEWS -> JobKind.REGENERATE_ONE_LINE_REVIEWS
+        GenerationItem.FEEDBACK_DOCUMENT -> JobKind.REGENERATE_FEEDBACK_DOCUMENT
+    }
+
     private fun failRegen(
         record: JobRecord,
         item: GenerationItem,
@@ -239,6 +273,8 @@ class AiGenerationRegenerationService(
         code: ErrorCode,
         message: String,
     ): Nothing {
+        // Validation-failure counter is emitted at the validator (single source of truth).
+        metrics.recordJobCompleted(JobStatus.FAILED, modelId.provider, modelId, regenKindFor(item))
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,

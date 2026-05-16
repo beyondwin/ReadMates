@@ -231,6 +231,7 @@ class AiGenerationOrchestratorTest {
             modelCatalog = modelCatalog,
             properties = properties,
             clock = clock,
+            metrics = fakeMetrics(),
         )
 
         fun command(model: String?): StartGenerationCommand = StartGenerationCommand(

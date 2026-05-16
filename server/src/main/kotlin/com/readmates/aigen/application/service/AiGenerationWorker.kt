@@ -18,6 +18,7 @@ import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditLogEntry
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GenerationCostGuard
+import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.aigen.application.port.out.ModelCatalog
 import com.readmates.aigen.application.port.out.SessionContentGenerator
@@ -65,6 +66,7 @@ class AiGenerationWorker(
     private val latencyNotification: AiGenerationLatencyNotification,
     private val properties: AiGenerationProperties,
     private val clock: Clock,
+    private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
 ) {
 
@@ -192,6 +194,7 @@ class AiGenerationWorker(
         jobStore.saveResult(record.jobId, snapshot, usage, cost)
         jobStore.updateStatus(record.jobId, JobStatus.SUCCEEDED, JobStage.READY, 100, null)
         costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+        emitJobMetrics(record, JobStatus.SUCCEEDED, usage, cost, start)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -228,6 +231,8 @@ class AiGenerationWorker(
             progressPct = 0,
             error = GenerationError(code, message),
         )
+        // Validation-failure counter is emitted at the validator (single source of truth).
+        emitJobMetrics(record, JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
@@ -265,4 +270,28 @@ class AiGenerationWorker(
 
     private fun elapsedMillis(start: Instant): Int =
         Duration.between(start, clock.instant()).toMillis().coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+
+    private fun emitJobMetrics(
+        record: JobRecord,
+        status: JobStatus,
+        usage: TokenUsage,
+        cost: BigDecimal,
+        start: Instant,
+    ) {
+        val elapsed = Duration.between(start, clock.instant())
+        metrics.recordJobCompleted(status, record.model.provider, record.model, JobKind.FULL)
+        metrics.recordLatency(record.model.provider, record.model, JobKind.FULL, elapsed)
+        if (usage.inputTokens > 0) {
+            metrics.recordTokens(record.model.provider, record.model, TokenDirection.INPUT, usage.inputTokens)
+        }
+        if (usage.cachedInputTokens > 0) {
+            metrics.recordTokens(record.model.provider, record.model, TokenDirection.CACHED_INPUT, usage.cachedInputTokens)
+        }
+        if (usage.outputTokens > 0) {
+            metrics.recordTokens(record.model.provider, record.model, TokenDirection.OUTPUT, usage.outputTokens)
+        }
+        if (cost > BigDecimal.ZERO) {
+            metrics.recordCost(record.model.provider, record.model, cost)
+        }
+    }
 }

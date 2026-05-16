@@ -57,9 +57,11 @@ class AiGenerationOrchestrator(
     private val modelCatalog: ModelCatalog,
     private val properties: AiGenerationProperties,
     private val clock: Clock,
+    private val metrics: AiGenerationMetrics,
 ) : StartGenerationUseCase, GetJobUseCase, CancelGenerationUseCase {
 
     override fun start(command: StartGenerationCommand): StartGenerationResult {
+        metrics.recordJobStarted()
         val modelId = resolveModelId(command.model, command.clubId)
             ?: failStart(command, ErrorCode.AI_DISABLED, "Requested model is not enabled")
 

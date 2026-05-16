@@ -260,6 +260,7 @@ class AiGenerationRegenerationServiceTest {
             costGuard = costGuard,
             properties = properties,
             clock = clock,
+            metrics = fakeMetrics(),
             sleeper = sleeper,
         )
     }

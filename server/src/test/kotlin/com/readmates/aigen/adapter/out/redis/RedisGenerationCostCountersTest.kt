@@ -3,6 +3,7 @@ package com.readmates.aigen.adapter.out.redis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
+import com.readmates.aigen.application.service.AiGenerationMetrics
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
@@ -123,6 +124,7 @@ class RedisGenerationCostCountersTest(
                 redisTemplate = failingTemplate,
                 properties = AiGenerationProperties(),
                 metrics = metrics(meterRegistry),
+                aigenMetrics = AiGenerationMetrics(meterRegistry),
             )
 
         val decision = guard.checkBeforeCall(UUID.randomUUID(), UUID.randomUUID())
