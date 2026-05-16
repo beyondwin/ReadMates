@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData, useParams } from "react-router-dom";
 import type { HostSessionDetailResponse, ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
 import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
@@ -17,10 +17,12 @@ export function NewHostSessionRoute({
   hostDashboardReturnTarget,
   readmatesReturnState,
 }: HostSessionEditorRouteProps) {
+  const { clubSlug } = useParams<{ clubSlug: string }>();
   return (
     <HostSessionEditor
       returnTarget={returnTarget}
       actions={hostSessionEditorActions}
+      clubSlug={clubSlug}
       LinkComponent={LinkComponent}
       hostDashboardReturnTarget={hostDashboardReturnTarget}
       readmatesReturnState={readmatesReturnState}
@@ -40,6 +42,7 @@ export function EditHostSessionRoute({
   };
   const session = "session" in loaderData ? loaderData.session : loaderData;
   const notificationDispatches = "session" in loaderData ? loaderData.notificationDispatches.items : [];
+  const { clubSlug } = useParams<{ clubSlug: string }>();
 
   return (
     <HostSessionEditor
@@ -47,6 +50,7 @@ export function EditHostSessionRoute({
       notificationDispatches={notificationDispatches}
       returnTarget={returnTarget}
       actions={hostSessionEditorActions}
+      clubSlug={clubSlug}
       LinkComponent={LinkComponent}
       hostDashboardReturnTarget={hostDashboardReturnTarget}
       readmatesReturnState={readmatesReturnState}

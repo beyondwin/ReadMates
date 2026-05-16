@@ -25,7 +25,11 @@ export const mobileEditorSections: { key: MobileEditorSection; label: string; ta
     key: "report",
     label: "문서",
     tabId: "host-editor-tab-report",
-    panelIds: ["host-editor-panel-session-import", "host-editor-panel-report"],
+    panelIds: [
+      "host-editor-panel-session-import",
+      "host-editor-panel-aigen",
+      "host-editor-panel-report",
+    ],
   },
 ];
 
