@@ -4,6 +4,13 @@ export type ReadmatesApiErrorBody = {
   status: number;
 };
 
+type ReadmatesProblemDetailBody = {
+  code: string;
+  detail: string | null;
+  status: number;
+  title?: string;
+};
+
 export type ReadmatesApiErrorMetadata = {
   status: number;
   statusText: string;
@@ -45,6 +52,29 @@ function isApiErrorBody(value: unknown): value is ReadmatesApiErrorBody {
   return typeof body.code === "string" && typeof body.message === "string" && typeof body.status === "number";
 }
 
+function isProblemDetailBody(value: unknown): value is ReadmatesProblemDetailBody {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const body = value as Partial<ReadmatesProblemDetailBody>;
+  return (
+    typeof body.code === "string" &&
+    (typeof body.detail === "string" || body.detail === null) &&
+    typeof body.status === "number"
+  );
+}
+
+function problemDetailMessage(body: ReadmatesProblemDetailBody) {
+  if (typeof body.detail === "string" && body.detail.trim()) {
+    return body.detail;
+  }
+  if (typeof body.title === "string" && body.title.trim()) {
+    return body.title;
+  }
+  return null;
+}
+
 async function parseApiErrorBody(response: Response): Promise<ReadmatesApiErrorBody & { fallback: boolean }> {
   try {
     const text = await response.clone().text();
@@ -54,6 +84,17 @@ async function parseApiErrorBody(response: Response): Promise<ReadmatesApiErrorB
 
     const parsed: unknown = JSON.parse(text);
     if (!isApiErrorBody(parsed)) {
+      if (isProblemDetailBody(parsed) && parsed.status === response.status) {
+        const message = problemDetailMessage(parsed);
+        if (message) {
+          return {
+            code: parsed.code,
+            message,
+            status: response.status,
+            fallback: false,
+          };
+        }
+      }
       return fallbackApiErrorBody(response.status);
     }
 

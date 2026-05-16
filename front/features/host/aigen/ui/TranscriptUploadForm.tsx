@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type CSSProperties, type FormEvent } from "react";
+import { useState, type ChangeEvent, type CSSProperties } from "react";
 import type {
   AiAuthorNameMode,
   StartGenerationRequest,
@@ -55,8 +55,7 @@ export function TranscriptUploadForm({
     !submitting &&
     !fileError;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleSubmit = () => {
     if (!transcript || !model) return;
     const payload: StartGenerationRequest = {
       transcript,
@@ -68,7 +67,7 @@ export function TranscriptUploadForm({
   };
 
   return (
-    <form className="stack" style={{ "--stack": "14px" } as CSSProperties} onSubmit={handleSubmit}>
+    <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
       <h2 style={{ margin: 0 }}>AI로 세션 기록 생성</h2>
       <p className="small" style={{ color: "var(--text-2)" }}>
         모임 대본(.txt, 1 MB 이하)을 업로드하면 요약·하이라이트·한줄평·피드백 문서를 자동으로 만듭니다.
@@ -163,9 +162,9 @@ export function TranscriptUploadForm({
         <dd style={{ display: "inline", marginLeft: 6 }}>-</dd>
       </dl>
 
-      <button type="submit" className="btn btn-primary" disabled={!canSubmit}>
+      <button type="button" className="btn btn-primary" disabled={!canSubmit} onClick={handleSubmit}>
         {submitting ? "시작 중…" : "생성 시작"}
       </button>
-    </form>
+    </div>
   );
 }

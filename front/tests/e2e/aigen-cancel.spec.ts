@@ -12,6 +12,7 @@ import type {
   ClubAiDefaultResponse,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
+import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
@@ -60,25 +61,14 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 test("cancel during GENERATING returns the editor to IDLE and clears the draft", async ({ page }) => {
-  await page.route("**/api/bff/api/auth/me**", async (route) => {
-    await json(route, 200, {
-      authenticated: true,
-      principal: { membershipId: "m-1", email: "host@example.com", role: "HOST" },
-    });
-  });
+  await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
     if (route.request().url().includes("/ai-generate")) {
       await route.fallback();
       return;
     }
-    await json(route, 200, {
-      sessionId: SESSION_ID,
-      clubSlug: CLUB_SLUG,
-      title: "E2E 세션",
-      state: "OPEN",
-      attendees: [],
-    });
+    await json(route, 200, hostSessionDetailResponse(SESSION_ID));
   });
 
   await page.route(
@@ -123,7 +113,7 @@ test("cancel during GENERATING returns the editor to IDLE and clears the draft",
     },
   );
 
-  await page.goto(`/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
 
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",
