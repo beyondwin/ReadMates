@@ -16,6 +16,7 @@
 2. **Find originating outbox row**
    ```sql
    SELECT * FROM notification_event_outbox WHERE request_id = '<id>';
+   SELECT * FROM notification_manual_dispatch_previews WHERE request_id = '<id>';
    SELECT * FROM notification_manual_dispatches WHERE request_id = '<id>';
    ```
 
