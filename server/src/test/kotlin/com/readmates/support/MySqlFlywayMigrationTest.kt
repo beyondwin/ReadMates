@@ -468,6 +468,55 @@ class MySqlFlywayMigrationTest(
     }
 
     @Test
+    fun `mysql creates ai generation audit and club defaults tables`() {
+        val tableCount =
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.tables
+                where table_schema = database()
+                  and table_name in ('ai_generation_audit_log', 'ai_generation_club_defaults')
+                """.trimIndent(),
+                Int::class.java,
+            )
+
+        assertEquals(2, tableCount)
+
+        assertEquals("NO", columnValue("ai_generation_audit_log", "job_id", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "session_id", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "club_id", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "host_user_id", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "kind", "is_nullable"))
+        assertEquals("YES", columnValue("ai_generation_audit_log", "item", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "provider", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "model", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "status", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_audit_log", "created_at", "is_nullable"))
+
+        assertEquals(
+            "session_id,created_at",
+            indexColumns("ai_generation_audit_log", "idx_aigen_audit_session"),
+        )
+        assertEquals(
+            "club_id,created_at",
+            indexColumns("ai_generation_audit_log", "idx_aigen_audit_club"),
+        )
+        assertEquals(
+            "host_user_id,created_at",
+            indexColumns("ai_generation_audit_log", "idx_aigen_audit_host"),
+        )
+
+        assertEquals("NO", columnValue("ai_generation_club_defaults", "club_id", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_club_defaults", "default_model", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_club_defaults", "updated_at", "is_nullable"))
+        assertEquals("NO", columnValue("ai_generation_club_defaults", "updated_by", "is_nullable"))
+        assertEquals(
+            "clubs:id",
+            foreignKeyReference("ai_generation_club_defaults", "fk_aigen_default_club"),
+        )
+    }
+
+    @Test
     fun `mysql creates multi club platform metadata tables`() {
         val tableCount =
             jdbcTemplate.queryForObject(
