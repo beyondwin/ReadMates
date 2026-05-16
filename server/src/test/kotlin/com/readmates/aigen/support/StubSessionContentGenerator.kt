@@ -10,13 +10,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 
 /**
- * Deterministic in-process stub that satisfies [SessionContentGenerator] without
- * calling out to a real LLM provider. Active only when both `readmates.aigen.enabled`
- * and `readmates.aigen.mock` are `true` — used by the AI generation API integration
- * test (Phase 2 task 2.5) to exercise the full HTTP→Kafka→worker→Redis→commit lifecycle
- * with predictable content.
- *
- * The returned snapshot is shaped to satisfy [DefaultSessionImportV1Validator]:
+ * Deterministic in-process stub payload shared by every provider-specific
+ * stub generator. The shape satisfies [DefaultSessionImportV1Validator]:
  *  - format constant
  *  - session metadata mirrors the input.sessionMeta
  *  - non-blank summary
@@ -24,13 +19,15 @@ import org.springframework.stereotype.Component
  *  - oneLineReviews use [expectedAuthorNames] with no duplicates
  *  - feedback markdown starts with `<!-- readmates-feedback:v1 -->` and includes
  *    the `# 독서모임 {sessionNumber}차 피드백` header.
+ *
+ * Extracted from [StubSessionContentGenerator] for task 4.3 so additional
+ * provider-specific stub Components (e.g. OPENAI in
+ * [StubOpenAiSessionContentGenerator]) can share identical content while
+ * advertising a different [Provider] value to
+ * `AiGenerationBeansConfig.sessionContentGeneratorsByProvider`.
  */
-@Component
-@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
-class StubSessionContentGenerator : SessionContentGenerator {
-    override val provider: Provider = Provider.CLAUDE
-
-    override fun generateFull(input: GenerationInput): GenerationOutput {
+internal object StubGenerationPayload {
+    fun buildOutput(input: GenerationInput): GenerationOutput {
         val meta = input.sessionMeta
         val author = meta.expectedAuthorNames.firstOrNull() ?: "Host"
         val highlights = listOf(
@@ -107,4 +104,35 @@ class StubSessionContentGenerator : SessionContentGenerator {
         )
         return GenerationOutput(snapshot, TokenUsage(inputTokens = 100, cachedInputTokens = 0, outputTokens = 200))
     }
+}
+
+/**
+ * Deterministic in-process stub that satisfies [SessionContentGenerator] without
+ * calling out to a real LLM provider. Active only when both `readmates.aigen.enabled`
+ * and `readmates.aigen.mock` are `true` — used by the AI generation API integration
+ * test (Phase 2 task 2.5) to exercise the full HTTP→Kafka→worker→Redis→commit lifecycle
+ * with predictable content.
+ *
+ * Targets [Provider.CLAUDE]. Companion [StubOpenAiSessionContentGenerator] targets
+ * [Provider.OPENAI] (task 4.3 provider-matrix integration test).
+ */
+@Component
+@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
+class StubSessionContentGenerator : SessionContentGenerator {
+    override val provider: Provider = Provider.CLAUDE
+    override fun generateFull(input: GenerationInput): GenerationOutput =
+        StubGenerationPayload.buildOutput(input)
+}
+
+/**
+ * Mirror of [StubSessionContentGenerator] for [Provider.OPENAI]. Added in
+ * task 4.3 so `AiGenerateApiIntegrationTest`'s parameterized OPENAI rows can
+ * exercise the same lifecycle without a real OpenAI SDK call.
+ */
+@Component
+@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
+class StubOpenAiSessionContentGenerator : SessionContentGenerator {
+    override val provider: Provider = Provider.OPENAI
+    override fun generateFull(input: GenerationInput): GenerationOutput =
+        StubGenerationPayload.buildOutput(input)
 }

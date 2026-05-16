@@ -11,19 +11,17 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 
 /**
- * Deterministic in-process stub for [SessionContentRegenerator]. The patched value
- * is a typed per-item replacement that the regeneration service will (after the
- * task_2_5 fix) merge into the full snapshot and validate before persisting.
+ * Deterministic in-process payload shared by every provider-specific stub
+ * regenerator. Extracted in task 4.3 so additional provider-specific stub
+ * Components (e.g. OPENAI in [StubOpenAiSessionContentRegenerator]) can
+ * share identical content while advertising a different [Provider] to
+ * `AiGenerationBeansConfig.sessionContentRegeneratorsByProvider`.
  *
- * Active only when both `readmates.aigen.enabled` and `readmates.aigen.mock` are
- * `true`.
+ * The patched value is a typed per-item replacement that the regeneration
+ * service merges into the full snapshot and validates before persisting.
  */
-@Component
-@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
-class StubSessionContentRegenerator : SessionContentRegenerator {
-    override val provider: Provider = Provider.CLAUDE
-
-    override fun regenerateItem(input: RegenerationInput): RegenerationOutput {
+internal object StubRegenerationPayload {
+    fun buildOutput(input: RegenerationInput): RegenerationOutput {
         val author = input.sessionMeta.expectedAuthorNames.firstOrNull() ?: "Host"
         val value: Any = when (input.item) {
             GenerationItem.SUMMARY ->
@@ -94,4 +92,32 @@ class StubSessionContentRegenerator : SessionContentRegenerator {
             usage = TokenUsage(inputTokens = 30, cachedInputTokens = 0, outputTokens = 60),
         )
     }
+}
+
+/**
+ * Deterministic in-process stub for [SessionContentRegenerator]. Active only
+ * when both `readmates.aigen.enabled` and `readmates.aigen.mock` are `true`.
+ *
+ * Targets [Provider.CLAUDE]. Companion [StubOpenAiSessionContentRegenerator]
+ * targets [Provider.OPENAI] (task 4.3 provider-matrix integration test).
+ */
+@Component
+@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
+class StubSessionContentRegenerator : SessionContentRegenerator {
+    override val provider: Provider = Provider.CLAUDE
+    override fun regenerateItem(input: RegenerationInput): RegenerationOutput =
+        StubRegenerationPayload.buildOutput(input)
+}
+
+/**
+ * Mirror of [StubSessionContentRegenerator] for [Provider.OPENAI]. Added in
+ * task 4.3 so `AiGenerateApiIntegrationTest`'s parameterized OPENAI rows can
+ * exercise the regenerate flow without a real OpenAI SDK call.
+ */
+@Component
+@ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled", "mock"], havingValue = "true")
+class StubOpenAiSessionContentRegenerator : SessionContentRegenerator {
+    override val provider: Provider = Provider.OPENAI
+    override fun regenerateItem(input: RegenerationInput): RegenerationOutput =
+        StubRegenerationPayload.buildOutput(input)
 }

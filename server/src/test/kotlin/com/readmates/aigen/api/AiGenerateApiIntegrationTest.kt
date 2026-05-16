@@ -9,6 +9,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -85,10 +87,17 @@ private const val SEED_SQL = """
         "readmates.redis.enabled=true",
         "readmates.aigen.enabled=true",
         "readmates.aigen.mock=true",
-        "readmates.aigen.enabled-providers=CLAUDE",
+        "readmates.aigen.enabled-providers=CLAUDE,OPENAI",
         "readmates.aigen.pricing.claude-sonnet-4-6.input-per-m-token-usd=3.00",
         "readmates.aigen.pricing.claude-sonnet-4-6.cached-input-per-m-token-usd=0.30",
         "readmates.aigen.pricing.claude-sonnet-4-6.output-per-m-token-usd=15.00",
+        // task 4.3: add OpenAI matrix. The model name here uses the `gpt-` prefix that
+        // YamlModelCatalog already routes to Provider.OPENAI (the production
+        // application.yml entry `openai-gpt-4-1` requires a separate prefix-routing
+        // change that is out of scope for this test-only task).
+        "readmates.aigen.pricing.gpt-4-1.input-per-m-token-usd=2.00",
+        "readmates.aigen.pricing.gpt-4-1.cached-input-per-m-token-usd=0.50",
+        "readmates.aigen.pricing.gpt-4-1.output-per-m-token-usd=8.00",
         "readmates.aigen.kafka.enabled=true",
         "spring.kafka.consumer.auto-offset-reset=earliest",
     ],
@@ -218,6 +227,123 @@ class AiGenerateApiIntegrationTest(
         }
 
         // Status response must reflect the regenerated summary in `result.summary`.
+        val statusJson = jobStatusJson(jobId)
+        assertThat(statusJson).contains("\"summary\":\"Regenerated summary for AI Gen Book.\"")
+    }
+
+    // task 4.3 — provider matrix: re-run the full lifecycle + regenerate flows
+    // against each enabled provider. The CLAUDE row duplicates the dedicated
+    // single-provider tests above (kept intact per the task constraint
+    // "DO NOT modify existing test method behavior") so that, if the matrix
+    // is later expanded, both providers are exercised uniformly here.
+
+    @ParameterizedTest(name = "full generation lifecycle - provider {0}")
+    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4-1"])
+    fun `full generation lifecycle - provider matrix`(model: String) {
+        val transcript = MockMultipartFile(
+            "transcript",
+            "transcript.txt",
+            "text/plain",
+            "Stub transcript for provider matrix ($model).".toByteArray(),
+        )
+        val body = MockMultipartFile(
+            "body",
+            "body.json",
+            "application/json",
+            """{"model":"$model","authorNameMode":"real","instructions":null}""".toByteArray(),
+        )
+
+        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+            file(transcript)
+            file(body)
+            with(user(HOST_EMAIL))
+        }.andReturn().response
+
+        assertThat(startResponse.status).isEqualTo(202)
+        val jobId = jobIdFrom(startResponse.contentAsString)
+
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
+            val status = jobStatusJson(jobId)
+            assertThat(status).contains("\"status\":\"SUCCEEDED\"")
+        }
+
+        assertThat(redis.hasKey("aigen:job:$jobId:result")).isTrue()
+        assertThat(redis.hasKey("aigen:job:$jobId:transcript")).isTrue()
+        assertThat(redis.hasKey("aigen:job:$jobId")).isTrue()
+
+        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
+            with(user(HOST_EMAIL))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"recordVisibility":"MEMBER","result":null}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value(SESSION_ID) }
+            jsonPath("$.publication.summary") { exists() }
+        }
+
+        assertThat(redis.hasKey("aigen:job:$jobId")).isFalse()
+        assertThat(redis.hasKey("aigen:job:$jobId:result")).isFalse()
+        assertThat(redis.hasKey("aigen:job:$jobId:transcript")).isFalse()
+
+        val summary = jdbcTemplate.queryForObject(
+            "select public_summary from public_session_publications where session_id = '$SESSION_ID'",
+            String::class.java,
+        )
+        assertThat(summary).isNotNull
+        assertThat(summary).contains("AI Gen Book")
+        val feedbackCount = jdbcTemplate.queryForObject(
+            "select count(*) from session_feedback_documents where session_id = '$SESSION_ID'",
+            Int::class.java,
+        )
+        assertThat(feedbackCount).isGreaterThanOrEqualTo(1)
+
+        val auditRows = jdbcTemplate.queryForList(
+            """
+            select kind, status from ai_generation_audit_log
+            where session_id = '$SESSION_ID' order by created_at
+            """.trimIndent(),
+        )
+        val kindStatus = auditRows.map { it["kind"] as String to it["status"] as String }
+        assertThat(kindStatus).contains("FULL" to "SUCCESS", "COMMIT" to "SUCCESS")
+    }
+
+    @ParameterizedTest(name = "regenerate updates stored result - provider {0}")
+    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4-1"])
+    fun `regenerate updates the stored result - provider matrix`(model: String) {
+        val transcript = MockMultipartFile(
+            "transcript",
+            "transcript.txt",
+            "text/plain",
+            "Another stub transcript ($model).".toByteArray(),
+        )
+        val body = MockMultipartFile(
+            "body",
+            "body.json",
+            "application/json",
+            """{"model":"$model","authorNameMode":"real","instructions":null}""".toByteArray(),
+        )
+
+        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+            file(transcript)
+            file(body)
+            with(user(HOST_EMAIL))
+        }.andReturn().response
+        val jobId = jobIdFrom(startResponse.contentAsString)
+
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
+            assertThat(jobStatusJson(jobId)).contains("\"status\":\"SUCCEEDED\"")
+        }
+
+        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/regenerate") {
+            with(user(HOST_EMAIL))
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"item":"SUMMARY","model":null,"instructions":null}"""
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.item") { value("SUMMARY") }
+            jsonPath("$.value") { value("Regenerated summary for AI Gen Book.") }
+        }
+
         val statusJson = jobStatusJson(jobId)
         assertThat(statusJson).contains("\"summary\":\"Regenerated summary for AI Gen Book.\"")
     }
