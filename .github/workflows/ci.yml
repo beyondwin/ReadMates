@@ -140,6 +140,15 @@ jobs:
         working-directory: server
         run: ./gradlew check
 
+      - name: Integration tests (Testcontainers; Docker required)
+        working-directory: server
+        # :check now depends only on :unitTest + :architectureTest + :detekt +
+        # :jacoco* (Task 1 disabled the default :test which previously ran
+        # the integration tag implicitly). Keep integration coverage in CI
+        # via an explicit step so spec §5 A6 stays green.
+        # Refs: docs/superpowers/specs/2026-05-16-readmates-build-test-speed-spec.md §4.1
+        run: ./gradlew integrationTest
+
       - name: Upload server reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
