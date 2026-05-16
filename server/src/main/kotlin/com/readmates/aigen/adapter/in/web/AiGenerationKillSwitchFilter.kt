@@ -37,17 +37,18 @@ class AiGenerationKillSwitchFilter(
     }
 
     private fun String.matchesAiGenerationPath(): Boolean =
-        AI_GENERATE_PATH.matches(this) || AI_DEFAULTS_PATH.matches(this)
+        AI_GENERATE_PATH.matches(this) ||
+            AI_DEFAULTS_PATH.matches(this)
 
     private companion object {
         const val PROBLEM_JSON_CONTENT_TYPE = "application/problem+json"
-        val AI_GENERATE_PATH = Regex("^/api/host/sessions/[^/]+/ai-generate(/.*)?$")
-        val AI_DEFAULTS_PATH = Regex("^/api/host/clubs/[^/]+/ai-defaults(/.*)?$")
-        val DISABLED_PROBLEM_BODY =
+        const val DISABLED_PROBLEM_BODY =
             """{"type":"https://readmates.com/problems/aigen/disabled",""" +
                 """"title":"AI generation is disabled",""" +
                 """"status":503,""" +
                 """"detail":"This endpoint is currently disabled by operator kill-switch.",""" +
                 """"code":"AI_DISABLED"}"""
+        val AI_GENERATE_PATH = Regex("^/api/host/sessions/[^/]+/ai-generate(/.*)?$")
+        val AI_DEFAULTS_PATH = Regex("^/api/host/clubs/[^/]+/ai-defaults(/.*)?$")
     }
 }

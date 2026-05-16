@@ -81,6 +81,5 @@ class AiGenerationKillSwitchFilterTest {
         assertThat(response.status).isEqualTo(200)
     }
 
-    private fun properties(enabled: Boolean): AiGenerationProperties =
-        AiGenerationProperties(enabled = enabled)
+    private fun properties(enabled: Boolean): AiGenerationProperties = AiGenerationProperties(enabled = enabled)
 }
