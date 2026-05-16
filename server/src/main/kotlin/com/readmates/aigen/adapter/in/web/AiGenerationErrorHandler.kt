@@ -58,9 +58,7 @@ class AiGenerationErrorHandler {
         )
 
     @ExceptionHandler(AiGenerationException.IllegalGenerationState::class)
-    fun handleIllegalGenerationState(
-        error: AiGenerationException.IllegalGenerationState,
-    ): ResponseEntity<ProblemDetail> =
+    fun handleIllegalGenerationState(error: AiGenerationException.IllegalGenerationState): ResponseEntity<ProblemDetail> =
         problem(
             status = HttpStatus.CONFLICT,
             code = "ILLEGAL_GENERATION_STATE",

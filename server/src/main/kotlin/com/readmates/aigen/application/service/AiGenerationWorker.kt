@@ -265,7 +265,10 @@ class AiGenerationWorker(
      * own audit entry — without this, a successful retry would erase the fact
      * that the first attempt failed.
      */
-    private fun auditRetryAttempt(record: JobRecord, previousError: GenerationError) {
+    private fun auditRetryAttempt(
+        record: JobRecord,
+        previousError: GenerationError,
+    ) {
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
