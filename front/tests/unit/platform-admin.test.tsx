@@ -455,6 +455,8 @@ describe("platform admin frontend shell", () => {
 
     expect(screen.getByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "운영 작업 큐" })).toBeInTheDocument();
+    expect(screen.getByLabelText("플랫폼 요약")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /읽는사이/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("첫 호스트가 아직 없습니다.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "읽는사이" })).toBeInTheDocument();
   });
