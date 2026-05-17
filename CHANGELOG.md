@@ -18,6 +18,25 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - fix(aigen): release-risk remediation removed the nested `<form>` from the AI transcript upload controls so `생성 시작` reliably starts generation inside the host editor, updated the AI E2E fixtures to use current club-scoped auth/session shell contracts, and taught the shared frontend API error parser to surface RFC 7807 `detail` messages such as `COST_CAP_EXCEEDED`.
 - chore(release): post-risk-remediation verification passed — `git diff --check origin/main..HEAD`, `bash scripts/aigen-pii-check.sh`, backend `unitTest`, targeted Flyway + AI generation integration tests, `architectureTest`, frontend `lint`/`test`/`build`/`test:e2e`, `pnpm design:check`, and public-release candidate build/check all completed successfully. Live provider SDK smoke remains skipped without `READMATES_AIGEN_{ANTHROPIC,OPENAI,GEMINI}_API_KEY`.
 
+Validation refreshed on 2026-05-17:
+
+- `git status --short --branch` — pass.
+- `git diff --check origin/main..HEAD` — pass.
+- `bash scripts/aigen-pii-check.sh` — pass.
+- `./server/gradlew -p server unitTest` — pass.
+- `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest` — pass.
+- `./server/gradlew -p server integrationTest --tests com.readmates.aigen.api.AiGenerateApiIntegrationTest` — pass.
+- `./server/gradlew -p server architectureTest` — pass.
+- `./server/gradlew -p server check` — pass.
+- `pnpm --dir front lint` — pass.
+- `pnpm --dir front test` — pass.
+- `pnpm --dir front build` — pass.
+- `pnpm --dir front test:e2e` — pass.
+- `pnpm design:check` — pass.
+- `./scripts/build-public-release-candidate.sh` — pass.
+- `./scripts/public-release-check.sh .tmp/public-release-candidate` — pass.
+- Live Claude/OpenAI/Gemini smoke — skipped: provider API keys (`READMATES_AIGEN_ANTHROPIC_API_KEY`, `READMATES_AIGEN_OPENAI_API_KEY`, `READMATES_AIGEN_GEMINI_API_KEY`) absent from the local environment.
+
 ### Risks NOT closed in Phase 9 (out of scope for this branch)
 - Live SDK smoke harness — requires `READMATES_AIGEN_{ANTHROPIC,OPENAI,GEMINI}_API_KEY` env vars not present in this environment; runnable via `./server/gradlew unitTest --tests '*LiveContract*'` plus `scripts/aigen-smoke-{claude,openai,gemini}.sh` when keys are provisioned.
 - Repo-wide ktlint/detekt baseline cleanup — pre-existing lint debt across non-aigen modules; tracked separately as a lint-debt sweep PR.
