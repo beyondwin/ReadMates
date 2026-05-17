@@ -310,6 +310,57 @@ class AiGenerationWorkerTest {
         assertThat(updated.error!!.code).isEqualTo(ErrorCode.AI_DISABLED)
     }
 
+    @Test
+    fun `process returns without provider call when pending to running transition loses`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord().copy(status = JobStatus.CANCELLED, stage = null)
+        ctx.jobStore.save(record)
+
+        ctx.worker.process(record.jobId)
+
+        assertThat(ctx.generator.calls).isEmpty()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
+    @Test
+    fun `process does not persist success when status changes before result save`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.jobStore.failNextConditionalSave = true
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot(),
+                usage = TokenUsage(100, 0, 200),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        val updated = ctx.jobStore.load(record.jobId)!!
+        assertThat(updated.result).isNull()
+        assertThat(updated.status).isEqualTo(JobStatus.RUNNING)
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
+    @Test
+    fun `succeed records cost even when conditional result save loses to cancel`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.jobStore.failNextConditionalSave = true
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot(),
+                usage = TokenUsage(100, 0, 200),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        assertThat(ctx.costGuard.recorded).hasSize(1)
+        assertThat(ctx.jobStore.load(record.jobId)!!.result).isNull()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
     private class TestContext(
         modelEnabled: Set<com.readmates.aigen.application.model.ModelId> =
             setOf(AiGenerationTestFixtures.CLAUDE_MODEL, AiGenerationTestFixtures.CLAUDE_FALLBACK),
