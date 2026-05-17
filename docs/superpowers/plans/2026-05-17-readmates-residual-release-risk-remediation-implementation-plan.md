@@ -86,7 +86,7 @@ Spot-check of this plan against the current `origin/main..HEAD` source found gap
 
 ---
 
-## Task 1: Reproduce And Freeze The Current Risk Baseline
+### Task 1: Reproduce And Freeze The Current Risk Baseline
 
 **Files:**
 - Read: `server/build/reports/detekt/detekt.txt`
@@ -149,7 +149,7 @@ This task is baseline-only. Leave the worktree unchanged.
 
 ---
 
-## Task 2: Convert AI Generation Expected Failures To Typed Exceptions
+### Task 2: Convert AI Generation Expected Failures To Typed Exceptions
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationOrchestrator.kt`
@@ -350,7 +350,7 @@ git commit -m "fix: return typed AI generation denials"
 
 ---
 
-## Task 3: Validate AI Commit Overrides Against Original Session Metadata
+### Task 3: Validate AI Commit Overrides Against Original Session Metadata
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationCommitService.kt`
@@ -621,7 +621,7 @@ git commit -m "fix: validate AI commit overrides against session metadata"
 
 ---
 
-## Task 4: Sanitize AI Generation Error Logging
+### Task 4: Sanitize AI Generation Error Logging
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationErrorHandler.kt`
@@ -699,7 +699,7 @@ git commit -m "fix: sanitize AI generation error logging"
 
 ---
 
-## Task 5: Send Platform Admin Host Invitations After Commit
+### Task 5: Send Platform Admin Host Invitations After Commit
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingService.kt`
@@ -1063,7 +1063,7 @@ git commit -m "fix: send platform admin invitations after commit"
 
 ---
 
-## Task 6: Treat Missing Redis Transcript As Expired Job
+### Task 6: Treat Missing Redis Transcript As Expired Job
 
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt`
@@ -1238,7 +1238,7 @@ git commit -m "fix: expire AI jobs when Redis transcript is missing"
 
 ---
 
-## Task 7: Clear Detekt Without Weakening The Gate
+### Task 7: Clear Detekt Without Weakening The Gate
 
 **Files:**
 - Modify files reported by `server/build/reports/detekt/detekt.txt`
@@ -1595,7 +1595,7 @@ If `server/config/detekt/baseline.xml` has no staged diff, the second command sh
 
 ---
 
-## Task 8: Remove Frontend Validation Warning Noise
+### Task 8: Remove Frontend Validation Warning Noise
 
 **Files:**
 - Modify: `front/eslint.config.mjs`
@@ -1659,7 +1659,7 @@ git commit -m "test: quiet AI generation polling validation"
 
 ---
 
-## Task 9: Add API-Level Regression Coverage For Typed AI Errors
+### Task 9: Add API-Level Regression Coverage For Typed AI Errors
 
 **Files:**
 - Modify: `server/src/test/kotlin/com/readmates/aigen/api/AiGenerateApiIntegrationTest.kt`
@@ -1740,7 +1740,7 @@ git commit -m "test: cover typed AI generation API denials"
 
 ---
 
-## Task 10: Refresh Release Evidence
+### Task 10: Refresh Release Evidence
 
 **Files:**
 - Modify: `CHANGELOG.md`
