@@ -162,6 +162,12 @@ describe("AiGenerateTab", () => {
       fireEvent.change(fileInput, { target: { files: [file] } });
     });
     const submit = screen.getByRole("button", { name: /생성 시작/ });
+    // Wait until the club default query resolves so the button is enabled;
+    // otherwise the click races and the start mutation never fires on slower
+    // CI runners.
+    await waitFor(() => {
+      expect(submit).toBeEnabled();
+    });
     await act(async () => {
       fireEvent.click(submit);
     });

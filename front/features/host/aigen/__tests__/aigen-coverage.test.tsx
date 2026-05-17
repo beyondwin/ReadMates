@@ -203,8 +203,15 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    // The submit button is disabled until the club default query resolves; on
+    // slower CI runners clicking before that races and the start mutation
+    // never fires.
+    await waitFor(() => {
+      expect(submit).toBeEnabled();
+    });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+      fireEvent.click(submit);
     });
 
     // Wait for PREVIEW. Polling cadence is 2s for the first refetch (see
