@@ -219,14 +219,15 @@ class AiGenerationOrchestrator(
             )
         }
         transitionPolicy.requireCancel(record.status, record.jobId)
-        val cancelled = jobStore.transitionStatus(
-            jobId = record.jobId,
-            expected = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED),
-            next = JobStatus.CANCELLED,
-            stage = null,
-            progressPct = 0,
-            error = null,
-        )
+        val cancelled =
+            jobStore.transitionStatus(
+                jobId = record.jobId,
+                expected = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED),
+                next = JobStatus.CANCELLED,
+                stage = null,
+                progressPct = 0,
+                error = null,
+            )
         if (!cancelled) {
             throw AiGenerationException.IllegalGenerationState(
                 jobId = jobId,

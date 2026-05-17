@@ -208,14 +208,15 @@ class AiGenerationOrchestratorTest {
     @Test
     fun `cancel marks job cancelled and deletes transient payload while keeping hash`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.RUNNING,
-            stage = JobStage.GENERATING_SUMMARY,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.RUNNING,
+                stage = JobStage.GENERATING_SUMMARY,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
 
         ctx.orchestrator.cancel(ctx.sessionId, record.jobId, ctx.hostUserId)
@@ -252,13 +253,14 @@ class AiGenerationOrchestratorTest {
     @Test
     fun `cancel rejects committed job`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.COMMITTED,
-            stage = null,
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.COMMITTED,
+                stage = null,
+            )
         ctx.jobStore.save(record)
 
         assertThatThrownBy {

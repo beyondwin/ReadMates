@@ -328,13 +328,14 @@ class AiGenerationRegenerationServiceTest {
     @Test
     fun `regenerate rejects jobs that are not succeeded`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.COMMITTING,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.COMMITTING,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
 
         assertThatThrownBy {
@@ -347,13 +348,14 @@ class AiGenerationRegenerationServiceTest {
     @Test
     fun `regenerate does not patch when status changes before conditional save`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot("original"),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot("original"),
+            )
         ctx.jobStore.save(record)
         ctx.jobStore.failNextConditionalSave = true
         ctx.regenerator.enqueueSuccess(
@@ -368,7 +370,12 @@ class AiGenerationRegenerationServiceTest {
             ctx.service.regenerate(ctx.sessionId, record.jobId, GenerationItem.SUMMARY, null, null)
         }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
 
-        assertThat(ctx.jobStore.load(record.jobId)!!.result!!.summary).isEqualTo("original")
+        assertThat(
+            ctx.jobStore
+                .load(record.jobId)!!
+                .result!!
+                .summary,
+        ).isEqualTo("original")
         val failedAudit = ctx.auditPort.entries.single()
         assertThat(failedAudit.status).isEqualTo(AuditStatus.FAILED)
         assertThat(failedAudit.errorCode).isEqualTo(ErrorCode.JOB_EXPIRED)

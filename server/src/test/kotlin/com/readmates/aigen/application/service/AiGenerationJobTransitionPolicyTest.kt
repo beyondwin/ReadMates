@@ -98,8 +98,12 @@ class AiGenerationJobTransitionPolicyTest {
     ) {
         assertThatThrownBy(block)
             .isInstanceOfSatisfying(AiGenerationException.IllegalGenerationState::class.java) { error ->
-                org.assertj.core.api.Assertions.assertThat(error.currentStatus).isEqualTo(status.name)
-                org.assertj.core.api.Assertions.assertThat(error.attemptedAction).isEqualTo(action)
+                org.assertj.core.api.Assertions
+                    .assertThat(error.currentStatus)
+                    .isEqualTo(status.name)
+                org.assertj.core.api.Assertions
+                    .assertThat(error.attemptedAction)
+                    .isEqualTo(action)
             }
     }
 }
