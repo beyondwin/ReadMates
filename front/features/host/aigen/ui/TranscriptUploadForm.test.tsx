@@ -6,6 +6,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { AIGEN_OPENAI_DEFAULT_MODEL_ID } from "./aigen-model-options";
 import { TranscriptUploadForm } from "./TranscriptUploadForm";
 
 describe("TranscriptUploadForm", () => {
@@ -39,14 +40,14 @@ describe("TranscriptUploadForm", () => {
   it("populates the model dropdown from defaultModel", () => {
     render(
       <TranscriptUploadForm
-        defaultModel="gpt-4.1"
+        defaultModel={AIGEN_OPENAI_DEFAULT_MODEL_ID}
         loadingDefaults={false}
         submitting={false}
         onSubmit={() => {}}
       />,
     );
     const select = screen.getByLabelText(/모델/) as HTMLSelectElement;
-    expect(select.value).toBe("gpt-4.1");
+    expect(select.value).toBe(AIGEN_OPENAI_DEFAULT_MODEL_ID);
   });
 
   it("calls onSubmit with file, model, authorNameMode, and instructions when submitted", async () => {

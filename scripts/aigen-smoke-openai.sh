@@ -12,7 +12,7 @@
 #
 # Note: requires server-side `readmates.aigen.enabled=true`, `enabled-providers`
 # including OPENAI, and the model name set below to be in the YAML pricing table.
-# OpenAI model IDs use the provider API aliases directly (for example, gpt-4.1).
+# OpenAI model IDs use the provider API aliases directly (for example, gpt-5.4-mini).
 #
 # Live execution is currently waived (orchestrator directive: missing
 # READMATES_AIGEN_OPENAI_API_KEY in headless env); this script is the manual
@@ -23,7 +23,7 @@ BASE_URL="${READMATES_SMOKE_BASE_URL:-https://readmates.pages.dev}"
 SESSION_ID="${READMATES_SMOKE_SESSION_ID:?READMATES_SMOKE_SESSION_ID required}"
 COOKIE="${READMATES_SMOKE_HOST_COOKIE:?READMATES_SMOKE_HOST_COOKIE required (readmates.sid value)}"
 TRANSCRIPT="${READMATES_SMOKE_TRANSCRIPT:?READMATES_SMOKE_TRANSCRIPT required (path to .txt)}"
-MODEL="${READMATES_SMOKE_OPENAI_MODEL:-gpt-4.1}"
+MODEL="${READMATES_SMOKE_OPENAI_MODEL:-gpt-5.4-mini}"
 
 if [[ ! -f "$TRANSCRIPT" ]]; then
   echo "Transcript file not found at $TRANSCRIPT" >&2

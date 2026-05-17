@@ -14,6 +14,7 @@ import com.readmates.aigen.application.model.RegenerationInput
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.support.AiGenerationTestModels
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -60,7 +61,7 @@ class GeminiContentRegeneratorTest {
             currentResult = currentSnapshot,
             item = item,
             sessionMeta = meta,
-            model = ModelId(Provider.GEMINI, "gemini-2-5-pro"),
+            model = ModelId(Provider.GEMINI, AiGenerationTestModels.GEMINI_DEFAULT),
             instructions = null,
         )
 

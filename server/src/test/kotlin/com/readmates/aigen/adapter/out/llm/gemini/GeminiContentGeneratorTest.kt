@@ -12,6 +12,7 @@ import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.support.AiGenerationTestModels
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -43,7 +44,7 @@ class GeminiContentGeneratorTest {
         GenerationInput(
             transcript = "녹취록 내용 ...",
             sessionMeta = meta,
-            model = ModelId(Provider.GEMINI, "gemini-2-5-pro"),
+            model = ModelId(Provider.GEMINI, AiGenerationTestModels.GEMINI_DEFAULT),
             instructions = null,
         )
 
@@ -110,7 +111,7 @@ class GeminiContentGeneratorTest {
 
         generator.generateFull(input)
 
-        assertEquals("gemini-2-5-pro", fake.lastModel)
+        assertEquals(AiGenerationTestModels.GEMINI_DEFAULT, fake.lastModel)
     }
 
     @Test

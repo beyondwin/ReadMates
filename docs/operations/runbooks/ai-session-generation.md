@@ -24,20 +24,21 @@
 
 새 모델 ID를 enable하려면 (a) pricing 항목 추가, (b) provider 활성, (c) frontend 노출까지 함께 맞춰야 합니다.
 
-1. `server/src/main/resources/application.yml`의 `readmates.aigen.pricing` map에 단가 항목을 추가합니다. 예 (`gpt-4.1-mini`):
+1. `server/src/main/resources/application.yml`의 `readmates.aigen.pricing` map에 단가 항목을 추가합니다. 예 (`gpt-5.4-mini`):
    ```yaml
    readmates:
      aigen:
        enabled-providers: [CLAUDE, OPENAI, GEMINI]
        pricing:
-         "[gpt-4.1-mini]":
-           input-per-m-token-usd: 0.40
-           cached-input-per-m-token-usd: 0.10
-           output-per-m-token-usd: 1.60
+         "[gpt-5.4-mini]":
+           input-per-m-token-usd: 0.75
+           cached-input-per-m-token-usd: 0.075
+           output-per-m-token-usd: 4.50
    ```
-   - Provider 접두사 매칭은 `YamlModelCatalog.providerFromName` (`claude-*`, `gpt-*`/`o\d+`, `gemini-*`). OpenAI 모델 ID는 provider API가 받는 canonical alias (`gpt-4.1`, `gpt-4.1-mini`)를 그대로 사용합니다.
+   - Provider 접두사 매칭은 `YamlModelCatalog.providerFromName` (`claude-*`, `gpt-*`/`o\d+`, `gemini-*`). OpenAI 모델 ID는 provider API가 받는 canonical alias (`gpt-5.4-mini`)를 그대로 사용합니다.
+   - 현재 등록된 provider 기본 모델: `claude-sonnet-4-6`, `claude-opus-4-7`, `gpt-5.4-mini`, `gemini-3-flash` (Gemini 3 Flash는 Preview — GA 시 단가/엔드포인트 재검토 필요).
 2. 모델 제거는 같은 map에서 key를 삭제하고, `enabled-providers`에서 해당 provider 전체를 빼면 해당 provider 모델 전부가 한꺼번에 차단됩니다.
-3. Frontend `front/features/host/aigen/ui/aigen-model-options.ts`의 하드코딩 allowlist를 함께 갱신합니다 (catalog endpoint로 교체될 때까지 임시).
+3. Frontend `front/features/host/aigen/ui/aigen-model-options.ts`의 명명 상수 `AIGEN_{CLAUDE,OPENAI,GEMINI}_DEFAULT_MODEL_ID`를 갱신합니다. Backend 테스트 픽스처는 `server/src/test/kotlin/com/readmates/aigen/support/AiGenerationTestModels.kt`에서 한 곳만 바꾸면 됩니다 (catalog endpoint로 교체될 때까지 임시).
 4. PR merge 후 deploy (server → frontend 순). Deploy 절차는 [post-deploy-watch.md](post-deploy-watch.md).
 5. Smoke: provider별 manual script 실행 — `scripts/aigen-smoke-claude.sh`, `scripts/aigen-smoke-openai.sh`, `scripts/aigen-smoke-gemini.sh`. 라이브 API key가 환경변수에 있는 노드에서만 실행합니다.
 

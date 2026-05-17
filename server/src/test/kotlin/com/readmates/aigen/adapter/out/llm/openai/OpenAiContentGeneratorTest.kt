@@ -11,6 +11,7 @@ import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.support.AiGenerationTestModels
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -41,7 +42,7 @@ class OpenAiContentGeneratorTest {
         GenerationInput(
             transcript = "녹취록 내용 ...",
             sessionMeta = meta,
-            model = ModelId(Provider.OPENAI, "gpt-4.1"),
+            model = ModelId(Provider.OPENAI, AiGenerationTestModels.OPENAI_DEFAULT),
             instructions = null,
         )
 
@@ -128,7 +129,7 @@ class OpenAiContentGeneratorTest {
 
         generator.generateFull(input)
 
-        assertEquals("gpt-4.1", fake.lastModel)
+        assertEquals(AiGenerationTestModels.OPENAI_DEFAULT, fake.lastModel)
     }
 
     @Test

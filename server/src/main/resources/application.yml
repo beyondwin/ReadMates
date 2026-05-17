@@ -116,26 +116,22 @@ readmates:
         input-per-m-token-usd: 15.00
         cached-input-per-m-token-usd: 1.50
         output-per-m-token-usd: 75.00
-      # OpenAI public API pricing (gpt-4.1 family, per-million-token, USD).
-      # Source: OpenAI model docs for gpt-4.1 and gpt-4.1-mini (verified 2026-05-17).
-      "[gpt-4.1]":
-        input-per-m-token-usd: 2.00
-        cached-input-per-m-token-usd: 0.50
-        output-per-m-token-usd: 8.00
-      "[gpt-4.1-mini]":
-        input-per-m-token-usd: 0.40
-        cached-input-per-m-token-usd: 0.10
-        output-per-m-token-usd: 1.60
-      # Gemini public API pricing (2.5 family, per-million-token, USD).
-      # Source: ai.google.dev/pricing (verified at task 5.1 implementation; for <=200K input tokens).
-      gemini-2-5-pro:
-        input-per-m-token-usd: 1.25
-        cached-input-per-m-token-usd: 0.31
-        output-per-m-token-usd: 10.00
-      gemini-2-5-flash:
-        input-per-m-token-usd: 0.30
+      # OpenAI public API pricing (gpt-5.4 family, per-million-token, USD).
+      # Source: developers.openai.com/api/docs/models/gpt-5.4-mini (verified 2026-05-17).
+      # gpt-4.x mini family is retiring 2026-02-13; we ship gpt-5.4-mini directly.
+      "[gpt-5.4-mini]":
+        input-per-m-token-usd: 0.75
         cached-input-per-m-token-usd: 0.075
-        output-per-m-token-usd: 2.50
+        output-per-m-token-usd: 4.50
+      # Gemini public API pricing (3 Flash, per-million-token, USD).
+      # Source: ai.google.dev/gemini-api/docs/pricing (verified 2026-05-17, standard tier).
+      # NOTE: gemini-3-flash is currently a Preview model — pricing and endpoint
+      # may change before GA. Track via release notes; bump pricing/version when
+      # GA lands. gemini-2.x flash retires 2026-06-01.
+      "[gemini-3-flash]":
+        input-per-m-token-usd: 0.50
+        cached-input-per-m-token-usd: 0.05
+        output-per-m-token-usd: 3.00
     kafka:
       enabled: ${READMATES_AIGEN_KAFKA_ENABLED:false}
       bootstrap-servers: ${READMATES_AIGEN_KAFKA_BOOTSTRAP_SERVERS:}

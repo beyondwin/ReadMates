@@ -75,7 +75,7 @@ class YamlModelCatalogTest {
         val props = AiGenerationProperties(
             enabledProviders = setOf("openai"),
             pricing = mapOf(
-                "gpt-4.1" to pricing("2", "0.50", "8"),
+                "gpt-5.4-mini" to pricing("2", "0.50", "8"),
                 "o1" to pricing("15", "0", "60"),
             ),
         )
@@ -84,7 +84,7 @@ class YamlModelCatalogTest {
 
         val allow = catalog.allowlisted()
         assertEquals(2, allow.size)
-        assertTrue(allow.any { it == ModelId(Provider.OPENAI, "gpt-4.1") })
+        assertTrue(allow.any { it == ModelId(Provider.OPENAI, "gpt-5.4-mini") })
         assertTrue(allow.any { it == ModelId(Provider.OPENAI, "o1") })
     }
 
@@ -93,14 +93,14 @@ class YamlModelCatalogTest {
         val props = AiGenerationProperties(
             enabledProviders = setOf("GEMINI"),
             pricing = mapOf(
-                "gemini-2-5-pro" to pricing("1.25", "0", "10"),
+                "gemini-3-flash" to pricing("1.25", "0", "10"),
             ),
         )
 
         val catalog = YamlModelCatalog(props)
 
         assertEquals(
-            listOf(ModelId(Provider.GEMINI, "gemini-2-5-pro")),
+            listOf(ModelId(Provider.GEMINI, "gemini-3-flash")),
             catalog.allowlisted(),
         )
     }

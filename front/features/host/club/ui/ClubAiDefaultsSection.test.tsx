@@ -15,6 +15,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  AIGEN_GEMINI_DEFAULT_MODEL_ID,
+  AIGEN_OPENAI_DEFAULT_MODEL_ID,
+} from "@/features/host/aigen/ui/aigen-model-options";
 
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   getClubAiDefault: vi.fn(),
@@ -60,7 +64,7 @@ describe("ClubAiDefaultsSection", () => {
   }
 
   it("renders the current default model from the GET response", async () => {
-    mockedGet.mockResolvedValue({ defaultModel: "gpt-4.1" });
+    mockedGet.mockResolvedValue({ defaultModel: AIGEN_OPENAI_DEFAULT_MODEL_ID });
     const { Wrapper } = createWrapper();
 
     render(
@@ -71,7 +75,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await waitFor(() => {
-      expect(select.value).toBe("gpt-4.1");
+      expect(select.value).toBe(AIGEN_OPENAI_DEFAULT_MODEL_ID);
     });
   });
 
@@ -92,7 +96,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "gpt-4.1" } });
+      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
     });
 
     expect(saveBtn).not.toBeDisabled();
@@ -111,7 +115,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "gemini-2-5-pro" } });
+      fireEvent.change(select, { target: { value: AIGEN_GEMINI_DEFAULT_MODEL_ID } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));
@@ -119,7 +123,7 @@ describe("ClubAiDefaultsSection", () => {
 
     await waitFor(() => {
       expect(mockedPut).toHaveBeenCalledWith("club-a", {
-        defaultModel: "gemini-2-5-pro",
+        defaultModel: AIGEN_GEMINI_DEFAULT_MODEL_ID,
       });
     });
   });
@@ -137,7 +141,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "gpt-4.1" } });
+      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));
@@ -169,7 +173,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "gpt-4.1" } });
+      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
     });
 
     const saveBtn = screen.getByRole("button", { name: /저장/ }) as HTMLButtonElement;
@@ -200,7 +204,7 @@ describe("ClubAiDefaultsSection", () => {
 
     const select = await findModelSelect();
     await act(async () => {
-      fireEvent.change(select, { target: { value: "gpt-4.1" } });
+      fireEvent.change(select, { target: { value: AIGEN_OPENAI_DEFAULT_MODEL_ID } });
     });
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /저장/ }));

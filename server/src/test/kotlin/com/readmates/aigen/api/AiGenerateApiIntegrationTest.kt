@@ -91,9 +91,9 @@ private const val SEED_SQL = """
         "readmates.aigen.pricing.claude-sonnet-4-6.input-per-m-token-usd=3.00",
         "readmates.aigen.pricing.claude-sonnet-4-6.cached-input-per-m-token-usd=0.30",
         "readmates.aigen.pricing.claude-sonnet-4-6.output-per-m-token-usd=15.00",
-        "readmates.aigen.pricing[gpt-4.1].input-per-m-token-usd=2.00",
-        "readmates.aigen.pricing[gpt-4.1].cached-input-per-m-token-usd=0.50",
-        "readmates.aigen.pricing[gpt-4.1].output-per-m-token-usd=8.00",
+        "readmates.aigen.pricing[gpt-5.4-mini].input-per-m-token-usd=0.75",
+        "readmates.aigen.pricing[gpt-5.4-mini].cached-input-per-m-token-usd=0.075",
+        "readmates.aigen.pricing[gpt-5.4-mini].output-per-m-token-usd=4.50",
         "readmates.aigen.kafka.enabled=true",
         "spring.kafka.consumer.auto-offset-reset=earliest",
     ],
@@ -234,7 +234,7 @@ class AiGenerateApiIntegrationTest(
     // is later expanded, both providers are exercised uniformly here.
 
     @ParameterizedTest(name = "full generation lifecycle - provider {0}")
-    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4.1"])
+    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-5.4-mini"])
     fun `full generation lifecycle - provider matrix`(model: String) {
         val transcript = MockMultipartFile(
             "transcript",
@@ -304,7 +304,7 @@ class AiGenerateApiIntegrationTest(
     }
 
     @ParameterizedTest(name = "regenerate updates stored result - provider {0}")
-    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-4.1"])
+    @ValueSource(strings = ["claude-sonnet-4-6", "gpt-5.4-mini"])
     fun `regenerate updates the stored result - provider matrix`(model: String) {
         val transcript = MockMultipartFile(
             "transcript",

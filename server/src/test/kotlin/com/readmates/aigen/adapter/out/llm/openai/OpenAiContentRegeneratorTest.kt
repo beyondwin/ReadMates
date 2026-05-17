@@ -13,6 +13,7 @@ import com.readmates.aigen.application.model.RegenerationInput
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.support.AiGenerationTestModels
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -58,7 +59,7 @@ class OpenAiContentRegeneratorTest {
             currentResult = currentSnapshot,
             item = item,
             sessionMeta = meta,
-            model = ModelId(Provider.OPENAI, "gpt-4.1"),
+            model = ModelId(Provider.OPENAI, AiGenerationTestModels.OPENAI_DEFAULT),
             instructions = null,
         )
 
@@ -188,7 +189,7 @@ class OpenAiContentRegeneratorTest {
 
         regen.regenerateItem(inputFor(GenerationItem.SUMMARY))
 
-        assertEquals("gpt-4.1", fake.lastModel)
+        assertEquals(AiGenerationTestModels.OPENAI_DEFAULT, fake.lastModel)
     }
 
     @Test

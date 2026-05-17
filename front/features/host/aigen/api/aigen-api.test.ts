@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AIGEN_OPENAI_DEFAULT_MODEL_ID } from "../ui/aigen-model-options";
 import {
   cancelGeneration,
   commitGeneration,
@@ -153,7 +154,7 @@ describe("regenerateItem", () => {
 
     const result = await regenerateItem("sid-1", "job-1", {
       item: "summary",
-      model: "gpt-4.1",
+      model: AIGEN_OPENAI_DEFAULT_MODEL_ID,
       instructions: "tighter",
     });
     expect(result.item).toBe("summary");
@@ -167,7 +168,7 @@ describe("regenerateItem", () => {
     const parsed = JSON.parse(init.body as string) as Record<string, unknown>;
     expect(parsed).toEqual({
       item: "summary",
-      model: "gpt-4.1",
+      model: AIGEN_OPENAI_DEFAULT_MODEL_ID,
       instructions: "tighter",
     });
   });
@@ -279,13 +280,13 @@ describe("putClubAiDefault", () => {
   it("PUTs JSON to /api/host/clubs/{slug}/ai-defaults", async () => {
     const fetchMock = captureFetch(new Response(null, { status: 200 }));
 
-    await putClubAiDefault("my-club", { defaultModel: "gpt-4.1" });
+    await putClubAiDefault("my-club", { defaultModel: AIGEN_OPENAI_DEFAULT_MODEL_ID });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/bff/api/host/clubs/my-club/ai-defaults");
     expect(init.method).toBe("PUT");
     expect((init.headers as Headers).get("Content-Type")).toBe("application/json");
     const parsed = JSON.parse(init.body as string) as Record<string, unknown>;
-    expect(parsed).toEqual({ defaultModel: "gpt-4.1" });
+    expect(parsed).toEqual({ defaultModel: AIGEN_OPENAI_DEFAULT_MODEL_ID });
   });
 });

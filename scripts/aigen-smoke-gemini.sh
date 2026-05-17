@@ -16,7 +16,7 @@
 #
 # Note: requires server-side `readmates.aigen.enabled=true`, `enabled-providers`
 # including GEMINI, and the model name below to be present in the YAML pricing
-# table (task 5.1 keys: `gemini-2-5-pro`, `gemini-2-5-flash`).
+# table (current key: `gemini-3-flash`).
 #
 # OPERATOR CAVEAT: as of task_5_3 the live Gemini SDK call throws
 # NotImplementedError — the provider adapter is wired but the SDK invocation
@@ -32,7 +32,7 @@ BASE_URL="${READMATES_SMOKE_BASE_URL:-https://readmates.pages.dev}"
 SESSION_ID="${READMATES_SMOKE_SESSION_ID:?READMATES_SMOKE_SESSION_ID required}"
 COOKIE="${READMATES_SMOKE_HOST_COOKIE:?READMATES_SMOKE_HOST_COOKIE required (readmates.sid value)}"
 TRANSCRIPT="${READMATES_SMOKE_TRANSCRIPT:?READMATES_SMOKE_TRANSCRIPT required (path to .txt)}"
-MODEL="${READMATES_SMOKE_GEMINI_MODEL:-gemini-2-5-pro}"
+MODEL="${READMATES_SMOKE_GEMINI_MODEL:-gemini-3-flash}"
 
 if [[ ! -f "$TRANSCRIPT" ]]; then
   echo "Transcript file not found at $TRANSCRIPT" >&2
