@@ -473,6 +473,89 @@ class SupportAccessGrantControllerTest(
     }
 
     @Test
+    fun `operator cannot create support access grant`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+
+        mockMvc
+            .post("/api/admin/support-access-grants") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "clubId": "$TEST_CLUB_ID",
+                      "granteeUserId": "$grantee",
+                      "scope": "HOST_SUPPORT_READ",
+                      "reason": "Customer escalation ticket #1234",
+                      "expiresAt": "2099-01-01T12:00:00Z"
+                    }
+                    """.trimIndent()
+                cookie(sessionCookieForUser(operator))
+            }.andExpect {
+                status { isForbidden() }
+            }
+    }
+
+    @Test
+    fun `support admin cannot create support access grant`() {
+        val support = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+        val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+
+        mockMvc
+            .post("/api/admin/support-access-grants") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "clubId": "$TEST_CLUB_ID",
+                      "granteeUserId": "$grantee",
+                      "scope": "HOST_SUPPORT_READ",
+                      "reason": "Customer escalation ticket #1234",
+                      "expiresAt": "2099-01-01T12:00:00Z"
+                    }
+                    """.trimIndent()
+                cookie(sessionCookieForUser(support))
+            }.andExpect {
+                status { isForbidden() }
+            }
+    }
+
+    @Test
+    fun `operator cannot revoke support access grant`() {
+        val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+
+        val createResult =
+            mockMvc
+                .post("/api/admin/support-access-grants") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "clubId": "$TEST_CLUB_ID",
+                          "granteeUserId": "$grantee",
+                          "scope": "HOST_SUPPORT_READ",
+                          "reason": "Revoke permission test",
+                          "expiresAt": "2099-01-01T12:00:00Z"
+                        }
+                        """.trimIndent()
+                    cookie(sessionCookieForUser(owner))
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+        val grantId = checkNotNull(createResult.response.jsonPathValue<String>("$.id"))
+        createdGrantIds += grantId
+
+        mockMvc
+            .delete("/api/admin/support-access-grants/$grantId") {
+                cookie(sessionCookieForUser(operator))
+            }.andExpect {
+                status { isForbidden() }
+            }
+    }
+
+    @Test
     fun `revoke audit event is written when grant is revoked`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
         val grantee = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")

@@ -295,6 +295,69 @@
   padding: 18px;
 }
 
+.platform-admin-console {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.35fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.platform-admin-work-queue,
+.platform-admin-brief,
+.platform-admin-publish-checklist,
+.platform-admin-support-grants {
+  display: grid;
+  gap: 14px;
+}
+
+.platform-admin-work-queue__row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  border: 1px solid var(--line);
+}
+
+.platform-admin-work-queue__row[aria-pressed="true"] {
+  border-color: var(--text);
+  background: var(--bg-sub);
+}
+
+.platform-admin-work-queue__row[data-severity="blocked"] {
+  border-left: 4px solid var(--danger);
+}
+
+.platform-admin-work-queue__row[data-severity="attention"] {
+  border-left: 4px solid var(--accent);
+}
+
+.platform-admin-work-queue__row[data-severity="ready"] {
+  border-left: 4px solid var(--success);
+}
+
+.platform-admin-work-queue__badges,
+.platform-admin-publish-checklist__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.platform-admin-publish-checklist__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 10px;
+  background: var(--bg-raised);
+}
+
+.platform-admin-publish-checklist__item .tiny {
+  grid-column: 2;
+}
+
+.platform-admin-publish-checklist__item[data-state="blocked"] {
+  border-color: var(--danger);
+}
+
 .rm-route-stage {
   min-height: inherit;
 }
@@ -1306,6 +1369,18 @@
 
   .platform-admin-domain-row__status {
     justify-items: start;
+  }
+
+  .platform-admin-console {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-admin-work-queue__row {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-admin-work-queue__badges {
+    justify-content: flex-start;
   }
 
   .rm-route-reveal {

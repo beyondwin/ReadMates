@@ -51,12 +51,12 @@ export function PlatformAdminClubDetail({ club, onUpdateClub }: Props) {
   }
 
   return (
-    <section className="platform-admin-detail" aria-labelledby="platform-admin-detail-title">
+    <section className="platform-admin-detail" aria-labelledby="platform-admin-club-detail-title">
       <div>
         <p className="eyebrow">Club detail</p>
-        <h2 id="platform-admin-detail-title" className="h3 editorial">
-          {club.name}
-        </h2>
+        <h3 id="platform-admin-club-detail-title" className="h4 editorial">
+          공개 정보
+        </h3>
       </div>
 
       <div className="platform-admin-detail__grid">

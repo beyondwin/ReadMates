@@ -3,7 +3,6 @@ import type {
   CreatedSessionResponse,
   CreateHostInvitationRequest,
   CurrentSessionResponse,
-  FeedbackDocumentResponse,
   HostAttendanceUpdate,
   HostDashboardResponse,
   HostInvitationListPage,
@@ -267,13 +266,6 @@ export function publishHostSession(sessionId: string) {
   return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/publish`, {
     method: "POST",
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
-}
-
-export function uploadHostSessionFeedbackDocument(sessionId: string, formData: FormData) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/feedback-document`, {
-    method: "POST",
-    body: formData,
-  }) as Promise<Response & { json(): Promise<FeedbackDocumentResponse> }>;
 }
 
 export function previewHostSessionImport(sessionId: string, request: SessionImportRequest) {

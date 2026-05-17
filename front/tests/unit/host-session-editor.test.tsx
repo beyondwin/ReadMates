@@ -15,13 +15,11 @@ import {
   defaultSessionDateFrom,
 } from "@/features/host/ui/host-session-schedule";
 import type {
-  FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
   SessionImportRequest,
 } from "@/features/host/api/host-contracts";
 import {
-  feedbackDocumentContractFixture,
   hostSessionDetailContractFixture,
 } from "./api-contract-fixtures";
 
@@ -78,12 +76,6 @@ const hostSessionEditorTestActions = {
       body: JSON.stringify(attendance),
       cache: "no-store",
     }),
-  uploadFeedbackDocument: (sessionId, formData) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/feedback-document`, {
-      method: "POST",
-      body: formData,
-      cache: "no-store",
-    }) as Promise<Response & { json(): Promise<FeedbackDocumentResponse> }>,
   previewSessionImport: async (_sessionId, request: SessionImportRequest) => ({
     valid: true,
     session: { sessionNumber: request.session.number, bookTitle: request.session.bookTitle, meetingDate: request.session.meetingDate },
@@ -360,7 +352,7 @@ describe("HostSessionEditor", () => {
   it("shows a new-session empty message instead of static attendance and feedback document controls", () => {
     render(<HostSessionEditorForTest />);
 
-    expect(screen.getAllByText("세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.")).toHaveLength(2);
+    expect(screen.getByText("세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.")).toBeInTheDocument();
     expect(screen.queryByText("HTML 파일을 드래그하거나 클릭해 업로드")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "파일 선택" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "에디터에서 작성" })).not.toBeInTheDocument();
@@ -390,23 +382,29 @@ describe("HostSessionEditor", () => {
     expect(screen.getByLabelText("질문 제출 마감")).toHaveValue("12-31 23:59까지");
   });
 
-  it("renders attendance and the session feedback document from the host session detail API payload", () => {
+  it("renders attendance from the host session detail API payload", () => {
     render(<HostSessionEditorForTest session={session} />);
 
     expect(screen.getAllByText("우")).not.toHaveLength(0);
-    expect(screen.getByText("피드백 문서")).toBeInTheDocument();
-    expect(screen.getByLabelText("피드백 문서 파일")).toHaveAttribute("accept", ".md,.txt");
-    expect(screen.getByText("업로드 완료")).toBeInTheDocument();
-    expect(screen.getByText("251126 1차.md")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "미리보기" })).toHaveAttribute("href", "/app/feedback/session-1");
     expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "교체" })).toBeInTheDocument();
     expect(screen.queryByText(`${retiredPersonalFeedbackReportLabel} (HTML)`)).not.toBeInTheDocument();
     expect(screen.queryByText("HTML 파일을 드래그하거나 클릭해 업로드")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "우 리포트 열기 준비중" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "수 리포트 업로드 준비중" })).not.toBeInTheDocument();
     expect(screen.queryByText("이멤버14")).not.toBeInTheDocument();
     expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
+  });
+
+  it("shows feedback document status without standalone upload controls", () => {
+    render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
+
+    expect(screen.getByText("세션 기록 완성")).toBeInTheDocument();
+    expect(screen.getByText("업로드 완료")).toBeInTheDocument();
+    expect(screen.getByText("251126 1차.md")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "미리보기" })).toHaveAttribute("href", "/app/feedback/session-1");
+    expect(screen.queryByLabelText("피드백 문서 파일")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "교체" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "등록" })).not.toBeInTheDocument();
   });
 
   it("renders manual notification sent badges from route data", () => {
@@ -477,43 +475,6 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByText("등록된 리포트 대상자가 없습니다.")).not.toBeInTheDocument();
   });
 
-  it("uploads the selected feedback document and updates status from the backend response", async () => {
-    const uploaded: FeedbackDocumentResponse = {
-      ...feedbackDocumentContractFixture,
-      subtitle: "팩트풀니스",
-      fileName: "server-normalized-feedback.md",
-      uploadedAt: "2026-04-20T12:00:00Z",
-      metadata: [],
-      observerNotes: [],
-      participants: [],
-    };
-    const json = vi.fn().mockResolvedValue(uploaded);
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json });
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-
-    render(<HostSessionEditorForTest session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
-
-    const input = screen.getByLabelText("피드백 문서 파일") as HTMLInputElement;
-    const file = new File(["# 독서모임 1차 피드백"], "local-draft.md", { type: "text/markdown" });
-    await user.upload(input, file);
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/session-1/feedback-document", expect.objectContaining({
-      cache: "no-store",
-      method: "POST",
-      body: expect.any(FormData),
-    }));
-
-    const body = fetchMock.mock.calls[0]?.[1]?.body;
-    expect(body).toBeInstanceOf(FormData);
-    expect((body as FormData).get("file")).toBe(file);
-    await waitFor(() => expect(screen.getByText("server-normalized-feedback.md")).toBeInTheDocument());
-    expect(json).toHaveBeenCalled();
-    expect(screen.queryByText("local-draft.md")).not.toBeInTheDocument();
-    expect(input.value).toBe("");
-  });
-
   it("previews a selected session import json before commit", async () => {
     const user = userEvent.setup();
     const previewSessionImport = vi.fn(hostSessionEditorTestActions.previewSessionImport);
@@ -552,19 +513,6 @@ describe("HostSessionEditor", () => {
 
     await waitFor(() => expect(commitSessionImport).toHaveBeenCalledTimes(1));
     expect(screen.getByText(/가져온 세션 기록을 저장했습니다/)).toBeVisible();
-  });
-
-  it("shows the upload failure toast when the feedback document request rejects", async () => {
-    const fetchMock = vi.fn().mockRejectedValue(new Error("network failed"));
-    vi.stubGlobal("fetch", fetchMock);
-    const user = userEvent.setup();
-
-    render(<HostSessionEditorForTest session={{ ...session, feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null } }} />);
-
-    const file = new File(["# 독서모임 1차 피드백"], "retry.md", { type: "text/markdown" });
-    await user.upload(screen.getByLabelText("피드백 문서 파일"), file);
-
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("피드백 문서 업로드에 실패했습니다"));
   });
 
   it("posts a new session through the BFF and redirects to the created session editor", async () => {
@@ -1461,30 +1409,27 @@ describe("HostSessionEditor", () => {
       restoreLocation();
     });
 
-    it("renders the JSON upload panel by default and hides the AI tab", () => {
+    it("renders the AI tab by default and hides the JSON panel", () => {
       stubLocationSearch("");
 
       render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
 
-      // Toggle exists with two options
-      const toggle = screen.getByRole("tablist", { name: "세션 기록 가져오기 방식" });
+      const toggle = screen.getByRole("tablist", { name: "세션 기록 완성 방식" });
       expect(toggle).toBeInTheDocument();
-      expect(within(toggle).getByRole("tab", { name: "외부 도구 JSON 업로드" })).toHaveAttribute(
+      expect(within(toggle).getByRole("tab", { name: "AI로 생성" })).toHaveAttribute(
         "aria-selected",
         "true",
       );
-      expect(within(toggle).getByRole("tab", { name: "AI 결과 가져오기" })).toHaveAttribute(
+      expect(within(toggle).getByRole("tab", { name: "외부 JSON 가져오기" })).toHaveAttribute(
         "aria-selected",
         "false",
       );
 
-      // JSON panel is rendered
-      expect(screen.getByText("AI 결과 JSON")).toBeInTheDocument();
-      // AI tab is not in tree
-      expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
+      expect(screen.getByTestId("aigen-tab")).toBeInTheDocument();
+      expect(screen.queryByLabelText("AI 결과 JSON 가져오기")).not.toBeInTheDocument();
     });
 
-    it("swaps to the AI tab when '" + "AI 결과 가져오기" + "' is clicked and updates the URL", async () => {
+    it("swaps to the JSON panel when '외부 JSON 가져오기' is clicked and updates the URL", async () => {
       stubLocationSearch("");
       const replaceStateSpy = vi.fn();
       window.history.replaceState = replaceStateSpy as typeof window.history.replaceState;
@@ -1492,48 +1437,44 @@ describe("HostSessionEditor", () => {
 
       render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
 
-      await user.click(screen.getByRole("tab", { name: "AI 결과 가져오기" }));
+      await user.click(screen.getByRole("tab", { name: "외부 JSON 가져오기" }));
 
-      expect(screen.getByTestId("aigen-tab")).toBeInTheDocument();
-      expect(screen.getByTestId("aigen-tab")).toHaveAttribute("data-club-slug", "club-a");
-      expect(screen.getByTestId("aigen-tab")).toHaveAttribute("data-session-id", session.sessionId);
-      // JSON panel no longer in tree
-      expect(screen.queryByText("AI 결과 JSON")).not.toBeInTheDocument();
-      // URL updated
+      expect(screen.getByLabelText("AI 결과 JSON 가져오기")).toBeInTheDocument();
+      expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
       expect(replaceStateSpy).toHaveBeenCalled();
       const callArgs = replaceStateSpy.mock.calls[replaceStateSpy.mock.calls.length - 1];
       const urlArg = String(callArgs[2]);
-      expect(urlArg).toMatch(/[?&]aigen=1\b/);
+      expect(urlArg).toMatch(/[?&]records=json\b/);
     });
 
-    it("initially renders the AI tab when the URL has ?aigen=1", () => {
-      stubLocationSearch("?aigen=1");
+    it("initially renders the JSON panel when the URL has ?records=json", () => {
+      stubLocationSearch("?records=json");
 
       render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
 
-      expect(screen.getByRole("tab", { name: "AI 결과 가져오기" })).toHaveAttribute(
+      expect(screen.getByRole("tab", { name: "외부 JSON 가져오기" })).toHaveAttribute(
         "aria-selected",
         "true",
       );
-      expect(screen.getByTestId("aigen-tab")).toBeInTheDocument();
-      expect(screen.queryByText("AI 결과 JSON")).not.toBeInTheDocument();
+      expect(screen.getByLabelText("AI 결과 JSON 가져오기")).toBeInTheDocument();
+      expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
     });
 
-    it("clears the aigen query param when switching back to JSON mode", async () => {
-      stubLocationSearch("?aigen=1");
+    it("clears the records query param when switching back to AI mode", async () => {
+      stubLocationSearch("?records=json");
       const replaceStateSpy = vi.fn();
       window.history.replaceState = replaceStateSpy as typeof window.history.replaceState;
       const user = userEvent.setup();
 
       render(<HostSessionEditorForTest session={session} clubSlug="club-a" />);
 
-      await user.click(screen.getByRole("tab", { name: "외부 도구 JSON 업로드" }));
+      await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
 
-      expect(screen.getByText("AI 결과 JSON")).toBeInTheDocument();
-      expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
+      expect(screen.getByTestId("aigen-tab")).toBeInTheDocument();
+      expect(screen.queryByLabelText("AI 결과 JSON 가져오기")).not.toBeInTheDocument();
       const callArgs = replaceStateSpy.mock.calls[replaceStateSpy.mock.calls.length - 1];
       const urlArg = String(callArgs[2]);
-      expect(urlArg).not.toMatch(/[?&]aigen=/);
+      expect(urlArg).not.toMatch(/[?&]records=/);
     });
 
     it("does not render the toggle for a not-yet-created session", () => {
@@ -1541,7 +1482,7 @@ describe("HostSessionEditor", () => {
 
       render(<HostSessionEditorForTest session={null} clubSlug="club-a" />);
 
-      expect(screen.queryByRole("tablist", { name: "세션 기록 가져오기 방식" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("tablist", { name: "세션 기록 완성 방식" })).not.toBeInTheDocument();
       expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
     });
   });

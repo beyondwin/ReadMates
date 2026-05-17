@@ -31,4 +31,5 @@ data class SessionImportStoredFeedbackDocument(
     val fileName: String,
     val title: String,
     val uploadedAt: String?,
+    val version: Int,
 )

@@ -1,6 +1,7 @@
 package com.readmates.sessionimport.application.service
 
 import com.readmates.feedback.application.FeedbackDocumentParser
+import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
@@ -45,6 +46,7 @@ private fun requireHost(host: com.readmates.shared.security.CurrentMember) {
 @Service
 class SessionImportService(
     private val writePort: SessionImportWritePort,
+    private val recordNotificationEventUseCase: RecordNotificationEventUseCase,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : PreviewSessionImportUseCase,
     CommitSessionImportUseCase,
@@ -113,6 +115,13 @@ class SessionImportService(
                     feedbackTitle = feedbackTitle,
                 ),
             )
+        recordNotificationEventUseCase.recordFeedbackDocumentPublished(
+            clubId = command.host.clubId,
+            sessionId = command.sessionId,
+            sessionNumber = command.session.number,
+            bookTitle = command.session.bookTitle,
+            documentVersion = storedFeedback.version,
+        )
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
 
         return SessionImportCommitResult(

@@ -191,6 +191,7 @@ ktlint {
     version.set("1.7.1")
     android.set(false)
     ignoreFailures.set(false)
+    baseline.set(file("$projectDir/config/ktlint/baseline.xml"))
     filter {
         exclude("**/generated/**")
     }

@@ -2,12 +2,22 @@ import userEvent from "@testing-library/user-event";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { HostMembersActions } from "@/features/host/route/host-members-actions";
 import HostMembers from "@/features/host/ui/host-members";
-import { hostMembersActions, hostMembersLoader } from "@/features/host";
+import { hostMembersActions, hostMembersLoaderFactory } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: Number.POSITIVE_INFINITY },
+      mutations: { retry: false },
+    },
+  });
+}
 
 const members: HostMemberListItem[] = [
   {
@@ -126,9 +136,21 @@ type HostMembersProps = Parameters<typeof HostMembers>[0];
 
 function HostMembersForTest({
   actions,
+  initialMembers,
   ...props
 }: Omit<HostMembersProps, "actions"> & { actions?: HostMembersActions }) {
-  return <HostMembers {...props} actions={actions ?? noopHostMembersActions} />;
+  // Fresh client per render so rerender-with-new-initialMembers tests
+  // observe the new prop instead of cache from prior render.
+  const client = createTestQueryClient();
+  return (
+    <QueryClientProvider client={client}>
+      <HostMembers
+        {...props}
+        initialMembers={initialMembers}
+        actions={actions ?? noopHostMembersActions}
+      />
+    </QueryClientProvider>
+  );
 }
 
 function lifecycleResponse(member: HostMemberListItem) {
@@ -195,19 +217,24 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
   }
 
   vi.stubGlobal("fetch", fetchMock);
+  const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
     [
       {
         path: "/app/host/members",
         element: <HostMembersPage />,
-        loader: hostMembersLoader,
+        loader: hostMembersLoaderFactory(queryClient),
         hydrateFallbackElement: <div>멤버 목록을 불러오는 중</div>,
       },
     ],
     { initialEntries: ["/app/host/members"] },
   );
 
-  render(<RouterProvider router={router} />);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
   return fetchMock;
 }
 
@@ -233,7 +260,7 @@ describe("HostMembersPage", () => {
     expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("이번 세션");
     expect(within(screen.getByText("멤버1").closest("article") as HTMLElement).getByText("이번 세션 참여")).toBeInTheDocument();
     expect(within(screen.getByText("새").closest("article") as HTMLElement).getByText("이번 세션 미포함")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members?limit=50", expect.objectContaining({ cache: "no-store" }));
   });
 
   it("renders each member row with identity, status, and current-session state", async () => {
@@ -1003,5 +1030,37 @@ describe("HostMembersPage", () => {
     expect(activeRow.getByText("locked@example.com · 정식 멤버")).toBeInTheDocument();
     expect(activeRow.getByRole("button", { name: "세션 제외" })).toBeDisabled();
     expect(activeRow.queryByRole("button", { name: "이번 세션 추가" })).not.toBeInTheDocument();
+  });
+
+  it("seeds the host members list through the route loader", async () => {
+    const fetchMock = renderHostMembersPage();
+
+    expect(await screen.findByText("멤버1")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/members?limit=50",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("refreshes the Query-backed list after a member profile update", async () => {
+    const user = userEvent.setup();
+    const updated = { ...members[0], displayName: "갱신된 이름" } satisfies HostMemberListItem;
+    const fetchMock = renderHostMembersPage([
+      memberListItemResponse(updated),
+      memberListResponse(members.map((m) => (m.membershipId === updated.membershipId ? updated : m))),
+    ]);
+
+    const row = within((await screen.findByText("멤버1")).closest("article") as HTMLElement);
+    await user.click(row.getByRole("button", { name: "이름 변경" }));
+    const dialog = within(screen.getByRole("dialog", { name: "멤버1 이름 수정" }));
+    await user.clear(dialog.getByLabelText("이름"));
+    await user.type(dialog.getByLabelText("이름"), "갱신된 이름");
+    await user.click(dialog.getByRole("button", { name: "이름 저장" }));
+
+    expect(await screen.findByText("갱신된 이름")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/members/membership-active/profile",
+      expect.objectContaining({ method: "PATCH" }),
+    );
   });
 });

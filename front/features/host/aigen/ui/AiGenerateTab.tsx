@@ -210,6 +210,19 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
     );
   }
 
+  if (clubDefaultsQuery.isError) {
+    return (
+      <div className="stack" style={{ "--stack": "8px" } as CSSProperties}>
+        <p className="small" role="status" style={{ color: "var(--text-2)", margin: 0 }}>
+          AI 생성을 사용할 수 없습니다. 외부 JSON 가져오기로 세션 기록을 저장할 수 있습니다.
+        </p>
+        <p className="tiny" style={{ color: "var(--text-3)", margin: 0 }}>
+          모델 설정, provider 상태, 비용 한도, 운영 kill switch를 확인하세요.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="stack" style={{ "--stack": "12px" } as CSSProperties}>
       <TranscriptUploadForm

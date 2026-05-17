@@ -8,39 +8,29 @@ import com.readmates.feedback.application.model.FeedbackDocumentListItemResult
 import com.readmates.feedback.application.model.FeedbackDocumentResult
 import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
 import com.readmates.feedback.application.model.FeedbackDocumentStatusResult
-import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
 import com.readmates.feedback.application.model.FeedbackMetadataItemResult
 import com.readmates.feedback.application.model.FeedbackParticipantResult
 import com.readmates.feedback.application.model.FeedbackProblemResult
 import com.readmates.feedback.application.model.FeedbackRevealingQuoteResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
-import com.readmates.feedback.application.port.`in`.AuthorizeHostFeedbackDocumentUploadUseCase
 import com.readmates.feedback.application.port.`in`.GetHostFeedbackDocumentStatusUseCase
 import com.readmates.feedback.application.port.`in`.GetReadableFeedbackDocumentUseCase
 import com.readmates.feedback.application.port.`in`.ListMyReadableFeedbackDocumentsUseCase
-import com.readmates.feedback.application.port.`in`.UploadHostFeedbackDocumentUseCase
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
-import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
-import com.readmates.notification.application.service.ReadmatesOperationalMetrics
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
 class FeedbackDocumentService(
     private val feedbackDocumentStorePort: FeedbackDocumentStorePort,
-    private val recordNotificationEventUseCase: RecordNotificationEventUseCase,
-    private val operationalMetrics: ReadmatesOperationalMetrics,
 ) : ListMyReadableFeedbackDocumentsUseCase,
     GetReadableFeedbackDocumentUseCase,
-    GetHostFeedbackDocumentStatusUseCase,
-    AuthorizeHostFeedbackDocumentUploadUseCase,
-    UploadHostFeedbackDocumentUseCase {
+    GetHostFeedbackDocumentStatusUseCase {
     private val parser = FeedbackDocumentParser()
 
     override fun listMyReadableFeedbackDocuments(
@@ -90,7 +80,7 @@ class FeedbackDocumentService(
         currentMember: CurrentMember,
         sessionId: UUID,
     ): FeedbackDocumentStatusResult {
-        requireHostFeedbackDocumentUploadAccess(currentMember)
+        requireHostFeedbackDocumentStatusAccess(currentMember)
         feedbackDocumentStorePort.findReadableSession(currentMember.clubId, sessionId)
             ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
 
@@ -102,50 +92,7 @@ class FeedbackDocumentService(
         )
     }
 
-    override fun authorizeHostFeedbackDocumentUpload(currentMember: CurrentMember) = requireHostFeedbackDocumentUploadAccess(currentMember)
-
-    @Transactional
-    override fun uploadHostFeedbackDocument(
-        currentMember: CurrentMember,
-        command: FeedbackDocumentUploadCommand,
-    ): FeedbackDocumentResult {
-        requireHostFeedbackDocumentUploadAccess(currentMember)
-        return runCatching {
-            val parsedDocument = parser.parse(command.sourceText)
-            val session =
-                feedbackDocumentStorePort.findSessionForUpload(currentMember.clubId, command.sessionId)
-                    ?: throw FeedbackDocumentException(FeedbackDocumentError.NOT_FOUND, "Feedback session not found")
-            val version = feedbackDocumentStorePort.nextDocumentVersion(currentMember.clubId, command.sessionId)
-            feedbackDocumentStorePort.insertDocument(
-                currentMember = currentMember,
-                command = command,
-                version = version,
-                documentId = UUID.randomUUID(),
-                title = parsedDocument.title,
-            )
-            recordNotificationEventUseCase.recordFeedbackDocumentPublished(
-                clubId = currentMember.clubId,
-                sessionId = command.sessionId,
-                sessionNumber = session.sessionNumber,
-                bookTitle = session.bookTitle,
-                documentVersion = version,
-            )
-
-            val storedDocument =
-                feedbackDocumentStorePort.findLatestDocument(currentMember.clubId, command.sessionId)
-                    ?: throw FeedbackDocumentException(
-                        FeedbackDocumentError.STORAGE_UNAVAILABLE,
-                        "Stored feedback document not found after upload",
-                    )
-            storedDocument.toResponse(session, parsedDocument)
-        }.onSuccess {
-            operationalMetrics.feedbackUploadSucceeded()
-        }.onFailure {
-            operationalMetrics.feedbackUploadFailed()
-        }.getOrThrow()
-    }
-
-    private fun requireHostFeedbackDocumentUploadAccess(currentMember: CurrentMember) {
+    private fun requireHostFeedbackDocumentStatusAccess(currentMember: CurrentMember) {
         if (!currentMember.isHost) {
             throw AccessDeniedException("Host role required")
         }

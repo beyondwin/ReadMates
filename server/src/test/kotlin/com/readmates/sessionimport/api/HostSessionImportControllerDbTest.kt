@@ -22,6 +22,7 @@ private const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000079521"
 private const val MEMBER_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000079522"
 
 private const val CLEANUP_SQL = """
+delete from notification_event_outbox where aggregate_id = '$SESSION_ID';
 delete from session_feedback_documents where session_id = '$SESSION_ID';
 delete from public_session_publications where session_id = '$SESSION_ID';
 delete from highlights where session_id = '$SESSION_ID';
@@ -163,6 +164,41 @@ class HostSessionImportControllerDbTest(
             }
 
         assertCommittedImportRecords()
+        assertFeedbackDocumentNotificationEvent()
+    }
+
+    private fun assertFeedbackDocumentNotificationEvent() {
+        val documentVersion =
+            jdbcTemplate.queryForObject(
+                """
+                select max(version)
+                from session_feedback_documents
+                where club_id = '$CLUB_ID'
+                  and session_id = '$SESSION_ID'
+                """.trimIndent(),
+                Int::class.java,
+            )
+
+        val event =
+            jdbcTemplate.queryForMap(
+                """
+                select
+                  dedupe_key,
+                  json_unquote(json_extract(payload_json, '$.sessionId')) as session_id,
+                  cast(json_unquote(json_extract(payload_json, '$.sessionNumber')) as signed) as session_number,
+                  json_unquote(json_extract(payload_json, '$.bookTitle')) as book_title,
+                  cast(json_unquote(json_extract(payload_json, '$.documentVersion')) as signed) as document_version
+                from notification_event_outbox
+                where event_type = 'FEEDBACK_DOCUMENT_PUBLISHED'
+                  and aggregate_id = '$SESSION_ID'
+                """.trimIndent(),
+            )
+
+        assertEquals("feedback-document:$SESSION_ID:$documentVersion", event["dedupe_key"])
+        assertEquals(SESSION_ID, event["session_id"])
+        assertEquals(7951, (event["session_number"] as Number).toInt())
+        assertEquals("Import Test Book", event["book_title"])
+        assertEquals(documentVersion, (event["document_version"] as Number).toInt())
     }
 
     private fun assertCommittedImportRecords() {

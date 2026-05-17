@@ -7,7 +7,7 @@ import HostDashboard from "@/features/host/ui/host-dashboard";
 import {
   hostDashboardLoader,
   hostInvitationsLoaderFactory,
-  hostMembersLoader,
+  hostMembersLoaderFactory,
   hostSessionEditorLoader,
 } from "@/features/host";
 import { QueryClient } from "@tanstack/react-query";
@@ -328,7 +328,7 @@ function hostSessionEditorLoaderForTest() {
 
 const hostLoaderCases: Array<[string, () => Promise<unknown>, string]> = [
   ["dashboard", () => hostDashboardLoader(), "/login"],
-  ["members", () => hostMembersLoader(), "/login"],
+  ["members", () => hostMembersLoaderFactory(new QueryClient())(), "/login"],
   ["invitations", () => hostInvitationsLoaderFactory(new QueryClient())(), "/login"],
   ["session editor", hostSessionEditorLoaderForTest, "/login?returnTo=%2Fapp%2Fhost%2Fsessions%2Fsession-7%2Fedit"],
 ];
@@ -1030,7 +1030,7 @@ describe("HostDashboard", () => {
   it("does not style pending feedback documents as completed", () => {
     const { container } = render(<HostDashboardForTest current={current} data={{ ...emptyDashboard, feedbackPending: 1 }} />);
     const desktop = getDesktopView(container);
-    const feedbackCard = desktop.getByText("회차 피드백 문서 업로드가 필요합니다.").closest(".row-between");
+    const feedbackCard = desktop.getByText("회차 세션 기록 패키지 저장이 필요합니다.").closest(".row-between");
 
     expect(feedbackCard).not.toBeNull();
     const statusBadge = within(feedbackCard as HTMLElement).getByText("1개 대기");

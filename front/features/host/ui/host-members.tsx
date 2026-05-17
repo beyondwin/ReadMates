@@ -1,5 +1,6 @@
 import { type CSSProperties, useMemo, useRef, useState } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   CurrentSessionPolicy,
   HostMemberProfileErrorCode,
@@ -10,6 +11,10 @@ import type {
   MemberLifecycleResponse,
   ViewerMember,
 } from "@/features/host/model/host-view-types";
+import {
+  hostMemberKeys,
+  hostMemberListQuery,
+} from "@/features/host/queries/host-members-queries";
 import type { PageRequest } from "@/shared/model/paging";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
@@ -100,7 +105,31 @@ async function hostProfileErrorCodeFromResponse(response: Response): Promise<Hos
 }
 
 export default function HostMembers({ initialMembers, actions, LinkComponent = DefaultLinkComponent }: HostMembersProps) {
-  const initialPage = normalizeMemberPage(initialMembers);
+  const propPage = normalizeMemberPage(initialMembers);
+  const queryClient = useQueryClient();
+  const listQuery = useQuery({
+    ...hostMemberListQuery({ limit: 50 }),
+    queryFn: async () => normalizeMemberPage(await actions.loadMembers({ limit: 50 })),
+    initialData: propPage,
+  });
+  // Track the prop and query page identities we have already consumed. When
+  // either changes identity we move the source-of-truth forward.
+  const queryPage = listQuery.data ?? propPage;
+  const [seen, setSeen] = useState<{ prop: HostMemberListItem[]; query: HostMemberListItem[]; active: HostMemberListPage }>(() => ({
+    prop: propPage.items,
+    query: queryPage.items,
+    active: queryPage,
+  }));
+  let nextSeen = seen;
+  if (propPage.items !== seen.prop) {
+    nextSeen = { prop: propPage.items, query: queryPage.items, active: propPage };
+  } else if (queryPage.items !== seen.query) {
+    nextSeen = { prop: propPage.items, query: queryPage.items, active: queryPage };
+  }
+  if (nextSeen !== seen) {
+    setSeen(nextSeen);
+  }
+  const initialPage = nextSeen.active;
   const [memberRowsState, setMemberRowsState] = useState<MemberRowsState>(() => ({
     source: initialPage.items,
     members: initialPage.items,
@@ -117,7 +146,6 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
   const [message, setMessage] = useState<null | { kind: "alert" | "status"; text: string }>(null);
   const pendingActionsRef = useRef<Set<string>>(new Set());
   const dialogTriggerRef = useRef<HTMLElement | null>(null);
-  const refreshRequestIdRef = useRef(0);
 
   const setMembers = (update: MemberRowsUpdate) => {
     setMemberRowsState((current) => {
@@ -187,20 +215,10 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
   };
 
   const refreshMembers = async () => {
-    const requestId = refreshRequestIdRef.current + 1;
-    refreshRequestIdRef.current = requestId;
-
-    try {
-      const nextPage = normalizeMemberPage(await actions.loadMembers({ limit: 50 }));
-      if (requestId === refreshRequestIdRef.current) {
-        setMembers(nextPage.items);
-        setNextCursor(nextPage.nextCursor);
-      }
-    } catch (error) {
-      if (requestId === refreshRequestIdRef.current) {
-        throw error;
-      }
-    }
+    await queryClient.invalidateQueries(
+      { queryKey: hostMemberKeys.all },
+      { throwOnError: true },
+    );
   };
 
   const loadMoreMembers = async () => {

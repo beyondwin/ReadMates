@@ -1,7 +1,6 @@
 package com.readmates.feedback.adapter.out.persistence
 
 import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
-import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
 import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
 import com.readmates.feedback.application.port.out.FeedbackDocumentStorePort
@@ -210,74 +209,6 @@ class JdbcFeedbackDocumentStoreAdapter(
                 clubId.dbString(),
                 sessionId.dbString(),
             ).firstOrNull()
-
-    override fun findSessionForUpload(
-        clubId: UUID,
-        sessionId: UUID,
-    ): FeedbackDocumentSessionResult? =
-        jdbcTemplate
-            .query(
-                """
-                select id, number, book_title, session_date
-                from sessions
-                where id = ?
-                  and club_id = ?
-                for update
-                """.trimIndent(),
-                { resultSet, _ -> resultSet.toSessionMetadata() },
-                sessionId.dbString(),
-                clubId.dbString(),
-            ).firstOrNull()
-
-    override fun nextDocumentVersion(
-        clubId: UUID,
-        sessionId: UUID,
-    ): Int =
-        jdbcTemplate.queryForObject(
-            """
-            select coalesce(max(version), 0) + 1
-            from session_feedback_documents
-            where club_id = ?
-              and session_id = ?
-            """.trimIndent(),
-            Int::class.java,
-            clubId.dbString(),
-            sessionId.dbString(),
-        ) ?: 1
-
-    override fun insertDocument(
-        currentMember: CurrentMember,
-        command: FeedbackDocumentUploadCommand,
-        version: Int,
-        documentId: UUID,
-        title: String,
-    ) {
-        jdbcTemplate.update(
-            """
-            insert into session_feedback_documents (
-              id,
-              club_id,
-              session_id,
-              version,
-              source_text,
-              document_title,
-              file_name,
-              content_type,
-              file_size
-            )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """.trimIndent(),
-            documentId.dbString(),
-            currentMember.clubId.dbString(),
-            command.sessionId.dbString(),
-            version,
-            command.sourceText,
-            title,
-            command.fileName,
-            command.contentType,
-            command.fileSize,
-        )
-    }
 
     private fun ResultSet.toStoredFeedbackDocumentList(): StoredFeedbackDocumentListResult =
         StoredFeedbackDocumentListResult(

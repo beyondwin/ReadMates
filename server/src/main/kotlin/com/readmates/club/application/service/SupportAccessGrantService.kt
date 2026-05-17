@@ -13,6 +13,7 @@ import com.readmates.club.application.port.out.CreateSupportAccessGrantPort
 import com.readmates.club.application.port.out.LoadSupportAccessGrantPort
 import com.readmates.club.application.port.out.RevokeSupportAccessGrantPort
 import com.readmates.club.application.port.out.WritePlatformAuditEventPort
+import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.stereotype.Service
 import tools.jackson.databind.ObjectMapper
@@ -50,6 +51,9 @@ class SupportAccessGrantService(
         admin: CurrentPlatformAdmin,
         command: CreateSupportAccessGrantCommand,
     ): SupportAccessGrant {
+        if (!admin.canManageSupportAccess) {
+            throw AccessDeniedException("Platform admin role cannot manage support access grants")
+        }
         if (command.reason.isBlank()) {
             throw PlatformAdminException(
                 PlatformAdminError.GRANT_REASON_REQUIRED,
@@ -90,6 +94,9 @@ class SupportAccessGrantService(
         admin: CurrentPlatformAdmin,
         grantId: UUID,
     ) {
+        if (!admin.canManageSupportAccess) {
+            throw AccessDeniedException("Platform admin role cannot manage support access grants")
+        }
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val revoked =
             revokeGrantPort.revokeGrant(grantId, now)

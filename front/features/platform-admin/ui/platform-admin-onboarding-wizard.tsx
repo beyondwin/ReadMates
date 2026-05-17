@@ -49,7 +49,10 @@ export type PlatformAdminOnboardingResultResponse = {
       status: "SENT" | "FAILED" | "SKIPPED";
     };
   };
-  domain: unknown;
+  domain: null | {
+    hostname: string;
+    status: string;
+  };
 };
 
 type Props = {
@@ -174,9 +177,11 @@ export function PlatformAdminOnboardingWizard({ onPreview, onCommit, onCreated }
 
       {result ? (
         <div className="surface platform-admin-onboarding__result">
+          <p className="eyebrow">생성 결과</p>
           <strong>{result.club.slug}</strong>
           <span>{result.hostOnboarding.kind}</span>
-          <span>{result.hostOnboarding.emailDelivery.status}</span>
+          <span>메일: {result.hostOnboarding.emailDelivery.status}</span>
+          {result.domain ? <span>도메인: {result.domain.hostname} · {result.domain.status}</span> : null}
           {result.hostOnboarding.acceptUrl ? <code>{result.hostOnboarding.acceptUrl}</code> : null}
         </div>
       ) : null}

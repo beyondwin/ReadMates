@@ -1,7 +1,6 @@
 package com.readmates.feedback.application.port.out
 
 import com.readmates.feedback.application.model.FeedbackDocumentSessionResult
-import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
 import com.readmates.feedback.application.model.StoredFeedbackDocumentListResult
 import com.readmates.feedback.application.model.StoredFeedbackDocumentResult
 import com.readmates.shared.paging.CursorPage
@@ -29,22 +28,4 @@ interface FeedbackDocumentStorePort {
         clubId: UUID,
         sessionId: UUID,
     ): StoredFeedbackDocumentResult?
-
-    fun findSessionForUpload(
-        clubId: UUID,
-        sessionId: UUID,
-    ): FeedbackDocumentSessionResult?
-
-    fun nextDocumentVersion(
-        clubId: UUID,
-        sessionId: UUID,
-    ): Int
-
-    fun insertDocument(
-        currentMember: CurrentMember,
-        command: FeedbackDocumentUploadCommand,
-        version: Int,
-        documentId: UUID,
-        title: String,
-    )
 }
