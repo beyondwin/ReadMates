@@ -150,6 +150,55 @@ class RedisAiGenerationJobStoreTest(
     }
 
     @Test
+    fun `load returns null and deletes stale keys when transcript key is missing`() {
+        val record = newRecord()
+        store.save(record)
+        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        redisTemplate.delete("aigen:job:${record.jobId}:transcript")
+
+        val loaded = store.load(record.jobId)
+
+        assertThat(loaded).isNull()
+        assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}")).isFalse()
+        assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}:result")).isFalse()
+    }
+
+    @Test
+    fun `saveResult refreshes transcript ttl with hash and result ttl`() {
+        val record = newRecord()
+        store.save(record)
+        val transcriptKey = "aigen:job:${record.jobId}:transcript"
+        redisTemplate.expire(transcriptKey, java.time.Duration.ofSeconds(1))
+
+        store.saveResult(record.jobId, snapshot(), TokenUsage(100, 0, 200), BigDecimal("0.01"))
+
+        val ttlSeconds = properties.job.redisTtl.seconds
+        val transcriptTtl = redisTemplate.getExpire(transcriptKey, TimeUnit.SECONDS)
+        assertThat(transcriptTtl).isBetween(ttlSeconds - 30, ttlSeconds + 30)
+    }
+
+    @Test
+    fun `patchItem refreshes transcript ttl with hash and result ttl`() {
+        val record = newRecord()
+        store.save(record)
+        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        val transcriptKey = "aigen:job:${record.jobId}:transcript"
+        redisTemplate.expire(transcriptKey, java.time.Duration.ofSeconds(1))
+
+        store.patchItem(
+            record.jobId,
+            GenerationItem.SUMMARY,
+            snapshot().copy(summary = "patched summary"),
+            TokenUsage(20, 0, 30),
+            BigDecimal("0.005"),
+        )
+
+        val ttlSeconds = properties.job.redisTtl.seconds
+        val transcriptTtl = redisTemplate.getExpire(transcriptKey, TimeUnit.SECONDS)
+        assertThat(transcriptTtl).isBetween(ttlSeconds - 30, ttlSeconds + 30)
+    }
+
+    @Test
     fun `delete removes hash, transcript, and result keys`() {
         val record = newRecord()
         store.save(record)

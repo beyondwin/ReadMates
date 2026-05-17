@@ -71,7 +71,9 @@ class RedisAiGenerationJobStore(
             val hash = redisTemplate.opsForHash<String, String>().entries(hashKey)
             if (hash.isEmpty()) return@runCatching null
 
-            val transcript = redisTemplate.opsForValue().get(transcriptKey(jobId)) ?: ""
+            val transcript =
+                redisTemplate.opsForValue().get(transcriptKey(jobId))
+                    ?: return@runCatching deleteStaleJob(jobId)
             val resultJson = redisTemplate.opsForValue().get(resultKey(jobId))
             val result =
                 resultJson?.let { objectMapper.readValue(it, SessionImportV1Snapshot::class.java) }
@@ -90,7 +92,7 @@ class RedisAiGenerationJobStore(
             val resultJson = objectMapper.writeValueAsString(result)
             redisTemplate.execute(
                 PATCH_RESULT_SCRIPT,
-                listOf(hashKey(jobId), resultKey(jobId)),
+                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId)),
                 resultJson,
                 usage.inputTokens.toString(),
                 usage.cachedInputTokens.toString(),
@@ -118,7 +120,7 @@ class RedisAiGenerationJobStore(
             val newResultJson = objectMapper.writeValueAsString(value)
             redisTemplate.execute(
                 PATCH_RESULT_SCRIPT,
-                listOf(hashKey(jobId), resultKey(jobId)),
+                listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId)),
                 newResultJson,
                 usage.inputTokens.toString(),
                 usage.cachedInputTokens.toString(),
@@ -162,6 +164,11 @@ class RedisAiGenerationJobStore(
             redisTemplate.expire(hashKey, properties.job.redisTtl)
             next.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
         }.onFailure { recordFailure("incrementLlmCallCount") }.getOrThrow()
+
+    private fun deleteStaleJob(jobId: UUID): JobRecord? {
+        delete(jobId)
+        return null
+    }
 
     override fun delete(jobId: UUID) {
         runCatching {
@@ -265,11 +272,12 @@ class RedisAiGenerationJobStore(
         const val MAX_ERROR_MESSAGE_LEN = 512
 
         /**
-         * KEYS[1]=hashKey, KEYS[2]=resultKey
+         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey
          * ARGV[1]=resultJson, ARGV[2..4]=tokens (input,cached,output) delta,
          * ARGV[5]=cost delta (decimal string), ARGV[6]=ttlSeconds
          *
-         * Atomically: SET resultJson; HINCRBY tokens; HINCRBYFLOAT cost; refresh TTL on both keys.
+         * Atomically: SET resultJson; HINCRBY tokens; HINCRBYFLOAT cost; refresh TTL on
+         * hash + result + (existing) transcript so all three expire together.
          */
         val PATCH_RESULT_SCRIPT: DefaultRedisScript<Void> =
             DefaultRedisScript(
@@ -281,6 +289,9 @@ class RedisAiGenerationJobStore(
                 redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[4])
                 redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[5])
                 redis.call('EXPIRE', KEYS[1], ARGV[6])
+                if redis.call('EXISTS', KEYS[3]) == 1 then
+                  redis.call('EXPIRE', KEYS[3], ARGV[6])
+                end
                 return nil
                 """.trimIndent(),
                 Void::class.java,
