@@ -9,3 +9,4 @@ ADR(`docs/development/adr/`)이 결정의 결과 카드라면, case study는 그
 1. [BFF 보안 경계와 무중단 secret rotation](01-bff-security-and-secret-rotation.md)
 2. [Mutation과 알림 발송의 결합 분리 (transactional outbox)](02-notification-pipeline-with-outbox.md)
 3. [Multi-club domain platform — host vs slug 우선순위](03-multi-club-domain-platform.md)
+4. [PII-safe in-app AI session generation](04-pii-safe-ai-session-generation.md)

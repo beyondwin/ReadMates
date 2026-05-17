@@ -17,6 +17,7 @@ ReadMates는 여러 정기 독서모임의 세션 준비, 참여 관리, 기록 
 - **BFF 보안 경계와 무중단 secret rotation** — Cloudflare Pages Functions에서 cookie domain strip, 내부 헤더 차단, multi-secret 회전을 한 곳에 응집. 분 단위 secret 회전과 audit log를 보유합니다. → [Case study](docs/case-studies/01-bff-security-and-secret-rotation.md)
 - **Mutation과 알림 발송의 결합 분리** — MySQL transactional outbox + Kafka relay로 mutation 트랜잭션과 SMTP/in-app 발송을 분리. PENDING/PUBLISHING/PUBLISHED/FAILED/DEAD state machine과 masked audit ledger를 운영합니다. → [Case study](docs/case-studies/02-notification-pipeline-with-outbox.md)
 - **Multi-club domain platform** — 하나의 인스턴스에서 path-routed shared fallback과 custom domain alias를 같은 codepath로. host/slug 우선순위 설계와 dev/prod parity가 깨진 실제 incident를 post-mortem으로 보유합니다. → [Case study](docs/case-studies/03-multi-club-domain-platform.md)
+- **PII-safe in-app AI session generation** — Transcript 기반 세션 기록 생성을 feature flag, provider adapter, Redis/Kafka job lifecycle, MySQL audit/cost cap, schema validator, kill switch로 운영 경계 안에 넣었습니다. → [Case study](docs/case-studies/04-pii-safe-ai-session-generation.md)
 
 ## 문서 사용 기준
 
