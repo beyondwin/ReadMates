@@ -15,6 +15,23 @@
 - Spec: `docs/superpowers/specs/2026-05-18-readmates-aigen-job-commit-state-machine-design.md`
 - Surface guides read before planning: `docs/agents/docs.md`, `docs/agents/server.md`, `docs/agents/front.md`
 
+## Code Review Adjustments (2026-05-18)
+
+After cross-checking against `server/src/main/kotlin/com/readmates/aigen/**` and `front/features/host/aigen/**`, the spec was updated with a "코드 검토 결과 발견된 추가 결함과 결정" section and this plan was revised to reflect those decisions. Specifically:
+
+- Commit lifecycle (Task 5)
+  - Override is persisted via `saveResultIfStatus(expected = COMMITTING)` AFTER the `SUCCEEDED -> COMMITTING` transition, never before, to prevent a cancel race from leaking host PII into a `CANCELLED` hash.
+  - Delegate failures are recovered for the full `RuntimeException` surface, not only `InvalidSessionImportException`, so transient downstream errors cannot leave the job stuck in `COMMITTING` until TTL.
+  - Order on the success path is `transition COMMITTING -> COMMITTED` first, THEN `deleteTransientPayload(jobId)`, so `load()` polls cannot observe a "non-terminal + payload missing" stale window.
+- Redis adapter (Task 3)
+  - `PAYLOAD_OPTIONAL_STATUSES` includes `COMMITTING` in addition to terminals, closing the same polling window from the read side as a defense-in-depth measure.
+  - A new Step 6b persists `expiresAt` on the hash and reads it back in `fromHash`, so `GET /jobs/{jobId}` no longer reports a moving target on each poll.
+- Worker (Task 4)
+  - `AiGenerationJobTransitionPolicy` is NOT injected into `AiGenerationWorker`. The CAS already enforces the lifecycle, and policy calls on the stale local `record.status` would have been dead code. The policy remains for commit/regenerate/orchestrator (where it gates before any CAS) and for unit-pinning the status/action matrix.
+  - `costGuard.recordUsage(...)` runs BEFORE `saveResultIfStatus(...)` so cancel-during-running does not silently drop club/host monthly cost accounting after a paid provider call.
+- Regeneration (Task 6)
+  - Race-loss audit uses `ErrorCode.JOB_EXPIRED` (lifecycle effectively ended) instead of `UNKNOWN` (500 mapping) so audit grep keeps semantic meaning.
+
 ## File Structure
 
 Create:
@@ -360,6 +377,13 @@ In `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationF
 ```kotlin
     val transientPayloadDeleted: MutableList<UUID> = mutableListOf()
     val statusTransitions: MutableList<Triple<UUID, JobStatus, JobStatus>> = mutableListOf()
+    /**
+     * Unified order log for ordering invariants — e.g. "commit must transition to
+     * COMMITTED BEFORE calling deleteTransientPayload". Push `"transition:${next.name}"`
+     * inside `transitionStatus` (when it returns true) and `"deleteTransient"` inside
+     * `deleteTransientPayload`. Asserted with `containsSubsequence(...)`.
+     */
+    val mutationOrder: MutableList<String> = mutableListOf()
     var failNextConditionalSave: Boolean = false
 ```
 
@@ -383,6 +407,7 @@ Add these method implementations before `incrementLlmCallCount(...)`:
             error = error,
         )
         statusTransitions += Triple(jobId, current.status, next)
+        mutationOrder += "transition:${next.name}"
         return true
     }
 
@@ -413,6 +438,7 @@ Add these method implementations before `incrementLlmCallCount(...)`:
 
     override fun deleteTransientPayload(jobId: UUID) {
         transientPayloadDeleted += jobId
+        mutationOrder += "deleteTransient"
         val current = records[jobId] ?: return
         records[jobId] = current.copy(
             transcript = "",
@@ -638,7 +664,7 @@ Replace the transcript lookup in `load(jobId)` with this block:
 ```kotlin
             val status = hash["status"]?.let { JobStatus.valueOf(it) }
             val transcript = redisTemplate.opsForValue().get(transcriptKey(jobId))
-            if (transcript == null && status !in TERMINAL_STATUSES_WITHOUT_PAYLOAD) {
+            if (transcript == null && status !in PAYLOAD_OPTIONAL_STATUSES) {
                 return@runCatching deleteStaleJob(jobId)
             }
             val resultJson = redisTemplate.opsForValue().get(resultKey(jobId))
@@ -648,11 +674,70 @@ Replace the transcript lookup in `load(jobId)` with this block:
             fromHash(jobId, hash, transcript.orEmpty(), result)
 ```
 
-Add this set to the companion object:
+Add this set to the companion object. `COMMITTING` is intentionally payload-optional: the commit success path performs `transition COMMITTING -> COMMITTED` then `deleteTransientPayload`, but `transcript`/`result` keys can also TTL-expire independently of the hash. Including `COMMITTING` here closes the polling race window where a host poll could otherwise see 410 `JOB_EXPIRED` for a few milliseconds.
 
 ```kotlin
-        val TERMINAL_STATUSES_WITHOUT_PAYLOAD =
-            setOf(JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
+        val PAYLOAD_OPTIONAL_STATUSES =
+            setOf(JobStatus.COMMITTING, JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
+```
+
+Also add an integration test pinning the new payload-optional case for `COMMITTING`:
+
+```kotlin
+    @Test
+    fun `committing job without transcript is loadable and not stale`() {
+        val record = newRecord()
+        store.save(record)
+        store.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.PENDING),
+            next = JobStatus.COMMITTING,
+            stage = JobStage.READY,
+            progressPct = 100,
+            error = null,
+        )
+        redisTemplate.delete("aigen:job:${record.jobId}:transcript")
+        redisTemplate.delete("aigen:job:${record.jobId}:result")
+
+        val loaded = store.load(record.jobId)
+
+        assertThat(loaded).isNotNull
+        assertThat(loaded!!.status).isEqualTo(JobStatus.COMMITTING)
+        assertThat(loaded.result).isNull()
+    }
+```
+
+- [ ] **Step 6b: Persist `expiresAt` on the hash for stable poll responses**
+
+Spec §"Redis adapter" requires `expiresAt` to be stored on the hash so that `GET /jobs/{jobId}` does not drift with each load. Without this step the integration assertion "stored `expiresAt` is preserved" (Task 8 verification) cannot pass.
+
+In `toHash(job)`, add:
+
+```kotlin
+                "expiresAt" to job.expiresAt.toString(),
+```
+
+In `fromHash`, replace `val expiresAt = Instant.now().plus(properties.job.redisTtl)` with:
+
+```kotlin
+        val expiresAt =
+            hash["expiresAt"]
+                ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                ?: Instant.now().plus(properties.job.redisTtl)
+```
+
+Add an integration test:
+
+```kotlin
+    @Test
+    fun `load preserves expiresAt stored on the hash`() {
+        val record = newRecord()
+        store.save(record)
+        val first = store.load(record.jobId)!!.expiresAt
+        Thread.sleep(20)
+        val second = store.load(record.jobId)!!.expiresAt
+        assertThat(second).isEqualTo(first)
+    }
 ```
 
 - [ ] **Step 7: Add Lua scripts**
@@ -808,19 +893,11 @@ Run:
 
 Expected: at least one new test fails because `process` still calls provider after loading a non-`PENDING` record or persists result without conditional status save.
 
-- [ ] **Step 3: Inject transition policy**
+- [ ] **Step 3: Skip policy injection in the worker**
 
-Add constructor dependency in `AiGenerationWorker`:
+`AiGenerationJobTransitionPolicy` is a pure unit-test surface (spec §"코드 검토 결과 발견된 추가 결함과 결정"). After a successful `transitionStatus(PENDING -> RUNNING)` the in-memory `record.status` is still the stale `PENDING`, so a `policy.requireWorkerStart(record.status, ...)` call would always pass and is dead code. The worker enforces lifecycle through Redis CAS only.
 
-```kotlin
-    private val transitionPolicy: AiGenerationJobTransitionPolicy,
-```
-
-Update `TestContext` construction in `AiGenerationWorkerTest` to pass:
-
-```kotlin
-            transitionPolicy = AiGenerationJobTransitionPolicy(),
-```
+Do not add a `transitionPolicy` constructor argument to `AiGenerationWorker`. Keep `AiGenerationWorkerTest`'s `TestContext` unchanged for the worker. The policy remains a separately-tested artifact for `AiGenerationCommitService`, `AiGenerationRegenerationService`, and `AiGenerationOrchestrator` (where the `requireX` calls run on freshly-loaded `record.status` and gate before any CAS).
 
 - [ ] **Step 4: Guard worker start**
 
@@ -848,7 +925,6 @@ with:
         ) {
             return
         }
-        transitionPolicy.requireWorkerStart(record.status, record.jobId)
         val runningRecord = record.copy(
             status = JobStatus.RUNNING,
             stage = JobStage.TRANSCRIPT_LOADED,
@@ -870,33 +946,55 @@ Then pass `runningRecord` into `runGenerationWithValidationRetry`, `succeed`, an
 
 In `resolveGenerator`, remove the `jobStore.updateStatus(...)` block that writes `RUNNING`. Keep the model/provider availability checks.
 
-- [ ] **Step 6: Persist success conditionally**
+- [ ] **Step 6: Persist success conditionally with cost recorded first**
 
-In `succeed(...)`, replace:
+`costGuard.recordUsage(...)` must run BEFORE the conditional save. The provider call has already executed by the time we reach `succeed(...)`, so the cost was incurred regardless of whether cancel won the race. Recording cost before the CAS preserves club/host monthly accounting (see spec §"비용 회계 정책").
+
+In `succeed(...)`, replace this block:
 
 ```kotlin
         jobStore.saveResult(record.jobId, snapshot, usage, cost)
-```
-
-with:
-
-```kotlin
-        transitionPolicy.requireWorkerCompletion(record.status, record.jobId)
-        val saved = jobStore.saveResultIfStatus(record.jobId, JobStatus.RUNNING, snapshot, usage, cost)
-        if (!saved) {
-            return
+        // Record cost BEFORE the visible status flip so a cost-guard
+        // counter outage cannot leave a SUCCEEDED job without its
+        // accumulated cost recorded (task_1_7 finding #8). recordUsage
+        // failures must not fail the job — log and swallow so the
+        // host still sees the result.
+        try {
+            costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+        } catch (
+            @Suppress("TooGenericExceptionCaught") failure: RuntimeException,
+        ) {
+            logger.warn(
+                "costGuard.recordUsage failed for jobId={}; status flip will proceed",
+                record.jobId,
+                failure,
+            )
         }
-```
-
-Then replace the final status update:
-
-```kotlin
         jobStore.updateStatus(record.jobId, JobStatus.SUCCEEDED, JobStage.READY, PROGRESS_COMPLETE_PCT, null)
 ```
 
 with:
 
 ```kotlin
+        // Cost was incurred by the provider call regardless of cancel race.
+        // Record BEFORE the CAS so cancel-during-running does not silently
+        // drop club/host monthly accounting (spec §"비용 회계 정책").
+        // recordUsage failures must not fail the job — log and swallow.
+        try {
+            costGuard.recordUsage(record.hostUserId, record.clubId, cost)
+        } catch (
+            @Suppress("TooGenericExceptionCaught") failure: RuntimeException,
+        ) {
+            logger.warn(
+                "costGuard.recordUsage failed for jobId={}; status flip will proceed",
+                record.jobId,
+                failure,
+            )
+        }
+        val saved = jobStore.saveResultIfStatus(record.jobId, JobStatus.RUNNING, snapshot, usage, cost)
+        if (!saved) {
+            return  // cancel/commit/another worker won the race
+        }
         if (!jobStore.transitionStatus(
                 jobId = record.jobId,
                 expected = setOf(JobStatus.RUNNING),
@@ -906,8 +1004,31 @@ with:
                 error = null,
             )
         ) {
-            return
+            return  // cancel won the race
         }
+```
+
+Add a worker test pinning the cost-accounting invariant:
+
+```kotlin
+    @Test
+    fun `succeed records cost even when conditional result save loses to cancel`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.jobStore.failNextConditionalSave = true
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot(),
+                usage = TokenUsage(100, 0, 200),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        assertThat(ctx.costGuard.recorded).hasSize(1)
+        assertThat(ctx.jobStore.load(record.jobId)!!.result).isNull()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
 ```
 
 - [ ] **Step 7: Make failures conditional**
@@ -982,6 +1103,16 @@ Append these tests to `AiGenerationCommitServiceTest`:
         assertThat(ctx.jobStore.transientPayloadDeleted).containsExactly(record.jobId)
         assertThat(ctx.jobStore.statusTransitions.map { it.second to it.third })
             .containsExactly(JobStatus.SUCCEEDED to JobStatus.COMMITTING, JobStatus.COMMITTING to JobStatus.COMMITTED)
+
+        // Spec §"코드 검토 결과 발견된 추가 결함과 결정": transition to COMMITTED MUST
+        // happen before deleteTransientPayload so a concurrent /get poll never sees
+        // "non-terminal + payload missing" and 410s.
+        // Implementation note: extend `FakeJobStore` with a unified ordering log,
+        // e.g. `val mutationOrder: MutableList<String> = mutableListOf()`, push
+        // "transition:${next.name}" inside `transitionStatus` (when it returns true)
+        // and "deleteTransient" inside `deleteTransientPayload`. Then assert:
+        assertThat(ctx.jobStore.mutationOrder)
+            .containsSubsequence("transition:COMMITTED", "deleteTransient")
     }
 
     @Test
@@ -1084,9 +1215,11 @@ After session mismatch check in `commit(...)`, add:
         transitionPolicy.requireCommit(record.status, record.jobId)
 ```
 
-- [ ] **Step 5: Move into `COMMITTING` before delegate call**
+- [ ] **Step 5: Transition to `COMMITTING` BEFORE persisting any override**
 
-After validation and optional override save, add:
+Spec §"코드 검토 결과 발견된 추가 결함과 결정" requires that override never be written to a non-`COMMITTING` hash. The existing code persists override via `saveResult` (no status check) which leaks host PII to a `CANCELLED` hash if cancel sneaks in between validation and transition.
+
+Restructure `commit(...)` so the order is: precheck policy → validate snapshot → CAS to `COMMITTING` → conditional override save → delegate → terminal transition. Remove the existing unconditional `jobStore.saveResult(jobId, overrideResult, ...)` call. Replace it with the block below, placed immediately after the validation `when` branch:
 
 ```kotlin
         val beganCommit = jobStore.transitionStatus(
@@ -1104,15 +1237,45 @@ After validation and optional override save, add:
                 attemptedAction = "commit",
             )
         }
+
+        if (overrideResult != null) {
+            val overrideSaved = jobStore.saveResultIfStatus(
+                jobId = jobId,
+                expected = JobStatus.COMMITTING,
+                result = overrideResult,
+                usage = TokenUsage(0, 0, 0),
+                cost = BigDecimal.ZERO,
+            )
+            if (!overrideSaved) {
+                jobStore.transitionStatus(
+                    jobId = record.jobId,
+                    expected = setOf(JobStatus.COMMITTING),
+                    next = JobStatus.SUCCEEDED,
+                    stage = JobStage.READY,
+                    progressPct = 100,
+                    error = null,
+                )
+                throw AiGenerationException.IllegalGenerationState(
+                    jobId = record.jobId,
+                    currentStatus = jobStore.load(record.jobId)?.status?.name ?: "MISSING",
+                    attemptedAction = "commit",
+                )
+            }
+        }
 ```
 
 Add imports for `JobStage` and `JobStatus`.
 
-- [ ] **Step 6: Restore status on delegate validation failure**
+- [ ] **Step 6: Recover from ALL delegate failures, not just `InvalidSessionImportException`**
 
-Replace the current `catch (error: InvalidSessionImportException)` block with:
+Spec §"코드 검토 결과 발견된 추가 결함과 결정" calls out the production risk: any other `RuntimeException` from `commitValidated` would leave the job stuck in `COMMITTING` forever (until TTL). Use a structured try/catch that recovers status on every throw path while preserving the existing masking for `InvalidSessionImportException`.
+
+Replace the existing `try { commitDelegate.commitValidated(...) } catch (InvalidSessionImportException) { ... }` block with:
 
 ```kotlin
+        val result =
+            try {
+                commitDelegate.commitValidated(ValidatedSessionImportInput(command))
             } catch (error: InvalidSessionImportException) {
                 jobStore.transitionStatus(
                     jobId = record.jobId,
@@ -1129,10 +1292,76 @@ Replace the current `catch (error: InvalidSessionImportException)` block with:
                         "Generated session import failed validation",
                     ),
                 )
+            } catch (
+                @Suppress("TooGenericExceptionCaught") error: RuntimeException,
+            ) {
+                jobStore.transitionStatus(
+                    jobId = record.jobId,
+                    expected = setOf(JobStatus.COMMITTING),
+                    next = JobStatus.SUCCEEDED,
+                    stage = JobStage.READY,
+                    progressPct = 100,
+                    error = null,
+                )
+                auditPort.insert(
+                    AuditLogEntry(
+                        jobId = record.jobId,
+                        sessionId = record.sessionId,
+                        clubId = record.clubId,
+                        hostUserId = record.hostUserId,
+                        kind = AuditKind.COMMIT,
+                        item = null,
+                        provider = record.model.provider,
+                        model = record.model.name,
+                        transcriptSha256 = null,
+                        usage = record.tokens,
+                        costEstimateUsd = record.costAccumulatedUsd,
+                        status = AuditStatus.FAILED,
+                        errorCode = ErrorCode.UNKNOWN,
+                        errorMessage = "Commit delegate failed; status restored to SUCCEEDED",
+                        latencyMs = 0,
+                        createdAt = clock.instant(),
+                    ),
+                )
+                throw error
             }
 ```
 
-- [ ] **Step 7: Replace full delete with transient payload delete and committed transition**
+Add a test pinning the broader recovery:
+
+```kotlin
+    @Test
+    fun `commit delegate runtime failure restores job to succeeded and rethrows`() {
+        val ctx = TestContext()
+        ctx.delegate.exception = IllegalStateException("downstream transient failure")
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.host.clubId,
+            hostUserId = ctx.host.userId,
+            status = JobStatus.SUCCEEDED,
+            result = AiGenerationTestFixtures.snapshot(),
+        )
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, null)
+        }.isInstanceOf(IllegalStateException::class.java)
+
+        val stored = ctx.jobStore.load(record.jobId)!!
+        assertThat(stored.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(ctx.jobStore.transientPayloadDeleted).isEmpty()
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.kind).isEqualTo(AuditKind.COMMIT)
+        assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(audit.errorCode).isEqualTo(ErrorCode.UNKNOWN)
+    }
+```
+
+(If `FakeCommitDelegate` does not yet expose a generic `exception: Throwable?`, extend it from the existing `InvalidSessionImportException`-only field — see Task 2's fake updates pattern.)
+
+- [ ] **Step 7: Transition to `COMMITTED` FIRST, then delete transient payload**
+
+Order matters: the spec mandates `transition → deleteTransientPayload`. The reverse order opens a window where `load()` sees `COMMITTING + transcript missing` and (depending on the `PAYLOAD_OPTIONAL_STATUSES` set) could return 410.
 
 Replace:
 
@@ -1143,7 +1372,6 @@ Replace:
 with:
 
 ```kotlin
-        jobStore.deleteTransientPayload(jobId)
         jobStore.transitionStatus(
             jobId = record.jobId,
             expected = setOf(JobStatus.COMMITTING),
@@ -1152,6 +1380,7 @@ with:
             progressPct = 100,
             error = null,
         )
+        jobStore.deleteTransientPayload(jobId)
 ```
 
 - [ ] **Step 8: Run commit tests**
@@ -1233,7 +1462,10 @@ Append to `AiGenerationRegenerationServiceTest`:
         assertThat(ctx.jobStore.load(record.jobId)!!.result!!.summary).isEqualTo("original")
         val failedAudit = ctx.auditPort.entries.single()
         assertThat(failedAudit.status).isEqualTo(AuditStatus.FAILED)
-        assertThat(failedAudit.errorCode).isEqualTo(ErrorCode.UNKNOWN)
+        // Spec §"코드 검토 결과 발견된 추가 결함과 결정": race-loss uses JOB_EXPIRED
+        // (job lifecycle effectively ended), not UNKNOWN — UNKNOWN maps to 500 and
+        // hides the semantic in audit grep.
+        assertThat(failedAudit.errorCode).isEqualTo(ErrorCode.JOB_EXPIRED)
     }
 ```
 
@@ -1349,7 +1581,10 @@ with:
                     usage = TokenUsage(0, 0, 0),
                     costEstimateUsd = BigDecimal.ZERO,
                     status = AuditStatus.FAILED,
-                    errorCode = ErrorCode.UNKNOWN,
+                    // Race-loss uses JOB_EXPIRED — the job's editable lifecycle has effectively
+                    // ended (cancelled, committed, or moved past SUCCEEDED). Avoid UNKNOWN
+                    // because it maps to 500 and obscures the cause in audit greps.
+                    errorCode = ErrorCode.JOB_EXPIRED,
                     errorMessage = "Job state changed before regeneration result could be saved",
                     latencyMs = 0,
                     createdAt = clock.instant(),
