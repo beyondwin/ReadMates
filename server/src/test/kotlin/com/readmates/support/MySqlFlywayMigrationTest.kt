@@ -517,6 +517,79 @@ class MySqlFlywayMigrationTest(
     }
 
     @Test
+    fun `fk to clubs id requires explicit COLLATE when schema default differs`() {
+        // Reproduces the v1.10.0 prod incident: schema default collation drifted
+        // away from the existing clubs.id column collation, so a new FK column
+        // created without an explicit COLLATE clause inherited the (wrong)
+        // schema default and Flyway failed with errno 3780.
+        val clubsIdCollation =
+            jdbcTemplate.queryForObject(
+                """
+                select collation_name
+                from information_schema.columns
+                where table_schema = database()
+                  and table_name = 'clubs'
+                  and column_name = 'id'
+                """.trimIndent(),
+                String::class.java,
+            ) ?: error("clubs.id collation must be present")
+        val originalSchemaDefault =
+            jdbcTemplate.queryForObject(
+                """
+                select default_collation_name
+                from information_schema.schemata
+                where schema_name = database()
+                """.trimIndent(),
+                String::class.java,
+            ) ?: error("schema default collation must be present")
+        val mismatchedDefault =
+            if (clubsIdCollation == "utf8mb4_0900_ai_ci") {
+                "utf8mb4_unicode_ci"
+            } else {
+                "utf8mb4_0900_ai_ci"
+            }
+
+        try {
+            jdbcTemplate.execute(
+                "alter database default character set utf8mb4 collate $mismatchedDefault",
+            )
+
+            // No explicit COLLATE: the new column inherits the (mismatched)
+            // schema default, so FK creation must fail.
+            assertThrows(Exception::class.java) {
+                jdbcTemplate.execute(
+                    """
+                    create table tmp_fk_collation_bad (
+                      club_id char(36) not null,
+                      constraint fk_tmp_collation_bad foreign key (club_id) references clubs(id)
+                    )
+                    """.trimIndent(),
+                )
+            }
+
+            // Explicit COLLATE matching clubs.id: FK creation must succeed even
+            // with a mismatched schema default. This is the pattern V31/V32 use.
+            jdbcTemplate.execute(
+                """
+                create table tmp_fk_collation_ok (
+                  club_id char(36) character set utf8mb4 collate $clubsIdCollation not null,
+                  constraint fk_tmp_collation_ok foreign key (club_id) references clubs(id)
+                )
+                """.trimIndent(),
+            )
+        } finally {
+            // Cleanup is critical: container reuse (~/.testcontainers.properties)
+            // shares state across runs, so leaked tables or a non-default schema
+            // collation would poison subsequent test invocations.
+            runCatching { jdbcTemplate.execute("drop table if exists tmp_fk_collation_bad") }
+            runCatching { jdbcTemplate.execute("drop table if exists tmp_fk_collation_ok") }
+            jdbcTemplate.execute(
+                "alter database default character set utf8mb4 collate $originalSchemaDefault",
+            )
+        }
+    }
+
+    @Test
     fun `mysql creates multi club platform metadata tables`() {
         val tableCount =
             jdbcTemplate.queryForObject(
