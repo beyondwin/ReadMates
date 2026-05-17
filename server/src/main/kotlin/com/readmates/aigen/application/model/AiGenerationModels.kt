@@ -28,7 +28,15 @@ data class TokenUsage(
 
 enum class GenerationItem { SUMMARY, HIGHLIGHTS, ONE_LINE_REVIEWS, FEEDBACK_DOCUMENT }
 
-enum class JobStatus { PENDING, RUNNING, SUCCEEDED, FAILED, CANCELLED }
+enum class JobStatus {
+    PENDING,
+    RUNNING,
+    SUCCEEDED,
+    COMMITTING,
+    COMMITTED,
+    FAILED,
+    CANCELLED,
+}
 
 enum class JobStage {
     QUEUED,

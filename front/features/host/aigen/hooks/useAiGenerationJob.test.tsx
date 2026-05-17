@@ -145,6 +145,39 @@ describe("useAiGenerationJob", () => {
     expect(mockedGetJob.mock.calls.length).toBe(callsAfterSettle);
   });
 
+  it("continues polling when status is COMMITTING", async () => {
+    vi.useFakeTimers();
+    mockedGetJob.mockResolvedValue(jobResponse("COMMITTING"));
+    const { Wrapper } = createWrapper();
+    renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(2));
+  });
+
+  it("stops polling when status is COMMITTED", async () => {
+    mockedGetJob.mockResolvedValue(jobResponse("COMMITTED"));
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
+      wrapper: Wrapper,
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.status).toBe("COMMITTED");
+    });
+
+    const callsAfterSettle = mockedGetJob.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockedGetJob.mock.calls.length).toBe(callsAfterSettle);
+  });
+
   it("polls at the spec-mandated cadence while RUNNING (first ~2s, then ~3-5s)", async () => {
     vi.useFakeTimers();
     const timestamps: number[] = [];

@@ -75,14 +75,16 @@ class RedisAiGenerationJobStore(
             val hash = redisTemplate.opsForHash<String, String>().entries(hashKey)
             if (hash.isEmpty()) return@runCatching null
 
-            val transcript =
-                redisTemplate.opsForValue().get(transcriptKey(jobId))
-                    ?: return@runCatching deleteStaleJob(jobId)
+            val status = hash["status"]?.let { JobStatus.valueOf(it) }
+            val transcript = redisTemplate.opsForValue().get(transcriptKey(jobId))
+            if (transcript == null && status !in PAYLOAD_OPTIONAL_STATUSES) {
+                return@runCatching deleteStaleJob(jobId)
+            }
             val resultJson = redisTemplate.opsForValue().get(resultKey(jobId))
             val result =
                 resultJson?.let { objectMapper.readValue(it, SessionImportV1Snapshot::class.java) }
 
-            fromHash(jobId, hash, transcript, result)
+            fromHash(jobId, hash, transcript.orEmpty(), result)
         }.onFailure { recordFailure("load") }.getOrNull()
 
     override fun saveResult(
@@ -157,6 +159,63 @@ class RedisAiGenerationJobStore(
         }.onFailure { recordFailure("updateStatus") }.getOrThrow()
     }
 
+    override fun transitionStatus(
+        jobId: UUID,
+        expected: Set<JobStatus>,
+        next: JobStatus,
+        stage: JobStage?,
+        progressPct: Int,
+        error: GenerationError?,
+    ): Boolean =
+        runCatching {
+            val result =
+                redisTemplate.execute(
+                    TRANSITION_STATUS_SCRIPT,
+                    listOf(hashKey(jobId)),
+                    expected.joinToString(",") { it.name },
+                    next.name,
+                    stage?.name.orEmpty(),
+                    progressPct.toString(),
+                    error?.code?.name.orEmpty(),
+                    error?.message?.take(MAX_ERROR_MESSAGE_LEN).orEmpty(),
+                )
+            result == 1L
+        }.onFailure { recordFailure("transitionStatus") }.getOrThrow()
+
+    override fun saveResultIfStatus(
+        jobId: UUID,
+        expected: JobStatus,
+        result: SessionImportV1Snapshot,
+        usage: TokenUsage,
+        cost: BigDecimal,
+    ): Boolean =
+        runCatching {
+            val ttlSeconds = properties.job.redisTtl.seconds
+            val resultJson = objectMapper.writeValueAsString(result)
+            val saved =
+                redisTemplate.execute(
+                    SAVE_RESULT_IF_STATUS_SCRIPT,
+                    listOf(hashKey(jobId), resultKey(jobId), transcriptKey(jobId)),
+                    expected.name,
+                    resultJson,
+                    usage.inputTokens.toString(),
+                    usage.cachedInputTokens.toString(),
+                    usage.outputTokens.toString(),
+                    cost.toPlainString(),
+                    ttlSeconds.toString(),
+                )
+            saved == 1L
+        }.onFailure { recordFailure("saveResultIfStatus") }.getOrThrow()
+
+    override fun deleteTransientPayload(jobId: UUID) {
+        runCatching {
+            redisTemplate.execute(
+                DELETE_TRANSIENT_PAYLOAD_SCRIPT,
+                listOf(transcriptKey(jobId), resultKey(jobId)),
+            )
+        }.onFailure { recordFailure("deleteTransientPayload") }.getOrThrow()
+    }
+
     override fun incrementLlmCallCount(jobId: UUID): Int =
         runCatching {
             val hashKey = hashKey(jobId)
@@ -201,6 +260,7 @@ class RedisAiGenerationJobStore(
                 "tokensOutput" to job.tokens.outputTokens.toString(),
                 "costAccumulatedUsd" to job.costAccumulatedUsd.toPlainString(),
                 "llmCallCount" to job.llmCallCount.toString(),
+                "expiresAt" to job.expiresAt.toString(),
             )
         job.stage?.let { map["stage"] = it.name }
         job.instructions?.let { map["instructions"] = it }
@@ -217,7 +277,10 @@ class RedisAiGenerationJobStore(
         transcript: String,
         result: SessionImportV1Snapshot?,
     ): JobRecord {
-        val expiresAt = Instant.now().plus(properties.job.redisTtl)
+        val expiresAt =
+            hash["expiresAt"]
+                ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                ?: Instant.now().plus(properties.job.redisTtl)
         return JobRecord(
             jobId = jobId,
             sessionId = UUID.fromString(hash.getValue("sessionId")),
@@ -274,6 +337,82 @@ class RedisAiGenerationJobStore(
 
     private companion object {
         const val MAX_ERROR_MESSAGE_LEN = 512
+
+        val PAYLOAD_OPTIONAL_STATUSES =
+            setOf(JobStatus.COMMITTING, JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
+
+        /**
+         * KEYS[1]=hashKey
+         * ARGV[1]=comma-separated expected statuses, ARGV[2]=next status,
+         * ARGV[3]=stage or "", ARGV[4]=progressPct,
+         * ARGV[5]=errorCode or "", ARGV[6]=errorMessage or "".
+         */
+        val TRANSITION_STATUS_SCRIPT: DefaultRedisScript<Long> =
+            DefaultRedisScript(
+                """
+                if redis.call('EXISTS', KEYS[1]) == 0 then
+                  return 0
+                end
+                local current = redis.call('HGET', KEYS[1], 'status')
+                local expected = ',' .. ARGV[1] .. ','
+                if string.find(expected, ',' .. current .. ',', 1, true) == nil then
+                  return 0
+                end
+                redis.call('HSET', KEYS[1], 'status', ARGV[2])
+                if ARGV[3] == '' then
+                  redis.call('HDEL', KEYS[1], 'stage')
+                else
+                  redis.call('HSET', KEYS[1], 'stage', ARGV[3])
+                end
+                redis.call('HSET', KEYS[1], 'progressPct', ARGV[4])
+                if ARGV[5] == '' then
+                  redis.call('HDEL', KEYS[1], 'errorCode', 'errorMessage')
+                else
+                  redis.call('HSET', KEYS[1], 'errorCode', ARGV[5])
+                  redis.call('HSET', KEYS[1], 'errorMessage', ARGV[6])
+                end
+                return 1
+                """.trimIndent(),
+                Long::class.java,
+            )
+
+        /**
+         * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey
+         * ARGV[1]=expected status, ARGV[2]=resultJson, ARGV[3..5]=token deltas,
+         * ARGV[6]=cost delta, ARGV[7]=ttlSeconds.
+         */
+        val SAVE_RESULT_IF_STATUS_SCRIPT: DefaultRedisScript<Long> =
+            DefaultRedisScript(
+                """
+                if redis.call('EXISTS', KEYS[1]) == 0 then
+                  return 0
+                end
+                if redis.call('HGET', KEYS[1], 'status') ~= ARGV[1] then
+                  return 0
+                end
+                redis.call('SET', KEYS[2], ARGV[2])
+                redis.call('EXPIRE', KEYS[2], ARGV[7])
+                redis.call('HINCRBY', KEYS[1], 'tokensInput', ARGV[3])
+                redis.call('HINCRBY', KEYS[1], 'tokensCached', ARGV[4])
+                redis.call('HINCRBY', KEYS[1], 'tokensOutput', ARGV[5])
+                redis.call('HINCRBYFLOAT', KEYS[1], 'costAccumulatedUsd', ARGV[6])
+                redis.call('EXPIRE', KEYS[1], ARGV[7])
+                if redis.call('EXISTS', KEYS[3]) == 1 then
+                  redis.call('EXPIRE', KEYS[3], ARGV[7])
+                end
+                return 1
+                """.trimIndent(),
+                Long::class.java,
+            )
+
+        /** KEYS[1]=transcriptKey, KEYS[2]=resultKey; deletes transient payload only. */
+        val DELETE_TRANSIENT_PAYLOAD_SCRIPT: DefaultRedisScript<Long> =
+            DefaultRedisScript(
+                """
+                return redis.call('DEL', KEYS[1], KEYS[2])
+                """.trimIndent(),
+                Long::class.java,
+            )
 
         /**
          * KEYS[1]=hashKey, KEYS[2]=resultKey, KEYS[3]=transcriptKey

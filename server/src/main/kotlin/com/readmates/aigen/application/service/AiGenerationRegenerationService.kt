@@ -69,6 +69,7 @@ class AiGenerationRegenerationService(
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
     private val sleeper: Sleeper = Sleeper.Default,
+    private val transitionPolicy: AiGenerationJobTransitionPolicy,
 ) : RegenerateItemUseCase {
     override fun regenerate(
         sessionId: UUID,
@@ -81,6 +82,7 @@ class AiGenerationRegenerationService(
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
+        transitionPolicy.requireRegenerate(record.status, record.jobId)
         val currentSnapshot =
             record.result
                 ?: throw AiGenerationException.IllegalGenerationState(
@@ -140,7 +142,34 @@ class AiGenerationRegenerationService(
         patchedSnapshot: SessionImportV1Snapshot,
         cost: BigDecimal,
     ): RegenerationResult {
-        jobStore.patchItem(record.jobId, item, patchedSnapshot, output.usage, cost)
+        val saved = jobStore.saveResultIfStatus(record.jobId, JobStatus.SUCCEEDED, patchedSnapshot, output.usage, cost)
+        if (!saved) {
+            auditPort.insert(
+                AuditLogEntry(
+                    jobId = record.jobId,
+                    sessionId = record.sessionId,
+                    clubId = record.clubId,
+                    hostUserId = record.hostUserId,
+                    kind = AuditKind.REGENERATE,
+                    item = item,
+                    provider = modelId.provider,
+                    model = modelId.name,
+                    transcriptSha256 = null,
+                    usage = TokenUsage(0, 0, 0),
+                    costEstimateUsd = BigDecimal.ZERO,
+                    status = AuditStatus.FAILED,
+                    errorCode = ErrorCode.JOB_EXPIRED,
+                    errorMessage = "Job state changed before regeneration result could be saved",
+                    latencyMs = 0,
+                    createdAt = clock.instant(),
+                ),
+            )
+            throw AiGenerationException.IllegalGenerationState(
+                jobId = record.jobId,
+                currentStatus = jobStore.load(record.jobId)?.status?.name ?: "MISSING",
+                attemptedAction = "regenerate",
+            )
+        }
         costGuard.recordUsage(record.hostUserId, record.clubId, cost)
         emitRegenMetrics(modelId, item, output.usage, cost, JobStatus.SUCCEEDED)
         auditPort.insert(
@@ -406,7 +435,8 @@ class AiGenerationRegenerationService(
             ErrorCode.QUEUE_UNAVAILABLE,
             -> throw AiGenerationException.Coded(code, message)
             else -> throw LlmGenerationException(
-                com.readmates.aigen.application.model.GenerationError(code, message),
+                com.readmates.aigen.application.model
+                    .GenerationError(code, message),
             )
         }
         // MAX_CALLS_EXCEEDED takes the LlmGenerationException branch so the

@@ -213,6 +213,136 @@ class RedisAiGenerationJobStoreTest(
         assertThat(store.load(record.jobId)).isNull()
     }
 
+    @Test
+    fun `transitionStatus only updates when current status is expected`() {
+        val record = newRecord()
+        store.save(record)
+
+        val first =
+            store.transitionStatus(
+                jobId = record.jobId,
+                expected = setOf(JobStatus.PENDING),
+                next = JobStatus.RUNNING,
+                stage = JobStage.TRANSCRIPT_LOADED,
+                progressPct = 5,
+                error = null,
+            )
+        val second =
+            store.transitionStatus(
+                jobId = record.jobId,
+                expected = setOf(JobStatus.PENDING),
+                next = JobStatus.CANCELLED,
+                stage = null,
+                progressPct = 0,
+                error = null,
+            )
+
+        val loaded = store.load(record.jobId)!!
+        assertThat(first).isTrue()
+        assertThat(second).isFalse()
+        assertThat(loaded.status).isEqualTo(JobStatus.RUNNING)
+        assertThat(loaded.stage).isEqualTo(JobStage.TRANSCRIPT_LOADED)
+        assertThat(loaded.progressPct).isEqualTo(5)
+    }
+
+    @Test
+    fun `saveResultIfStatus refuses to update when status changed`() {
+        val record = newRecord()
+        store.save(record)
+        store.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.PENDING),
+            next = JobStatus.CANCELLED,
+            stage = null,
+            progressPct = 0,
+            error = null,
+        )
+
+        val saved =
+            store.saveResultIfStatus(
+                jobId = record.jobId,
+                expected = JobStatus.RUNNING,
+                result = snapshot(),
+                usage = TokenUsage(100, 0, 100),
+                cost = BigDecimal("0.01"),
+            )
+
+        val loaded = store.load(record.jobId)!!
+        assertThat(saved).isFalse()
+        assertThat(loaded.status).isEqualTo(JobStatus.CANCELLED)
+        assertThat(loaded.result).isNull()
+        assertThat(loaded.tokens.inputTokens).isEqualTo(0L)
+    }
+
+    @Test
+    fun `deleteTransientPayload keeps terminal hash but removes transcript and result`() {
+        val record = newRecord()
+        store.save(record)
+        store.saveResult(record.jobId, snapshot(), TokenUsage(1, 0, 1), BigDecimal("0.001"))
+        store.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.PENDING),
+            next = JobStatus.COMMITTED,
+            stage = null,
+            progressPct = 100,
+            error = null,
+        )
+
+        store.deleteTransientPayload(record.jobId)
+
+        assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}")).isTrue()
+        assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}:transcript")).isFalse()
+        assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}:result")).isFalse()
+        val loaded = store.load(record.jobId)!!
+        assertThat(loaded.status).isEqualTo(JobStatus.COMMITTED)
+        assertThat(loaded.result).isNull()
+        assertThat(loaded.transcript).isEmpty()
+    }
+
+    @Test
+    fun `non-terminal hash without transcript is treated as stale and deleted`() {
+        val record = newRecord()
+        store.save(record)
+        redisTemplate.delete("aigen:job:${record.jobId}:transcript")
+
+        val loaded = store.load(record.jobId)
+
+        assertThat(loaded).isNull()
+        assertThat(redisTemplate.hasKey("aigen:job:${record.jobId}")).isFalse()
+    }
+
+    @Test
+    fun `committing job without transcript is loadable and not stale`() {
+        val record = newRecord()
+        store.save(record)
+        store.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.PENDING),
+            next = JobStatus.COMMITTING,
+            stage = JobStage.READY,
+            progressPct = 100,
+            error = null,
+        )
+        redisTemplate.delete("aigen:job:${record.jobId}:transcript")
+        redisTemplate.delete("aigen:job:${record.jobId}:result")
+
+        val loaded = store.load(record.jobId)
+
+        assertThat(loaded).isNotNull
+        assertThat(loaded!!.status).isEqualTo(JobStatus.COMMITTING)
+        assertThat(loaded.result).isNull()
+    }
+
+    @Test
+    fun `load preserves expiresAt stored on the hash`() {
+        val record = newRecord()
+        store.save(record)
+        val first = store.load(record.jobId)!!.expiresAt
+        Thread.sleep(20)
+        val second = store.load(record.jobId)!!.expiresAt
+        assertThat(second).isEqualTo(first)
+    }
+
     private fun newRecord(): JobRecord {
         val ttl = properties.job.redisTtl
         val sessionId = UUID.randomUUID()
@@ -226,16 +356,17 @@ class RedisAiGenerationJobStoreTest(
             authorNameMode = AuthorNameMode.REAL,
             instructions = "be concise",
             transcript = "transcript body contents",
-            sessionMeta = SessionMeta(
-                sessionId = sessionId,
-                clubId = clubId,
-                sessionNumber = 7,
-                bookTitle = "Test Book",
-                bookAuthor = "Author",
-                meetingDate = LocalDate.of(2026, 5, 16),
-                expectedAuthorNames = listOf("Alice", "Bob"),
-                authorNameMode = AuthorNameMode.REAL,
-            ),
+            sessionMeta =
+                SessionMeta(
+                    sessionId = sessionId,
+                    clubId = clubId,
+                    sessionNumber = 7,
+                    bookTitle = "Test Book",
+                    bookAuthor = "Author",
+                    meetingDate = LocalDate.of(2026, 5, 16),
+                    expectedAuthorNames = listOf("Alice", "Bob"),
+                    authorNameMode = AuthorNameMode.REAL,
+                ),
             status = JobStatus.PENDING,
             stage = JobStage.QUEUED,
             progressPct = 0,

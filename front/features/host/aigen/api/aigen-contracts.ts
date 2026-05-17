@@ -18,6 +18,8 @@ export type AiGenerationStatus =
   | "PENDING"
   | "RUNNING"
   | "SUCCEEDED"
+  | "COMMITTING"
+  | "COMMITTED"
   | "FAILED"
   | "CANCELLED";
 

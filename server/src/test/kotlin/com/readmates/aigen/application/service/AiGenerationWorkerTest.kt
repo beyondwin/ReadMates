@@ -14,7 +14,6 @@ import java.time.Instant
 import java.util.UUID
 
 class AiGenerationWorkerTest {
-
     @Test
     fun `process happy path persists snapshot, audits SUCCESS, and records cost`() {
         val ctx = TestContext()
@@ -93,7 +92,11 @@ class AiGenerationWorkerTest {
 
         assertThat(ctx.generator.calls).hasSize(2)
         // Strengthened instructions should be present on the retry call.
-        assertThat(ctx.generator.calls.last().instructions).contains("Strict: SCHEMA_INVALID")
+        assertThat(
+            ctx.generator.calls
+                .last()
+                .instructions,
+        ).contains("Strict: SCHEMA_INVALID")
         val updated = ctx.jobStore.load(record.jobId)!!
         assertThat(updated.status).isEqualTo(JobStatus.SUCCEEDED)
         // Spec §9.2: every LLM call (including the validator-driven retry) gets its own
@@ -128,10 +131,11 @@ class AiGenerationWorkerTest {
     @Test
     fun `process invokes latency notification when elapsed time exceeds threshold`() {
         val start = AiGenerationTestFixtures.NOW
-        val ctx = TestContext(
-            clock = FakeClock(start, start.plusSeconds(90L)),
-            notificationThreshold = Duration.ofSeconds(60),
-        )
+        val ctx =
+            TestContext(
+                clock = FakeClock(start, start.plusSeconds(90L)),
+                notificationThreshold = Duration.ofSeconds(60),
+            )
         val record = ctx.savedRecord()
         ctx.generator.enqueueSuccess(
             GenerationOutput(
@@ -143,16 +147,21 @@ class AiGenerationWorkerTest {
         ctx.worker.process(record.jobId)
 
         assertThat(ctx.latencyNotification.notified).hasSize(1)
-        assertThat(ctx.latencyNotification.notified.single().jobId).isEqualTo(record.jobId)
+        assertThat(
+            ctx.latencyNotification.notified
+                .single()
+                .jobId,
+        ).isEqualTo(record.jobId)
     }
 
     @Test
     fun `process does not notify when elapsed time below threshold`() {
         val start = AiGenerationTestFixtures.NOW
-        val ctx = TestContext(
-            clock = FakeClock(start, start.plusSeconds(5L)),
-            notificationThreshold = Duration.ofSeconds(60),
-        )
+        val ctx =
+            TestContext(
+                clock = FakeClock(start, start.plusSeconds(5L)),
+                notificationThreshold = Duration.ofSeconds(60),
+            )
         val record = ctx.savedRecord()
         ctx.generator.enqueueSuccess(
             GenerationOutput(
@@ -179,7 +188,10 @@ class AiGenerationWorkerTest {
 
         ctx.worker.process(record.jobId)
 
-        val passed = ctx.generator.calls.single().sessionMeta
+        val passed =
+            ctx.generator.calls
+                .single()
+                .sessionMeta
         // The integration regression: the auth-supplied SessionMeta must reach the generator,
         // not a degenerate (sessionNumber=0, bookTitle="") meta synthesized inside the worker.
         assertThat(passed.sessionNumber).isEqualTo(record.sessionMeta.sessionNumber)
@@ -247,11 +259,12 @@ class AiGenerationWorkerTest {
         val ctx = TestContext()
         // Pre-populate the record with llmCallCount = maxLlmCallsPerJob (3) so the
         // first generator call attempt would push it to 4 — over the cap.
-        val base = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-        )
+        val base =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+            )
         val record = base.copy(llmCallCount = 3)
         ctx.jobStore.save(record)
 
@@ -269,11 +282,12 @@ class AiGenerationWorkerTest {
         // task_1_7 #10: increment per ATTEMPT, INCLUDING retries.
         val ctx = TestContext()
         // initial + 1 retry would push counter to 4 -> over cap of 3
-        val base = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-        )
+        val base =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+            )
         val record = base.copy(llmCallCount = 2)
         ctx.jobStore.save(record)
         ctx.generator.enqueueFailure(
@@ -310,6 +324,57 @@ class AiGenerationWorkerTest {
         assertThat(updated.error!!.code).isEqualTo(ErrorCode.AI_DISABLED)
     }
 
+    @Test
+    fun `process returns without provider call when pending to running transition loses`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord().copy(status = JobStatus.CANCELLED, stage = null)
+        ctx.jobStore.save(record)
+
+        ctx.worker.process(record.jobId)
+
+        assertThat(ctx.generator.calls).isEmpty()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
+    @Test
+    fun `process does not persist success when status changes before result save`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.jobStore.failNextConditionalSave = true
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot(),
+                usage = TokenUsage(100, 0, 200),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        val updated = ctx.jobStore.load(record.jobId)!!
+        assertThat(updated.result).isNull()
+        assertThat(updated.status).isEqualTo(JobStatus.RUNNING)
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
+    @Test
+    fun `succeed records cost even when conditional result save loses to cancel`() {
+        val ctx = TestContext()
+        val record = ctx.savedRecord()
+        ctx.jobStore.failNextConditionalSave = true
+        ctx.generator.enqueueSuccess(
+            GenerationOutput(
+                result = AiGenerationTestFixtures.snapshot(),
+                usage = TokenUsage(100, 0, 200),
+            ),
+        )
+
+        ctx.worker.process(record.jobId)
+
+        assertThat(ctx.costGuard.recorded).hasSize(1)
+        assertThat(ctx.jobStore.load(record.jobId)!!.result).isNull()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
     private class TestContext(
         modelEnabled: Set<com.readmates.aigen.application.model.ModelId> =
             setOf(AiGenerationTestFixtures.CLAUDE_MODEL, AiGenerationTestFixtures.CLAUDE_FALLBACK),
@@ -328,30 +393,33 @@ class AiGenerationWorkerTest {
         val latencyNotification = FakeLatencyNotification()
         val sleeper = FakeSleeper()
         val modelCatalog = AiGenerationTestFixtures.defaultModelCatalog(enabled = modelEnabled)
-        val properties = AiGenerationTestFixtures.defaultProperties(
-            notificationThreshold = notificationThreshold,
-        )
+        val properties =
+            AiGenerationTestFixtures.defaultProperties(
+                notificationThreshold = notificationThreshold,
+            )
 
-        val worker = AiGenerationWorker(
-            jobStore = jobStore,
-            generators = mapOf(Provider.CLAUDE to generator),
-            modelCatalog = modelCatalog,
-            validator = validator,
-            auditPort = auditPort,
-            costGuard = costGuard,
-            latencyNotification = latencyNotification,
-            properties = properties,
-            clock = clock,
-            metrics = fakeMetrics(),
-            sleeper = sleeper,
-        )
+        val worker =
+            AiGenerationWorker(
+                jobStore = jobStore,
+                generators = mapOf(Provider.CLAUDE to generator),
+                modelCatalog = modelCatalog,
+                validator = validator,
+                auditPort = auditPort,
+                costGuard = costGuard,
+                latencyNotification = latencyNotification,
+                properties = properties,
+                clock = clock,
+                metrics = fakeMetrics(),
+                sleeper = sleeper,
+            )
 
         fun savedRecord(): com.readmates.aigen.application.port.out.JobRecord {
-            val record = AiGenerationTestFixtures.jobRecord(
-                sessionId = sessionId,
-                clubId = clubId,
-                hostUserId = hostUserId,
-            )
+            val record =
+                AiGenerationTestFixtures.jobRecord(
+                    sessionId = sessionId,
+                    clubId = clubId,
+                    hostUserId = hostUserId,
+                )
             jobStore.save(record)
             return record
         }

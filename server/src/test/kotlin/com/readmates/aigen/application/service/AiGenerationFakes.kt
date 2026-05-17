@@ -44,6 +44,17 @@ import java.util.UUID
 internal class FakeJobStore : AiGenerationJobStore {
     val records: MutableMap<UUID, JobRecord> = mutableMapOf()
     val deleted: MutableList<UUID> = mutableListOf()
+    val transientPayloadDeleted: MutableList<UUID> = mutableListOf()
+    val statusTransitions: MutableList<Triple<UUID, JobStatus, JobStatus>> = mutableListOf()
+
+    /**
+     * Unified order log for ordering invariants — e.g. "commit must transition to
+     * COMMITTED BEFORE calling deleteTransientPayload". Push `"transition:${next.name}"`
+     * inside `transitionStatus` (when it returns true) and `"deleteTransient"` inside
+     * `deleteTransientPayload`. Asserted with `containsSubsequence(...)`.
+     */
+    val mutationOrder: MutableList<String> = mutableListOf()
+    var failNextConditionalSave: Boolean = false
 
     override fun save(job: JobRecord) {
         records[job.jobId] = job
@@ -58,15 +69,17 @@ internal class FakeJobStore : AiGenerationJobStore {
         cost: BigDecimal,
     ) {
         val current = records.getValue(jobId)
-        records[jobId] = current.copy(
-            result = result,
-            tokens = TokenUsage(
-                current.tokens.inputTokens + usage.inputTokens,
-                current.tokens.cachedInputTokens + usage.cachedInputTokens,
-                current.tokens.outputTokens + usage.outputTokens,
-            ),
-            costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
-        )
+        records[jobId] =
+            current.copy(
+                result = result,
+                tokens =
+                    TokenUsage(
+                        current.tokens.inputTokens + usage.inputTokens,
+                        current.tokens.cachedInputTokens + usage.cachedInputTokens,
+                        current.tokens.outputTokens + usage.outputTokens,
+                    ),
+                costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
+            )
     }
 
     override fun patchItem(
@@ -80,15 +93,17 @@ internal class FakeJobStore : AiGenerationJobStore {
             "FakeJobStore.patchItem requires value: SessionImportV1Snapshot (mirrors Redis contract)"
         }
         val current = records.getValue(jobId)
-        records[jobId] = current.copy(
-            result = value,
-            tokens = TokenUsage(
-                current.tokens.inputTokens + usage.inputTokens,
-                current.tokens.cachedInputTokens + usage.cachedInputTokens,
-                current.tokens.outputTokens + usage.outputTokens,
-            ),
-            costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
-        )
+        records[jobId] =
+            current.copy(
+                result = value,
+                tokens =
+                    TokenUsage(
+                        current.tokens.inputTokens + usage.inputTokens,
+                        current.tokens.cachedInputTokens + usage.cachedInputTokens,
+                        current.tokens.outputTokens + usage.outputTokens,
+                    ),
+                costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
+            )
     }
 
     override fun updateStatus(
@@ -99,12 +114,74 @@ internal class FakeJobStore : AiGenerationJobStore {
         error: GenerationError?,
     ) {
         val current = records.getValue(jobId)
-        records[jobId] = current.copy(
-            status = status,
-            stage = stage,
-            progressPct = progressPct,
-            error = error,
-        )
+        records[jobId] =
+            current.copy(
+                status = status,
+                stage = stage,
+                progressPct = progressPct,
+                error = error,
+            )
+    }
+
+    override fun transitionStatus(
+        jobId: UUID,
+        expected: Set<JobStatus>,
+        next: JobStatus,
+        stage: JobStage?,
+        progressPct: Int,
+        error: GenerationError?,
+    ): Boolean {
+        val current = records[jobId]?.takeIf { it.status in expected } ?: return false
+        records[jobId] =
+            current.copy(
+                status = next,
+                stage = stage,
+                progressPct = progressPct,
+                error = error,
+            )
+        statusTransitions += Triple(jobId, current.status, next)
+        mutationOrder += "transition:${next.name}"
+        return true
+    }
+
+    override fun saveResultIfStatus(
+        jobId: UUID,
+        expected: JobStatus,
+        result: SessionImportV1Snapshot,
+        usage: TokenUsage,
+        cost: BigDecimal,
+    ): Boolean {
+        val current =
+            when {
+                failNextConditionalSave -> {
+                    failNextConditionalSave = false
+                    null
+                }
+                else -> records[jobId]?.takeIf { it.status == expected }
+            } ?: return false
+        records[jobId] =
+            current.copy(
+                result = result,
+                tokens =
+                    TokenUsage(
+                        current.tokens.inputTokens + usage.inputTokens,
+                        current.tokens.cachedInputTokens + usage.cachedInputTokens,
+                        current.tokens.outputTokens + usage.outputTokens,
+                    ),
+                costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
+            )
+        return true
+    }
+
+    override fun deleteTransientPayload(jobId: UUID) {
+        transientPayloadDeleted += jobId
+        mutationOrder += "deleteTransient"
+        val current = records[jobId] ?: return
+        records[jobId] =
+            current.copy(
+                transcript = "",
+                result = null,
+            )
     }
 
     override fun incrementLlmCallCount(jobId: UUID): Int {
@@ -168,9 +245,16 @@ internal class FakeCostGuard(
 ) : GenerationCostGuard {
     val recorded: MutableList<Triple<UUID, UUID, BigDecimal>> = mutableListOf()
 
-    override fun checkBeforeCall(hostId: UUID, clubId: UUID): GuardDecision = decision
+    override fun checkBeforeCall(
+        hostId: UUID,
+        clubId: UUID,
+    ): GuardDecision = decision
 
-    override fun recordUsage(hostId: UUID, clubId: UUID, cost: BigDecimal) {
+    override fun recordUsage(
+        hostId: UUID,
+        clubId: UUID,
+        cost: BigDecimal,
+    ) {
         recorded += Triple(hostId, clubId, cost)
     }
 
@@ -182,22 +266,31 @@ internal class FakeClubDefaultPort(
 ) : AiGenerationClubDefaultPort {
     override fun load(clubId: UUID): ClubDefault? = defaults[clubId]
 
-    override fun upsert(clubId: UUID, defaultModel: String, updatedBy: UUID) {
-        defaults[clubId] = ClubDefault(
-            clubId = clubId,
-            defaultModel = defaultModel,
-            updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
-            updatedBy = updatedBy,
-        )
+    override fun upsert(
+        clubId: UUID,
+        defaultModel: String,
+        updatedBy: UUID,
+    ) {
+        defaults[clubId] =
+            ClubDefault(
+                clubId = clubId,
+                defaultModel = defaultModel,
+                updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
+                updatedBy = updatedBy,
+            )
     }
 
-    fun set(clubId: UUID, defaultModel: String) {
-        defaults[clubId] = ClubDefault(
-            clubId = clubId,
-            defaultModel = defaultModel,
-            updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
-            updatedBy = UUID.randomUUID(),
-        )
+    fun set(
+        clubId: UUID,
+        defaultModel: String,
+    ) {
+        defaults[clubId] =
+            ClubDefault(
+                clubId = clubId,
+                defaultModel = defaultModel,
+                updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
+                updatedBy = UUID.randomUUID(),
+            )
     }
 }
 
@@ -207,11 +300,9 @@ internal class FakeModelCatalog(
 ) : ModelCatalog {
     override fun allowlisted(): List<ModelId> = enabled.toList()
 
-    override fun pricing(id: ModelId): ModelPricing =
-        pricing[id] ?: error("No pricing for $id")
+    override fun pricing(id: ModelId): ModelPricing = pricing[id] ?: error("No pricing for $id")
 
-    override fun resolveAlias(alias: String): ModelId? =
-        enabled.firstOrNull { it.name == alias }
+    override fun resolveAlias(alias: String): ModelId? = enabled.firstOrNull { it.name == alias }
 
     override fun isEnabled(id: ModelId): Boolean = id in enabled
 }
@@ -221,8 +312,13 @@ internal class FakeContentGenerator(
     private val responses: ArrayDeque<Response> = ArrayDeque(),
 ) : SessionContentGenerator {
     sealed class Response {
-        data class Success(val output: GenerationOutput) : Response()
-        data class Failure(val error: GenerationError) : Response()
+        data class Success(
+            val output: GenerationOutput,
+        ) : Response()
+
+        data class Failure(
+            val error: GenerationError,
+        ) : Response()
     }
 
     val calls: MutableList<GenerationInput> = mutableListOf()
@@ -237,12 +333,14 @@ internal class FakeContentGenerator(
 
     override fun generateFull(input: GenerationInput): GenerationOutput {
         calls += input
-        val response = responses.removeFirstOrNull()
-            ?: error("FakeContentGenerator: no more queued responses (call #${calls.size})")
+        val response =
+            responses.removeFirstOrNull()
+                ?: error("FakeContentGenerator: no more queued responses (call #${calls.size})")
         return when (response) {
             is Response.Success -> response.output
             is Response.Failure ->
-                throw com.readmates.aigen.adapter.out.llm.common.LlmGenerationException(response.error)
+                throw com.readmates.aigen.adapter.out.llm.common
+                    .LlmGenerationException(response.error)
         }
     }
 }
@@ -252,8 +350,13 @@ internal class FakeContentRegenerator(
     private val responses: ArrayDeque<Response> = ArrayDeque(),
 ) : SessionContentRegenerator {
     sealed class Response {
-        data class Success(val output: RegenerationOutput) : Response()
-        data class Failure(val error: GenerationError) : Response()
+        data class Success(
+            val output: RegenerationOutput,
+        ) : Response()
+
+        data class Failure(
+            val error: GenerationError,
+        ) : Response()
     }
 
     val calls: MutableList<RegenerationInput> = mutableListOf()
@@ -268,12 +371,14 @@ internal class FakeContentRegenerator(
 
     override fun regenerateItem(input: RegenerationInput): RegenerationOutput {
         calls += input
-        val response = responses.removeFirstOrNull()
-            ?: error("FakeContentRegenerator: no more queued responses")
+        val response =
+            responses.removeFirstOrNull()
+                ?: error("FakeContentRegenerator: no more queued responses")
         return when (response) {
             is Response.Success -> response.output
             is Response.Failure ->
-                throw com.readmates.aigen.adapter.out.llm.common.LlmGenerationException(response.error)
+                throw com.readmates.aigen.adapter.out.llm.common
+                    .LlmGenerationException(response.error)
         }
     }
 }
@@ -315,6 +420,7 @@ internal class FakeLatencyNotification : AiGenerationLatencyNotification {
 
 internal class FakeSleeper : Sleeper {
     val sleeps: MutableList<Duration> = mutableListOf()
+
     override fun sleep(duration: Duration) {
         sleeps += duration
     }
@@ -327,10 +433,10 @@ internal class FakeClock(
     constructor(vararg instants: Instant) : this(ArrayDeque(instants.toList()))
 
     override fun getZone(): java.time.ZoneId = fixedZone
+
     override fun withZone(zone: java.time.ZoneId): Clock = FakeClock(ticks, zone)
-    override fun instant(): Instant {
-        return if (ticks.size > 1) ticks.removeFirst() else ticks.first()
-    }
+
+    override fun instant(): Instant = if (ticks.size > 1) ticks.removeFirst() else ticks.first()
 }
 
 /**
@@ -343,34 +449,38 @@ internal fun fakeMetrics(): AiGenerationMetrics = AiGenerationMetrics(SimpleMete
 internal object AiGenerationTestFixtures {
     val CLAUDE_MODEL = ModelId(Provider.CLAUDE, "claude-sonnet-4-6")
     val CLAUDE_FALLBACK = ModelId(Provider.CLAUDE, "claude-sonnet-fallback")
-    val CLAUDE_PRICING = ModelPricing(
-        inputPerMTokenUsd = BigDecimal("3"),
-        cachedInputPerMTokenUsd = BigDecimal("0.30"),
-        outputPerMTokenUsd = BigDecimal("15"),
-    )
+    val CLAUDE_PRICING =
+        ModelPricing(
+            inputPerMTokenUsd = BigDecimal("3"),
+            cachedInputPerMTokenUsd = BigDecimal("0.30"),
+            outputPerMTokenUsd = BigDecimal("15"),
+        )
     val NOW: Instant = Instant.parse("2026-05-16T10:00:00Z")
 
     fun defaultProperties(
         fallback: String = CLAUDE_FALLBACK.name,
         notificationThreshold: Duration = Duration.ofSeconds(60),
-    ): AiGenerationProperties = AiGenerationProperties(
-        enabled = true,
-        mock = false,
-        enabledProviders = setOf("CLAUDE"),
-        fallbackDefaultModel = fallback,
-        caps = AiGenerationProperties.Caps(
-            hostDailyCalls = 10,
-            clubMonthlyCostUsd = BigDecimal("20.00"),
-            hostPerMinuteCalls = 5,
-            softWarningRatio = BigDecimal("0.80"),
-        ),
-        job = AiGenerationProperties.Job(
-            redisTtl = Duration.ofHours(6),
-            notificationLatencyThreshold = notificationThreshold,
-            maxLlmCallsPerJob = 3,
-        ),
-        pricing = emptyMap(),
-    )
+    ): AiGenerationProperties =
+        AiGenerationProperties(
+            enabled = true,
+            mock = false,
+            enabledProviders = setOf("CLAUDE"),
+            fallbackDefaultModel = fallback,
+            caps =
+                AiGenerationProperties.Caps(
+                    hostDailyCalls = 10,
+                    clubMonthlyCostUsd = BigDecimal("20.00"),
+                    hostPerMinuteCalls = 5,
+                    softWarningRatio = BigDecimal("0.80"),
+                ),
+            job =
+                AiGenerationProperties.Job(
+                    redisTtl = Duration.ofHours(6),
+                    notificationLatencyThreshold = notificationThreshold,
+                    maxLlmCallsPerJob = 3,
+                ),
+            pricing = emptyMap(),
+        )
 
     fun defaultModelCatalog(enabled: Set<ModelId> = setOf(CLAUDE_MODEL, CLAUDE_FALLBACK)): FakeModelCatalog =
         FakeModelCatalog(
@@ -382,16 +492,17 @@ internal object AiGenerationTestFixtures {
         sessionId: UUID = UUID.randomUUID(),
         clubId: UUID = UUID.randomUUID(),
         expectedAuthorNames: List<String> = listOf("Alice", "Bob"),
-    ): SessionMeta = SessionMeta(
-        sessionId = sessionId,
-        clubId = clubId,
-        sessionNumber = 7,
-        bookTitle = "Test Book",
-        bookAuthor = "Author Author",
-        meetingDate = LocalDate.of(2026, 5, 16),
-        expectedAuthorNames = expectedAuthorNames,
-        authorNameMode = AuthorNameMode.REAL,
-    )
+    ): SessionMeta =
+        SessionMeta(
+            sessionId = sessionId,
+            clubId = clubId,
+            sessionNumber = 7,
+            bookTitle = "Test Book",
+            bookAuthor = "Author Author",
+            meetingDate = LocalDate.of(2026, 5, 16),
+            expectedAuthorNames = expectedAuthorNames,
+            authorNameMode = AuthorNameMode.REAL,
+        )
 
     fun snapshot(summary: String = "An interesting discussion."): SessionImportV1Snapshot =
         SessionImportV1Snapshot(
@@ -400,13 +511,15 @@ internal object AiGenerationTestFixtures {
             bookTitle = "Test Book",
             meetingDate = LocalDate.of(2026, 5, 16),
             summary = summary,
-            highlights = listOf(
-                SessionImportV1Snapshot.AuthoredText("Alice", "I liked this line."),
-            ),
-            oneLineReviews = listOf(
-                SessionImportV1Snapshot.AuthoredText("Alice", "Wonderful."),
-                SessionImportV1Snapshot.AuthoredText("Bob", "Solid."),
-            ),
+            highlights =
+                listOf(
+                    SessionImportV1Snapshot.AuthoredText("Alice", "I liked this line."),
+                ),
+            oneLineReviews =
+                listOf(
+                    SessionImportV1Snapshot.AuthoredText("Alice", "Wonderful."),
+                    SessionImportV1Snapshot.AuthoredText("Bob", "Solid."),
+                ),
             feedbackDocumentFileName = "feedback.md",
             feedbackDocumentMarkdown = "<!-- readmates-feedback:v1 -->\n# 독서모임 7차 피드백\n",
         )
@@ -426,25 +539,26 @@ internal object AiGenerationTestFixtures {
         transcript: String = "transcript text",
         sessionMeta: SessionMeta = sessionMeta(sessionId = sessionId, clubId = clubId),
         expiresAt: Instant = NOW.plusSeconds(21_600L),
-    ): JobRecord = JobRecord(
-        jobId = jobId,
-        sessionId = sessionId,
-        clubId = clubId,
-        hostUserId = hostUserId,
-        model = model,
-        authorNameMode = AuthorNameMode.REAL,
-        instructions = instructions,
-        transcript = transcript,
-        sessionMeta = sessionMeta,
-        status = status,
-        stage = stage,
-        progressPct = if (status == JobStatus.SUCCEEDED) 100 else 0,
-        result = result,
-        error = error,
-        tokens = TokenUsage(0, 0, 0),
-        costAccumulatedUsd = BigDecimal.ZERO,
-        expiresAt = expiresAt,
-    )
+    ): JobRecord =
+        JobRecord(
+            jobId = jobId,
+            sessionId = sessionId,
+            clubId = clubId,
+            hostUserId = hostUserId,
+            model = model,
+            authorNameMode = AuthorNameMode.REAL,
+            instructions = instructions,
+            transcript = transcript,
+            sessionMeta = sessionMeta,
+            status = status,
+            stage = stage,
+            progressPct = if (status == JobStatus.SUCCEEDED) 100 else 0,
+            result = result,
+            error = error,
+            tokens = TokenUsage(0, 0, 0),
+            costAccumulatedUsd = BigDecimal.ZERO,
+            expiresAt = expiresAt,
+        )
 
     fun providerError(code: ErrorCode): GenerationError = GenerationError(code, code.name)
 }

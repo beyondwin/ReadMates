@@ -65,6 +65,37 @@ interface AiGenerationJobStore {
      */
     fun incrementLlmCallCount(jobId: UUID): Int
 
+    /**
+     * Atomically change status only when the current status belongs to [expected].
+     * Returns false when the job is missing or a competing transition already won.
+     */
+    fun transitionStatus(
+        jobId: UUID,
+        expected: Set<JobStatus>,
+        next: JobStatus,
+        stage: JobStage?,
+        progressPct: Int,
+        error: GenerationError?,
+    ): Boolean
+
+    /**
+     * Atomically save the full result only when the job is still in [expected].
+     * Returns false when commit/cancel/another worker transition already won.
+     */
+    fun saveResultIfStatus(
+        jobId: UUID,
+        expected: JobStatus,
+        result: SessionImportV1Snapshot,
+        usage: TokenUsage,
+        cost: BigDecimal,
+    ): Boolean
+
+    /**
+     * Delete transient PII/result payload keys while keeping the safe job hash for
+     * terminal status reads until the hash TTL expires.
+     */
+    fun deleteTransientPayload(jobId: UUID): Unit
+
     /** Delete all 3 job keys (hash, transcript, result) atomically. Used on commit/cancel. */
     fun delete(jobId: UUID): Unit
 }

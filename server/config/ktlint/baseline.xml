@@ -553,7 +553,7 @@
         <error line="78" column="58" source="standard:chain-method-continuation" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStoreTest.kt">
-        <error line="229" column="27" source="standard:multiline-expression-wrapping" />
+        <error line="359" column="27" source="standard:multiline-expression-wrapping" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCountersTest.kt">
         <error line="159" column="32" source="standard:function-signature" />
@@ -638,58 +638,69 @@
         <error line="297" column="36" source="standard:multiline-expression-wrapping" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationFakes.kt">
-        <error line="61" column="26" source="standard:multiline-expression-wrapping" />
-        <error line="63" column="22" source="standard:multiline-expression-wrapping" />
-        <error line="83" column="26" source="standard:multiline-expression-wrapping" />
-        <error line="85" column="22" source="standard:multiline-expression-wrapping" />
-        <error line="102" column="26" source="standard:multiline-expression-wrapping" />
-        <error line="171" column="34" source="standard:function-signature" />
-        <error line="171" column="48" source="standard:function-signature" />
-        <error line="171" column="60" source="standard:function-signature" />
-        <error line="173" column="30" source="standard:function-signature" />
-        <error line="173" column="44" source="standard:function-signature" />
-        <error line="173" column="58" source="standard:function-signature" />
-        <error line="173" column="74" source="standard:function-signature" />
-        <error line="185" column="25" source="standard:function-signature" />
-        <error line="185" column="39" source="standard:function-signature" />
-        <error line="185" column="61" source="standard:function-signature" />
-        <error line="185" column="76" source="standard:function-signature" />
-        <error line="186" column="28" source="standard:multiline-expression-wrapping" />
-        <error line="194" column="13" source="standard:function-signature" />
-        <error line="194" column="27" source="standard:function-signature" />
-        <error line="194" column="47" source="standard:function-signature" />
-        <error line="195" column="28" source="standard:multiline-expression-wrapping" />
-        <error line="210" column="54" source="standard:function-signature" />
-        <error line="213" column="57" source="standard:function-signature" />
-        <error line="224" column="28" source="standard:class-signature" />
-        <error line="224" column="56" source="standard:class-signature" />
-        <error line="225" column="9" source="standard:blank-line-before-declaration" />
-        <error line="225" column="28" source="standard:class-signature" />
-        <error line="225" column="54" source="standard:class-signature" />
-        <error line="240" column="24" source="standard:multiline-expression-wrapping" />
-        <error line="245" column="65" source="standard:chain-method-continuation" />
-        <error line="255" column="28" source="standard:class-signature" />
-        <error line="255" column="58" source="standard:class-signature" />
-        <error line="256" column="9" source="standard:blank-line-before-declaration" />
-        <error line="256" column="28" source="standard:class-signature" />
-        <error line="256" column="54" source="standard:class-signature" />
-        <error line="271" column="24" source="standard:multiline-expression-wrapping" />
-        <error line="276" column="65" source="standard:chain-method-continuation" />
-        <error line="318" column="5" source="standard:blank-line-before-declaration" />
-        <error line="330" column="5" source="standard:blank-line-before-declaration" />
-        <error line="331" column="5" source="standard:blank-line-before-declaration" />
-        <error line="331" column="37" source="standard:function-expression-body" />
-        <error line="346" column="26" source="standard:multiline-expression-wrapping" />
-        <error line="356" column="33" source="standard:multiline-expression-wrapping" />
-        <error line="356" column="33" source="standard:function-signature" />
-        <error line="361" column="16" source="standard:multiline-expression-wrapping" />
-        <error line="367" column="15" source="standard:multiline-expression-wrapping" />
-        <error line="385" column="22" source="standard:multiline-expression-wrapping" />
-        <error line="385" column="22" source="standard:function-signature" />
-        <error line="403" column="26" source="standard:multiline-expression-wrapping" />
-        <error line="406" column="30" source="standard:multiline-expression-wrapping" />
-        <error line="429" column="20" source="standard:multiline-expression-wrapping" />
-        <error line="429" column="20" source="standard:function-signature" />
+        <error line="49" column="5" source="standard:spacing-between-declarations-with-comments" />
+        <error line="71" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="73" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="93" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="95" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="112" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="130" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="154" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="156" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="170" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="237" column="34" source="standard:function-signature" />
+        <error line="237" column="48" source="standard:function-signature" />
+        <error line="237" column="60" source="standard:function-signature" />
+        <error line="239" column="30" source="standard:function-signature" />
+        <error line="239" column="44" source="standard:function-signature" />
+        <error line="239" column="58" source="standard:function-signature" />
+        <error line="239" column="74" source="standard:function-signature" />
+        <error line="251" column="25" source="standard:function-signature" />
+        <error line="251" column="39" source="standard:function-signature" />
+        <error line="251" column="61" source="standard:function-signature" />
+        <error line="251" column="76" source="standard:function-signature" />
+        <error line="252" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="260" column="13" source="standard:function-signature" />
+        <error line="260" column="27" source="standard:function-signature" />
+        <error line="260" column="47" source="standard:function-signature" />
+        <error line="261" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="276" column="54" source="standard:function-signature" />
+        <error line="279" column="57" source="standard:function-signature" />
+        <error line="290" column="28" source="standard:class-signature" />
+        <error line="290" column="56" source="standard:class-signature" />
+        <error line="291" column="9" source="standard:blank-line-before-declaration" />
+        <error line="291" column="28" source="standard:class-signature" />
+        <error line="291" column="54" source="standard:class-signature" />
+        <error line="306" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="311" column="65" source="standard:chain-method-continuation" />
+        <error line="321" column="28" source="standard:class-signature" />
+        <error line="321" column="58" source="standard:class-signature" />
+        <error line="322" column="9" source="standard:blank-line-before-declaration" />
+        <error line="322" column="28" source="standard:class-signature" />
+        <error line="322" column="54" source="standard:class-signature" />
+        <error line="337" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="342" column="65" source="standard:chain-method-continuation" />
+        <error line="384" column="5" source="standard:blank-line-before-declaration" />
+        <error line="396" column="5" source="standard:blank-line-before-declaration" />
+        <error line="397" column="5" source="standard:blank-line-before-declaration" />
+        <error line="397" column="37" source="standard:function-expression-body" />
+        <error line="412" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="422" column="33" source="standard:multiline-expression-wrapping" />
+        <error line="422" column="33" source="standard:function-signature" />
+        <error line="427" column="16" source="standard:multiline-expression-wrapping" />
+        <error line="433" column="15" source="standard:multiline-expression-wrapping" />
+        <error line="451" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="451" column="22" source="standard:function-signature" />
+        <error line="469" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="472" column="30" source="standard:multiline-expression-wrapping" />
+        <error line="495" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="495" column="20" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationJobTransitionPolicyTest.kt">
+        <error line="101" column="48" source="standard:chain-method-continuation" />
+        <error line="101" column="80" source="standard:chain-method-continuation" />
+        <error line="102" column="48" source="standard:chain-method-continuation" />
+        <error line="102" column="82" source="standard:chain-method-continuation" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationMetricsTest.kt">
         <error line="21" column="1" source="standard:no-empty-first-line-in-class-body" />
@@ -761,9 +772,9 @@
         <error line="182" column="50" source="standard:chain-method-continuation" />
         <error line="250" column="20" source="standard:multiline-expression-wrapping" />
         <error line="272" column="20" source="standard:multiline-expression-wrapping" />
-        <error line="331" column="26" source="standard:multiline-expression-wrapping" />
-        <error line="335" column="22" source="standard:multiline-expression-wrapping" />
-        <error line="350" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="382" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="386" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="401" column="26" source="standard:multiline-expression-wrapping" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/application/service/ClubAiDefaultsServiceTest.kt">
         <error line="142" column="28" source="standard:multiline-expression-wrapping" />

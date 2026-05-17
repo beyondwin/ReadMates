@@ -75,13 +75,31 @@ class AiGenerationWorker(
 ) {
     private val logger = LoggerFactory.getLogger(AiGenerationWorker::class.java)
 
+    @Suppress("ReturnCount")
     fun process(jobId: UUID) {
         val record = jobStore.load(jobId) ?: return // expired / already cleaned
         val start = clock.instant()
-        val generator = resolveGenerator(record, start) ?: return
-        when (val outcome = runGenerationWithValidationRetry(record, generator)) {
-            is Outcome.Success -> succeed(record, outcome.snapshot, outcome.usage, start)
-            is Outcome.Failure -> failJob(record, outcome.error.code, outcome.error.message, start)
+        if (!jobStore.transitionStatus(
+                jobId = record.jobId,
+                expected = setOf(JobStatus.PENDING),
+                next = JobStatus.RUNNING,
+                stage = JobStage.TRANSCRIPT_LOADED,
+                progressPct = PROGRESS_PROVIDER_RUNNING_PCT,
+                error = null,
+            )
+        ) {
+            return
+        }
+        val runningRecord =
+            record.copy(
+                status = JobStatus.RUNNING,
+                stage = JobStage.TRANSCRIPT_LOADED,
+                progressPct = PROGRESS_PROVIDER_RUNNING_PCT,
+            )
+        val generator = resolveGenerator(runningRecord, start) ?: return
+        when (val outcome = runGenerationWithValidationRetry(runningRecord, generator)) {
+            is Outcome.Success -> succeed(runningRecord, outcome.snapshot, outcome.usage, start)
+            is Outcome.Failure -> failJob(runningRecord, outcome.error.code, outcome.error.message, start)
         }
     }
 
@@ -96,13 +114,6 @@ class AiGenerationWorker(
                     null
                 }
                 else -> {
-                    jobStore.updateStatus(
-                        record.jobId,
-                        JobStatus.RUNNING,
-                        JobStage.TRANSCRIPT_LOADED,
-                        PROGRESS_PROVIDER_RUNNING_PCT,
-                        null,
-                    )
                     val candidate = generators[record.model.provider]
                     if (candidate == null) {
                         failJob(
@@ -322,12 +333,10 @@ class AiGenerationWorker(
         start: Instant,
     ) {
         val cost = CostCalculator.estimate(usage, modelCatalog.pricing(record.model))
-        jobStore.saveResult(record.jobId, snapshot, usage, cost)
-        // Record cost BEFORE the visible status flip so a cost-guard
-        // counter outage cannot leave a SUCCEEDED job without its
-        // accumulated cost recorded (task_1_7 finding #8). recordUsage
-        // failures must not fail the job — log and swallow so the
-        // host still sees the result.
+        // Cost was incurred by the provider call regardless of cancel race.
+        // Record BEFORE the CAS so cancel-during-running does not silently
+        // drop club/host monthly accounting (spec §"비용 회계 정책").
+        // recordUsage failures must not fail the job — log and swallow.
         try {
             costGuard.recordUsage(record.hostUserId, record.clubId, cost)
         } catch (
@@ -339,7 +348,21 @@ class AiGenerationWorker(
                 failure,
             )
         }
-        jobStore.updateStatus(record.jobId, JobStatus.SUCCEEDED, JobStage.READY, PROGRESS_COMPLETE_PCT, null)
+        val saved = jobStore.saveResultIfStatus(record.jobId, JobStatus.RUNNING, snapshot, usage, cost)
+        if (!saved) {
+            return // cancel/commit/another worker won the race
+        }
+        if (!jobStore.transitionStatus(
+                jobId = record.jobId,
+                expected = setOf(JobStatus.RUNNING),
+                next = JobStatus.SUCCEEDED,
+                stage = JobStage.READY,
+                progressPct = PROGRESS_COMPLETE_PCT,
+                error = null,
+            )
+        ) {
+            return // cancel won the race
+        }
         emitJobMetrics(record, JobStatus.SUCCEEDED, usage, cost, start)
         auditPort.insert(
             AuditLogEntry(
@@ -370,13 +393,18 @@ class AiGenerationWorker(
         message: String,
         start: Instant,
     ) {
-        jobStore.updateStatus(
-            jobId = record.jobId,
-            status = JobStatus.FAILED,
-            stage = null,
-            progressPct = 0,
-            error = GenerationError(code, message),
-        )
+        val transitioned =
+            jobStore.transitionStatus(
+                jobId = record.jobId,
+                expected = setOf(JobStatus.PENDING, JobStatus.RUNNING),
+                next = JobStatus.FAILED,
+                stage = null,
+                progressPct = 0,
+                error = GenerationError(code, message),
+            )
+        if (!transitioned) {
+            return
+        }
         // Validation-failure counter is emitted at the validator (single source of truth).
         emitJobMetrics(record, JobStatus.FAILED, TokenUsage(0, 0, 0), BigDecimal.ZERO, start)
         auditPort.insert(
