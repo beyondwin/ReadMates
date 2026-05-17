@@ -13,9 +13,11 @@ import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
 import com.readmates.sessionimport.application.model.SessionImportCommittedFeedbackDocument
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentPreview
+import com.readmates.sessionimport.application.model.SessionImportIssue
 import com.readmates.sessionimport.application.model.SessionImportPublicationPreview
 import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
+import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -155,6 +157,89 @@ class AiGenerationCommitServiceTest {
     }
 
     @Test
+    fun `commit override validates authors against original session metadata`() {
+        val ctx = TestContext()
+        val originalMeta = AiGenerationTestFixtures.sessionMeta(
+            sessionId = ctx.sessionId,
+            clubId = ctx.host.clubId,
+            expectedAuthorNames = listOf("Real Host"),
+        )
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.host.clubId,
+            hostUserId = ctx.host.userId,
+            status = JobStatus.SUCCEEDED,
+            result = AiGenerationTestFixtures.snapshot(),
+            sessionMeta = originalMeta,
+        )
+        ctx.jobStore.save(record)
+        val injectedOverride = AiGenerationTestFixtures.snapshot().copy(
+            highlights = listOf(
+                SessionImportV1Snapshot.AuthoredText("Injected Person", "Untrusted edit."),
+            ),
+            oneLineReviews = listOf(
+                SessionImportV1Snapshot.AuthoredText("Injected Person", "Untrusted review."),
+            ),
+        )
+        ctx.validator.resultProvider = { _, meta ->
+            if ("Injected Person" in meta.expectedAuthorNames) {
+                ValidationResult.Ok
+            } else {
+                ValidationResult.Violation(ErrorCode.AUTHOR_NAME_MISMATCH, "unknown author")
+            }
+        }
+
+        assertThatThrownBy {
+            ctx.service.commit(
+                host = ctx.host,
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                recordVisibility = SessionRecordVisibility.MEMBER,
+                overrideResult = injectedOverride,
+            )
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.AUTHOR_NAME_MISMATCH)
+        }
+
+        val validatedMeta = ctx.validator.calls.single().second
+        assertThat(validatedMeta.expectedAuthorNames).containsExactly("Real Host")
+        assertThat(ctx.delegate.invocations).isEmpty()
+    }
+
+    @Test
+    fun `commit maps downstream invalid import to safe AI schema error`() {
+        val ctx = TestContext()
+        ctx.delegate.exception = InvalidSessionImportException(
+            listOf(SessionImportIssue("AUTHOR_NOT_FOUND", "작성자 'Private Name'을 찾을 수 없습니다.")),
+        )
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.host.clubId,
+            hostUserId = ctx.host.userId,
+            status = JobStatus.SUCCEEDED,
+            result = AiGenerationTestFixtures.snapshot(),
+        )
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.service.commit(
+                host = ctx.host,
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                recordVisibility = SessionRecordVisibility.MEMBER,
+                overrideResult = null,
+            )
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.SCHEMA_INVALID)
+            assertThat(it.message).doesNotContain("Private Name")
+        }
+
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(audit.errorMessage).doesNotContain("Private Name")
+    }
+
+    @Test
     fun `commit throws JobNotFoundException when record missing`() {
         val ctx = TestContext()
         assertThatThrownBy {
@@ -198,8 +283,10 @@ class AiGenerationCommitServiceTest {
 
     private class FakeCommitValidatedUseCase : CommitValidatedSessionImportUseCase {
         val invocations: MutableList<ValidatedSessionImportInput> = mutableListOf()
+        var exception: RuntimeException? = null
 
         override fun commitValidated(input: ValidatedSessionImportInput): SessionImportCommitResult {
+            exception?.let { throw it }
             invocations += input
             val command: SessionImportCommand = input.command
             return SessionImportCommitResult(

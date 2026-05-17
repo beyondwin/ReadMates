@@ -280,14 +280,14 @@ internal class FakeValidator(
     var result: ValidationResult = ValidationResult.Ok,
 ) : SessionImportV1Validator {
     val calls: MutableList<Pair<SessionImportV1Snapshot, SessionMeta>> = mutableListOf()
-    var resultProvider: ((SessionImportV1Snapshot) -> ValidationResult)? = null
+    var resultProvider: ((SessionImportV1Snapshot, SessionMeta) -> ValidationResult)? = null
 
     override fun validate(
         snapshot: SessionImportV1Snapshot,
         sessionMeta: SessionMeta,
     ): ValidationResult {
         calls += snapshot to sessionMeta
-        return resultProvider?.invoke(snapshot) ?: result
+        return resultProvider?.invoke(snapshot, sessionMeta) ?: result
     }
 }
 

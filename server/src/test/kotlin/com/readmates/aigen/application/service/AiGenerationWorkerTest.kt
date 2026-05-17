@@ -72,7 +72,7 @@ class AiGenerationWorkerTest {
         val ctx = TestContext()
         val record = ctx.savedRecord()
         var validateCount = 0
-        ctx.validator.resultProvider = { snapshot ->
+        ctx.validator.resultProvider = { snapshot, _ ->
             validateCount += 1
             if (validateCount == 1) ValidationResult.Violation(ErrorCode.SCHEMA_INVALID) else ValidationResult.Ok
         }

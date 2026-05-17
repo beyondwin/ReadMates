@@ -160,7 +160,7 @@ class AiGenerationRegenerationServiceTest {
     @Test
     fun `regenerate rolls back and audits FAILED when patched snapshot fails validation`() {
         val ctx = TestContext()
-        ctx.validator.resultProvider = { snapshot ->
+        ctx.validator.resultProvider = { snapshot, _ ->
             // Reject ONLY the patched snapshot (the one that contains the bad new summary).
             if (snapshot.summary == "bad summary") {
                 ValidationResult.Violation(ErrorCode.SCHEMA_INVALID, "blank summary")

@@ -108,8 +108,9 @@ data class JobRecord(
      * even if the original meta was constructed before that distinction existed.
      *
      * Centralizes the worker/regen duplication called out in task_1_7 finding #11.
-     * The commit service intentionally builds a different SessionMeta derived from
-     * the snapshot, so it does not call this.
+     * Worker, regeneration, and commit validation all use this metadata as the
+     * original trust boundary. User-edited snapshots may change content, but they
+     * must not redefine the session identity or expected author list.
      */
     fun toSessionMeta(): SessionMeta = sessionMeta.copy(authorNameMode = authorNameMode)
 }

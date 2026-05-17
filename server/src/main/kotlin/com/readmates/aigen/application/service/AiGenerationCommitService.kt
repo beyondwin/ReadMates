@@ -1,8 +1,8 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
-import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
 import com.readmates.aigen.application.port.`in`.JobNotFoundException
@@ -22,6 +22,7 @@ import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput
+import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
@@ -77,7 +78,7 @@ class AiGenerationCommitService(
         // override would pollute the Redis result before validation could reject it.
         // See spec §9.3: validation is the trust boundary between aigen and
         // sessionimport.commitValidated.
-        val sessionMeta = buildSessionMeta(record, snapshot)
+        val sessionMeta = record.toSessionMeta()
         when (val outcome = validator.validate(snapshot, sessionMeta)) {
             is ValidationResult.Ok -> Unit
             is ValidationResult.Violation -> failCommit(record, outcome)
@@ -88,7 +89,18 @@ class AiGenerationCommitService(
         }
 
         val command = toSessionImportCommand(host, snapshot, sessionId, recordVisibility)
-        val result = commitDelegate.commitValidated(ValidatedSessionImportInput(command))
+        val result =
+            try {
+                commitDelegate.commitValidated(ValidatedSessionImportInput(command))
+            } catch (error: InvalidSessionImportException) {
+                failCommit(
+                    record,
+                    ValidationResult.Violation(
+                        ErrorCode.SCHEMA_INVALID,
+                        "Generated session import failed validation",
+                    ),
+                )
+            }
 
         jobStore.delete(jobId)
         auditPort.insert(
@@ -139,24 +151,6 @@ class AiGenerationCommitService(
                     fileName = snapshot.feedbackDocumentFileName,
                     markdown = snapshot.feedbackDocumentMarkdown,
                 ),
-        )
-
-    private fun buildSessionMeta(
-        record: JobRecord,
-        snapshot: SessionImportV1Snapshot,
-    ): SessionMeta =
-        SessionMeta(
-            sessionId = record.sessionId,
-            clubId = record.clubId,
-            sessionNumber = snapshot.sessionNumber,
-            bookTitle = snapshot.bookTitle,
-            bookAuthor = null,
-            meetingDate = snapshot.meetingDate,
-            expectedAuthorNames =
-                (snapshot.highlights + snapshot.oneLineReviews)
-                    .map { it.authorName }
-                    .distinct(),
-            authorNameMode = record.authorNameMode,
         )
 
     private fun failCommit(
