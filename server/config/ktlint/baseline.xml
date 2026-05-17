@@ -600,14 +600,26 @@
         <error line="322" column="36" source="standard:chain-method-continuation" />
         <error line="326" column="22" source="standard:chain-method-continuation" />
         <error line="333" column="16" source="standard:chain-method-continuation" />
-        <error line="348" column="16" source="standard:chain-method-continuation" />
-        <error line="350" column="22" source="standard:chain-method-continuation" />
-        <error line="353" column="21" source="standard:multiline-expression-wrapping" />
-        <error line="380" column="33" source="standard:function-signature" />
-        <error line="380" column="59" source="standard:function-signature" />
-        <error line="380" column="72" source="standard:function-signature" />
-        <error line="381" column="24" source="standard:chain-method-continuation" />
-        <error line="384" column="22" source="standard:chain-method-continuation" />
+        <error line="354" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="360" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="367" column="16" source="standard:chain-method-continuation" />
+        <error line="380" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="386" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="393" column="29" source="standard:multiline-expression-wrapping" />
+        <error line="393" column="36" source="standard:chain-method-continuation" />
+        <error line="397" column="22" source="standard:chain-method-continuation" />
+        <error line="409" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="409" column="28" source="standard:string-template-indent" />
+        <error line="430" column="9" source="standard:string-template-indent" />
+        <error line="432" column="16" source="standard:chain-method-continuation" />
+        <error line="446" column="16" source="standard:chain-method-continuation" />
+        <error line="448" column="22" source="standard:chain-method-continuation" />
+        <error line="451" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="478" column="33" source="standard:function-signature" />
+        <error line="478" column="59" source="standard:function-signature" />
+        <error line="478" column="72" source="standard:function-signature" />
+        <error line="479" column="24" source="standard:chain-method-continuation" />
+        <error line="482" column="22" source="standard:chain-method-continuation" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationCommitServiceTest.kt">
         <error line="28" column="1" source="standard:no-empty-first-line-in-class-body" />
