@@ -5,6 +5,8 @@ import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.FirstHostPreviewKind
 import com.readmates.club.application.model.HostOnboardingResultKind
+import com.readmates.club.application.model.PlatformAdminClubDomain
+import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.PlatformAdminDomainPreview
 import com.readmates.club.application.model.PlatformAdminEmailDeliveryResult
 import com.readmates.club.application.model.PlatformAdminEmailDeliveryStatus
@@ -27,7 +29,7 @@ import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Locale
@@ -44,12 +46,14 @@ private val IPV4_LITERAL = Regex("^\\d{1,3}(?:\\.\\d{1,3}){3}$")
 private val FORBIDDEN_HOSTNAME_PARTS = listOf("://", "/", ":", "*")
 
 @Service
+@Suppress("LongParameterList")
 class PlatformAdminOnboardingService(
     private val onboardingPort: PlatformAdminOnboardingPort,
     private val loadClubsPort: LoadPlatformAdminClubsPort,
     private val createClubDomainPort: CreateClubDomainPort,
     private val sendHostInvitationEmailPort: SendPlatformAdminHostInvitationEmailPort,
     private val invitationTokenService: InvitationTokenService,
+    private val transactionTemplate: TransactionTemplate,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : PreviewPlatformAdminClubOnboardingUseCase,
@@ -90,7 +94,6 @@ class PlatformAdminOnboardingService(
         )
     }
 
-    @Transactional
     override fun commit(
         admin: CurrentPlatformAdmin,
         command: PlatformAdminOnboardingCommand,
@@ -99,6 +102,19 @@ class PlatformAdminOnboardingService(
         val normalized = normalize(command)
         rejectConflicts(normalized)
 
+        val persisted =
+            transactionTemplate.execute {
+                persistOnboarding(admin, normalized)
+            } ?: error("Platform admin onboarding transaction returned no result")
+
+        val deliveryStatus = sendInvitationAfterCommit(persisted.pendingEmail)
+        return persisted.toResult(deliveryStatus)
+    }
+
+    private fun persistOnboarding(
+        admin: CurrentPlatformAdmin,
+        normalized: PlatformAdminOnboardingCommand,
+    ): PersistedOnboarding {
         val clubId = UUID.randomUUID()
         onboardingPort.createClub(
             CreatePlatformAdminClubCommand(
@@ -110,41 +126,25 @@ class PlatformAdminOnboardingService(
             ),
         )
 
-        val hostResult = createFirstHost(admin, clubId, normalized)
-        val domain =
-            normalized.domain?.let {
-                when (
-                    val result =
-                        createClubDomainPort.createClubDomain(
-                            clubId = clubId,
-                            hostname = it.hostname,
-                            kind = it.kind,
-                            isPrimary = false,
-                        )
-                ) {
-                    is CreateClubDomainResult.Created -> result.domain
-                    CreateClubDomainResult.ClubNotFound -> throw PlatformAdminException(
-                        PlatformAdminError.CLUB_NOT_FOUND,
-                        "Club not found",
-                    )
-                    CreateClubDomainResult.DuplicateHostname -> throw PlatformAdminException(
-                        PlatformAdminError.CLUB_DOMAIN_CONFLICT,
-                        "Club domain hostname already exists",
-                    )
-                }
-            }
-
+        val host = createFirstHostWithoutEmail(admin, clubId, normalized)
+        val domain = createDomainIfRequested(clubId, normalized)
         val club =
             loadClubsPort.loadClub(clubId)
                 ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Created club not found")
-        return PlatformAdminOnboardingResult(club = club, hostOnboarding = hostResult, domain = domain)
+
+        return PersistedOnboarding(
+            club = club,
+            host = host.host,
+            domain = domain,
+            pendingEmail = host.pendingEmail,
+        )
     }
 
-    private fun createFirstHost(
+    private fun createFirstHostWithoutEmail(
         admin: CurrentPlatformAdmin,
         clubId: UUID,
         command: PlatformAdminOnboardingCommand,
-    ): PlatformAdminHostOnboardingResult {
+    ): PersistedHostWithEmail {
         val existingUser = onboardingPort.findUserByEmail(command.firstHost.email)
         if (existingUser != null) {
             if (command.existingUserConfirmation != EXISTING_USER_CONFIRMATION) {
@@ -154,13 +154,16 @@ class PlatformAdminOnboardingService(
                 )
             }
             onboardingPort.upsertHostMembership(clubId, existingUser.userId, command.firstHost.name)
-            return PlatformAdminHostOnboardingResult(
-                kind = HostOnboardingResultKind.EXISTING_USER_ASSIGNED,
-                email = existingUser.email,
-                userId = existingUser.userId,
-                invitationId = null,
-                acceptUrl = null,
-                emailDelivery = PlatformAdminEmailDeliveryResult(PlatformAdminEmailDeliveryStatus.SKIPPED),
+            return PersistedHostWithEmail(
+                host =
+                    PersistedHostOnboarding(
+                        kind = HostOnboardingResultKind.EXISTING_USER_ASSIGNED,
+                        email = existingUser.email,
+                        userId = existingUser.userId,
+                        invitationId = null,
+                        acceptUrl = null,
+                    ),
+                pendingEmail = null,
             )
         }
 
@@ -178,21 +181,55 @@ class PlatformAdminOnboardingService(
             ),
         )
         val acceptUrl = "${appBaseUrl.trimEnd('/')}/clubs/${command.club.slug}/invite/$token"
-        val deliveryStatus =
-            try {
-                sendHostInvitationEmailPort.send(command.firstHost.email, command.club.name, acceptUrl)
-                PlatformAdminEmailDeliveryStatus.SENT
-            } catch (_: Exception) {
-                PlatformAdminEmailDeliveryStatus.FAILED
-            }
-        return PlatformAdminHostOnboardingResult(
-            kind = HostOnboardingResultKind.INVITATION_CREATED,
-            email = command.firstHost.email,
-            userId = null,
-            invitationId = invitationId,
-            acceptUrl = acceptUrl,
-            emailDelivery = PlatformAdminEmailDeliveryResult(deliveryStatus),
+        return PersistedHostWithEmail(
+            host =
+                PersistedHostOnboarding(
+                    kind = HostOnboardingResultKind.INVITATION_CREATED,
+                    email = command.firstHost.email,
+                    userId = null,
+                    invitationId = invitationId,
+                    acceptUrl = acceptUrl,
+                ),
+            pendingEmail = PendingHostInvitationEmail(command.firstHost.email, command.club.name, acceptUrl),
         )
+    }
+
+    private fun createDomainIfRequested(
+        clubId: UUID,
+        command: PlatformAdminOnboardingCommand,
+    ): PlatformAdminClubDomain? =
+        command.domain?.let {
+            when (
+                val result =
+                    createClubDomainPort.createClubDomain(
+                        clubId = clubId,
+                        hostname = it.hostname,
+                        kind = it.kind,
+                        isPrimary = false,
+                    )
+            ) {
+                is CreateClubDomainResult.Created -> result.domain
+                CreateClubDomainResult.ClubNotFound -> throw PlatformAdminException(
+                    PlatformAdminError.CLUB_NOT_FOUND,
+                    "Club not found",
+                )
+                CreateClubDomainResult.DuplicateHostname -> throw PlatformAdminException(
+                    PlatformAdminError.CLUB_DOMAIN_CONFLICT,
+                    "Club domain hostname already exists",
+                )
+            }
+        }
+
+    private fun sendInvitationAfterCommit(email: PendingHostInvitationEmail?): PlatformAdminEmailDeliveryStatus {
+        if (email == null) {
+            return PlatformAdminEmailDeliveryStatus.SKIPPED
+        }
+        return try {
+            sendHostInvitationEmailPort.send(email.email, email.clubName, email.acceptUrl)
+            PlatformAdminEmailDeliveryStatus.SENT
+        } catch (_: Exception) {
+            PlatformAdminEmailDeliveryStatus.FAILED
+        }
     }
 
     private fun rejectConflicts(command: PlatformAdminOnboardingCommand) {
@@ -248,6 +285,49 @@ class PlatformAdminOnboardingService(
             throw AccessDeniedException("Platform admin role cannot onboard clubs")
         }
     }
+
+    private data class PersistedOnboarding(
+        val club: PlatformAdminClubListItem,
+        val host: PersistedHostOnboarding,
+        val domain: PlatformAdminClubDomain?,
+        val pendingEmail: PendingHostInvitationEmail?,
+    ) {
+        fun toResult(deliveryStatus: PlatformAdminEmailDeliveryStatus): PlatformAdminOnboardingResult =
+            PlatformAdminOnboardingResult(
+                club = club,
+                hostOnboarding = host.toResult(deliveryStatus),
+                domain = domain,
+            )
+    }
+
+    private data class PersistedHostOnboarding(
+        val kind: HostOnboardingResultKind,
+        val email: String,
+        val userId: UUID?,
+        val invitationId: UUID?,
+        val acceptUrl: String?,
+    ) {
+        fun toResult(deliveryStatus: PlatformAdminEmailDeliveryStatus): PlatformAdminHostOnboardingResult =
+            PlatformAdminHostOnboardingResult(
+                kind = kind,
+                email = email,
+                userId = userId,
+                invitationId = invitationId,
+                acceptUrl = acceptUrl,
+                emailDelivery = PlatformAdminEmailDeliveryResult(deliveryStatus),
+            )
+    }
+
+    private data class PersistedHostWithEmail(
+        val host: PersistedHostOnboarding,
+        val pendingEmail: PendingHostInvitationEmail?,
+    )
+
+    private data class PendingHostInvitationEmail(
+        val email: String,
+        val clubName: String,
+        val acceptUrl: String,
+    )
 }
 
 private fun validateRequiredFields(vararg values: String) {
