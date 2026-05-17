@@ -35,7 +35,12 @@ class JdbcHostSessionWriteAdapter(
     private val queries = HostSessionQueries()
     private val writeOperations = HostSessionWriteOperations(queries)
 
-    override fun create(command: HostSessionCommand) = writeOperations.createDraftSession(jdbcTemplate, command.host, command)
+    override fun create(command: HostSessionCommand) =
+        writeOperations.createDraftSession(
+            jdbcTemplate,
+            command.host,
+            command,
+        )
 
     override fun list(
         host: CurrentMember,
@@ -52,20 +57,44 @@ class JdbcHostSessionWriteAdapter(
     override fun deletionPreview(command: HostSessionIdCommand) =
         deletionQueries.previewOpenSessionDeletion(command.host, command.sessionId)
 
-    override fun delete(command: HostSessionIdCommand) = deletionQueries.deleteOpenHostSession(command.host, command.sessionId)
+    override fun delete(command: HostSessionIdCommand) =
+        deletionQueries.deleteOpenHostSession(
+            command.host,
+            command.sessionId,
+        )
 
-    override fun confirmAttendance(command: ConfirmAttendanceCommand) = writeOperations.confirmHostAttendance(jdbcTemplate, command)
+    override fun confirmAttendance(command: ConfirmAttendanceCommand) =
+        writeOperations.confirmHostAttendance(
+            jdbcTemplate,
+            command,
+        )
 
-    override fun upsertPublication(command: UpsertPublicationCommand) = writeOperations.upsertHostPublication(jdbcTemplate, command)
+    override fun upsertPublication(command: UpsertPublicationCommand) =
+        writeOperations.upsertHostPublication(
+            jdbcTemplate,
+            command,
+        )
 
     override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)
 
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionDetailResponse =
         writeOperations.updateVisibility(jdbcTemplate, command)
 
-    override fun open(command: HostSessionIdCommand): HostSessionTransitionResult = writeOperations.open(jdbcTemplate, command)
+    override fun open(command: HostSessionIdCommand): HostSessionTransitionResult =
+        writeOperations.open(
+            jdbcTemplate,
+            command,
+        )
 
-    override fun close(command: HostSessionIdCommand): HostSessionTransitionResult = writeOperations.close(jdbcTemplate, command)
+    override fun close(command: HostSessionIdCommand): HostSessionTransitionResult =
+        writeOperations.close(
+            jdbcTemplate,
+            command,
+        )
 
-    override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult = writeOperations.publish(jdbcTemplate, command)
+    override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult =
+        writeOperations.publish(
+            jdbcTemplate,
+            command,
+        )
 }
