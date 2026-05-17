@@ -9,8 +9,10 @@ node_modules/
 recode
 .env
 .env.*
+*.env
 !.env.example
 !.env.*.example
+!*.env.example
 .dev.vars
 .dev.vars.*
 .playwright-cli

@@ -67,22 +67,31 @@ curl -fsS https://api.<domain>/actuator/health
 
 **Variables (비민감):**
 
+GitHub Variables 로 관리하는 것 — 환경 의존적인 값만:
+
 | 키 | 타입 | 비고 |
 |---|---|---|
 | `READMATES_VM_HOST` | Variable | VM 호스트명 |
-| `READMATES_VM_USER` | Variable | `deploy` |
-| `READMATES_VM_SSH_PORT` | Variable | `2222` |
-| `READMATES_DEPLOY_ROOT` | Variable | `/opt/readmates` |
 | `READMATES_APP_BASE_URL` | Variable | `https://readmates.pages.dev` 등 |
 | `READMATES_AUTH_BASE_URL` | Variable | 동일 |
 | `READMATES_ALLOWED_ORIGINS` | Variable | 콤마 구분 |
-| `READMATES_BFF_SECRET_REQUIRED` | Variable | `true` |
-| `READMATES_AUTH_SESSION_COOKIE_SECURE` | Variable | `true` |
 | `READMATES_AIGEN_ENABLED` | Variable | `true`/`false` |
 | `READMATES_AIGEN_ENABLED_PROVIDERS` | Variable | `OPENAI` 등 |
-| `READMATES_AIGEN_FALLBACK_DEFAULT_MODEL` | Variable | `gpt-5.4-mini` |
 | `CADDY_SITE` | Variable | `api.example.com` |
 | `READMATES_SERVER_IMAGE` | Variable | GHCR image ref |
+
+워크플로 YAML 에 인라인된 값들 — GitHub 등록 불필요. 변경하려면 워크플로 PR:
+
+| 키 | 인라인 값 | 사유 |
+|---|---|---|
+| `VM_USER` | `deploy` | runbook 으로 고정 |
+| `VM_PORT` | `2222` | runbook 으로 고정 (비표준 포트) |
+| `DEPLOY_ROOT` | `/opt/readmates` | compose.yml 위치 고정 |
+| `READMATES_BFF_SECRET_REQUIRED` | `true` | prod 정책 |
+| `READMATES_AUTH_SESSION_COOKIE_SECURE` | `true` | prod 정책 |
+| `READMATES_AIGEN_FALLBACK_DEFAULT_MODEL` | `gpt-5.4-mini` | application.yml default 와 동기화 |
+
+**bulk import:** 기존 운영 `readmates.env` 가 있다면 `scripts/sync-config/import-from-prod-env.sh <path>` 로 일괄 등록. dry-run 기본; `--apply` 로 실제 적용. 레포 외부 경로만 허용 (실수 commit 방지).
 
 #### 보안 수칙
 

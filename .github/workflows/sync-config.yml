@@ -27,19 +27,24 @@ jobs:
       name: production
     env:
       # ----- 인프라 (Variables) -----
+      # 변경 가능: VM 호스트는 OCI 인스턴스 마이그레이션 시 바뀜.
       VM_HOST: ${{ vars.READMATES_VM_HOST }}
-      VM_USER: ${{ vars.READMATES_VM_USER }}
-      VM_PORT: ${{ vars.READMATES_VM_SSH_PORT }}
-      DEPLOY_ROOT: ${{ vars.READMATES_DEPLOY_ROOT }}
+      # 고정 (runbook 기준 — vm-deploy-key-bootstrap.md 의 deploy 유저 / 포트 2222 / DEPLOY_ROOT).
+      # 변경하려면 PR 로 워크플로 + runbook 동시 수정.
+      VM_USER: deploy
+      VM_PORT: "2222"
+      DEPLOY_ROOT: /opt/readmates
       # ----- 앱 Variables (비민감 설정) -----
       READMATES_APP_BASE_URL: ${{ vars.READMATES_APP_BASE_URL }}
       READMATES_AUTH_BASE_URL: ${{ vars.READMATES_AUTH_BASE_URL }}
       READMATES_ALLOWED_ORIGINS: ${{ vars.READMATES_ALLOWED_ORIGINS }}
-      READMATES_BFF_SECRET_REQUIRED: ${{ vars.READMATES_BFF_SECRET_REQUIRED }}
-      READMATES_AUTH_SESSION_COOKIE_SECURE: ${{ vars.READMATES_AUTH_SESSION_COOKIE_SECURE }}
+      # prod 정책 — 모든 BFF 호출 secret 필수, 세션 쿠키 Secure.
+      READMATES_BFF_SECRET_REQUIRED: "true"
+      READMATES_AUTH_SESSION_COOKIE_SECURE: "true"
       READMATES_AIGEN_ENABLED: ${{ vars.READMATES_AIGEN_ENABLED }}
       READMATES_AIGEN_ENABLED_PROVIDERS: ${{ vars.READMATES_AIGEN_ENABLED_PROVIDERS }}
-      READMATES_AIGEN_FALLBACK_DEFAULT_MODEL: ${{ vars.READMATES_AIGEN_FALLBACK_DEFAULT_MODEL }}
+      # application.yml 의 fallback default 와 일치. provider 모델 catalog 갱신 시 PR.
+      READMATES_AIGEN_FALLBACK_DEFAULT_MODEL: gpt-5.4-mini
       # ----- 앱 Secrets (민감) -----
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
