@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLoaderData } from "react-router-dom";
 import type { PlatformAdminRouteData } from "@/features/platform-admin/route/platform-admin-data";
 import { PlatformAdminDashboard } from "@/features/platform-admin/ui/platform-admin-dashboard";
@@ -6,6 +6,7 @@ import {
   checkPlatformAdminDomainProvisioning,
   commitPlatformAdminOnboarding,
   createSupportAccessGrant,
+  listSupportAccessGrantsByClub,
   previewPlatformAdminOnboarding,
   revokeSupportAccessGrant,
   updatePlatformAdminClub,
@@ -17,6 +18,10 @@ import type {
   PlatformAdminSummaryResponse,
   SupportAccessGrantResponse,
 } from "@/features/platform-admin/api/platform-admin-contracts";
+import {
+  buildPlatformAdminWorkbench,
+  type PlatformAdminWorkbenchInput,
+} from "@/features/platform-admin/model/platform-admin-workbench-model";
 import type { CreateSupportAccessGrantFields } from "@/features/platform-admin/ui/support-access-grants-panel";
 
 export function PlatformAdminRoute() {
@@ -26,10 +31,64 @@ export function PlatformAdminRoute() {
   const [checkingDomainIds, setCheckingDomainIds] = useState<ReadonlySet<string>>(new Set());
   const [checkErrorByDomainId, setCheckErrorByDomainId] = useState<Record<string, string>>({});
   const [activeGrants, setActiveGrants] = useState<SupportAccessGrantResponse[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
+  const [supportGrantLoadError, setSupportGrantLoadError] = useState<string | null>(null);
+  const [loadingSupportGrants, setLoadingSupportGrants] = useState(false);
+
+  const workbench = useMemo(() => {
+    const input: PlatformAdminWorkbenchInput = {
+      role: summary.platformRole,
+      activeClubCount: summary.activeClubCount,
+      domainActionRequiredCount: summary.domainActionRequiredCount,
+      selectedClubId,
+      clubs: clubs.items,
+      domains: summary.domains ?? summary.domainsRequiringAction ?? [],
+    };
+    return buildPlatformAdminWorkbench(input);
+  }, [clubs.items, selectedClubId, summary]);
+
+  const effectiveSelectedClubId = workbench.selectedClub?.clubId ?? null;
+
+  useEffect(() => {
+    const clubId = effectiveSelectedClubId;
+    if (!clubId) {
+      return;
+    }
+
+    let cancelled = false;
+    const run = async () => {
+      setLoadingSupportGrants(true);
+      setSupportGrantLoadError(null);
+      try {
+        const grants = await listSupportAccessGrantsByClub(clubId);
+        if (!cancelled) {
+          setActiveGrants(grants);
+        }
+      } catch {
+        if (!cancelled) {
+          setActiveGrants([]);
+          setSupportGrantLoadError("지원 접근 권한을 불러오지 못했습니다.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSupportGrants(false);
+        }
+      }
+    };
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSelectedClubId]);
 
   async function handleCreateGrant(fields: CreateSupportAccessGrantFields) {
+    const clubId = workbench.selectedClub?.clubId;
+    if (!clubId) {
+      throw new Error("No selected club for support access grant");
+    }
     const request: CreateSupportAccessGrantRequest = {
-      clubId: fields.clubId,
+      clubId,
       granteeUserId: fields.granteeUserId,
       scope: fields.scope,
       reason: fields.reason,
@@ -46,8 +105,9 @@ export function PlatformAdminRoute() {
 
   return (
     <PlatformAdminDashboard
-      summary={summary}
-      clubs={clubs}
+      workbench={workbench}
+      selectedClubId={effectiveSelectedClubId}
+      onSelectClub={setSelectedClubId}
       checkingDomainIds={checkingDomainIds}
       domainCheckErrors={checkErrorByDomainId}
       onCheckDomain={async (domainId) => {
@@ -69,6 +129,7 @@ export function PlatformAdminRoute() {
       onCommitOnboarding={async (request) => {
         const result = await commitPlatformAdminOnboarding(request);
         setClubs((current) => prependOrReplaceClub(current, result.club));
+        setSelectedClubId(result.club.clubId);
         return result;
       }}
       onUpdateClub={async (clubId, request) => {
@@ -76,7 +137,15 @@ export function PlatformAdminRoute() {
         setClubs((current) => replaceClub(current, updated));
         return updated;
       }}
+      onSetVisibility={async (publicVisibility) => {
+        const clubId = workbench.selectedClub?.clubId;
+        if (!clubId) return;
+        const updated = await updatePlatformAdminClub(clubId, { publicVisibility });
+        setClubs((current) => replaceClub(current, updated));
+      }}
       activeGrants={activeGrants}
+      loadingSupportGrants={loadingSupportGrants}
+      supportGrantLoadError={supportGrantLoadError}
       onCreateGrant={handleCreateGrant}
       onRevokeGrant={handleRevokeGrant}
     />
