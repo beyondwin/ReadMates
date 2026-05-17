@@ -40,6 +40,7 @@ private const val MEMBER_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000088622"
 private const val HOST_EMAIL = "aigen-host@example.test"
 
 private const val CLEANUP_SQL = """
+    delete from notification_event_outbox where club_id = '$CLUB_ID';
     delete from session_feedback_documents where session_id = '$SESSION_ID';
     delete from public_session_publications where session_id = '$SESSION_ID';
     delete from highlights where session_id = '$SESSION_ID';
