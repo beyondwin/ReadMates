@@ -344,6 +344,104 @@ class AiGenerateApiIntegrationTest(
         assertThat(statusJson).contains("\"summary\":\"Regenerated summary for AI Gen Book.\"")
     }
 
+    // task 9 — typed AI error regression coverage at the public API.
+    // These two tests pin the contract that previously-untyped 500 UNKNOWN
+    // failures now surface as stable RFC-7807 problems with `code` values
+    // AI_DISABLED (start path) and AUTHOR_NAME_MISMATCH (commit override).
+
+    @Test
+    fun `start with unknown model returns typed AI disabled problem`() {
+        val transcript = MockMultipartFile(
+            "transcript",
+            "transcript.txt",
+            "text/plain",
+            "Stub transcript content.".toByteArray(),
+        )
+        val body = MockMultipartFile(
+            "body",
+            "body.json",
+            "application/json",
+            """{"model":"not-allowlisted-model","authorNameMode":"real","instructions":null}""".toByteArray(),
+        )
+
+        mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+            file(transcript)
+            file(body)
+            with(user(HOST_EMAIL))
+        }.andExpect {
+            status { isServiceUnavailable() }
+            jsonPath("$.code") { value("AI_DISABLED") }
+            jsonPath("$.detail") { value("Requested model is not enabled") }
+        }
+    }
+
+    @Test
+    fun `commit override with unknown author returns typed author name mismatch problem`() {
+        val transcript = MockMultipartFile(
+            "transcript",
+            "transcript.txt",
+            "text/plain",
+            "Stub transcript for override test.".toByteArray(),
+        )
+        val body = MockMultipartFile(
+            "body",
+            "body.json",
+            "application/json",
+            """{"model":"claude-sonnet-4-6","authorNameMode":"real","instructions":null}""".toByteArray(),
+        )
+
+        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+            file(transcript)
+            file(body)
+            with(user(HOST_EMAIL))
+        }.andReturn().response
+        assertThat(startResponse.status).isEqualTo(202)
+        val jobId = jobIdFrom(startResponse.contentAsString)
+
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
+            assertThat(jobStatusJson(jobId)).contains("\"status\":\"SUCCEEDED\"")
+        }
+
+        // Override result with an author not present in the seeded session's
+        // expectedAuthorNames. The validator emits
+        //   "Unknown authorName(s) not in expectedAuthorNames: [Injected Person]"
+        // — we match the prefix so the offender list ordering stays free.
+        val overrideJson = """
+            {
+              "recordVisibility": "MEMBER",
+              "result": {
+                "format": "readmates-session-import:v1",
+                "sessionNumber": 8861,
+                "bookTitle": "AI Gen Book",
+                "meetingDate": "2026-05-14",
+                "summary": "Override summary for AI Gen Book.",
+                "highlights": [
+                  {"authorName": "Injected Person", "text": "Untrusted highlight 1."},
+                  {"authorName": "Injected Person", "text": "Untrusted highlight 2."},
+                  {"authorName": "Injected Person", "text": "Untrusted highlight 3."}
+                ],
+                "oneLineReviews": [
+                  {"authorName": "Injected Person", "text": "Untrusted review."}
+                ],
+                "feedbackDocumentFileName": "session-8861-feedback.md",
+                "feedbackDocumentMarkdown": "<!-- readmates-feedback:v1 -->\n\n# 독서모임 8861차 피드백\n\nOverride body."
+              }
+            }
+        """.trimIndent()
+
+        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
+            with(user(HOST_EMAIL))
+            contentType = MediaType.APPLICATION_JSON
+            content = overrideJson
+        }.andExpect {
+            status { isUnprocessableEntity() }
+            jsonPath("$.code") { value("AUTHOR_NAME_MISMATCH") }
+            jsonPath("$.detail") {
+                value(org.hamcrest.Matchers.startsWith("Unknown authorName(s) not in expectedAuthorNames:"))
+            }
+        }
+    }
+
     private fun jobStatusJson(jobId: UUID): String =
         mockMvc.get("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId") {
             with(user(HOST_EMAIL))
