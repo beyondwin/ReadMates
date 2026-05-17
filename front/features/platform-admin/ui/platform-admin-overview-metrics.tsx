@@ -10,6 +10,7 @@ export function PlatformAdminOverviewMetrics({ metrics }: Props) {
       <MetricCard label="플랫폼 역할" value={metrics.platformRole} />
       <MetricCard label="활성 클럽" value={metrics.activeClubCount.toLocaleString("ko-KR")} />
       <MetricCard label="조치 필요" value={metrics.needsActionCount.toLocaleString("ko-KR")} />
+      <MetricCard label="도메인 조치 필요" value={metrics.domainActionRequiredCount.toLocaleString("ko-KR")} />
       <MetricCard label="공개 준비" value={metrics.publishReadyCount.toLocaleString("ko-KR")} />
     </section>
   );

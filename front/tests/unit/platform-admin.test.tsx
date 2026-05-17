@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
@@ -394,7 +394,7 @@ describe("platform admin frontend shell", () => {
             platformRole: "OWNER",
             activeClubCount: 1,
             needsActionCount: 1,
-            domainActionRequiredCount: 0,
+            domainActionRequiredCount: 2,
             publishReadyCount: 0,
           },
           queueItems: [
@@ -455,7 +455,13 @@ describe("platform admin frontend shell", () => {
 
     expect(screen.getByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "운영 작업 큐" })).toBeInTheDocument();
-    expect(screen.getByLabelText("플랫폼 요약")).toBeInTheDocument();
+    const summary = screen.getByLabelText("플랫폼 요약");
+    expect(summary).toBeInTheDocument();
+    expect(within(summary).getByText("플랫폼 역할")).toBeInTheDocument();
+    expect(within(summary).getByText("활성 클럽")).toBeInTheDocument();
+    expect(within(summary).getByText("조치 필요")).toBeInTheDocument();
+    expect(within(summary).getByText("도메인 조치 필요")).toBeInTheDocument();
+    expect(within(summary).getByText("공개 준비")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /읽는사이/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("첫 호스트가 아직 없습니다.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "읽는사이" })).toBeInTheDocument();
