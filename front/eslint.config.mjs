@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "test-results/**",
+    "coverage/**",
   ]),
   js.configs.recommended,
   ...tseslint.configs.recommended,

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiGenerationJobResponse, AiGenerationStatus } from "@/features/host/aigen/api/aigen-contracts";
@@ -158,15 +158,21 @@ describe("useAiGenerationJob", () => {
     renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
 
     // Flush the initial fetch.
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
 
     // Advance well past the second poll (which should fire near 2s).
-    await vi.advanceTimersByTimeAsync(2500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
     await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(2));
 
     // Advance past the third poll (which should fire ~4s after the 2nd).
-    await vi.advanceTimersByTimeAsync(4500);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4500);
+    });
     await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(3));
 
     // Validate the cadence: gap[1] ≈ 2s; gap[2] ≈ 3-5s (spec window).
@@ -185,11 +191,15 @@ describe("useAiGenerationJob", () => {
     const { Wrapper } = createWrapper();
     renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
 
-    await vi.advanceTimersByTimeAsync(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
     await vi.waitFor(() => expect(mockedGetJob).toHaveBeenCalledTimes(1));
 
     // Comfortably under the 2s first-poll window — should still be only 1 call.
-    await vi.advanceTimersByTimeAsync(1000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
     expect(mockedGetJob).toHaveBeenCalledTimes(1);
   });
 
