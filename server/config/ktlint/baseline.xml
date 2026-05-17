@@ -553,7 +553,7 @@
         <error line="78" column="58" source="standard:chain-method-continuation" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStoreTest.kt">
-        <error line="229" column="27" source="standard:multiline-expression-wrapping" />
+        <error line="359" column="27" source="standard:multiline-expression-wrapping" />
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCountersTest.kt">
         <error line="159" column="32" source="standard:function-signature" />
