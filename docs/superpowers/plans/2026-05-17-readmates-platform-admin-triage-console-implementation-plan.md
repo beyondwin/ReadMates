@@ -218,6 +218,8 @@ Add this import:
 import com.readmates.shared.security.AccessDeniedException
 ```
 
+`AccessDeniedException` is already mapped to HTTP 403 by `com.readmates.shared.adapter.in.web.SharedApplicationErrorHandler` (`@RestControllerAdvice`, no `assignableTypes` filter). `PlatformAdminErrorHandler` is scoped to `assignableTypes = [PlatformAdminController::class, PlatformAdminClubController::class, SupportAccessGrantController::class]` and only handles `PlatformAdminException`, so it does **not** intercept this exception. **No new exception handler is needed.** This mirrors the existing pattern in `PlatformAdminClubRegistryService.updateClub:41` and `PlatformAdminService` domain methods.
+
 At the start of `createSupportAccessGrant`, before `reason` validation, add:
 
 ```kotlin
@@ -383,6 +385,36 @@ describe("platform admin workbench model", () => {
     expect(support.permissions.canCreateSupportGrant).toBe(false);
     expect(support.permissions.canUpdateClub).toBe(false);
   });
+
+  it("returns the 'none' primary action for ARCHIVED and SUSPENDED clubs", () => {
+    const archived = buildPlatformAdminWorkbench({
+      ...baseInput,
+      selectedClubId: "club-archived",
+      clubs: [
+        ...baseInput.clubs,
+        {
+          clubId: "club-archived",
+          slug: "archived-club",
+          name: "보관 클럽",
+          tagline: "tagline",
+          about: "about",
+          status: "ARCHIVED",
+          publicVisibility: "PRIVATE",
+          domainCount: 0,
+          domainActionRequiredCount: 0,
+          firstHostOnboardingState: "ASSIGNED",
+        },
+      ],
+    });
+
+    expect(archived.selectedClub?.primaryAction.kind).toBe("none");
+    expect(archived.selectedClub?.primaryAction.disabled).toBe(true);
+  });
+
+  it("picks the first queue item when selectedClubId is null", () => {
+    const workbench = buildPlatformAdminWorkbench({ ...baseInput, selectedClubId: null });
+    expect(workbench.selectedClub?.clubId).toBe("club-host-missing");
+  });
 });
 ```
 
@@ -414,7 +446,8 @@ export type PlatformAdminDomainStatus =
   | "DISABLED";
 
 export type WorkQueueSeverity = "blocked" | "attention" | "ready" | "stable";
-export type WorkQueueFilter = "needs-action" | "publish-ready" | "domains" | "all";
+// Filter chips are deferred (see spec Non-Goals); severity ordering covers triage for the first pass.
+// When added back, key filtering off typed signals (e.g., severity, a domainState field) — not badge strings.
 
 export type PlatformAdminWorkbenchClub = {
   clubId: string;
@@ -533,22 +566,6 @@ export function buildPlatformAdminWorkbench(input: PlatformAdminWorkbenchInput):
         }
       : null,
   };
-}
-
-export function filterQueueItems(
-  items: PlatformAdminWorkQueueItem[],
-  filter: WorkQueueFilter,
-): PlatformAdminWorkQueueItem[] {
-  switch (filter) {
-    case "needs-action":
-      return items.filter((item) => item.severity === "blocked" || item.severity === "attention");
-    case "publish-ready":
-      return items.filter((item) => item.primaryActionLabel === "공개 전환");
-    case "domains":
-      return items.filter((item) => item.badges.some((badge) => badge.startsWith("domain ")));
-    case "all":
-      return items;
-  }
 }
 
 function permissionsForRole(role: PlatformAdminRole): PlatformAdminPermissionView {
@@ -674,6 +691,17 @@ function buildPrimaryAction(
   club: PlatformAdminWorkbenchClub,
   domains: PlatformAdminWorkbenchDomain[],
 ): SelectedClubAction {
+  if (club.status === "SUSPENDED" || club.status === "ARCHIVED") {
+    return {
+      kind: "none",
+      label: "전환 불가",
+      disabled: true,
+      reason: club.status === "ARCHIVED"
+        ? "보관된 클럽은 공개/비공개 전환 대상이 아닙니다."
+        : "정지된 클럽은 공개/비공개 전환 대상이 아닙니다.",
+    };
+  }
+
   const checklist = buildPublishChecklist(club, domains);
   const failed = checklist.find((item) => !item.passed);
 
@@ -893,10 +921,10 @@ Include `listSupportAccessGrantsByClub` in API imports:
 listSupportAccessGrantsByClub,
 ```
 
-Add route state:
+Add route state. **Initialize `selectedClubId` to `null`** — do NOT seed from `data.clubs.items[0]`. The spec requires the "first queue item" to be selected by default, and the queue is ordered by severity inside `buildPlatformAdminWorkbench`. Seeding from API order would silently pin the route to a non-queue-first club whenever the API and queue orders disagree (which is the common case in triage). The model's `selectClubId` resolves `null` to the top-of-queue club.
 
 ```ts
-const [selectedClubId, setSelectedClubId] = useState<string | null>(data.clubs.items[0]?.clubId ?? null);
+const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
 const [supportGrantLoadError, setSupportGrantLoadError] = useState<string | null>(null);
 const [loadingSupportGrants, setLoadingSupportGrants] = useState(false);
 ```
@@ -998,9 +1026,16 @@ pnpm --dir front exec vitest run tests/unit/platform-admin.test.tsx -t "loads su
 
 Expected: PASS after the UI updates in Task 4 expose the grant row. If this step still fails because the UI does not render the new props yet, continue to Task 4 and rerun this exact command there.
 
-- [ ] **Step 7: Commit after Task 4 passes**
+- [ ] **Step 7: Commit only after Task 4 lands**
 
-Do not commit Task 3 alone if the intermediate route props do not compile before Task 4. Commit Tasks 3 and 4 together if needed:
+Task 3 and Task 4 are **tightly coupled**: Task 3 introduces the `workbench` prop and selected-club state on the route, but the dashboard component continues to receive the legacy props until Task 4 is wired. If you ship Task 3 alone the route will pass props the dashboard does not declare and the build (`pnpm --dir front build`) will fail TypeScript.
+
+Treat Tasks 3 and 4 as a single phase. Either:
+
+- Do Tasks 3 and 4 back-to-back and create one combined commit at the end of Task 4, or
+- Use a temporary bridge inside `PlatformAdminDashboardProps` (accept both old `summary`/`clubs`/`activeGrants` and the new `workbench`) for the duration of Task 3, and remove the bridge in Task 4 Step 8.
+
+The preferred path is back-to-back commits. Use these commands once Task 4 Step 9 verifies green:
 
 ```bash
 git add front/features/platform-admin/route/platform-admin-route.tsx front/tests/unit/platform-admin.test.tsx
@@ -1558,7 +1593,20 @@ it("selects the created club and shows returned domain after onboarding commit",
 });
 ```
 
-This test can stay component-level for the wizard result. Route-level state update is covered by adding assertions to the existing route onboarding test if one exists.
+The test above stays component-level for the wizard result. There is **no** existing route-level onboarding test in `front/tests/unit/platform-admin.test.tsx`, so add one here (do not skip on the pretext that one exists). Use the same `createMemoryRouter(routes, { initialEntries: ["/admin"] })` + `AuthProvider` pattern as the existing `"runs domain status check from the platform admin route"` test:
+
+```ts
+it("selects the created club and adds returned domain after onboarding commit (route)", async () => {
+  // Stub /api/bff/api/auth/me, /api/bff/api/admin/summary (empty domains), /api/bff/api/admin/clubs (items: []),
+  // and POST /api/bff/api/admin/clubs/onboarding/preview + /onboarding returning a club + a domain in ACTION_REQUIRED.
+  // After clicking "새 클럽" → wizard → "미리 확인" → "클럽 생성":
+  //   - work queue contains the new club row
+  //   - selected brief title shows the new club name
+  //   - domain provisioning panel inside the brief shows the returned hostname + ACTION_REQUIRED
+}
+```
+
+Keep the mock stub list narrow to the routes actually traversed; the existing helper `installRouterRequestShim()` handles `Request` abort signals.
 
 - [ ] **Step 2: Add route helper for domain insertion**
 
@@ -1890,3 +1938,13 @@ Skip this commit when no implementation-time docs changed.
 - Placeholder scan: The plan contains no unfinished requirement markers and uses public-safe example values only.
 - Type consistency: `PlatformAdminWorkbenchInput`, `PlatformAdminWorkbenchView`, `PlatformAdminSelectedClubBrief`, and `CreateSupportAccessGrantFields` are named consistently across tasks.
 - Architecture consistency: UI receives props and callbacks only; API calls remain in route/API files; server hardening stays in application service.
+
+### Source audit revisions (2026-05-17)
+
+- Task 1 now states explicitly that `AccessDeniedException` is already mapped to HTTP 403 by `SharedApplicationErrorHandler` (verified at `server/.../shared/adapter/in/web/SharedApplicationErrorHandler.kt:12`) and that `PlatformAdminErrorHandler` is `assignableTypes`-scoped and ignores it. No new `@ExceptionHandler` is required.
+- Task 2 model: `buildPrimaryAction` now branches on `SUSPENDED`/`ARCHIVED` lifecycle first and returns the `kind: "none"` variant, eliminating dead code in the `SelectedClubAction` union. New tests cover the lifecycle branch and a null `selectedClubId` falling through to the queue-top club.
+- Task 2 model: the unused `filterQueueItems` export and `WorkQueueFilter` type were removed. Filter chips are now a non-goal (see spec); when they come back they should key off typed signals, not badge-string prefixes.
+- Task 3 route: `selectedClubId` is initialized to `null`, not `data.clubs.items[0]?.clubId`. The model is the single source of truth for "first queue item," which is what the spec asserts. Seeding from API order silently disagrees with the queue.
+- Task 3 ↔ Task 4 coupling is now called out explicitly with two compatible commit strategies; the previous wording left implementers to discover a TypeScript build failure mid-Task-3.
+- Task 5 no longer defers route-level onboarding coverage to a non-existent test. A concrete route-level test using `createMemoryRouter` is added in the same file as the wizard test.
+- Spec divergence documented: the frontend publish checklist intentionally flags `FAILED` custom domains as blocking even though `PlatformAdminClubRegistryService.updateClub` only rejects publish on `SUSPENDED`/`ARCHIVED` lifecycle and missing active host. This is an operator-aid asymmetry, not a server defect.

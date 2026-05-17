@@ -45,6 +45,7 @@ This design does not create a duplicate host dashboard. It preserves the archite
 - No new platform admin user management surface.
 - No audit-log explorer in this first triage-console pass.
 - No new domain provisioning backend model beyond the existing marker-check workflow.
+- No work-queue client-side filter chips (`조치 필요 / 공개 준비 / 도메인 / 전체`) in this pass. Severity-based ordering covers triage; chip-style filters are deferred. See "Work Queue" below.
 - No private member data, real domains, deployment state, secrets, token-shaped examples, OCIDs, or local absolute paths in docs, fixtures, or UI examples.
 
 ## Architecture Principles
@@ -105,6 +106,8 @@ This hardening stays in the existing `club` write-side package:
 club.adapter.in.web -> club.application.port.in -> club.application.service -> club.application.port.out
 ```
 
+Implementation note: the service should throw `com.readmates.shared.security.AccessDeniedException`, which is already mapped to HTTP 403 by `SharedApplicationErrorHandler` (`@RestControllerAdvice`). `PlatformAdminErrorHandler` is `assignableTypes`-scoped and only handles `PlatformAdminException`, so it does **not** intercept this exception. No new exception handler is required; the precedent already exists in `PlatformAdminClubRegistryService.updateClub` and `PlatformAdminService` domain/onboarding paths.
+
 ## User Model
 
 Primary operator persona:
@@ -155,18 +158,11 @@ Default ordering:
 5. Stable public clubs.
 6. Archived or suspended clubs.
 
-Filters:
-
-- `조치 필요`
-- `공개 준비`
-- `도메인`
-- `전체`
-
-The filters are local frontend state and do not require server query changes.
+Filters are deferred (see Non-Goals). Severity ordering and badges on each row provide sufficient triage signal for the first pass. When filters are added, they should be local frontend state and key off typed signals on the queue item view model (e.g., severity, a dedicated `domainState` field), not string-prefix matching on badge labels.
 
 ### Selected Club Operations Brief
 
-The right region shows the selected club. If no club is selected, the route selects the first queue item. The brief includes:
+The right region shows the selected club. The route does **not** seed `selectedClubId` from `clubs.items[0]`; it starts as `null` and the workbench model picks the first queue item after severity ordering. This keeps the "선택 클럽" rule in one place (the pure model) and avoids a race where API order and queue order disagree. The brief includes:
 
 - Club identity: name, slug, lifecycle status, public visibility.
 - Publish-readiness checklist.
@@ -180,7 +176,7 @@ The brief makes public/private actions explicit:
 - `PUBLIC` action is primary only when the checklist passes.
 - If blocked, the UI shows the blocking reasons before the action.
 - `PRIVATE` action remains available to `OWNER` and `OPERATOR` when the club is public and not archived.
-- `SUSPENDED` and `ARCHIVED` lifecycle transitions remain outside this pass.
+- `SUSPENDED` and `ARCHIVED` lifecycle transitions remain outside this pass. For clubs in these lifecycle states the primary action is the `none` variant (`disabled: true`, reason = lifecycle state), not a disabled `make-public`/`make-private` button. The model branches on lifecycle before computing the publish path so the `none` variant is reachable and tested.
 
 ### New Club Onboarding
 
@@ -213,6 +209,8 @@ Readiness states:
 - `archived-or-suspended`: no publish action in this pass.
 
 The server remains the source of truth. The frontend checklist is an operator aid and an early explanation layer; server errors are still possible and are displayed inline.
+
+The frontend checklist is intentionally stricter than the server: it surfaces a `FAILED` custom domain as a publish blocker, while `PlatformAdminClubRegistryService.updateClub` currently only rejects publish on `SUSPENDED`/`ARCHIVED` lifecycle and missing active host. This asymmetry is acceptable for a triage UI — operators should fix a `FAILED` domain before announcing public — but is documented here so the gap is not mistaken for a server defect.
 
 ## Support Access Flow
 
@@ -385,3 +383,9 @@ Residual risks:
 - Internal consistency: the design keeps `/admin` platform-owned and host operations out of scope throughout.
 - Scope check: the work is a single frontend-centered admin-console improvement with one server hardening task for support access authorization.
 - Ambiguity check: support access role policy is explicit, and deferred platform user search is documented as out of scope.
+- Source audit (2026-05-17):
+  - Initial selection is now stated as model-owned (`selectedClubId` seeds to `null`) so the "first queue item" rule does not silently regress to API order.
+  - Work-queue filter chips moved to Non-Goals; the plan does not wire them and the spec no longer asserts they ship in this pass.
+  - SUSPENDED/ARCHIVED lifecycle now explicitly maps to the `SelectedClubAction.kind: "none"` variant rather than a disabled `make-public`, so the union member is reachable.
+  - Implementation note added that `AccessDeniedException` is already handled by `SharedApplicationErrorHandler`; no new advice is required, matching prior precedent in `PlatformAdminClubRegistryService` and `PlatformAdminService`.
+  - Frontend `FAILED`-domain checklist behavior is documented as intentionally stricter than server publish validation so the asymmetry is not later misread as a server bug.
