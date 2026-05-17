@@ -10,6 +10,31 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.10.2 - 2026-05-17
+
+### Highlights
+
+- v1.10.0의 V31 collation 사고에 대한 사후 정리 패치. 운영 schema 기본 collation을 테이블 collation과 일치시키고, 동일 회귀를 잡는 통합 테스트와 AIGEN 설정 일관성 startup-check를 추가합니다. 기능 변경 없음.
+
+### Added
+
+- **db:** `V33__align_schema_default_collation.sql` — `ALTER DATABASE DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`. 운영 schema 기본 collation이 `utf8mb4_unicode_ci`로 어긋나 있던 상태를 기존 테이블(`clubs.id`, `users.id` 등)과 동일한 `utf8mb4_0900_ai_ci`로 정렬합니다. 기존 테이블/컬럼은 그대로 유지(no full-table rebuild, no FK drop). 향후 COLLATE를 누락한 migration도 schema 기본값을 상속하므로 FK 호환이 유지되는 defense-in-depth.
+- **server:** `AiGenerationConfigValidator` — `@PostConstruct`에서 `readmates.aigen.enabled=true`인데 `AiGenerationJobQueue` 빈이 하나도 wired되지 않은 경우 actionable 메시지로 fail-fast. v1.10.1 배포 초기 `KAFKA_ENABLED=false` 환경에서 발생한 "No qualifying bean of type 'AiGenerationJobQueue'" 부팅 실패를 재발 시 즉시 진단 가능한 형태로 변환합니다. `@MockitoBean`으로 큐를 주입하는 좁은 integration test는 그대로 통과합니다(빈 존재 자체를 검사하므로).
+- **test:** `MySqlFlywayMigrationTest`에 `fk to clubs id requires explicit COLLATE when schema default differs` 회귀 테스트 — schema 기본 collation을 일부러 `clubs.id`와 어긋나게 바꿔둔 상태에서 (a) COLLATE 미지정 FK는 거부되고 (b) 명시 COLLATE FK는 성공함을 검증. 컨테이너 `withReuse(true)`를 깨지 않도록 try/finally로 원상복구.
+- **test:** `AiGenerationConfigValidatorTest` 3건 — disabled, enabled+queue 존재, enabled+queue 없음 각 케이스.
+
+### Deployment Notes
+
+- 추가 인프라/시크릿 변경 없음. `READMATES_SERVER_IMAGE` GitHub Variable을 `:v1.10.2`로 bump → `sync-config` 실행 → compose force-recreate.
+- Flyway는 V33만 새로 적용(idempotent ALTER DATABASE). 기존 V29~V32에는 영향 없음.
+
+### Verification
+
+- Local: `./server/gradlew -p server unitTest --tests 'com.readmates.aigen.config.AiGenerationConfigValidatorTest'` — pass (3/3).
+- Local: `./server/gradlew -p server integrationTest --tests 'com.readmates.support.MySqlFlywayMigrationTest'` — pass (7/7, 새 collation 회귀 테스트 포함).
+- Local: `./server/gradlew -p server integrationTest --tests 'com.readmates.aigen.adapter.out.redis.RedisAiGenerationJobStoreTest' --tests 'com.readmates.aigen.adapter.out.redis.RedisGenerationCostCountersTest'` — pass (17/17, validator가 `@MockitoBean` 큐 환경을 통과함을 확인).
+- ktlint: `./gradlew ktlintMainSourceSetCheck ktlintTestSourceSetCheck` — pass.
+
 ## v1.10.1 - 2026-05-17
 
 ### Highlights

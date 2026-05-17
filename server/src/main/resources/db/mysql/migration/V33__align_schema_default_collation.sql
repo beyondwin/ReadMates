@@ -1,0 +1,12 @@
+-- Align the database default collation with the collation used by existing
+-- tables (utf8mb4_0900_ai_ci). In production the default drifted to
+-- utf8mb4_unicode_ci while most tables (e.g. clubs.id, users.id) were created
+-- with utf8mb4_0900_ai_ci, which is what caused V31's FK to fail with errno
+-- 3780. This change only affects future tables/columns that omit an explicit
+-- COLLATE clause — it does NOT rewrite existing tables (no full-table rebuild,
+-- no FK drops required).
+--
+-- Explicit COLLATE on every FK column is still the safer pattern (see
+-- V31/V32) and remains the convention going forward; this migration is a
+-- defense-in-depth backstop for accidental omissions.
+ALTER DATABASE DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
