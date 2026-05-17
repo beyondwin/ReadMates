@@ -10,7 +10,32 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
+## v1.10.1 - 2026-05-17
+
+### Highlights
+
+- v1.10.0의 V31/V32 Flyway migration이 운영 MySQL의 collation 기본값 차이로 FK 생성에 실패해(errno 3780: `Referencing column 'club_id' and referenced column 'id' in foreign key constraint 'fk_aigen_default_club' are incompatible`), v1.10.0 배포는 자동 롤백되고 본 패치로 대체합니다. v1.10.0 GHCR 이미지는 부팅 불가능하므로 사용 금지.
+
+### Fixed
+
+- **db:** `V31__create_ai_generation_club_defaults.sql`의 `club_id`/`updated_by` 컬럼에 `CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`를 명시해 `clubs.id`와 collation을 일치시켰습니다. 운영 schema 기본 collation이 `utf8mb4_unicode_ci`였던 탓에 새 컬럼이 `unicode_ci`로 생성되어 FK가 거부되던 문제를 해소합니다. Testcontainers는 schema/테이블 기본값이 같아 회귀를 노출하지 못해서 통과했으나 본 패치 후에도 통과합니다.
+- **db:** `V32__platform_admin_onboarding.sql`의 신규 `invitations.invited_by_platform_admin_user_id` 컬럼도 동일 이유로 `character set utf8mb4 collate utf8mb4_0900_ai_ci`를 명시해 `users.id`와 정렬했습니다.
+
+### Deployment Notes
+
+- v1.10.0 배포 시도가 V31에서 실패하면서 운영 `flyway_schema_history`에 `version=31, success=0` row가 남아 있습니다. v1.10.1 배포 전에 해당 row를 `DELETE FROM flyway_schema_history WHERE version='31' AND success=0;`로 정리해야 Flyway가 새 V31을 재시도합니다(`ai_generation_club_defaults` 테이블은 생성되지 않았으므로 안전). V29/V30은 success=1로 남아 있어 그대로 유지됩니다.
+- 그 외 배포 순서/롤백은 v1.10.0과 동일합니다(`READMATES_SERVER_IMAGE` GitHub Variable을 `:v1.10.1`로 bump → `sync-config` 실행 → compose force-recreate).
+
+### Verification
+
+- Local: `./server/gradlew -p server integrationTest --tests "com.readmates.support.MySqlFlywayMigrationTest"` — pass.
+- Prod-state probe: 운영 DB에서 수정된 V31 패턴의 `CREATE TABLE ... CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci ... FOREIGN KEY (club_id) REFERENCES clubs(id)` 수동 dry-run 성공.
+- 운영 schema 점검: `clubs.id`, `users.id`, `invitations.id`, `memberships.id` 모두 `utf8mb4_0900_ai_ci` 확인.
+
 ## v1.10.0 - 2026-05-17
+
+> **Withdrawn (2026-05-17)**: 본 릴리즈는 V31 Flyway migration이 운영 MySQL에서 FK collation 불일치(errno 3780)로 부팅에 실패해 배포 직후 v1.9.0으로 롤백되었습니다. 후속 패치는 v1.10.1을 사용하세요. v1.10.0 GHCR 이미지는 historical artifact로만 남기고 promote 하지 않습니다.
+
 
 ### Highlights
 
