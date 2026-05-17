@@ -20,7 +20,6 @@ import java.math.BigDecimal
 import java.util.UUID
 
 class AiGenerationOrchestratorTest {
-
     @Test
     fun `start uses club default when command omits model`() {
         val ctx = TestContext()
@@ -28,7 +27,9 @@ class AiGenerationOrchestratorTest {
 
         val result = ctx.orchestrator.start(ctx.command(model = null))
 
-        val saved = ctx.jobStore.records.values.single()
+        val saved =
+            ctx.jobStore.records.values
+                .single()
         assertThat(saved.model.name).isEqualTo(AiGenerationTestFixtures.CLAUDE_MODEL.name)
         assertThat(result.status).isEqualTo(JobStatus.PENDING)
         assertThat(result.expiresAt).isEqualTo(saved.expiresAt)
@@ -40,7 +41,9 @@ class AiGenerationOrchestratorTest {
 
         ctx.orchestrator.start(ctx.command(model = null))
 
-        val saved = ctx.jobStore.records.values.single()
+        val saved =
+            ctx.jobStore.records.values
+                .single()
         assertThat(saved.model.name).isEqualTo(AiGenerationTestFixtures.CLAUDE_FALLBACK.name)
     }
 
@@ -53,12 +56,15 @@ class AiGenerationOrchestratorTest {
         val ctx = TestContext()
         ctx.queue.throwOnPublish = RuntimeException("kafka down")
 
-        val thrown = assertThatThrownBy {
-            ctx.orchestrator.start(ctx.command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name))
-        }
+        val thrown =
+            assertThatThrownBy {
+                ctx.orchestrator.start(ctx.command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name))
+            }
         thrown.isInstanceOf(LlmGenerationException::class.java)
 
-        val saved = ctx.jobStore.records.values.single()
+        val saved =
+            ctx.jobStore.records.values
+                .single()
         assertThat(saved.status).isEqualTo(JobStatus.FAILED)
         assertThat(saved.error!!.code).isEqualTo(ErrorCode.QUEUE_UNAVAILABLE)
         val audit = ctx.auditPort.entries.single()
@@ -122,14 +128,15 @@ class AiGenerationOrchestratorTest {
     @Test
     fun `get returns JobView for an existing record`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            stage = JobStage.READY,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                stage = JobStage.READY,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
 
         val view = ctx.orchestrator.get(ctx.sessionId, record.jobId)
@@ -151,11 +158,12 @@ class AiGenerationOrchestratorTest {
     @Test
     fun `get throws JobSessionMismatchException when sessionId does not match`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = UUID.randomUUID(),
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = UUID.randomUUID(),
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+            )
         ctx.jobStore.save(record)
 
         assertThatThrownBy {
@@ -167,11 +175,12 @@ class AiGenerationOrchestratorTest {
     fun `get appends CLUB_BUDGET_80PCT warning when monthly cost crosses softWarningRatio`() {
         val ctx = TestContext()
         ctx.costGuard.clubMonthly = BigDecimal("16.50") // > 0.80 * 20.00
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+            )
         ctx.jobStore.save(record)
 
         val view = ctx.orchestrator.get(ctx.sessionId, record.jobId)
@@ -183,11 +192,12 @@ class AiGenerationOrchestratorTest {
     fun `get omits CLUB_BUDGET_80PCT warning when monthly cost below soft threshold`() {
         val ctx = TestContext()
         ctx.costGuard.clubMonthly = BigDecimal("1.00")
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+            )
         ctx.jobStore.save(record)
 
         val view = ctx.orchestrator.get(ctx.sessionId, record.jobId)
@@ -196,19 +206,24 @@ class AiGenerationOrchestratorTest {
     }
 
     @Test
-    fun `cancel deletes job record and writes CANCEL audit row`() {
+    fun `cancel marks job cancelled and deletes transient payload while keeping hash`() {
         val ctx = TestContext()
         val record = AiGenerationTestFixtures.jobRecord(
             sessionId = ctx.sessionId,
             clubId = ctx.clubId,
             hostUserId = ctx.hostUserId,
+            status = JobStatus.RUNNING,
+            stage = JobStage.GENERATING_SUMMARY,
+            result = AiGenerationTestFixtures.snapshot(),
         )
         ctx.jobStore.save(record)
 
         ctx.orchestrator.cancel(ctx.sessionId, record.jobId, ctx.hostUserId)
 
-        assertThat(ctx.jobStore.deleted).containsExactly(record.jobId)
-        assertThat(ctx.jobStore.records).doesNotContainKey(record.jobId)
+        val stored = ctx.jobStore.load(record.jobId)!!
+        assertThat(stored.status).isEqualTo(JobStatus.CANCELLED)
+        assertThat(stored.result).isNull()
+        assertThat(ctx.jobStore.transientPayloadDeleted).containsExactly(record.jobId)
         val audit = ctx.auditPort.entries.single()
         assertThat(audit.kind).isEqualTo(AuditKind.CANCEL)
         assertThat(audit.status).isEqualTo(AuditStatus.CANCELLED)
@@ -217,11 +232,12 @@ class AiGenerationOrchestratorTest {
     @Test
     fun `cancel rejects when hostUserId does not match the job's host`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+            )
         ctx.jobStore.save(record)
 
         val intruder = UUID.randomUUID()
@@ -230,6 +246,25 @@ class AiGenerationOrchestratorTest {
         }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
 
         assertThat(ctx.jobStore.deleted).isEmpty()
+        assertThat(ctx.auditPort.entries).isEmpty()
+    }
+
+    @Test
+    fun `cancel rejects committed job`() {
+        val ctx = TestContext()
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+            status = JobStatus.COMMITTED,
+            stage = null,
+        )
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.orchestrator.cancel(ctx.sessionId, record.jobId, ctx.hostUserId)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+
         assertThat(ctx.auditPort.entries).isEmpty()
     }
 
@@ -250,27 +285,30 @@ class AiGenerationOrchestratorTest {
         val properties = AiGenerationTestFixtures.defaultProperties()
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
 
-        val orchestrator = AiGenerationOrchestrator(
-            jobStore = jobStore,
-            queue = queue,
-            auditPort = auditPort,
-            costGuard = costGuard,
-            clubDefaultPort = clubDefaults,
-            modelCatalog = modelCatalog,
-            properties = properties,
-            clock = clock,
-            metrics = fakeMetrics(),
-        )
+        val orchestrator =
+            AiGenerationOrchestrator(
+                jobStore = jobStore,
+                queue = queue,
+                auditPort = auditPort,
+                costGuard = costGuard,
+                clubDefaultPort = clubDefaults,
+                modelCatalog = modelCatalog,
+                properties = properties,
+                clock = clock,
+                metrics = fakeMetrics(),
+                transitionPolicy = AiGenerationJobTransitionPolicy(),
+            )
 
-        fun command(model: String?): StartGenerationCommand = StartGenerationCommand(
-            sessionId = sessionId,
-            clubId = clubId,
-            hostUserId = hostUserId,
-            transcript = "the transcript",
-            model = model,
-            authorNameMode = AuthorNameMode.REAL,
-            instructions = null,
-            sessionMeta = AiGenerationTestFixtures.sessionMeta(sessionId = sessionId, clubId = clubId),
-        )
+        fun command(model: String?): StartGenerationCommand =
+            StartGenerationCommand(
+                sessionId = sessionId,
+                clubId = clubId,
+                hostUserId = hostUserId,
+                transcript = "the transcript",
+                model = model,
+                authorNameMode = AuthorNameMode.REAL,
+                instructions = null,
+                sessionMeta = AiGenerationTestFixtures.sessionMeta(sessionId = sessionId, clubId = clubId),
+            )
     }
 }

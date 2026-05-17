@@ -63,6 +63,7 @@ class AiGenerationOrchestrator(
     private val properties: AiGenerationProperties,
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
+    private val transitionPolicy: AiGenerationJobTransitionPolicy,
 ) : StartGenerationUseCase,
     GetJobUseCase,
     CancelGenerationUseCase {
@@ -217,7 +218,23 @@ class AiGenerationOrchestrator(
                 attemptedAction = "cancel (host mismatch)",
             )
         }
-        jobStore.delete(jobId)
+        transitionPolicy.requireCancel(record.status, record.jobId)
+        val cancelled = jobStore.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED),
+            next = JobStatus.CANCELLED,
+            stage = null,
+            progressPct = 0,
+            error = null,
+        )
+        if (!cancelled) {
+            throw AiGenerationException.IllegalGenerationState(
+                jobId = jobId,
+                currentStatus = jobStore.load(jobId)?.status?.name ?: "MISSING",
+                attemptedAction = "cancel",
+            )
+        }
+        jobStore.deleteTransientPayload(jobId)
         auditPort.insert(
             AuditLogEntry(
                 jobId = jobId,

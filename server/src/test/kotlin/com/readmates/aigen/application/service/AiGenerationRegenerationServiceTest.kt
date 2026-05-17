@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
@@ -11,7 +12,6 @@ import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.GuardDecision
-import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -20,17 +20,17 @@ import java.time.Duration
 import java.util.UUID
 
 class AiGenerationRegenerationServiceTest {
-
     @Test
     fun `regenerate happy path patches snapshot and writes SUCCESS audit row`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot("old summary"),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot("old summary"),
+            )
         ctx.jobStore.save(record)
         ctx.regenerator.enqueueSuccess(
             RegenerationOutput(
@@ -40,13 +40,14 @@ class AiGenerationRegenerationServiceTest {
             ),
         )
 
-        val result = ctx.service.regenerate(
-            sessionId = ctx.sessionId,
-            jobId = record.jobId,
-            item = GenerationItem.SUMMARY,
-            model = null,
-            instructions = null,
-        )
+        val result =
+            ctx.service.regenerate(
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                item = GenerationItem.SUMMARY,
+                model = null,
+                instructions = null,
+            )
 
         assertThat(result.item).isEqualTo(GenerationItem.SUMMARY)
         assertThat(result.value).isEqualTo("fresh summary")
@@ -63,13 +64,14 @@ class AiGenerationRegenerationServiceTest {
     @Test
     fun `regenerate retries once on PROVIDER_UNAVAILABLE then succeeds`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
         ctx.regenerator.enqueueFailure(AiGenerationTestFixtures.providerError(ErrorCode.PROVIDER_UNAVAILABLE))
         ctx.regenerator.enqueueSuccess(
@@ -80,13 +82,14 @@ class AiGenerationRegenerationServiceTest {
             ),
         )
 
-        val result = ctx.service.regenerate(
-            sessionId = ctx.sessionId,
-            jobId = record.jobId,
-            item = GenerationItem.SUMMARY,
-            model = null,
-            instructions = null,
-        )
+        val result =
+            ctx.service.regenerate(
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                item = GenerationItem.SUMMARY,
+                model = null,
+                instructions = null,
+            )
 
         assertThat(result.value).isEqualTo("summary after retry")
         assertThat(ctx.regenerator.calls).hasSize(2)
@@ -96,13 +99,14 @@ class AiGenerationRegenerationServiceTest {
     @Test
     fun `regenerate fails after max retries when provider keeps erroring`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
         ctx.regenerator.enqueueFailure(AiGenerationTestFixtures.providerError(ErrorCode.PROVIDER_RATE_LIMITED))
         ctx.regenerator.enqueueFailure(AiGenerationTestFixtures.providerError(ErrorCode.PROVIDER_RATE_LIMITED))
@@ -130,13 +134,14 @@ class AiGenerationRegenerationServiceTest {
     fun `regenerate is blocked by cost guard deny and writes FAILED audit`() {
         val ctx = TestContext()
         ctx.costGuard.decision = GuardDecision.Deny(ErrorCode.HOST_DAILY_CAP_EXCEEDED)
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
 
         assertThatThrownBy {
@@ -168,13 +173,14 @@ class AiGenerationRegenerationServiceTest {
                 ValidationResult.Ok
             }
         }
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot("good original summary"),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot("good original summary"),
+            )
         ctx.jobStore.save(record)
         ctx.regenerator.enqueueSuccess(
             RegenerationOutput(
@@ -216,13 +222,14 @@ class AiGenerationRegenerationServiceTest {
         // cap (3) short-circuits with MAX_CALLS_EXCEEDED without calling the
         // provider.
         val ctx = TestContext()
-        val base = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val base =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         val record = base.copy(llmCallCount = 3)
         ctx.jobStore.save(record)
 
@@ -249,14 +256,15 @@ class AiGenerationRegenerationServiceTest {
         // codes trigger strengthened instructions on retry. Mirrors the Worker
         // contract in AiGenerationWorker.retryStrategyFor.
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-            instructions = "tighten the summary",
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+                instructions = "tighten the summary",
+            )
         ctx.jobStore.save(record)
         ctx.regenerator.enqueueFailure(AiGenerationTestFixtures.providerError(ErrorCode.PROVIDER_RATE_LIMITED))
         ctx.regenerator.enqueueSuccess(
@@ -276,7 +284,10 @@ class AiGenerationRegenerationServiceTest {
         )
 
         assertThat(ctx.regenerator.calls).hasSize(2)
-        val retryInstructions = ctx.regenerator.calls.last().instructions
+        val retryInstructions =
+            ctx.regenerator.calls
+                .last()
+                .instructions
         assertThat(retryInstructions).isEqualTo("tighten the summary")
         assertThat(retryInstructions).doesNotContain("Strict:")
     }
@@ -285,13 +296,14 @@ class AiGenerationRegenerationServiceTest {
     fun `regenerate appends CLUB_BUDGET_80PCT to warnings when monthly cost crosses soft ratio`() {
         val ctx = TestContext()
         ctx.costGuard.clubMonthly = BigDecimal("16.50")
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.clubId,
-            hostUserId = ctx.hostUserId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.clubId,
+                hostUserId = ctx.hostUserId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
         ctx.regenerator.enqueueSuccess(
             RegenerationOutput(
@@ -301,15 +313,65 @@ class AiGenerationRegenerationServiceTest {
             ),
         )
 
-        val result = ctx.service.regenerate(
-            sessionId = ctx.sessionId,
-            jobId = record.jobId,
-            item = GenerationItem.SUMMARY,
-            model = null,
-            instructions = null,
-        )
+        val result =
+            ctx.service.regenerate(
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                item = GenerationItem.SUMMARY,
+                model = null,
+                instructions = null,
+            )
 
         assertThat(result.warnings).contains("CLUB_BUDGET_80PCT")
+    }
+
+    @Test
+    fun `regenerate rejects jobs that are not succeeded`() {
+        val ctx = TestContext()
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+            status = JobStatus.COMMITTING,
+            result = AiGenerationTestFixtures.snapshot(),
+        )
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.service.regenerate(ctx.sessionId, record.jobId, GenerationItem.SUMMARY, null, null)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+
+        assertThat(ctx.regenerator.calls).isEmpty()
+    }
+
+    @Test
+    fun `regenerate does not patch when status changes before conditional save`() {
+        val ctx = TestContext()
+        val record = AiGenerationTestFixtures.jobRecord(
+            sessionId = ctx.sessionId,
+            clubId = ctx.clubId,
+            hostUserId = ctx.hostUserId,
+            status = JobStatus.SUCCEEDED,
+            result = AiGenerationTestFixtures.snapshot("original"),
+        )
+        ctx.jobStore.save(record)
+        ctx.jobStore.failNextConditionalSave = true
+        ctx.regenerator.enqueueSuccess(
+            RegenerationOutput(
+                patchedItem = GenerationItem.SUMMARY,
+                patchedValue = "patched",
+                usage = TokenUsage(1, 0, 1),
+            ),
+        )
+
+        assertThatThrownBy {
+            ctx.service.regenerate(ctx.sessionId, record.jobId, GenerationItem.SUMMARY, null, null)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+
+        assertThat(ctx.jobStore.load(record.jobId)!!.result!!.summary).isEqualTo("original")
+        val failedAudit = ctx.auditPort.entries.single()
+        assertThat(failedAudit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(failedAudit.errorCode).isEqualTo(ErrorCode.JOB_EXPIRED)
     }
 
     @Suppress("LongParameterList")
@@ -328,17 +390,19 @@ class AiGenerationRegenerationServiceTest {
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
         val sleeper = FakeSleeper()
 
-        val service = AiGenerationRegenerationService(
-            jobStore = jobStore,
-            regenerators = mapOf(Provider.CLAUDE to regenerator),
-            modelCatalog = modelCatalog,
-            validator = validator,
-            auditPort = auditPort,
-            costGuard = costGuard,
-            properties = properties,
-            clock = clock,
-            metrics = fakeMetrics(),
-            sleeper = sleeper,
-        )
+        val service =
+            AiGenerationRegenerationService(
+                jobStore = jobStore,
+                regenerators = mapOf(Provider.CLAUDE to regenerator),
+                modelCatalog = modelCatalog,
+                validator = validator,
+                auditPort = auditPort,
+                costGuard = costGuard,
+                properties = properties,
+                clock = clock,
+                metrics = fakeMetrics(),
+                sleeper = sleeper,
+                transitionPolicy = AiGenerationJobTransitionPolicy(),
+            )
     }
 }
