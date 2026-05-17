@@ -1,0 +1,44 @@
+# compose.override.yml — 로컬 prod-parity 개발용 override.
+# 사용:
+#   cp .env.example .env  &&  편집
+#   docker compose -f deploy/oci/compose.yml -f deploy/local/compose.override.yml --env-file .env up
+#
+# 주의: 운영(VM)에서는 이 파일을 사용하지 않는다. 운영은 compose.yml + env_file 만으로 동작.
+
+services:
+  readmates-api:
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+    volumes:
+      - ./logs/readmates-api:/var/log/readmates
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${READMATES_LOCAL_MYSQL_PORT:-3306}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${READMATES_LOCAL_MYSQL_ROOT_PASSWORD:?READMATES_LOCAL_MYSQL_ROOT_PASSWORD 필요}
+      MYSQL_DATABASE: ${READMATES_LOCAL_MYSQL_DATABASE:-readmates}
+      MYSQL_USER: ${READMATES_LOCAL_MYSQL_USERNAME:-readmates}
+      MYSQL_PASSWORD: ${READMATES_LOCAL_MYSQL_PASSWORD:-readmates}
+    volumes:
+      - readmates-local-mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    ports:
+      - "6379:6379"
+
+volumes:
+  readmates-local-mysql:
