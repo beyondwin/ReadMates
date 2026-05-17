@@ -1,6 +1,6 @@
 # AI 세션 생성 운영 Runbook
 
-> Phase 0-7 (in-app AI session generation) — 호스트 세션 편집기 안에서 LLM이 생성한 회차 기록의 운영 절차를 모은 문서입니다. 변경 배경은 CHANGELOG `Phase 0` (도메인 계약), `Phase 1` (백엔드 서비스/Redis/Audit), `Phase 2` (Kafka + E2E + 신뢰 경계 정합), `Phase 3` (프런트 모드), `Phase 4-5` (OpenAI/Gemini adapter), `Phase 6` (운영 통합) 항목과 spec [`docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md`](../../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md)을 참조합니다.
+> In-app AI session generation — 호스트 세션 편집기 안에서 LLM이 생성한 회차 기록의 운영 절차를 모은 문서입니다. 변경 배경은 CHANGELOG `Phase 0-7` (출시 범위), `Phase 8` (live SDK/risk resolution), `Phase 9` (residual risk cleanup) 항목과 spec [`docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md`](../../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md)을 참조합니다.
 
 이 runbook은 다음 상황에서 참조합니다.
 
@@ -45,7 +45,7 @@ Rollback: `application.yml`의 직전 commit으로 되돌리고 재배포.
 
 ## 2. 클럽 cost cap 임시 상향 (Redis 키 수동 reset)
 
-`readmates.aigen.caps.club-cost-monthly-usd` (기본 $20) 초과로 호스트가 503/`COST_CAP_EXCEEDED`를 받을 때 임시로 풀어야 하는 경우의 절차입니다.
+`readmates.aigen.caps.club-monthly-cost-usd` (기본 $20) 초과로 호스트가 503/`COST_CAP_EXCEEDED`를 받을 때 임시로 풀어야 하는 경우의 절차입니다.
 
 1. **승인 게이트**: incident ticket을 먼저 만들고, 운영 책임자 1인의 명시 승인을 받습니다. Cap 정책은 spec §6 비용 보호의 핵심이라 무단 해제는 감사 위반입니다.
 2. 현재 누적 비용 확인:
@@ -67,11 +67,11 @@ Rollback: `application.yml`의 직전 commit으로 되돌리고 재배포.
    `EX 2678400` (≈31d)는 monthly counter TTL과 일치합니다. 부분 차감이 필요하면 `SET <newValue>`로 명시값을 적습니다.
 5. 같은 incident ticket에 `operator`, `timestamp`, `clubId`, `previousValue`, `newValue`, `justification`을 남기고 다음 영업일에 cap 재산정 또는 정책 변경 여부를 회의 안건으로 올립니다.
 
-Backout: 원래 값을 다시 `SET`. Cap 자체를 영구 상향하려면 `application.yml`의 `caps.club-cost-monthly-usd`를 변경한 PR을 통합 검토합니다.
+Backout: 원래 값을 다시 `SET`. Cap 자체를 영구 상향하려면 `application.yml`의 `caps.club-monthly-cost-usd`를 변경한 PR을 통합 검토합니다.
 
 ## 3. 호스트 일일 cap 임시 해제
 
-`readmates.aigen.caps.host-daily-jobs` (기본 30회) 초과로 호스트가 `HOST_DAILY_CAP_EXCEEDED`를 받을 때의 절차입니다.
+`readmates.aigen.caps.host-daily-calls` (기본 10회) 초과로 호스트가 `HOST_DAILY_CAP_EXCEEDED`를 받을 때의 절차입니다.
 
 1. **승인 게이트**: incident ticket 발급 + 운영 책임자 승인. 호스트 단위 일일 cap은 PII/abuse 보호 목적이므로 routine 해제 대상이 아닙니다.
 2. 현재 카운트:
@@ -294,7 +294,7 @@ CI는 모든 PR에서 `scripts/aigen-pii-check.sh`를 실행합니다. Fail 시 
 
 새 PII 누출 surface가 발견되면:
 
-1. `scripts/aigen-pii-check.sh`에 `check5()` (또는 다음 번호)를 추가합니다. 기존 4개 함수의 패턴(grep 또는 ripgrep으로 금지 패턴 검출 → 발견 시 exit non-zero + 명확한 메시지)을 따릅니다.
+1. `scripts/aigen-pii-check.sh`에 `check6()` (또는 다음 번호)를 추가합니다. 기존 함수의 패턴(grep 또는 ripgrep으로 금지 패턴 검출 → 발견 시 exit non-zero + 명확한 메시지)을 따릅니다.
 2. 이 runbook 섹션에 새 invariant의 의도와 디버깅 힌트를 한 단락 추가합니다.
 3. PR description에 spec 어느 부분이 새 invariant의 근거인지 명시합니다.
 

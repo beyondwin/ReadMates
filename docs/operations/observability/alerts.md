@@ -1,10 +1,10 @@
 # 알림 룰 후보
 
-본 문서는 Prometheus alertmanager rule 정의를 정리합니다. 실 배포는 후속 plan에서 별도 환경(`docs/deploy/observability-stack.md`)에 따라.
+본 문서는 Prometheus alertmanager rule 정의를 정리합니다. 일반 서비스 룰은 후보 정의이고, AI 세션 생성 룰은 `ops/prometheus/alerts/aigen-rules.yml`에 파일화되어 있습니다. 실 배포 여부는 운영 환경에서 별도 확인합니다.
 
 ## 룰 작성 규약
 
-- severity: `critical` | `warning` | `info`.
+- severity: `critical` | `warning` 또는 `warn` | `info`. 기존 후보 룰은 `warning`, 파일화된 AI 세션 생성 룰은 현재 `warn` label을 씁니다.
 - `for:`로 일시적 spike 무시.
 - annotations에 runbook 링크 (runbook 미작성 시 `TBD`).
 - prod-only로 적용 가정. dev/staging은 룰 별도 set.
@@ -22,6 +22,25 @@
 <a id="ratelimitdenied"></a>
 <a id="redisfallbackshigh"></a>
 <a id="redisoperationerrors"></a>
+<a id="aigenprovidererrorburst"></a>
+<a id="aigenschemafailurespike"></a>
+<a id="aigenbudgetexhaustion"></a>
+<a id="aigenqueuelaghigh"></a>
+<a id="aigenredisdown"></a>
+
+## 파일화된 AI 세션 생성 룰
+
+`ops/prometheus/alerts/aigen-rules.yml`은 in-app AI 세션 생성 운영용으로 다음 alert를 정의합니다. 각 alert의 `runbook_url`은 [AI session generation runbook](../runbooks/ai-session-generation.md)의 anchor로 연결됩니다.
+
+| Alert | Severity | 기준 | Runbook anchor |
+| --- | --- | --- | --- |
+| `AiGenProviderErrorBurst` | warn | provider별 FAILED job ratio > 10% over 10m | `#provider-error-burst` |
+| `AiGenSchemaFailureSpike` | warn | `SCHEMA_INVALID` validation failure ratio > 20% over 1h | `#schema-failure-spike` |
+| `AiGenBudgetExhaustion` | info | aggregate 30d AI generation cost > $1000 | `#budget-exhaustion` |
+| `AiGenQueueLagHigh` | warn | `readmates_aigen_queue_depth > 50` for 5m | `#queue-lag-high` |
+| `AiGenRedisDown` | critical | `redis_up == 0` and HTTP 5xx rate elevated | `#redis-down` |
+
+Per-club cost cap은 metric label에 `club_id`를 싣지 않는 정책 때문에 Prometheus alert가 아니라 application cap guard와 `ai_generation_audit_log` SQL drill-down으로 운영합니다.
 
 ## 룰
 

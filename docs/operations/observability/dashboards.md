@@ -227,6 +227,22 @@
   ```
 - 임계 (참고): `sensitive="true"` baseline 대비 큰 변화 시 조사.
 
+## Dashboard 5 — AI Session Generation
+<a id="ai-session-generation"></a>
+
+실제 dashboard JSON은 `ops/grafana/dashboards/aigen.json`입니다. 패널은 `readmates_aigen_*` meter와 audit-log drill-down 안내를 함께 보여줍니다.
+
+| Panel | 메트릭 / 근거 | 목적 |
+| --- | --- | --- |
+| Latency p50 / p95 / p99 by provider | `readmates_aigen_latency_seconds_bucket` | provider/model별 생성 지연 추적 |
+| Cost rate by provider/model | `readmates_aigen_cost_usd_total` | 최근 비용 증가율 확인 |
+| Top-N club cost | SQL drill-down 안내 | `club_id`를 metric label로 쓰지 않는 정책을 유지하면서 과금 원인 확인 |
+| Validation failures by reason | `readmates_aigen_validation_failures_total` | schema/author/template 실패 spike 확인 |
+| Queue lag | `readmates_aigen_queue_depth` | Kafka consumer lag wiring 후 backlog 확인 |
+| Jobs by status/provider | `readmates_aigen_jobs_completed_total` | 성공/실패/취소 비율 확인 |
+| Tokens by direction | `readmates_aigen_tokens_total` | input/cached_input/output token 사용량 확인 |
+| Cap denials by reason | `readmates_aigen_cap_denials_total` | host daily, club monthly, host per-minute cap 거절 확인 |
+
 ## 패널 작성 규약
 
 - 모든 panel에 *임계 (참고)* 를 명시. 임계가 없으면 "조사 기준 미정"으로 적기.

@@ -2,7 +2,7 @@
 # scripts/aigen-pii-check.sh — PII regression check for aigen
 # Spec: docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md §11
 # Plan: docs/superpowers/plans/2026-05-16-readmates-in-app-ai-session-generation-implementation-plan.md task 6.4
-# Runbook: docs/superpowers/runbooks/2026-05-16-readmates-aigen-operations.md#pii-regression (created by task 6.5)
+# Runbook: docs/operations/runbooks/ai-session-generation.md#pii-regression
 #
 # Run by CI on every PR (.github/workflows/ci.yml :: scripts job).
 # Operators can also run manually: `bash scripts/aigen-pii-check.sh`.

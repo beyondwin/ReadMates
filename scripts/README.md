@@ -37,6 +37,28 @@ READMATES_SERVER_CI_CHECK_DRY_RUN=true ./scripts/server-ci-check.sh
 ./scripts/lint-grafana-dashboards.sh
 ```
 
+## `aigen-pii-check.sh`
+
+In-app AI 세션 생성 경로가 transcript 본문을 durable store, Kafka message, metric tag, Flyway column으로 흘리지 않는지 확인합니다. Redis `aigen:job:<jobId>:transcript`는 worker handoff용 short-lived key로만 허용됩니다.
+
+```bash
+bash scripts/aigen-pii-check.sh
+```
+
+CI `scripts` job이 PR마다 실행합니다. 실패하면 출력의 `checkN` 메시지와 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md#pii-regression)을 기준으로 어느 invariant가 깨졌는지 확인합니다.
+
+## `aigen-smoke-{claude,openai,gemini}.sh`
+
+Provider별 라이브 API key가 있는 운영 또는 staging 노드에서 AI generation multipart start/polling smoke를 수동 확인합니다. 이 스크립트는 live key를 요구하므로 공개 CI에서는 실행하지 않습니다.
+
+```bash
+./scripts/aigen-smoke-claude.sh
+./scripts/aigen-smoke-openai.sh
+./scripts/aigen-smoke-gemini.sh
+```
+
+Provider key, transcript, 응답 전문, 운영 domain은 Git에 남기지 않습니다. 모델 allowlist, cap, key 회전, kill switch 절차는 [AI session generation runbook](../docs/operations/runbooks/ai-session-generation.md)을 기준으로 합니다.
+
 ## `build-public-release-candidate.sh`
 
 아래 명령은 저장소 루트에서 실행하는 것을 기준으로 합니다. 스크립트 자체는 저장소 내부 어디에서든 실행할 수 있지만, 이 문서의 `./scripts/...` 경로는 저장소 루트에서 그대로 복사해 실행할 수 있습니다.

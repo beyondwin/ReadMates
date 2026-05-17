@@ -33,8 +33,16 @@
 | `readmates.redis.operation.errors` | counter | `feature`, `operation` | 건수 | Redis 명령 실행 오류 횟수. `feature`는 어댑터별 식별자, `operation`은 명령 유형(예: `check`). | `server/.../RedisCacheMetrics.kt` (다수 어댑터에서 호출) | dashboards.md#redis-cache | alerts.md#redisoperationerrors |
 | `bff.audit.shutdown.dropped` | counter | (없음) | 건수 | BFF audit 태스크가 executor 종료 또는 큐 포화로 폐기된 횟수. graceful shutdown 시 0이 정상. 지속 증가 시 audit 손실 신호. | `server/.../security/BffSecretAuditExecutorConfig.kt` | — | — |
 | `notification.dispatch.unknown_status` | counter | (없음) | 건수 | SMTP 발송 결과가 `UNKNOWN`이라 retryable로 처리한 이메일 deliveries 건수. 짧은 spike는 정상, 지속 증가 시 SMTP 응답 모호 또는 어댑터 상태 매핑 문제 신호. | `server/.../notification/application/service/NotificationDispatchService.kt` | dashboards.md#notification-pipeline | — |
+| `readmates.aigen.jobs` | counter | (없음) | 건수 | AI generation job accepted count. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
+| `readmates.aigen.jobs.completed` | counter | `status`, `provider`, `model`, `kind` | 건수 | Terminal status로 끝난 AI generation job 수. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenprovidererrorburst |
+| `readmates.aigen.latency` | timer/histogram | `provider`, `model`, `kind` | 초 | AI provider 호출 wall-clock latency. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
+| `readmates.aigen.tokens` | counter | `provider`, `model`, `direction` | token | Input, cached input, output token 사용량. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
+| `readmates.aigen.cost.usd` | counter | `provider`, `model` | USD | AI generation 누적 비용 추정치. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenbudgetexhaustion |
+| `readmates.aigen.validation.failures` | counter | `reason` | 건수 | Validation class error로 실패한 AI output 수. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenschemafailurespike |
+| `readmates.aigen.cap.denials` | counter | `reason` | 건수 | Provider 호출 전 cap guard가 거절한 요청 수. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | — |
+| `readmates.aigen.queue.depth` | gauge | (없음) | 건수 | AI generation queue depth. 현재는 consumer lag wiring 전 placeholder 0 gauge입니다. | `server/.../aigen/application/service/AiGenerationMetrics.kt` | dashboards.md#ai-session-generation | alerts.md#aigenqueuelaghigh |
 
-> **태그 정책**: enum/low-cardinality 값만 허용. `club_id`, `user_id`, `membership_id`, `email`, `delivery_id` 등 고유 식별자는 절대 태그로 사용하지 않는다. 행 단위 감사는 `notification_deliveries` 테이블을 사용한다. 근거: `server/.../ReadmatesOperationalMetrics.kt` KDoc 참조.
+> **태그 정책**: enum/low-cardinality 값만 허용. `club_id`, `user_id`, `membership_id`, `email`, `delivery_id`, transcript 본문 등 고유 식별자나 민감 본문은 절대 태그로 사용하지 않는다. 행 단위 감사는 notification은 `notification_deliveries`, AI 생성은 `ai_generation_audit_log`를 사용한다. 근거: `server/.../ReadmatesOperationalMetrics.kt`, `server/.../aigen/application/service/AiGenerationMetrics.kt` KDoc 참조.
 
 ## 표준 메트릭 그룹
 
@@ -77,6 +85,8 @@
 | BFF secret 회전 이력 | `SELECT count(*), max(used_at) FROM bff_secret_rotation_audit;` |
 | Notification delivery state 분포 | `SELECT status, count(*) FROM notification_deliveries GROUP BY status;` |
 | Notification event outbox state 분포 | `SELECT status, count(*) FROM notification_event_outbox GROUP BY status;` |
+| AI generation provider/model/status 분포 | `SELECT provider, model, status, count(*) FROM ai_generation_audit_log GROUP BY provider, model, status;` |
+| AI generation per-club monthly cost | `SELECT club_id, SUM(cost_estimate_usd) FROM ai_generation_audit_log WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01') GROUP BY club_id;` |
 
 > 참고: `bff_secret_rotation_audit`의 날짜 컬럼은 `used_at`(datetime). `notification_deliveries`와 `notification_event_outbox`의 상태 컬럼은 `status`. 확인 근원: `server/src/main/resources/db/mysql/migration/V26__bff_secret_rotation_audit.sql`, `V20__kafka_notification_pipeline.sql`.
 
@@ -86,3 +96,4 @@
 - `bff_request_total` (counter, by `route`, `host`) — Cloudflare Worker analytics 의존. BFF layer에서 별도 계측 필요.
 - `frontend_route_load_seconds` (histogram) — RUM (Real User Monitoring) 도입 후 추가.
 - `readmates.redis.operation.errors` 세분화 — 현재 `feature`/`operation` 2개 태그로 충분하나, 향후 Redis Cluster 도입 시 `node` 태그 추가 검토.
+- `readmates.aigen.queue.depth` 실제 Kafka consumer lag wiring — 현재 gauge는 placeholder 0입니다.

@@ -13,13 +13,15 @@
 - `pnpm`
 - `Docker Compose` 또는 `MySQL 8` compatible database
 
-프론트엔드는 `front/package.json`의 `packageManager` 기준으로 `pnpm@10.33.0`을 사용합니다. CI는 Node.js 24로 frontend lint/test/build를 실행합니다. 백엔드는 Gradle wrapper와 Java toolchain으로 `JDK 21`을 사용합니다.
+프론트엔드와 디자인 시스템은 루트 `package.json` / `pnpm-workspace.yaml` 기준의 `pnpm@10.33.0` workspace를 사용합니다. CI는 Node.js 24로 frontend lint/test/build와 design-system check를 실행합니다. 백엔드는 Gradle wrapper와 Java toolchain으로 `JDK 21`을 사용합니다.
 
 ## 의존성 설치
 
 ```bash
-pnpm --dir front install --frozen-lockfile
+pnpm install --frozen-lockfile
 ```
+
+이 명령은 `front`, `design/system`, `design/docs` workspace 의존성을 루트 `pnpm-lock.yaml` 기준으로 설치합니다.
 
 백엔드는 Gradle wrapper가 필요한 의존성을 내려받습니다. 별도 전역 Gradle 설치는 필요하지 않습니다.
 
