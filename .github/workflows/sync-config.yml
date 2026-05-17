@@ -62,6 +62,11 @@ jobs:
       READMATES_AIGEN_GEMINI_API_KEY: ${{ secrets.READMATES_AIGEN_GEMINI_API_KEY }}
       SPRING_MAIL_USERNAME: ${{ secrets.SPRING_MAIL_USERNAME }}
       SPRING_MAIL_PASSWORD: ${{ secrets.SPRING_MAIL_PASSWORD }}
+      # SMTP host as Variable so switching provider (Gmail → SES 등) is GitHub UI only.
+      SPRING_MAIL_HOST: ${{ vars.SPRING_MAIL_HOST }}
+      # Notification sender identity (display + reply address).
+      READMATES_NOTIFICATION_SENDER_EMAIL: ${{ vars.READMATES_NOTIFICATION_SENDER_EMAIL }}
+      READMATES_NOTIFICATION_SENDER_NAME: ${{ vars.READMATES_NOTIFICATION_SENDER_NAME }}
       # ----- 배포 채널 Secrets (dry_run=false 일 때 필수) -----
       DEPLOY_SSH_KEY: ${{ secrets.READMATES_DEPLOY_SSH_KEY }}
       VM_KNOWN_HOSTS: ${{ secrets.READMATES_VM_KNOWN_HOSTS }}
@@ -79,6 +84,8 @@ jobs:
             READMATES_AUTH_RETURN_STATE_SECRET READMATES_BFF_SECRET READMATES_IP_HASH_BASE_SECRET
             SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID
             SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET
+            SPRING_MAIL_USERNAME SPRING_MAIL_PASSWORD SPRING_MAIL_HOST
+            READMATES_NOTIFICATION_SENDER_EMAIL READMATES_NOTIFICATION_SENDER_NAME
             VM_HOST VM_USER VM_PORT DEPLOY_ROOT
             READMATES_APP_BASE_URL READMATES_AUTH_BASE_URL READMATES_ALLOWED_ORIGINS
           )
@@ -130,6 +137,32 @@ jobs:
             printf 'READMATES_AIGEN_GEMINI_API_KEY=%s\n' "$READMATES_AIGEN_GEMINI_API_KEY"
             printf 'SPRING_MAIL_USERNAME=%s\n' "$SPRING_MAIL_USERNAME"
             printf 'SPRING_MAIL_PASSWORD=%s\n' "$SPRING_MAIL_PASSWORD"
+            # SMTP host as Variable; port + properties inlined for Gmail/STARTTLS standard (587).
+            # Switching to SSL (465) or different provider requires PR.
+            printf 'SPRING_MAIL_HOST=%s\n' "$SPRING_MAIL_HOST"
+            printf 'SPRING_MAIL_PORT=587\n'
+            printf 'SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true\n'
+            printf 'SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true\n'
+            printf 'SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=5000\n'
+            printf 'SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=5000\n'
+            printf 'SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000\n'
+            # Notification sender identity.
+            printf 'READMATES_NOTIFICATION_SENDER_EMAIL=%s\n' "$READMATES_NOTIFICATION_SENDER_EMAIL"
+            printf 'READMATES_NOTIFICATION_SENDER_NAME=%s\n' "$READMATES_NOTIFICATION_SENDER_NAME"
+            # OAuth redirect URI derived from APP_BASE_URL — keeps Google Console config in sync.
+            # Must match the URI registered in Google Cloud Console → OAuth credentials.
+            printf 'SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI=%s/login/oauth2/code/google\n' "$READMATES_APP_BASE_URL"
+            # Spring header forwarding (running behind Caddy reverse proxy).
+            printf 'SERVER_FORWARD_HEADERS_STRATEGY=framework\n'
+            # Infrastructure toggles — prod standard, all enabled.
+            # Disabling individually requires PR (intentional friction).
+            printf 'READMATES_REDIS_ENABLED=true\n'
+            printf 'READMATES_RATE_LIMIT_ENABLED=true\n'
+            printf 'READMATES_AUTH_SESSION_CACHE_ENABLED=true\n'
+            printf 'READMATES_PUBLIC_CACHE_ENABLED=true\n'
+            printf 'READMATES_NOTES_CACHE_ENABLED=true\n'
+            printf 'READMATES_NOTIFICATIONS_ENABLED=true\n'
+            printf 'READMATES_KAFKA_ENABLED=true\n'
           } > "$out"
           lines=$(wc -l < "$out")
           checksum=$(sha256sum "$out" | awk '{print $1}')

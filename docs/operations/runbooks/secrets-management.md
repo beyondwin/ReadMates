@@ -67,29 +67,40 @@ curl -fsS https://api.<domain>/actuator/health
 
 **Variables (비민감):**
 
-GitHub Variables 로 관리하는 것 — 환경 의존적인 값만:
+GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 
-| 키 | 타입 | 비고 |
-|---|---|---|
-| `READMATES_VM_HOST` | Variable | VM 호스트명 |
-| `READMATES_APP_BASE_URL` | Variable | `https://readmates.pages.dev` 등 |
-| `READMATES_AUTH_BASE_URL` | Variable | 동일 |
-| `READMATES_ALLOWED_ORIGINS` | Variable | 콤마 구분 |
-| `READMATES_AIGEN_ENABLED` | Variable | `true`/`false` |
-| `READMATES_AIGEN_ENABLED_PROVIDERS` | Variable | `OPENAI` 등 |
-| `CADDY_SITE` | Variable | `api.example.com` |
-| `READMATES_SERVER_IMAGE` | Variable | GHCR image ref |
+| 키 | 비고 |
+|---|---|
+| `READMATES_VM_HOST` | VM 공인 IP 또는 호스트명 |
+| `READMATES_APP_BASE_URL` | `https://readmates.pages.dev` |
+| `READMATES_AUTH_BASE_URL` | 보통 APP_BASE_URL과 동일 |
+| `READMATES_ALLOWED_ORIGINS` | CORS 허용 origin (콤마 구분) |
+| `SPRING_MAIL_HOST` | SMTP host, 예: `smtp.gmail.com` |
+| `READMATES_NOTIFICATION_SENDER_EMAIL` | 발신자 주소 |
+| `READMATES_NOTIFICATION_SENDER_NAME` | 발신자 표시 이름 |
+| `READMATES_AIGEN_ENABLED` | `true`/`false` (kill-switch) |
+| `READMATES_AIGEN_ENABLED_PROVIDERS` | 화이트리스트, 예: `OPENAI` |
+| `CADDY_SITE` | Caddy 도메인 |
+| `READMATES_SERVER_IMAGE` | GHCR image ref |
 
 워크플로 YAML 에 인라인된 값들 — GitHub 등록 불필요. 변경하려면 워크플로 PR:
 
 | 키 | 인라인 값 | 사유 |
 |---|---|---|
+| `SPRING_PROFILES_ACTIVE` | `prod` | 운영 고정 |
 | `VM_USER` | `deploy` | runbook 으로 고정 |
 | `VM_PORT` | `2222` | runbook 으로 고정 (비표준 포트) |
 | `DEPLOY_ROOT` | `/opt/readmates` | compose.yml 위치 고정 |
 | `READMATES_BFF_SECRET_REQUIRED` | `true` | prod 정책 |
 | `READMATES_AUTH_SESSION_COOKIE_SECURE` | `true` | prod 정책 |
 | `READMATES_AIGEN_FALLBACK_DEFAULT_MODEL` | `gpt-5.4-mini` | application.yml default 와 동기화 |
+| `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_SCOPE` | `openid,email,profile` | Google OAuth 표준 |
+| `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_REDIRECT_URI` | `${APP_BASE_URL}/login/oauth2/code/google` | APP_BASE_URL 에서 파생 |
+| `SPRING_MAIL_PORT` | `587` | Gmail/STARTTLS 표준 |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` / `STARTTLS_ENABLE` | `true` | Gmail/STARTTLS 표준 |
+| `SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT` / `TIMEOUT` / `WRITETIMEOUT` | `5000` | 5s 표준 |
+| `SERVER_FORWARD_HEADERS_STRATEGY` | `framework` | Caddy reverse-proxy 뒤 fixed |
+| `READMATES_REDIS_ENABLED` / `RATE_LIMIT_ENABLED` / `AUTH_SESSION_CACHE_ENABLED` / `PUBLIC_CACHE_ENABLED` / `NOTES_CACHE_ENABLED` / `NOTIFICATIONS_ENABLED` / `KAFKA_ENABLED` | `true` | prod 표준 (전부 활성) |
 
 **bulk import:** 기존 운영 `readmates.env` 가 있다면 `scripts/sync-config/import-from-prod-env.sh <path>` 로 일괄 등록. dry-run 기본; `--apply` 로 실제 적용. 레포 외부 경로만 허용 (실수 commit 방지).
 
