@@ -58,7 +58,7 @@ Frontend files:
 - Modify: `front/features/host/api/host-api.ts`
   - Remove `uploadHostSessionFeedbackDocument`.
 - Test: `front/tests/unit/host-session-editor.test.tsx`
-- Optional E2E update: `front/tests/e2e/aigen-jsonupload-coexistence.spec.ts`
+- Required E2E update: `front/tests/e2e/aigen-jsonupload-coexistence.spec.ts` — 기본 모드가 `json`에서 `aigen`으로 바뀌고 JSON 진입 param이 `aigen=1` 삭제에서 `records=json` 추가로 바뀌므로 이 테스트는 반드시 갱신해야 한다. 다른 `?aigen=1`을 사용하는 aigen E2E는 새 contract에서도 aigen 모드로 그대로 진입하므로 변경이 필요하지 않다.
 
 Docs files after implementation:
 
@@ -123,7 +123,11 @@ return SessionImportStoredFeedbackDocument(
 )
 ```
 
-Add this fake near the bottom of the test file:
+Add this fake near the bottom of the test file. The `recordSessionReminderDue` signature uses `java.time.LocalDate`, so ensure the import is present:
+
+```kotlin
+import java.time.LocalDate
+```
 
 ```kotlin
 private data class RecordedFeedbackEvent(
@@ -307,6 +311,11 @@ recordNotificationEventUseCase.recordFeedbackDocumentPublished(
 )
 ```
 
+Notification 이중 발화 검증 (no separate work — record only):
+
+- `AiGenerationCommitService`는 `commitDelegate.commitValidated(...)`로 위임할 뿐 자체적으로 `recordFeedbackDocumentPublished`를 호출하지 않는다 (현재 `AiGenerationNotificationDispatcher`는 `recordAiGenerationReady`만 호출). 따라서 알림 호출을 `commitValidated`로 옮겨도 AI commit 경로에서 정확히 1회만 발화한다.
+- `FeedbackDocumentService`의 호출처(`uploadHostFeedbackDocument` 안)는 Task 2에서 method 자체가 삭제되므로 중복 source가 남지 않는다.
+
 - [ ] **Step 6: Run the focused tests and verify they pass**
 
 Run:
@@ -461,7 +470,9 @@ override fun uploadHostFeedbackDocument(
 ): FeedbackDocumentResult
 ```
 
-Keep `requireHostFeedbackDocumentUploadAccess` but rename it to `requireHostFeedbackDocumentStatusAccess` because it now guards status reads only.
+The `uploadHostFeedbackDocument` body currently contains a `recordNotificationEventUseCase.recordFeedbackDocumentPublished(...)` call (around `FeedbackDocumentService.kt:126`); deleting the method removes that call site so the only remaining source for `FEEDBACK_DOCUMENT_PUBLISHED` is the `SessionImportService.commitValidated(...)` site added in Task 1.
+
+Keep `requireHostFeedbackDocumentUploadAccess` but rename it to `requireHostFeedbackDocumentStatusAccess` because it now guards status reads only. **Rename order:** delete `authorizeHostFeedbackDocumentUpload` and `uploadHostFeedbackDocument` first so that the only remaining caller is `getHostFeedbackDocumentStatus`; then rename. Performing the rename before the deletions leaves stale callers and breaks compilation.
 
 - [ ] **Step 5: Remove upload-only persistence methods**
 
@@ -896,7 +907,7 @@ Replace the old import toggle, AI panel, JSON panel, and standalone feedback pan
 
 - [ ] **Step 7: Update mobile report panel IDs**
 
-In `front/features/host/ui/session-editor/mobile-editor-tabs.tsx`, change the report entry:
+In `front/features/host/ui/session-editor/mobile-editor-tabs.tsx`, change the report entry. The current `panelIds` for the report section is `["host-editor-panel-session-import", "host-editor-panel-aigen", "host-editor-panel-report"]`; replace with the single new ID:
 
 ```ts
 panelIds: ["host-editor-panel-session-record-completion"],
@@ -946,6 +957,7 @@ git commit -m "feat(front): unify session record completion"
 - Modify: `front/features/host/aigen/ui/TranscriptUploadForm.tsx`
 - Test: `front/features/host/aigen/ui/AiGenerateTab.test.tsx`
 - Test: `front/tests/unit/host-session-editor.test.tsx`
+- Test: `front/tests/e2e/aigen-jsonupload-coexistence.spec.ts` — 기본 모드 전환과 새 URL contract(`records=json`)에 맞춰 시나리오를 갱신한다.
 
 - [ ] **Step 1: Add failing AI unavailable test**
 
@@ -1023,6 +1035,17 @@ expect(urlArg).toMatch(/[?&]records=json\b/);
 expect(urlArg).not.toMatch(/[?&]aigen=/);
 ```
 
+- [ ] **Step 4b: Update the JSON-upload coexistence E2E**
+
+`front/tests/e2e/aigen-jsonupload-coexistence.spec.ts` currently asserts (a) param 없음 = JSON 모드, (b) AI 클릭 시 URL에 `aigen=1` 추가, (c) JSON 클릭 시 `aigen` 제거. 새 contract에 맞춰 다음으로 갱신한다:
+
+- 진입 시 param 없음이면 AI 모드가 활성화되어야 한다 (`대본 파일` 입력이 보임). JSON-upload form은 보이지 않음.
+- `외부 JSON 가져오기` 탭을 클릭하면 URL `searchParams.get("records")`가 `"json"`이 된다.
+- 다시 `AI로 생성` 탭을 클릭하면 `records` param이 사라지고 (`null`) `aigen` param 역시 없다 (AI가 기본이라 URL에 흔적을 남기지 않음).
+- 두 패널이 동시에 mount되지 않는 mutual exclusion은 유지한다.
+
+다른 `?aigen=1`을 사용하는 aigen E2E (`aigen-full-flow`, `aigen-cancel`, `aigen-cost-cap`, `aigen-expired-job`, `aigen-regenerate`)는 새 `readInitialImportMode`에서 `aigen=1`이 무시되어도 기본이 aigen이므로 결과적으로 동일 모드에 도달한다. 변경 불필요.
+
 - [ ] **Step 5: Run focused frontend tests**
 
 Run:
@@ -1039,7 +1062,8 @@ Expected: PASS.
 git add front/features/host/aigen/ui/AiGenerateTab.tsx \
   front/features/host/aigen/ui/TranscriptUploadForm.tsx \
   front/features/host/aigen/ui/AiGenerateTab.test.tsx \
-  front/tests/unit/host-session-editor.test.tsx
+  front/tests/unit/host-session-editor.test.tsx \
+  front/tests/e2e/aigen-jsonupload-coexistence.spec.ts
 git commit -m "fix(front): surface ai unavailable fallback"
 ```
 
@@ -1055,7 +1079,7 @@ git commit -m "fix(front): surface ai unavailable fallback"
 
 - [ ] **Step 1: Update architecture**
 
-In `docs/development/architecture.md`, change the host app row to replace "피드백 문서 업로드" with "세션 기록 패키지 저장".
+In `docs/development/architecture.md` (line ~16), change the 호스트 앱 row to replace "피드백 문서 업로드" with "세션 기록 패키지 저장". The same row also lists "세션 기록 JSON 가져오기" — leave it as is (the JSON fallback is preserved).
 
 In `## 피드백 문서 흐름`, replace the host upload text flow with:
 
@@ -1091,17 +1115,12 @@ In `docs/development/session-import-generator.md`, update "모드 병존 안내"
 
 - [ ] **Step 3: Update README**
 
-In `README.md`, replace the host role sentence segment:
+`README.md` 안 두 곳에 손을 댄다.
 
-```markdown
-세션 기록 JSON 가져오기, 피드백 문서 업로드
-```
+1. 호스트 역할 설명 (`README.md` line ~46): "세션 기록 JSON 가져오기, 피드백 문서 업로드" 부분을 "AI 생성 또는 JSON 가져오기를 통한 세션 기록 패키지 저장"으로 바꾼다.
+2. 상단 Highlight 문단 (`README.md` line ~8): "세션 기록 JSON 가져오기와 in-app AI 세션 생성" 표현이 새 UX 방향(AI 기본 · JSON fallback)에 맞춰 자연스럽게 읽히는지 확인한다. 기본 메시지가 유지된다면 문구는 그대로 둘 수 있다 (필수 변경 아님). 변경한다면 "AI 생성 기본의 세션 기록 완성과 외부 JSON fallback"으로 정리한다.
 
-with:
-
-```markdown
-AI 생성 또는 JSON 가져오기를 통한 세션 기록 패키지 저장
-```
+또한 `docs/README.md`와 `docs/development/README.md`에 "세션 기록 JSON 가져오기" 문구가 그대로 남아 있더라도 외부 generator 문서를 가리키는 링크 라벨이므로 변경 대상이 아니다. 변경 여부는 grep 결과로 한 번 더 확인한다.
 
 - [ ] **Step 4: Add CHANGELOG entry**
 
@@ -1223,6 +1242,14 @@ If no fixes were needed, do not create an empty commit.
   - `SessionImportStoredFeedbackDocument.version` is defined before `SessionImportService` reads it.
   - `SessionRecordCompletionMode` is reused by host editor rather than duplicating mode string unions.
   - `uploadFeedbackDocument` is removed from the action type, route wiring, API wrapper, tests, and component tree in the same task.
+  - `RecordingNotificationEvents` fake in `SessionImportServiceCommitValidatedTest` imports `java.time.LocalDate` because `recordSessionReminderDue` requires it.
+- Notification source uniqueness:
+  - 단독 업로드 호출처(`FeedbackDocumentService.kt:126`)는 Task 2에서 method 삭제와 함께 사라지고, `SessionImportService.commitValidated`가 유일한 source가 된다.
+  - `AiGenerationNotificationDispatcher`는 `recordFeedbackDocumentPublished`를 호출하지 않으므로 AI commit에서 이중 발화 없음.
+  - dedupe key `feedback-document:{sessionId}:{documentVersion}`이 commit마다 새 version으로 갱신되어 동일 commit 안에서는 충돌하지 않는다.
+- URL contract & E2E:
+  - `readInitialImportMode`의 기본값이 `json`에서 `aigen`으로 바뀐다. JSON 진입 URL이 `aigen=1` 삭제에서 `records=json` 추가로 바뀌므로 `aigen-jsonupload-coexistence.spec.ts`는 반드시 갱신해야 한다 (Task 4 Step 4b).
+  - 기존 `?aigen=1`로 진입하는 aigen E2E들은 기본이 aigen이라 그대로 통과한다.
 - Residual risk:
   - Repeated import/AI commits produce a new feedback document version and a new notification, matching the previous "replace upload" meaning.
   - Direct external callers of the removed host upload endpoint receive 404. No compatibility shim is planned.

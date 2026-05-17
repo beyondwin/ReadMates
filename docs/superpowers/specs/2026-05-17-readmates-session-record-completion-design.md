@@ -1,7 +1,12 @@
 # ReadMates Session Record Completion Design
 
 작성일: 2026-05-17
+최종 수정: 2026-05-17 (소스 코드 검증 반영)
 상태: APPROVED DESIGN SPEC
+
+## 변경 이력
+
+- 2026-05-17 v2: 소스 코드 검증 후 알림 이벤트 source 단일화, AI commit 이중 발화 검증, E2E 영향, 기존 호출처(`FeedbackDocumentService.kt:126`) 명시.
 
 ## 배경
 
@@ -108,11 +113,17 @@ AI generation commit
 
 ### 알림 의미
 
-기존 단독 업로드는 피드백 문서가 올라왔다는 알림 이벤트를 발생시켰다. 단독 업로드가 제거되면 이 이벤트의 source는 세션 기록 패키지 commit으로 바뀐다.
+기존 단독 업로드는 피드백 문서가 올라왔다는 알림 이벤트를 발생시켰다 (`FeedbackDocumentService.uploadHostFeedbackDocument` 안의 `recordNotificationEventUseCase.recordFeedbackDocumentPublished(...)` 호출). 단독 업로드가 제거되면 이 호출도 함께 사라지고, 이벤트의 유일한 source는 세션 기록 패키지 commit이 된다.
 
 - JSON import commit: 피드백 문서를 새 version으로 저장하고 `FEEDBACK_DOCUMENT_PUBLISHED` 이벤트를 기록한다.
 - AI commit: `AiGenerationCommitService`가 `SessionImportService.commitValidated(...)`로 위임하므로 같은 이벤트가 기록된다.
 - 피드백 문서 조회와 수동 알림 발송 조건은 기존 `session_feedback_documents` 존재 여부를 기준으로 유지한다.
+
+이중 발화 검증:
+
+- 현재 `AiGenerationNotificationDispatcher`는 `recordAiGenerationReady`만 호출하며 `recordFeedbackDocumentPublished`를 호출하지 않는다. 따라서 알림 호출을 `commitValidated`로 이동해도 AI commit 경로에서 정확히 1회만 발화한다.
+- dedupe key 형식 `feedback-document:{sessionId}:{documentVersion}`은 commit마다 새 version이 발급되므로 동일 commit에서 충돌하지 않는다. 같은 세션을 여러 번 commit하면 version이 증가하면서 새 알림이 발생하며, 이는 기존 "교체 업로드"와 같은 의미다.
+- `FeedbackDocumentService`에서 `recordNotificationEventUseCase`와 `ReadmatesOperationalMetrics` 의존성도 함께 제거된다. metric 기록은 단독 업로드 경로에만 묶여 있던 부수효과였다.
 
 ## 오류 처리
 
@@ -139,6 +150,11 @@ AI generation commit
 - AI unavailable 상태에서도 JSON fallback이 접근 가능하다.
 - 기존 피드백 문서가 있는 세션은 preview/read link를 계속 보여준다.
 - JSON import 성공 후 editor의 publication summary와 feedback document status가 갱신된다.
+
+E2E 영향:
+
+- 기본 모드가 `json`에서 `aigen`으로 바뀐다. `?aigen=1`로 진입하는 기존 aigen E2E (`aigen-full-flow`, `aigen-cancel`, `aigen-cost-cap`, `aigen-expired-job`, `aigen-regenerate`)는 결과적으로 같은 모드(aigen)에 도달하므로 영향 없음.
+- 그러나 `aigen-jsonupload-coexistence.spec.ts`는 "param 없음 = JSON 모드", "AI 클릭 시 URL에 `aigen=1` 추가", "JSON 클릭 시 `aigen` 제거"를 검증하고 있어 새 contract에 맞춰 업데이트가 필요하다. Implementation plan Task 3 또는 Task 4에서 함께 갱신한다.
 
 서버:
 
