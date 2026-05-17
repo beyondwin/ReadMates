@@ -102,6 +102,17 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
     saveAigenDraft(stage.jobId, editedSnapshot);
   }, [stage, editedSnapshot]);
 
+  useEffect(() => {
+    if (stage.tag !== "active") return;
+    if (jobStatus !== "COMMITTED") return;
+    clearAigenDraft(stage.jobId);
+    adoptedForJobRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- legitimate server-event → local-state sync
+    setEditedSnapshot(null);
+    setStage({ tag: "committed" });
+    onCommitted();
+  }, [stage, jobStatus, onCommitted]);
+
   const handleStart = useCallback(
     async (payload: StartGenerationRequest) => {
       setSubmittingStart(true);
@@ -182,6 +193,13 @@ export function AiGenerateTab({ sessionId, clubSlug, onCommitted }: AiGenerateTa
   }
 
   if (stage.tag === "active") {
+    if (jobStatus === "COMMITTING") {
+      return (
+        <div className="small" role="status">
+          AI 기록을 저장하는 중입니다.
+        </div>
+      );
+    }
     if (jobStatus === "FAILED") {
       const message = jobQuery.data?.error?.message ?? "AI 생성에 실패했습니다.";
       return <ErrorState message={message} onRetry={handleRetry} />;

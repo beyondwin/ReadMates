@@ -8,7 +8,7 @@
  *
  * - First scheduled refetch (data update count <= 1): 2000 ms.
  * - Subsequent refetches: 4000 ms.
- * - Terminal statuses (SUCCEEDED / FAILED / CANCELLED): stop polling.
+ * - Terminal statuses (FAILED / CANCELLED / COMMITTED): stop polling.
  *
  * `enabled` is auto-disabled when `jobId` is null/undefined so the hook is
  * safe to mount before the job has been created.
@@ -23,9 +23,9 @@ const FIRST_POLL_MS = 2000;
 const SUBSEQUENT_POLL_MS = 4000;
 
 const TERMINAL_STATUSES: ReadonlySet<AiGenerationJobResponse["status"]> = new Set([
-  "SUCCEEDED",
   "FAILED",
   "CANCELLED",
+  "COMMITTED",
 ]);
 
 const JOBS_ROOT = ["host", "aigen", "jobs"] as const;

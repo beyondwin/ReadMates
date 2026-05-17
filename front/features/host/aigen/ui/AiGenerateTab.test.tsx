@@ -369,6 +369,67 @@ describe("AiGenerateTab", () => {
     });
   });
 
+  it("shows saving state when poll returns COMMITTING", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(jobResponse("COMMITTING"));
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(submit);
+    });
+
+    expect(await screen.findByRole("status")).toHaveTextContent("AI 기록을 저장하는 중입니다.");
+    expect(screen.queryByRole("button", { name: /기록 저장/ })).not.toBeInTheDocument();
+  });
+
+  it("treats server COMMITTED status as completed and calls onCommitted once", async () => {
+    mockedStart.mockResolvedValue({
+      jobId: "job-1",
+      status: "PENDING",
+      expiresAt: "2026-05-16T18:00:00Z",
+    });
+    mockedGetJob.mockResolvedValue(jobResponse("COMMITTED"));
+
+    const onCommitted = vi.fn();
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={onCommitted} />
+      </Wrapper>,
+    );
+
+    await screen.findByText("AI로 세션 기록 생성");
+    const file = new File(["t"], "transcript.txt", { type: "text/plain" });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
+    });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await act(async () => {
+      fireEvent.click(submit);
+    });
+
+    expect(await screen.findByRole("status")).toHaveTextContent("AI 기록 저장을 완료했습니다.");
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+  });
+
   it("shows an unavailable state when club AI defaults cannot be loaded", async () => {
     mockedClubDefault.mockReset();
     mockedClubDefault.mockRejectedValueOnce(new Error("AI generation is disabled"));
