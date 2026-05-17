@@ -175,7 +175,7 @@ Git history까지 검사하는 `gitleaks detect --source .`는 이미 공개된 
 아래 값이 로컬 배포 상태 파일, 공유 메모, screenshot, terminal output에 노출된 적이 있으면 공개 전 또는 공개 직후 순서대로 교체합니다.
 
 1. 새 BFF secret을 생성합니다.
-2. OCI VM `/etc/readmates/readmates.env`에 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 Spring을 재시작합니다.
+2. GitHub Secrets `READMATES_BFF_SECRETS`에 `<new-secret>,<old-secret>`을 설정하고 `sync-config` 워크플로를 실행해 OCI VM `/etc/readmates/readmates.env`를 갱신하고 `readmates-api`를 재시작합니다 (절차: [secrets management runbook](../operations/runbooks/secrets-management.md)).
 3. Cloudflare Pages 운영 secret에도 같은 `READMATES_BFF_SECRETS` 목록을 설정하고 배포합니다.
 4. `/api/bff/api/auth/me`를 smoke test합니다.
 5. `/api/bff/__internal/secret-status`와 `bff_secret_rotation_audit`에서 old-secret alias 트래픽이 0으로 떨어졌는지 확인한 뒤 old secret을 제거합니다.

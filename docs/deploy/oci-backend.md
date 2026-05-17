@@ -115,19 +115,10 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/01-vm-s
 
 ## 운영 설정 적용
 
-로컬에서 secret을 환경 변수로 주입해 실행합니다.
+VM 인프라(디렉터리, Caddy)는 `02-configure.sh`로 1회 세팅합니다.
 
 ```bash
-APP_DB_PASS='<db-password>' \
-BFF_SECRET='<same-secret-as-cloudflare>' \
-MYSQL_PRIVATE_IP='<mysql-private-ip>' \
-READMATES_APP_BASE_URL='https://readmates.pages.dev' \
-READMATES_AUTH_BASE_URL='https://readmates.pages.dev' \
-READMATES_AUTH_RETURN_STATE_SECRET='{return-state-signing-secret}' \
-READMATES_ALLOWED_ORIGINS='https://readmates.pages.dev' \
 CADDY_SITE='api.example.com' \
-GOOGLE_CLIENT_ID='<google-oauth-client-id>' \
-GOOGLE_CLIENT_SECRET='<google-oauth-client-secret>' \
 ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-configure.sh
 ```
 
@@ -135,12 +126,13 @@ ssh -i ~/.ssh/readmates_oci ubuntu@<vm-public-ip> 'bash -s' < deploy/oci/02-conf
 
 `02-configure.sh`가 수행하는 일:
 
-- `/etc/readmates/readmates.env` 생성, 권한 `600`
-- `/etc/systemd/system/readmates-server.service` 등록
-- `readmates-server` 서비스 enable
+- `/etc/readmates` 디렉터리 생성 (deploy 사용자 소유, 권한 `750`)
+- `/opt/readmates` 디렉터리 생성
 - Caddy reverse proxy 설정, `${CADDY_SITE} -> 127.0.0.1:8080`
 
-`02-configure.sh`는 baseline OAuth, DB, BFF 값으로 `/etc/readmates/readmates.env`를 다시 생성합니다. Compose stack도 이 Spring env 파일을 읽습니다. 알림 발송을 켜는 배포에서는 실행 뒤 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*` 값을 같은 env 파일에 운영 값으로 추가하고 compose stack의 `readmates-api`를 재시작합니다.
+스크립트는 secret을 더 이상 직접 쓰지 않습니다. `/etc/readmates/readmates.env`(Spring 운영 변수)와 `/etc/readmates/caddy.env`는 GitHub Actions의 `sync-config` 워크플로가 GitHub Secrets/Variables 값을 렌더링해 scp로 배포합니다. 변수 inventory, 추가/회전 절차, 비상 복구 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md), 초기 VM 배포키 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다.
+
+알림 발송, AI 생성, BFF secret rotation처럼 위 환경 변수 블록의 `READMATES_NOTIFICATIONS_ENABLED`, `READMATES_KAFKA_*`, `READMATES_NOTIFICATION_SENDER_*`, `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`, `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS`, `SPRING_MAIL_*`, `READMATES_AIGEN_*`, `READMATES_BFF_SECRETS` 값을 바꾸는 배포는 GitHub Secrets/Variables를 갱신한 뒤 `sync-config` 워크플로를 실행하고, 마지막에 compose stack의 `readmates-api`를 재시작합니다.
 
 ## Redis and Kafka Rollout
 
@@ -412,7 +404,7 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
 
 무중단 rotation 절차:
 
-1. `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 `/etc/readmates/readmates.env`에 추가하고 서버를 재시작합니다.
+1. GitHub Secrets `READMATES_BFF_SECRETS`에 `<new-secret>,<old-secret>` 값을 설정한 뒤 `sync-config` 워크플로(`.github/workflows/sync-config.yml`)를 실행해 `/etc/readmates/readmates.env`를 갱신하고 compose stack의 `readmates-api`를 재시작합니다. 세부 절차는 [secrets management runbook](../operations/runbooks/secrets-management.md)을 따릅니다.
 2. Cloudflare Pages 환경 변수에도 `READMATES_BFF_SECRETS=<new-secret>,<old-secret>`을 설정하고 배포합니다. (또는 BFF를 먼저 `<new-secret>`만으로 전환합니다.)
 3. BFF `/api/bff/api/auth/me` smoke로 정상 동작을 확인합니다.
 4. `bff_secret_rotation_audit` 테이블에서 old-secret alias 트래픽이 0으로 떨어졌는지 확인합니다. 기본 `rotation-only` audit mode에서는 rotation 확인에 필요한 non-primary alias 사용만 비동기로 기록합니다. old-secret alias의 최근 row가 없으면 모든 트래픽이 new-secret으로 전환된 것입니다.
@@ -425,7 +417,7 @@ SMTP까지 실제 발송으로 확인할 때만 `SPRING_MAIL_HOST`, `SPRING_MAIL
    ORDER BY last_seen DESC;
    ```
 
-5. `<old-secret>`을 제거하고 `READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET=<shared-bff-secret>`으로 env를 정리한 뒤 재시작합니다.
+5. GitHub Secrets에서 `<old-secret>`을 제거해 `READMATES_BFF_SECRETS=<new-secret>` 또는 `READMATES_BFF_SECRET=<shared-bff-secret>`만 남기고 `sync-config` 워크플로를 다시 실행합니다.
 
 `READMATES_BFF_SECRETS`가 설정되면 `READMATES_BFF_SECRET`은 fallback으로만 쓰입니다.
 
@@ -445,5 +437,5 @@ where used_at < utc_timestamp() - interval 30 day;
 ### IP hash base secret
 
 `READMATES_IP_HASH_BASE_SECRET` 환경변수는 client IP hash의 주간 salt rotation에서 base secret 역할을 한다. 한 번 생성한 후 manual rotation 대상이 아니다.
-생성: `openssl rand -base64 32`. 값은 `/etc/readmates/readmates.env`에 추가하고 1Password에 저장한다.
+생성: `openssl rand -base64 32`. 값은 1Password에 저장하고, GitHub Secrets `READMATES_IP_HASH_BASE_SECRET`에 등록한 뒤 `sync-config` 워크플로로 `/etc/readmates/readmates.env`에 반영한다.
 운영 프로파일(`spring.profiles.active`가 비어 있거나 `production` 포함)에서 비어 있으면 startup이 명시적 메시지와 함께 실패한다(DEF-002). local/test 등 비운영 프로파일도 기본값은 실패이며, 빈 값을 허용하려면 `readmates.security.ip-hash.allow-empty-secret=true`를 명시해야 한다. 이 opt-in 설정일 때만 startup이 계속되고 WARN이 출력되며, 운영에서는 이 설정으로도 빈 값을 허용하지 않는다.

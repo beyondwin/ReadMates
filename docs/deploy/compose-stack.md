@@ -14,12 +14,9 @@ ReadMates의 최종 OCI backend runtime은 Caddy, Spring Boot API, Redis, Redpan
 
 Compose stack은 deploy/config/start 전에 VM의 `/etc/readmates/readmates.env`가 먼저 있어야 합니다. 이 파일에는 Spring `prod` runtime 값이 들어가며 Git에는 실제 값을 기록하지 않습니다.
 
-준비 방법은 둘 중 하나입니다.
+운영 표준 경로는 GitHub Actions의 `sync-config` 워크플로(`.github/workflows/sync-config.yml`)입니다. 워크플로는 GitHub Secrets/Variables 값을 렌더링해 `/etc/readmates/readmates.env`와 `/etc/readmates/caddy.env`를 scp로 배포합니다. 변수 inventory, 추가/회전 절차, 비상 복구는 [secrets management runbook](../operations/runbooks/secrets-management.md)을, 워크플로가 사용하는 deploy key/sudoers 부트스트랩은 [VM deploy key bootstrap](../operations/runbooks/vm-deploy-key-bootstrap.md)을 따릅니다. `deploy/oci/02-configure.sh`는 디렉터리와 Caddy만 설정하고 readmates.env를 더 이상 만들지 않습니다.
 
-1. Legacy host 설정 flow로 `/etc/readmates/readmates.env`를 먼저 만듭니다. `deploy/oci/02-configure.sh`는 placeholder-safe 변수 이름만 문서화하고 실제 운영 값은 실행 시 Git 밖에서 주입합니다.
-2. 운영자가 VM에서 `/etc/readmates/readmates.env`를 직접 만듭니다. 문서에는 `<db-password>`, `<google-oauth-client-id>` 같은 placeholder만 남기고 실제 DB/OAuth/BFF/SMTP 값은 VM 또는 운영 secret 채널에만 둡니다.
-
-`05-deploy-compose-stack.sh`는 `/etc/readmates/caddy.env`와 `/opt/readmates/.env`를 생성하지만 `/etc/readmates/readmates.env`는 생성하지 않습니다.
+`05-deploy-compose-stack.sh`는 `/opt/readmates/.env`(compose image 변수)를 생성하지만 `/etc/readmates/readmates.env`와 `/etc/readmates/caddy.env`는 생성하지 않습니다.
 
 Docker와 Compose plugin은 VM에서 한 번 설치합니다.
 

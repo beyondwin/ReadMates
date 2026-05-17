@@ -117,6 +117,17 @@ READMATES_NOTIFICATION_SENDER_NAME='ReadMates' \
 
 SMTP provider가 auth 또는 TLS를 요구하면 `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true`, `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true` 같은 Spring mail property도 로컬 환경에만 추가합니다. 예시에는 실제 credential이나 private endpoint를 남기지 않습니다.
 
+## Optional Prod-parity Compose Stack
+
+OCI 운영과 같은 Docker Compose 런타임(Caddy + Spring + MySQL + Redis + Redpanda)에서 로컬 검증이 필요하면 `deploy/local/compose.override.yml`을 함께 띄웁니다. `.env`는 위 MySQL section의 `READMATES_LOCAL_MYSQL_*` 값을 사용합니다 (`READMATES_LOCAL_MYSQL_ROOT_PASSWORD`는 필수).
+
+```bash
+cp .env.example .env  # READMATES_LOCAL_MYSQL_ROOT_PASSWORD 등 편집
+docker compose -f deploy/oci/compose.yml -f deploy/local/compose.override.yml --env-file .env up
+```
+
+override는 `readmates-api` container를 `dev` profile로 띄우고 8080/3306/6379 포트를 host에 노출합니다. 운영 VM에서는 이 override를 사용하지 않습니다 (운영은 `compose.yml` + sync-config가 배포한 env_file 조합으로만 동작).
+
 ## Backend 실행
 
 로컬 개발은 `dev` profile을 사용합니다. 이 profile은 sample seed data와 dev-login fixture를 켭니다.
