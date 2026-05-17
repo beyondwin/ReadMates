@@ -10,7 +10,7 @@
 #
 # Safety:
 #   - The env file MUST be outside the repository (so it can't be committed).
-#   - Values are passed to `gh` via stdin (--body-file -), never on the command
+#   - Values are passed to `gh` via stdin (), never on the command
 #     line, so they don't leak to process listings or shell history.
 #   - This script and its classification list are safe to commit; they hold
 #     no secret values.
@@ -167,7 +167,7 @@ while IFS=$'\t' read -r key val; do
 
   if is_in_array "$key" "${SECRET_KEYS[@]}"; then
     if [ $APPLY -eq 1 ]; then
-      printf '%s' "$val" | gh secret set "$key" --body-file - >/dev/null
+      printf '%s' "$val" | gh secret set "$key"  >/dev/null
       echo "SET   secret         $key"
     else
       echo "DRY   secret         $key  (len=${#val})"
@@ -176,7 +176,7 @@ while IFS=$'\t' read -r key val; do
     n_secret=$((n_secret+1))
   elif is_in_array "$key" "${VARIABLE_KEYS[@]}"; then
     if [ $APPLY -eq 1 ]; then
-      printf '%s' "$val" | gh variable set "$key" --body-file - >/dev/null
+      printf '%s' "$val" | gh variable set "$key"  >/dev/null
       echo "SET   variable       $key  = $val"
     else
       echo "DRY   variable       $key  = $val"
