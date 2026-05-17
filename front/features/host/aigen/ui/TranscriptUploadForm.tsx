@@ -153,15 +153,6 @@ export function TranscriptUploadForm({
         />
       </div>
 
-      {/* TODO(task_3_4): wire to real cost/cap data once the endpoint exists. */}
-      <dl data-testid="aigen-cost-estimate" className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-        <dt style={{ display: "inline" }}>예상 비용</dt>
-        <dd style={{ display: "inline", marginLeft: 6 }}>- USD</dd>
-        <span aria-hidden="true"> · </span>
-        <dt style={{ display: "inline" }}>남은 한도</dt>
-        <dd style={{ display: "inline", marginLeft: 6 }}>-</dd>
-      </dl>
-
       <button type="button" className="btn btn-primary" disabled={!canSubmit} onClick={handleSubmit}>
         {submitting ? "시작 중…" : "생성 시작"}
       </button>

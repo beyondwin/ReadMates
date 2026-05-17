@@ -3,7 +3,6 @@ package com.readmates.feedback.application.port.`in`
 import com.readmates.feedback.application.model.FeedbackDocumentListItemResult
 import com.readmates.feedback.application.model.FeedbackDocumentResult
 import com.readmates.feedback.application.model.FeedbackDocumentStatusResult
-import com.readmates.feedback.application.model.FeedbackDocumentUploadCommand
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
@@ -28,15 +27,4 @@ interface GetHostFeedbackDocumentStatusUseCase {
         currentMember: CurrentMember,
         sessionId: UUID,
     ): FeedbackDocumentStatusResult
-}
-
-interface AuthorizeHostFeedbackDocumentUploadUseCase {
-    fun authorizeHostFeedbackDocumentUpload(currentMember: CurrentMember)
-}
-
-interface UploadHostFeedbackDocumentUseCase {
-    fun uploadHostFeedbackDocument(
-        currentMember: CurrentMember,
-        command: FeedbackDocumentUploadCommand,
-    ): FeedbackDocumentResult
 }

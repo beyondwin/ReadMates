@@ -369,6 +369,21 @@ describe("AiGenerateTab", () => {
     });
   });
 
+  it("shows an unavailable state when club AI defaults cannot be loaded", async () => {
+    mockedClubDefault.mockReset();
+    mockedClubDefault.mockRejectedValueOnce(new Error("AI generation is disabled"));
+
+    const { Wrapper } = createWrapper();
+    render(
+      <Wrapper>
+        <AiGenerateTab sessionId="s1" clubSlug="club-a" onCommitted={() => {}} />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent("AI 생성을 사용할 수 없습니다");
+    expect(screen.queryByRole("button", { name: "생성 시작" })).not.toBeInTheDocument();
+  });
+
   it("returns ERROR → IDLE when retry is clicked", async () => {
     mockedStart.mockResolvedValue({
       jobId: "job-1",

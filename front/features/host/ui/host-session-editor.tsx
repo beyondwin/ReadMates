@@ -9,10 +9,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { AiGenerateTab } from "@/features/host/aigen/ui/AiGenerateTab";
 import type {
   AttendanceStatus,
-  FeedbackDocumentResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDetailResponse,
   ManualNotificationDispatchListItem,
@@ -36,7 +34,6 @@ import { readmatesReturnState as defaultReadmatesReturnState } from "@/shared/ro
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
-import { HostSessionFeedbackUpload } from "./host-session-feedback-upload";
 import { AttendancePanel } from "./session-editor/attendance-panel";
 import { BasicSessionPanel } from "./session-editor/basic-session-panel";
 import { DocumentStatePanel } from "./session-editor/document-state-panel";
@@ -61,8 +58,10 @@ import {
   type MobileEditorSection,
 } from "./session-editor/mobile-editor-tabs";
 import { PublicationPanel } from "./session-editor/publication-panel";
-import { SessionImportPanel } from "./session-editor/session-import-panel";
-import { Panel } from "./session-editor/session-editor-panel";
+import {
+  SessionRecordCompletionPanel,
+  type SessionRecordCompletionMode,
+} from "./session-editor/session-record-completion-panel";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
 
@@ -84,17 +83,17 @@ function scopedHostRedirectHref(href: string) {
   return scopedAppLinkTarget(globalThis.location.pathname, href);
 }
 
-type ImportMode = "json" | "aigen";
+type ImportMode = SessionRecordCompletionMode;
 
 function readInitialImportMode(): ImportMode {
   if (typeof window === "undefined") {
-    return "json";
+    return "aigen";
   }
   try {
     const params = new URLSearchParams(window.location.search);
-    return params.get("aigen") === "1" ? "aigen" : "json";
+    return params.get("records") === "json" ? "json" : "aigen";
   } catch {
-    return "json";
+    return "aigen";
   }
 }
 
@@ -104,10 +103,12 @@ function writeImportModeToUrl(mode: ImportMode) {
   }
   try {
     const params = new URLSearchParams(window.location.search);
-    if (mode === "aigen") {
-      params.set("aigen", "1");
-    } else {
+    if (mode === "json") {
+      params.set("records", "json");
       params.delete("aigen");
+    } else {
+      params.set("aigen", "1");
+      params.delete("records");
     }
     const search = params.toString();
     const nextUrl = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash ?? ""}`;
@@ -217,7 +218,6 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   // Refs
   // ---------------------------------------------------------------------------
-  const feedbackDocumentInputRef = useRef<HTMLInputElement>(null);
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
   const deleteRestoreFocusRef = useRef<HTMLElement | null>(null);
   const committedAttendanceStatusesRef = useRef<Record<string, AttendanceStatus>>(
@@ -651,49 +651,6 @@ export default function HostSessionEditor({
     [session, actions, flash],
   );
 
-  const uploadFeedbackDocument = useCallback(
-    async (event: ChangeEvent<HTMLInputElement>) => {
-      const input = event.currentTarget;
-      const file = input.files?.[0];
-      if (!file) {
-        return;
-      }
-
-      if (!session) {
-        input.value = "";
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const response = await actions.uploadFeedbackDocument(session.sessionId, formData);
-
-        if (!response.ok) {
-          flash("피드백 문서 업로드에 실패했습니다. 파일 형식과 권한을 확인해 주세요");
-          return;
-        }
-
-        const uploaded = (await response.json()) as FeedbackDocumentResponse;
-        dispatch({
-          type: "FEEDBACK_DOCUMENT_UPDATED",
-          feedbackDocument: {
-            uploaded: true,
-            fileName: uploaded.fileName,
-            uploadedAt: uploaded.uploadedAt,
-          },
-        });
-        flash("피드백 문서가 업로드되었습니다");
-      } catch {
-        flash("피드백 문서 업로드에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요");
-      } finally {
-        input.value = "";
-      }
-    },
-    [session, actions, flash],
-  );
-
   const previewSessionImport = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const input = event.currentTarget;
@@ -816,7 +773,7 @@ export default function HostSessionEditor({
                       : "저장되었습니다. 이전 화면으로 이동합니다."
                     : saveState === "error"
                       ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
-                      : "기본 정보 저장, 기록 공개 범위 저장, 피드백 문서 업로드는 각각 별도로 처리됩니다."}
+                      : "기본 정보 저장, 기록 공개 범위 저장, 세션 기록 패키지 저장은 각각 별도로 처리됩니다."}
               </div>
             </div>
             <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>
@@ -936,80 +893,24 @@ export default function HostSessionEditor({
                 onUpdateAttendance={updateAttendance}
               />
 
-              {canShowImportModeToggle ? (
-                <div
-                  className="row"
-                  role="tablist"
-                  aria-label="세션 기록 가져오기 방식"
-                  data-testid="host-editor-import-mode-toggle"
-                  style={{ gap: 8, flexWrap: "wrap" }}
-                >
-                  {([
-                    { mode: "json" as const, label: "외부 도구 JSON 업로드" },
-                    { mode: "aigen" as const, label: "AI 결과 가져오기" },
-                  ]).map(({ mode, label }) => {
-                    const selected = effectiveImportMode === mode;
-                    return (
-                      <button
-                        key={mode}
-                        type="button"
-                        role="tab"
-                        aria-selected={selected}
-                        className={`btn btn-sm${selected ? " btn-primary" : " btn-quiet"}`}
-                        onClick={() => handleImportModeChange(mode)}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              {effectiveImportMode === "aigen" && sessionIdForAigen && clubSlug ? (
-                <Panel
-                  eyebrow="AI 생성"
-                  title="AI로 세션 기록 가져오기"
-                  mobileSection="report"
-                  panelId="host-editor-panel-aigen"
-                  activeMobileSection={activeMobileSection}
-                >
-                  <AiGenerateTab
-                    sessionId={sessionIdForAigen}
-                    clubSlug={clubSlug}
-                    onCommitted={handleAigenCommitted}
-                  />
-                </Panel>
-              ) : (
-                <SessionImportPanel
-                  activeMobileSection={activeMobileSection}
-                  sessionId={session?.sessionId}
-                  recordVisibility={recordVisibility}
-                  preview={sessionImportPreview}
-                  status={sessionImportStatus}
-                  error={sessionImportError}
-                  onFileSelected={previewSessionImport}
-                  onCommit={commitSessionImport}
-                />
-              )}
-
-              <Panel
-                eyebrow="피드백 문서 · 민감"
-                title="피드백 문서"
-                tone="warn"
-                mobileSection="report"
-                panelId="host-editor-panel-report"
+              <SessionRecordCompletionPanel
                 activeMobileSection={activeMobileSection}
-              >
-                <HostSessionFeedbackUpload
-                  sessionId={session?.sessionId}
-                  feedbackDocument={feedbackDocumentForPanel}
-                  inputRef={feedbackDocumentInputRef}
-                  emptyMessage={emptyManagementMessage}
-                  previewState={feedbackPreviewState}
-                  LinkComponent={LinkComponent}
-                  onUploadFeedbackDocument={uploadFeedbackDocument}
-                />
-              </Panel>
+                sessionId={session?.sessionId}
+                clubSlug={clubSlug}
+                mode={effectiveImportMode}
+                canUseAigen={canShowImportModeToggle}
+                feedbackDocument={feedbackDocumentForPanel}
+                previewState={feedbackPreviewState}
+                LinkComponent={LinkComponent}
+                recordVisibility={recordVisibility}
+                preview={sessionImportPreview}
+                status={sessionImportStatus}
+                error={sessionImportError}
+                onModeChange={handleImportModeChange}
+                onAigenCommitted={handleAigenCommitted}
+                onFileSelected={previewSessionImport}
+                onCommit={commitSessionImport}
+              />
             </form>
 
             <aside className="stack rm-host-session-editor__aside" style={{ "--stack": "20px" } as CSSProperties}>
