@@ -14,6 +14,7 @@ Engineering proof portfolio 분기에서는 다음 순서로 server state migrat
 
 ## 완료
 - `host/invitations` — list query + create/revoke mutation + loader hand-off
+- `host/members` — list query + lifecycle/profile/viewer mutation refresh + loader hand-off
 
 ## 패턴
 - query: `features/<feature>/queries/<area>-queries.ts` 에 `queryOptions` + `useXxxMutation` export
@@ -22,8 +23,7 @@ Engineering proof portfolio 분기에서는 다음 순서로 server state migrat
 - 컴포넌트는 actions props 인터페이스를 유지 — 테스트는 wrapper + mock actions 로 동일하게 작성
 
 ## 후속 후보 (우선순위)
-1. `host/members`
+1. `host/notifications`
 2. `host/sessions`
-3. `host/notifications`
-4. `current-session` (actions 4개)
-5. `archive`, `feedback`, `public` — 읽기 중심, loader 와 결합도 높음
+3. `current-session` (actions 4개)
+4. `archive`, `feedback`, `public` — 읽기 중심, loader 와 결합도 높음

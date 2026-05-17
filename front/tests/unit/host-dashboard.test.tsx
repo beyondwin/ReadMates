@@ -7,7 +7,7 @@ import HostDashboard from "@/features/host/ui/host-dashboard";
 import {
   hostDashboardLoader,
   hostInvitationsLoaderFactory,
-  hostMembersLoader,
+  hostMembersLoaderFactory,
   hostSessionEditorLoader,
 } from "@/features/host";
 import { QueryClient } from "@tanstack/react-query";
@@ -328,7 +328,7 @@ function hostSessionEditorLoaderForTest() {
 
 const hostLoaderCases: Array<[string, () => Promise<unknown>, string]> = [
   ["dashboard", () => hostDashboardLoader(), "/login"],
-  ["members", () => hostMembersLoader(), "/login"],
+  ["members", () => hostMembersLoaderFactory(new QueryClient())(), "/login"],
   ["invitations", () => hostInvitationsLoaderFactory(new QueryClient())(), "/login"],
   ["session editor", hostSessionEditorLoaderForTest, "/login?returnTo=%2Fapp%2Fhost%2Fsessions%2Fsession-7%2Fedit"],
 ];

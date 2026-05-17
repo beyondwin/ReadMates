@@ -39,7 +39,7 @@ export {
 } from "@/features/host/route/host-members-route";
 export {
   hostMembersActions,
-  hostMembersLoader,
+  hostMembersLoaderFactory,
 } from "@/features/host/route/host-members-data";
 export {
   HostInvitationsRoute,

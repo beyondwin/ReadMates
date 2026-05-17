@@ -27,11 +27,14 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostMembersRouteElement }, { hostMembersLoader }] = await Promise.all([
+        const [{ HostMembersRouteElement }, { hostMembersLoaderFactory }] = await Promise.all([
           import("@/src/app/host-route-elements"),
           import("@/features/host/route/host-members-data"),
         ]);
-        return { Component: HostMembersRouteElement, loader: hostMembersLoader };
+        return {
+          Component: HostMembersRouteElement,
+          loader: hostMembersLoaderFactory(queryClient),
+        };
       },
     },
     {
