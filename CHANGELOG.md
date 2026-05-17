@@ -9,6 +9,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- **platform-admin:** 플랫폼 운영자용 triage 콘솔(`/admin`) — 온보딩 큐, 클럽 디렉터리, 클럽 상세 + Support access grant 패널을 단일 워크벤치로 통합. OWNER 전용 support access, 라이프사이클 우선 정렬, 온보딩 결과의 즉시 선택 반영.
 
 ## v1.10.2 - 2026-05-17
 
