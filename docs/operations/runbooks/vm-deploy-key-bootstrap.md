@@ -15,25 +15,25 @@ ssh-keygen -t ed25519 -C "github-actions-deploy@readmates" -f ./readmates-deploy
 
 생성된 `readmates-deploy` (private), `readmates-deploy.pub` (public) 두 파일.
 
-#### 2. VM에 `deploy` 유저 생성 (없으면)
+### 2. VM에 `deploy` 유저 생성 (없으면)
 
 ```bash
 ssh ubuntu@<vm-host> "sudo adduser --disabled-password --gecos '' deploy"
 ```
 
-#### 3. pubkey를 deploy 유저 authorized_keys 에 등록
+### 3. pubkey를 deploy 유저 authorized_keys 에 등록
 
 ```bash
 cat /tmp/readmates-deploy.pub | ssh ubuntu@<vm-host> "sudo tee -a /home/deploy/.ssh/authorized_keys >/dev/null && sudo chown -R deploy:deploy /home/deploy/.ssh && sudo chmod 700 /home/deploy/.ssh && sudo chmod 600 /home/deploy/.ssh/authorized_keys"
 ```
 
-#### 4. `/etc/readmates/` 디렉토리 권한
+### 4. `/etc/readmates/` 디렉토리 권한
 
 ```bash
 ssh ubuntu@<vm-host> "sudo mkdir -p /etc/readmates && sudo chown deploy:deploy /etc/readmates && sudo chmod 750 /etc/readmates"
 ```
 
-#### 5. sudoers 작성 (4개 명령에만 NOPASSWD)
+### 5. sudoers 작성 (4개 명령에만 NOPASSWD)
 
 ```bash
 ssh ubuntu@<vm-host> "sudo tee /etc/sudoers.d/readmates-deploy >/dev/null" <<'EOF'
@@ -47,7 +47,7 @@ ssh ubuntu@<vm-host> "sudo chmod 440 /etc/sudoers.d/readmates-deploy && sudo vis
 
 마지막 `visudo -c` 가 `parsed OK` 출력하는지 확인.
 
-#### 6. sshd 비표준 포트 + 비밀번호 인증 비활성화
+### 6. sshd 비표준 포트 + 비밀번호 인증 비활성화
 
 ```bash
 ssh ubuntu@<vm-host> "sudo tee /etc/ssh/sshd_config.d/99-readmates.conf >/dev/null" <<'EOF'
@@ -74,7 +74,7 @@ ssh -p 2222 -i /tmp/readmates-deploy deploy@<vm-host> 'whoami && id'
 
 성공 확인 후 OCI security list에서 기존 포트 22 inbound 제거 (admin 키만 별도 IP 제한으로 유지하거나 같은 2222로 통일).
 
-#### 7. fail2ban sshd jail 활성화 확인
+### 7. fail2ban sshd jail 활성화 확인
 
 ```bash
 ssh -p 2222 -i /tmp/readmates-deploy deploy@<vm-host> "sudo systemctl status fail2ban && sudo fail2ban-client status sshd"
@@ -87,7 +87,7 @@ ssh -p 2222 -i /tmp/readmates-deploy deploy@<vm-host> "sudo systemctl status fai
 ssh ubuntu@<vm-host> "sudo apt-get install -y fail2ban && sudo systemctl enable --now fail2ban"
 ```
 
-#### 8. known_hosts 라인 수집
+### 8. known_hosts 라인 수집
 
 ```bash
 ssh-keyscan -p 2222 -t ed25519 <vm-host>
@@ -95,7 +95,7 @@ ssh-keyscan -p 2222 -t ed25519 <vm-host>
 
 출력 첫 줄을 클립보드에 복사.
 
-#### 9. GitHub Repository Secrets/Variables 등록
+### 9. GitHub Repository Secrets/Variables 등록
 
 GitHub Repo → **Settings → Secrets and variables → Actions**:
 
@@ -109,7 +109,7 @@ GitHub Repo → **Settings → Secrets and variables → Actions**:
 - `READMATES_VM_SSH_PORT` = `2222`
 - `READMATES_DEPLOY_ROOT` = `/opt/readmates`
 
-#### 10. 로컬 임시 키 파일 안전 삭제
+### 10. 로컬 임시 키 파일 안전 삭제
 
 ```bash
 shred -u /tmp/readmates-deploy /tmp/readmates-deploy.pub
@@ -117,7 +117,7 @@ shred -u /tmp/readmates-deploy /tmp/readmates-deploy.pub
 
 (`shred` 없는 macOS에서는 `rm -P` 사용.)
 
-#### 11. sync-config 워크플로 1회 실행해 readmates.env 초기 배포
+### 11. sync-config 워크플로 1회 실행해 readmates.env 초기 배포
 
 GitHub Actions 탭 → **sync-config** → Run workflow → input: `restart_api=true` → Run.
 
@@ -131,7 +131,7 @@ ssh -p 2222 -i ~/.ssh/<admin-key> ubuntu@<vm-host> "sudo ls -la /etc/readmates/r
 
 `curl https://api.<domain>/actuator/health` → `{"status":"UP"}`.
 
-#### 비상 복구
+## 비상 복구
 
 deploy 키 분실/손상 시:
 1. 새 ed25519 키 페어 생성
@@ -141,7 +141,7 @@ deploy 키 분실/손상 시:
 sudoers 실수로 잠겼을 때:
 - ubuntu 유저로 ssh 접속해 `sudo visudo -f /etc/sudoers.d/readmates-deploy` 수정.
 
-#### 보안 체크리스트
+## 보안 체크리스트
 
 - [ ] private key (`/tmp/readmates-deploy`) 가 로컬에 남아있지 않다 (`shred -u` 완료)
 - [ ] private key 가 git history에 들어가 있지 않다 (`git log -p | grep -i 'BEGIN OPENSSH'` 결과 없음)

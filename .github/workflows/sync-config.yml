@@ -57,10 +57,15 @@ jobs:
       READMATES_AIGEN_GEMINI_API_KEY: ${{ secrets.READMATES_AIGEN_GEMINI_API_KEY }}
       SPRING_MAIL_USERNAME: ${{ secrets.SPRING_MAIL_USERNAME }}
       SPRING_MAIL_PASSWORD: ${{ secrets.SPRING_MAIL_PASSWORD }}
+      # ----- 배포 채널 Secrets (dry_run=false 일 때 필수) -----
+      DEPLOY_SSH_KEY: ${{ secrets.READMATES_DEPLOY_SSH_KEY }}
+      VM_KNOWN_HOSTS: ${{ secrets.READMATES_VM_KNOWN_HOSTS }}
 
     steps:
       - name: Assert required secrets present
         # 값을 절대 echo 하지 않는다 — boolean 존재 여부만 출력.
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -u
           missing=()
@@ -72,6 +77,9 @@ jobs:
             VM_HOST VM_USER VM_PORT DEPLOY_ROOT
             READMATES_APP_BASE_URL READMATES_AUTH_BASE_URL READMATES_ALLOWED_ORIGINS
           )
+          if [ "$DRY_RUN" != "true" ]; then
+            required+=(DEPLOY_SSH_KEY VM_KNOWN_HOSTS)
+          fi
           for k in "${required[@]}"; do
             v="${!k:-}"
             if [ -z "$v" ]; then
@@ -130,9 +138,6 @@ jobs:
 
       - name: Setup SSH agent + known_hosts
         if: ${{ !inputs.dry_run }}
-        env:
-          DEPLOY_SSH_KEY: ${{ secrets.READMATES_DEPLOY_SSH_KEY }}
-          VM_KNOWN_HOSTS: ${{ secrets.READMATES_VM_KNOWN_HOSTS }}
         run: |
           set -u
           umask 077
@@ -164,7 +169,14 @@ jobs:
         run: |
           ssh -p "$VM_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
             "${VM_USER}@${VM_HOST}" \
-            "sudo /usr/bin/install -m 600 -o ${VM_USER} /home/${VM_USER}/readmates.env.new /etc/readmates/readmates.env && rm -f /home/${VM_USER}/readmates.env.new"
+            "sudo /usr/bin/install -m 600 -o ${VM_USER} /home/${VM_USER}/readmates.env.new /etc/readmates/readmates.env"
+
+      - name: Cleanup remote staging file
+        if: ${{ !inputs.dry_run && always() }}
+        run: |
+          ssh -p "$VM_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "${VM_USER}@${VM_HOST}" \
+            "rm -f /home/${VM_USER}/readmates.env.new" || true
 
       - name: Restart readmates-api (optional)
         if: ${{ !inputs.dry_run && inputs.restart_api }}
