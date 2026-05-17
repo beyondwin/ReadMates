@@ -5,6 +5,8 @@ import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
+import com.readmates.sessionimport.application.model.SessionImportIssue
+import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.security.AccessDeniedException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -120,6 +122,21 @@ class AiGenerationErrorHandlerTest {
         assertThat(response.body!!.code).isEqualTo("UNKNOWN")
         assertThat(response.body!!.detail).doesNotContain("PII")
         assertThat(response.body!!.detail).doesNotContain("transcript")
+    }
+
+    @Test
+    fun `unknown handler scrubs invalid session import details from response`() {
+        val handler = AiGenerationErrorHandler()
+        val error = InvalidSessionImportException(
+            listOf(SessionImportIssue("AUTHOR_NOT_FOUND", "작성자 'Private Name'을 찾을 수 없습니다.")),
+        )
+
+        val response = handler.handleUnknown(error)
+
+        assertThat(response.statusCode.value()).isEqualTo(500)
+        assertThat(response.body!!.code).isEqualTo(ErrorCode.UNKNOWN.name)
+        assertThat(response.body!!.detail).isEqualTo("internal error")
+        assertThat(response.body!!.detail).doesNotContain("Private Name")
     }
 
     @Test

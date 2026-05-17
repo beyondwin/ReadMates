@@ -96,7 +96,13 @@ class AiGenerationErrorHandler {
     fun handleUnknown(error: RuntimeException): ResponseEntity<ProblemDetail> {
         val log = org.slf4j.LoggerFactory.getLogger(AiGenerationErrorHandler::class.java)
         if (error is com.readmates.sessionimport.application.service.InvalidSessionImportException) {
-            log.error("Unhandled AI generation exception. Issues: {}", error.issues, error)
+            val issueCodes = error.issues.map { it.code }.distinct()
+            log.error(
+                "Unhandled AI generation exception. issueCount={}, issueCodes={}",
+                error.issues.size,
+                issueCodes,
+                error,
+            )
         } else {
             log.error("Unhandled AI generation exception", error)
         }
