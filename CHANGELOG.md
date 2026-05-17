@@ -6,6 +6,20 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Highlights
+
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v1.10.0 - 2026-05-17
+
+### Highlights
+
+- **In-app AI 세션 생성 GA**: 호스트 세션 편집기 안에서 LLM(OpenAI `gpt-5.4-mini`, Gemini `gemini-3-flash`, Claude 옵션)으로 세션 회차 기록을 초안 생성 → 미리보기 편집 → 커밋하는 전체 흐름이 production에 enable됩니다. Kill switch (`READMATES_AIGEN_ENABLED`) + provider allowlist (`READMATES_AIGEN_ENABLED_PROVIDERS`) + 클럽 월 $20 cost cap이 모두 운영 가능 상태로 출시됩니다.
+- **운영 시크릿/설정의 단일 source-of-truth**: 운영 환경변수와 시크릿 관리를 SSH 편집에서 GitHub Actions `sync-config` 워크플로로 이관해, 변경 이력이 Git/Actions 로그에 남고 secret 갱신·롤백 절차가 표준화됐습니다.
+- **Observability backbone**: BFF → Spring → Kafka → SMTP까지 동일한 `X-Readmates-Request-Id`가 흐르고 모든 컴포넌트가 JSON 로그를 출력합니다. SLO 카탈로그가 startup schema 검증으로 로드되고, Grafana dashboard 2종과 AI 생성 전용 5개 alert / 8개 panel이 함께 추가됐습니다.
+- **Platform Admin & Design System**: 클럽 생성/첫 호스트 셋업/공개 노출/도메인 준비 흐름을 호스트 앱과 분리된 platform admin 권한 경계에서 운영하고, 새 pnpm workspace 루트의 `design/system` 패키지가 디자인 시스템 source-of-truth로 분리됐습니다.
+- **DB migration**: Flyway V29 (`request_id` 컬럼 추가), V30 (`ai_generation_audit_log`), V31 (`ai_generation_club_defaults`), V32 (`platform_admin_onboarding`) 4건이 함께 적용됩니다.
+
 ### Changed
 - **deploy:** 운영 시크릿/설정 관리를 SSH 편집에서 GitHub Actions `sync-config` 워크플로로 이관. `deploy/oci/02-configure.sh` 는 인프라 셋업만 담당. 로컬 개발은 `deploy/local/compose.override.yml` 로 운영과 동일한 compose 스택을 띄울 수 있게 됨. 자세한 절차: `docs/operations/runbooks/secrets-management.md`, `docs/operations/runbooks/vm-deploy-key-bootstrap.md`.
 
@@ -95,6 +109,25 @@ Validation refreshed on 2026-05-17:
 
 ### Post-deploy verification (v1.9 perf follow-up)
 - Local docker MySQL EXPLAIN 검증 완료 (2026-05-15): rewritten `publicStats`/`publicSessions`에 대해 `sessions`는 PRIMARY `eq_ref`, `session_participants`는 `session_participants_club_session_status_member_idx` covering index lookup, `one_line_reviews`는 unique `session_id` `eq_ref`로 핵심 path에 full scan 없음. 운영(OCI MySQL HeatWave) row 수 기준 재확인은 [docs/reports/2026-05-15-v19-perf-explain-verification.md](docs/reports/2026-05-15-v19-perf-explain-verification.md)의 운영 DB 재현 절차로 별도 실행.
+
+### Deployment Notes
+
+- **DB migration**: Flyway V29 (`correlation_request_id_columns`) → V30 (`create_ai_generation_audit_log`) → V31 (`create_ai_generation_club_defaults`) → V32 (`platform_admin_onboarding`) 4건이 backend startup 시 순차 적용됩니다. 모두 additive (신규 컬럼/테이블) 변경이라 rollback 시 schema 추가분이 남지만 application은 정상 동작합니다.
+- **배포 순서**: tag push가 `deploy-front.yml`(Cloudflare Pages — 자동)과 `deploy-server.yml`(GHCR 이미지 빌드 + Trivy + release tag promote — 자동)을 함께 트리거합니다. `deploy-server.yml`이 GHCR `ghcr.io/<owner>/<repo>/readmates-server:v1.10.0` promotion을 완료한 뒤, `READMATES_SERVER_IMAGE` GitHub Variable을 v1.10.0으로 올리고 `sync-config` 워크플로를 한 번 더 실행해 VM의 `/opt/readmates/.env`에 새 이미지 태그를 반영한 다음 `deploy/oci/05-deploy-compose-stack.sh`로 backend container를 promote합니다. Frontend Pages는 tag push 즉시 배포되므로 짧은 시간 동안 신규 프론트엔드가 v1.9 서버를 호출할 수 있으며, AIGEN UI는 server kill switch가 켜진 다음에만 의미 있는 호출을 하므로 정합성 영향은 없습니다.
+- **AIGEN 운영 토글**: `READMATES_AIGEN_ENABLED=true` + `READMATES_AIGEN_ENABLED_PROVIDERS=OPENAI,GEMINI`가 GitHub Variables에 이미 등록되어 있어 v1.10.0 배포와 동시에 AI 생성 기능이 enable됩니다. OpenAI/Gemini API key는 `READMATES_AIGEN_{OPENAI,GEMINI}_API_KEY` secret으로 동기화되어 있습니다. 사용량 cap은 application.yml 기본값(`host-daily-calls=10`, `club-monthly-cost-usd=20`, `host-per-minute-calls=5`).
+- **운영 smoke 기대값**: `curl -fsS http://<vm-ip>/internal/health` → `200 OK`, `/api/host/clubs/<club>/ai-defaults`가 403 (인증) 또는 200 (인증된 호스트)으로 응답(503 `AI_DISABLED`이 아님), Flyway version table에 V29~V32 항목 4개 추가.
+- **롤백**: `READMATES_SERVER_IMAGE` GitHub Variable을 `v1.9.0` 태그로 되돌리고 `sync-config` 재실행 → `05-deploy-compose-stack.sh` 재실행. DB schema는 forward-only이므로 V29~V32는 남고 v1.9.0 코드는 이를 무시한다.
+
+### Verification
+
+CI run 25987965235 (commit `f088cd42`, 2026-05-17): 9 잡 모두 success — Backend, Backend Integration, Frontend, Public release safety, Design system, Scripts, E2E (1/3, 2/3, 3/3). 추가 로컬 검증:
+
+- `./scripts/build-public-release-candidate.sh` — pass.
+- `./scripts/public-release-check.sh .tmp/public-release-candidate` — pass.
+- `bash scripts/aigen-pii-check.sh` — pass.
+- `git diff --check v1.9.0..HEAD` — pass.
+
+Live Claude/OpenAI/Gemini provider smoke는 v1.10 배포 직후 `scripts/aigen-smoke-{openai,gemini}.sh`를 운영 환경에서 수동 실행해 확인합니다.
 
 ## v1.9.0 - 2026-05-15
 
