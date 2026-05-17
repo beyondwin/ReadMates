@@ -646,11 +646,8 @@ import {
   submitHostViewerAction,
 } from "@/features/host/api/host-api";
 import type {
-  HostMemberProfileResponse,
   HostMemberListPage,
   MemberLifecycleRequest,
-  MemberLifecycleResponse,
-  ViewerMember,
 } from "@/features/host/api/host-contracts";
 import type {
   HostMemberLifecyclePath,
@@ -658,8 +655,6 @@ import type {
 } from "@/features/host/route/host-members-actions";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
-
-type JsonResponse<T> = Response & { json(): Promise<T> };
 
 export const hostMemberKeys = {
   all: ["host", "members"] as const,
@@ -727,22 +722,6 @@ export function useHostViewerActionMutation() {
     onSuccess: () => invalidateHostMembers(client),
   });
 }
-
-export async function parseHostMemberLifecycleResponse(
-  response: JsonResponse<MemberLifecycleResponse>,
-): Promise<MemberLifecycleResponse> {
-  return response.json();
-}
-
-export async function parseHostMemberProfileResponse(
-  response: JsonResponse<HostMemberProfileResponse>,
-): Promise<HostMemberProfileResponse> {
-  return response.json();
-}
-
-export function parseHostViewerResponse(response: ViewerMember): ViewerMember {
-  return response;
-}
 ```
 
 - [ ] **Step 3: Convert loader to factory and seed query cache**
@@ -793,13 +772,11 @@ export const hostMembersActions = {
 
 - [ ] **Step 4: Pass query client from host routes**
 
-Modify the `members` route in `front/src/app/routes/host.tsx`:
+Modify the `members` route in `front/src/app/routes/host.tsx` to thread `queryClient` into the loader factory while keeping the surrounding route shape identical to the current code (no new `errorElement` or `hydrateFallbackElement` fields):
 
 ```typescript
 {
   path: "members",
-  errorElement: <HostRouteError />,
-  hydrateFallbackElement: <ReadmatesRouteLoading label="멤버 목록을 불러오는 중" variant="host" />,
   lazy: async () => {
     const [{ HostMembersRouteElement }, { hostMembersLoaderFactory }] = await Promise.all([
       import("@/src/app/host-route-elements"),
@@ -812,6 +789,8 @@ Modify the `members` route in `front/src/app/routes/host.tsx`:
   },
 }
 ```
+
+The only change versus the current `host.tsx` member route is that `hostMembersLoader` becomes `hostMembersLoaderFactory(queryClient)`. Error/loading fallback wiring stays out of this task; if it should be added, do it in a separate route-UX PR.
 
 - [ ] **Step 5: Wire `HostMembers` to Query without moving API calls into UI**
 
@@ -897,7 +876,17 @@ Modify `docs/development/server-state-migration.md`:
 - `host/members` — list query + lifecycle/profile/viewer mutation refresh + loader hand-off
 ```
 
-Move `host/members` out of the 후속 후보 list.
+Also update the `## 후속 후보 (우선순위)` list so it (a) removes `host/members` and (b) reorders the remaining frontend candidates to match the design spec section 9.1 priority (`host/notifications` before `host/sessions`). The intended post-edit shape:
+
+```markdown
+## 후속 후보 (우선순위)
+1. `host/notifications`
+2. `host/sessions`
+3. `current-session` (actions 4개)
+4. `archive`, `feedback`, `public` — 읽기 중심, loader 와 결합도 높음
+```
+
+This keeps Task 8's premise (notifications is the next slice) consistent with the migration status doc.
 
 - [ ] **Step 8: Run frontend checks**
 
