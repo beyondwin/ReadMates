@@ -2,6 +2,7 @@ package com.readmates.aigen.adapter.out.llm.openai
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.readmates.aigen.support.AiGenerationTestModels
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -49,7 +50,7 @@ class OpenAiApiClientLiveContractTest {
 
         val result =
             client.callJsonSchema(
-                model = "gpt-4o-mini",
+                model = AiGenerationTestModels.OPENAI_DEFAULT,
                 systemPrompt = "You are a smoke-test helper. Always emit a JSON object matching the schema.",
                 userText = "Please respond with value=\"ok\".",
                 transcriptText = "(smoke transcript — irrelevant content)",
