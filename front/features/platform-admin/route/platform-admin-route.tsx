@@ -130,6 +130,25 @@ export function PlatformAdminRoute() {
         const result = await commitPlatformAdminOnboarding(request);
         setClubs((current) => prependOrReplaceClub(current, result.club));
         setSelectedClubId(result.club.clubId);
+        if (result.domain) {
+          const domain = result.domain;
+          setSummary((current) => {
+            const alreadyTracked =
+              current.domains?.some((candidate) => candidate.id === domain.id) ?? false;
+            return {
+              ...current,
+              domains: prependOrReplaceDomain(current.domains, domain),
+              domainsRequiringAction:
+                domain.status === "ACTION_REQUIRED"
+                  ? prependOrReplaceDomain(current.domainsRequiringAction, domain)
+                  : current.domainsRequiringAction,
+              domainActionRequiredCount:
+                domain.status === "ACTION_REQUIRED" && !alreadyTracked
+                  ? current.domainActionRequiredCount + 1
+                  : current.domainActionRequiredCount,
+            };
+          });
+        }
         return result;
       }}
       onUpdateClub={async (clubId, request) => {
@@ -209,6 +228,17 @@ function recomputeActionRequiredCount(
     return summary.domainActionRequiredCount + 1;
   }
   return summary.domainActionRequiredCount;
+}
+
+function prependOrReplaceDomain(
+  domains: PlatformAdminDomainResponse[] | undefined,
+  domain: PlatformAdminDomainResponse,
+): PlatformAdminDomainResponse[] {
+  const current = domains ?? [];
+  if (current.some((candidate) => candidate.id === domain.id)) {
+    return current.map((candidate) => (candidate.id === domain.id ? domain : candidate));
+  }
+  return [domain, ...current];
 }
 
 function withoutKey(record: Record<string, string>, key: string) {
