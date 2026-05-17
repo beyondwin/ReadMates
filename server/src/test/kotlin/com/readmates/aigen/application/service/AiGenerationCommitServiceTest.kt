@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
@@ -108,7 +109,9 @@ class AiGenerationCommitServiceTest {
                 recordVisibility = SessionRecordVisibility.MEMBER,
                 overrideResult = null,
             )
-        }.isInstanceOf(IllegalStateException::class.java)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.AUTHOR_NAME_MISMATCH)
+        }
 
         assertThat(ctx.delegate.invocations).isEmpty()
         assertThat(ctx.jobStore.deleted).isEmpty()
@@ -140,7 +143,9 @@ class AiGenerationCommitServiceTest {
                 recordVisibility = SessionRecordVisibility.MEMBER,
                 overrideResult = badOverride,
             )
-        }.isInstanceOf(IllegalStateException::class.java)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.AUTHOR_NAME_MISMATCH)
+        }
 
         // Redis result MUST be unchanged on failed validation — the trust boundary
         // requires validation BEFORE we mutate the persisted snapshot.

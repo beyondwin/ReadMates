@@ -403,10 +403,9 @@ class AiGenerationRegenerationService(
             ErrorCode.AI_DISABLED,
             ErrorCode.JOB_EXPIRED,
             ErrorCode.QUEUE_UNAVAILABLE,
-            -> throw IllegalStateException("$code: $message")
+            -> throw AiGenerationException.Coded(code, message)
             else -> throw LlmGenerationException(
-                com.readmates.aigen.application.model
-                    .GenerationError(code, message),
+                com.readmates.aigen.application.model.GenerationError(code, message),
             )
         }
         // MAX_CALLS_EXCEEDED takes the LlmGenerationException branch so the

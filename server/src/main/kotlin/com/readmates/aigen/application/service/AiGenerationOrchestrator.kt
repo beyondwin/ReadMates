@@ -285,7 +285,7 @@ class AiGenerationOrchestrator(
                 createdAt = clock.instant(),
             ),
         )
-        throw IllegalStateException("$code: $message")
+        throw AiGenerationException.Coded(code, message)
     }
 
     /**
@@ -326,7 +326,7 @@ class AiGenerationOrchestrator(
                 createdAt = clock.instant(),
             ),
         )
-        throw IllegalStateException("$code: $message")
+        throw AiGenerationException.Coded(code, message)
     }
 
     private fun sha256(text: String): String {

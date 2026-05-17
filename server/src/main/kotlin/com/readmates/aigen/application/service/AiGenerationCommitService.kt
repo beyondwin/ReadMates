@@ -183,6 +183,6 @@ class AiGenerationCommitService(
                 createdAt = clock.instant(),
             ),
         )
-        throw IllegalStateException("Validation failed: ${violation.code}: ${violation.message}")
+        throw AiGenerationException.Coded(violation.code, violation.message)
     }
 }

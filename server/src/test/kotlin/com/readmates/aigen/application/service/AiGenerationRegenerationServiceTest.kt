@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.JobStatus
@@ -146,7 +147,9 @@ class AiGenerationRegenerationServiceTest {
                 model = null,
                 instructions = null,
             )
-        }.isInstanceOf(IllegalStateException::class.java)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.HOST_DAILY_CAP_EXCEEDED)
+        }
 
         assertThat(ctx.regenerator.calls).isEmpty()
         val audit = ctx.auditPort.entries.single()

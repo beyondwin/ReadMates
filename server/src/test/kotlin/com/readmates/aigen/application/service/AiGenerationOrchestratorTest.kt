@@ -91,7 +91,9 @@ class AiGenerationOrchestratorTest {
 
         assertThatThrownBy {
             ctx.orchestrator.start(ctx.command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name))
-        }.isInstanceOf(IllegalStateException::class.java)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.AI_DISABLED)
+        }
 
         val audit = ctx.auditPort.entries.single()
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
@@ -107,7 +109,9 @@ class AiGenerationOrchestratorTest {
 
         assertThatThrownBy {
             ctx.orchestrator.start(ctx.command(model = AiGenerationTestFixtures.CLAUDE_MODEL.name))
-        }.isInstanceOf(IllegalStateException::class.java)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.HOST_DAILY_CAP_EXCEEDED)
+        }
 
         val audit = ctx.auditPort.entries.single()
         assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
