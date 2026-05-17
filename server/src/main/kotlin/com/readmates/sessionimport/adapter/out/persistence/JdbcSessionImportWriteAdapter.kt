@@ -239,6 +239,7 @@ class JdbcSessionImportWriteAdapter(
             fileName = fileName,
             title = command.feedbackTitle,
             uploadedAt = uploadedAt,
+            version = nextVersion,
         )
     }
 
