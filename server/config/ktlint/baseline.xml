@@ -1,5 +1,155 @@
 <?xml version="1.0" encoding="utf-8"?>
 <baseline version="1.0">
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumer.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationAuthorizationPolicy.kt">
+        <error line="1" column="9" source="standard:package-name" />
+        <error line="47" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="48" column="36" source="standard:function-signature" />
+        <error line="48" column="53" source="standard:function-signature" />
+        <error line="48" column="74" source="standard:function-signature" />
+        <error line="49" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="49" column="23" source="standard:chain-method-continuation" />
+        <error line="68" column="35" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationKillSwitchFilter.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/web/ClubAiDefaultsController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/out/llm/common/LlmErrorMapper.kt">
+        <error line="36" column="22" source="standard:function-signature" />
+        <error line="36" column="36" source="standard:function-signature" />
+        <error line="36" column="54" source="standard:function-signature" />
+        <error line="44" column="33" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/out/llm/common/LlmPromptBuilder.kt">
+        <error line="22" column="31" source="standard:function-signature" />
+        <error line="22" column="50" source="standard:function-signature" />
+        <error line="22" column="71" source="standard:function-signature" />
+        <error line="54" column="33" source="standard:function-signature" />
+        <error line="54" column="52" source="standard:function-signature" />
+        <error line="54" column="69" source="standard:function-signature" />
+        <error line="77" column="71" source="standard:multiline-expression-wrapping" />
+        <error line="77" column="71" source="standard:function-signature" />
+        <error line="90" column="46" source="standard:function-signature" />
+        <error line="90" column="65" source="standard:function-signature" />
+        <error line="90" column="98" source="standard:function-signature" />
+        <error line="97" column="36" source="standard:function-signature" />
+        <error line="97" column="55" source="standard:function-signature" />
+        <error line="97" column="76" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/adapter/out/llm/common/YamlModelCatalog.kt">
+        <error line="37" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="40" column="53" source="standard:multiline-expression-wrapping" />
+        <error line="46" column="9" source="standard:chain-method-continuation" />
+        <error line="49" column="55" source="standard:multiline-expression-wrapping" />
+        <error line="49" column="73" source="standard:chain-method-continuation" />
+        <error line="55" column="40" source="standard:multiline-expression-wrapping" />
+        <error line="63" column="48" source="standard:multiline-expression-wrapping" />
+        <error line="77" column="51" source="standard:function-signature" />
+        <error line="80" column="61" source="standard:multiline-expression-wrapping" />
+        <error line="80" column="61" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/port/in/AiGenerationUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/port/in/ClubAiDefaultsUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+        <error line="15" column="13" source="standard:function-signature" />
+        <error line="15" column="31" source="standard:function-signature" />
+        <error line="15" column="52" source="standard:function-signature" />
+        <error line="19" column="16" source="standard:function-signature" />
+        <error line="19" column="34" source="standard:function-signature" />
+        <error line="19" column="56" source="standard:function-signature" />
+        <error line="19" column="77" source="standard:function-signature" />
+        <error line="27" column="31" source="standard:class-signature" />
+        <error line="27" column="56" source="standard:class-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/port/out/GenerationCostGuard.kt">
+        <error line="13" column="25" source="standard:function-signature" />
+        <error line="13" column="39" source="standard:function-signature" />
+        <error line="13" column="51" source="standard:function-signature" />
+        <error line="15" column="21" source="standard:function-signature" />
+        <error line="15" column="35" source="standard:function-signature" />
+        <error line="15" column="49" source="standard:function-signature" />
+        <error line="15" column="65" source="standard:function-signature" />
+        <error line="23" column="21" source="standard:class-signature" />
+        <error line="23" column="40" source="standard:class-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/port/out/ModelCatalog.kt">
+        <error line="8" column="5" source="standard:blank-line-before-declaration" />
+        <error line="9" column="5" source="standard:blank-line-before-declaration" />
+        <error line="10" column="5" source="standard:blank-line-before-declaration" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/port/out/SessionContentGenerator.kt">
+        <error line="9" column="5" source="standard:blank-line-before-declaration" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/port/out/SessionContentRegenerator.kt">
+        <error line="9" column="5" source="standard:blank-line-before-declaration" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/service/AiGenerationMetrics.kt">
+        <error line="45" column="1" source="standard:spacing-between-declarations-with-annotations" />
+        <error line="50" column="16" source="standard:chain-method-continuation" />
+        <error line="67" column="16" source="standard:chain-method-continuation" />
+        <error line="77" column="13" source="standard:chain-method-continuation" />
+        <error line="88" column="14" source="standard:chain-method-continuation" />
+        <error line="98" column="13" source="standard:chain-method-continuation" />
+        <error line="112" column="16" source="standard:chain-method-continuation" />
+        <error line="121" column="13" source="standard:chain-method-continuation" />
+        <error line="131" column="16" source="standard:chain-method-continuation" />
+        <error line="140" column="13" source="standard:chain-method-continuation" />
+        <error line="151" column="16" source="standard:chain-method-continuation" />
+        <error line="160" column="16" source="standard:chain-method-continuation" />
+        <error line="180" column="18" source="standard:chain-method-continuation" />
+        <error line="217" column="24" source="standard:class-signature" />
+        <error line="217" column="42" source="standard:class-signature" />
+        <error line="230" column="27" source="standard:class-signature" />
+        <error line="230" column="47" source="standard:class-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/service/AiGenerationRegenerationService.kt">
+        <error line="409" column="54" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/service/CostCalculator.kt">
+        <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="26" column="18" source="standard:function-signature" />
+        <error line="26" column="37" source="standard:function-signature" />
+        <error line="26" column="58" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/service/DefaultSessionImportV1Validator.kt">
+        <error line="36" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="41" column="25" source="standard:multiline-expression-wrapping" />
+        <error line="111" column="25" source="standard:multiline-expression-wrapping" />
+        <error line="136" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="173" column="77" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/application/service/SessionImportV1Validator.kt">
+        <error line="19" column="18" source="standard:function-signature" />
+        <error line="19" column="53" source="standard:function-signature" />
+        <error line="19" column="77" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/config/AiGenerationBeansConfig.kt">
+        <error line="32" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="35" column="9" source="standard:function-signature" />
+        <error line="35" column="51" source="standard:function-signature" />
+        <error line="41" column="9" source="standard:function-signature" />
+        <error line="41" column="55" source="standard:function-signature" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/aigen/config/AiGenerationProperties.kt">
+        <error line="14" column="52" source="standard:parameter-list-spacing" />
+        <error line="14" column="53" source="standard:no-multi-spaces" />
+    </file>
     <file name="src/main/kotlin/com/readmates/archive/adapter/in/web/ArchiveController.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
@@ -170,9 +320,6 @@
     <file name="src/main/kotlin/com/readmates/note/application/port/in/NotesFeedUseCases.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
-    <file name="src/main/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumer.kt">
-        <error line="1" column="9" source="standard:package-name" />
-    </file>
     <file name="src/main/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListener.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
@@ -192,45 +339,30 @@
         <error line="1" column="9" source="standard:package-name" />
     </file>
     <file name="src/main/kotlin/com/readmates/notification/application/model/NotificationEmailTemplates.kt">
-        <error line="246" column="9" source="standard:string-template-indent" />
-        <error line="247" column="9" source="standard:string-template-indent" />
-        <error line="248" column="9" source="standard:string-template-indent" />
-        <error line="249" column="9" source="standard:string-template-indent" />
-        <error line="250" column="9" source="standard:string-template-indent" />
-        <error line="251" column="9" source="standard:string-template-indent" />
-        <error line="252" column="9" source="standard:string-template-indent" />
-        <error line="253" column="9" source="standard:string-template-indent" />
-        <error line="254" column="9" source="standard:string-template-indent" />
-        <error line="255" column="9" source="standard:string-template-indent" />
-        <error line="256" column="9" source="standard:string-template-indent" />
-        <error line="257" column="9" source="standard:string-template-indent" />
-        <error line="258" column="9" source="standard:string-template-indent" />
-        <error line="261" column="9" source="standard:string-template-indent" />
-        <error line="264" column="9" source="standard:string-template-indent" />
         <error line="265" column="9" source="standard:string-template-indent" />
         <error line="266" column="9" source="standard:string-template-indent" />
         <error line="267" column="9" source="standard:string-template-indent" />
+        <error line="268" column="9" source="standard:string-template-indent" />
+        <error line="269" column="9" source="standard:string-template-indent" />
         <error line="270" column="9" source="standard:string-template-indent" />
         <error line="271" column="9" source="standard:string-template-indent" />
         <error line="272" column="9" source="standard:string-template-indent" />
+        <error line="273" column="9" source="standard:string-template-indent" />
+        <error line="274" column="9" source="standard:string-template-indent" />
         <error line="275" column="9" source="standard:string-template-indent" />
         <error line="276" column="9" source="standard:string-template-indent" />
         <error line="277" column="9" source="standard:string-template-indent" />
-        <error line="278" column="9" source="standard:string-template-indent" />
-        <error line="279" column="9" source="standard:string-template-indent" />
         <error line="280" column="9" source="standard:string-template-indent" />
-        <error line="281" column="9" source="standard:string-template-indent" />
-        <error line="282" column="9" source="standard:string-template-indent" />
         <error line="283" column="9" source="standard:string-template-indent" />
         <error line="284" column="9" source="standard:string-template-indent" />
         <error line="285" column="9" source="standard:string-template-indent" />
         <error line="286" column="9" source="standard:string-template-indent" />
-        <error line="287" column="9" source="standard:string-template-indent" />
-        <error line="288" column="9" source="standard:string-template-indent" />
         <error line="289" column="9" source="standard:string-template-indent" />
-        <error line="292" column="9" source="standard:string-template-indent" />
-        <error line="293" column="9" source="standard:string-template-indent" />
+        <error line="290" column="9" source="standard:string-template-indent" />
+        <error line="291" column="9" source="standard:string-template-indent" />
         <error line="294" column="9" source="standard:string-template-indent" />
+        <error line="295" column="9" source="standard:string-template-indent" />
+        <error line="296" column="9" source="standard:string-template-indent" />
         <error line="297" column="9" source="standard:string-template-indent" />
         <error line="298" column="9" source="standard:string-template-indent" />
         <error line="299" column="9" source="standard:string-template-indent" />
@@ -241,20 +373,23 @@
         <error line="304" column="9" source="standard:string-template-indent" />
         <error line="305" column="9" source="standard:string-template-indent" />
         <error line="306" column="9" source="standard:string-template-indent" />
+        <error line="307" column="9" source="standard:string-template-indent" />
+        <error line="308" column="9" source="standard:string-template-indent" />
+        <error line="311" column="9" source="standard:string-template-indent" />
+        <error line="312" column="9" source="standard:string-template-indent" />
+        <error line="313" column="9" source="standard:string-template-indent" />
+        <error line="316" column="9" source="standard:string-template-indent" />
+        <error line="317" column="9" source="standard:string-template-indent" />
+        <error line="318" column="9" source="standard:string-template-indent" />
+        <error line="319" column="9" source="standard:string-template-indent" />
+        <error line="320" column="9" source="standard:string-template-indent" />
+        <error line="321" column="9" source="standard:string-template-indent" />
+        <error line="322" column="9" source="standard:string-template-indent" />
+        <error line="323" column="9" source="standard:string-template-indent" />
+        <error line="324" column="9" source="standard:string-template-indent" />
+        <error line="325" column="9" source="standard:string-template-indent" />
     </file>
     <file name="src/main/kotlin/com/readmates/notification/application/port/in/NotificationUseCases.kt">
-        <error line="1" column="9" source="standard:package-name" />
-    </file>
-    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportController.kt">
-        <error line="1" column="9" source="standard:package-name" />
-    </file>
-    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandler.kt">
-        <error line="1" column="9" source="standard:package-name" />
-    </file>
-    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportWebDtos.kt">
-        <error line="1" column="9" source="standard:package-name" />
-    </file>
-    <file name="src/main/kotlin/com/readmates/sessionimport/application/port/in/SessionImportUseCases.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
     <file name="src/main/kotlin/com/readmates/publication/adapter/in/web/PublicController.kt">
@@ -303,6 +438,18 @@
     <file name="src/main/kotlin/com/readmates/session/application/port/in/SessionMemberWriteUseCases.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportController.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandler.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportWebDtos.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/main/kotlin/com/readmates/sessionimport/application/port/in/SessionImportUseCases.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
     <file name="src/main/kotlin/com/readmates/shared/adapter/in/web/ApiErrorResponse.kt">
         <error line="1" column="9" source="standard:package-name" />
     </file>
@@ -314,6 +461,370 @@
     </file>
     <file name="src/test/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumerIntegrationTest.kt">
         <error line="1" column="9" source="standard:package-name" />
+        <error line="90" column="16" source="standard:chain-method-continuation" />
+        <error line="92" column="28" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationControllerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+        <error line="478" column="78" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationErrorHandlerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+        <error line="130" column="21" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationKillSwitchFilterTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/in/web/ClubAiDefaultsControllerTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+        <error line="183" column="26" source="standard:function-signature" />
+        <error line="183" column="44" source="standard:function-signature" />
+        <error line="183" column="65" source="standard:function-signature" />
+        <error line="193" column="29" source="standard:function-signature" />
+        <error line="193" column="47" source="standard:function-signature" />
+        <error line="193" column="69" source="standard:function-signature" />
+        <error line="193" column="90" source="standard:function-signature" />
+        <error line="202" column="78" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/in/web/DefaultAiGenerationAuthorizationPolicyTest.kt">
+        <error line="1" column="9" source="standard:package-name" />
+        <error line="74" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="140" column="1" source="standard:no-blank-line-before-rbrace" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/out/llm/common/LlmPromptBuilderTest.kt">
+        <error line="14" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="25" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="78" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="91" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="103" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="114" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="126" column="22" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/out/llm/common/SessionImportSchemaResourceTest.kt">
+        <error line="21" column="33" source="standard:chain-method-continuation" />
+        <error line="21" column="52" source="standard:chain-method-continuation" />
+        <error line="21" column="67" source="standard:chain-method-continuation" />
+        <error line="21" column="81" source="standard:chain-method-continuation" />
+        <error line="27" column="32" source="standard:chain-method-continuation" />
+        <error line="27" column="41" source="standard:chain-method-continuation" />
+        <error line="27" column="57" source="standard:chain-method-continuation" />
+        <error line="27" column="77" source="standard:chain-method-continuation" />
+        <error line="28" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="29" column="23" source="standard:argument-list-wrapping" />
+        <error line="29" column="40" source="standard:argument-list-wrapping" />
+        <error line="29" column="53" source="standard:argument-list-wrapping" />
+        <error line="30" column="24" source="standard:argument-list-wrapping" />
+        <error line="30" column="38" source="standard:argument-list-wrapping" />
+        <error line="31" column="41" source="standard:argument-list-wrapping" />
+        <error line="31" column="67" source="standard:trailing-comma-on-call-site" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/out/llm/common/YamlModelCatalogTest.kt">
+        <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="17" column="25" source="standard:function-signature" />
+        <error line="17" column="40" source="standard:function-signature" />
+        <error line="17" column="62" source="standard:function-signature" />
+        <error line="17" column="76" source="standard:function-signature" />
+        <error line="26" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="28" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="40" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="42" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="58" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="60" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="75" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="77" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="93" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="95" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="110" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="112" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="126" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="128" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="143" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="145" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="159" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="161" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="175" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="177" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="191" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="193" column="23" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/out/llm/gemini/GeminiSchemaCompatAdapterTest.kt">
+        <error line="93" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="104" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="118" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="128" column="29" source="standard:trailing-comma-on-call-site" />
+        <error line="169" column="52" source="standard:chain-method-continuation" />
+        <error line="173" column="33" source="standard:function-signature" />
+        <error line="173" column="49" source="standard:function-signature" />
+        <error line="173" column="60" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobMessageSerializationTest.kt">
+        <error line="78" column="58" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStoreTest.kt">
+        <error line="229" column="27" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCountersTest.kt">
+        <error line="159" column="32" source="standard:function-signature" />
+        <error line="159" column="46" source="standard:function-signature" />
+        <error line="159" column="58" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/api/AiGenerateApiIntegrationTest.kt">
+        <error line="111" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="114" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="120" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="127" column="29" source="standard:multiline-expression-wrapping" />
+        <error line="127" column="36" source="standard:chain-method-continuation" />
+        <error line="131" column="22" source="standard:chain-method-continuation" />
+        <error line="149" column="16" source="standard:chain-method-continuation" />
+        <error line="165" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="171" column="29" source="standard:multiline-expression-wrapping" />
+        <error line="178" column="25" source="standard:multiline-expression-wrapping" />
+        <error line="190" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="196" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="203" column="29" source="standard:multiline-expression-wrapping" />
+        <error line="203" column="36" source="standard:chain-method-continuation" />
+        <error line="207" column="22" source="standard:chain-method-continuation" />
+        <error line="215" column="16" source="standard:chain-method-continuation" />
+        <error line="239" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="245" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="252" column="29" source="standard:multiline-expression-wrapping" />
+        <error line="252" column="36" source="standard:chain-method-continuation" />
+        <error line="256" column="22" source="standard:chain-method-continuation" />
+        <error line="270" column="16" source="standard:chain-method-continuation" />
+        <error line="284" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="290" column="29" source="standard:multiline-expression-wrapping" />
+        <error line="296" column="25" source="standard:multiline-expression-wrapping" />
+        <error line="309" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="315" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="322" column="29" source="standard:multiline-expression-wrapping" />
+        <error line="322" column="36" source="standard:chain-method-continuation" />
+        <error line="326" column="22" source="standard:chain-method-continuation" />
+        <error line="333" column="16" source="standard:chain-method-continuation" />
+        <error line="348" column="16" source="standard:chain-method-continuation" />
+        <error line="350" column="22" source="standard:chain-method-continuation" />
+        <error line="353" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="380" column="33" source="standard:function-signature" />
+        <error line="380" column="59" source="standard:function-signature" />
+        <error line="380" column="72" source="standard:function-signature" />
+        <error line="381" column="24" source="standard:chain-method-continuation" />
+        <error line="384" column="22" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationCommitServiceTest.kt">
+        <error line="28" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="32" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="41" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="67" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="86" column="52" source="standard:chain-method-continuation" />
+        <error line="86" column="61" source="standard:chain-method-continuation" />
+        <error line="89" column="47" source="standard:chain-method-continuation" />
+        <error line="89" column="56" source="standard:chain-method-continuation" />
+        <error line="97" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="130" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="162" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="167" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="176" column="32" source="standard:multiline-expression-wrapping" />
+        <error line="177" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="180" column="30" source="standard:multiline-expression-wrapping" />
+        <error line="204" column="48" source="standard:chain-method-continuation" />
+        <error line="204" column="57" source="standard:chain-method-continuation" />
+        <error line="212" column="34" source="standard:multiline-expression-wrapping" />
+        <error line="215" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="258" column="35" source="standard:multiline-expression-wrapping" />
+        <error line="275" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="297" column="36" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationFakes.kt">
+        <error line="61" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="63" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="83" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="85" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="102" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="171" column="34" source="standard:function-signature" />
+        <error line="171" column="48" source="standard:function-signature" />
+        <error line="171" column="60" source="standard:function-signature" />
+        <error line="173" column="30" source="standard:function-signature" />
+        <error line="173" column="44" source="standard:function-signature" />
+        <error line="173" column="58" source="standard:function-signature" />
+        <error line="173" column="74" source="standard:function-signature" />
+        <error line="185" column="25" source="standard:function-signature" />
+        <error line="185" column="39" source="standard:function-signature" />
+        <error line="185" column="61" source="standard:function-signature" />
+        <error line="185" column="76" source="standard:function-signature" />
+        <error line="186" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="194" column="13" source="standard:function-signature" />
+        <error line="194" column="27" source="standard:function-signature" />
+        <error line="194" column="47" source="standard:function-signature" />
+        <error line="195" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="210" column="54" source="standard:function-signature" />
+        <error line="213" column="57" source="standard:function-signature" />
+        <error line="224" column="28" source="standard:class-signature" />
+        <error line="224" column="56" source="standard:class-signature" />
+        <error line="225" column="9" source="standard:blank-line-before-declaration" />
+        <error line="225" column="28" source="standard:class-signature" />
+        <error line="225" column="54" source="standard:class-signature" />
+        <error line="240" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="245" column="65" source="standard:chain-method-continuation" />
+        <error line="255" column="28" source="standard:class-signature" />
+        <error line="255" column="58" source="standard:class-signature" />
+        <error line="256" column="9" source="standard:blank-line-before-declaration" />
+        <error line="256" column="28" source="standard:class-signature" />
+        <error line="256" column="54" source="standard:class-signature" />
+        <error line="271" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="276" column="65" source="standard:chain-method-continuation" />
+        <error line="318" column="5" source="standard:blank-line-before-declaration" />
+        <error line="330" column="5" source="standard:blank-line-before-declaration" />
+        <error line="331" column="5" source="standard:blank-line-before-declaration" />
+        <error line="331" column="37" source="standard:function-expression-body" />
+        <error line="346" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="356" column="33" source="standard:multiline-expression-wrapping" />
+        <error line="356" column="33" source="standard:function-signature" />
+        <error line="361" column="16" source="standard:multiline-expression-wrapping" />
+        <error line="367" column="15" source="standard:multiline-expression-wrapping" />
+        <error line="385" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="385" column="22" source="standard:function-signature" />
+        <error line="403" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="406" column="30" source="standard:multiline-expression-wrapping" />
+        <error line="429" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="429" column="20" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationMetricsTest.kt">
+        <error line="21" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="40" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="40" column="31" source="standard:chain-method-continuation" />
+        <error line="59" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="59" column="29" source="standard:chain-method-continuation" />
+        <error line="75" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="75" column="29" source="standard:chain-method-continuation" />
+        <error line="76" column="39" source="standard:chain-method-continuation" />
+        <error line="76" column="73" source="standard:chain-method-continuation" />
+        <error line="78" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="78" column="30" source="standard:chain-method-continuation" />
+        <error line="79" column="39" source="standard:chain-method-continuation" />
+        <error line="79" column="73" source="standard:chain-method-continuation" />
+        <error line="81" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="81" column="30" source="standard:chain-method-continuation" />
+        <error line="82" column="39" source="standard:chain-method-continuation" />
+        <error line="82" column="73" source="standard:chain-method-continuation" />
+        <error line="94" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="94" column="31" source="standard:chain-method-continuation" />
+        <error line="99" column="84" source="standard:chain-method-continuation" />
+        <error line="108" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="108" column="30" source="standard:chain-method-continuation" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationOrchestratorTest.kt">
+        <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="31" column="48" source="standard:chain-method-continuation" />
+        <error line="43" column="48" source="standard:chain-method-continuation" />
+        <error line="56" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="61" column="48" source="standard:chain-method-continuation" />
+        <error line="125" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="154" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="170" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="186" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="201" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="220" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="253" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="265" column="63" source="standard:multiline-expression-wrapping" />
+        <error line="265" column="63" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationRegenerationServiceTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="27" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="43" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="66" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="83" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="99" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="133" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="171" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="219" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="252" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="279" column="54" source="standard:chain-method-continuation" />
+        <error line="279" column="61" source="standard:chain-method-continuation" />
+        <error line="288" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="304" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="331" column="23" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/AiGenerationWorkerTest.kt">
+        <error line="17" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="96" column="39" source="standard:chain-method-continuation" />
+        <error line="96" column="46" source="standard:chain-method-continuation" />
+        <error line="131" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="146" column="52" source="standard:chain-method-continuation" />
+        <error line="146" column="61" source="standard:chain-method-continuation" />
+        <error line="152" column="19" source="standard:multiline-expression-wrapping" />
+        <error line="182" column="41" source="standard:chain-method-continuation" />
+        <error line="182" column="50" source="standard:chain-method-continuation" />
+        <error line="250" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="272" column="20" source="standard:multiline-expression-wrapping" />
+        <error line="331" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="335" column="22" source="standard:multiline-expression-wrapping" />
+        <error line="350" column="26" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/ClubAiDefaultsServiceTest.kt">
+        <error line="142" column="28" source="standard:multiline-expression-wrapping" />
+        <error line="156" column="58" source="standard:function-signature" />
+        <error line="159" column="61" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/CostCalculatorTest.kt">
+        <error line="10" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="17" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="22" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="35" column="21" source="standard:multiline-expression-wrapping" />
+        <error line="40" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="54" column="23" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/DefaultSessionImportV1ValidatorTest.kt">
+        <error line="14" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="89" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="100" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="101" column="30" source="standard:multiline-expression-wrapping" />
+        <error line="114" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="115" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="128" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="129" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="141" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="142" column="30" source="standard:multiline-expression-wrapping" />
+        <error line="155" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="166" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="177" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="186" column="33" source="standard:function-signature" />
+        <error line="186" column="59" source="standard:function-signature" />
+        <error line="186" column="82" source="standard:function-signature" />
+        <error line="192" column="44" source="standard:multiline-expression-wrapping" />
+        <error line="192" column="44" source="standard:function-signature" />
+        <error line="203" column="60" source="standard:multiline-expression-wrapping" />
+        <error line="203" column="60" source="standard:function-signature" />
+        <error line="210" column="26" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/application/service/MetricLabelsTest.kt">
+        <error line="21" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="55" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="79" column="26" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/config/AiGenerationPropertiesTest.kt">
+        <error line="20" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="24" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="32" column="29" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/support/StubSessionContentGenerator.kt">
+        <error line="34" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="39" column="23" source="standard:multiline-expression-wrapping" />
+        <error line="45" column="32" source="standard:multiline-expression-wrapping" />
+        <error line="95" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="124" column="5" source="standard:blank-line-before-declaration" />
+        <error line="124" column="74" source="standard:function-signature" />
+        <error line="137" column="5" source="standard:blank-line-before-declaration" />
+        <error line="137" column="74" source="standard:function-signature" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/aigen/support/StubSessionContentRegenerator.kt">
+        <error line="27" column="26" source="standard:multiline-expression-wrapping" />
+        <error line="30" column="42" source="standard:multiline-expression-wrapping" />
+        <error line="39" column="49" source="standard:multiline-expression-wrapping" />
+        <error line="109" column="5" source="standard:blank-line-before-declaration" />
+        <error line="109" column="80" source="standard:function-signature" />
+        <error line="122" column="5" source="standard:blank-line-before-declaration" />
+        <error line="122" column="80" source="standard:function-signature" />
     </file>
     <file name="src/test/kotlin/com/readmates/archive/api/ArchiveErrorHandlerTest.kt">
         <error line="1" column="9" source="standard:package-name" />
@@ -326,6 +837,16 @@
     </file>
     <file name="src/test/kotlin/com/readmates/club/adapter/in/web/ResolveClubContextRequestExtensionTest.kt">
         <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingServiceTest.kt">
+        <error line="77" column="26" source="standard:function-signature" />
+        <error line="77" column="44" source="standard:function-signature" />
+        <error line="77" column="77" source="standard:function-signature" />
+        <error line="128" column="21" source="standard:class-signature" />
+        <error line="128" column="40" source="standard:class-signature" />
+        <error line="128" column="62" source="standard:class-signature" />
+        <error line="128" column="83" source="standard:class-signature" />
+        <error line="180" column="70" source="standard:function-signature" />
     </file>
     <file name="src/test/kotlin/com/readmates/note/api/CheckinControllerTest.kt">
         <error line="1" column="9" source="standard:package-name" />
@@ -344,6 +865,9 @@
     </file>
     <file name="src/test/kotlin/com/readmates/session/api/SessionApplicationErrorHandlerTest.kt">
         <error line="1" column="9" source="standard:package-name" />
+    </file>
+    <file name="src/test/kotlin/com/readmates/sessionimport/application/service/SessionImportServiceCommitValidatedTest.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
     </file>
     <file name="src/test/kotlin/com/readmates/shared/adapter/in/web/ApiErrorResponseTest.kt">
         <error line="1" column="9" source="standard:package-name" />

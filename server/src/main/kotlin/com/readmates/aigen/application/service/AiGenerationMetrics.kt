@@ -8,6 +8,7 @@ import com.readmates.aigen.application.port.out.JobKind
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Tag
 import io.micrometer.core.instrument.Tags
 import io.micrometer.core.instrument.Timer
 import org.springframework.stereotype.Component
@@ -192,7 +193,7 @@ class AiGenerationMetrics(
      */
     private fun aigenMeter(vararg labels: Pair<MetricLabel, String>): Tags {
         if (labels.isEmpty()) return Tags.empty()
-        return Tags.of(*labels.flatMap { (label, value) -> listOf(label.tagKey, value) }.toTypedArray())
+        return Tags.of(labels.map { (label, value) -> Tag.of(label.tagKey, value) })
     }
 
     private companion object {

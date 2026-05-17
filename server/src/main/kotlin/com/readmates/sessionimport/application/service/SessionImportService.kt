@@ -28,6 +28,20 @@ class InvalidSessionImportException(
     val issues: List<SessionImportIssue>,
 ) : RuntimeException("Invalid session import")
 
+private fun isSafeFeedbackFileName(fileName: String): Boolean {
+    val trimmed = fileName.trim()
+    return trimmed.isNotBlank() &&
+        !trimmed.contains('/') &&
+        !trimmed.contains('\\') &&
+        (trimmed.endsWith(".md") || trimmed.endsWith(".txt"))
+}
+
+private fun requireHost(host: com.readmates.shared.security.CurrentMember) {
+    if (!host.isHost) {
+        throw AccessDeniedException("Host role required")
+    }
+}
+
 @Service
 class SessionImportService(
     private val writePort: SessionImportWritePort,
@@ -246,20 +260,6 @@ class SessionImportService(
             attendee != null,
             attendee?.membershipId?.toString(),
         )
-    }
-
-    private fun requireHost(host: com.readmates.shared.security.CurrentMember) {
-        if (!host.isHost) {
-            throw AccessDeniedException("Host role required")
-        }
-    }
-
-    private fun isSafeFeedbackFileName(fileName: String): Boolean {
-        val trimmed = fileName.trim()
-        return trimmed.isNotBlank() &&
-            !trimmed.contains('/') &&
-            !trimmed.contains('\\') &&
-            (trimmed.endsWith(".md") || trimmed.endsWith(".txt"))
     }
 
     private companion object {

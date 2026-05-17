@@ -3,6 +3,8 @@ package com.readmates.aigen.config
 import org.springframework.boot.context.properties.ConfigurationProperties
 import java.time.Duration
 
+private const val DEFAULT_SEND_TIMEOUT_SECONDS = 10L
+
 /**
  * Configuration for the AI-generation Kafka producer and consumer (spec §8.1).
  *
@@ -14,5 +16,5 @@ data class AiGenerationKafkaProperties(
     val bootstrapServers: List<String> = emptyList(),
     val topicJobs: String = "readmates.aigen.jobs.v1",
     val consumerGroup: String = "readmates-aigen-worker",
-    val sendTimeout: Duration = Duration.ofSeconds(10),
+    val sendTimeout: Duration = Duration.ofSeconds(DEFAULT_SEND_TIMEOUT_SECONDS),
 )

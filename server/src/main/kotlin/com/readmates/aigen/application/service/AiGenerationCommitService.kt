@@ -54,6 +54,7 @@ class AiGenerationCommitService(
     private val commitDelegate: CommitValidatedSessionImportUseCase,
     private val clock: Clock,
 ) : CommitGenerationUseCase {
+    @Suppress("SwallowedException")
     override fun commit(
         host: CurrentMember,
         sessionId: UUID,

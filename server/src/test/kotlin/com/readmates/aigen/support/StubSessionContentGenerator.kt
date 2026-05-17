@@ -27,6 +27,7 @@ import org.springframework.stereotype.Component
  * `AiGenerationBeansConfig.sessionContentGeneratorsByProvider`.
  */
 internal object StubGenerationPayload {
+    @Suppress("LongMethod")
     fun buildOutput(input: GenerationInput): GenerationOutput {
         val meta = input.sessionMeta
         val author = meta.expectedAuthorNames.firstOrNull() ?: "Host"

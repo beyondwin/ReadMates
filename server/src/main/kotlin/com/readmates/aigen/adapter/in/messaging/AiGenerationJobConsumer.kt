@@ -50,6 +50,7 @@ class AiGenerationJobConsumer(
         groupId = "\${readmates.aigen.kafka.consumer-group:readmates-aigen-worker}",
         containerFactory = "aiGenerationKafkaListenerContainerFactory",
     )
+    @Suppress("TooGenericExceptionCaught")
     fun onMessage(
         message: AiGenerationJobMessage,
         acknowledgment: Acknowledgment,

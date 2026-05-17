@@ -26,7 +26,7 @@ class AiGenerationNotificationDispatcherTest {
     }
 
     @Test
-    fun `notifyLongGeneration does not call any other RecordNotificationEventUseCase method (PII invariant - no transcript path)`() {
+    fun `notifyLongGeneration only calls record - PII invariant ensures no transcript path leak`() {
         val recorder = RecordingRecordNotificationEventUseCase()
         val dispatcher = AiGenerationNotificationDispatcher(recorder)
 

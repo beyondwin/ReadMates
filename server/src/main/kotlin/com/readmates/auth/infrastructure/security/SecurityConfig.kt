@@ -19,6 +19,9 @@ import org.springframework.security.web.util.matcher.RegexRequestMatcher
 import org.springframework.security.web.util.matcher.RequestMatcher
 import org.springframework.web.filter.ForwardedHeaderFilter
 
+private val AI_GENERATE_MUTATION_PATH =
+    Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+/(regenerate|commit)$")
+
 @Configuration
 class SecurityConfig(
     private val bffSecretFilter: BffSecretFilter,
@@ -64,7 +67,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/feedback-document$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/session-import/(preview|commit)$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/ai-generate/jobs$")),
-                    methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+/(regenerate|commit)$")),
+                    methodAndPath("POST", AI_GENERATE_MUTATION_PATH),
                     methodAndPath("DELETE", Regex("^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+$")),
                     methodAndPath("PUT", Regex("^/api/host/clubs/[^/]+/ai-defaults$")),
                     methodAndPath("POST", Regex("^/api/host/invitations/[^/]+/revoke$")),

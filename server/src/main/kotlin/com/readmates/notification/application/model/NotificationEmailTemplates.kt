@@ -111,6 +111,7 @@ object NotificationEmailTemplates {
         )
     }
 
+    @Suppress("LongMethod")
     private fun detailFor(
         eventType: NotificationEventType,
         sessionId: UUID,

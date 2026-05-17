@@ -60,7 +60,11 @@ class RedisAiGenerationJobStore(
             if (job.result != null) {
                 redisTemplate
                     .opsForValue()
-                    .set(resultKey, objectMapper.writeValueAsString(job.result), java.time.Duration.ofSeconds(ttlSeconds))
+                    .set(
+                        resultKey,
+                        objectMapper.writeValueAsString(job.result),
+                        java.time.Duration.ofSeconds(ttlSeconds),
+                    )
             }
         }.onFailure { recordFailure("save") }.getOrThrow()
     }

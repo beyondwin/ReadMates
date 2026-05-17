@@ -93,6 +93,26 @@ internal class NotificationDeliveryPlanningOperations(
         message: NotificationEventMessage,
         recipient: DeliveryRecipient,
     ): List<DeliveryInsertRow> {
+        val channelInclusion = computeChannelInclusion(message, recipient)
+        return buildList {
+            if (channelInclusion.includeInApp) {
+                add(inAppDeliveryRow(recipient))
+            }
+            if (channelInclusion.includeEmail) {
+                add(emailDeliveryRow(recipient))
+            }
+        }
+    }
+
+    private data class ChannelInclusion(
+        val includeInApp: Boolean,
+        val includeEmail: Boolean,
+    )
+
+    private fun computeChannelInclusion(
+        message: NotificationEventMessage,
+        recipient: DeliveryRecipient,
+    ): ChannelInclusion {
         val manual = message.payload.manualDispatch
         val requested = manual?.requestedChannels
         val frozenInAppIds = manual?.inAppMembershipIds?.toSet().orEmpty()
@@ -115,45 +135,39 @@ internal class NotificationDeliveryPlanningOperations(
                     requested == ManualNotificationRequestedChannels.BOTH
             }
         val includeEmail =
-            if (emailSuppressedByEventType) {
-                false
-            } else if (hasFrozenSnapshot) {
-                recipient.membershipId in frozenEmailIds
-            } else {
-                requested == null ||
-                    requested == ManualNotificationRequestedChannels.EMAIL ||
-                    requested == ManualNotificationRequestedChannels.BOTH
+            when {
+                emailSuppressedByEventType -> false
+                hasFrozenSnapshot -> recipient.membershipId in frozenEmailIds
+                else ->
+                    requested == null ||
+                        requested == ManualNotificationRequestedChannels.EMAIL ||
+                        requested == ManualNotificationRequestedChannels.BOTH
             }
-        return buildList {
-            if (includeInApp) {
-                add(
-                    DeliveryInsertRow(
-                        id = UUID.randomUUID(),
-                        recipient = recipient,
-                        channel = NotificationChannel.IN_APP,
-                        status = NotificationDeliveryStatus.SENT,
-                        skipReason = null,
-                    ),
-                )
-            }
-            if (includeEmail) {
-                add(
-                    DeliveryInsertRow(
-                        id = UUID.randomUUID(),
-                        recipient = recipient,
-                        channel = NotificationChannel.EMAIL,
-                        status =
-                            if (recipient.emailAllowed) {
-                                NotificationDeliveryStatus.PENDING
-                            } else {
-                                NotificationDeliveryStatus.SKIPPED
-                            },
-                        skipReason = if (recipient.emailAllowed) null else SKIP_REASON_EMAIL_DISABLED,
-                    ),
-                )
-            }
-        }
+        return ChannelInclusion(includeInApp = includeInApp, includeEmail = includeEmail)
     }
+
+    private fun inAppDeliveryRow(recipient: DeliveryRecipient): DeliveryInsertRow =
+        DeliveryInsertRow(
+            id = UUID.randomUUID(),
+            recipient = recipient,
+            channel = NotificationChannel.IN_APP,
+            status = NotificationDeliveryStatus.SENT,
+            skipReason = null,
+        )
+
+    private fun emailDeliveryRow(recipient: DeliveryRecipient): DeliveryInsertRow =
+        DeliveryInsertRow(
+            id = UUID.randomUUID(),
+            recipient = recipient,
+            channel = NotificationChannel.EMAIL,
+            status =
+                if (recipient.emailAllowed) {
+                    NotificationDeliveryStatus.PENDING
+                } else {
+                    NotificationDeliveryStatus.SKIPPED
+                },
+            skipReason = if (recipient.emailAllowed) null else SKIP_REASON_EMAIL_DISABLED,
+        )
 
     private fun sessionViewerRecipients(
         jdbcTemplate: JdbcTemplate,

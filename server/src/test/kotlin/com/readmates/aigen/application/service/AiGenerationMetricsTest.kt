@@ -49,7 +49,12 @@ class AiGenerationMetricsTest {
 
     @Test
     fun `recordLatency records to histogram with provider model kind tags`() {
-        metrics.recordLatency(Provider.OPENAI, ModelId(Provider.OPENAI, "gpt-x"), JobKind.REGENERATE_SUMMARY, Duration.ofMillis(1500))
+        metrics.recordLatency(
+            Provider.OPENAI,
+            ModelId(Provider.OPENAI, "gpt-x"),
+            JobKind.REGENERATE_SUMMARY,
+            Duration.ofMillis(1500),
+        )
 
         val timer = registry.find("readmates.aigen.latency")
             .tag("provider", "OPENAI")
@@ -100,7 +105,9 @@ class AiGenerationMetricsTest {
         metrics.recordValidationFailure(ErrorCode.AUTHOR_NAME_MISMATCH)
 
         val schema = registry.find("readmates.aigen.validation.failures").tag("reason", "SCHEMA_INVALID").counter()
-        val author = registry.find("readmates.aigen.validation.failures").tag("reason", "AUTHOR_NAME_MISMATCH").counter()
+        val author = registry.find("readmates.aigen.validation.failures")
+            .tag("reason", "AUTHOR_NAME_MISMATCH")
+            .counter()
         assertThat(schema?.count()).isEqualTo(1.0)
         assertThat(author?.count()).isEqualTo(1.0)
     }

@@ -249,7 +249,8 @@ class AiGenerationRegenerationService(
     private fun retryStrategyFor(code: ErrorCode): RetryStrategy? =
         when (code) {
             ErrorCode.PROVIDER_UNAVAILABLE -> RetryStrategy(Duration.ofSeconds(1), strengthen = false)
-            ErrorCode.PROVIDER_RATE_LIMITED -> RetryStrategy(Duration.ofSeconds(5), strengthen = false)
+            ErrorCode.PROVIDER_RATE_LIMITED ->
+                RetryStrategy(Duration.ofSeconds(PROVIDER_RATE_LIMIT_BACKOFF_SECONDS), strengthen = false)
             ErrorCode.SCHEMA_INVALID,
             ErrorCode.AUTHOR_NAME_MISMATCH,
             ErrorCode.HIGHLIGHTS_OUT_OF_RANGE,

@@ -2,6 +2,7 @@ package com.readmates.aigen.adapter.out.llm.claude
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.readmates.aigen.adapter.out.llm.common.LlmErrorMapper
 import com.readmates.aigen.adapter.out.llm.common.LlmGenerationException
@@ -109,7 +110,7 @@ class ClaudeContentRegenerator(
         return node
     }
 
-    private fun authoredArray(items: List<SessionImportV1Snapshot.AuthoredText>): com.fasterxml.jackson.databind.node.ArrayNode {
+    private fun authoredArray(items: List<SessionImportV1Snapshot.AuthoredText>): ArrayNode {
         val arr = mapper.createArrayNode()
         items.forEach { item ->
             val obj = arr.addObject()

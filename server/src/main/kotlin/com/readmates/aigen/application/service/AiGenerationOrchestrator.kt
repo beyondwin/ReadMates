@@ -19,6 +19,7 @@ import com.readmates.aigen.application.port.`in`.StartGenerationResult
 import com.readmates.aigen.application.port.`in`.StartGenerationUseCase
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationClubDefaultPort
+import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.AuditKind
@@ -51,6 +52,7 @@ import java.util.UUID
  */
 @Service
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
+@Suppress("LongParameterList")
 class AiGenerationOrchestrator(
     private val jobStore: AiGenerationJobStore,
     private val queue: AiGenerationJobQueue,
@@ -105,13 +107,15 @@ class AiGenerationOrchestrator(
         jobStore.save(record)
         try {
             queue.publish(
-                jobId = jobId,
-                sessionId = command.sessionId,
-                clubId = command.clubId,
-                hostUserId = command.hostUserId,
-                provider = modelId.provider,
-                model = modelId.name,
-                kind = JobKind.FULL,
+                AiGenerationJobPublishCommand(
+                    jobId = jobId,
+                    sessionId = command.sessionId,
+                    clubId = command.clubId,
+                    hostUserId = command.hostUserId,
+                    provider = modelId.provider,
+                    model = modelId.name,
+                    kind = JobKind.FULL,
+                ),
             )
         } catch (
             // Compensate: a PENDING JobRecord lives in Redis for TTL hours otherwise

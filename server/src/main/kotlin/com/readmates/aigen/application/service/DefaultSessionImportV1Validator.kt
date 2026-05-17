@@ -53,33 +53,55 @@ class DefaultSessionImportV1Validator(
     private fun checkSchema(
         snapshot: SessionImportV1Snapshot,
         meta: SessionMeta,
-    ): ValidationResult.Violation? {
-        if (snapshot.format != FORMAT_CONST) {
-            return schemaInvalid("format must equal '$FORMAT_CONST' (was '${snapshot.format}')")
-        }
-        if (snapshot.sessionNumber != meta.sessionNumber) {
-            return schemaInvalid(
-                "session metadata mismatch: sessionNumber " +
-                    "(snapshot=${snapshot.sessionNumber}, expected=${meta.sessionNumber})",
-            )
-        }
-        if (snapshot.bookTitle != meta.bookTitle) {
-            return schemaInvalid("session metadata mismatch: bookTitle")
-        }
-        if (!snapshot.meetingDate.isEqual(meta.meetingDate)) {
-            return schemaInvalid("session metadata mismatch: meetingDate")
-        }
-        if (snapshot.summary.isBlank()) {
-            return schemaInvalid("summary must not be blank")
-        }
-        if (snapshot.feedbackDocumentFileName.isBlank()) {
-            return schemaInvalid("feedbackDocumentFileName must not be blank")
-        }
-        if (snapshot.feedbackDocumentMarkdown.isBlank()) {
-            return schemaInvalid("feedbackDocumentMarkdown must not be blank")
-        }
-        return null
-    }
+    ): ValidationResult.Violation? =
+        sequenceOf<() -> ValidationResult.Violation?>(
+            {
+                if (snapshot.format != FORMAT_CONST) {
+                    schemaInvalid("format must equal '$FORMAT_CONST' (was '${snapshot.format}')")
+                } else {
+                    null
+                }
+            },
+            {
+                if (snapshot.sessionNumber != meta.sessionNumber) {
+                    schemaInvalid(
+                        "session metadata mismatch: sessionNumber " +
+                            "(snapshot=${snapshot.sessionNumber}, expected=${meta.sessionNumber})",
+                    )
+                } else {
+                    null
+                }
+            },
+            {
+                if (snapshot.bookTitle != meta.bookTitle) {
+                    schemaInvalid("session metadata mismatch: bookTitle")
+                } else {
+                    null
+                }
+            },
+            {
+                if (!snapshot.meetingDate.isEqual(meta.meetingDate)) {
+                    schemaInvalid("session metadata mismatch: meetingDate")
+                } else {
+                    null
+                }
+            },
+            { if (snapshot.summary.isBlank()) schemaInvalid("summary must not be blank") else null },
+            {
+                if (snapshot.feedbackDocumentFileName.isBlank()) {
+                    schemaInvalid("feedbackDocumentFileName must not be blank")
+                } else {
+                    null
+                }
+            },
+            {
+                if (snapshot.feedbackDocumentMarkdown.isBlank()) {
+                    schemaInvalid("feedbackDocumentMarkdown must not be blank")
+                } else {
+                    null
+                }
+            },
+        ).mapNotNull { it.invoke() }.firstOrNull()
 
     private fun checkAuthorNames(
         snapshot: SessionImportV1Snapshot,
@@ -130,20 +152,22 @@ class DefaultSessionImportV1Validator(
         meta: SessionMeta,
     ): ValidationResult.Violation? {
         val markdown = snapshot.feedbackDocumentMarkdown
-        if (!markdown.trimStart().startsWith(FEEDBACK_MARKER)) {
-            return ValidationResult.Violation(
-                ErrorCode.FEEDBACK_TEMPLATE_INVALID,
-                "feedbackDocumentMarkdown must start with '$FEEDBACK_MARKER'",
-            )
-        }
         val expectedHeader = "# 독서모임 ${meta.sessionNumber}차 피드백"
-        if (!markdown.contains(expectedHeader)) {
-            return ValidationResult.Violation(
-                ErrorCode.FEEDBACK_TEMPLATE_INVALID,
-                "feedbackDocumentMarkdown must contain header '$expectedHeader'",
-            )
-        }
-        return null
+        val violation =
+            when {
+                !markdown.trimStart().startsWith(FEEDBACK_MARKER) ->
+                    ValidationResult.Violation(
+                        ErrorCode.FEEDBACK_TEMPLATE_INVALID,
+                        "feedbackDocumentMarkdown must start with '$FEEDBACK_MARKER'",
+                    )
+                !markdown.contains(expectedHeader) ->
+                    ValidationResult.Violation(
+                        ErrorCode.FEEDBACK_TEMPLATE_INVALID,
+                        "feedbackDocumentMarkdown must contain header '$expectedHeader'",
+                    )
+                else -> null
+            }
+        return violation
     }
 
     private fun schemaInvalid(message: String): ValidationResult.Violation =

@@ -34,8 +34,14 @@ class AiGenerationSecurityConfigTest {
 
     @Test
     fun `csrf ignores POST regenerate and commit on ai-generate job`() {
+        // Step 9 extracted the regex into a private top-level `AI_GENERATE_MUTATION_PATH` constant
+        // to satisfy MaxLineLength. Assert both: the regex literal is declared exactly once at the
+        // constant binding site, and the binding is referenced by methodAndPath("POST", ...).
         assertThat(source).contains(
-            "methodAndPath(\"POST\", Regex(\"^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+/(regenerate|commit)\$\"))",
+            "Regex(\"^/api/host/sessions/[^/]+/ai-generate/jobs/[^/]+/(regenerate|commit)\$\")",
+        )
+        assertThat(source).contains(
+            "methodAndPath(\"POST\", AI_GENERATE_MUTATION_PATH)",
         )
     }
 

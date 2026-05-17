@@ -37,7 +37,12 @@ class MetricLabelsTest {
 
         metrics.recordJobStarted()
         metrics.recordJobCompleted(JobStatus.SUCCEEDED, Provider.CLAUDE, model, JobKind.FULL)
-        metrics.recordJobCompleted(JobStatus.FAILED, Provider.OPENAI, ModelId(Provider.OPENAI, "gpt-x"), JobKind.REGENERATE_SUMMARY)
+        metrics.recordJobCompleted(
+            JobStatus.FAILED,
+            Provider.OPENAI,
+            ModelId(Provider.OPENAI, "gpt-x"),
+            JobKind.REGENERATE_SUMMARY,
+        )
         metrics.recordLatency(Provider.CLAUDE, model, JobKind.FULL, Duration.ofSeconds(2))
         metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.INPUT, 100)
         metrics.recordTokens(Provider.CLAUDE, model, TokenDirection.CACHED_INPUT, 50)

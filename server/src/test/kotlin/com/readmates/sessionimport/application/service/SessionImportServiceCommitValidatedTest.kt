@@ -78,6 +78,7 @@ Steady.
 @Tag("unit")
 class SessionImportServiceCommitValidatedTest {
     @Test
+    @Suppress("LongMethod")
     fun `commitValidated returns same sessionId and triggers cache eviction`() {
         val clubId = UUID.randomUUID()
         val sessionId = UUID.randomUUID()

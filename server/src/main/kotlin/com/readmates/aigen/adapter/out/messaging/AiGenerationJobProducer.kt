@@ -1,8 +1,7 @@
 package com.readmates.aigen.adapter.out.messaging
 
-import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
-import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.config.AiGenerationKafkaProperties
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -10,7 +9,6 @@ import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.kafka.support.KafkaHeaders
 import org.springframework.messaging.support.MessageBuilder
 import org.springframework.stereotype.Component
-import java.util.UUID
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
@@ -35,32 +33,26 @@ class AiGenerationJobProducer(
     private val kafkaTemplate: KafkaTemplate<String, AiGenerationJobMessage>,
     private val properties: AiGenerationKafkaProperties,
 ) : AiGenerationJobQueue {
-    override fun publish(
-        jobId: UUID,
-        sessionId: UUID,
-        clubId: UUID,
-        hostUserId: UUID,
-        provider: Provider,
-        model: String,
-        kind: JobKind,
-    ) {
+    @Suppress("TooGenericExceptionCaught")
+    override fun publish(command: AiGenerationJobPublishCommand) {
+        val jobId = command.jobId
         val payload =
             AiGenerationJobMessage(
                 jobId = jobId,
-                sessionId = sessionId,
-                clubId = clubId,
-                hostUserId = hostUserId,
-                provider = provider,
-                model = model,
-                kind = kind,
+                sessionId = command.sessionId,
+                clubId = command.clubId,
+                hostUserId = command.hostUserId,
+                provider = command.provider,
+                model = command.model,
+                kind = command.kind,
             )
         val kafkaMessage =
             MessageBuilder
                 .withPayload(payload)
                 .setHeader(KafkaHeaders.TOPIC, properties.topicJobs)
-                .setHeader(KafkaHeaders.KEY, clubId.toString())
+                .setHeader(KafkaHeaders.KEY, command.clubId.toString())
                 .setHeader("readmates-aigen-job-id", jobId.toString())
-                .setHeader("readmates-aigen-kind", kind.name)
+                .setHeader("readmates-aigen-kind", command.kind.name)
                 .build()
 
         try {

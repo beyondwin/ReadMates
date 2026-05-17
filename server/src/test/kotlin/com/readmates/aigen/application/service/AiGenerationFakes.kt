@@ -18,6 +18,7 @@ import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationClubDefaultPort
+import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.AiGenerationLatencyNotification
@@ -138,17 +139,18 @@ internal class FakeJobQueue : AiGenerationJobQueue {
      */
     var throwOnPublish: Throwable? = null
 
-    override fun publish(
-        jobId: UUID,
-        sessionId: UUID,
-        clubId: UUID,
-        hostUserId: UUID,
-        provider: Provider,
-        model: String,
-        kind: JobKind,
-    ) {
+    override fun publish(command: AiGenerationJobPublishCommand) {
         throwOnPublish?.let { throw it }
-        published += Published(jobId, sessionId, clubId, hostUserId, provider, model, kind)
+        published +=
+            Published(
+                command.jobId,
+                command.sessionId,
+                command.clubId,
+                command.hostUserId,
+                command.provider,
+                command.model,
+                command.kind,
+            )
     }
 }
 
@@ -409,6 +411,7 @@ internal object AiGenerationTestFixtures {
             feedbackDocumentMarkdown = "<!-- readmates-feedback:v1 -->\n# 독서모임 7차 피드백\n",
         )
 
+    @Suppress("LongParameterList")
     fun jobRecord(
         jobId: UUID = UUID.randomUUID(),
         sessionId: UUID = UUID.randomUUID(),

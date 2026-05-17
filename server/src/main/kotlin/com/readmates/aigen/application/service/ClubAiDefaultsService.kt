@@ -81,10 +81,9 @@ class ClubAiDefaultsService(
      * [ModelCatalog.isEnabled] for the final allowlist decision.
      */
     private fun resolveAllowlistedModel(name: String): ModelId? {
-        modelCatalog.resolveAlias(name)?.let { return it }
-        val provider = providerFromName(name) ?: return null
-        val candidate = ModelId(provider, name)
-        return candidate.takeIf { modelCatalog.isEnabled(it) }
+        val direct = modelCatalog.resolveAlias(name)
+        val fallback = providerFromName(name)?.let { provider -> ModelId(provider, name) }
+        return direct ?: fallback?.takeIf(modelCatalog::isEnabled)
     }
 
     private fun providerFromName(name: String): Provider? =

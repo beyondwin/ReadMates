@@ -57,6 +57,7 @@ class AiGenerationErrorHandler {
             type = PROBLEM_JOB_SESSION_MISMATCH,
         )
 
+    @Suppress("MaxLineLength")
     @ExceptionHandler(AiGenerationException.IllegalGenerationState::class)
     fun handleIllegalGenerationState(error: AiGenerationException.IllegalGenerationState): ResponseEntity<ProblemDetail> =
         problem(
@@ -83,6 +84,7 @@ class AiGenerationErrorHandler {
         @Suppress("UNUSED_PARAMETER") error: AccessDeniedException,
     ): ResponseEntity<ProblemDetail> = problem(HttpStatus.FORBIDDEN, "PERMISSION_DENIED", "Access denied")
 
+    @Suppress("MaxLineLength")
     @ExceptionHandler(MaxUploadSizeExceededException::class)
     fun handleUploadTooLarge(
         @Suppress("UNUSED_PARAMETER") error: MaxUploadSizeExceededException,

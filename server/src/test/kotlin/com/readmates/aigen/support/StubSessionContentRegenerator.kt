@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component
  * service merges into the full snapshot and validates before persisting.
  */
 internal object StubRegenerationPayload {
+    @Suppress("LongMethod")
     fun buildOutput(input: RegenerationInput): RegenerationOutput {
         val author = input.sessionMeta.expectedAuthorNames.firstOrNull() ?: "Host"
         val value: Any = when (input.item) {

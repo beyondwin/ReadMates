@@ -45,6 +45,7 @@ class RedisAiGenerationJobStoreTest(
     // The aigen Kafka adapter is gated on readmates.aigen.kafka.enabled; this integration
     // test only exercises the Redis JobStore adapter, so satisfy the orchestrator's queue
     // dependency with a mock so the context can load.
+    @Suppress("UnusedPrivateProperty")
     @MockitoBean
     private lateinit var jobQueue: AiGenerationJobQueue
 

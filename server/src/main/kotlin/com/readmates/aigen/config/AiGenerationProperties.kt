@@ -4,6 +4,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import java.math.BigDecimal
 import java.time.Duration
 
+private const val DEFAULT_REDIS_TTL_HOURS = 6L
+private const val DEFAULT_NOTIFICATION_LATENCY_SECONDS = 60L
+
 @ConfigurationProperties("readmates.aigen")
 data class AiGenerationProperties(
     val enabled: Boolean = false,
@@ -20,11 +23,13 @@ data class AiGenerationProperties(
         val hostPerMinuteCalls: Int = 5,
         val softWarningRatio: BigDecimal = BigDecimal("0.80"),
     )
+
     data class Job(
-        val redisTtl: Duration = Duration.ofHours(6),
-        val notificationLatencyThreshold: Duration = Duration.ofSeconds(60),
+        val redisTtl: Duration = Duration.ofHours(DEFAULT_REDIS_TTL_HOURS),
+        val notificationLatencyThreshold: Duration = Duration.ofSeconds(DEFAULT_NOTIFICATION_LATENCY_SECONDS),
         val maxLlmCallsPerJob: Int = 3,
     )
+
     data class Pricing(
         val inputPerMTokenUsd: BigDecimal,
         val cachedInputPerMTokenUsd: BigDecimal = BigDecimal.ZERO,

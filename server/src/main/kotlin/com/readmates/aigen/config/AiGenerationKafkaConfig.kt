@@ -37,12 +37,15 @@ import tools.jackson.databind.json.JsonMapper
  * Wired only when both `readmates.aigen.enabled=true` and
  * `readmates.aigen.kafka.enabled=true`.
  */
+private const val PRODUCER_MAX_IN_FLIGHT_REQUESTS = 5
+
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.aigen.kafka", name = ["enabled"], havingValue = "true")
 @EnableKafka
 @EnableConfigurationProperties(AiGenerationKafkaProperties::class)
 class AiGenerationKafkaConfig {
+    @Suppress("MaxLineLength")
     @Bean
     fun aiGenerationJobProducerFactory(properties: AiGenerationKafkaProperties): ProducerFactory<String, AiGenerationJobMessage> =
         DefaultKafkaProducerFactory(
@@ -57,6 +60,7 @@ class AiGenerationKafkaConfig {
         aiGenerationJobProducerFactory: ProducerFactory<String, AiGenerationJobMessage>,
     ): KafkaTemplate<String, AiGenerationJobMessage> = KafkaTemplate(aiGenerationJobProducerFactory)
 
+    @Suppress("MaxLineLength")
     @Bean
     fun aiGenerationJobConsumerFactory(properties: AiGenerationKafkaProperties): ConsumerFactory<String, AiGenerationJobMessage> =
         DefaultKafkaConsumerFactory(
@@ -88,7 +92,7 @@ class AiGenerationKafkaConfig {
             ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG to true,
             ProducerConfig.ACKS_CONFIG to "all",
             ProducerConfig.RETRIES_CONFIG to Int.MAX_VALUE,
-            ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION to 5,
+            ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION to PRODUCER_MAX_IN_FLIGHT_REQUESTS,
         )
     }
 

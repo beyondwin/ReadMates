@@ -3,6 +3,7 @@ package com.readmates.aigen.adapter.`in`.messaging
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobProducer
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.service.AiGenerationWorker
 import com.readmates.aigen.config.AiGenerationKafkaConfig
@@ -60,13 +61,15 @@ class AiGenerationJobConsumerIntegrationTest(
         Mockito.doNothing().`when`(worker).process(jobId)
 
         producer.publish(
-            jobId = jobId,
-            sessionId = sessionId,
-            clubId = clubId,
-            hostUserId = hostUserId,
-            provider = Provider.CLAUDE,
-            model = "claude-sonnet-4-6",
-            kind = JobKind.FULL,
+            AiGenerationJobPublishCommand(
+                jobId = jobId,
+                sessionId = sessionId,
+                clubId = clubId,
+                hostUserId = hostUserId,
+                provider = Provider.CLAUDE,
+                model = "claude-sonnet-4-6",
+                kind = JobKind.FULL,
+            ),
         )
 
         await()
@@ -89,13 +92,15 @@ class AiGenerationJobConsumerIntegrationTest(
             .`when`(worker).process(jobId)
 
         producer.publish(
-            jobId = jobId,
-            sessionId = sessionId,
-            clubId = clubId,
-            hostUserId = hostUserId,
-            provider = Provider.CLAUDE,
-            model = "claude-sonnet-4-6",
-            kind = JobKind.FULL,
+            AiGenerationJobPublishCommand(
+                jobId = jobId,
+                sessionId = sessionId,
+                clubId = clubId,
+                hostUserId = hostUserId,
+                provider = Provider.CLAUDE,
+                model = "claude-sonnet-4-6",
+                kind = JobKind.FULL,
+            ),
         )
 
         await()

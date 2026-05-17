@@ -53,9 +53,13 @@ import java.util.UUID
  * worker invokes [AiGenerationLatencyNotification.notifyLongGeneration] so the
  * Phase 6 notification adapter can ping the host with an in-app message.
  */
+private const val PROGRESS_PROVIDER_RUNNING_PCT = 5
+internal const val PROVIDER_RATE_LIMIT_BACKOFF_SECONDS = 5L
+private const val PROGRESS_COMPLETE_PCT = 100
+
 @Service
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "TooManyFunctions")
 class AiGenerationWorker(
     private val jobStore: AiGenerationJobStore,
     private val generators: Map<Provider, SessionContentGenerator>,
@@ -74,25 +78,44 @@ class AiGenerationWorker(
     fun process(jobId: UUID) {
         val record = jobStore.load(jobId) ?: return // expired / already cleaned
         val start = clock.instant()
-
-        if (!modelCatalog.isEnabled(record.model)) {
-            failJob(record, ErrorCode.AI_DISABLED, "Model ${record.model.name} no longer enabled", start)
-            return
-        }
-
-        jobStore.updateStatus(jobId, JobStatus.RUNNING, JobStage.TRANSCRIPT_LOADED, 5, null)
-
-        val generator =
-            generators[record.model.provider]
-                ?: run {
-                    failJob(record, ErrorCode.AI_DISABLED, "No generator for provider ${record.model.provider}", start)
-                    return
-                }
-
+        val generator = resolveGenerator(record, start) ?: return
         when (val outcome = runGenerationWithValidationRetry(record, generator)) {
             is Outcome.Success -> succeed(record, outcome.snapshot, outcome.usage, start)
             is Outcome.Failure -> failJob(record, outcome.error.code, outcome.error.message, start)
         }
+    }
+
+    private fun resolveGenerator(
+        record: JobRecord,
+        start: Instant,
+    ): SessionContentGenerator? {
+        val resolved: SessionContentGenerator? =
+            when {
+                !modelCatalog.isEnabled(record.model) -> {
+                    failJob(record, ErrorCode.AI_DISABLED, "Model ${record.model.name} no longer enabled", start)
+                    null
+                }
+                else -> {
+                    jobStore.updateStatus(
+                        record.jobId,
+                        JobStatus.RUNNING,
+                        JobStage.TRANSCRIPT_LOADED,
+                        PROGRESS_PROVIDER_RUNNING_PCT,
+                        null,
+                    )
+                    val candidate = generators[record.model.provider]
+                    if (candidate == null) {
+                        failJob(
+                            record,
+                            ErrorCode.AI_DISABLED,
+                            "No generator for provider ${record.model.provider}",
+                            start,
+                        )
+                    }
+                    candidate
+                }
+            }
+        return resolved
     }
 
     private sealed class Outcome {
@@ -241,7 +264,8 @@ class AiGenerationWorker(
     private fun retryStrategyFor(code: ErrorCode): RetryStrategy? =
         when (code) {
             ErrorCode.PROVIDER_UNAVAILABLE -> RetryStrategy(Duration.ofSeconds(1), strengthen = false)
-            ErrorCode.PROVIDER_RATE_LIMITED -> RetryStrategy(Duration.ofSeconds(5), strengthen = false)
+            ErrorCode.PROVIDER_RATE_LIMITED ->
+                RetryStrategy(Duration.ofSeconds(PROVIDER_RATE_LIMIT_BACKOFF_SECONDS), strengthen = false)
             ErrorCode.SCHEMA_INVALID,
             ErrorCode.AUTHOR_NAME_MISMATCH,
             ErrorCode.HIGHLIGHTS_OUT_OF_RANGE,
@@ -315,7 +339,7 @@ class AiGenerationWorker(
                 failure,
             )
         }
-        jobStore.updateStatus(record.jobId, JobStatus.SUCCEEDED, JobStage.READY, 100, null)
+        jobStore.updateStatus(record.jobId, JobStatus.SUCCEEDED, JobStage.READY, PROGRESS_COMPLETE_PCT, null)
         emitJobMetrics(record, JobStatus.SUCCEEDED, usage, cost, start)
         auditPort.insert(
             AuditLogEntry(
@@ -414,7 +438,12 @@ class AiGenerationWorker(
             metrics.recordTokens(record.model.provider, record.model, TokenDirection.INPUT, usage.inputTokens)
         }
         if (usage.cachedInputTokens > 0) {
-            metrics.recordTokens(record.model.provider, record.model, TokenDirection.CACHED_INPUT, usage.cachedInputTokens)
+            metrics.recordTokens(
+                record.model.provider,
+                record.model,
+                TokenDirection.CACHED_INPUT,
+                usage.cachedInputTokens,
+            )
         }
         if (usage.outputTokens > 0) {
             metrics.recordTokens(record.model.provider, record.model, TokenDirection.OUTPUT, usage.outputTokens)

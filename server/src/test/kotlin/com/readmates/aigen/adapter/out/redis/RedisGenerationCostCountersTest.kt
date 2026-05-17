@@ -39,6 +39,7 @@ class RedisGenerationCostCountersTest(
     // The aigen Kafka adapter is gated on readmates.aigen.kafka.enabled; this integration
     // test only exercises the Redis cost-counter adapter, so satisfy the orchestrator's
     // queue dependency with a mock so the context can load.
+    @Suppress("UnusedPrivateProperty")
     @MockitoBean
     private lateinit var jobQueue: AiGenerationJobQueue
 
@@ -125,7 +126,7 @@ class RedisGenerationCostCountersTest(
         val meterRegistry = SimpleMeterRegistry()
         val failingTemplate =
             object : StringRedisTemplate() {
-                override fun opsForValue() = throw IllegalStateException("redis unavailable")
+                override fun opsForValue() = error("redis unavailable")
             }
         val guard =
             RedisGenerationCostCounters(

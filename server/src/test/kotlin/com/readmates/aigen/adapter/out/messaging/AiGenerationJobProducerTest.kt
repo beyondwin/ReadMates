@@ -3,6 +3,7 @@
 package com.readmates.aigen.adapter.out.messaging
 
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.config.AiGenerationKafkaProperties
 import org.assertj.core.api.Assertions.assertThat
@@ -65,13 +66,15 @@ class AiGenerationJobProducerTest {
         val hostUserId = UUID.fromString("44444444-4444-4444-8444-444444444444")
 
         producer.publish(
-            jobId = jobId,
-            sessionId = sessionId,
-            clubId = clubId,
-            hostUserId = hostUserId,
-            provider = Provider.CLAUDE,
-            model = "claude-sonnet-4-6",
-            kind = JobKind.FULL,
+            AiGenerationJobPublishCommand(
+                jobId = jobId,
+                sessionId = sessionId,
+                clubId = clubId,
+                hostUserId = hostUserId,
+                provider = Provider.CLAUDE,
+                model = "claude-sonnet-4-6",
+                kind = JobKind.FULL,
+            ),
         )
 
         val captor =
@@ -108,13 +111,15 @@ class AiGenerationJobProducerTest {
 
         assertThatThrownBy {
             producer.publish(
-                jobId = UUID.randomUUID(),
-                sessionId = UUID.randomUUID(),
-                clubId = UUID.randomUUID(),
-                hostUserId = UUID.randomUUID(),
-                provider = Provider.CLAUDE,
-                model = "claude-sonnet-4-6",
-                kind = JobKind.FULL,
+                AiGenerationJobPublishCommand(
+                    jobId = UUID.randomUUID(),
+                    sessionId = UUID.randomUUID(),
+                    clubId = UUID.randomUUID(),
+                    hostUserId = UUID.randomUUID(),
+                    provider = Provider.CLAUDE,
+                    model = "claude-sonnet-4-6",
+                    kind = JobKind.FULL,
+                ),
             )
         }.isInstanceOf(AiGenerationJobPublishException::class.java)
             .hasMessageContaining("Timed out publishing AI generation job")
@@ -135,13 +140,15 @@ class AiGenerationJobProducerTest {
 
         assertThatThrownBy {
             producer.publish(
-                jobId = UUID.randomUUID(),
-                sessionId = UUID.randomUUID(),
-                clubId = UUID.randomUUID(),
-                hostUserId = UUID.randomUUID(),
-                provider = Provider.CLAUDE,
-                model = "claude-sonnet-4-6",
-                kind = JobKind.FULL,
+                AiGenerationJobPublishCommand(
+                    jobId = UUID.randomUUID(),
+                    sessionId = UUID.randomUUID(),
+                    clubId = UUID.randomUUID(),
+                    hostUserId = UUID.randomUUID(),
+                    provider = Provider.CLAUDE,
+                    model = "claude-sonnet-4-6",
+                    kind = JobKind.FULL,
+                ),
             )
         }.isInstanceOf(AiGenerationJobPublishException::class.java)
             .hasMessageContaining("Failed publishing AI generation job")
@@ -162,13 +169,15 @@ class AiGenerationJobProducerTest {
 
         assertThatThrownBy {
             producer.publish(
-                jobId = UUID.randomUUID(),
-                sessionId = UUID.randomUUID(),
-                clubId = UUID.randomUUID(),
-                hostUserId = UUID.randomUUID(),
-                provider = Provider.CLAUDE,
-                model = "claude-sonnet-4-6",
-                kind = JobKind.FULL,
+                AiGenerationJobPublishCommand(
+                    jobId = UUID.randomUUID(),
+                    sessionId = UUID.randomUUID(),
+                    clubId = UUID.randomUUID(),
+                    hostUserId = UUID.randomUUID(),
+                    provider = Provider.CLAUDE,
+                    model = "claude-sonnet-4-6",
+                    kind = JobKind.FULL,
+                ),
             )
         }.isInstanceOf(AiGenerationJobPublishException::class.java)
             .hasMessageContaining("Interrupted publishing AI generation job")
