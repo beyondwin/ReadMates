@@ -12,7 +12,6 @@ import {
   saveHostSessionAttendance,
   saveHostSessionPublication,
   updateHostSession,
-  uploadHostSessionFeedbackDocument,
 } from "@/features/host/api/host-api";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
 import { requireHostLoaderAuth } from "./host-loader-auth";
@@ -44,7 +43,6 @@ export const hostSessionEditorActions = {
     sessionId === null ? createHostSession(request) : updateHostSession(sessionId, request),
   savePublication: saveHostSessionPublication,
   updateAttendance: saveHostSessionAttendance,
-  uploadFeedbackDocument: uploadHostSessionFeedbackDocument,
   previewSessionImport: previewHostSessionImport,
   commitSessionImport: commitHostSessionImport,
 } satisfies HostSessionEditorActions;
