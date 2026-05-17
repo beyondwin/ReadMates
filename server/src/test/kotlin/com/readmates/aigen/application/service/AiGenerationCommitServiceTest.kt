@@ -25,26 +25,27 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class AiGenerationCommitServiceTest {
-
     @Test
     fun `commit happy path delegates to CommitValidatedSessionImportUseCase and deletes the job`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.host.clubId,
-            hostUserId = ctx.host.userId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
 
-        val result = ctx.service.commit(
-            host = ctx.host,
-            sessionId = ctx.sessionId,
-            jobId = record.jobId,
-            recordVisibility = SessionRecordVisibility.MEMBER,
-            overrideResult = null,
-        )
+        val result =
+            ctx.service.commit(
+                host = ctx.host,
+                sessionId = ctx.sessionId,
+                jobId = record.jobId,
+                recordVisibility = SessionRecordVisibility.MEMBER,
+                overrideResult = null,
+            )
 
         assertThat(result.sessionId).isEqualTo(ctx.sessionId.toString())
         val delegateCalls = ctx.delegate.invocations
@@ -55,7 +56,7 @@ class AiGenerationCommitServiceTest {
         assertThat(deliveredCommand.recordVisibility).isEqualTo(SessionRecordVisibility.MEMBER)
         assertThat(deliveredCommand.session.bookTitle).isEqualTo(record.result!!.bookTitle)
         assertThat(deliveredCommand.publication.summary).isEqualTo(record.result!!.summary)
-        assertThat(ctx.jobStore.deleted).containsExactly(record.jobId)
+        assertThat(ctx.jobStore.transientPayloadDeleted).containsExactly(record.jobId)
         val audit = ctx.auditPort.entries.single()
         assertThat(audit.kind).isEqualTo(AuditKind.COMMIT)
         assertThat(audit.status).isEqualTo(AuditStatus.SUCCESS)
@@ -64,13 +65,14 @@ class AiGenerationCommitServiceTest {
     @Test
     fun `commit with overrideResult validates and then overwrites Redis snapshot`() {
         val ctx = TestContext()
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.host.clubId,
-            hostUserId = ctx.host.userId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot("auto-generated"),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot("auto-generated"),
+            )
         ctx.jobStore.save(record)
         val edited = AiGenerationTestFixtures.snapshot("user-edited summary")
 
@@ -83,10 +85,16 @@ class AiGenerationCommitServiceTest {
         )
 
         // The validator must have seen the user-edited snapshot.
-        val validatedSnapshot = ctx.validator.calls.single().first
+        val validatedSnapshot =
+            ctx.validator.calls
+                .single()
+                .first
         assertThat(validatedSnapshot.summary).isEqualTo("user-edited summary")
         // And the delegate command must have summary from the override.
-        val command = ctx.delegate.invocations.single().command
+        val command =
+            ctx.delegate.invocations
+                .single()
+                .command
         assertThat(command.publication.summary).isEqualTo("user-edited summary")
     }
 
@@ -94,13 +102,14 @@ class AiGenerationCommitServiceTest {
     fun `commit throws when validator returns Violation and writes FAILED audit row`() {
         val ctx = TestContext()
         ctx.validator.result = ValidationResult.Violation(ErrorCode.AUTHOR_NAME_MISMATCH)
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.host.clubId,
-            hostUserId = ctx.host.userId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
 
         assertThatThrownBy {
@@ -127,13 +136,14 @@ class AiGenerationCommitServiceTest {
         val ctx = TestContext()
         ctx.validator.result = ValidationResult.Violation(ErrorCode.AUTHOR_NAME_MISMATCH)
         val original = AiGenerationTestFixtures.snapshot("auto-generated original")
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.host.clubId,
-            hostUserId = ctx.host.userId,
-            status = JobStatus.SUCCEEDED,
-            result = original,
-        )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = original,
+            )
         ctx.jobStore.save(record)
         val badOverride = AiGenerationTestFixtures.snapshot("user-edited bad summary")
 
@@ -159,28 +169,33 @@ class AiGenerationCommitServiceTest {
     @Test
     fun `commit override validates authors against original session metadata`() {
         val ctx = TestContext()
-        val originalMeta = AiGenerationTestFixtures.sessionMeta(
-            sessionId = ctx.sessionId,
-            clubId = ctx.host.clubId,
-            expectedAuthorNames = listOf("Real Host"),
-        )
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.host.clubId,
-            hostUserId = ctx.host.userId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-            sessionMeta = originalMeta,
-        )
+        val originalMeta =
+            AiGenerationTestFixtures.sessionMeta(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                expectedAuthorNames = listOf("Real Host"),
+            )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+                sessionMeta = originalMeta,
+            )
         ctx.jobStore.save(record)
-        val injectedOverride = AiGenerationTestFixtures.snapshot().copy(
-            highlights = listOf(
-                SessionImportV1Snapshot.AuthoredText("Injected Person", "Untrusted edit."),
-            ),
-            oneLineReviews = listOf(
-                SessionImportV1Snapshot.AuthoredText("Injected Person", "Untrusted review."),
-            ),
-        )
+        val injectedOverride =
+            AiGenerationTestFixtures.snapshot().copy(
+                highlights =
+                    listOf(
+                        SessionImportV1Snapshot.AuthoredText("Injected Person", "Untrusted edit."),
+                    ),
+                oneLineReviews =
+                    listOf(
+                        SessionImportV1Snapshot.AuthoredText("Injected Person", "Untrusted review."),
+                    ),
+            )
         ctx.validator.resultProvider = { _, meta ->
             if ("Injected Person" in meta.expectedAuthorNames) {
                 ValidationResult.Ok
@@ -201,7 +216,10 @@ class AiGenerationCommitServiceTest {
             assertThat(it.code).isEqualTo(ErrorCode.AUTHOR_NAME_MISMATCH)
         }
 
-        val validatedMeta = ctx.validator.calls.single().second
+        val validatedMeta =
+            ctx.validator.calls
+                .single()
+                .second
         assertThat(validatedMeta.expectedAuthorNames).containsExactly("Real Host")
         assertThat(ctx.delegate.invocations).isEmpty()
     }
@@ -209,16 +227,18 @@ class AiGenerationCommitServiceTest {
     @Test
     fun `commit maps downstream invalid import to safe AI schema error`() {
         val ctx = TestContext()
-        ctx.delegate.exception = InvalidSessionImportException(
-            listOf(SessionImportIssue("AUTHOR_NOT_FOUND", "작성자 'Private Name'을 찾을 수 없습니다.")),
-        )
-        val record = AiGenerationTestFixtures.jobRecord(
-            sessionId = ctx.sessionId,
-            clubId = ctx.host.clubId,
-            hostUserId = ctx.host.userId,
-            status = JobStatus.SUCCEEDED,
-            result = AiGenerationTestFixtures.snapshot(),
-        )
+        ctx.delegate.exception =
+            InvalidSessionImportException(
+                listOf(SessionImportIssue("AUTHOR_NOT_FOUND", "작성자 'Private Name'을 찾을 수 없습니다.")),
+            )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
         ctx.jobStore.save(record)
 
         assertThatThrownBy {
@@ -240,6 +260,131 @@ class AiGenerationCommitServiceTest {
     }
 
     @Test
+    fun `commit transitions succeeded to committing to committed and deletes transient payload`() {
+        val ctx = TestContext()
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
+        ctx.jobStore.save(record)
+
+        ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, null)
+
+        val stored = ctx.jobStore.load(record.jobId)!!
+        assertThat(stored.status).isEqualTo(JobStatus.COMMITTED)
+        assertThat(stored.result).isNull()
+        assertThat(stored.transcript).isEmpty()
+        assertThat(ctx.jobStore.transientPayloadDeleted).containsExactly(record.jobId)
+        assertThat(ctx.jobStore.statusTransitions.map { it.second to it.third })
+            .containsExactly(JobStatus.SUCCEEDED to JobStatus.COMMITTING, JobStatus.COMMITTING to JobStatus.COMMITTED)
+
+        assertThat(ctx.jobStore.mutationOrder)
+            .containsSubsequence("transition:COMMITTED", "deleteTransient")
+    }
+
+    @Test
+    fun `commit delegate failure restores job to succeeded for retry`() {
+        val ctx = TestContext()
+        ctx.delegate.exception =
+            InvalidSessionImportException(
+                listOf(SessionImportIssue("INVALID", "safe validation failure")),
+            )
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, null)
+        }.isInstanceOfSatisfying(AiGenerationException.Coded::class.java) {
+            assertThat(it.code).isEqualTo(ErrorCode.SCHEMA_INVALID)
+        }
+
+        val stored = ctx.jobStore.load(record.jobId)!!
+        assertThat(stored.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(stored.result).isNotNull
+        assertThat(ctx.jobStore.transientPayloadDeleted).isEmpty()
+    }
+
+    @Test
+    fun `commit rejects when job is not succeeded`() {
+        val ctx = TestContext()
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.COMMITTING,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, null)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+
+        assertThat(ctx.delegate.invocations).isEmpty()
+    }
+
+    @Test
+    fun `second commit for the same job is rejected after committed transition`() {
+        val ctx = TestContext()
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
+        ctx.jobStore.save(record)
+
+        ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, null)
+
+        assertThatThrownBy {
+            ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, null)
+        }.isInstanceOf(AiGenerationException.IllegalGenerationState::class.java)
+
+        assertThat(ctx.delegate.invocations).hasSize(1)
+    }
+
+    @Test
+    fun `commit delegate runtime failure restores job to succeeded and rethrows`() {
+        val ctx = TestContext()
+        ctx.delegate.exception = IllegalStateException("downstream transient failure")
+        val record =
+            AiGenerationTestFixtures.jobRecord(
+                sessionId = ctx.sessionId,
+                clubId = ctx.host.clubId,
+                hostUserId = ctx.host.userId,
+                status = JobStatus.SUCCEEDED,
+                result = AiGenerationTestFixtures.snapshot(),
+            )
+        ctx.jobStore.save(record)
+
+        assertThatThrownBy {
+            ctx.service.commit(ctx.host, ctx.sessionId, record.jobId, SessionRecordVisibility.MEMBER, null)
+        }.isInstanceOf(IllegalStateException::class.java)
+
+        val stored = ctx.jobStore.load(record.jobId)!!
+        assertThat(stored.status).isEqualTo(JobStatus.SUCCEEDED)
+        assertThat(ctx.jobStore.transientPayloadDeleted).isEmpty()
+        val audit = ctx.auditPort.entries.single()
+        assertThat(audit.kind).isEqualTo(AuditKind.COMMIT)
+        assertThat(audit.status).isEqualTo(AuditStatus.FAILED)
+        assertThat(audit.errorCode).isEqualTo(ErrorCode.UNKNOWN)
+    }
+
+    @Test
     fun `commit throws JobNotFoundException when record missing`() {
         val ctx = TestContext()
         assertThatThrownBy {
@@ -255,16 +400,17 @@ class AiGenerationCommitServiceTest {
 
     private class TestContext {
         val sessionId: UUID = UUID.randomUUID()
-        val host: CurrentMember = CurrentMember(
-            userId = UUID.randomUUID(),
-            membershipId = UUID.randomUUID(),
-            clubId = UUID.randomUUID(),
-            clubSlug = "test-club",
-            email = "host@example.com",
-            displayName = "Host User",
-            accountName = "host",
-            role = MembershipRole.HOST,
-        )
+        val host: CurrentMember =
+            CurrentMember(
+                userId = UUID.randomUUID(),
+                membershipId = UUID.randomUUID(),
+                clubId = UUID.randomUUID(),
+                clubSlug = "test-club",
+                email = "host@example.com",
+                displayName = "Host User",
+                accountName = "host",
+                role = MembershipRole.HOST,
+            )
 
         val jobStore = FakeJobStore()
         val auditPort = FakeAuditPort()
@@ -272,13 +418,15 @@ class AiGenerationCommitServiceTest {
         val delegate = FakeCommitValidatedUseCase()
         val clock = FakeClock(AiGenerationTestFixtures.NOW)
 
-        val service = AiGenerationCommitService(
-            jobStore = jobStore,
-            auditPort = auditPort,
-            validator = validator,
-            commitDelegate = delegate,
-            clock = clock,
-        )
+        val service =
+            AiGenerationCommitService(
+                jobStore = jobStore,
+                auditPort = auditPort,
+                validator = validator,
+                commitDelegate = delegate,
+                clock = clock,
+                transitionPolicy = AiGenerationJobTransitionPolicy(),
+            )
     }
 
     private class FakeCommitValidatedUseCase : CommitValidatedSessionImportUseCase {
@@ -294,12 +442,13 @@ class AiGenerationCommitServiceTest {
                 publication = SessionImportPublicationPreview(command.publication.summary),
                 highlights = emptyList(),
                 oneLineReviews = emptyList(),
-                feedbackDocument = SessionImportCommittedFeedbackDocument(
-                    uploaded = true,
-                    fileName = command.feedbackDocument.fileName,
-                    title = "title",
-                    uploadedAt = "2026-05-16T10:00:00Z",
-                ),
+                feedbackDocument =
+                    SessionImportCommittedFeedbackDocument(
+                        uploaded = true,
+                        fileName = command.feedbackDocument.fileName,
+                        title = "title",
+                        uploadedAt = "2026-05-16T10:00:00Z",
+                    ),
             )
         }
     }

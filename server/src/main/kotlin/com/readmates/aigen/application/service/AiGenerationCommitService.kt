@@ -2,6 +2,8 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.JobStage
+import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.`in`.CommitGenerationUseCase
@@ -53,6 +55,7 @@ class AiGenerationCommitService(
     private val validator: SessionImportV1Validator,
     private val commitDelegate: CommitValidatedSessionImportUseCase,
     private val clock: Clock,
+    private val transitionPolicy: AiGenerationJobTransitionPolicy,
 ) : CommitGenerationUseCase {
     @Suppress("SwallowedException")
     override fun commit(
@@ -66,6 +69,7 @@ class AiGenerationCommitService(
         if (record.sessionId != sessionId) {
             throw JobSessionMismatchException(jobId, sessionId, record.sessionId)
         }
+        transitionPolicy.requireCommit(record.status, record.jobId)
         val snapshot =
             overrideResult
                 ?: record.result
@@ -85,8 +89,47 @@ class AiGenerationCommitService(
             is ValidationResult.Violation -> failCommit(record, outcome)
         }
 
+        val beganCommit =
+            jobStore.transitionStatus(
+                jobId = record.jobId,
+                expected = setOf(JobStatus.SUCCEEDED),
+                next = JobStatus.COMMITTING,
+                stage = JobStage.READY,
+                progressPct = 100,
+                error = null,
+            )
+        if (!beganCommit) {
+            throw AiGenerationException.IllegalGenerationState(
+                jobId = record.jobId,
+                currentStatus = jobStore.load(record.jobId)?.status?.name ?: "MISSING",
+                attemptedAction = "commit",
+            )
+        }
+
         if (overrideResult != null) {
-            jobStore.saveResult(jobId, overrideResult, TokenUsage(0, 0, 0), BigDecimal.ZERO)
+            val overrideSaved =
+                jobStore.saveResultIfStatus(
+                    jobId = jobId,
+                    expected = JobStatus.COMMITTING,
+                    result = overrideResult,
+                    usage = TokenUsage(0, 0, 0),
+                    cost = BigDecimal.ZERO,
+                )
+            if (!overrideSaved) {
+                jobStore.transitionStatus(
+                    jobId = record.jobId,
+                    expected = setOf(JobStatus.COMMITTING),
+                    next = JobStatus.SUCCEEDED,
+                    stage = JobStage.READY,
+                    progressPct = 100,
+                    error = null,
+                )
+                throw AiGenerationException.IllegalGenerationState(
+                    jobId = record.jobId,
+                    currentStatus = jobStore.load(record.jobId)?.status?.name ?: "MISSING",
+                    attemptedAction = "commit",
+                )
+            }
         }
 
         val command = toSessionImportCommand(host, snapshot, sessionId, recordVisibility)
@@ -94,6 +137,14 @@ class AiGenerationCommitService(
             try {
                 commitDelegate.commitValidated(ValidatedSessionImportInput(command))
             } catch (error: InvalidSessionImportException) {
+                jobStore.transitionStatus(
+                    jobId = record.jobId,
+                    expected = setOf(JobStatus.COMMITTING),
+                    next = JobStatus.SUCCEEDED,
+                    stage = JobStage.READY,
+                    progressPct = 100,
+                    error = null,
+                )
                 failCommit(
                     record,
                     ValidationResult.Violation(
@@ -101,9 +152,49 @@ class AiGenerationCommitService(
                         "Generated session import failed validation",
                     ),
                 )
+            } catch (
+                @Suppress("TooGenericExceptionCaught") error: RuntimeException,
+            ) {
+                jobStore.transitionStatus(
+                    jobId = record.jobId,
+                    expected = setOf(JobStatus.COMMITTING),
+                    next = JobStatus.SUCCEEDED,
+                    stage = JobStage.READY,
+                    progressPct = 100,
+                    error = null,
+                )
+                auditPort.insert(
+                    AuditLogEntry(
+                        jobId = record.jobId,
+                        sessionId = record.sessionId,
+                        clubId = record.clubId,
+                        hostUserId = record.hostUserId,
+                        kind = AuditKind.COMMIT,
+                        item = null,
+                        provider = record.model.provider,
+                        model = record.model.name,
+                        transcriptSha256 = null,
+                        usage = record.tokens,
+                        costEstimateUsd = record.costAccumulatedUsd,
+                        status = AuditStatus.FAILED,
+                        errorCode = ErrorCode.UNKNOWN,
+                        errorMessage = "Commit delegate failed; status restored to SUCCEEDED",
+                        latencyMs = 0,
+                        createdAt = clock.instant(),
+                    ),
+                )
+                throw error
             }
 
-        jobStore.delete(jobId)
+        jobStore.transitionStatus(
+            jobId = record.jobId,
+            expected = setOf(JobStatus.COMMITTING),
+            next = JobStatus.COMMITTED,
+            stage = null,
+            progressPct = 100,
+            error = null,
+        )
+        jobStore.deleteTransientPayload(jobId)
         auditPort.insert(
             AuditLogEntry(
                 jobId = record.jobId,
