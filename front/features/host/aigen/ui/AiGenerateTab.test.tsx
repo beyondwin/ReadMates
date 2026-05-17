@@ -299,8 +299,12 @@ describe("AiGenerateTab", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => {
+      expect(submit).toBeEnabled();
+    });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+      fireEvent.click(submit);
     });
 
     const cancelBtn = await screen.findByRole("button", { name: /^취소$/ });
