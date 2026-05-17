@@ -10,6 +10,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 - **호스트 세션 기록 완성 UX 정리**: 호스트 세션 편집기에서 단독 피드백 문서 업로드 경로를 제거하고, AI 생성 기본 경로와 외부 JSON fallback을 하나의 `세션 기록 완성` 패널로 통합했습니다. 새 피드백 문서 저장은 세션 기록 패키지 commit을 통해서만 발생하며, 기존 `FEEDBACK_DOCUMENT_PUBLISHED` 알림 이벤트는 JSON import와 AI commit 경로에서 동일하게 기록됩니다.
+- **platform-admin:** 플랫폼 운영자용 triage 콘솔(`/admin`) — 온보딩 큐, 클럽 디렉터리, 클럽 상세 + Support access grant 패널을 단일 워크벤치로 통합. OWNER 전용 support access, 라이프사이클 우선 정렬, 온보딩 결과의 즉시 선택 반영.
 
 ## v1.10.2 - 2026-05-17
 

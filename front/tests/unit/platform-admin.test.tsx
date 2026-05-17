@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, RouterProvider } from "react-router-dom";
@@ -232,107 +232,6 @@ describe("platform admin frontend shell", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("renders summary metrics without club-role wording", () => {
-    render(
-      <PlatformAdminDashboard
-        summary={{
-          platformRole: "OWNER",
-          activeClubCount: 2,
-          domainActionRequiredCount: 0,
-          domainsRequiringAction: [],
-        }}
-      />,
-    );
-
-    expect(screen.getByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
-    expect(screen.getByText("OWNER")).toBeInTheDocument();
-    expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("0")).toBeInTheDocument();
-    expect(screen.queryByText(/호스트|멤버 승인/)).not.toBeInTheDocument();
-  });
-
-  it("renders domain provisioning status and manual action text", () => {
-    render(
-      <PlatformAdminDashboard
-        summary={{
-          platformRole: "OPERATOR",
-          activeClubCount: 2,
-          domainActionRequiredCount: 1,
-          domains: [
-            {
-              id: "domain-1",
-              clubId: "club-1",
-              hostname: "reading-sai.example.test",
-              kind: "SUBDOMAIN",
-              status: "ACTION_REQUIRED",
-              desiredState: "ENABLED",
-              manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
-              errorCode: null,
-              isPrimary: false,
-              verifiedAt: null,
-              lastCheckedAt: null,
-            },
-            {
-              id: "domain-2",
-              clubId: "club-1",
-              hostname: "failed.example.test",
-              kind: "SUBDOMAIN",
-              status: "FAILED",
-              desiredState: "ENABLED",
-              manualAction: "NONE",
-              errorCode: "DNS_NOT_CONNECTED",
-              isPrimary: false,
-              verifiedAt: null,
-              lastCheckedAt: null,
-            },
-          ],
-          domainsRequiringAction: [],
-        }}
-      />,
-    );
-
-    expect(screen.getByRole("heading", { name: "Cloudflare Pages custom domain" })).toBeInTheDocument();
-    expect(screen.getByText("reading-sai.example.test")).toBeInTheDocument();
-    expect(screen.getByText("ACTION_REQUIRED")).toBeInTheDocument();
-    expect(screen.getByText("Cloudflare Pages custom domain 연결 후 상태 확인을 실행하세요.")).toBeInTheDocument();
-    expect(screen.getByText("failed.example.test")).toBeInTheDocument();
-    expect(screen.getByText("FAILED")).toBeInTheDocument();
-    expect(screen.getByText("DNS_NOT_CONNECTED")).toBeInTheDocument();
-  });
-
-  it("renders the platform club registry", () => {
-    render(
-      <PlatformAdminDashboard
-        summary={{
-          platformRole: "OWNER",
-          activeClubCount: 1,
-          domainActionRequiredCount: 0,
-          domainsRequiringAction: [],
-        }}
-        clubs={{
-          items: [
-            {
-              clubId: "club-1",
-              slug: "reading-sai",
-              name: "읽는사이",
-              tagline: "함께 읽는 모임",
-              about: "공개 소개",
-              status: "ACTIVE",
-              publicVisibility: "PUBLIC",
-              domainCount: 1,
-              domainActionRequiredCount: 0,
-              firstHostOnboardingState: "ASSIGNED",
-            },
-          ],
-        }}
-      />,
-    );
-
-    expect(screen.getByRole("heading", { name: "클럽 레지스트리" })).toBeInTheDocument();
-    expect(screen.getByText("reading-sai")).toBeInTheDocument();
-    expect(screen.getByText("PUBLIC")).toBeInTheDocument();
-  });
-
   it("shows existing user confirmation in onboarding wizard", async () => {
     const user = userEvent.setup();
     const onPreview = vi.fn().mockResolvedValue({
@@ -409,8 +308,30 @@ describe("platform admin frontend shell", () => {
 
       if (url === "/api/bff/api/admin/clubs") {
         return Promise.resolve(
-          new Response(JSON.stringify({ items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }),
+          new Response(
+            JSON.stringify({
+              items: [
+                {
+                  clubId: "club-1",
+                  slug: "reading-sai",
+                  name: "읽는사이",
+                  tagline: "함께 읽는 모임",
+                  about: "공개 소개",
+                  status: "ACTIVE",
+                  publicVisibility: "PUBLIC",
+                  domainCount: 1,
+                  domainActionRequiredCount: 1,
+                  firstHostOnboardingState: "ASSIGNED",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
         );
+      }
+
+      if (url === "/api/bff/api/admin/support-access-grants?clubId=club-1") {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       }
 
       if (url === "/api/bff/api/admin/domains/domain-1/check") {
@@ -450,11 +371,213 @@ describe("platform admin frontend shell", () => {
 
     await user.click(await screen.findByRole("button", { name: /상태 확인/ }));
 
-    expect(await screen.findByText("ACTIVE")).toBeInTheDocument();
-    expect(screen.getByText("추가 조치 없음")).toBeInTheDocument();
+    expect(await screen.findByText("추가 조치 없음")).toBeInTheDocument();
+    expect(screen.getAllByText("ACTIVE").length).toBeGreaterThan(0);
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/admin/domains/domain-1/check",
       expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("renders a triage work queue and selected club brief", () => {
+    render(
+      <PlatformAdminDashboard
+        workbench={{
+          permissions: {
+            canCreateClub: true,
+            canUpdateClub: true,
+            canManageDomains: true,
+            canCreateSupportGrant: true,
+            canRevokeSupportGrant: true,
+          },
+          metrics: {
+            platformRole: "OWNER",
+            activeClubCount: 1,
+            needsActionCount: 1,
+            domainActionRequiredCount: 2,
+            publishReadyCount: 0,
+          },
+          queueItems: [
+            {
+              clubId: "club-1",
+              slug: "reading-sai",
+              name: "읽는사이",
+              severity: "blocked",
+              reason: "첫 호스트가 아직 없습니다.",
+              primaryActionLabel: "체크리스트",
+              badges: ["SETUP_REQUIRED", "PRIVATE", "host MISSING"],
+              sortRank: 10,
+            },
+          ],
+          selectedClub: {
+            clubId: "club-1",
+            slug: "reading-sai",
+            name: "읽는사이",
+            tagline: "함께 읽는 모임",
+            about: "공개 소개",
+            status: "SETUP_REQUIRED",
+            publicVisibility: "PRIVATE",
+            domainCount: 0,
+            domainActionRequiredCount: 0,
+            firstHostOnboardingState: "MISSING",
+            domains: [],
+            publishChecklist: [
+              {
+                id: "first-host",
+                label: "첫 호스트 지정",
+                passed: false,
+                detail: "첫 호스트가 아직 없습니다.",
+              },
+            ],
+            primaryAction: {
+              kind: "make-public",
+              label: "공개 전환",
+              disabled: true,
+              reason: "첫 호스트가 아직 없습니다.",
+            },
+            queueItem: {
+              clubId: "club-1",
+              slug: "reading-sai",
+              name: "읽는사이",
+              severity: "blocked",
+              reason: "첫 호스트가 아직 없습니다.",
+              primaryActionLabel: "체크리스트",
+              badges: ["SETUP_REQUIRED", "PRIVATE", "host MISSING"],
+              sortRank: 10,
+            },
+          },
+        }}
+        selectedClubId="club-1"
+        onSelectClub={vi.fn()}
+        activeGrants={[]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "운영 작업 큐" })).toBeInTheDocument();
+    const summary = screen.getByLabelText("플랫폼 요약");
+    expect(summary).toBeInTheDocument();
+    expect(within(summary).getByText("플랫폼 역할")).toBeInTheDocument();
+    expect(within(summary).getByText("활성 클럽")).toBeInTheDocument();
+    expect(within(summary).getByText("조치 필요")).toBeInTheDocument();
+    expect(within(summary).getByText("도메인 조치 필요")).toBeInTheDocument();
+    expect(within(summary).getByText("공개 준비")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /읽는사이/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("첫 호스트가 아직 없습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "읽는사이" })).toBeInTheDocument();
+  });
+
+  it("loads support access grants for the selected club", async () => {
+    const ownerAuth: AuthMeResponse = {
+      ...baseAuth,
+      platformAdmin: {
+        userId: "user-1",
+        email: "owner@example.com",
+        role: "OWNER",
+      },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(new Response(JSON.stringify(ownerAuth), { status: 200 }));
+      }
+
+      if (url === "/api/bff/api/admin/summary") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              platformRole: "OWNER",
+              activeClubCount: 2,
+              domainActionRequiredCount: 0,
+              domains: [],
+              domainsRequiringAction: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/clubs") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              items: [
+                {
+                  clubId: "club-1",
+                  slug: "first-club",
+                  name: "첫 클럽",
+                  tagline: "첫 클럽 tagline",
+                  about: "첫 클럽 소개",
+                  status: "ACTIVE",
+                  publicVisibility: "PUBLIC",
+                  domainCount: 0,
+                  domainActionRequiredCount: 0,
+                  firstHostOnboardingState: "ASSIGNED",
+                },
+                {
+                  clubId: "club-2",
+                  slug: "second-club",
+                  name: "둘째 클럽",
+                  tagline: "둘째 클럽 tagline",
+                  about: "둘째 클럽 소개",
+                  status: "ACTIVE",
+                  publicVisibility: "PRIVATE",
+                  domainCount: 0,
+                  domainActionRequiredCount: 0,
+                  firstHostOnboardingState: "ASSIGNED",
+                },
+              ],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/support-access-grants?clubId=club-1") {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+
+      if (url === "/api/bff/api/admin/support-access-grants?clubId=club-2") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: "grant-1",
+                clubId: "club-2",
+                grantedByUserId: "owner-1",
+                granteeUserId: "support-1",
+                scope: "HOST_SUPPORT_READ",
+                reason: "Support review",
+                expiresAt: "2099-01-01T12:00:00Z",
+                revokedAt: null,
+                createdAt: "2026-05-17T00:00:00Z",
+              },
+            ]),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
+    const user = userEvent.setup();
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: /둘째 클럽/ }));
+
+    expect(await screen.findByText("Support review")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/admin/support-access-grants?clubId=club-2",
+      expect.anything(),
     );
   });
 
@@ -508,5 +631,205 @@ describe("platform admin frontend shell", () => {
 
     expect(await screen.findByRole("heading", { name: "플랫폼 관리" })).toBeInTheDocument();
     expect(screen.getByText("OWNER")).toBeInTheDocument();
+  });
+
+  it("selects the created club and shows returned domain after onboarding commit", async () => {
+    const onPreview = vi.fn().mockResolvedValue({
+      club: { slug: "new-club", available: true },
+      firstHost: {
+        kind: "NEW_USER",
+        email: "host@example.com",
+        existingUserId: null,
+        existingUserName: null,
+        requiredConfirmation: null,
+      },
+      domain: { hostname: "new-club.example.com", available: true },
+    });
+    const onCommit = vi.fn().mockResolvedValue({
+      club: {
+        clubId: "club-new",
+        slug: "new-club",
+        name: "새 클럽",
+        tagline: "새 클럽 tagline",
+        about: "새 클럽 소개",
+        status: "SETUP_REQUIRED",
+        publicVisibility: "PRIVATE",
+        domainCount: 1,
+        domainActionRequiredCount: 1,
+        firstHostOnboardingState: "INVITED",
+      },
+      hostOnboarding: {
+        kind: "INVITATION_CREATED",
+        email: "host@example.com",
+        userId: null,
+        invitationId: "invite-1",
+        acceptUrl: "https://readmates.example/invite/example",
+        emailDelivery: { status: "SENT" },
+      },
+      domain: {
+        id: "domain-new",
+        clubId: "club-new",
+        hostname: "new-club.example.com",
+        kind: "SUBDOMAIN",
+        status: "ACTION_REQUIRED",
+        desiredState: "ENABLED",
+        manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
+        errorCode: null,
+        isPrimary: false,
+        verifiedAt: null,
+        lastCheckedAt: null,
+      },
+    });
+
+    render(<PlatformAdminOnboardingWizard onPreview={onPreview} onCommit={onCommit} />);
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("클럽 이름"), "새 클럽");
+    await user.type(screen.getByLabelText("Slug"), "new-club");
+    await user.type(screen.getByLabelText("Tagline"), "새 클럽 tagline");
+    await user.type(screen.getByLabelText("About"), "새 클럽 소개");
+    await user.type(screen.getByLabelText("첫 호스트 이메일"), "host@example.com");
+    await user.type(screen.getByLabelText("첫 호스트 이름"), "Host User");
+    await user.click(screen.getByRole("button", { name: "미리 확인" }));
+    await user.click(await screen.findByRole("button", { name: "클럽 생성" }));
+
+    expect(await screen.findByText("new-club")).toBeInTheDocument();
+    expect(screen.getByText("메일: SENT")).toBeInTheDocument();
+  });
+
+  it("selects the created club and adds returned domain after onboarding commit (route)", async () => {
+    const ownerAuth: AuthMeResponse = {
+      ...baseAuth,
+      platformAdmin: {
+        userId: "user-1",
+        email: "owner@example.com",
+        role: "OWNER",
+      },
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = input.toString();
+
+      if (url === "/api/bff/api/auth/me") {
+        return Promise.resolve(new Response(JSON.stringify(ownerAuth), { status: 200 }));
+      }
+
+      if (url === "/api/bff/api/admin/summary") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              platformRole: "OWNER",
+              activeClubCount: 0,
+              domainActionRequiredCount: 0,
+              domains: [],
+              domainsRequiringAction: [],
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/clubs") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ items: [] }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/clubs/onboarding/preview") {
+        expect(init?.method).toBe("POST");
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              club: { slug: "new-club", available: true },
+              firstHost: {
+                kind: "NEW_USER",
+                email: "host@example.com",
+                existingUserId: null,
+                existingUserName: null,
+                requiredConfirmation: null,
+              },
+              domain: { hostname: "new-club.example.com", available: true },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/clubs/onboarding") {
+        expect(init?.method).toBe("POST");
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              club: {
+                clubId: "club-new",
+                slug: "new-club",
+                name: "새 클럽",
+                tagline: "새 클럽 tagline",
+                about: "새 클럽 소개",
+                status: "SETUP_REQUIRED",
+                publicVisibility: "PRIVATE",
+                domainCount: 1,
+                domainActionRequiredCount: 1,
+                firstHostOnboardingState: "INVITED",
+              },
+              hostOnboarding: {
+                kind: "INVITATION_CREATED",
+                email: "host@example.com",
+                userId: null,
+                invitationId: "invite-1",
+                acceptUrl: "https://readmates.example/invite/example",
+                emailDelivery: { status: "SENT" },
+              },
+              domain: {
+                id: "domain-new",
+                clubId: "club-new",
+                hostname: "new-club.example.com",
+                kind: "SUBDOMAIN",
+                status: "ACTION_REQUIRED",
+                desiredState: "ENABLED",
+                manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
+                errorCode: null,
+                isPrimary: false,
+                verifiedAt: null,
+                lastCheckedAt: null,
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      if (url === "/api/bff/api/admin/support-access-grants?clubId=club-new") {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/admin"] });
+    const user = userEvent.setup();
+
+    render(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "새 클럽" }));
+    await user.type(screen.getByLabelText("클럽 이름"), "새 클럽");
+    await user.type(screen.getByLabelText("Slug"), "new-club");
+    await user.type(screen.getByLabelText("Tagline"), "새 클럽 tagline");
+    await user.type(screen.getByLabelText("About"), "새 클럽 소개");
+    await user.type(screen.getByLabelText("첫 호스트 이메일"), "host@example.com");
+    await user.type(screen.getByLabelText("첫 호스트 이름"), "Host User");
+    await user.click(screen.getByRole("button", { name: "미리 확인" }));
+    await user.click(await screen.findByRole("button", { name: "클럽 생성" }));
+
+    expect(await screen.findByRole("heading", { name: "새 클럽" })).toBeInTheDocument();
+    expect(screen.getByText("new-club.example.com")).toBeInTheDocument();
+    expect(screen.getAllByText("ACTION_REQUIRED").length).toBeGreaterThan(0);
   });
 });
