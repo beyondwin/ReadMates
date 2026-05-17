@@ -187,7 +187,7 @@ export function getHostDashboardPublicationFeedbackRows(
     {
       label: "피드백 문서",
       value: feedbackPending > 0 ? `${feedbackPending}개 대기` : "대기 없음",
-      helper: feedbackPending > 0 ? "회차 피드백 문서 업로드가 필요합니다." : "문서 등록 대기 중인 이전 세션이 없습니다.",
+      helper: feedbackPending > 0 ? "회차 세션 기록 패키지 저장이 필요합니다." : "문서 등록 대기 중인 이전 세션이 없습니다.",
       tone: feedbackPending > 0 ? "warn" : "ok",
     },
   ];

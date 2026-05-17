@@ -773,7 +773,7 @@ export default function HostSessionEditor({
                       : "저장되었습니다. 이전 화면으로 이동합니다."
                     : saveState === "error"
                       ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
-                      : "기본 정보 저장, 기록 공개 범위 저장, 피드백 문서 업로드는 각각 별도로 처리됩니다."}
+                      : "기본 정보 저장, 기록 공개 범위 저장, 세션 기록 패키지 저장은 각각 별도로 처리됩니다."}
               </div>
             </div>
             <div className="row" style={{ gap: "8px", flexWrap: "wrap" }}>

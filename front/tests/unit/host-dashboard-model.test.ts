@@ -126,7 +126,7 @@ describe("host dashboard model", () => {
     expect(getHostDashboardPublicationFeedbackRows(data)[1]).toEqual({
       label: "피드백 문서",
       value: "3개 대기",
-      helper: "회차 피드백 문서 업로드가 필요합니다.",
+      helper: "회차 세션 기록 패키지 저장이 필요합니다.",
       tone: "warn",
     });
     expect(getHostDashboardNextOperationAction(session, data, null)).toMatchObject({
