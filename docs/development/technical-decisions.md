@@ -129,3 +129,11 @@ boot 시 Kafka listener bean이 등록되지 않는지 log 확인.
 **Trade-off:** token bucket이 주 경계에서 reset되는 의도된 부작용이 있습니다. 율 제한은 단기(분~시간 단위) 정책이므로 실질적인 영향은 없습니다. 토큰·세션 ID 해시에는 여전히 `stableHash`(salt 없음)를 사용해 주 경계 영향을 받지 않습니다.
 
 **관련 문서와 검증:** `./server/gradlew -p server test --tests '*ClientIpHashing*'`
+
+## Transaction Boundary Policy
+
+Application services own business transaction boundaries. Controllers parse HTTP and call use cases; persistence adapters execute SQL and mapping. When an application service coordinates more than one write port, the service method owns the transaction so cache invalidation, notification event recording, and state mutation share one visible boundary.
+
+Adapter-level `@Transactional` is allowed only when the adapter is called by an inbound scheduler, Kafka listener, or other path that does not already pass through an application service transaction. If both service and adapter carry `@Transactional`, the service boundary is treated as the authoritative boundary and the adapter annotation should be removed in a narrow cleanup once tests pin the behavior.
+
+Isolation is specified only where the operation depends on claim/read-modify-write behavior that needs a non-default guarantee. Existing examples include session/login restoration and notification delivery claiming. New isolation choices must be explained in the service or adjacent decision record.
