@@ -12,7 +12,7 @@ data class AiGenerationProperties(
     val enabled: Boolean = false,
     val mock: Boolean = false,
     val enabledProviders: Set<String> = emptySet(),     // "CLAUDE","OPENAI","GEMINI"
-    val fallbackDefaultModel: String = "claude-sonnet-4-6",
+    val fallbackDefaultModel: String = "gpt-5.4-mini",
     val caps: Caps = Caps(),
     val job: Job = Job(),
     val pricing: Map<String, Pricing> = emptyMap(),

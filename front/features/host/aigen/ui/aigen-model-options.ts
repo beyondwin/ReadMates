@@ -21,9 +21,9 @@ export const AIGEN_OPENAI_DEFAULT_MODEL_ID = "gpt-5.4-mini";
 export const AIGEN_GEMINI_DEFAULT_MODEL_ID = "gemini-3-flash";
 
 export const AIGEN_MODEL_OPTIONS: ReadonlyArray<AigenModelOption> = [
-  { value: AIGEN_CLAUDE_DEFAULT_MODEL_ID, label: "Claude Sonnet 4.6" },
   { value: AIGEN_OPENAI_DEFAULT_MODEL_ID, label: "OpenAI GPT-5.4 mini" },
+  { value: AIGEN_CLAUDE_DEFAULT_MODEL_ID, label: "Claude Sonnet 4.6" },
   { value: AIGEN_GEMINI_DEFAULT_MODEL_ID, label: "Gemini 3 Flash (Preview)" },
 ] as const;
 
-export const AIGEN_DEFAULT_MODEL = AIGEN_MODEL_OPTIONS[0].value;
+export const AIGEN_DEFAULT_MODEL: string = AIGEN_OPENAI_DEFAULT_MODEL_ID;

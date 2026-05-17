@@ -97,7 +97,7 @@ readmates:
     mock: ${READMATES_AIGEN_MOCK:false}
     # Canonical provider names: CLAUDE, OPENAI, GEMINI. Empty default = kill switch.
     enabled-providers: ${READMATES_AIGEN_ENABLED_PROVIDERS:}
-    fallback-default-model: ${READMATES_AIGEN_FALLBACK_DEFAULT_MODEL:claude-sonnet-4-6}
+    fallback-default-model: ${READMATES_AIGEN_FALLBACK_DEFAULT_MODEL:gpt-5.4-mini}
     caps:
       host-daily-calls: ${READMATES_AIGEN_HOST_DAILY_CALLS:10}
       club-monthly-cost-usd: ${READMATES_AIGEN_CLUB_MONTHLY_COST_USD:20.00}
