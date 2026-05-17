@@ -13,7 +13,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 | 공개 사이트 | `/clubs/:slug`, `/clubs/:slug/about`, `/clubs/:slug/records`, `/clubs/:slug/sessions/:sessionId`, `/`, `/about`, `/records`, `/sessions/:sessionId`, `/login`, `/clubs/:slug/invite/:token`, `/invite/:token`, `/reset-password/:token` | 게스트, 로그인 사용자 | 클럽 소개, 공개 기록, 공개 세션 상세, Google OAuth 시작, 클럽 context가 있는 초대 수락 진입, 종료된 비밀번호 경로 안내. Unscoped public route는 호환성을 위해 baseline club을 사용 |
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/notifications`, 등록된 club host의 `/app/**` | 둘러보기 멤버, 정식 멤버, 호스트 | 현재 세션 확인, 멤버 공개 예정 세션 확인, 둘러보기 멤버 안내, RSVP, 읽은 분량, 질문, 한줄평, 장문 서평, 아카이브, 참석 회차 피드백 문서, 본인 표시 이름과 알림 설정 변경, 클럽별 멤버 알림함 확인 |
-| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 세션 기록 JSON 가져오기, 초대 관리, 멤버 상태와 표시 이름 관리, 피드백 문서 업로드, 알림 발송 운영 |
+| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, 닫힌 기록 발행, 세션 기록 JSON 가져오기, 초대 관리, 멤버 상태와 표시 이름 관리, 세션 기록 패키지 저장, 알림 발송 운영 |
 | 플랫폼 관리 | `/admin` | platform admin | 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인. 세션/멤버/알림 같은 클럽 내부 운영은 호스트 앱 책임 |
 
 ## 프런트엔드 route-first 경계
@@ -330,17 +330,13 @@ Public route/API에는 명시적으로 공개된 데이터만 나갑니다.
 피드백 문서는 모임 후 운영 산출물을 저장하고 읽기 좋게 제공하기 위한 기능입니다.
 
 ```text
-External operating workflow
+Session record package commit
   |
-  | Markdown or text feedback document
+  | AI generation result or readmates-session-import:v1 JSON
   v
-Host upload
+SessionImportService validation and replacement
   |
-  | POST /api/host/sessions/{sessionId}/feedback-document
-  v
-Spring validation and parser
-  |
-  | UTF-8, .md/.txt, size, filename, structured sections
+  | UTF-8, structured feedback template, session metadata, attendee authors
   v
 MySQL session_feedback_documents
   |
@@ -349,7 +345,7 @@ MySQL session_feedback_documents
 Readable response for host or attended full member
 ```
 
-호스트는 `.md` 또는 `.txt` 피드백 문서를 업로드합니다. 서버는 파일명, 크기, UTF-8 텍스트 여부를 검증하고 `FeedbackDocumentParser`로 문서를 typed response 형태로 파싱합니다. 저장은 원문 텍스트와 metadata를 versioned document로 남깁니다.
+호스트는 더 이상 피드백 문서만 별도로 업로드하지 않습니다. 새 피드백 문서는 AI 생성 또는 `readmates-session-import:v1` JSON import commit이 세션 기록 패키지를 저장할 때 함께 교체됩니다.
 
 프런트엔드에는 `/app/feedback/:sessionId/print` route와 browser print 기반 helper가 남아 있지만, 현재 `front/shared/config/readmates-feature-flags.ts`의 `feedbackDocumentPdfDownloadsEnabled`가 `false`라서 사용자는 `PDF로 저장` 또는 자동 print action을 보지 않습니다. 이 기능을 다시 켤 때는 archive, my page, feedback document route, E2E print smoke를 함께 검증합니다.
 
