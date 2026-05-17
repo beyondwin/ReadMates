@@ -5,6 +5,7 @@ import com.readmates.aigen.adapter.out.messaging.AiGenerationJobProducer
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.JobKind
+import com.readmates.aigen.application.service.AiGenerationMetrics
 import com.readmates.aigen.application.service.AiGenerationWorker
 import com.readmates.aigen.config.AiGenerationKafkaConfig
 import com.readmates.aigen.config.AiGenerationKafkaProperties
@@ -87,9 +88,11 @@ class AiGenerationJobConsumerIntegrationTest(
         val clubId = UUID.randomUUID()
         val hostUserId = UUID.randomUUID()
         // First call throws (consumer skips ack → container redelivers); subsequent calls succeed.
-        Mockito.doThrow(RuntimeException("first attempt fails"))
+        Mockito
+            .doThrow(RuntimeException("first attempt fails"))
             .doNothing()
-            .`when`(worker).process(jobId)
+            .`when`(worker)
+            .process(jobId)
 
         producer.publish(
             AiGenerationJobPublishCommand(
@@ -132,6 +135,9 @@ class AiGenerationJobConsumerIntegrationTest(
     class TestWorkerConfiguration {
         @Bean
         fun aiGenerationWorker(): AiGenerationWorker = Mockito.mock(AiGenerationWorker::class.java)
+
+        @Bean
+        fun aiGenerationMetrics(): AiGenerationMetrics = Mockito.mock(AiGenerationMetrics::class.java)
     }
 
     companion object {

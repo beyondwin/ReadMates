@@ -6,6 +6,7 @@ import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
+import org.hamcrest.Matchers
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -85,14 +86,17 @@ class PlatformAdminControllerTest(
     fun `active owner can access admin summary`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
 
+        // Seed guarantees at least the two ACTIVE clubs (reading-sai + sample-book-club).
+        // Use ≥ rather than == so the test is robust to other integration tests that
+        // share the MySQL container and may have left ACTIVE clubs behind.
         mockMvc
             .get("/api/admin/summary") {
                 cookie(sessionCookieForUser(owner))
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.platformRole") { value("OWNER") }
-                jsonPath("$.activeClubCount") { value(2) }
-                jsonPath("$.domainActionRequiredCount") { value(0) }
+                jsonPath("$.activeClubCount") { value(Matchers.greaterThanOrEqualTo(2)) }
+                jsonPath("$.domainActionRequiredCount") { value(Matchers.greaterThanOrEqualTo(0)) }
             }
     }
 

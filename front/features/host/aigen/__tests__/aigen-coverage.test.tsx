@@ -207,10 +207,14 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
       fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
     });
 
-    // Wait for PREVIEW.
-    await waitFor(() => {
-      expect(screen.getByText(/AI가 생성한 기록 미리보기/)).toBeInTheDocument();
-    });
+    // Wait for PREVIEW. Polling cadence is 2s for the first refetch (see
+    // useAiGenerationJob), so allow ample headroom for slower CI runners.
+    await waitFor(
+      () => {
+        expect(screen.getByText(/AI가 생성한 기록 미리보기/)).toBeInTheDocument();
+      },
+      { timeout: 5000 },
+    );
 
     // The draft summary should win over the server-supplied one.
     expect(screen.getByDisplayValue("사용자가 편집한 요약")).toBeInTheDocument();
