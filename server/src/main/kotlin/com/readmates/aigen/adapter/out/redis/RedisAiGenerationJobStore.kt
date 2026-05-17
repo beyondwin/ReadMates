@@ -157,6 +157,26 @@ class RedisAiGenerationJobStore(
         }.onFailure { recordFailure("updateStatus") }.getOrThrow()
     }
 
+    override fun transitionStatus(
+        jobId: UUID,
+        expected: Set<JobStatus>,
+        next: JobStatus,
+        stage: JobStage?,
+        progressPct: Int,
+        error: GenerationError?,
+    ): Boolean = error("transitionStatus is implemented in task 3 (Redis Atomic Transitions)")
+
+    override fun saveResultIfStatus(
+        jobId: UUID,
+        expected: JobStatus,
+        result: SessionImportV1Snapshot,
+        usage: TokenUsage,
+        cost: BigDecimal,
+    ): Boolean = error("saveResultIfStatus is implemented in task 3 (Redis Atomic Transitions)")
+
+    override fun deleteTransientPayload(jobId: UUID): Unit =
+        error("deleteTransientPayload is implemented in task 3 (Redis Atomic Transitions)")
+
     override fun incrementLlmCallCount(jobId: UUID): Int =
         runCatching {
             val hashKey = hashKey(jobId)

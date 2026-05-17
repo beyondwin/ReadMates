@@ -44,6 +44,16 @@ import java.util.UUID
 internal class FakeJobStore : AiGenerationJobStore {
     val records: MutableMap<UUID, JobRecord> = mutableMapOf()
     val deleted: MutableList<UUID> = mutableListOf()
+    val transientPayloadDeleted: MutableList<UUID> = mutableListOf()
+    val statusTransitions: MutableList<Triple<UUID, JobStatus, JobStatus>> = mutableListOf()
+    /**
+     * Unified order log for ordering invariants — e.g. "commit must transition to
+     * COMMITTED BEFORE calling deleteTransientPayload". Push `"transition:${next.name}"`
+     * inside `transitionStatus` (when it returns true) and `"deleteTransient"` inside
+     * `deleteTransientPayload`. Asserted with `containsSubsequence(...)`.
+     */
+    val mutationOrder: MutableList<String> = mutableListOf()
+    var failNextConditionalSave: Boolean = false
 
     override fun save(job: JobRecord) {
         records[job.jobId] = job
@@ -104,6 +114,62 @@ internal class FakeJobStore : AiGenerationJobStore {
             stage = stage,
             progressPct = progressPct,
             error = error,
+        )
+    }
+
+    override fun transitionStatus(
+        jobId: UUID,
+        expected: Set<JobStatus>,
+        next: JobStatus,
+        stage: JobStage?,
+        progressPct: Int,
+        error: GenerationError?,
+    ): Boolean {
+        val current = records[jobId] ?: return false
+        if (current.status !in expected) return false
+        records[jobId] = current.copy(
+            status = next,
+            stage = stage,
+            progressPct = progressPct,
+            error = error,
+        )
+        statusTransitions += Triple(jobId, current.status, next)
+        mutationOrder += "transition:${next.name}"
+        return true
+    }
+
+    override fun saveResultIfStatus(
+        jobId: UUID,
+        expected: JobStatus,
+        result: SessionImportV1Snapshot,
+        usage: TokenUsage,
+        cost: BigDecimal,
+    ): Boolean {
+        if (failNextConditionalSave) {
+            failNextConditionalSave = false
+            return false
+        }
+        val current = records[jobId] ?: return false
+        if (current.status != expected) return false
+        records[jobId] = current.copy(
+            result = result,
+            tokens = TokenUsage(
+                current.tokens.inputTokens + usage.inputTokens,
+                current.tokens.cachedInputTokens + usage.cachedInputTokens,
+                current.tokens.outputTokens + usage.outputTokens,
+            ),
+            costAccumulatedUsd = current.costAccumulatedUsd.add(cost),
+        )
+        return true
+    }
+
+    override fun deleteTransientPayload(jobId: UUID) {
+        transientPayloadDeleted += jobId
+        mutationOrder += "deleteTransient"
+        val current = records[jobId] ?: return
+        records[jobId] = current.copy(
+            transcript = "",
+            result = null,
         )
     }
 
