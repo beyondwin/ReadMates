@@ -237,8 +237,12 @@ describe("AiGenerateTab", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => {
+      expect(submit).toBeEnabled();
+    });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+      fireEvent.click(submit);
     });
 
     await waitFor(() => {
@@ -267,8 +271,12 @@ describe("AiGenerateTab", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => {
+      expect(submit).toBeEnabled();
+    });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+      fireEvent.click(submit);
     });
 
     // Back to IDLE: TranscriptUploadForm is shown again.
@@ -342,8 +350,12 @@ describe("AiGenerateTab", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => {
+      expect(submit).toBeEnabled();
+    });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+      fireEvent.click(submit);
     });
 
     const commitBtn = await screen.findByRole("button", { name: /기록 저장/ });
@@ -379,8 +391,12 @@ describe("AiGenerateTab", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
+    const submit = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => {
+      expect(submit).toBeEnabled();
+    });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+      fireEvent.click(submit);
     });
 
     const retryBtn = await screen.findByRole("button", { name: /다시 시도/ });
