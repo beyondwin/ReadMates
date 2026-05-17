@@ -6,6 +6,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ## Unreleased
 
+### Changed
+- **deploy:** 운영 시크릿/설정 관리를 SSH 편집에서 GitHub Actions `sync-config` 워크플로로 이관. `deploy/oci/02-configure.sh` 는 인프라 셋업만 담당. 로컬 개발은 `deploy/local/compose.override.yml` 로 운영과 동일한 compose 스택을 띄울 수 있게 됨. 자세한 절차: `docs/operations/runbooks/secrets-management.md`, `docs/operations/runbooks/vm-deploy-key-bootstrap.md`.
+
+### Removed
+- **deploy:** 레거시 host JAR systemd 유닛 (`readmates-server.service`) 및 `02-configure.sh` 의 readmates.env heredoc 작성 블록 제거.
+
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
