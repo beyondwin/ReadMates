@@ -11,6 +11,7 @@
 
 import { expect, test, type Route } from "@playwright/test";
 import type { ClubAiDefaultResponse } from "@/features/host/aigen/api/aigen-contracts";
+import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
@@ -24,25 +25,14 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 }
 
 test("JSON-upload and AI-generate modes coexist and toggle via ?aigen URL query", async ({ page }) => {
-  await page.route("**/api/bff/api/auth/me**", async (route) => {
-    await json(route, 200, {
-      authenticated: true,
-      principal: { membershipId: "m-1", email: "host@example.com", role: "HOST" },
-    });
-  });
+  await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
     if (route.request().url().includes("/ai-generate")) {
       await route.fallback();
       return;
     }
-    await json(route, 200, {
-      sessionId: SESSION_ID,
-      clubSlug: CLUB_SLUG,
-      title: "E2E 세션",
-      state: "OPEN",
-      attendees: [],
-    });
+    await json(route, 200, hostSessionDetailResponse(SESSION_ID));
   });
 
   await page.route(
@@ -53,10 +43,10 @@ test("JSON-upload and AI-generate modes coexist and toggle via ?aigen URL query"
   );
 
   // 1) Land on the editor WITHOUT ?aigen=1 → JSON-upload mode.
-  await page.goto(`/app/host/sessions/${SESSION_ID}/edit`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit`);
 
   // The mode toggle should be visible.
-  const aigenToggle = page.getByRole("button", { name: /AI 결과 가져오기/ });
+  const aigenToggle = page.getByRole("tab", { name: /AI 결과 가져오기/ });
   await expect(aigenToggle).toBeVisible({ timeout: 15000 });
 
   // The AI upload form must NOT be mounted yet (mutually exclusive panels).
@@ -70,7 +60,7 @@ test("JSON-upload and AI-generate modes coexist and toggle via ?aigen URL query"
   await expect.poll(() => new URL(page.url()).searchParams.get("aigen")).toBe("1");
 
   // 3) Switch back to JSON mode.
-  const jsonToggle = page.getByRole("button", { name: /JSON|업로드/ }).first();
+  const jsonToggle = page.getByRole("tab", { name: /JSON|업로드/ }).first();
   await jsonToggle.click();
 
   // The AI upload form is gone again.

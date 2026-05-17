@@ -224,4 +224,3 @@ describe("useAiGenerationJob", () => {
     expect(mockedGetJob.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });
-

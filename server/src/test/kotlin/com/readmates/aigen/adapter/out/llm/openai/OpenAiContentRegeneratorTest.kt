@@ -58,7 +58,7 @@ class OpenAiContentRegeneratorTest {
             currentResult = currentSnapshot,
             item = item,
             sessionMeta = meta,
-            model = ModelId(Provider.OPENAI, "openai-gpt-4-1"),
+            model = ModelId(Provider.OPENAI, "gpt-4.1"),
             instructions = null,
         )
 
@@ -188,7 +188,7 @@ class OpenAiContentRegeneratorTest {
 
         regen.regenerateItem(inputFor(GenerationItem.SUMMARY))
 
-        assertEquals("openai-gpt-4-1", fake.lastModel)
+        assertEquals("gpt-4.1", fake.lastModel)
     }
 
     @Test

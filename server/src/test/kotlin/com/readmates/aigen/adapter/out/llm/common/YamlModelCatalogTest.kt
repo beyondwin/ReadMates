@@ -75,7 +75,7 @@ class YamlModelCatalogTest {
         val props = AiGenerationProperties(
             enabledProviders = setOf("openai"),
             pricing = mapOf(
-                "gpt-4o" to pricing("5", "0", "15"),
+                "gpt-4.1" to pricing("2", "0.50", "8"),
                 "o1" to pricing("15", "0", "60"),
             ),
         )
@@ -84,7 +84,7 @@ class YamlModelCatalogTest {
 
         val allow = catalog.allowlisted()
         assertEquals(2, allow.size)
-        assertTrue(allow.any { it == ModelId(Provider.OPENAI, "gpt-4o") })
+        assertTrue(allow.any { it == ModelId(Provider.OPENAI, "gpt-4.1") })
         assertTrue(allow.any { it == ModelId(Provider.OPENAI, "o1") })
     }
 

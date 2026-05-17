@@ -195,8 +195,12 @@ describe("AiGenerateTab", () => {
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
+    const startButton = screen.getByRole("button", { name: /생성 시작/ });
+    await waitFor(() => {
+      expect(startButton).toBeEnabled();
+    });
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+      fireEvent.click(startButton);
     });
 
     // After poll, PREVIEW shows summary section editor.

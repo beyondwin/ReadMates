@@ -155,6 +155,32 @@ describe("readmatesFetchResponse", () => {
     });
   });
 
+  it("throws API errors with parsed RFC 7807 problem detail", async () => {
+    const response = new Response(
+      JSON.stringify({
+        type: "/problems/aigen/cost-cap-exceeded",
+        title: "Cost cap exceeded",
+        status: 429,
+        detail: "이번 달 AI 생성 비용 한도를 초과했습니다.",
+        code: "COST_CAP_EXCEEDED",
+      }),
+      {
+        status: 429,
+        statusText: "Too Many Requests",
+        headers: { "Content-Type": "application/problem+json" },
+      },
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+
+    await expect(readmatesFetch("/api/host/sessions/s1/ai-generate/jobs")).rejects.toMatchObject({
+      name: "ReadmatesApiError",
+      message: "이번 달 AI 생성 비용 한도를 초과했습니다.",
+      status: 429,
+      code: "COST_CAP_EXCEEDED",
+      fallback: false,
+    });
+  });
+
   it("throws API errors with safe fallback body when the response body is empty", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 403 })));
 

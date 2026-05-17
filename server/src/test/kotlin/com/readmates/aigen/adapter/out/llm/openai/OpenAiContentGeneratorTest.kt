@@ -41,7 +41,7 @@ class OpenAiContentGeneratorTest {
         GenerationInput(
             transcript = "녹취록 내용 ...",
             sessionMeta = meta,
-            model = ModelId(Provider.OPENAI, "openai-gpt-4-1"),
+            model = ModelId(Provider.OPENAI, "gpt-4.1"),
             instructions = null,
         )
 
@@ -128,7 +128,7 @@ class OpenAiContentGeneratorTest {
 
         generator.generateFull(input)
 
-        assertEquals("openai-gpt-4-1", fake.lastModel)
+        assertEquals("gpt-4.1", fake.lastModel)
     }
 
     @Test

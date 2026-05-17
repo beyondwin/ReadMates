@@ -13,7 +13,7 @@ export type AigenModelOption = {
 
 export const AIGEN_MODEL_OPTIONS: ReadonlyArray<AigenModelOption> = [
   { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
-  { value: "openai-gpt-4-1", label: "OpenAI GPT-4.1" },
+  { value: "gpt-4.1", label: "OpenAI GPT-4.1" },
   { value: "gemini-2-5-pro", label: "Gemini 2.5 Pro" },
 ] as const;
 

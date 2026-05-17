@@ -15,6 +15,7 @@ import type {
   SessionImportV1,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
+import { hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const JOB_ID = "22222222-2222-2222-2222-222222222222";
@@ -86,25 +87,14 @@ async function fulfillJson(route: Route, status: number, body: unknown): Promise
 
 test("AI generation full flow: upload → poll → preview → commit", async ({ page }) => {
   // ── Stub auth / session shell so the editor page renders without a live API ──
-  await page.route("**/api/bff/api/auth/me**", async (route) => {
-    await fulfillJson(route, 200, {
-      authenticated: true,
-      principal: { membershipId: "m-1", email: "host@example.com", role: "HOST" },
-    });
-  });
+  await routeHostEditorShell(page, CLUB_SLUG);
 
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}**`, async (route) => {
     if (route.request().url().includes("/ai-generate")) {
       await route.fallback();
       return;
     }
-    await fulfillJson(route, 200, {
-      sessionId: SESSION_ID,
-      clubSlug: CLUB_SLUG,
-      title: "E2E 세션",
-      state: "OPEN",
-      attendees: [],
-    });
+    await fulfillJson(route, 200, hostSessionDetailResponse(SESSION_ID));
   });
 
   // ── Stub club ai-defaults ──
@@ -153,7 +143,7 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
   );
 
   // ── Navigate ──
-  await page.goto(`/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
 
   // Upload a small file
   const fileChooser = page.getByLabel(/대본 파일/);

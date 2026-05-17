@@ -39,14 +39,14 @@ describe("TranscriptUploadForm", () => {
   it("populates the model dropdown from defaultModel", () => {
     render(
       <TranscriptUploadForm
-        defaultModel="openai-gpt-4-1"
+        defaultModel="gpt-4.1"
         loadingDefaults={false}
         submitting={false}
         onSubmit={() => {}}
       />,
     );
     const select = screen.getByLabelText(/모델/) as HTMLSelectElement;
-    expect(select.value).toBe("openai-gpt-4-1");
+    expect(select.value).toBe("gpt-4.1");
   });
 
   it("calls onSubmit with file, model, authorNameMode, and instructions when submitted", async () => {

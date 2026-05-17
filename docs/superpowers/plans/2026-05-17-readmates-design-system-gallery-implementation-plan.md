@@ -16,39 +16,39 @@ This is one cohesive implementation slice: the docs gallery needs a small set of
 
 ## File Structure
 
-- Create: `design/system/src/components/book-cover.tsx`  
+- Create: `design/system/src/components/book-cover.tsx`
   React wrapper for the existing `.rm-book-cover` CSS contract, including image and fallback states.
-- Create: `design/system/src/components/book-cover.test.tsx`  
+- Create: `design/system/src/components/book-cover.test.tsx`
   Tests image alt, fallback title, author text, and size classes.
-- Create: `design/system/src/components/avatar-chip.tsx`  
+- Create: `design/system/src/components/avatar-chip.tsx`
   Compact identity chip built from `.rm-avatar-chip`, with derived initials and optional metadata.
-- Create: `design/system/src/components/avatar-chip.test.tsx`  
+- Create: `design/system/src/components/avatar-chip.test.tsx`
   Tests initials fallback, explicit initials, metadata, and long-name class behavior.
-- Create: `design/system/src/components/state-panel.tsx`  
+- Create: `design/system/src/components/state-panel.tsx`
   `EmptyState` and `LockedState` components over `.rm-empty-state` and `.rm-locked-state`.
-- Create: `design/system/src/components/state-panel.test.tsx`  
+- Create: `design/system/src/components/state-panel.test.tsx`
   Tests empty/locked titles, descriptions, action rendering, and reason classes.
-- Create: `design/system/src/components/document-panel.tsx`  
+- Create: `design/system/src/components/document-panel.tsx`
   Document-like panel for introductions, reading notes, and summaries.
-- Create: `design/system/src/components/document-panel.test.tsx`  
+- Create: `design/system/src/components/document-panel.test.tsx`
   Tests heading, eyebrow, metadata, divided content, and footer rendering.
-- Modify: `design/system/src/index.ts`  
+- Modify: `design/system/src/index.ts`
   Export the new components and public prop types.
-- Modify: `design/system/src/styles/tokens.css`  
+- Modify: `design/system/src/styles/tokens.css`
   Add focused modifier classes for the new wrappers while preserving existing CSS contract names.
-- Modify: `design/system/src/design-system-boundaries.test.ts`  
+- Modify: `design/system/src/design-system-boundaries.test.ts`
   Keep the boundary test as-is unless the new source files expose a forbidden import. Do not weaken this test.
-- Create: `design/docs/src/gallery-data.ts`  
+- Create: `design/docs/src/gallery-data.ts`
   Public-safe copy, pattern metadata, and sample book/member data for the gallery.
-- Modify: `design/docs/src/docs-data.ts`  
+- Modify: `design/docs/src/docs-data.ts`
   Add the new components to migration/component status.
-- Modify: `design/docs/src/app.test.tsx`  
+- Modify: `design/docs/src/app.test.tsx`
   Drive the docs IA rewrite with tests for Overview, Public, Member, Components, and Migration.
-- Modify: `design/docs/src/app.tsx`  
+- Modify: `design/docs/src/app.tsx`
   Rebuild the docs app around the Editorial Pattern Gallery.
-- Modify: `design/docs/src/app.css`  
+- Modify: `design/docs/src/app.css`
   Add desktop sidebar, mobile top navigation, clean pattern previews, and responsive rules.
-- Modify: `design/README.md`  
+- Modify: `design/README.md`
   Document the gallery purpose, public-safe sample rules, and local verification commands.
 
 ## Task 1: Add BookCover And AvatarChip Primitives
