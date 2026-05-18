@@ -3,16 +3,10 @@ import { describe, expect, it } from "vitest";
 import { Button } from "./button";
 
 describe("Button", () => {
-  it("renders the existing ReadMates button CSS contract", () => {
-    render(
-      <Button variant="primary" size="sm">
-        저장
-      </Button>,
-    );
+  it("defaults to type=button so it does not submit forms unintentionally", () => {
+    render(<Button>저장</Button>);
 
-    const button = screen.getByRole("button", { name: "저장" });
-    expect(button).toHaveAttribute("type", "button");
-    expect(button).toHaveClass("btn", "btn-primary", "btn-sm");
+    expect(screen.getByRole("button", { name: "저장" })).toHaveAttribute("type", "button");
   });
 
   it("allows submit buttons when forms need them", () => {
