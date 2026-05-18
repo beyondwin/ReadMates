@@ -38,7 +38,6 @@ import type { PageRequest } from "@/shared/model/paging";
 import {
   normalizePageRequest,
   pageFromNormalizedPageRequest,
-  type NormalizedPageRequest,
 } from "@/shared/query/cursor-pagination";
 
 export type ManualOptionsQueryRequest = {

@@ -21,6 +21,9 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Plan host notifications query migration as a separate slice in `docs/superpowers/plans/2026-05-17-readmates-host-notifications-query-migration.md`.
 - Migrate `host/notifications` server state to TanStack Query: loader seeding, query-owned event/delivery/audit/manual ledgers, mutation invalidation for process/retry/restore/test-mail/confirm, and local-only manual preview/selection state.
 - Migrate `host/sessions` server state to TanStack Query: dashboard current/session list, editor detail/manual dispatch reads, create/update/delete/open/close/publish/publication/attendance/visibility/import-commit mutation invalidation, and shared session selector cache for host notifications.
+- refactor(front): migrate `current-session` route to TanStack Query loader seeding and mutation hooks; remove the custom `readmates:route-refresh` event and the route-level `currentSessionAction`.
+- refactor(front): extract `front/shared/query/cursor-pagination` and apply normalized helpers across host notifications/sessions/archive load-more paths.
+- refactor(front): move platform-admin summary/clubs/support-grants ownership to Query cache with explicit per-mutation cache strategies (targeted-update for domain check/club update/support grants; targeted-update + invalidate for onboarding commit).
 - Document the server transaction boundary policy (application-service-owned `@Transactional`; adapters stay non-transactional) in `docs/development/technical-decisions.md`.
 - Refactor `JdbcHostSessionWriteAdapter` to drop redundant adapter-level `@Transactional` annotations, aligning with the documented policy.
 
