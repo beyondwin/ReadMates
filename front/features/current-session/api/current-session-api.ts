@@ -20,17 +20,22 @@ export async function getCurrentSession(context?: ReadmatesApiContext) {
   return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
 }
 
-export async function updateCurrentSessionRsvp(status: RsvpStatus) {
+export async function updateCurrentSessionRsvp(status: RsvpStatus, context?: ReadmatesApiContext) {
   return readmatesFetchResponse(
     "/api/sessions/current/rsvp",
     jsonRequest({ method: "PATCH" }, { status }),
+    context,
   );
 }
 
-export async function saveCurrentSessionCheckin(readingProgress: CheckinRequest["readingProgress"]) {
+export async function saveCurrentSessionCheckin(
+  readingProgress: CheckinRequest["readingProgress"],
+  context?: ReadmatesApiContext,
+) {
   return readmatesFetchResponse(
     "/api/sessions/current/checkin",
     jsonRequest({ method: "PUT" }, { readingProgress }),
+    context,
   );
 }
 
@@ -45,23 +50,26 @@ export async function saveCurrentSessionQuestion(
   );
 }
 
-export async function saveCurrentSessionQuestions(questions: QuestionListItem[]) {
+export async function saveCurrentSessionQuestions(questions: QuestionListItem[], context?: ReadmatesApiContext) {
   return readmatesFetchResponse(
     "/api/sessions/current/questions",
     jsonRequest({ method: "PUT" }, { questions }),
+    context,
   );
 }
 
-export async function saveCurrentSessionOneLineReview(text: string) {
+export async function saveCurrentSessionOneLineReview(text: string, context?: ReadmatesApiContext) {
   return readmatesFetchResponse(
     "/api/sessions/current/one-line-reviews",
     jsonRequest({ method: "POST" }, { text }),
+    context,
   );
 }
 
-export async function saveCurrentSessionLongReview(body: string) {
+export async function saveCurrentSessionLongReview(body: string, context?: ReadmatesApiContext) {
   return readmatesFetchResponse(
     "/api/sessions/current/reviews",
     jsonRequest({ method: "POST" }, { body }),
+    context,
   );
 }
