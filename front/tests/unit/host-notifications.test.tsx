@@ -328,7 +328,7 @@ describe("hostNotificationsLoader", () => {
       if (url === "/api/bff/api/host/notifications/events?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/deliveries?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/test-mail/audit?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
-      if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
+      if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ items: [hostSessionDraft, hostSessionOpen], nextCursor: null }));
       }
       if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&limit=50&clubSlug=reading-sai") {
@@ -364,6 +364,53 @@ describe("hostNotificationsLoader", () => {
     });
   });
 
+  it("seeds the host session list into the shared host session cache", async () => {
+    const sessionsPage = { items: [hostSessionDraft, hostSessionOpen], nextCursor: null };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({
+          authenticated: true,
+          userId: "user-host",
+          membershipId: "membership-host",
+          clubId: "club-1",
+          email: "host@example.com",
+          displayName: "호스트",
+          accountName: "호",
+          role: "HOST",
+          membershipStatus: "ACTIVE",
+          approvalState: "ACTIVE",
+        }));
+      }
+      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") return Promise.resolve(jsonResponse(summary));
+      if (url === "/api/bff/api/host/notifications/events?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/notifications/deliveries?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/notifications/test-mail/audit?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(sessionsPage));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ ...manualOptionsFixture, session: { ...manualOptionsFixture.session, sessionId: "session-open" } }));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/dispatches?limit=20&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = testQueryClient();
+    const loader = hostNotificationsLoaderFactory(client);
+    await loader({
+      params: { clubSlug: "reading-sai" },
+      request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications"),
+    } as LoaderFunctionArgs);
+
+    const { hostSessionListQuery } = await import("@/features/host/queries/host-session-queries");
+    expect(client.getQueryData(hostSessionListQuery({ limit: 50 }, { clubSlug: "reading-sai" }).queryKey))
+      .toEqual(sessionsPage);
+  });
+
   it("falls back from an unknown URL session id before loading manual options", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
@@ -385,7 +432,7 @@ describe("hostNotificationsLoader", () => {
       if (url === "/api/bff/api/host/notifications/events?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/deliveries?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/test-mail/audit?limit=50&clubSlug=reading-sai") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
-      if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
+      if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ items: [hostSessionOpen], nextCursor: null }));
       }
       if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&limit=50&clubSlug=reading-sai") {

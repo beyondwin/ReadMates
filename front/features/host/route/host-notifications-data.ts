@@ -5,7 +5,6 @@ import {
   fetchHostNotificationEvents,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
-  fetchHostSessions,
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
 } from "@/features/host/api/host-api";
@@ -62,7 +61,7 @@ export function hostNotificationsLoaderFactory(client: QueryClient) {
       fetchHostNotificationEvents(context, ledgerPage),
       fetchHostNotificationDeliveries(context, ledgerPage),
       fetchHostNotificationTestMailAudit(context, ledgerPage),
-      fetchHostSessions(context),
+      client.fetchQuery(hostNotificationSessionsQuery(context)),
       fetchManualNotificationDispatches(context, { page: dispatchPage }),
     ]);
 
@@ -77,7 +76,6 @@ export function hostNotificationsLoaderFactory(client: QueryClient) {
     client.setQueryData(hostNotificationEventsQuery(ledgerPage, context).queryKey, events);
     client.setQueryData(hostNotificationDeliveriesQuery(ledgerPage, context).queryKey, deliveries);
     client.setQueryData(hostNotificationAuditQuery(ledgerPage, context).queryKey, audit);
-    client.setQueryData(hostNotificationSessionsQuery(context).queryKey, hostSessions);
     client.setQueryData(hostNotificationManualDispatchesQuery({ page: dispatchPage }, context).queryKey, manualDispatches);
     client.setQueryData(hostNotificationManualOptionsQuery(manualOptionsRequest, context).queryKey, manualOptions);
 

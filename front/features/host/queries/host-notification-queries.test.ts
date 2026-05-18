@@ -3,9 +3,11 @@ import {
   hostNotificationKeys,
   hostNotificationEventsQuery,
   hostNotificationManualOptionsQuery,
+  hostNotificationSessionsQuery,
   invalidateHostNotificationOverview,
   invalidateManualNotificationState,
 } from "./host-notification-queries";
+import { hostSessionListQuery } from "./host-session-queries";
 
 describe("host notification query keys", () => {
   it("scopes keys by club slug when one is provided", () => {
@@ -34,6 +36,12 @@ describe("host notification query keys", () => {
         { sessionId: "session-1", page: { limit: 50 } },
         { clubSlug: "reading-sai" },
       ).queryKey,
+    );
+  });
+
+  it("uses the shared host session list query for notification session selectors", () => {
+    expect(hostNotificationSessionsQuery({ clubSlug: "reading-sai" }).queryKey).toEqual(
+      hostSessionListQuery({ limit: 50 }, { clubSlug: "reading-sai" }).queryKey,
     );
   });
 

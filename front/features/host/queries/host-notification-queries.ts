@@ -6,7 +6,6 @@ import {
   fetchHostNotificationEvents,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
-  fetchHostSessions,
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
   previewManualNotification,
@@ -15,6 +14,7 @@ import {
   retryHostNotification,
   sendHostNotificationTestMail,
 } from "@/features/host/api/host-api";
+import { hostSessionListQuery } from "@/features/host/queries/host-session-queries";
 import type {
   HostNotificationDeliveryListResponse,
   HostNotificationEventListResponse,
@@ -119,8 +119,6 @@ export const hostNotificationKeys = {
     [...hostNotificationKeys.overview(context), "audit"] as const,
   audit: (page?: PageRequest, context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.auditRoot(context), normalizePage(page)] as const,
-  hostSessions: (context?: ReadmatesApiContext) =>
-    [...hostNotificationKeys.scope(context), "hostSessions"] as const,
   manualOptionsRoot: (context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.manual(context), "options"] as const,
   manualOptions: (request?: ManualOptionsQueryRequest, context?: ReadmatesApiContext) =>
@@ -159,11 +157,10 @@ export function hostNotificationAuditQuery(page?: PageRequest, context?: Readmat
   });
 }
 
+const HOST_NOTIFICATION_SESSION_SELECTOR_LIMIT = 50;
+
 export function hostNotificationSessionsQuery(context?: ReadmatesApiContext) {
-  return queryOptions({
-    queryKey: hostNotificationKeys.hostSessions(context),
-    queryFn: () => fetchHostSessions(context),
-  });
+  return hostSessionListQuery({ limit: HOST_NOTIFICATION_SESSION_SELECTOR_LIMIT }, context);
 }
 
 export function hostNotificationManualOptionsQuery(
