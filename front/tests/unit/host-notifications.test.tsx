@@ -1,12 +1,18 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hostNotificationsLoaderFactory } from "@/features/host/route/host-notifications-data";
+import { HostNotificationsRoute } from "@/features/host/route/host-notifications-route";
 import {
+  hostNotificationAuditQuery,
+  hostNotificationDeliveriesQuery,
   hostNotificationEventsQuery,
+  hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
+  hostNotificationSessionsQuery,
   hostNotificationSummaryQuery,
 } from "@/features/host/queries/host-notification-queries";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
@@ -224,6 +230,76 @@ function renderPage({
   return { onProcess, onRetry, onRestore, onSendTestMail, onPreviewManual, onConfirmManual };
 }
 
+function installRouterRequestShim() {
+  const NativeRequest = globalThis.Request;
+
+  vi.stubGlobal(
+    "Request",
+    class RouterTestRequest extends NativeRequest {
+      constructor(input: RequestInfo | URL, init?: RequestInit) {
+        super(input, init === undefined ? init : { ...init, signal: undefined });
+      }
+    },
+  );
+}
+
+function seedNotificationsRoute(client: QueryClient) {
+  const context = { clubSlug: "reading-sai" };
+  client.setQueryData(hostNotificationSummaryQuery(context).queryKey, summary);
+  client.setQueryData(hostNotificationEventsQuery({ limit: 50 }, context).queryKey, {
+    items: [pendingEvent],
+    nextCursor: null,
+  });
+  client.setQueryData(hostNotificationDeliveriesQuery({ limit: 50 }, context).queryKey, {
+    items: [deadDelivery],
+    nextCursor: null,
+  });
+  client.setQueryData(hostNotificationAuditQuery({ limit: 50 }, context).queryKey, {
+    items: audit,
+    nextCursor: null,
+  });
+  client.setQueryData(hostNotificationSessionsQuery(context).queryKey, {
+    items: [hostSessionCurrent, hostSessionDraft],
+    nextCursor: null,
+  });
+  client.setQueryData(hostNotificationManualOptionsQuery(
+    { sessionId: "session-1", page: { limit: 50 } },
+    context,
+  ).queryKey, manualOptionsFixture);
+  client.setQueryData(hostNotificationManualDispatchesQuery(
+    { page: { limit: 20 } },
+    context,
+  ).queryKey, {
+    items: [manualDispatch],
+    nextCursor: null,
+  });
+}
+
+function renderNotificationsRoute(client = testQueryClient()) {
+  installRouterRequestShim();
+  seedNotificationsRoute(client);
+  const router = createMemoryRouter([
+    {
+      path: "/clubs/:clubSlug/app/host/notifications",
+      element: <HostNotificationsRoute />,
+      loader: () => ({
+        initialManualSelection: { sessionId: "session-1", eventType: null },
+      }),
+      hydrateFallbackElement: <div>알림 정보를 불러오는 중</div>,
+    },
+  ], {
+    initialEntries: ["/clubs/reading-sai/app/host/notifications"],
+  });
+
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+
+  return { client, router };
+}
+
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -333,6 +409,17 @@ describe("hostNotificationsLoader", () => {
       expect.stringContaining("sessionId=missing"),
       expect.anything(),
     );
+  });
+});
+
+describe("HostNotificationsRoute", () => {
+  it("renders host notifications route from query seeded data", async () => {
+    renderNotificationsRoute();
+
+    expect(await screen.findByRole("heading", { name: "알림 발송 장부" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
+    expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
   });
 });
 

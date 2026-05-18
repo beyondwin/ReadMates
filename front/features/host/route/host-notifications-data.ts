@@ -1,7 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import {
-  confirmManualNotification,
   fetchHostNotificationDeliveries,
   fetchHostNotificationEvents,
   fetchHostNotificationSummary,
@@ -9,11 +8,6 @@ import {
   fetchHostSessions,
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
-  previewManualNotification,
-  processHostNotifications,
-  restoreHostNotification,
-  retryHostNotification,
-  sendHostNotificationTestMail,
 } from "@/features/host/api/host-api";
 import type {
   HostNotificationEventType,
@@ -29,7 +23,6 @@ import {
   hostNotificationSummaryQuery,
 } from "@/features/host/queries/host-notification-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
-import type { PageRequest } from "@/shared/model/paging";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
@@ -93,22 +86,3 @@ export function hostNotificationsLoaderFactory(client: QueryClient) {
     };
   };
 }
-
-export const hostNotificationsActions = {
-  process: async () => {
-    const response = await processHostNotifications();
-    if (!response.ok) {
-      throw new Error("Notification process failed");
-    }
-  },
-  retry: retryHostNotification,
-  restore: restoreHostNotification,
-  sendTestMail: sendHostNotificationTestMail,
-  previewManual: previewManualNotification,
-  confirmManual: confirmManualNotification,
-  loadManualOptions: (sessionId?: string, search?: string, page?: PageRequest) => fetchManualNotificationOptions(undefined, { sessionId, search, page }),
-  loadManualDispatches: (page?: PageRequest) => fetchManualNotificationDispatches(undefined, { page }),
-  loadEvents: (page?: PageRequest) => fetchHostNotificationEvents(undefined, page),
-  loadDeliveries: (page?: PageRequest) => fetchHostNotificationDeliveries(undefined, page),
-  loadAudit: (page?: PageRequest) => fetchHostNotificationTestMailAudit(undefined, page),
-};

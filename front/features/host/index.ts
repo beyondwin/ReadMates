@@ -53,6 +53,5 @@ export {
 } from "@/features/host/route/host-notifications-route";
 export {
   hostNotificationsLoaderFactory,
-  hostNotificationsActions,
   type HostNotificationsRouteData,
 } from "@/features/host/route/host-notifications-data";
