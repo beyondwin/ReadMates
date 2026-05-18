@@ -15,7 +15,8 @@ export function buildRoutes(queryClient: QueryClient): RouteObject[] {
   ];
 }
 
-export const routes: RouteObject[] = buildRoutes(createReadmatesQueryClient());
+export const routesQueryClient = createReadmatesQueryClient();
+export const routes: RouteObject[] = buildRoutes(routesQueryClient);
 
 export function createReadmatesRouter() {
   const queryClient = createReadmatesQueryClient();

@@ -1,8 +1,10 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/src/app/auth-context";
-import { routes } from "@/src/app/router";
+import { routes, routesQueryClient } from "@/src/app/router";
 import { currentSessionContractFixture } from "./api-contract-fixtures";
 
 afterEach(() => {
@@ -37,10 +39,18 @@ function installRouterRequestShim() {
 
 function renderRouterAt(path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
-  render(
+  renderWithRoutesQueryClient(
     <AuthProvider>
       <RouterProvider router={router} />
     </AuthProvider>,
+  );
+}
+
+function renderWithRoutesQueryClient(children: ReactNode) {
+  render(
+    <QueryClientProvider client={routesQueryClient}>
+      {children}
+    </QueryClientProvider>,
   );
 }
 
@@ -305,7 +315,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/login"] });
 
-    render(<RouterProvider router={router} />);
+    renderWithRoutesQueryClient(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { name: "읽는사이 들어가기" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "시작하기" })).toHaveAttribute(
@@ -318,7 +328,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/reset-password/reset-token"] });
 
-    render(<RouterProvider router={router} />);
+    renderWithRoutesQueryClient(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { name: "비밀번호 로그인은 종료되었습니다." })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 계속하기" })).toHaveAttribute(
@@ -353,7 +363,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/invite/raw-token"] });
 
-    render(<RouterProvider router={router} />);
+    renderWithRoutesQueryClient(<RouterProvider router={router} />);
 
     expect(await screen.findByText("member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
@@ -388,7 +398,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai/invite/raw-token"] });
 
-    render(<RouterProvider router={router} />);
+    renderWithRoutesQueryClient(<RouterProvider router={router} />);
 
     expect(await screen.findByText("member@example.com")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
@@ -415,7 +425,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -471,7 +481,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/pending"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -518,7 +528,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -564,7 +574,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai/app/session/current"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -608,7 +618,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -634,7 +644,7 @@ describe("SPA router", () => {
       initialEntries: ["/clubs/reading-sai/app/feedback/session-1?from=email"],
     });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -674,7 +684,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/session/current"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -698,7 +708,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -722,7 +732,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -788,7 +798,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/app/archive"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -856,7 +866,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: ["/clubs/reading-sai/app/archive"] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -894,7 +904,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: [path] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
@@ -925,7 +935,7 @@ describe("SPA router", () => {
     installRouterRequestShim();
     const router = createMemoryRouter(routes, { initialEntries: [path] });
 
-    render(
+    renderWithRoutesQueryClient(
       <AuthProvider>
         <RouterProvider router={router} />
       </AuthProvider>,
