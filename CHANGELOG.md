@@ -12,11 +12,13 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **호스트 세션 기록 완성 UX 정리**: 호스트 세션 편집기에서 단독 피드백 문서 업로드 경로를 제거하고, AI 생성 기본 경로와 외부 JSON fallback을 하나의 `세션 기록 완성` 패널로 통합했습니다. 새 피드백 문서 저장은 세션 기록 패키지 commit을 통해서만 발생하며, 기존 `FEEDBACK_DOCUMENT_PUBLISHED` 알림 이벤트는 JSON import와 AI commit 경로에서 동일하게 기록됩니다.
 - **platform-admin:** 플랫폼 운영자용 triage 콘솔(`/admin`) — 온보딩 큐, 클럽 디렉터리, 클럽 상세 + Support access grant 패널을 단일 워크벤치로 통합. OWNER 전용 support access, 라이프사이클 우선 정렬, 온보딩 결과의 즉시 선택 반영.
 - **AI 생성 job state machine 정리**: AI 세션 생성 job에 `COMMITTING`/`COMMITTED` terminal path를 추가하고, Redis job store의 상태 전이를 CAS로 강제해 worker completion, regenerate, commit, cancel 경합이 서로 결과 payload를 덮어쓰지 않도록 했습니다. Commit/cancel 이후에는 transcript/result payload를 지우되 terminal hash는 TTL까지 남겨 프런트가 `COMMITTED` 상태를 확인하고 polling을 종료할 수 있습니다.
+- **CI 안정화와 로컬 사전 게이트 정리**: `scripts/pre-push-check.sh`로 push 전 frontend coverage/build/Zod fixture/backend check/public-release scanner를 한 번에 실행할 수 있게 했고, auth context 비동기 상태 assertion과 notification logger capture 테스트에 flake 방지 락을 추가했습니다.
 
 ### Engineering Proof Portfolio
 
 - Add reviewer-facing showcase index, guest-mode walkthrough, architecture evidence, engineering confidence, and operational proof docs under `docs/showcase/`.
 - Add a "How to Review This Project" entry point to `README.md` pointing at the showcase set.
+- Add `scripts/pre-push-check.sh` and document the standard/full/release modes in `scripts/README.md`, `README.md`, and `docs/development/test-guide.md`.
 - Migrate `host/members` server state to TanStack Query (route loader factory seeds query cache; mutations invalidate on success; UI remains prop-driven). Documented in `docs/development/server-state-migration.md`.
 - Plan host notifications query migration as a separate slice in `docs/superpowers/plans/2026-05-17-readmates-host-notifications-query-migration.md`.
 - Migrate `host/notifications` server state to TanStack Query: loader seeding, query-owned event/delivery/audit/manual ledgers, mutation invalidation for process/retry/restore/test-mail/confirm, and local-only manual preview/selection state.
@@ -24,6 +26,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - refactor(front): migrate `current-session` route to TanStack Query loader seeding and mutation hooks; remove the custom `readmates:route-refresh` event and the route-level `currentSessionAction`.
 - refactor(front): extract `front/shared/query/cursor-pagination` and apply normalized helpers across host notifications/sessions/archive load-more paths.
 - refactor(front): move platform-admin summary/clubs/support-grants ownership to Query cache with explicit per-mutation cache strategies (targeted-update for domain check/club update/support grants; targeted-update + invalidate for onboarding commit).
+- test: stabilize CI flakes by waiting for async auth state transitions in `auth-context.test.tsx` and serializing notification delivery logger capture tests with `@ResourceLock("NotificationDeliveryEngineLogger")`.
 - Document the server transaction boundary policy (application-service-owned `@Transactional`; adapters stay non-transactional) in `docs/development/technical-decisions.md`.
 - Refactor `JdbcHostSessionWriteAdapter` to drop redundant adapter-level `@Transactional` annotations, aligning with the documented policy.
 

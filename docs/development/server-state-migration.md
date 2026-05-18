@@ -2,13 +2,15 @@
 
 본 문서는 TanStack Query 마이그레이션 진행 상황을 추적합니다.
 
-## 이번 분기 계획
+## 이번 분기 진행 범위
 
-Engineering proof portfolio 분기에서는 다음 순서로 server state migration을 진행합니다.
+Engineering proof portfolio 분기에서는 아래 순서로 server state migration을 진행했고, 현재 `platform-admin`까지 완료했습니다.
 
 1. `host/members` — 멤버 목록과 lifecycle/profile/viewer mutation을 Query invalidation 패턴으로 정리합니다.
 2. `host/notifications` — 수동 알림 options/preview/confirm/dispatch ledger를 route-owned state와 Query cache로 분리합니다.
-3. `host/sessions` — 세션 목록/read path부터 좁게 시작하고 editor mutation은 별도 pass로 나눕니다.
+3. `host/sessions` — dashboard/session list, editor detail/manual dispatch read, session mutation을 Query cache로 옮깁니다.
+4. `current-session` — 멤버 현재 세션 read/mutation path를 Query loader seeding과 invalidation으로 정리하고 custom route refresh event를 제거합니다.
+5. `platform-admin` — summary, club directory/detail, support grants, onboarding/domain/club mutation cache ownership을 platform admin query module로 모읍니다.
 
 각 migration은 UI 컴포넌트가 API를 직접 호출하지 않는다는 route-first 경계를 유지해야 합니다.
 
