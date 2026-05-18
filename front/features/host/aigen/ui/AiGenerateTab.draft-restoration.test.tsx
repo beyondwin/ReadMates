@@ -1,19 +1,3 @@
-/**
- * Consolidated coverage index for the AI generation frontend (task_3_6 step 1).
- *
- * Most behaviour is exercised by the co-located unit tests:
- *   - `ui/TranscriptUploadForm.test.tsx` (1 MB rejection, model dropdown)
- *   - `ui/RegenerateModal.test.tsx` (camelCase → UPPER_SNAKE payload)
- *   - `hooks/useAiGenerationJob.test.tsx` (polling cadence, terminal stops)
- *   - `storage/aigen-draft-storage.test.tsx` (save / load / clear)
- *   - `ui/AiGenerateTab.test.tsx` (IDLE → GENERATING → PREVIEW → COMMITTED)
- *
- * This file fills the one residual gap the plan calls out — *draft restoration
- * combined with the PREVIEW state machine* — and provides a meta sanity check
- * for `AIGEN_MODEL_OPTIONS` plus a round-trip integration assertion for the
- * draft helpers. It deliberately does **not** duplicate the focused tests above.
- */
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
@@ -25,16 +9,7 @@ import type {
   SessionImportV1,
   StartGenerationResponse,
 } from "@/features/host/aigen/api/aigen-contracts";
-import {
-  AIGEN_DEFAULT_MODEL,
-  AIGEN_MODEL_OPTIONS,
-} from "@/features/host/aigen/ui/aigen-model-options";
-import {
-  clearAigenDraft,
-  draftStorageKey,
-  loadAigenDraft,
-  saveAigenDraft,
-} from "@/features/host/aigen/storage/aigen-draft-storage";
+import { saveAigenDraft } from "@/features/host/aigen/storage/aigen-draft-storage";
 
 vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   startGeneration: vi.fn(),
@@ -57,8 +32,6 @@ const mockedStart = vi.mocked(startGeneration);
 const mockedGetJob = vi.mocked(getJob);
 const mockedClubDefault = vi.mocked(getClubAiDefault);
 
-// Stable jobId used by the start-response stub so the draft pre-seed matches
-// the jobId the tab will eventually adopt.
 const PRESEEDED_JOB_ID = "job-with-draft";
 
 function serverSnapshot(): SessionImportV1 {
@@ -128,38 +101,6 @@ function installFakeLocalStorage(): void {
   Object.defineProperty(window, "localStorage", { configurable: true, value: store });
 }
 
-describe("AIGEN_MODEL_OPTIONS", () => {
-  it("exposes a non-empty, well-formed allowlist with the documented default", () => {
-    expect(AIGEN_MODEL_OPTIONS.length).toBeGreaterThan(0);
-    for (const option of AIGEN_MODEL_OPTIONS) {
-      expect(typeof option.value).toBe("string");
-      expect(option.value.length).toBeGreaterThan(0);
-      expect(typeof option.label).toBe("string");
-      expect(option.label.length).toBeGreaterThan(0);
-    }
-    const values = AIGEN_MODEL_OPTIONS.map((option) => option.value);
-    expect(values).toContain(AIGEN_DEFAULT_MODEL);
-    // No duplicate values.
-    expect(new Set(values).size).toBe(values.length);
-  });
-});
-
-describe("aigen draft round-trip", () => {
-  beforeEach(() => {
-    installFakeLocalStorage();
-  });
-
-  it("saves a snapshot, loads it back as deep-equal, and removes it on clear", () => {
-    const snap = serverSnapshot();
-    expect(loadAigenDraft("rt-1")).toBeNull();
-    saveAigenDraft("rt-1", snap);
-    expect(window.localStorage.getItem(draftStorageKey("rt-1"))).not.toBeNull();
-    expect(loadAigenDraft("rt-1")).toEqual(snap);
-    clearAigenDraft("rt-1");
-    expect(loadAigenDraft("rt-1")).toBeNull();
-  });
-});
-
 describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
   beforeEach(() => {
     mockedStart.mockReset();
@@ -174,8 +115,6 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
   });
 
   it("seeds the PREVIEW snapshot from localStorage draft (not the server result) when a draft exists for the new jobId", async () => {
-    // Pre-seed the draft *before* start runs. The draft summary differs from
-    // the server result so we can assert which one wins.
     const draft: SessionImportV1 = {
       ...serverSnapshot(),
       summary: "사용자가 편집한 요약",
@@ -204,9 +143,6 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
     });
     const submit = screen.getByRole("button", { name: /생성 시작/ });
-    // The submit button is disabled until the club default query resolves; on
-    // slower CI runners clicking before that races and the start mutation
-    // never fires.
     await waitFor(() => {
       expect(submit).toBeEnabled();
     });
@@ -214,8 +150,6 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
       fireEvent.click(submit);
     });
 
-    // Wait for PREVIEW. Polling cadence is 2s for the first refetch (see
-    // useAiGenerationJob), so allow ample headroom for slower CI runners.
     await waitFor(
       () => {
         expect(screen.getByText(/AI가 생성한 기록 미리보기/)).toBeInTheDocument();
@@ -223,7 +157,6 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
       { timeout: 5000 },
     );
 
-    // The draft summary should win over the server-supplied one.
     expect(screen.getByDisplayValue("사용자가 편집한 요약")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("서버가 생성한 요약")).not.toBeInTheDocument();
   });
