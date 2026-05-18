@@ -57,11 +57,14 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="알림 발송 장부를 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostNotificationsRouteElement }, { hostNotificationsLoader }] = await Promise.all([
+        const [{ HostNotificationsRouteElement }, { hostNotificationsLoaderFactory }] = await Promise.all([
           import("@/src/app/host-route-elements"),
           import("@/features/host/route/host-notifications-data"),
         ]);
-        return { Component: HostNotificationsRouteElement, loader: hostNotificationsLoader };
+        return {
+          Component: HostNotificationsRouteElement,
+          loader: hostNotificationsLoaderFactory(queryClient),
+        };
       },
     },
     {

@@ -1,8 +1,14 @@
+import { QueryClient } from "@tanstack/react-query";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { hostNotificationsLoader } from "@/features/host/route/host-notifications-data";
+import { hostNotificationsLoaderFactory } from "@/features/host/route/host-notifications-data";
+import {
+  hostNotificationEventsQuery,
+  hostNotificationManualOptionsQuery,
+  hostNotificationSummaryQuery,
+} from "@/features/host/queries/host-notification-queries";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
 import type {
   HostNotificationDeliveryItem,
@@ -150,6 +156,15 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function testQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity },
+      mutations: { retry: false },
+    },
+  });
+}
+
 function renderPage({
   summaryData = summary,
   events = [pendingEvent],
@@ -240,7 +255,7 @@ describe("hostNotificationsLoader", () => {
       if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ items: [hostSessionDraft, hostSessionOpen], nextCursor: null }));
       }
-      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&clubSlug=reading-sai") {
+      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&limit=50&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ ...manualOptionsFixture, session: { ...manualOptionsFixture.session, sessionId: "session-open" } }));
       }
       if (url === "/api/bff/api/host/notifications/manual/dispatches?limit=20&clubSlug=reading-sai") {
@@ -250,12 +265,26 @@ describe("hostNotificationsLoader", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostNotificationsLoader({
+    const client = testQueryClient();
+    const loader = hostNotificationsLoaderFactory(client);
+    await expect(loader({
       params: { clubSlug: "reading-sai" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications"),
     } as LoaderFunctionArgs)).resolves.toMatchObject({
-      hostSessions: { items: [hostSessionDraft, hostSessionOpen], nextCursor: null },
       initialManualSelection: { sessionId: "session-open", eventType: null },
+    });
+
+    const context = { clubSlug: "reading-sai" };
+    expect(client.getQueryData(hostNotificationSummaryQuery(context).queryKey)).toEqual(summary);
+    expect(client.getQueryData(hostNotificationEventsQuery({ limit: 50 }, context).queryKey)).toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    expect(client.getQueryData(hostNotificationManualOptionsQuery(
+      { sessionId: "session-open", page: { limit: 50 } },
+      context,
+    ).queryKey)).toMatchObject({
+      session: { sessionId: "session-open" },
     });
   });
 
@@ -283,7 +312,7 @@ describe("hostNotificationsLoader", () => {
       if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ items: [hostSessionOpen], nextCursor: null }));
       }
-      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&clubSlug=reading-sai") {
+      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-open&limit=50&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ ...manualOptionsFixture, session: { ...manualOptionsFixture.session, sessionId: "session-open" } }));
       }
       if (url === "/api/bff/api/host/notifications/manual/dispatches?limit=20&clubSlug=reading-sai") {
@@ -293,7 +322,9 @@ describe("hostNotificationsLoader", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await hostNotificationsLoader({
+    const client = testQueryClient();
+    const loader = hostNotificationsLoaderFactory(client);
+    await loader({
       params: { clubSlug: "reading-sai" },
       request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications?sessionId=missing"),
     } as LoaderFunctionArgs);

@@ -52,7 +52,7 @@ export {
   HostNotificationsRoute,
 } from "@/features/host/route/host-notifications-route";
 export {
+  hostNotificationsLoaderFactory,
   hostNotificationsActions,
-  hostNotificationsLoader,
   type HostNotificationsRouteData,
 } from "@/features/host/route/host-notifications-data";
