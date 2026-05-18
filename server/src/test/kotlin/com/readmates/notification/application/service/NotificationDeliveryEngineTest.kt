@@ -11,10 +11,12 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.ResourceLock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 
+@ResourceLock("NotificationDeliveryEngineLogger")
 class NotificationDeliveryEngineTest {
     @Test
     fun `sendClaimed throws when a required delivery field is missing`() {

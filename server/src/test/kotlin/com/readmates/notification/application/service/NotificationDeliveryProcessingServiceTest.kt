@@ -17,11 +17,13 @@ import com.readmates.notification.domain.NotificationEventType
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.ResourceLock
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 
+@ResourceLock("NotificationDeliveryEngineLogger")
 class NotificationDeliveryProcessingServiceTest {
     @Test
     fun `processClaimed increments sent metric after sent mark succeeds`() {

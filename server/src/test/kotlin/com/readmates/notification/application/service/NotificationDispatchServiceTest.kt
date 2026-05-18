@@ -22,11 +22,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.ResourceLock
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 
+@ResourceLock("NotificationDeliveryEngineLogger")
 class NotificationDispatchServiceTest {
     @Test
     fun `member notification deep link includes club scoped app path`() {

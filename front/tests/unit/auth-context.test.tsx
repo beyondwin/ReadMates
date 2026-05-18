@@ -217,7 +217,9 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
@@ -231,7 +233,9 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("auth-state")).toHaveTextContent("session_expired");
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("session_expired");
+    });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
@@ -245,7 +249,9 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", { cache: "no-store" });
   });
 
@@ -284,11 +290,15 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    });
 
     await user.click(screen.getByRole("button", { name: "로그아웃" }));
 
-    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    });
     expect(location.href).toBe("/login");
     expect(fetchMock).toHaveBeenLastCalledWith(
       "/api/bff/api/auth/logout",
@@ -316,11 +326,15 @@ describe("AuthProvider", () => {
       </AuthProvider>,
     );
 
-    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ACTIVE");
+    });
 
     await user.click(screen.getByRole("button", { name: "로그아웃" }));
 
-    expect(await screen.findByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    await waitFor(() => {
+      expect(screen.getByTestId("auth-state")).toHaveTextContent("ANONYMOUS");
+    });
     expect(location.href).toBe("/login");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenLastCalledWith(
@@ -353,7 +367,9 @@ describe("AuthProvider", () => {
 
     await user.click(screen.getByRole("button", { name: "refresh auth" }));
 
-    expect(await screen.findByTestId("short-name")).toHaveTextContent("새이름");
+    await waitFor(() => {
+      expect(screen.getByTestId("short-name")).toHaveTextContent("새이름");
+    });
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/bff/api/auth/me", { cache: "no-store" });
   });
 
