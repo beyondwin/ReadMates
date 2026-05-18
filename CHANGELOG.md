@@ -9,6 +9,11 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v1.11.0 - 2026-05-18
+
+### Highlights
+
 - **호스트 세션 기록 완성 UX 정리**: 호스트 세션 편집기에서 단독 피드백 문서 업로드 경로를 제거하고, AI 생성 기본 경로와 외부 JSON fallback을 하나의 `세션 기록 완성` 패널로 통합했습니다. 새 피드백 문서 저장은 세션 기록 패키지 commit을 통해서만 발생하며, 기존 `FEEDBACK_DOCUMENT_PUBLISHED` 알림 이벤트는 JSON import와 AI commit 경로에서 동일하게 기록됩니다.
 - **platform-admin:** 플랫폼 운영자용 triage 콘솔(`/admin`) — 온보딩 큐, 클럽 디렉터리, 클럽 상세 + Support access grant 패널을 단일 워크벤치로 통합. OWNER 전용 support access, 라이프사이클 우선 정렬, 온보딩 결과의 즉시 선택 반영.
 - **AI 생성 job state machine 정리**: AI 세션 생성 job에 `COMMITTING`/`COMMITTED` terminal path를 추가하고, Redis job store의 상태 전이를 CAS로 강제해 worker completion, regenerate, commit, cancel 경합이 서로 결과 payload를 덮어쓰지 않도록 했습니다. Commit/cancel 이후에는 transcript/result payload를 지우되 terminal hash는 TTL까지 남겨 프런트가 `COMMITTED` 상태를 확인하고 polling을 종료할 수 있습니다.
@@ -37,6 +42,33 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Commit now moves `SUCCEEDED -> COMMITTING -> COMMITTED`, validates override snapshots before saving them, restores `SUCCEEDED` when downstream commit validation fails, and deletes only transcript/result payloads after a successful commit so terminal job status remains readable until TTL.
 - Regeneration validates the patched full snapshot before persisting and saves it only while the job is still `SUCCEEDED`. The per-job LLM call counter now applies to worker retries and regenerations, returning typed `MAX_CALLS_EXCEEDED` without calling the provider once the hard cap is crossed.
 - Frontend AI polling now treats `COMMITTING` as an active saving state and `COMMITTED` as the terminal success state, then calls the editor refresh callback once after the server confirms the committed job.
+
+### Test Suite Curation
+
+- test: prune `front/tests/unit/vitest-config.test.ts` (자기 자신을 동어반복하는 vitest 설정 검증)과 `aigen-coverage.test.tsx`의 230줄 filler — PREVIEW 상태에서 localStorage draft가 server result를 이긴다는 유니크 검증만 co-location 컨벤션에 맞춰 `AiGenerateTab.draft-restoration.test.tsx`로 추출.
+- test(design-system): `badge`, `surface` 컴포넌트 테스트 삭제 + `avatar-chip`, `book-cover`, `button`, `document-panel`, `state-panel`, `text-field` 테스트에서 CSS class snapshot 어설션 제거. Korean initial derivation, label/input binding, region/status role, default button type 같은 a11y/동작 검증만 유지. 디자인 클래스명을 리네임해도 테스트가 깨지지 않으면서 사용자가 실제로 의존하는 계약은 보존.
+
+### Deployment Notes
+
+- **DB migration**: 없음. Flyway에서 적용되는 새 V*.sql 파일이 없으므로 DB 작업은 생략 가능.
+- **배포 순서**: server image → 프론트 순. 1) `v*` tag push가 `Deploy Server Image` workflow를 트리거해 GHCR `readmates-server:v1.11.0` 이미지를 scan/promote합니다. 2) 같은 tag로 `Deploy Front` workflow가 Cloudflare Pages production에 배포합니다. 3) 서버 코드 변경이 포함되어 있으므로 OCI Compose stack을 `./deploy/oci/05-deploy-compose-stack.sh`로 새 image tag에 맞춰 promote해야 production 백엔드가 실제로 갱신됩니다.
+- **새 환경 변수**: 없음. AIGEN 관련 설정은 v1.10.x에서 도입된 키를 그대로 사용합니다.
+- **Smoke 기대값** (배포 후):
+  - `GET /api/bff/api/auth/me` → 200 (비로그인 200 응답 — `authenticated: false` body)
+  - `GET /oauth2/authorization/google` → 302 redirect
+  - `GET /api/bff/api/host/sessions` → 401 when anonymous
+  - 호스트 로그인 후 `/host` 워크벤치에서 세션 편집기의 `세션 기록 완성` 패널이 AI 생성/JSON import 통합 형태로 표시되어야 함.
+  - OWNER 권한 사용자에서 `/admin` 라우트가 platform-admin 워크벤치(온보딩 큐 + 클럽 디렉터리)를 렌더링해야 함.
+
+### Verification
+
+- `./scripts/pre-push-check.sh` (standard) — all green
+  - Frontend lint, test:coverage (lines 90.09 / statements 90.09 / functions 84.69 / branches 86.67 vs thresholds 87/87/83/84), build
+  - Backend `./server/gradlew -p server check` — ktlint + detekt + unitTest + architectureTest + jacoco 모두 UP-TO-DATE, BUILD SUCCESSFUL in 5s
+  - Zod fixtures `git diff --exit-code tests/unit/__fixtures__/zod-schemas/` — no diff
+  - Public release candidate gitleaks scan — no leaks found (7.09 MB scanned in 575ms)
+- `pnpm design:check` — design system build + test, design docs build + test 모두 통과 (13 tests passed)
+- 미실행: `pnpm --dir front test:e2e` (Playwright), `./server/gradlew -p server integrationTest` (Testcontainers). E2E 스펙 변경이 없고 backend integration도 v1.10.x 이후 contract 변경이 없어 정기 CI shard에서 검증되는 범위로 충분하다고 판단. 운영 smoke에서 BFF/auth 경로를 한번 더 확인합니다.
 
 ## v1.10.2 - 2026-05-17
 
