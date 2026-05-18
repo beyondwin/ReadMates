@@ -719,6 +719,8 @@ export function publicSessionLoaderFactory(queryClient: QueryClient) {
 
 - [ ] **Step 9: Wire public and member routes to query-aware loaders**
 
+> **Source audit note**: `front/src/app/routes/public.tsx` currently does **not** receive a `QueryClient` (unlike `member.tsx`). This task introduces the parameter for the first time. Confirm the change to `router.tsx` actually passes `queryClient` to the public route builder; otherwise the loader factories will be unreachable.
+
 Modify `front/src/app/routes/public.tsx` to accept `queryClient: QueryClient` and use `publicClubLoaderFactory(queryClient)` / `publicSessionLoaderFactory(queryClient)`. Modify `front/src/app/router.tsx`:
 
 ```ts
@@ -758,6 +760,8 @@ Expected: commit succeeds.
 ---
 
 ## Task 3: Cross-Surface Invalidation And AI Full Reload Removal
+
+> **Source audit note**: The `window.location.reload()` lives in `front/features/host/ui/host-session-editor.tsx` (around line 214, inside `handleAigenCommitted`). `AiGenerateTab` itself does not reload — it only fires `onCommitted` to its parent. The fix is therefore at the editor level; do not search inside `AiGenerateTab.tsx` for the call.
 
 **Files:**
 - Modify: `front/features/host/queries/host-session-queries.ts`
@@ -961,6 +965,8 @@ Expected: FAIL because `loadRecentForSession` and `loadActiveJobs` do not exist.
 
 - [ ] **Step 3: Extend job model and store port**
 
+> **Source audit note**: `JobRecord` currently has `expiresAt: Instant` but no `createdAt`/`lastUpdatedAt`. This step adds both. Existing call sites construct `JobRecord` from Redis hash deserialization in `RedisAiGenerationJobStore` and from orchestrator job creation — update both, and bump the Redis hash schema version if one is tracked.
+
 Modify `JobRecord` in `AiGenerationJobStore.kt`:
 
 ```kotlin
@@ -974,9 +980,11 @@ Add to `AiGenerationJobStore`:
 fun loadRecentForSession(sessionId: UUID): JobRecord?
 
 fun loadActiveJobs(): List<JobRecord>
+
+fun findJobById(jobId: UUID): JobRecord?
 ```
 
-Use `createdAt` and `lastUpdatedAt` default values only to keep existing tests compiling; the orchestrator will set explicit values at job creation.
+`findJobById` is required by the admin job detail use case so it does not have to misuse `listJobs(cursor = jobId)` to locate a single row. Existing `load(jobId)` may be reused if it already provides Redis-only lookup; if it does, alias it rather than duplicate. Use `createdAt` and `lastUpdatedAt` default values only to keep existing tests compiling; the orchestrator will set explicit values at job creation.
 
 - [ ] **Step 4: Implement Redis metadata indexes**
 
@@ -1064,8 +1072,14 @@ Make `AiGenerationOrchestrator` implement it:
 override fun recent(sessionId: UUID): JobView? =
     jobStore.loadRecentForSession(sessionId)
         ?.takeIf { it.sessionId == sessionId }
-        ?.takeIf { it.status in RECOVERABLE_HOST_STATUSES }
+        ?.takeIf { isRecoverable(it) }
         ?.let { toJobView(it) }
+
+private fun isRecoverable(record: JobRecord): Boolean {
+    if (record.status in RECOVERABLE_NON_FAILED_STATUSES) return true
+    if (record.status != JobStatus.FAILED) return false
+    return record.error?.code in HOST_RETRY_SAFE_ERROR_CODES
+}
 ```
 
 Extract the existing `get` mapping into `private fun toJobView(record: JobRecord): JobView`.
@@ -1073,9 +1087,19 @@ Extract the existing `get` mapping into `private fun toJobView(record: JobRecord
 Add companion:
 
 ```kotlin
-private val RECOVERABLE_HOST_STATUSES =
-    setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING, JobStatus.FAILED)
+private val RECOVERABLE_NON_FAILED_STATUSES =
+    setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED, JobStatus.COMMITTING)
+
+private val HOST_RETRY_SAFE_ERROR_CODES =
+    setOf(
+        ErrorCode.QUEUE_UNAVAILABLE,
+        ErrorCode.PROVIDER_TIMEOUT,
+        ErrorCode.PROVIDER_RATE_LIMITED,
+        ErrorCode.ILLEGAL_GENERATION_STATE,
+    )
 ```
+
+> **Source audit note**: confirm `ErrorCode` enum values match the actual `AiGenerationModels.kt`. If a code in the whitelist does not exist, replace it with the closest equivalent (e.g. `PROVIDER_UNAVAILABLE`). The intent is to exclude config/user errors (`AI_DISABLED`, `INVALID_REQUEST`, transcript validation failures) from recovery — keep retryable provider/queue errors only.
 
 - [ ] **Step 6: Add endpoint and DTO**
 
@@ -1121,6 +1145,11 @@ Expected: commit succeeds.
 ---
 
 ## Task 5: Host AI Recovery UI And Query Hooks
+
+> **Source audit notes**:
+> - `front/features/host/aigen/ui/AiGenerateTab.tsx` currently uses `useAiGenerationJob(jobId)` polling with `jobId` from local stage state. Keep that hook (or move it onto `aiJobDetailQuery`) for active-job polling, and use the new `recentAiJobQuery` only for *idle* page render. Do not run both in parallel for the same `jobId`.
+> - `cancelGeneration`, `commitGeneration`, etc. live in `front/features/host/aigen/api/aigen-api.ts` and already use `readmatesFetch`; the new `getRecentJob` follows the same `sessionsPath(sessionId, "/jobs/recent")` shape.
+
 
 **Files:**
 - Modify: `front/features/host/aigen/api/aigen-contracts.ts`
@@ -1206,10 +1235,18 @@ export const aiJobKeys = {
   detail: (sessionId: string, jobId: string) => [...aiJobKeys.session(sessionId), "detail", jobId] as const,
 } as const;
 
+const RECENT_JOB_POLL_INTERVAL_MS = 4000;
+const RECENT_JOB_TERMINAL_STATUSES = new Set(["COMMITTED", "CANCELLED"]);
+
 export function recentAiJobQuery(sessionId: string) {
   return queryOptions({
     queryKey: aiJobKeys.recent(sessionId),
     queryFn: () => getRecentJob(sessionId),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      return RECENT_JOB_TERMINAL_STATUSES.has(data.status) ? false : RECENT_JOB_POLL_INTERVAL_MS;
+    },
   });
 }
 
@@ -1591,6 +1628,7 @@ package com.readmates.aigen.application.port.out
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.AiOpsJobList
+import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsProviderCost
 import com.readmates.club.domain.PlatformAdminRole
 import java.math.BigDecimal
@@ -1603,6 +1641,7 @@ interface AiGenerationAuditQueryPort {
     fun failureCodesSince(since: Instant): List<AiOpsFailureCodeCount>
     fun providerCostsSince(since: Instant): List<AiOpsProviderCost>
     fun listJobs(filters: AiOpsJobFilters): AiOpsJobList
+    fun findJobById(jobId: UUID): AiOpsJobListItem?
 }
 
 interface AiGenerationAdminActionAuditPort {
@@ -1669,12 +1708,13 @@ class AiGenerationOpsService(
     override fun summary(admin: CurrentPlatformAdmin): AiOpsSummary {
         val now = clock.instant()
         val activeJobs = jobStore.loadActiveJobs()
+        val monthStart = now.atZone(ZoneOffset.UTC).withDayOfMonth(1).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant()
         return AiOpsSummary(
             activeJobCount = activeJobs.size,
             failedLast24h = auditQueryPort.countFailuresSince(now.minus(Duration.ofHours(24))),
-            monthToDateCostEstimateUsd = auditQueryPort.costSince(now.minus(Duration.ofDays(31))),
-            failureCodes = auditQueryPort.failureCodesSince(now.minus(Duration.ofDays(31))),
-            providerCosts = auditQueryPort.providerCostsSince(now.minus(Duration.ofDays(31))),
+            monthToDateCostEstimateUsd = auditQueryPort.costSince(monthStart),
+            failureCodes = auditQueryPort.failureCodesSince(monthStart),
+            providerCosts = auditQueryPort.providerCostsSince(monthStart),
             staleCandidateCount = activeJobs.count { it.status in STALE_CANDIDATE_STATUSES && it.lastUpdatedAt.isBefore(now.minus(Duration.ofMinutes(15))) },
         )
     }
@@ -1683,16 +1723,20 @@ class AiGenerationOpsService(
         auditQueryPort.listJobs(filters)
 
     override fun get(admin: CurrentPlatformAdmin, jobId: UUID): AiOpsJobListItem =
-        auditQueryPort.listJobs(AiOpsJobFilters(status = null, clubId = null, errorCode = null, cursor = jobId.toString()))
-            .items
-            .firstOrNull { it.jobId == jobId }
+        auditQueryPort.findJobById(jobId)
             ?: throw AiGenerationException.JobNotFound(jobId)
 
     override fun forceCancel(admin: CurrentPlatformAdmin, jobId: UUID): AiOpsAdminActionResult {
         if (admin.role !in ACTION_ROLES) {
             throw AccessDeniedException("Platform admin role ${admin.role} cannot force-cancel AI generation jobs")
         }
-        val record = jobStore.load(jobId) ?: throw AiGenerationException.JobNotFound(jobId)
+        val record = jobStore.findJobById(jobId)
+            ?: run {
+                val historical = auditQueryPort.findJobById(jobId)
+                    ?: throw AiGenerationException.JobNotFound(jobId)
+                val safeCode = if (historical.status in TERMINAL_STATUSES) "JOB_NOT_LIVE" else "JOB_EXPIRED"
+                throw AiGenerationException.SafeOpsError(jobId, safeCode)
+            }
         if (record.status !in FORCE_CANCEL_STATUSES) {
             throw AiGenerationException.IllegalGenerationState(jobId, record.status.name, "admin force-cancel")
         }
@@ -1734,9 +1778,12 @@ class AiGenerationOpsService(
         val ACTION_ROLES = setOf(PlatformAdminRole.OWNER, PlatformAdminRole.OPERATOR)
         val FORCE_CANCEL_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED)
         val STALE_CANDIDATE_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.COMMITTING)
+        val TERMINAL_STATUSES = setOf(JobStatus.COMMITTED, JobStatus.CANCELLED, JobStatus.FAILED)
     }
 }
 ```
+
+> **Source audit note**: `AiGenerationException` currently defines `JobNotFound`, `JobSessionMismatch`, `IllegalGenerationState`, and `Coded` (no `SafeOpsError`). Add a new `SafeOpsError(jobId, code)` subtype (or reuse `Coded`) and map it to a 409/410 RFC 7807 response so the wire surface returns `JOB_NOT_LIVE` / `JOB_EXPIRED` instead of generic 404. Also add `findJobById` to `AiGenerationAuditQueryPort` (returns `AiOpsJobListItem?` from a single-row `SELECT ... WHERE job_id = ?` against `ai_generation_audit_log` joined with clubs/sessions).
 
 - [ ] **Step 5: Implement JDBC query repository**
 
