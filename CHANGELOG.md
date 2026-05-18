@@ -20,7 +20,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Migrate `host/members` server state to TanStack Query (route loader factory seeds query cache; mutations invalidate on success; UI remains prop-driven). Documented in `docs/development/server-state-migration.md`.
 - Plan host notifications query migration as a separate slice in `docs/superpowers/plans/2026-05-17-readmates-host-notifications-query-migration.md`.
 - Migrate `host/notifications` server state to TanStack Query: loader seeding, query-owned event/delivery/audit/manual ledgers, mutation invalidation for process/retry/restore/test-mail/confirm, and local-only manual preview/selection state.
-- Migrate `host/sessions` server state to TanStack Query: dashboard current/session list, editor detail/manual dispatch reads, create/update/delete/open/close/publish/publication/attendance/import-commit mutation invalidation, and shared session selector cache for host notifications.
+- Migrate `host/sessions` server state to TanStack Query: dashboard current/session list, editor detail/manual dispatch reads, create/update/delete/open/close/publish/publication/attendance/visibility/import-commit mutation invalidation, and shared session selector cache for host notifications.
 - Document the server transaction boundary policy (application-service-owned `@Transactional`; adapters stay non-transactional) in `docs/development/technical-decisions.md`.
 - Refactor `JdbcHostSessionWriteAdapter` to drop redundant adapter-level `@Transactional` annotations, aligning with the documented policy.
 
