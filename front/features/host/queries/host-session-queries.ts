@@ -1,20 +1,35 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { queryOptions } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  closeHostSession,
+  commitHostSessionImport,
+  createHostSession,
+  deleteHostSession,
   fetchHostCurrentSession,
   fetchHostDashboard,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
   fetchHostSessions,
   fetchManualNotificationDispatches,
+  openHostSession,
+  publishHostSession,
+  saveHostSessionAttendance,
+  saveHostSessionPublication,
+  saveHostSessionVisibility,
+  updateHostSession,
 } from "@/features/host/api/host-api";
 import type {
   CurrentSessionResponse,
+  HostAttendanceUpdate,
   HostDashboardResponse,
   HostSessionDetailResponse,
   HostSessionListPage,
+  HostSessionPublicationRequest,
+  HostSessionRequest,
+  HostSessionVisibilityRequest,
   ManualNotificationDispatchListResponse,
   HostNotificationEventType,
+  SessionImportRequest,
 } from "@/features/host/api/host-contracts";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
@@ -164,4 +179,155 @@ export function invalidateHostSessionManualDispatches(client: QueryClient, conte
 
 export function invalidateHostSessionSurface(client: QueryClient, context?: ReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.scope(context) });
+}
+
+function invalidateOk(response: Response, invalidate: () => Promise<unknown>) {
+  return response.ok ? invalidate() : Promise.resolve();
+}
+
+async function invalidateSessionMutationSurfaces(
+  client: QueryClient,
+  sessionId: string,
+  context?: ReadmatesApiContext,
+  options?: { manualDispatches?: boolean },
+) {
+  await Promise.all([
+    invalidateHostSessionDetail(client, sessionId, context),
+    invalidateHostSessionLists(client, context),
+    invalidateHostSessionDashboard(client, context),
+    invalidateHostCurrentSession(client, context),
+    ...(options?.manualDispatches ? [invalidateHostSessionManualDispatches(client, context)] : []),
+  ]);
+}
+
+export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (request: HostSessionRequest) => createHostSession(request),
+    onSuccess: (response) =>
+      invalidateOk(response, () =>
+        Promise.all([
+          invalidateHostSessionLists(client, context),
+          invalidateHostSessionDashboard(client, context),
+        ]),
+      ),
+  });
+}
+
+export function useUpdateHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionRequest }) =>
+      updateHostSession(sessionId, request),
+    onSuccess: (response, variables) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, variables.sessionId, context)),
+  });
+}
+
+export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => deleteHostSession(sessionId),
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, async () => {
+        client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
+        await Promise.all([
+          invalidateHostSessionLists(client, context),
+          invalidateHostSessionDashboard(client, context),
+          invalidateHostCurrentSession(client, context),
+          invalidateHostSessionManualDispatches(client, context),
+        ]);
+      }),
+  });
+}
+
+export function useOpenHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => openHostSession(sessionId),
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context)),
+  });
+}
+
+export function useCloseHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => closeHostSession(sessionId),
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
+  });
+}
+
+export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => publishHostSession(sessionId),
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
+  });
+}
+
+export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionVisibilityRequest }) =>
+      saveHostSessionVisibility(sessionId, request),
+    onSuccess: (response, variables) =>
+      invalidateOk(response, () =>
+        Promise.all([
+          invalidateHostSessionDetail(client, variables.sessionId, context),
+          invalidateHostSessionLists(client, context),
+          invalidateHostSessionDashboard(client, context),
+        ]),
+      ),
+  });
+}
+
+export function useSaveHostSessionPublicationMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionPublicationRequest }) =>
+      saveHostSessionPublication(sessionId, request),
+    onSuccess: (response, variables) =>
+      invalidateOk(response, () =>
+        Promise.all([
+          invalidateHostSessionDetail(client, variables.sessionId, context),
+          invalidateHostSessionLists(client, context),
+          invalidateHostSessionDashboard(client, context),
+          invalidateHostSessionManualDispatches(client, context),
+        ]),
+      ),
+  });
+}
+
+export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, attendance }: { sessionId: string; attendance: HostAttendanceUpdate[] }) =>
+      saveHostSessionAttendance(sessionId, attendance),
+    onSuccess: (response, variables) =>
+      invalidateOk(response, () =>
+        Promise.all([
+          invalidateHostSessionDetail(client, variables.sessionId, context),
+          invalidateHostCurrentSession(client, context),
+        ]),
+      ),
+  });
+}
+
+export function useCommitHostSessionImportMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: SessionImportRequest }) =>
+      commitHostSessionImport(sessionId, request),
+    onSuccess: (_response, variables) =>
+      Promise.all([
+        invalidateHostSessionDetail(client, variables.sessionId, context),
+        invalidateHostSessionLists(client, context),
+        invalidateHostSessionDashboard(client, context),
+        invalidateHostCurrentSession(client, context),
+        invalidateHostSessionManualDispatches(client, context),
+      ]),
+  });
 }
