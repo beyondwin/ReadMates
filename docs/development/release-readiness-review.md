@@ -10,6 +10,8 @@
 - [ ] [MANUAL REQUIRED] Task 2 production host smoke — Google OAuth automation blocked. Owner: kws. Target: within 7 days.
 - Task 5 (OAuth happy path): 2026-05-18T12:24Z UTC, MANUAL REQUIRED. Playwright MCP redirect from https://readmates.pages.dev/login reached https://accounts.google.com/v3/signin/identifier; Google blocked credential entry under automated browser (spec §S1.4.3 escape hatch). Artifact: .tmp/v1.11.0-followups/oauth-flow-results.json.
 - [ ] [MANUAL REQUIRED] Task 5 OAuth happy-path — automation blocked at accounts.google.com/v3/signin/identifier. Owner: kws. Target: within 7 days.
+- Task 3 (DB backup → Object Storage + daily timer): 2026-05-18T12:37Z UTC, partial. Object upload: automated via local OCI CLI fallback. Uploaded `mysql/readmates-pre-v1.11.0-20260518T113652Z.sql.gz` to bucket `readmates-db-exports` (namespace `ax5hfpscso8v`) with `opc-meta-sha256=4b6c36c237e94736574894065ceabaa08d7492469bc6d45f4600d67903c1c81a`, `opc-meta-tag=pre-v1.11.0`. Local unit files + runbook committed. Timer install on VM: BLOCKED (OCI CLI not installed on VM, ENV_BLOCKER per spec §S1.4.3). Artifact: .tmp/v1.11.0-followups/oci-object-head.json.
+- [ ] [MANUAL REQUIRED] Task 3 daily backup timer — VM lacks OCI CLI. Bootstrap per docs/deploy/oci-mysql-heatwave.md, populate /etc/readmates/backup-mysql.env, scp deploy/oci/backup-mysql.{service,timer} → /etc/systemd/system/, daemon-reload, enable --now. Owner: kws. Target: within 7 days.
 
 ## 기본 범위
 
