@@ -184,10 +184,10 @@ describe("host session mutation hooks", () => {
   });
 
   it.each([
-    ["open", useOpenHostSessionMutation, openHostSession],
-    ["close", useCloseHostSessionMutation, closeHostSession],
-    ["publish", usePublishHostSessionMutation, publishHostSession],
-  ] as const)("invalidates session surfaces after %s", async (_name, hook, apiFn) => {
+    ["open", useOpenHostSessionMutation, openHostSession, false],
+    ["close", useCloseHostSessionMutation, closeHostSession, true],
+    ["publish", usePublishHostSessionMutation, publishHostSession, true],
+  ] as const)("invalidates session surfaces after %s", async (_name, hook, apiFn, expectsManualDispatches) => {
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
     const invalidateSpy = vi.spyOn(client, "invalidateQueries");
@@ -202,6 +202,19 @@ describe("host session mutation hooks", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.current({ clubSlug: "reading-sai" }) });
+    // close/publish must also invalidate manual dispatches (notification ledger refresh);
+    // open must NOT. Guards against accidental removal of `{ manualDispatches: true }`
+    // from either hook.
+    const manualDispatchesCall = invalidateSpy.mock.calls.find(
+      ([arg]) =>
+        JSON.stringify(arg?.queryKey) ===
+        JSON.stringify(hostSessionKeys.manualDispatchesRoot({ clubSlug: "reading-sai" })),
+    );
+    if (expectsManualDispatches) {
+      expect(manualDispatchesCall).toBeDefined();
+    } else {
+      expect(manualDispatchesCall).toBeUndefined();
+    }
   });
 
   it("invalidates detail, lists, and dashboard after visibility save", async () => {
