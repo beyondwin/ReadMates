@@ -97,6 +97,7 @@ describe("host notification query keys", () => {
       "notifications",
       "scope",
       "reading-sai",
+      "overview",
       "summary",
     ]);
   });
