@@ -415,10 +415,9 @@ copy_manifest() {
   copy_dir "docs/development"
   copy_required_file "docs/operations/README.md"
   copy_dir "docs/operations/runbooks"
-  copy_dir "docs/superpowers"
-
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/README.md"
+  copy_optional_file "scripts/pre-push-check.sh"
   copy_optional_file "scripts/public-release-check.sh"
   copy_optional_file "scripts/server-ci-check.sh"
   copy_optional_file "scripts/smoke-production-integrations.sh"
