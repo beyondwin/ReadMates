@@ -64,6 +64,8 @@ Redis aigen:job:<jobId>:result             (validated snapshot, TTL 6h)
 
 Kafka topic 이름은 `readmates.aigen.jobs.v1`이고 partition key는 club id입니다. transcript 본문은 topic payload에 포함되지 않습니다. 이 invariant는 `scripts/aigen-pii-check.sh`가 production Kotlin, Flyway migration, Kafka producer, Micrometer tag, Redis transcript key 사용 범위를 스캔해 회귀를 막습니다.
 
+Job status는 `PENDING -> RUNNING -> SUCCEEDED -> COMMITTING -> COMMITTED`를 정상 commit 경로로 사용합니다. `FAILED`와 `CANCELLED`는 terminal 상태이고, Redis `transitionStatus`/`saveResultIfStatus` Lua CAS가 worker completion, regenerate, commit, cancel 경합을 막습니다. Commit/cancel 이후에는 raw transcript와 result payload를 삭제하지만 `aigen:job:<jobId>` hash는 TTL까지 남겨 frontend가 `COMMITTED`/`CANCELLED` 최종 상태를 확인할 수 있습니다. Per-job `llmCallCount`도 같은 hash에서 원자 증가하므로 retry와 regeneration을 합쳐 hard cap을 넘으면 provider 호출 없이 `MAX_CALLS_EXCEEDED`로 중단됩니다.
+
 ### provider adapter와 오류 마스킹
 
 Provider 구현은 `SessionContentGenerator`와 `SessionContentRegenerator` outbound port 뒤에 숨겼습니다.
@@ -103,10 +105,10 @@ AI 생성은 기본 off입니다.
 
 - `api/` — BFF 호출과 DTO contract
 - `hooks/useAiGenerationJob.ts` — TanStack Query v5 adaptive polling
-- `ui/` — transcript upload, progress, preview, section별 regenerate modal
+- `ui/` — transcript upload, progress, preview, section별 regenerate modal, committed/saving state
 - `storage/aigen-draft-storage.ts` — preview 수동 수정 draft를 `aigen-draft:{jobId}` localStorage key에 보관
 
-호스트 세션 편집기는 `[ 외부 도구 JSON 업로드 ]`와 `[ AI 결과 가져오기 ]` 탭을 함께 보여주며, `?aigen=1` query로 AI 모드 진입을 보존합니다. 두 모드는 최종 commit 경로를 공유하므로 저장 후 데이터 모델이 갈라지지 않습니다.
+호스트 세션 편집기는 `세션 기록 완성` 패널에서 `AI로 생성`과 `외부 JSON 가져오기` 모드를 함께 보여주며, `?aigen=1` query로 AI 모드 진입을 보존합니다. 두 모드는 최종 commit 경로를 공유하므로 저장 후 데이터 모델이 갈라지지 않습니다.
 
 ## 검증
 
@@ -114,12 +116,12 @@ AI 생성은 기본 off입니다.
 
 - `AiGenerateApiIntegrationTest` — HTTP → Kafka/Testcontainers → worker → Redis → commit lifecycle.
 - Provider adapter tests — Claude/OpenAI/Gemini generator와 regenerator의 schema/tool 호출, 오류 마스킹, model 전달.
-- `RedisAiGenerationJobStoreTest`, `RedisGenerationCostCountersTest` — TTL, stale transcript cleanup, cost counter.
+- `RedisAiGenerationJobStoreTest`, `RedisGenerationCostCountersTest` — TTL, stale transcript cleanup, atomic status/result transition, terminal payload cleanup, cost counter.
 - `AiGenerationErrorHandlerTest` 계열 — typed RFC 7807 denial과 unknown error scrub.
 
 **프런트 테스트**
 
-- `front/features/host/aigen/**` unit tests — job polling, draft storage, upload/preview transition.
+- `front/features/host/aigen/**` unit tests — job polling, draft storage, upload/preview/committed transition.
 - Playwright `aigen-*.spec.ts` — full flow, cancel, regenerate, expired job, cost cap, JSON upload coexistence.
 
 **PII invariant**

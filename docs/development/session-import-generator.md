@@ -13,7 +13,7 @@
 | 외부 JSON 업로드 | 호스트가 로컬에서 정리한 `readmates-session-import:v1` JSON | 앱 외부 | 항상 사용 가능 |
 | In-app AI 생성 | 호스트가 업로드한 transcript (≤ 1 MB .txt) + 모델 선택 | 서버 측 provider adapter (Claude/OpenAI/Gemini) | `readmates.aigen.enabled` + `readmates.aigen.enabled-providers` + provider API key |
 
-두 모드의 commit 경로는 같은 `SessionImportService.commitValidated(...)`를 사용하므로 저장 후의 데이터 형태와 권한 경계는 동일합니다. In-app AI 생성 모드의 흐름, 컴포넌트, 운영 절차는 spec §7 ([docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md](../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md))과 runbook ([docs/operations/runbooks/ai-session-generation.md](../operations/runbooks/ai-session-generation.md))을 참고합니다. CHANGELOG `Phase 3 frontend AI 모드` 항목이 두 모드 토글의 frontend 변경을 정리합니다.
+두 모드의 commit 경로는 같은 `SessionImportService.commitValidated(...)`를 사용하므로 저장 후의 데이터 형태와 권한 경계는 동일합니다. In-app AI 생성 모드의 흐름, 컴포넌트, 운영 절차는 spec §7 ([docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md](../superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md))과 runbook ([docs/operations/runbooks/ai-session-generation.md](../operations/runbooks/ai-session-generation.md))을 참고합니다. 최신 AI job state machine 변경은 CHANGELOG `Unreleased`와 [architecture.md의 In-app AI 세션 생성 컴포넌트](architecture.md#in-app-ai-세션-생성-컴포넌트)에 정리합니다.
 
 ## 출력 형식
 
@@ -80,7 +80,7 @@
 ## 호스트 편집기 사용
 
 1. 호스트 세션 편집기에서 기록 공개 범위를 먼저 선택합니다.
-2. `AI 결과 JSON 가져오기`에서 파일을 선택합니다.
+2. `세션 기록 완성` 패널에서 `외부 JSON 가져오기`를 선택하고 파일을 고릅니다.
 3. 미리보기에서 회차, 책, 날짜, 작성자 매칭, 피드백 문서 상태를 확인합니다.
 4. 저장 가능 상태일 때 `가져온 기록 저장`을 누릅니다.
 

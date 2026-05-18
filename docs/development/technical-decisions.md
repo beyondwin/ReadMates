@@ -53,13 +53,13 @@
 
 ---
 
-### Redis는 optional 보조 계층으로만 사용한다
+### Redis는 optional 보조 계층과 짧은 TTL workflow state로만 사용한다
 
-**결정:** Redis는 기본 비활성화이며, 켜더라도 rate limit counter, auth session metadata cache, public/notes read-through cache, read-cache invalidation에만 사용합니다.
+**결정:** Redis는 기본 비활성화이며, 켜더라도 rate limit counter, auth session metadata cache, public/notes read-through cache, read-cache invalidation, AI generation job handoff/cost counter처럼 짧은 TTL의 보조 상태에만 사용합니다.
 
-**이유:** Redis 장애나 cache 유실이 서비스의 핵심 데이터 손실로 이어지지 않게 하기 위해서입니다. Cache decode 실패 또는 Redis 오류가 발생하면 best-effort 정리 후 MySQL fallback을 사용합니다.
+**이유:** Redis 장애나 cache 유실이 서비스의 핵심 데이터 손실로 이어지지 않게 하기 위해서입니다. Cache decode 실패 또는 Redis 오류가 발생하면 best-effort 정리 후 MySQL fallback을 사용합니다. AI generation job은 Redis가 transcript handoff와 preview result를 보관하는 workflow state라 Redis 장애 시 생성 job은 실패/만료될 수 있지만, 기존 session/publication/member 데이터는 MySQL에 남아야 합니다.
 
-**Trade-off:** Redis를 켜도 모든 조회가 항상 빨라지는 구조는 아닙니다. Source of truth를 MySQL에 유지하므로 invalidation과 fallback 경로를 함께 테스트해야 합니다. Redis key와 metric label에는 raw session token, 초대 token 원문, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다.
+**Trade-off:** Redis를 켜도 모든 조회가 항상 빨라지는 구조는 아닙니다. Source of truth를 MySQL에 유지하므로 invalidation과 fallback 경로를 함께 테스트해야 합니다. AI generation transcript 본문은 `aigen:job:<jobId>:transcript` 값에만 TTL로 둘 수 있고, commit/cancel 이후에는 transient payload를 삭제합니다. Redis key와 metric label에는 raw session token, 초대 token 원문, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다.
 
 **관련 문서와 검증:** [architecture.md](architecture.md#optional-redis-계층), [test-guide.md](test-guide.md#redis-backed-server-features), targeted Redis adapter tests
 

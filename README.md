@@ -5,7 +5,7 @@ ReadMates는 여러 정기 독서모임의 세션 준비, 참여 관리, 기록 
 - Site: [https://readmates.pages.dev](https://readmates.pages.dev)
 - Stack: `React 19`, `TypeScript`, `Vite`, `Cloudflare Pages Functions`, `Kotlin`, `Spring Boot`, `Spring Security`, `MySQL`, `Flyway`, optional `Redis`, `Redpanda/Kafka`, `Micrometer/Prometheus`
 - Scope: 멀티 클럽 플랫폼에서 클럽별 공개 사이트, 현재·예정 회차 준비, 참여 관리, 기록 공개, 피드백 문서 열람까지 아우르는 운영형 서비스
-- Highlight: Google OAuth, 안전한 로그인 복귀 경로, 서버 측 공유 session cookie, Cloudflare BFF 보안 경계, club-scoped URL과 역할 권한, Cloudflare Pages marker 기반 domain alias 상태 확인, optional Redis rate limit/cache, 현재/예정 세션 공개 범위, 세션 기록 JSON 가져오기와 in-app AI 세션 생성, 멤버 알림 설정과 알림함, 호스트 수동 알림 발송 워크벤치, 피드백 문서 접근 제어, 디자인 시스템 workspace, Playwright E2E, 공개 릴리즈 후보 scan
+- Highlight: Google OAuth, 안전한 로그인 복귀 경로, 서버 측 공유 session cookie, Cloudflare BFF 보안 경계, club-scoped URL과 역할 권한, Cloudflare Pages marker 기반 domain alias 상태 확인, optional Redis rate limit/cache와 AI job state/cost cap, 현재/예정 세션 공개 범위, 세션 기록 JSON 가져오기와 in-app AI 세션 생성, 멤버 알림 설정과 알림함, 호스트 수동 알림 발송 워크벤치, 피드백 문서 접근 제어, 디자인 시스템 workspace, Playwright E2E, 공개 릴리즈 후보 scan
 - 운영 파이프라인: MySQL transactional event outbox, Redpanda/Kafka relay/consumer 기반 이메일 및 in-app 알림, 수동 발송 preview/confirm 감사 원장, 클럽명 기반 HTML/plain text 이메일 템플릿, Micrometer/Prometheus 운영 지표, OCI Object Storage 백업 업로드를 지원합니다.
 
 이 저장소는 외부 공개를 전제로 정리되어 있습니다. 운영 secret, 실제 멤버 데이터, private deployment state, DB dump, 로컬 경로, OCI OCID는 문서와 예시에 포함하지 않습니다.
@@ -80,7 +80,7 @@ Cloudflare Pages
 Spring Boot API
   |-- Google OAuth success handling
   |-- HttpOnly readmates_session cookie
-  |-- optional Redis-backed rate limit and read-through cache
+  |-- optional Redis-backed rate limit, read-through cache, AI job state
   |-- membership, role, and session authorization
   |-- feedback document parsing and access control
   |-- Flyway migrations
@@ -97,7 +97,7 @@ MySQL
 
 - Browser-facing origin은 Cloudflare Pages이며, API와 OAuth는 Pages Functions BFF를 통해 Spring으로 전달합니다.
 - 인증은 Google OAuth와 서버 측 `readmates_session` cookie를 사용하고, raw token은 저장하지 않습니다. 로그인 세션은 platform 전체에서 공유하고 role/status는 club membership별로 판정합니다. 프런트엔드는 같은 origin의 안전한 relative `returnTo`만 로그인과 OAuth 시작 흐름에 전달합니다.
-- MySQL/Flyway가 source of truth이며 Redis는 rate limit, cache, invalidation을 위한 optional 보조 계층입니다.
+- MySQL/Flyway가 source of truth이며 Redis는 rate limit, cache, invalidation, AI generation job handoff/cost counter를 위한 optional 보조 계층입니다.
 - 세션 lifecycle, 공개 범위, 역할 기반 권한, 피드백 문서 접근 제어는 서버에서 검증합니다.
 - 알림은 MySQL transactional outbox와 Kafka relay/consumer로 처리하며, 서버의 순수 템플릿 helper가 club-scoped in-app/deep link/email subject/plain/HTML copy를 함께 생성합니다. 호스트는 세션과 대상 그룹을 고른 뒤 preview를 10분 TTL로 확정해 수동 알림을 만들 수 있고, duplicate dispatch는 명시적 재발송 확인을 요구합니다. SMTP는 HTML이 있으면 plain text fallback을 포함한 MIME 메시지로 발송하고, 공개 릴리즈 후보는 별도 scanner로 점검합니다.
 
@@ -108,7 +108,7 @@ MySQL
 ReadMates 호스트 도구는 세션 기록을 채우는 두 가지 모드를 함께 제공합니다.
 
 - **외부 정리된 산출물 (legacy)**: 호스트가 앱 밖에서 정리한 `readmates-session-import:v1` JSON을 호스트 세션 편집기로 가져옵니다. 이 흐름은 server/frontend에서 AI API를 호출하지 않고, 앱은 검증과 commit만 담당합니다. 형식 정의는 [docs/development/session-import-generator.md](docs/development/session-import-generator.md).
-- **In-app AI 생성**: 호스트 세션 편집기 안에서 LLM이 transcript로부터 공개 요약/하이라이트/한줄평/피드백 문서를 직접 생성합니다. Provider adapter는 Claude, OpenAI, Gemini를 지원하며, Kafka job queue + Redis job state + MySQL audit log로 PII-safe하게 운영합니다.
+- **In-app AI 생성**: 호스트 세션 편집기 안에서 LLM이 transcript로부터 공개 요약/하이라이트/한줄평/피드백 문서를 직접 생성합니다. Provider adapter는 Claude, OpenAI, Gemini를 지원하며, Kafka job queue + Redis job state/cost counter + MySQL audit log로 PII-safe하게 운영합니다. Commit/cancel 이후에는 transcript/result payload를 지우고 terminal job 상태만 TTL까지 남깁니다.
 
 In-app AI 생성은 `readmates.aigen.enabled`와 `readmates.aigen.enabled-providers` 두 flag로 운영 단위에서 feature-gate됩니다. 두 flag 모두 기본 off이며, 운영자가 provider API key(`READMATES_AIGEN_{ANTHROPIC|OPENAI|GEMINI}_API_KEY`)를 프로비저닝하고 명시적으로 enable한 환경에서만 동작합니다. 운영 절차(모델 allowlist, cap 관리, key 회전, alert 대응, kill switch)는 [docs/operations/runbooks/ai-session-generation.md](docs/operations/runbooks/ai-session-generation.md), 설계 spec은 [docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md](docs/superpowers/specs/2026-05-16-readmates-in-app-ai-session-generation-design.md)를 따릅니다.
 

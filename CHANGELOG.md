@@ -11,6 +11,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 - **호스트 세션 기록 완성 UX 정리**: 호스트 세션 편집기에서 단독 피드백 문서 업로드 경로를 제거하고, AI 생성 기본 경로와 외부 JSON fallback을 하나의 `세션 기록 완성` 패널로 통합했습니다. 새 피드백 문서 저장은 세션 기록 패키지 commit을 통해서만 발생하며, 기존 `FEEDBACK_DOCUMENT_PUBLISHED` 알림 이벤트는 JSON import와 AI commit 경로에서 동일하게 기록됩니다.
 - **platform-admin:** 플랫폼 운영자용 triage 콘솔(`/admin`) — 온보딩 큐, 클럽 디렉터리, 클럽 상세 + Support access grant 패널을 단일 워크벤치로 통합. OWNER 전용 support access, 라이프사이클 우선 정렬, 온보딩 결과의 즉시 선택 반영.
+- **AI 생성 job state machine 정리**: AI 세션 생성 job에 `COMMITTING`/`COMMITTED` terminal path를 추가하고, Redis job store의 상태 전이를 CAS로 강제해 worker completion, regenerate, commit, cancel 경합이 서로 결과 payload를 덮어쓰지 않도록 했습니다. Commit/cancel 이후에는 transcript/result payload를 지우되 terminal hash는 TTL까지 남겨 프런트가 `COMMITTED` 상태를 확인하고 polling을 종료할 수 있습니다.
 
 ### Engineering Proof Portfolio
 
@@ -20,6 +21,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Plan host notifications query migration as a separate slice in `docs/superpowers/plans/2026-05-17-readmates-host-notifications-query-migration.md`.
 - Document the server transaction boundary policy (application-service-owned `@Transactional`; adapters stay non-transactional) in `docs/development/technical-decisions.md`.
 - Refactor `JdbcHostSessionWriteAdapter` to drop redundant adapter-level `@Transactional` annotations, aligning with the documented policy.
+
+### AI Generation Job Lifecycle
+
+- Added `AiGenerationJobTransitionPolicy` to centralize allowed actions: worker starts only from `PENDING`, worker completion only from `RUNNING`, regenerate/commit only from `SUCCEEDED`, and cancel only from `PENDING`/`RUNNING`/`SUCCEEDED`.
+- Added Redis atomic operations for `transitionStatus`, `saveResultIfStatus`, `incrementLlmCallCount`, and transient payload deletion. Worker success records incurred cost before the `RUNNING -> SUCCEEDED` CAS so cancel races do not drop accounting, while stale completions stop without rewriting cancelled/committed jobs.
+- Commit now moves `SUCCEEDED -> COMMITTING -> COMMITTED`, validates override snapshots before saving them, restores `SUCCEEDED` when downstream commit validation fails, and deletes only transcript/result payloads after a successful commit so terminal job status remains readable until TTL.
+- Regeneration validates the patched full snapshot before persisting and saves it only while the job is still `SUCCEEDED`. The per-job LLM call counter now applies to worker retries and regenerations, returning typed `MAX_CALLS_EXCEEDED` without calling the provider once the hard cap is crossed.
+- Frontend AI polling now treats `COMMITTING` as an active saving state and `COMMITTED` as the terminal success state, then calls the editor refresh callback once after the server confirms the committed job.
 
 ## v1.10.2 - 2026-05-17
 
