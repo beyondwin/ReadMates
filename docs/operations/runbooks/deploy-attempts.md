@@ -90,6 +90,26 @@ jq -r 'select(.ts != null)' /var/log/readmates/deploy-attempts.jsonl
 
 현재 ledger는 registry digest를 별도 필드로 기록하지 않습니다. `image`, `imageId`, `exitCode`도 top-level field가 아니라 필요한 event의 `detail` 안에만 기록합니다. 관련: [ADR-0016](../../development/adr/0016-deploy-ledger-event-schema.md)
 
+### `attemptId == "unknown"` (post-v1.11.1 부터 금지)
+
+v1.11.0 까지 post-deploy watch stage가 `READMATES_DEPLOY_ATTEMPT_ID`를 부모 프로세스로부터 상속받지 못해 `WATCH_STARTED`, `STAGE_STARTED` 등 일부 ledger 라인이 `"attemptId":"unknown"`으로 기록되었습니다.
+
+v1.11.1 (fix commit: `<TBD-after-merge>`) 이후로는:
+
+- `05-deploy-compose-stack.sh`가 watch invocation에 `READMATES_DEPLOY_ATTEMPT_ID="$ATTEMPT_ID"`를 전달합니다.
+- `watch-compose-post-deploy.sh`가 `${READMATES_DEPLOY_ATTEMPT_ID:-${ATTEMPT_ID:-unknown}}` 순서로 id를 결정합니다 (부모 우선, 로컬 fallback, 최후의 `unknown`).
+- 가드 테스트: `deploy/oci/tests/watch-attempt-id.test.sh` (dry-run mode: `WATCH_DRY_RUN=true bash deploy/oci/watch-compose-post-deploy.sh`).
+
+검증 쿼리:
+
+```bash
+# post-fix ledger에는 "unknown" attemptId가 없어야 합니다.
+jq -r 'select(.attemptId == "unknown")' /var/log/readmates/deploy-attempts.jsonl
+# 빈 출력이면 정상.
+```
+
+위 쿼리가 hit하면 fix가 회귀했거나 외부 도구가 watch script를 직접 호출하면서 env를 전달하지 않은 것입니다.
+
 ## Image verification
 
 릴리즈 배포는 tag 문자열만 믿지 않고 Docker image id를 확인합니다.
