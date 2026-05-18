@@ -10,6 +10,22 @@
 
 ---
 
+## Code-Level Review Findings (2026-05-18)
+
+코드 레벨에서 plan을 검증하며 발견한 결함과 보완점이다. 본 plan은 아래 항목을 반영해 갱신되었다.
+
+1. **`routes` 모듈 export가 자체 QueryClient를 캡처한다** — `front/src/app/router.tsx`의 `export const routes = buildRoutes(createReadmatesQueryClient());` 라인은 import 시점에 별도 QueryClient를 만든다. `front/tests/unit/spa-router.test.tsx`는 이 `routes`를 그대로 사용하며 `QueryClientProvider`로 감싸지 않는다. Phase 1 적용 후 `CurrentSessionRoute`가 `useQuery`를 호출하면 `/app/session/current`, `/clubs/:clubSlug/app/session/current` 케이스가 일제히 깨진다. Phase 3 적용 후 `/admin`도 동일. → **신규 Task 0**(아래)을 추가한다. Task 2 Step 7의 "`memberRoutes()` 호출 업데이트" 지시는 실제 코드와 맞지 않아 폐기한다.
+2. **`currentSessionAction`이 orphan이 된다** — Migration 후 UI는 mutation hook만 호출하므로 `member.tsx:60` `action: currentSessionAction` 연결은 사용자가 없다. 남기면 stale path가 된다. Task 2에서 함께 제거한다.
+3. **`saveCurrentSessionQuestion` (단수형)에 context 추가는 불필요** — 호출자가 존재하지 않는다 (`actions/save-question.ts`는 복수형 wrapper만 사용). Task 1 Step 3의 단수형 wrapper context 추가는 옵션으로 격하한다.
+4. **비-팩토리 `currentSessionLoader` 잔존** — 두 코드 path 유지의 정당화가 약하다. Phase 3 끝나면 cleanup PR로 제거한다는 후속 task를 명시한다.
+5. **`recomputeActionRequiredCount`의 의미 변경** — 현행 `platform-admin-route.tsx`의 helper는 "summary에 없는 새 도메인"일 때 count를 그대로 둔다. Plan의 `platform-admin-queries.ts` 버전은 새 도메인이 `ACTION_REQUIRED`이면 `+1`을 더한다. 동작 변경이며 onboarding commit 경로 정확성을 위해 필요하다 — PR 본문에 반드시 명시한다.
+6. **mutation별 cache 전략 명시 부족** — Task 4 Step 3의 5개 mutation 각각에 대해 "invalidate / targeted-update / 둘 다" 중 어떤 전략을 쓰는지 코드 주석 수준으로는 부족하다. 본 plan과 design 양쪽에 결정을 못 박는다.
+7. **`combineCursorPages`의 `nextCursor` 의미** — 코드상 `[...pages].reverse().find(Boolean)`은 "마지막 페이지"가 아닌 "마지막으로 정의된 페이지"의 `nextCursor`다. design에 명시한다.
+
+---
+
+---
+
 ## File Structure
 
 - Create `front/features/current-session/queries/current-session-queries.ts`  
@@ -60,6 +76,74 @@
   Marks `current-session` and `platform-admin` complete and documents `shared/query` cursor helpers.
 - Modify `CHANGELOG.md`  
   Adds one concise Unreleased entry for the frontend server-state consolidation.
+
+---
+
+### Task 0: Routes Export QueryClient Identity (Pre-flight)
+
+**Why:** 현재 `front/src/app/router.tsx`는 `export const routes = buildRoutes(createReadmatesQueryClient());`로 import-time QueryClient를 만든다. `spa-router.test.tsx`는 `routes`를 import해 `QueryClientProvider` 없이 RouterProvider에 넘긴다. Phase 1/3 적용 후 `useQuery`가 즉시 throw하므로 **이 작업은 Phase 1보다 먼저 실행해야 한다**.
+
+**Files:**
+- Modify: `front/src/app/router.tsx`
+- Modify: `front/tests/unit/spa-router.test.tsx`
+
+- [ ] **Step 1: Export the routes-time QueryClient alongside `routes`**
+
+`front/src/app/router.tsx`:
+
+```ts
+export const routesQueryClient = createReadmatesQueryClient();
+export const routes: RouteObject[] = buildRoutes(routesQueryClient);
+```
+
+`createReadmatesRouter()` 본문은 변경 없이 유지한다. Production `main.tsx`는 `createReadmatesRouter()`만 쓰므로 영향 없다.
+
+- [ ] **Step 2: Wrap spa-router tests with the matching QueryClient**
+
+`front/tests/unit/spa-router.test.tsx`:
+
+```tsx
+import { QueryClientProvider } from "@tanstack/react-query";
+import { routes, routesQueryClient } from "@/src/app/router";
+```
+
+기존 `renderRouterAt`와 모든 `render(<RouterProvider router={router} />)` 호출을 다음으로 통일한다.
+
+```tsx
+function renderRouterAt(path: string) {
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  render(
+    <QueryClientProvider client={routesQueryClient}>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
+    </QueryClientProvider>,
+  );
+}
+```
+
+각 `it` 별로 `render(<RouterProvider router={router} />)`이 직접 호출되는 경우(파일 내 약 12군데)도 동일하게 `QueryClientProvider`로 감싼다. 같은 `routesQueryClient`를 공유해야 loader seed가 component에서 보인다. `afterEach`의 `cleanup()`은 그대로 둔다. 검사 코드:
+
+```bash
+rg -n "render\(\s*<RouterProvider" front/tests/unit/spa-router.test.tsx
+```
+
+Expected: 모든 render가 `<QueryClientProvider>` 안에 있다.
+
+- [ ] **Step 3: Run the existing spa-router suite once before Phase 1**
+
+```bash
+pnpm --dir front test -- spa-router
+```
+
+Expected: PASS — Task 0은 의미적 변경이 없으므로 기존 테스트가 전부 통과해야 한다. 실패하면 Phase 1로 진행하지 않는다.
+
+- [ ] **Step 4: Commit Task 0**
+
+```bash
+git add front/src/app/router.tsx front/tests/unit/spa-router.test.tsx
+git commit -m "refactor(front): expose routes-time query client for tests"
+```
 
 ---
 
@@ -291,16 +375,17 @@ export async function saveCurrentSessionCheckin(
   );
 }
 
+// NOTE (code-level review): `saveCurrentSessionQuestion` (singular) has no callers
+// in the current tree (`actions/save-question.ts`만 복수형을 사용). 본 wrapper는 context를
+// 추가하지 않고 그대로 둔다. 다음 cleanup PR에서 사용처 재확인 후 제거 검토.
 export async function saveCurrentSessionQuestion(
   priority: CreateQuestionRequest["priority"],
   text: CreateQuestionRequest["text"],
   draftThought: NonNullable<CreateQuestionRequest["draftThought"]>,
-  context?: ReadmatesApiContext,
 ) {
   return readmatesFetchResponse(
     "/api/sessions/current/questions",
     jsonRequest({ method: "POST" }, { priority, text, draftThought }),
-    context,
   );
 }
 
@@ -333,6 +418,8 @@ export async function saveCurrentSessionLongReview(body: string, context?: Readm
 ```
 
 Keep `front/features/current-session/actions/*.ts` unchanged. Those wrappers still compile because the context argument is optional.
+
+> **Code-level review note:** Task 2에서 `currentSessionAction` 및 `member.tsx`의 `action: currentSessionAction` 연결을 함께 제거한다. 그 시점에 `front/features/current-session/actions/*.ts`도 호출자가 없어지면 함께 정리할 수 있으나, mutation hook의 내부 helper(`requireSuccessfulSave` 패턴 등)가 이들 wrapper를 직접 가져다 쓰지 않는다는 점을 grep으로 확인한 뒤 결정한다. 본 plan에서는 boundary를 보수적으로 잡아 actions 모듈은 유지하고, follow-up PR에서 dead code 제거를 검토한다.
 
 - [ ] **Step 4: Implement the current-session query module**
 
@@ -695,7 +782,21 @@ export async function currentSessionLoader(args?: LoaderFunctionArgs): Promise<C
 }
 ```
 
-Leave `currentSessionAction` in the file for route action compatibility. It still uses the API wrappers without an explicit context, which preserves the current browser path fallback behavior.
+**Remove `currentSessionAction` and its parsing helpers** from `current-session-data.ts` in this same step:
+
+- `currentSessionAction` 함수 전체
+- `actionPayloadFromRequest`, `isCurrentSessionActionIntent`, `isRsvpUpdateStatus`, `stringValue`, `numberValue`, `questionPayload` 등 action 전용 helper
+- `CurrentSessionActionIntent`, `CurrentSessionActionPayload` 타입
+
+UI는 mutation hook만 호출하므로 action 경로가 남으면 Query cache invalidation을 우회하는 hidden path가 된다. `member.tsx`에서 `action: currentSessionAction` 연결도 함께 제거한다 (Step 6 참고). `front/features/current-session/index.ts`도 `currentSessionAction` export를 제거한다.
+
+검증:
+
+```bash
+rg -n "currentSessionAction" front
+```
+
+Expected: 매치 없음.
 
 - [ ] **Step 4: Replace route refresh state with Query state**
 
@@ -775,20 +876,21 @@ export function CurrentSessionRouteError() {
 }
 ```
 
-- [ ] **Step 5: Export the loader factory**
+- [ ] **Step 5: Export the loader factory and drop the action**
 
 Modify `front/features/current-session/index.ts` so the data exports are:
 
 ```ts
 export {
-  currentSessionAction,
   currentSessionLoader,
   currentSessionLoaderFactory,
 } from "@/features/current-session/route/current-session-data";
 export type { CurrentSessionRouteData } from "@/features/current-session/route/current-session-data";
 ```
 
-- [ ] **Step 6: Pass QueryClient into member routes**
+`currentSessionAction` re-export는 제거한다. Phase 3 종료 시점에 비-팩토리 `currentSessionLoader`도 제거 대상이지만, 호환 layer가 필요한 spa-router/legacy unit 테스트가 남아 있는 동안은 유지한다 (Task 6에 cleanup follow-up을 추가).
+
+- [ ] **Step 6: Pass QueryClient into member routes (action 제거 포함)**
 
 Modify `front/src/app/routes/member.tsx`:
 
@@ -803,13 +905,12 @@ Change the route builders:
 function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boolean } = {}): RouteObject[] {
 ```
 
-Inside the `session/current` lazy import, import `currentSessionLoaderFactory` and return the factory loader:
+Inside the `session/current` lazy import, drop the action import and use the factory loader:
 
 ```tsx
 const {
   CurrentSessionRoute,
   CurrentSessionRouteError,
-  currentSessionAction,
   currentSessionLoaderFactory,
 } = await import("@/features/current-session");
 ```
@@ -818,10 +919,11 @@ const {
 return {
   Component: CurrentSessionRouteElement,
   ErrorBoundary: CurrentSessionRouteError,
-  action: currentSessionAction,
   loader: currentSessionLoaderFactory(queryClient),
 };
 ```
+
+`action: currentSessionAction` 라인은 삭제한다. 본 spec에서 action 경로는 제거되었다.
 
 Change `memberRoutes` signature and calls:
 
@@ -837,7 +939,7 @@ children: memberAppRoutes(queryClient, { includeIndex: false }),
 children: memberAppRoutes(queryClient),
 ```
 
-Modify `front/src/app/router.tsx`:
+Modify `front/src/app/router.tsx` `buildRoutes` (Task 0에서 `routes`와 `routesQueryClient` export가 이미 추가되어 있으므로 signature 변경에 따라 `routesQueryClient`로 재구성한다):
 
 ```ts
 export function buildRoutes(queryClient: QueryClient): RouteObject[] {
@@ -848,6 +950,9 @@ export function buildRoutes(queryClient: QueryClient): RouteObject[] {
     ...hostRoutes(queryClient),
   ];
 }
+
+export const routesQueryClient = createReadmatesQueryClient();
+export const routes: RouteObject[] = buildRoutes(routesQueryClient);
 ```
 
 - [ ] **Step 7: Run current-session and router tests**
@@ -858,7 +963,7 @@ Run:
 pnpm --dir front test -- current-session spa-router
 ```
 
-Expected: PASS. Before running, update any `front/tests/unit/spa-router.test.tsx` direct `memberRoutes()` call to use the exported `routes` object from `front/src/app/router.tsx`; this keeps the test on the same QueryClient-aware route construction path as the app.
+Expected: PASS. Task 0에서 spa-router 테스트는 이미 `routesQueryClient`를 공유하도록 wrap되어 있다. spa-router 테스트가 깨지면 (1) `routesQueryClient` import 누락, (2) `<QueryClientProvider>` 없이 RouterProvider만 렌더하는 잔여 호출, (3) 호환 loader가 아닌 factory loader로 잘못 wiring된 경우를 우선 확인한다.
 
 - [ ] **Step 8: Confirm refresh event code is gone**
 
@@ -870,7 +975,15 @@ rg -n "READMATES_ROUTE_REFRESH_EVENT|readmates:route-refresh|requestCurrentSessi
 
 Expected: no matches.
 
-- [ ] **Step 9: Commit Task 2**
+- [ ] **Step 9: Verify action removal**
+
+```bash
+rg -n "currentSessionAction|isCurrentSessionActionIntent|actionPayloadFromRequest" front
+```
+
+Expected: no matches.
+
+- [ ] **Step 10: Commit Task 2**
 
 ```bash
 git add front/features/current-session/route/current-session-data.ts \
@@ -1518,6 +1631,10 @@ function replaceDomain(domains: PlatformAdminDomainResponse[] | undefined, domai
   return current.map((candidate) => (candidate.id === domain.id ? domain : candidate));
 }
 
+// Behavior change vs. current `platform-admin-route.tsx#recomputeActionRequiredCount`:
+// 현행 route 버전은 도메인이 summary에 없으면 count를 그대로 둔다 (check-only 경로 기준).
+// 본 query module 버전은 onboarding commit 경로(신규 도메인 prepend)에도 재사용되므로,
+// 새 도메인이 ACTION_REQUIRED 상태이면 +1을 더한다. PR 본문에 동작 변경 사유로 명시할 것.
 function recomputeActionRequiredCount(summary: PlatformAdminSummaryResponse, domain: PlatformAdminDomainResponse) {
   const currentDomain = (summary.domains ?? summary.domainsRequiringAction ?? [])
     .find((candidate) => candidate.id === domain.id);
@@ -1559,6 +1676,9 @@ function prependSupportGrant(
   return [grant, ...current];
 }
 
+// Cache strategy: targeted-update only.
+// 응답이 PlatformAdminDomainResponse 1건이므로 server를 다시 부르지 않는다.
+// 서버 count 산식이 진화하면 client 추정이 drift할 수 있어 follow-up으로 background invalidate를 고려.
 export function useCheckPlatformAdminDomainProvisioningMutation() {
   const client = useQueryClient();
   return useMutation({
@@ -1571,6 +1691,9 @@ export function useCheckPlatformAdminDomainProvisioningMutation() {
   });
 }
 
+// Cache strategy: targeted-update + invalidate.
+// 즉시 화면이 채워지도록 setQueryData로 club/summary를 갱신하고,
+// invalidateQueries로 서버 진실값을 다시 받아 client 추정과의 drift를 해소한다.
 export function useCommitPlatformAdminOnboardingMutation() {
   const client = useQueryClient();
   return useMutation({
@@ -1590,6 +1713,7 @@ export function useCommitPlatformAdminOnboardingMutation() {
   });
 }
 
+// Cache strategy: targeted-update only. 응답이 갱신된 club 전체이므로 invalidate 불필요.
 export function useUpdatePlatformAdminClubMutation() {
   const client = useQueryClient();
   return useMutation({
@@ -1603,6 +1727,8 @@ export function useUpdatePlatformAdminClubMutation() {
   });
 }
 
+// Cache strategy: targeted-update only.
+// 응답이 단일 grant이므로 prepend 후 invalidate 생략.
 export function useCreateSupportAccessGrantMutation(clubId: string | null) {
   const client = useQueryClient();
   return useMutation({
@@ -1615,6 +1741,8 @@ export function useCreateSupportAccessGrantMutation(clubId: string | null) {
   });
 }
 
+// Cache strategy: targeted-update only.
+// 응답 본문이 없어도 mutation variable에서 grantId를 회수해 안전하게 제거.
 export function useRevokeSupportAccessGrantMutation(clubId: string | null) {
   const client = useQueryClient();
   return useMutation({
@@ -1735,6 +1863,8 @@ rg -n "authRoutes\\(" front/tests front/src
 
 Expected after edits: direct test calls pass a QueryClient, while `front/src/app/router.tsx` passes the app QueryClient.
 
+**Task 0 reminder:** spa-router 테스트는 이미 `routesQueryClient`를 `<QueryClientProvider>`로 공유하므로 `/admin` 케이스의 PlatformAdminRoute가 `useQuery`를 호출해도 동작한다. 추가 wrap이 필요하지 않다. 만약 `/admin` 케이스에서 `No QueryClient set` 류 에러가 나오면 Task 0 적용이 누락된 것이다.
+
 - [ ] **Step 2: Pass QueryClient into auth routes**
 
 Modify `front/src/app/routes/auth.tsx`:
@@ -1762,7 +1892,7 @@ const [{ PlatformAdminRoute }, { platformAdminLoaderFactory }] = await Promise.a
 return { Component: PlatformAdminRouteElement, loader: platformAdminLoaderFactory(queryClient) };
 ```
 
-Modify `front/src/app/router.tsx`:
+Modify `front/src/app/router.tsx` (Task 0 + Task 2의 변경을 합쳐 다음 형태가 된다):
 
 ```ts
 export function buildRoutes(queryClient: QueryClient): RouteObject[] {
@@ -1773,6 +1903,9 @@ export function buildRoutes(queryClient: QueryClient): RouteObject[] {
     ...hostRoutes(queryClient),
   ];
 }
+
+export const routesQueryClient = createReadmatesQueryClient();
+export const routes: RouteObject[] = buildRoutes(routesQueryClient);
 ```
 
 - [ ] **Step 3: Replace platform-admin route-local server data with Query**
@@ -2004,12 +2137,14 @@ Change `후속 후보` to keep only future read-heavy routes:
 3. `public`
 ```
 
-- [ ] **Step 2: Add CHANGELOG entry**
+- [ ] **Step 2: Add CHANGELOG entries**
 
-Add under `## Unreleased` in `CHANGELOG.md`:
+Rollout 섹션이 "세 개의 작은 commit/PR"을 권장하므로, 각 phase별로 한 줄씩 명시한다. Add under `## Unreleased` in `CHANGELOG.md`:
 
 ```md
-- Consolidate frontend server-state ownership: migrate `current-session` and `platform-admin` to TanStack Query loader seeding/mutation invalidation, remove the custom current-session route refresh event, and share cursor pagination helpers across migrated host/archive surfaces.
+- refactor(front): migrate `current-session` route to TanStack Query loader seeding and mutation hooks; remove the custom `readmates:route-refresh` event and the route-level `currentSessionAction`.
+- refactor(front): extract `front/shared/query/cursor-pagination` and apply normalized helpers across host notifications/sessions/archive load-more paths.
+- refactor(front): move platform-admin summary/clubs/support-grants ownership to Query cache with explicit per-mutation cache strategies (targeted-update for domain check/club update/support grants; targeted-update + invalidate for onboarding commit).
 ```
 
 - [ ] **Step 3: Run targeted checks**
@@ -2076,10 +2211,19 @@ git commit -m "docs: record frontend server-state consolidation"
 ## Final Review Checklist
 
 - [ ] `current-session` no longer defines or dispatches `READMATES_ROUTE_REFRESH_EVENT`.
-- [ ] `front/src/app/router.tsx` passes one app QueryClient to auth, member, and host routes.
+- [ ] `currentSessionAction`과 `member.tsx`의 `action: ...` 연결, action 파싱 helper 전체가 제거되었다. `rg "currentSessionAction" front` → no match.
+- [ ] `front/src/app/router.tsx`는 `createReadmatesRouter()` 경로에서 단일 QueryClient를 auth/member/host route와 RouterProvider에 공유한다. `routes`/`routesQueryClient` export는 spa-router 테스트가 같은 client를 `<QueryClientProvider>`로 공유한다 (Task 0).
 - [ ] `current-session`, `host`, and `platform-admin` query keys include the intended scope and do not rely on global browser path state.
 - [ ] UI components remain prop/callback driven and do not import feature API modules.
 - [ ] `front/shared/query/cursor-pagination.ts` imports only `front/shared` types.
 - [ ] Failed mutations do not write partial data into Query cache.
+- [ ] platform-admin의 mutation별 cache 전략(주석 기준 5종)이 코드와 design spec에 일치한다.
+- [ ] `recomputeActionRequiredCount`의 의미 변경(신규 도메인 `+1`)이 PR 본문에 적혀 있다.
 - [ ] `docs/development/server-state-migration.md` matches the shipped migration status.
 - [ ] The full frontend verification commands have passed or the skipped command and reason are documented before handoff.
+
+## Follow-up (out of scope of this plan)
+
+- 비-팩토리 `currentSessionLoader` / `loadCurrentSessionRouteData` 호환 path는 호환 caller가 사라진 시점에 별도 cleanup PR로 제거한다.
+- `saveCurrentSessionQuestion` (단수형 wrapper)도 동일 cleanup에서 사용처 재확인 후 제거 검토.
+- platform-admin domain check 경로에 background invalidate가 필요해지면 (서버 count 산식 변경 시) `useCheckPlatformAdminDomainProvisioningMutation`에 `invalidateQueries(summary)`를 추가한다.
