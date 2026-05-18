@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import type { LoaderFunctionArgs } from "react-router-dom";
@@ -420,6 +420,58 @@ describe("HostNotificationsRoute", () => {
     expect(screen.getByRole("heading", { name: "새 알림 발송" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 수동 발송" })).toBeInTheDocument();
     expect(screen.getAllByText("앱+이메일").length).toBeGreaterThan(0);
+  });
+
+  it("disables manual preview button while manual options refetch is in flight after a session change", async () => {
+    const client = testQueryClient();
+    seedNotificationsRoute(client);
+
+    let resolveManualOptionsForDraft: ((value: ManualNotificationOptionsResponse) => void) | null = null;
+    const pendingManualOptionsForDraft = new Promise<ManualNotificationOptionsResponse>((resolve) => {
+      resolveManualOptionsForDraft = resolve;
+    });
+
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(summary));
+      }
+      if (url === "/api/bff/api/host/notifications/events?limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [pendingEvent], nextCursor: null }));
+      }
+      if (url === "/api/bff/api/host/notifications/deliveries?limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [deadDelivery], nextCursor: null }));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/options?sessionId=session-draft&limit=50&clubSlug=reading-sai") {
+        return pendingManualOptionsForDraft.then((body) => jsonResponse(body));
+      }
+      if (url === "/api/bff/api/host/notifications/manual/dispatches?limit=20&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: [manualDispatch], nextCursor: null }));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    }));
+
+    renderNotificationsRoute(client);
+    await screen.findByRole("heading", { name: "새 알림 발송" });
+
+    const previewButton = screen.getByRole("button", { name: "미리보기" });
+    expect(previewButton).not.toBeDisabled();
+
+    const sessionSelect = screen.getByLabelText("세션 선택");
+    await userEvent.selectOptions(sessionSelect, "session-draft");
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "확인 중" })).toBeDisabled();
+    });
+
+    resolveManualOptionsForDraft!({
+      ...manualOptionsFixture,
+      session: { ...manualOptionsFixture.session, sessionId: "session-draft" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "미리보기" })).not.toBeDisabled();
+    });
   });
 
   it("refreshes manual dispatch ledger after confirm mutation invalidates query state", async () => {

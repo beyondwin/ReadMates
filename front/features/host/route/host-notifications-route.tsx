@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLoaderData, useParams } from "react-router-dom";
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useIsFetching, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { HostNotificationsPage } from "@/features/host/ui/host-notifications-page";
 import type {
   HostNotificationDeliveryListResponse,
@@ -12,6 +12,7 @@ import {
   hostNotificationAuditQuery,
   hostNotificationDeliveriesQuery,
   hostNotificationEventsQuery,
+  hostNotificationKeys,
   hostNotificationManualDispatchesQuery,
   hostNotificationManualOptionsQuery,
   hostNotificationSessionsQuery,
@@ -156,7 +157,13 @@ export function HostNotificationsRoute() {
     auditQueries.some((query) => query.isFetching) ||
     manualDispatchQueries.some((query) => query.isFetching) ||
     manualOptionsQueries.some((query) => query.isFetching);
-  const manualPending = previewManualMutation.isPending || confirmManualMutation.isPending;
+  const manualOptionsFetchingCount = useIsFetching({
+    queryKey: hostNotificationKeys.manualOptionsRoot(context),
+  });
+  const manualPending =
+    previewManualMutation.isPending ||
+    confirmManualMutation.isPending ||
+    manualOptionsFetchingCount > 0;
 
   const loadManualOptions = async (sessionId?: string, search?: string) => {
     const request = {
