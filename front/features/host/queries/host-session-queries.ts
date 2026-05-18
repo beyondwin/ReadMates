@@ -33,13 +33,13 @@ import type {
 } from "@/features/host/api/host-contracts";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
+import {
+  normalizePageRequest,
+  pageFromNormalizedPageRequest,
+  type NormalizedPageRequest,
+} from "@/shared/query/cursor-pagination";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
-
-type NormalizedPageRequest = {
-  limit: number | null;
-  cursor: string | null;
-};
 
 export type HostSessionManualDispatchesQueryRequest = {
   sessionId?: string | null;
@@ -51,24 +51,6 @@ function scopeKey(context?: ReadmatesApiContext): string | null {
   return context?.clubSlug ?? null;
 }
 
-function normalizePage(page?: PageRequest): NormalizedPageRequest {
-  return {
-    limit: page?.limit ?? null,
-    cursor: page?.cursor ?? null,
-  };
-}
-
-function pageFromNormalized(page: NormalizedPageRequest): PageRequest | undefined {
-  if (page.limit === null && page.cursor === null) {
-    return undefined;
-  }
-
-  return {
-    ...(page.limit !== null ? { limit: page.limit } : {}),
-    ...(page.cursor !== null ? { cursor: page.cursor } : {}),
-  };
-}
-
 function optional(value: string | null | undefined): string | undefined {
   return value ?? undefined;
 }
@@ -77,7 +59,7 @@ function normalizeManualDispatchesRequest(request?: HostSessionManualDispatchesQ
   return {
     sessionId: request?.sessionId ?? null,
     eventType: request?.eventType ?? null,
-    page: normalizePage(request?.page),
+    page: normalizePageRequest(request?.page),
   };
 }
 
@@ -88,7 +70,7 @@ export const hostSessionKeys = {
   lists: (context?: ReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "list"] as const,
   list: (page?: PageRequest, context?: ReadmatesApiContext) =>
-    [...hostSessionKeys.lists(context), normalizePage(page)] as const,
+    [...hostSessionKeys.lists(context), normalizePageRequest(page)] as const,
   detail: (sessionId: string, context?: ReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "detail", sessionId] as const,
   current: (context?: ReadmatesApiContext) =>
@@ -118,10 +100,10 @@ export function hostDashboardQuery(context?: ReadmatesApiContext) {
 }
 
 export function hostSessionListQuery(page?: PageRequest, context?: ReadmatesApiContext) {
-  const normalized = normalizePage(page);
+  const normalized = normalizePageRequest(page);
   return queryOptions<HostSessionListPage>({
     queryKey: hostSessionKeys.list(page, context),
-    queryFn: () => fetchHostSessions(context, pageFromNormalized(normalized)),
+    queryFn: () => fetchHostSessions(context, pageFromNormalizedPageRequest(normalized)),
   });
 }
 
@@ -154,7 +136,7 @@ export function hostSessionManualDispatchesQuery(
     queryFn: () => fetchManualNotificationDispatches(context, {
       sessionId: optional(normalized.sessionId),
       eventType: normalized.eventType ?? undefined,
-      page: pageFromNormalized(normalized.page),
+      page: pageFromNormalizedPageRequest(normalized.page),
     }),
   });
 }

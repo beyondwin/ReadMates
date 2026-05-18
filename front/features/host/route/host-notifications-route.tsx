@@ -26,43 +26,19 @@ import {
   type ManualOptionsQueryRequest,
 } from "@/features/host/queries/host-notification-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
-import type { PageRequest } from "@/shared/model/paging";
+import {
+  appendCursor,
+  combineCursorPages,
+  pageRequests,
+} from "@/shared/query/cursor-pagination";
 import type { HostNotificationsRouteData } from "./host-notifications-data";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
 const MANUAL_MEMBER_PAGE_LIMIT = 50;
 
-type PagedResponse<T> = {
-  items: T[];
-  nextCursor: string | null;
-};
-
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
   return clubSlug ? { clubSlug } : undefined;
-}
-
-function firstPage(limit: number): PageRequest {
-  return { limit };
-}
-
-function pageRequests(limit: number, cursors: string[]): PageRequest[] {
-  return [firstPage(limit), ...cursors.map((cursor) => ({ limit, cursor }))];
-}
-
-function appendCursor(cursors: string[], cursor: string | null | undefined): string[] {
-  if (!cursor || cursors.includes(cursor)) {
-    return cursors;
-  }
-  return [...cursors, cursor];
-}
-
-function combinePages<T>(pages: Array<PagedResponse<T> | undefined>): PagedResponse<T> {
-  const lastPage = [...pages].reverse().find(Boolean);
-  return {
-    items: pages.flatMap((page) => page?.items ?? []),
-    nextCursor: lastPage?.nextCursor ?? null,
-  };
 }
 
 function combineManualOptions(
@@ -130,10 +106,10 @@ export function HostNotificationsRoute() {
     ),
   });
 
-  const events = combinePages<HostNotificationEventListResponse["items"][number]>(eventQueries.map((query) => query.data));
-  const deliveries = combinePages<HostNotificationDeliveryListResponse["items"][number]>(deliveryQueries.map((query) => query.data));
-  const audit = combinePages<NotificationTestMailAuditPage["items"][number]>(auditQueries.map((query) => query.data));
-  const manualDispatches = combinePages(manualDispatchQueries.map((query) => query.data));
+  const events = combineCursorPages<HostNotificationEventListResponse["items"][number]>(eventQueries.map((query) => query.data));
+  const deliveries = combineCursorPages<HostNotificationDeliveryListResponse["items"][number]>(deliveryQueries.map((query) => query.data));
+  const audit = combineCursorPages<NotificationTestMailAuditPage["items"][number]>(auditQueries.map((query) => query.data));
+  const manualDispatches = combineCursorPages(manualDispatchQueries.map((query) => query.data));
   const manualOptions = combineManualOptions(manualOptionsQueries.map((query) => query.data));
 
   const resetLedgerPages = () => {

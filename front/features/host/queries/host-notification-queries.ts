@@ -35,11 +35,11 @@ import type {
 } from "@/features/host/api/host-contracts";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
-
-type NormalizedPageRequest = {
-  limit: number | null;
-  cursor: string | null;
-};
+import {
+  normalizePageRequest,
+  pageFromNormalizedPageRequest,
+  type NormalizedPageRequest,
+} from "@/shared/query/cursor-pagination";
 
 export type ManualOptionsQueryRequest = {
   sessionId?: string | null;
@@ -57,24 +57,6 @@ function scopeKey(context?: ReadmatesApiContext): string | null {
   return context?.clubSlug ?? null;
 }
 
-function normalizePage(page?: PageRequest): NormalizedPageRequest {
-  return {
-    limit: page?.limit ?? null,
-    cursor: page?.cursor ?? null,
-  };
-}
-
-function pageFromNormalized(page: NormalizedPageRequest): PageRequest | undefined {
-  if (page.limit === null && page.cursor === null) {
-    return undefined;
-  }
-
-  return {
-    ...(page.limit !== null ? { limit: page.limit } : {}),
-    ...(page.cursor !== null ? { cursor: page.cursor } : {}),
-  };
-}
-
 function optional(value: string | null | undefined): string | undefined {
   return value ?? undefined;
 }
@@ -88,7 +70,7 @@ function normalizeManualOptionsRequest(request?: ManualOptionsQueryRequest) {
   return {
     sessionId: request?.sessionId ?? null,
     search: normalizeSearch(request?.search),
-    page: normalizePage(request?.page),
+    page: normalizePageRequest(request?.page),
   };
 }
 
@@ -96,7 +78,7 @@ function normalizeManualDispatchesRequest(request?: ManualDispatchesQueryRequest
   return {
     sessionId: request?.sessionId ?? null,
     eventType: request?.eventType ?? null,
-    page: normalizePage(request?.page),
+    page: normalizePageRequest(request?.page),
   };
 }
 
@@ -113,15 +95,15 @@ export const hostNotificationKeys = {
   eventsRoot: (context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.overview(context), "events"] as const,
   events: (page?: PageRequest, context?: ReadmatesApiContext) =>
-    [...hostNotificationKeys.eventsRoot(context), normalizePage(page)] as const,
+    [...hostNotificationKeys.eventsRoot(context), normalizePageRequest(page)] as const,
   deliveriesRoot: (context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.overview(context), "deliveries"] as const,
   deliveries: (page?: PageRequest, context?: ReadmatesApiContext) =>
-    [...hostNotificationKeys.deliveriesRoot(context), normalizePage(page)] as const,
+    [...hostNotificationKeys.deliveriesRoot(context), normalizePageRequest(page)] as const,
   auditRoot: (context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.overview(context), "audit"] as const,
   audit: (page?: PageRequest, context?: ReadmatesApiContext) =>
-    [...hostNotificationKeys.auditRoot(context), normalizePage(page)] as const,
+    [...hostNotificationKeys.auditRoot(context), normalizePageRequest(page)] as const,
   manualOptionsRoot: (context?: ReadmatesApiContext) =>
     [...hostNotificationKeys.manual(context), "options"] as const,
   manualOptions: (request?: ManualOptionsQueryRequest, context?: ReadmatesApiContext) =>
@@ -142,21 +124,21 @@ export function hostNotificationSummaryQuery(context?: ReadmatesApiContext) {
 export function hostNotificationEventsQuery(page?: PageRequest, context?: ReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.events(page, context),
-    queryFn: () => fetchHostNotificationEvents(context, pageFromNormalized(normalizePage(page))),
+    queryFn: () => fetchHostNotificationEvents(context, pageFromNormalizedPageRequest(normalizePageRequest(page))),
   });
 }
 
 export function hostNotificationDeliveriesQuery(page?: PageRequest, context?: ReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.deliveries(page, context),
-    queryFn: () => fetchHostNotificationDeliveries(context, pageFromNormalized(normalizePage(page))),
+    queryFn: () => fetchHostNotificationDeliveries(context, pageFromNormalizedPageRequest(normalizePageRequest(page))),
   });
 }
 
 export function hostNotificationAuditQuery(page?: PageRequest, context?: ReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.audit(page, context),
-    queryFn: () => fetchHostNotificationTestMailAudit(context, pageFromNormalized(normalizePage(page))),
+    queryFn: () => fetchHostNotificationTestMailAudit(context, pageFromNormalizedPageRequest(normalizePageRequest(page))),
   });
 }
 
@@ -174,7 +156,7 @@ export function hostNotificationManualOptionsQuery(
     queryFn: () => fetchManualNotificationOptions(context, {
       sessionId: optional(normalized.sessionId),
       search: optional(normalized.search),
-      page: pageFromNormalized(normalized.page),
+      page: pageFromNormalizedPageRequest(normalized.page),
     }),
   });
 }
@@ -189,7 +171,7 @@ export function hostNotificationManualDispatchesQuery(
     queryFn: () => fetchManualNotificationDispatches(context, {
       sessionId: optional(normalized.sessionId),
       eventType: normalized.eventType ?? undefined,
-      page: pageFromNormalized(normalized.page),
+      page: pageFromNormalizedPageRequest(normalized.page),
     }),
   });
 }

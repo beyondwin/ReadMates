@@ -9,6 +9,7 @@ import {
 import { archiveViewFromSearchParam, type ArchiveView } from "@/features/archive/model/archive-model";
 import type { ArchiveListRouteData } from "@/features/archive/route/archive-list-data";
 import ArchivePage from "@/features/archive/ui/archive-page";
+import { combineCursorPages } from "@/shared/query/cursor-pagination";
 
 const ARCHIVE_NEXT_PAGE_LIMIT = 30;
 
@@ -42,10 +43,7 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
         source: data,
         pages: {
           ...currentPages,
-          sessions: {
-            items: [...currentPages.sessions.items, ...nextPage.items],
-            nextCursor: nextPage.nextCursor,
-          },
+          sessions: combineCursorPages([currentPages.sessions, nextPage]),
         },
       };
     });
@@ -65,10 +63,7 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
         source: data,
         pages: {
           ...currentPages,
-          questions: {
-            items: [...currentPages.questions.items, ...nextPage.items],
-            nextCursor: nextPage.nextCursor,
-          },
+          questions: combineCursorPages([currentPages.questions, nextPage]),
         },
       };
     });
@@ -88,10 +83,7 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
         source: data,
         pages: {
           ...currentPages,
-          reviews: {
-            items: [...currentPages.reviews.items, ...nextPage.items],
-            nextCursor: nextPage.nextCursor,
-          },
+          reviews: combineCursorPages([currentPages.reviews, nextPage]),
         },
       };
     });
@@ -111,10 +103,7 @@ export function ArchiveListRoute({ reviewAuthorName = null }: { reviewAuthorName
         source: data,
         pages: {
           ...currentPages,
-          reports: {
-            items: [...currentPages.reports.items, ...nextPage.items],
-            nextCursor: nextPage.nextCursor,
-          },
+          reports: combineCursorPages([currentPages.reports, nextPage]),
         },
       };
     });
