@@ -34,6 +34,8 @@ import type {
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 
+export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
+
 type NormalizedPageRequest = {
   limit: number | null;
   cursor: string | null;

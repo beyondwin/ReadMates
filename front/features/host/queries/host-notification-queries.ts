@@ -14,7 +14,10 @@ import {
   retryHostNotification,
   sendHostNotificationTestMail,
 } from "@/features/host/api/host-api";
-import { hostSessionListQuery } from "@/features/host/queries/host-session-queries";
+import {
+  DEFAULT_HOST_SESSION_LIST_LIMIT,
+  hostSessionListQuery,
+} from "@/features/host/queries/host-session-queries";
 import type {
   HostNotificationDeliveryListResponse,
   HostNotificationEventListResponse,
@@ -157,10 +160,8 @@ export function hostNotificationAuditQuery(page?: PageRequest, context?: Readmat
   });
 }
 
-const HOST_NOTIFICATION_SESSION_SELECTOR_LIMIT = 50;
-
 export function hostNotificationSessionsQuery(context?: ReadmatesApiContext) {
-  return hostSessionListQuery({ limit: HOST_NOTIFICATION_SESSION_SELECTOR_LIMIT }, context);
+  return hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context);
 }
 
 export function hostNotificationManualOptionsQuery(

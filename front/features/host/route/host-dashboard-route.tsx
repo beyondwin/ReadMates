@@ -16,6 +16,7 @@ import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routi
 import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
 import { hostNotificationSummaryQuery } from "@/features/host/queries/host-notification-queries";
 import {
+  DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostCurrentSessionQuery,
   hostDashboardQuery,
   hostSessionListQuery,
@@ -24,8 +25,6 @@ import {
 } from "@/features/host/queries/host-session-queries";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import { hostDashboardActions, type HostDashboardRouteData } from "./host-dashboard-data";
-
-const HOST_SESSIONS_PAGE_LIMIT = 50;
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
@@ -48,7 +47,7 @@ export function HostDashboardRoute({
   const queryClient = useQueryClient();
   const currentQuery = useQuery(hostCurrentSessionQuery(context));
   const dashboardQuery = useQuery(hostDashboardQuery(context));
-  const sessionsQuery = useQuery(hostSessionListQuery({ limit: HOST_SESSIONS_PAGE_LIMIT }, context));
+  const sessionsQuery = useQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context));
   const notificationsQuery = useQuery(hostNotificationSummaryQuery(context));
   const visibilityMutation = useSaveHostSessionVisibilityMutation(context);
   const openMutation = useOpenHostSessionMutation(context);

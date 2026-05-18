@@ -3,6 +3,7 @@ import { fetchHostNotificationSummary, submitHostMemberLifecycle } from "@/featu
 import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
 import { hostNotificationSummaryQuery } from "@/features/host/queries/host-notification-queries";
 import {
+  DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostCurrentSessionQuery,
   hostDashboardQuery,
   hostSessionListQuery,
@@ -17,8 +18,6 @@ import type {
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
-
-const HOST_SESSIONS_PAGE_LIMIT = 50;
 
 const EMPTY_HOST_NOTIFICATION_SUMMARY: HostNotificationSummary = {
   pending: 0,
@@ -43,7 +42,7 @@ export function hostDashboardLoaderFactory(client: QueryClient) {
     const [current, data, hostSessions, notifications] = await Promise.all([
       client.fetchQuery(hostCurrentSessionQuery(context)),
       client.fetchQuery(hostDashboardQuery(context)),
-      client.fetchQuery(hostSessionListQuery({ limit: HOST_SESSIONS_PAGE_LIMIT }, context)),
+      client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)),
       fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
     ]);
 
