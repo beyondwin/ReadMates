@@ -749,6 +749,49 @@ describe("HostDashboard", () => {
     expect(within(upcomingSection as HTMLElement).queryByRole("button", { name: "더 보기" })).not.toBeInTheDocument();
   });
 
+  it("drops the appended host sessions buffer when the base list reference advances", async () => {
+    const user = userEvent.setup();
+    const nextSession = twoDraftHostSessions[1];
+    const actions = {
+      ...noopHostDashboardActions,
+      loadHostSessions: vi.fn(async () => ({ items: [nextSession], nextCursor: null })),
+    } satisfies HostDashboardActions;
+    const initialBase: HostSessionListPage = { items: [twoDraftHostSessions[0]], nextCursor: "cursor-1" };
+    const { container, rerender } = render(
+      <HostDashboardForTest
+        auth={hostAuth}
+        current={noCurrent}
+        data={dashboard}
+        hostSessions={initialBase}
+        actions={actions}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const upcomingSection = desktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section") as HTMLElement;
+
+    await user.click(within(upcomingSection).getByRole("button", { name: "더 보기" }));
+    expect(await within(upcomingSection).findByText("그 다음 책")).toBeInTheDocument();
+
+    // Simulate a base-list refetch (deep-equal-but-fresh page): TanStack Query's structuralSharing
+    // keeps the same content but the host-dashboard route hands a fresh page reference to the UI.
+    // Per spec: appended rows must not survive the refetch.
+    const refreshedBase: HostSessionListPage = { items: [twoDraftHostSessions[0]], nextCursor: "cursor-1" };
+    rerender(
+      <HostDashboardForTest
+        auth={hostAuth}
+        current={noCurrent}
+        data={dashboard}
+        hostSessions={refreshedBase}
+        actions={actions}
+      />,
+    );
+
+    const refreshedDesktop = getDesktopView(container);
+    const refreshedSection = refreshedDesktop.getByRole("heading", { name: "앞으로 읽을 세션" }).closest("section") as HTMLElement;
+    expect(within(refreshedSection).queryByText("그 다음 책")).not.toBeInTheDocument();
+    expect(within(refreshedSection).getByText("다음 책")).toBeInTheDocument();
+  });
+
   it("calls visibility and open actions from upcoming session rows", async () => {
     const user = userEvent.setup();
     const actions = {

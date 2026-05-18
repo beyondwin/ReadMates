@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useInRouterContext, useLocation } from "react-router-dom";
 import type {
   HostDashboardResponse,
@@ -116,6 +116,13 @@ export default function HostDashboard({
     items: HostSessionListItem[];
     nextCursor: string | null;
   }>(null);
+  // Spec: appended page buffer is cleared when the base list invalidates and refetches,
+  // so a mutation-driven refetch does not leave stale appended rows. Render-time fallback
+  // on `appendedHostSessions?.base === hostSessions` covers the same frame; this effect
+  // also drops the in-memory state so it does not survive across renders.
+  useEffect(() => {
+    setAppendedHostSessions((current) => (current && current.base !== hostSessions ? null : current));
+  }, [hostSessions]);
   const [hostSessionVisibilityOverrides, setHostSessionVisibilityOverrides] = useState<Record<string, SessionRecordVisibility>>({});
   const [locallyOpenedSessionId, setLocallyOpenedSessionId] = useState<string | null>(null);
   const [pendingUpcomingAction, setPendingUpcomingAction] = useState<string | null>(null);
