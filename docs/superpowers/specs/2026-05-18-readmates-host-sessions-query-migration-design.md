@@ -68,6 +68,23 @@ TanStack Query becomes the owner for:
 
 Notification event, delivery, audit, and manual member-option state remain under `hostNotificationKeys`. Only the host session list used by notification manual dispatch moves to shared `hostSessionKeys`.
 
+### Deletion Preview Cache Strategy
+
+`hostSessionDeletionPreviewQuery` is read via `queryClient.fetchQuery` at click time, not via `useQuery`. The current implementation issues a fresh request per click. To preserve that behavior under Query ownership the query must opt out of result caching with both `staleTime: 0` and `gcTime: 0`, otherwise a repeat click will serve a stale preview that no longer reflects server state mutated by interleaved publish / close / update calls. The alternative — adding deletion-preview invalidation to every mutation that can change preview content — adds matrix surface without UX benefit.
+
+### Mutation Return Shapes
+
+The migration intentionally preserves the host API's existing dual return convention:
+
+- Read endpoints return parsed JSON.
+- Most mutations return raw `Response` (so callers can inspect `.ok` and parse on success).
+- `commitHostSessionImport` and `previewHostSessionImport` are exceptions — they return parsed JSON because the editor consumes the body shape directly.
+
+Mutation hooks therefore split their `onSuccess` handling:
+
+- Response-returning hooks gate invalidation on `response.ok` (a `200`-style guard). A non-ok response is not a thrown error; the hook resolves but does not invalidate, and the caller still receives the `Response` to surface its own error UI.
+- `useCommitHostSessionImportMutation` invalidates unconditionally on success because the API call either resolves with a valid `SessionImportCommitResponse` or throws.
+
 ## Loader Seeding
 
 `front/src/app/routes/host.tsx` already receives the shared `QueryClient`. Convert dashboard and editor loaders to factories.
@@ -86,6 +103,8 @@ Notification event, delivery, audit, and manual member-option state remain under
 4. Preserve the existing notification summary fallback for transient notification API failures.
 
 The route should read from Query with `useQuery`. It may keep the existing loader return shape for compatibility, but Query data should be the rendered source of truth.
+
+**Behavior change — dashboard session list is now paginated.** The pre-migration loader calls `fetchHostSessions(context)` without a page argument, so the BFF returns the full host session list and the UI then paginates on display. The migration loader requests `{ limit: 50 }`, which becomes a paginated `?limit=50` request. The dashboard UI already calls `actions.loadHostSessions(page)` for "load more" so the pagination plumbing exists; the loader behavior simply aligns with it. Loader-level tests must assert the URL carries `limit=50` so this change does not silently revert.
 
 ### Editor Loader
 
@@ -134,9 +153,16 @@ The editor should not import Query hooks or API clients directly.
 
 ### Host Dashboard UI
 
-`front/features/host/ui/host-dashboard.tsx` should keep API access behind action props. It can keep local append state for "load more" display, but canonical page data comes from Query.
+`front/features/host/ui/host-dashboard.tsx` should keep API access behind action props. Canonical page data comes from Query; the existing four pieces of local state are dispositioned as follows:
 
-Local optimistic overrides should be reduced where Query invalidation now provides the real state. If a local append state is retained, it should reset naturally when the base Query page changes.
+| Local state | Disposition under Query ownership |
+| --- | --- |
+| `appendedHostSessions` (paginated append buffer) | Keep. Canonical first page comes from Query; appended pages remain local. Cleared when the base list invalidates and refetches so stale appended rows do not survive a mutation. |
+| `hostSessionVisibilityOverrides` (optimistic visibility) | Remove. Visibility mutations invalidate detail / list / dashboard, so the next refetch carries authoritative state — no local override is needed. |
+| `locallyOpenedSessionId` (optimistic open badge) | Keep as transient UX state. `useOpenHostSessionMutation` invalidates `current`, `lists`, `dashboard`, and `detail`; the local flag bridges the gap until the refetch lands. |
+| `pendingUpcomingAction` / `upcomingMessage` | Keep. These are pure UI affordances (toast / disabled-button state), not server state. |
+
+The "load more" buffer should reset whenever the base list query reports a new `dataUpdatedAt` for the first page so a post-mutation refresh starts from a clean page-1.
 
 ### Host Session Editor UI
 
@@ -149,7 +175,9 @@ Local optimistic overrides should be reduced where Query invalidation now provid
 - AI preview and progress
 - transient save/error labels
 
-Background Query refetch must not overwrite a user's in-progress draft. Existing prop-based initialization behavior should be preserved unless a focused test proves a safer replacement.
+Background Query refetch must not overwrite a user's in-progress draft. The editor already uses `useReducer(reducer, initialState, init(session))`, and React's `useReducer` runs the `init` callback only on mount. A subsequent re-render with a new `session` prop (e.g., from a background `useQuery` refetch) therefore does NOT re-seed the reducer — drafts are inherently safe under Query ownership without further guards.
+
+The corollary is that the editor cannot rely on prop changes to surface fresh server data either. After a successful mutation it dispatches reconciliation actions (`PUBLICATION_SAVED`, `FEEDBACK_DOCUMENT_UPDATED`, etc.) from the mutation success path so the reducer merges authoritative fields back into the form. Migration must preserve those explicit dispatches — converting an `await actions.savePublication(...)` followed by a local dispatch into a Query-only flow that just invalidates would leave the form fields stale until the user manually refreshed.
 
 ## Mutations
 
@@ -198,7 +226,13 @@ Mutation success behavior:
 | `updateAttendance` | invalidate detail and current session. |
 | `commitSessionImport` | invalidate detail, lists, dashboard, current session, manual dispatches, and notification state. |
 
-`commitSessionImport` should also invalidate `hostNotificationKeys.scope(context)` through an existing notification invalidation helper because feedback document publication can affect notification ledgers.
+`commitSessionImport` should also invalidate `hostNotificationKeys.scope(context)` through an existing notification invalidation helper because feedback document publication can affect notification ledgers. That cross-surface invalidation is composed in `host-session-editor-route.tsx` (which imports both query modules) so `host-session-queries.ts` does not need to import `host-notification-queries.ts` and the modules remain free of an import cycle.
+
+### Cross-surface invalidation semantics after sharing
+
+Today `hostNotificationSessionsQuery` lives under `hostNotificationKeys.scope`, so any caller of `invalidateHostNotifications(...)` happens to also refresh the notification-page session selector cache. After the migration the same query alias resolves to `hostSessionKeys.list({ limit: 50 }, context)` — outside the notification scope — and `invalidateHostNotifications` no longer touches it. This is the correct semantic: no host notification mutation changes the host session list, so the previous behavior was over-invalidation that happened to be harmless.
+
+The inverse direction is preserved: host session mutations call `invalidateHostSessionLists` (and its parents), which invalidates the shared key the notification selector now subscribes to, so editing or publishing a session from anywhere still refreshes the notification page's selector.
 
 ## Notification Route Integration
 
@@ -237,22 +271,27 @@ Add focused tests for the new query module:
 - Query functions call the existing host API wrappers with the expected page/context.
 - Mutation success invalidates or removes the expected keys.
 - `commitSessionImport` invalidates both host session and notification surfaces.
+- Mutation hooks gating on `response.ok` do NOT invalidate when the API returns a non-ok response (at least `useCreateHostSessionMutation` and `useDeleteHostSessionMutation` need this case so the guard is covered on both create and remove-bearing branches).
+- `hostSessionDeletionPreviewQuery` does not retain results between fetches (i.e., `staleTime`/`gcTime` opt-out is honoured).
 
 Update loader tests:
 
 - Dashboard loader factory seeds current session, dashboard, session list, and notification summary.
+- Dashboard loader URL for sessions includes `limit=50`, locking in the pagination behavior change.
 - Dashboard loader preserves the notification summary fallback.
 - Editor loader factory seeds detail and manual dispatches.
+- Notification loader writes the host session list into `hostSessionKeys.list({ limit: 50 }, context)` (the shared key), not into the deprecated `hostNotificationKeys.hostSessions`.
 - Club-scoped routes keep `clubSlug` in query keys and fetch paths.
 
 Update route/UI regression tests:
 
 - Dashboard renders from Query-seeded data.
-- "Load more" fetches the next host session page through Query and appends it.
+- "Load more" fetches the next host session page through Query and appends it; the append buffer clears when the base list invalidates.
 - Open and visibility actions refresh through Query invalidation rather than `useRevalidator`.
 - Editor reads detail and manual dispatches from Query.
 - Save, close, publish, delete, attendance, and import commit actions call Query-backed mutations and invalidate cache.
 - Editor draft state is not overwritten by a background detail refetch.
+- Editor still dispatches reducer reconciliation actions (`PUBLICATION_SAVED`, `FEEDBACK_DOCUMENT_UPDATED`, etc.) after the corresponding mutation resolves.
 - Notification route session selector reads the shared host session list key.
 
 Suggested focused commands:

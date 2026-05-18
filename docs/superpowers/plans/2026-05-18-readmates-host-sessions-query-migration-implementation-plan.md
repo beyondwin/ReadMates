@@ -230,6 +230,12 @@ describe("host session query keys", () => {
     );
   });
 
+  it("does not retain deletion preview results between fetches", () => {
+    const options = hostSessionDeletionPreviewQuery("session-7", { clubSlug: "reading-sai" });
+    expect(options.staleTime).toBe(0);
+    expect(options.gcTime).toBe(0);
+  });
+
   it("invalidates each host session surface with scoped keys", async () => {
     const client = {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
@@ -397,9 +403,14 @@ export function hostSessionDetailQuery(sessionId: string, context?: ReadmatesApi
 }
 
 export function hostSessionDeletionPreviewQuery(sessionId: string, context?: ReadmatesApiContext) {
+  // Each click currently issues a fresh request; opt out of result retention so the
+  // delete-preview UX continues to reflect the server state at click time even after
+  // an interleaved publish / close / update has mutated the underlying session.
   return queryOptions({
     queryKey: hostSessionKeys.deletionPreview(sessionId, context),
     queryFn: () => fetchHostSessionDeletionPreview(sessionId, context),
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
@@ -620,6 +631,22 @@ describe("host session mutation hooks", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.dashboard({ clubSlug: "reading-sai" }) });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: hostSessionKeys.current({ clubSlug: "reading-sai" }) });
+  });
+
+  it("does not remove detail or invalidate when delete returns a non-ok response", async () => {
+    vi.mocked(deleteHostSession).mockResolvedValue(new Response("conflict", { status: 409 }) as never);
+    const { client, Wrapper } = createWrapper();
+    client.setQueryData(hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" }), { sessionId: "session-7" });
+    const removeSpy = vi.spyOn(client, "removeQueries");
+    const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+    const { result } = renderHook(() => useDeleteHostSessionMutation({ clubSlug: "reading-sai" }), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    expect(removeSpy).not.toHaveBeenCalled();
+    expect(invalidateSpy).not.toHaveBeenCalled();
   });
 
   it("removes deleted detail cache and invalidates dependent surfaces after delete", async () => {
@@ -974,6 +1001,17 @@ git commit -m "feat(front): add host session mutation hooks"
 
 ### Task 3: Migrate Host Dashboard Loader and Route
 
+> **Behavior change to lock in with tests.** The pre-migration dashboard loader calls `fetchHostSessions(context)` with no page argument, so the BFF returns the unbounded host session list. After this task the loader requests `{ limit: 50 }`, which becomes `?limit=50` in the URL. The dashboard UI already paginates via `actions.loadHostSessions(page)`, so this aligns the loader with the UI rather than changing the user-visible result for clubs with ≤50 sessions. For clubs with >50 sessions the dashboard renders the first 50 and the UI's existing "load more" path fetches subsequent pages. The new loader test must assert `limit=50` appears in the recorded fetch URL so a future refactor cannot silently revert to unbounded.
+
+> **Dashboard local state migration.** `front/features/host/ui/host-dashboard.tsx` holds four pieces of local state. Migration disposition:
+>
+> - `hostSessionVisibilityOverrides` — **remove**. Visibility mutations invalidate detail / lists / dashboard, so Query refetch is the new source of truth.
+> - `appendedHostSessions` — **keep** for paginated append display. Add a reset (e.g., reset to `[]` whenever the base list query's `dataUpdatedAt` advances) so a post-mutation refetch starts from a clean page-1.
+> - `locallyOpenedSessionId` — **keep** as transient UX state until `useOpenHostSessionMutation`'s invalidation propagates through the dashboard / current / list queries.
+> - `pendingUpcomingAction` / `upcomingMessage` — **keep**, these are pure UI affordances and not server state.
+>
+> If the visibility-override removal causes user-visible regression in the dashboard test, fall back to keeping the override but clearing it on `visibilityMutation.onSuccess`. Document the choice in the route file.
+
 **Files:**
 - Modify: `front/features/host/route/host-dashboard-data.ts`
 - Modify: `front/features/host/route/host-dashboard-route.tsx`
@@ -1049,6 +1087,9 @@ Add a loader cache assertion after the existing "loads host session list for the
       if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ items: hostSessions, nextCursor: null }));
       }
+      // If the recorded URL has a different query-string order, assert it contains both
+      // `limit=50` and `clubSlug=reading-sai` instead of an exact-equality match — the
+      // important guarantee is that pagination is no longer unbounded.
       if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse(notificationSummary));
       }
@@ -1318,6 +1359,10 @@ git commit -m "feat(front): move host dashboard sessions to query"
 ---
 
 ### Task 4: Migrate Host Session Editor Loader and Route
+
+> **Editor draft-safety note.** `front/features/host/ui/host-session-editor.tsx` uses `useReducer(reducer, initialState, init(session))`. React invokes `init` only on first render, so a background refetch that produces a new `session` prop will NOT re-seed the reducer — drafts are inherently safe under Query ownership. The converse is also true: prop changes do not surface fresh server state to the form. The editor reconciles by dispatching local actions (`PUBLICATION_SAVED`, `FEEDBACK_DOCUMENT_UPDATED`, etc.) from the mutation success path. Preserve those dispatches — converting them into "just invalidate the cache and let the form refetch" would leave the form stale until a manual reload.
+
+> **useMemo stability note for `useHostSessionEditorActions`.** TanStack Query v5 returns a fresh result object from each `useMutation` call on every render even when its underlying handlers are stable. Listing those result objects in `useMemo` deps therefore recomputes the `actions` object every render and does not actually memoize. Either (a) destructure `mutateAsync` from each hook and depend on those (stable across renders), or (b) drop the `useMemo` and accept the per-render allocation — both are valid; pick (a) if it stays tidy. Do not leave the deps listing whole mutation objects, since that reads like memoization without providing it.
 
 **Files:**
 - Modify: `front/features/host/route/host-session-editor-data.ts`
@@ -1805,7 +1850,7 @@ In `front/features/host/route/host-notifications-data.ts`, keep the import `host
 const hostSessions = await client.fetchQuery(hostNotificationSessionsQuery(context));
 ```
 
-Then remove `fetchHostSessions` from the loader's direct `Promise.all` if needed. The loader sequence should still fetch sessions before selecting the initial manual session id.
+Then remove `fetchHostSessions` from the loader's direct `Promise.all` AND from its import list — the migration leaves no remaining caller of `fetchHostSessions` inside this file. The loader sequence should still fetch sessions before selecting the initial manual session id.
 
 Use this structure:
 
@@ -1821,6 +1866,27 @@ const [summary, events, deliveries, audit, hostSessions, manualDispatches] = awa
 ```
 
 Remove the later `client.setQueryData(hostNotificationSessionsQuery(context).queryKey, hostSessions)` call because `fetchQuery` already seeds the shared key.
+
+- [ ] **Step 4a: Add notification loader regression for the shared seed key**
+
+In `front/tests/unit/host-notifications.test.tsx`, add a test that mocks the notification loader's `fetch` for `/api/host/sessions?limit=50&clubSlug=...` and asserts the loader writes the resulting page into the SHARED key:
+
+```ts
+it("seeds the host session list into the shared host session cache", async () => {
+  const client = createTestQueryClient();
+  // ... mock fetch for sessions, summary, events, deliveries, audit, manual dispatches ...
+  await hostNotificationsLoaderFactory(client)({
+    params: { clubSlug: "reading-sai" },
+    request: new Request("https://readmates.test/clubs/reading-sai/app/host/notifications"),
+  } as LoaderFunctionArgs);
+
+  const { hostSessionListQuery } = await import("@/features/host/queries/host-session-queries");
+  expect(client.getQueryData(hostSessionListQuery({ limit: 50 }, { clubSlug: "reading-sai" }).queryKey))
+    .toEqual({ items: hostSessions, nextCursor: null });
+});
+```
+
+The shared-key assertion is the regression guard; without it the loader could silently revert to a private notification key and the only signal would be a duplicate request from the dashboard on cross-route navigation.
 
 - [ ] **Step 5: Keep notification route unchanged unless imports require cleanup**
 
@@ -1955,3 +2021,16 @@ git commit -m "docs: record host sessions query migration"
 - Import-cycle guard: `host-session-queries.ts` does not import `host-notification-queries.ts`. `commitSessionImport` notification invalidation is composed in `host-session-editor-route.tsx`, where importing both modules is safe.
 - Local-state guard: the plan does not move editor draft, AI, import preview, or confirmation state into Query.
 - Validation scope: focused query/route tests run first; full frontend test and build run before final completion.
+
+### Findings from code review (2026-05-18)
+
+These items were flagged after walking the existing implementation against the plan and are folded into the task bodies above. They are listed here for traceability.
+
+1. **Dashboard loader behavior change.** Pre-migration the loader fetches the unbounded session list. The migration paginates it to `limit=50`. Task 3 carries the explicit URL assertion to lock this in.
+2. **Deletion-preview cache opt-out.** Without `staleTime: 0` / `gcTime: 0`, repeat clicks would serve cached previews from the Query cache rather than the fresh server view the current UX relies on. Task 1 adds the opt-out and a guard test.
+3. **`useDeleteHostSessionMutation` non-ok branch.** Plan code already gates removal+invalidation on `response.ok`, but only `useCreateHostSessionMutation` covers the non-ok path in tests. Task 2 adds the matching delete test.
+4. **Editor reducer reconciliation pattern.** `useReducer`'s `init` callback runs once on mount, so Query refetch never overwrites drafts. The corollary is that explicit reconciliation dispatches after each mutation must survive the migration — Task 4 calls this out so a reviewer doesn't "simplify" them away.
+5. **`useMemo` over mutation results is a no-op.** TanStack Query v5 returns a new top-level object per render. Task 4 notes the destructure-`mutateAsync` fix.
+6. **Notification loader shared-seed regression test.** The shared-key migration is silent on the read side — without a loader-level assertion that the shared key receives the seed, a regression to a private notification key would only surface as a duplicate network request. Task 5 adds Step 4a.
+7. **Cross-surface invalidation semantics after the share.** `invalidateHostNotifications` no longer reaches the session selector (intentional and correct — no notification mutation changes session content). The reverse direction is preserved via `invalidateHostSessionLists`. Captured in the spec under "Cross-surface invalidation semantics after sharing".
+8. **Dashboard local optimistic state inventory.** Four pieces, not two: `hostSessionVisibilityOverrides` (remove), `appendedHostSessions` (keep, reset on base-list refetch), `locallyOpenedSessionId` (keep transient), `pendingUpcomingAction`/`upcomingMessage` (keep as UI affordance). Task 3 carries the disposition table.
