@@ -62,6 +62,7 @@ type HostNotificationsPageProps = {
   onLoadManualOptions?: (sessionId?: string, search?: string) => Promise<ManualNotificationOptionsResponse>;
   onLoadMoreManualMembers?: (sessionId?: string, search?: string, cursor?: string) => Promise<ManualNotificationOptionsResponse>;
   isRefreshing?: boolean;
+  manualPending?: boolean;
 };
 
 type HostNotificationMessage = {
@@ -105,6 +106,7 @@ export function HostNotificationsPage({
   onLoadManualOptions,
   onLoadMoreManualMembers,
   isRefreshing = false,
+  manualPending = false,
 }: HostNotificationsPageProps) {
   const [activeLedgerTab, setActiveLedgerTab] = useState<NotificationLedgerTab>("events");
   const [restoreTarget, setRestoreTarget] = useState<HostNotificationDeliveryItem | null>(null);
@@ -112,12 +114,8 @@ export function HostNotificationsPage({
   const [testEmail, setTestEmail] = useState("");
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
   const [manualPreview, setManualPreview] = useState<ManualNotificationPreviewResponse | null>(null);
-  const [manualOptionsState, setManualOptionsState] = useState(() => ({
-    source: manualOptions,
-    value: manualOptions,
-  }));
   const [manualError, setManualError] = useState<string | null>(null);
-  const [manualBusy, setManualBusy] = useState(false);
+  const manualBusy = manualPending;
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const processableNotificationCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
   const hasVisibleProcessableDelivery = deliveries.some(
@@ -126,14 +124,8 @@ export function HostNotificationsPage({
   const hasVisibleProcessableEvent = events.some((event) => event.status === "PENDING" || event.status === "FAILED");
   const hasProcessableNotifications = processableNotificationCount > 0 || hasVisibleProcessableDelivery || hasVisibleProcessableEvent;
   const isBusy = pendingAction !== null || manualBusy || isRefreshing;
-  if (manualOptionsState.source !== manualOptions) {
-    setManualOptionsState({
-      source: manualOptions,
-      value: manualOptions,
-    });
-  }
-  const visibleManualOptions = manualOptionsState.source === manualOptions ? manualOptionsState.value : manualOptions;
-  const visibleManualDispatches = manualDispatches ?? visibleManualOptions.recentDispatches;
+  const visibleManualOptions = manualOptions;
+  const visibleManualDispatches = manualDispatches ?? manualOptions.recentDispatches;
 
   const isPending = (kind: PendingAction["kind"], id?: string) => {
     if (!pendingAction || pendingAction.kind !== kind) {
@@ -214,7 +206,6 @@ export function HostNotificationsPage({
       return;
     }
 
-    setManualBusy(true);
     setManualError(null);
     setManualPreview(null);
     try {
@@ -222,8 +213,6 @@ export function HostNotificationsPage({
       setManualPreview(preview);
     } catch {
       setManualError("미리보기를 만들지 못했습니다. 세션과 대상 조건을 확인해 주세요.");
-    } finally {
-      setManualBusy(false);
     }
   };
 
@@ -232,7 +221,6 @@ export function HostNotificationsPage({
       return;
     }
 
-    setManualBusy(true);
     setManualError(null);
     try {
       await onConfirmManual(request);
@@ -240,55 +228,29 @@ export function HostNotificationsPage({
       setMessage({ kind: "status", text: "수동 알림 발송을 요청했습니다." });
     } catch {
       setManualError("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요.");
-    } finally {
-      setManualBusy(false);
     }
   };
 
   const handleManualSessionChange = async (sessionId: string) => {
     if (!onLoadManualOptions) return visibleManualOptions;
-    setManualBusy(true);
     setManualError(null);
     setManualPreview(null);
     try {
-      const nextOptions = await onLoadManualOptions(sessionId, undefined);
-      setManualOptionsState((current) => ({
-        ...current,
-        value: nextOptions,
-      }));
-      return nextOptions;
+      return await onLoadManualOptions(sessionId, undefined);
     } catch (error) {
       setManualError("세션 정보를 불러오지 못했습니다.");
       throw error;
-    } finally {
-      setManualBusy(false);
     }
   };
 
   const handleLoadManualOptions = async (sessionId?: string, search?: string) => {
     if (!onLoadManualOptions) return visibleManualOptions;
-    const nextOptions = await onLoadManualOptions(sessionId, search);
-    setManualOptionsState((current) => ({
-      ...current,
-      value: nextOptions,
-    }));
-    return nextOptions;
+    return onLoadManualOptions(sessionId, search);
   };
 
   const handleLoadMoreManualMembers = async (sessionId?: string, search?: string, cursor?: string) => {
     if (!onLoadMoreManualMembers || !cursor) return visibleManualOptions;
-    const nextOptions = await onLoadMoreManualMembers(sessionId, search, cursor);
-    setManualOptionsState((current) => ({
-      ...current,
-      value: {
-        ...nextOptions,
-        members: {
-          items: [...current.value.members.items, ...nextOptions.members.items],
-          nextCursor: nextOptions.members.nextCursor,
-        },
-      },
-    }));
-    return nextOptions;
+    return onLoadMoreManualMembers(sessionId, search, cursor);
   };
 
   return (

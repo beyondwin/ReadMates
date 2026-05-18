@@ -500,27 +500,15 @@ describe("HostNotificationsPage", () => {
     expect(screen.getByRole("button", { name: "미리보기" })).toBeDisabled();
   });
 
-  it("reloads manual options when the host changes the selected session", async () => {
+  it("asks the route to reload manual options when the host changes the selected session", async () => {
     const user = userEvent.setup();
-    const nextOptions = {
-      ...manualOptionsFixture,
-      session: {
-        ...manualOptionsFixture.session!,
-        sessionId: "session-draft",
-        sessionNumber: 10,
-        bookTitle: "다음 책",
-        date: "2026-08-19",
-        state: "DRAFT",
-      },
-    } as ManualNotificationOptionsResponse;
-    const onLoadManualOptions = vi.fn().mockResolvedValue(nextOptions);
+    const onLoadManualOptions = vi.fn().mockResolvedValue(manualOptionsFixture);
 
     renderPage({ onLoadManualOptions });
 
     await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
 
     expect(onLoadManualOptions).toHaveBeenCalledWith("session-draft", undefined);
-    expect(await screen.findByText("다음 책")).toBeInTheDocument();
   });
 
   it("shows an inline error when changing sessions cannot reload manual options", async () => {
@@ -580,7 +568,6 @@ describe("HostNotificationsPage", () => {
 
     await user.click(screen.getByRole("button", { name: "멤버 더 보기" }));
     expect(onLoadMoreManualMembers).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText("추가 멤버 이름")).toBeInTheDocument();
   });
 
   it("previews and confirms a manual notification with resend confirmation", async () => {
