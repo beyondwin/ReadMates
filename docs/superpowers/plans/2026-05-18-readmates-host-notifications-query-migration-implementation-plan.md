@@ -37,7 +37,7 @@ No backend files should change.
 - Modify `front/features/host/route/host-notifications-data.ts`
   - Replace `hostNotificationsLoader` with `hostNotificationsLoaderFactory(queryClient)`.
   - Seed Query cache and return only route-only initial manual selection.
-  - Remove `hostNotificationsActions` after route no longer uses it.
+  - Keep `hostNotificationsActions` as a transient export through Task 2 (route still imports it) and delete it in Task 3 when the route migrates to Query mutations. This avoids breaking the build between Task 2 and Task 3 commits.
 - Modify `front/features/host/route/host-notifications-route.tsx`
   - Read server state through Query.
   - Track only opened cursor identifiers for paginated ledgers.
@@ -522,7 +522,7 @@ Expected: FAIL because `hostNotificationsLoaderFactory` does not exist and the r
 
 - [ ] **Step 3: Replace loader data implementation**
 
-In `front/features/host/route/host-notifications-data.ts`, keep imports for API functions needed by the loader and add query imports. Replace the route data and loader with:
+In `front/features/host/route/host-notifications-data.ts`, keep imports for API functions needed by the loader and add query imports. Replace the route data type and loader with the structure below. Important: keep the existing `hostNotificationsActions` export untouched in this task so `host-notifications-route.tsx` continues to compile until Task 3 step 3 migrates the route off it.
 
 ```ts
 import type { QueryClient } from "@tanstack/react-query";
@@ -637,9 +637,12 @@ In `front/features/host/index.ts`, replace the notifications data export block w
 ```ts
 export {
   hostNotificationsLoaderFactory,
+  hostNotificationsActions,
   type HostNotificationsRouteData,
 } from "@/features/host/route/host-notifications-data";
 ```
+
+`hostNotificationsActions` stays exported through this task because `host-notifications-route.tsx` still imports it. Task 3 removes both the route import and this export line in the same commit.
 
 - [ ] **Step 6: Run focused tests**
 
@@ -649,9 +652,20 @@ Run:
 pnpm --dir front test -- host-notifications
 ```
 
-Expected: PASS for loader tests after all imports are updated.
+Expected: Loader tests PASS. Existing route/page tests must still PASS because `hostNotificationsActions` is intentionally kept exported. If any route/page test now fails because it relied on the previous loader return shape, fix the call site to seed Query cache instead — do not delete `hostNotificationsActions` here.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Verify build is not broken**
+
+Run:
+
+```bash
+pnpm --dir front lint
+pnpm --dir front build
+```
+
+Expected: PASS. This guards against the Task 2/Task 3 sequencing risk where the route still imports `hostNotificationsActions`.
+
+- [ ] **Step 8: Commit**
 
 ```bash
 git add front/features/host/route/host-notifications-data.ts \
@@ -1030,9 +1044,13 @@ pnpm --dir front test -- host-notifications
 
 Expected: Some `HostNotificationsPage` tests may fail because the page still copies manual options into local state. Fix that in Task 4.
 
-- [ ] **Step 5: Commit the route refactor after Task 4 passes**
+- [ ] **Step 5: Remove the transient `hostNotificationsActions` export**
 
-Do not commit yet if tests fail. Continue to Task 4, then commit both route and page changes together.
+Now that the route no longer imports `hostNotificationsActions`, delete the export and helper definitions in `front/features/host/route/host-notifications-data.ts`, and remove `hostNotificationsActions` from the `front/features/host/index.ts` export block. The final export from `index.ts` should match the form documented in Task 2 Step 5 minus that name.
+
+- [ ] **Step 6: Commit the route refactor after Task 4 passes**
+
+Do not commit yet if tests fail. Continue to Task 4, then commit route changes (including the removal of `hostNotificationsActions`) and page changes together.
 
 ## Task 4: Remove UI-Owned Manual Options Server State
 
@@ -1513,6 +1531,17 @@ Type consistency:
 - Route loader export is `hostNotificationsLoaderFactory`.
 - Route data type remains `HostNotificationsRouteData`.
 - Manual request types are `ManualOptionsQueryRequest` and `ManualDispatchesQueryRequest`.
+
+Invalidation scope (intentional narrowing):
+
+- `useRevalidator()` in the existing route re-runs the loader and refreshes every server slice. The new mutations narrow invalidation:
+  - `process`, `retry`, `restore`, `sendTestMail` → `overview` root only (summary + event/delivery/audit ledgers). They never affect manual selection or manual dispatch ledger, so manual queries stay warm.
+  - `confirmManual` → both `overview` and `manual` roots. Confirmation publishes a manual event which surfaces in the event/delivery ledgers and adds a new manual dispatch row.
+- If a future mutation needs to refresh everything, prefer `invalidateHostNotifications(client, context)` (scope root) instead of re-introducing route-wide revalidation.
+
+Build-safety between commits:
+
+- Task 2 keeps `hostNotificationsActions` exported so `host-notifications-route.tsx` still compiles. Task 3 removes both the route import and the export in the same commit. Task 2 Step 7 runs lint + build to catch any accidental break before the commit lands.
 
 Placeholder scan:
 
