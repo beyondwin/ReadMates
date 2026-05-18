@@ -23,7 +23,7 @@ export {
 } from "@/features/host/route/host-dashboard-route";
 export {
   hostDashboardActions,
-  hostDashboardLoader,
+  hostDashboardLoaderFactory,
   type HostDashboardRouteData,
 } from "@/features/host/route/host-dashboard-data";
 export {

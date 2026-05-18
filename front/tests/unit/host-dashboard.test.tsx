@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
 import HostDashboard from "@/features/host/ui/host-dashboard";
 import {
-  hostDashboardLoader,
+  hostDashboardLoaderFactory,
   hostInvitationsLoaderFactory,
   hostMembersLoaderFactory,
   hostSessionEditorLoader,
@@ -319,6 +319,19 @@ async function expectLoaderRedirect(runLoader: () => Promise<unknown>, location:
   }
 }
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function hostDashboardLoaderForTest(args?: LoaderFunctionArgs) {
+  return hostDashboardLoaderFactory(createTestQueryClient())(args);
+}
+
 function hostSessionEditorLoaderForTest() {
   return hostSessionEditorLoader({
     params: { sessionId: "session-7" },
@@ -327,15 +340,13 @@ function hostSessionEditorLoaderForTest() {
 }
 
 const hostLoaderCases: Array<[string, () => Promise<unknown>, string]> = [
-  ["dashboard", () => hostDashboardLoader(), "/login"],
+  ["dashboard", () => hostDashboardLoaderForTest(), "/login"],
   ["members", () => hostMembersLoaderFactory(new QueryClient())(), "/login"],
   ["invitations", () => hostInvitationsLoaderFactory(new QueryClient())(), "/login"],
   ["session editor", hostSessionEditorLoaderForTest, "/login?returnTo=%2Fapp%2Fhost%2Fsessions%2Fsession-7%2Fedit"],
 ];
 
-const clubScopedHostDashboardLoader = hostDashboardLoader as unknown as (
-  args: LoaderFunctionArgs,
-) => ReturnType<typeof hostDashboardLoader>;
+const clubScopedHostDashboardLoader = hostDashboardLoaderForTest;
 
 describe("HostDashboard", () => {
   it.each(hostLoaderCases)("redirects anonymous users before calling %s host endpoints", async (_name, runLoader, location) => {
@@ -394,7 +405,7 @@ describe("HostDashboard", () => {
         return Promise.resolve(new Response(JSON.stringify(dashboard), { status: 200 }));
       }
 
-      if (url === "/api/bff/api/host/sessions") {
+      if (url === "/api/bff/api/host/sessions?limit=50") {
         return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
 
@@ -406,7 +417,7 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader()).resolves.toEqual({
+    await expect(hostDashboardLoaderForTest()).resolves.toEqual({
       current,
       data: dashboard,
       hostSessions: { items: [], nextCursor: null },
@@ -416,7 +427,7 @@ describe("HostDashboard", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/dashboard", expect.objectContaining({ cache: "no-store" }));
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions?limit=50", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/host/notifications/summary",
       expect.objectContaining({ cache: "no-store" }),
@@ -440,7 +451,7 @@ describe("HostDashboard", () => {
         return Promise.resolve(jsonResponse(dashboard));
       }
 
-      if (url === "/api/bff/api/host/sessions") {
+      if (url === "/api/bff/api/host/sessions?limit=50") {
         return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
 
@@ -452,7 +463,7 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader({ params: {}, request: new Request("https://readmates.test/app/host") } as LoaderFunctionArgs))
+    await expect(hostDashboardLoaderForTest({ params: {}, request: new Request("https://readmates.test/app/host") } as LoaderFunctionArgs))
       .resolves.toEqual({ current, data: dashboard, hostSessions: { items: [], nextCursor: null }, notifications: notificationSummary });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url)).every((url) => !url.includes("clubSlug="))).toBe(true);
@@ -474,7 +485,7 @@ describe("HostDashboard", () => {
         return Promise.resolve(jsonResponse(dashboard));
       }
 
-      if (url === "/api/bff/api/host/sessions?clubSlug=reading-sai") {
+      if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ items: [], nextCursor: "cursor-1" }));
       }
 
@@ -513,16 +524,54 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: "cursor-1" }));
+      if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: "cursor-1" }));
       if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const data = await hostDashboardLoader();
+    const data = await hostDashboardLoaderForTest();
 
     expect(data.hostSessions).toEqual({ items: [], nextCursor: "cursor-1" });
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({}));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions?limit=50", expect.objectContaining({}));
+  });
+
+  it("seeds host dashboard query data into the shared query client", async () => {
+    const client = createTestQueryClient();
+    const fetchMock = vi.fn((url: string) => {
+      if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") return Promise.resolve(authResponse(hostAuth));
+      if (url === "/api/bff/api/sessions/current?clubSlug=reading-sai") return Promise.resolve(jsonResponse(current));
+      if (url === "/api/bff/api/host/dashboard?clubSlug=reading-sai") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({ items: hostSessions, nextCursor: null }));
+      }
+      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(notificationSummary));
+      }
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await hostDashboardLoaderFactory(client)({
+      params: { clubSlug: "reading-sai" },
+      request: new Request("https://readmates.test/clubs/reading-sai/app/host"),
+    } as LoaderFunctionArgs);
+
+    const { hostCurrentSessionQuery, hostDashboardQuery, hostSessionListQuery } = await import(
+      "@/features/host/queries/host-session-queries"
+    );
+    const { hostNotificationSummaryQuery } = await import("@/features/host/queries/host-notification-queries");
+
+    expect(client.getQueryData(hostCurrentSessionQuery({ clubSlug: "reading-sai" }).queryKey)).toEqual(current);
+    expect(client.getQueryData(hostDashboardQuery({ clubSlug: "reading-sai" }).queryKey)).toEqual(dashboard);
+    expect(client.getQueryData(hostSessionListQuery({ limit: 50 }, { clubSlug: "reading-sai" }).queryKey)).toEqual({
+      items: hostSessions,
+      nextCursor: null,
+    });
+    expect(client.getQueryData(hostNotificationSummaryQuery({ clubSlug: "reading-sai" }).queryKey)).toEqual(notificationSummary);
+
+    const fetchedUrls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(fetchedUrls.some((url) => url.includes("limit=50") && url.includes("clubSlug=reading-sai"))).toBe(true);
   });
 
   it("loads host notification status for the dashboard", async () => {
@@ -530,13 +579,13 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const data = await hostDashboardLoader();
+    const data = await hostDashboardLoaderForTest();
 
     expect(data).toMatchObject({ notifications: notificationSummary });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/notifications/summary", expect.objectContaining({}));
@@ -547,7 +596,7 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/summary") {
         return Promise.resolve(new Response(JSON.stringify({ message: "notification status unavailable" }), { status: 503 }));
       }
@@ -555,7 +604,7 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader()).resolves.toEqual({
+    await expect(hostDashboardLoaderForTest()).resolves.toEqual({
       current,
       data: dashboard,
       hostSessions: { items: [], nextCursor: null },
@@ -568,7 +617,7 @@ describe("HostDashboard", () => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
       if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
       if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
+      if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       if (url === "/api/bff/api/host/notifications/summary") {
         return Promise.resolve(new Response(JSON.stringify({ message: "forbidden" }), { status: 403 }));
       }
@@ -576,7 +625,7 @@ describe("HostDashboard", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(hostDashboardLoader()).rejects.toThrow("이 작업을 수행할 권한이 없습니다.");
+    await expect(hostDashboardLoaderForTest()).rejects.toThrow("이 작업을 수행할 권한이 없습니다.");
   });
 
   it("renders notification status without full recipient email addresses", () => {

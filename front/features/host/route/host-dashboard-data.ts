@@ -1,13 +1,12 @@
-import {
-  fetchHostCurrentSession,
-  fetchHostDashboard,
-  fetchHostNotificationSummary,
-  fetchHostSessions,
-  openHostSession,
-  saveHostSessionVisibility,
-  submitHostMemberLifecycle,
-} from "@/features/host/api/host-api";
+import type { QueryClient } from "@tanstack/react-query";
+import { fetchHostNotificationSummary, submitHostMemberLifecycle } from "@/features/host/api/host-api";
 import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
+import { hostNotificationSummaryQuery } from "@/features/host/queries/host-notification-queries";
+import {
+  hostCurrentSessionQuery,
+  hostDashboardQuery,
+  hostSessionListQuery,
+} from "@/features/host/queries/host-session-queries";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import type {
   CurrentSessionResponse,
@@ -18,6 +17,8 @@ import type {
 import type { LoaderFunctionArgs } from "react-router-dom";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
+
+const HOST_SESSIONS_PAGE_LIMIT = 50;
 
 const EMPTY_HOST_NOTIFICATION_SUMMARY: HostNotificationSummary = {
   pending: 0,
@@ -34,22 +35,26 @@ export type HostDashboardRouteData = {
   notifications: HostNotificationSummary;
 };
 
-export async function hostDashboardLoader(args?: LoaderFunctionArgs): Promise<HostDashboardRouteData> {
-  await requireHostLoaderAuth(args);
-  const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+export function hostDashboardLoaderFactory(client: QueryClient) {
+  return async (args?: LoaderFunctionArgs): Promise<HostDashboardRouteData> => {
+    await requireHostLoaderAuth(args);
+    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
-  const [current, data, hostSessions, notifications] = await Promise.all([
-    fetchHostCurrentSession(context),
-    fetchHostDashboard(context),
-    fetchHostSessions(context),
-    fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
-  ]);
+    const [current, data, hostSessions, notifications] = await Promise.all([
+      client.fetchQuery(hostCurrentSessionQuery(context)),
+      client.fetchQuery(hostDashboardQuery(context)),
+      client.fetchQuery(hostSessionListQuery({ limit: HOST_SESSIONS_PAGE_LIMIT }, context)),
+      fetchHostNotificationSummary(context).catch(notificationSummaryFallback),
+    ]);
 
-  return {
-    current,
-    data,
-    hostSessions,
-    notifications,
+    client.setQueryData(hostNotificationSummaryQuery(context).queryKey, notifications);
+
+    return {
+      current,
+      data,
+      hostSessions,
+      notifications,
+    };
   };
 }
 
@@ -75,19 +80,4 @@ export const hostDashboardActions = {
       throw new Error("Current session member action failed");
     }
   },
-  updateSessionVisibility: async (sessionId, visibility) => {
-    const response = await saveHostSessionVisibility(sessionId, { visibility });
-
-    if (!response.ok) {
-      throw new Error("Host session visibility update failed");
-    }
-  },
-  openSession: async (sessionId) => {
-    const response = await openHostSession(sessionId);
-
-    if (!response.ok) {
-      throw new Error("Host session open failed");
-    }
-  },
-  loadHostSessions: (page) => fetchHostSessions(undefined, page),
-} satisfies HostDashboardActions;
+} satisfies Pick<HostDashboardActions, "updateCurrentSessionParticipation">;

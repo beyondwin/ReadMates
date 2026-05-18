@@ -15,11 +15,11 @@ function hostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="모임 운영 화면을 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostDashboardRouteElement }, { hostDashboardLoader }] = await Promise.all([
+        const [{ HostDashboardRouteElement }, { hostDashboardLoaderFactory }] = await Promise.all([
           import("@/src/app/host-route-elements"),
           import("@/features/host/route/host-dashboard-data"),
         ]);
-        return { Component: HostDashboardRouteElement, loader: hostDashboardLoader };
+        return { Component: HostDashboardRouteElement, loader: hostDashboardLoaderFactory(queryClient) };
       },
     },
     {
