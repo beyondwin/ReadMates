@@ -1373,7 +1373,100 @@ it("refreshes manual dispatch ledger after confirm mutation invalidates query st
 
 If the explicit fetch URLs differ because `readmatesApiPath` orders `clubSlug` differently, adjust only the string order to match the actual helper output observed in the failure. Keep the endpoint and assertions identical.
 
-- [ ] **Step 3: Run focused tests**
+- [ ] **Step 3: Add resend confirmation blocking test**
+
+Design spec line 170 requires "Duplicate manual dispatch confirm is blocked until resend confirmation is selected." Append this test to the `HostNotificationsPage` describe block to lock in the existing duplicate-resend gate after the state migration:
+
+```ts
+it("blocks confirm until resend confirmation is selected when preview reports duplicates", async () => {
+  const user = userEvent.setup();
+  const duplicatePreview: ManualNotificationPreviewResponse = {
+    previewId: "preview-duplicate",
+    expiresAt: "2026-05-13T09:10:00Z",
+    template: {
+      eventType: "SESSION_REMINDER_DUE",
+      label: "모임 전날 리마인더",
+      subject: "모임 전날 리마인더",
+      bodyPreview: "모임 전 준비를 확인해 주세요.",
+    },
+    audience: {
+      baseGroup: "ALL_ACTIVE_MEMBERS",
+      baseCount: 3,
+      excludedCount: 0,
+      includedCount: 0,
+      finalTargetCount: 3,
+    },
+    channels: {
+      requested: "BOTH",
+      inAppEligibleCount: 3,
+      emailEligibleCount: 3,
+      emailSkippedByPreferenceCount: 0,
+      emailMissingCount: 0,
+    },
+    duplicates: {
+      requiresResendConfirmation: true,
+      recentDispatches: [manualDispatch],
+    },
+    warnings: [],
+  };
+  const onPreviewManual = vi.fn().mockResolvedValue(duplicatePreview);
+  const onConfirmManual = vi.fn().mockResolvedValue(undefined);
+
+  renderPage({ onPreviewManual, onConfirmManual });
+
+  await user.click(screen.getByRole("button", { name: "미리보기" }));
+  await screen.findByRole("heading", { name: "발송 전 확인" });
+
+  const confirmButton = screen.getByRole("button", { name: /발송|확정/ });
+  expect(confirmButton).toBeDisabled();
+  await user.click(confirmButton);
+  expect(onConfirmManual).not.toHaveBeenCalled();
+
+  await user.click(screen.getByRole("checkbox", { name: /재발송|중복/ }));
+  expect(confirmButton).toBeEnabled();
+});
+```
+
+If the resend confirmation control's accessible name in the existing workbench differs from `/재발송|중복/`, replace the regex with the actual label observed when reading the workbench source — keep the structural intent of the test the same.
+
+- [ ] **Step 4: Add UI boundary guard test**
+
+Design spec line 54 and line 172 require that files under `front/features/host/ui/**` never import `@/features/host/api/host-api`, `@/shared/api`, or the new query module. Add a single static regression test at `front/tests/unit/host-notifications-ui-boundary.test.ts`:
+
+```ts
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { sync as globSync } from "fast-glob";
+import { describe, expect, it } from "vitest";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const FORBIDDEN = [
+  /from\s+["']@\/features\/host\/api\/host-api["']/,
+  /from\s+["']@\/features\/host\/queries\/host-notification-queries["']/,
+  /from\s+["']@\/shared\/api(?:\/[^"']+)?["']/,
+];
+
+describe("host notifications UI boundary", () => {
+  it("does not import server-state modules from features/host/ui", () => {
+    const files = globSync("features/host/ui/**/*.{ts,tsx}", { cwd: repoRoot });
+    const violations: string[] = [];
+    for (const rel of files) {
+      const source = readFileSync(resolve(repoRoot, rel), "utf8");
+      for (const pattern of FORBIDDEN) {
+        if (pattern.test(source)) {
+          violations.push(`${rel} matches ${pattern}`);
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+});
+```
+
+If `fast-glob` is already a dev dependency it can be reused; otherwise replace it with the existing repo glob helper used by other boundary tests. The intent is to fail CI if a UI file regresses by importing a server-state module.
+
+- [ ] **Step 5: Run focused tests**
 
 Run:
 
@@ -1381,12 +1474,23 @@ Run:
 pnpm --dir front test -- host-notifications
 ```
 
-Expected: PASS.
+Expected: PASS for both the preview-persistence/dispatch-refresh regressions and the resend-confirmation block. The UI boundary test is run separately in the next step because it has its own filename.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 6: Run UI boundary test**
+
+Run:
 
 ```bash
-git add front/tests/unit/host-notifications.test.tsx
+pnpm --dir front test -- host-notifications-ui-boundary
+```
+
+Expected: PASS. Failure means a `front/features/host/ui/**` file imports a server-state module — fix the import before continuing.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add front/tests/unit/host-notifications.test.tsx \
+  front/tests/unit/host-notifications-ui-boundary.test.ts
 git commit -m "test(front): cover host notification query migration"
 ```
 
@@ -1515,15 +1619,22 @@ If the route migration commit must be reverted, also revert the docs commit beca
 
 ## Self-Review Notes
 
-Spec coverage:
+Spec coverage (mapped to `docs/superpowers/specs/2026-05-18-readmates-host-notifications-query-migration-design.md`):
 
-- Query ownership for summary/events/deliveries/audit/hostSessions/manualOptions/manualDispatches: Tasks 1-4.
-- Loader seeding factory: Task 2.
-- Route orchestration and removal of `useRevalidator`: Task 3.
-- UI remains prop/callback driven and user input state stays local: Task 4.
-- Manual preview persistence and resend confirmation coverage: Task 5.
+- Query ownership for summary/events/deliveries/audit/hostSessions/manualOptions/manualDispatches (design §Target Architecture): Tasks 1-4.
+- Loader seeding factory and loader return shrunk to `initialManualSelection` only (design §Loader Seeding): Task 2.
+- Route orchestration and removal of `useRevalidator` (design §Route Orchestration): Task 3.
+- UI remains prop/callback driven and user input state stays local (design §Manual Notification Flow): Task 4.
+- Manual preview persistence regression (design §Risks): Task 5 Step 1.
+- Manual dispatch ledger refresh after confirm (design line 171): Task 5 Step 2.
+- Resend confirmation block (design line 170): Task 5 Step 3.
+- UI boundary — `features/host/ui/**` must not import server-state modules (design lines 54, 172): Task 5 Step 4.
 - Tracking docs and changelog: Task 6.
-- Required checks: Task 7.
+- Required checks (`pnpm --dir front test/lint/build` per design §Tests): Task 7.
+
+Intentional deviations from design:
+
+- `confirmManual` invalidates the entire `overview` root (summary + events + deliveries + audit) plus the `manual` root. Design line 101 lists summary/events/deliveries/manual options/manual dispatches but omits audit. Audit is included because invalidating at the `overview` root is simpler than enumerating siblings, and audit refetches are cheap. If audit refetch on confirm becomes a perf concern, replace the root invalidation with per-key invalidation.
 
 Type consistency:
 
