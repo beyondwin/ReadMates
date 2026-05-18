@@ -180,7 +180,10 @@ class ClubAiDefaultsControllerTest {
         var view: ClubAiDefaultsView = ClubAiDefaultsView(defaultModel = null)
         var error: RuntimeException? = null
 
-        override fun get(clubSlug: String, member: CurrentMember): ClubAiDefaultsView {
+        override fun get(
+            clubSlug: String,
+            member: CurrentMember,
+        ): ClubAiDefaultsView {
             error?.let { throw it }
             return view
         }
@@ -190,7 +193,11 @@ class ClubAiDefaultsControllerTest {
         val calls = mutableListOf<Pair<String, String>>()
         var error: RuntimeException? = null
 
-        override fun update(clubSlug: String, defaultModel: String, member: CurrentMember) {
+        override fun update(
+            clubSlug: String,
+            defaultModel: String,
+            member: CurrentMember,
+        ) {
             error?.let { throw it }
             calls += clubSlug to defaultModel
         }
@@ -199,8 +206,7 @@ class ClubAiDefaultsControllerTest {
     private class StubCurrentMemberResolver(
         private val member: CurrentMember,
     ) : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter): Boolean =
-            parameter.parameterType == CurrentMember::class.java
+        override fun supportsParameter(parameter: MethodParameter): Boolean = isClubDefaultsCurrentMember(parameter)
 
         override fun resolveArgument(
             parameter: MethodParameter,
@@ -210,3 +216,5 @@ class ClubAiDefaultsControllerTest {
         ): Any = member
     }
 }
+
+private fun isClubDefaultsCurrentMember(p: MethodParameter): Boolean = p.parameterType == CurrentMember::class.java

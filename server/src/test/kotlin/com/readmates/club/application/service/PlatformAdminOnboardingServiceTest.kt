@@ -74,7 +74,10 @@ class PlatformAdminOnboardingServiceTest {
 private class NoOpTransactionManager : AbstractPlatformTransactionManager() {
     override fun doGetTransaction(): Any = Any()
 
-    override fun doBegin(transaction: Any, definition: TransactionDefinition) = Unit
+    override fun doBegin(
+        transaction: Any,
+        definition: TransactionDefinition,
+    ) = Unit
 
     override fun doCommit(status: DefaultTransactionStatus) = Unit
 
@@ -125,7 +128,11 @@ private fun commandWithNewHostAndDomain(): PlatformAdminOnboardingCommand =
     )
 
 private class FakePlatformAdminInvitationMail : SendPlatformAdminHostInvitationEmailPort {
-    data class Sent(val email: String, val clubName: String, val acceptUrl: String)
+    data class Sent(
+        val email: String,
+        val clubName: String,
+        val acceptUrl: String,
+    )
 
     val sent = mutableListOf<Sent>()
 
@@ -178,7 +185,9 @@ private class FakePlatformAdminOnboardingPorts :
     override fun listClubs(limit: Int): List<PlatformAdminClubListItem> = createdClubs.map { toListItem(it) }
 
     override fun loadClub(clubId: UUID): PlatformAdminClubListItem? =
-        createdClubs.firstOrNull { it.clubId == clubId }?.let(::toListItem)
+        createdClubs
+            .firstOrNull { it.clubId == clubId }
+            ?.let(::toListItem)
 
     override fun activeHostCount(clubId: UUID): Int = 0
 

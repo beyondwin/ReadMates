@@ -75,7 +75,8 @@ class AiGenerationJobMessageSerializationTest {
             val original = sampleMessage()
 
             val bytes =
-                producerFactory.valueSerializerSupplier!!.get()!!
+                producerFactory.valueSerializerSupplier!!
+                    .get()!!
                     .serialize("readmates.aigen.jobs.v1", original)
             val deserialized =
                 consumerFactory.valueDeserializer!!

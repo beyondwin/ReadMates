@@ -46,7 +46,7 @@ import java.util.UUID
  *   enabled-model check, cost-guard pre-check, JobRecord persistence,
  *   Kafka publish without transcript, then return jobId+expiresAt.
  * - get: rehydrates JobView and applies the soft 80% budget warning.
- * - cancel: deletes the 3 Redis keys and writes a CANCEL audit row.
+ * - cancel: deletes transient Redis payload and writes a CANCEL audit row.
  *
  * Wired only when `readmates.aigen.enabled=true`.
  */

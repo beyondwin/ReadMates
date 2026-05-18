@@ -3,12 +3,12 @@ package com.readmates.sessionimport.application.service
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionimport.application.model.SessionImportAttendee
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionCommand
-import com.readmates.sessionimport.application.model.SessionImportAttendee
 import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.`in`.CommitValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportInput

@@ -156,7 +156,10 @@ class RedisGenerationCostCountersTest(
             },
         )
 
-    private fun deleteCounters(hostId: UUID, clubId: UUID) {
+    private fun deleteCounters(
+        hostId: UUID,
+        clubId: UUID,
+    ) {
         redisTemplate.delete("aigen:host:$hostId:daily")
         redisTemplate.delete("aigen:club:$clubId:monthly_cost_usd")
     }

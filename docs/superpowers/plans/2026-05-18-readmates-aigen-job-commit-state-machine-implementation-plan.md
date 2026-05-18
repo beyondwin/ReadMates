@@ -36,48 +36,48 @@ After cross-checking against `server/src/main/kotlin/com/readmates/aigen/**` and
 
 Create:
 
-- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationJobTransitionPolicy.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationJobTransitionPolicy.kt`
   Pure lifecycle policy. Defines which actions are allowed from each `JobStatus`.
-- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationJobTransitionPolicyTest.kt`  
+- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationJobTransitionPolicyTest.kt`
   Pins the status/action matrix from the spec.
 
 Modify:
 
-- `server/src/main/kotlin/com/readmates/aigen/application/model/AiGenerationModels.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/application/model/AiGenerationModels.kt`
   Add `COMMITTING` and `COMMITTED` to `JobStatus`.
-- `server/src/main/kotlin/com/readmates/aigen/application/port/out/AiGenerationJobStore.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/application/port/out/AiGenerationJobStore.kt`
   Add compare-and-set transition, conditional result save, and transient payload deletion methods.
-- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationFakes.kt`  
+- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationFakes.kt`
   Keep service tests fast by mirroring the new store port in `FakeJobStore`.
-- `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt`
   Implement atomic transition/result-save scripts, terminal hash loading, and transient payload deletion.
-- `server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStoreTest.kt`  
+- `server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStoreTest.kt`
   Cover transition scripts, terminal hash behavior, stale non-terminal cleanup, and stable `expiresAt`.
-- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationWorker.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationWorker.kt`
   Guard provider call and result persistence with status transitions.
-- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationWorkerTest.kt`  
+- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationWorkerTest.kt`
   Add worker/cancel race regressions.
-- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationCommitService.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationCommitService.kt`
   Add `SUCCEEDED -> COMMITTING -> COMMITTED` flow and failure recovery.
-- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationCommitServiceTest.kt`  
+- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationCommitServiceTest.kt`
   Add commit transition, duplicate commit, and delegate failure recovery tests.
-- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationRegenerationService.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationRegenerationService.kt`
   Require `SUCCEEDED` and conditionally persist patched snapshots.
-- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationRegenerationServiceTest.kt`  
+- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationRegenerationServiceTest.kt`
   Add non-`SUCCEEDED` and race-after-provider tests.
-- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationOrchestrator.kt`  
+- `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationOrchestrator.kt`
   Change cancel to transition to `CANCELLED` and delete transient payload instead of deleting the whole hash.
-- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationOrchestratorTest.kt`  
+- `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationOrchestratorTest.kt`
   Update cancel expectations and add disallowed cancel status tests.
-- `front/features/host/aigen/api/aigen-contracts.ts`  
+- `front/features/host/aigen/api/aigen-contracts.ts`
   Add `COMMITTING` and `COMMITTED` to `AiGenerationStatus`.
-- `front/features/host/aigen/hooks/useAiGenerationJob.ts`  
+- `front/features/host/aigen/hooks/useAiGenerationJob.ts`
   Stop polling on `COMMITTED`; keep polling on `COMMITTING`.
-- `front/features/host/aigen/hooks/useAiGenerationJob.test.tsx`  
+- `front/features/host/aigen/hooks/useAiGenerationJob.test.tsx`
   Add polling tests for `COMMITTING` and `COMMITTED`.
-- `front/features/host/aigen/ui/AiGenerateTab.tsx`  
+- `front/features/host/aigen/ui/AiGenerateTab.tsx`
   Show saving state for `COMMITTING`, complete state for `COMMITTED`, and delete draft on server-side committed status.
-- `front/features/host/aigen/ui/AiGenerateTab.test.tsx`  
+- `front/features/host/aigen/ui/AiGenerateTab.test.tsx`
   Add state-machine tests for `COMMITTING` and `COMMITTED`.
 
 ## Task 1: Add Status Contract and Transition Policy

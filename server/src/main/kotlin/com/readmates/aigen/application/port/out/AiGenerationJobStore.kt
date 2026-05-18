@@ -96,7 +96,7 @@ interface AiGenerationJobStore {
      */
     fun deleteTransientPayload(jobId: UUID): Unit
 
-    /** Delete all 3 job keys (hash, transcript, result) atomically. Used on commit/cancel. */
+    /** Delete all 3 job keys (hash, transcript, result) atomically. Used for stale job cleanup. */
     fun delete(jobId: UUID): Unit
 }
 

@@ -71,7 +71,6 @@ private const val SEED_SQL = """
 class DefaultAiGenerationAuthorizationPolicyTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-
     private val policy = DefaultAiGenerationAuthorizationPolicy(jdbcTemplate)
 
     private fun hostMember(clubId: UUID = UUID.fromString(CLUB_ID)) =
@@ -137,5 +136,4 @@ class DefaultAiGenerationAuthorizationPolicyTest(
             .isInstanceOf(AccessDeniedException::class.java)
             .hasMessageContaining("not a HOST")
     }
-
 }

@@ -28,53 +28,53 @@
 
 ## File Structure
 
-- Create `front/features/current-session/queries/current-session-queries.ts`  
+- Create `front/features/current-session/queries/current-session-queries.ts`
   Owns current-session query keys, `currentSessionQuery`, save mutation hooks, and current-session invalidation.
-- Create `front/features/current-session/queries/current-session-queries.test.tsx`  
+- Create `front/features/current-session/queries/current-session-queries.test.tsx`
   Tests current-session query keys, queryFn API calls, mutation invalidation, and non-OK mutation behavior.
-- Modify `front/features/current-session/api/current-session-api.ts`  
+- Modify `front/features/current-session/api/current-session-api.ts`
   Adds optional `ReadmatesApiContext` to current-session mutation API wrappers so route-scoped mutations do not rely on browser location fallback.
-- Modify `front/features/current-session/route/current-session-data.ts`  
+- Modify `front/features/current-session/route/current-session-data.ts`
   Adds `currentSessionLoaderFactory(queryClient)` and seeds `currentSessionQuery(context)` while keeping `currentSessionLoader` for non-factory tests and compatibility.
-- Modify `front/features/current-session/route/current-session-route.tsx`  
+- Modify `front/features/current-session/route/current-session-route.tsx`
   Replaces the custom refresh event / loader reload path with `useQuery` and current-session mutation hooks.
-- Modify `front/features/current-session/index.ts`  
+- Modify `front/features/current-session/index.ts`
   Exports `currentSessionLoaderFactory`.
-- Modify `front/src/app/routes/member.tsx` and `front/src/app/router.tsx`  
+- Modify `front/src/app/routes/member.tsx` and `front/src/app/router.tsx`
   Passes the app QueryClient into member route construction so current-session loader seeding uses the same cache as components.
-- Modify `front/tests/unit/current-session.test.tsx`  
+- Modify `front/tests/unit/current-session.test.tsx`
   Wraps route tests in `QueryClientProvider`, removes refresh-event assertions, and adds Query invalidation assertions.
 
-- Create `front/shared/query/cursor-pagination.ts`  
+- Create `front/shared/query/cursor-pagination.ts`
   Provides stable cursor-page normalization and combining helpers.
-- Create `front/shared/query/cursor-pagination.test.ts`  
+- Create `front/shared/query/cursor-pagination.test.ts`
   Pins normalization, cursor append, request generation, and page combining.
-- Modify `front/features/host/queries/host-notification-queries.ts`  
+- Modify `front/features/host/queries/host-notification-queries.ts`
   Reuses shared page normalization helpers without changing query key shape.
-- Modify `front/features/host/queries/host-session-queries.ts`  
+- Modify `front/features/host/queries/host-session-queries.ts`
   Reuses shared page normalization helpers without changing query key shape.
-- Modify `front/features/host/route/host-notifications-route.tsx`  
+- Modify `front/features/host/route/host-notifications-route.tsx`
   Reuses shared cursor append/page request/combine helpers for ledger pages.
-- Modify `front/features/archive/route/archive-list-route.tsx`  
+- Modify `front/features/archive/route/archive-list-route.tsx`
   Reuses `combineCursorPages` for each load-more merge.
 - Modify `front/features/host/queries/host-notification-queries.test.ts`, `front/features/host/queries/host-session-queries.test.ts`, and `front/tests/unit/host-notifications.test.tsx` when import names change; keep existing semantic key and load-more assertions intact.
 
-- Create `front/features/platform-admin/queries/platform-admin-queries.ts`  
+- Create `front/features/platform-admin/queries/platform-admin-queries.ts`
   Owns platform-admin query keys, queryOptions, mutation hooks, and targeted cache updates.
-- Create `front/features/platform-admin/queries/platform-admin-queries.test.tsx`  
+- Create `front/features/platform-admin/queries/platform-admin-queries.test.tsx`
   Tests query keys, queryFns, mutation cache updates, and support grant invalidation/update behavior.
-- Modify `front/features/platform-admin/route/platform-admin-data.ts`  
+- Modify `front/features/platform-admin/route/platform-admin-data.ts`
   Adds `platformAdminLoaderFactory(queryClient)` and seeds summary/clubs query data while preserving auth-first loading.
-- Modify `front/features/platform-admin/route/platform-admin-route.tsx`  
+- Modify `front/features/platform-admin/route/platform-admin-route.tsx`
   Reads summary/clubs/support grants from Query and keeps selected club, checking ids, and inline errors as UI-only state.
-- Modify `front/src/app/routes/auth.tsx` and `front/src/app/router.tsx`  
+- Modify `front/src/app/routes/auth.tsx` and `front/src/app/router.tsx`
   Passes QueryClient into auth routes so `/admin` loader and component share cache.
-- Modify `front/tests/unit/platform-admin.test.tsx`  
+- Modify `front/tests/unit/platform-admin.test.tsx`
   Wraps route tests with a query-aware router and updates assertions around support grant loading and mutation updates.
 
-- Modify `docs/development/server-state-migration.md`  
+- Modify `docs/development/server-state-migration.md`
   Marks `current-session` and `platform-admin` complete and documents `shared/query` cursor helpers.
-- Modify `CHANGELOG.md`  
+- Modify `CHANGELOG.md`
   Adds one concise Unreleased entry for the frontend server-state consolidation.
 
 ---

@@ -90,19 +90,20 @@ class GeminiSchemaCompatAdapterTest {
 
     @Test
     fun `strips unknown format vocabulary but keeps recognized formats`() {
-        val node = jsonNode(
-            """
-            {
-              "type": "object",
-              "properties": {
-                "a": {"type": "string", "format": "uuid"},
-                "b": {"type": "string", "format": "date"},
-                "c": {"type": "string", "format": "date-time"},
-                "d": {"type": "string", "format": "email"}
-              }
-            }
-            """.trimIndent()
-        )
+        val node =
+            jsonNode(
+                """
+                {
+                  "type": "object",
+                  "properties": {
+                    "a": {"type": "string", "format": "uuid"},
+                    "b": {"type": "string", "format": "date"},
+                    "c": {"type": "string", "format": "date-time"},
+                    "d": {"type": "string", "format": "email"}
+                  }
+                }
+                """.trimIndent(),
+            )
 
         val result = adapter.convert(node)
 
@@ -115,18 +116,19 @@ class GeminiSchemaCompatAdapterTest {
 
     @Test
     fun `drops ref defs and definitions defensively`() {
-        val node = jsonNode(
-            """
-            {
-              "type": "object",
-              "${'$'}defs": {"X": {"type": "string"}},
-              "definitions": {"Y": {"type": "string"}},
-              "properties": {
-                "a": {"${'$'}ref": "#/${'$'}defs/X"}
-              }
-            }
-            """.trimIndent()
-        )
+        val node =
+            jsonNode(
+                """
+                {
+                  "type": "object",
+                  "${'$'}defs": {"X": {"type": "string"}},
+                  "definitions": {"Y": {"type": "string"}},
+                  "properties": {
+                    "a": {"${'$'}ref": "#/${'$'}defs/X"}
+                  }
+                }
+                """.trimIndent(),
+            )
 
         val result = adapter.convert(node)
 
@@ -166,11 +168,16 @@ class GeminiSchemaCompatAdapterTest {
     }
 
     private fun jsonNode(json: String): ObjectNode {
-        val mapper = com.fasterxml.jackson.databind.ObjectMapper()
+        val mapper =
+            com.fasterxml.jackson.databind
+                .ObjectMapper()
         return mapper.readTree(json) as ObjectNode
     }
 
-    private fun findKeyAnywhere(node: JsonNode, key: String): Boolean {
+    private fun findKeyAnywhere(
+        node: JsonNode,
+        key: String,
+    ): Boolean {
         if (node.isObject && node.has(key)) return true
         val children: Iterable<JsonNode> =
             when {

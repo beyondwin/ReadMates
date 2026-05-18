@@ -18,18 +18,35 @@ class SessionImportSchemaResourceTest {
     @Test
     fun `schema declares format const as readmates session import v1`() {
         val schema = resource.schema()
-        val formatConst = schema.path("properties").path("format").path("const").asText()
+        val formatConst =
+            schema
+                .path("properties")
+                .path("format")
+                .path("const")
+                .asText()
         assertEquals("readmates-session-import:v1", formatConst)
     }
 
     @Test
     fun `schema requires the documented top-level fields`() {
-        val required = resource.schema().get("required").map { it.asText() }.toSet()
-        val expected = setOf(
-            "format", "sessionNumber", "bookTitle", "meetingDate",
-            "summary", "highlights", "oneLineReviews",
-            "feedbackDocumentFileName", "feedbackDocumentMarkdown"
-        )
+        val required =
+            resource
+                .schema()
+                .get("required")
+                .map { it.asText() }
+                .toSet()
+        val expected =
+            setOf(
+                "format",
+                "sessionNumber",
+                "bookTitle",
+                "meetingDate",
+                "summary",
+                "highlights",
+                "oneLineReviews",
+                "feedbackDocumentFileName",
+                "feedbackDocumentMarkdown",
+            )
         assertEquals(expected, required)
     }
 

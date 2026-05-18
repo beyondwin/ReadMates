@@ -139,12 +139,13 @@ class ClubAiDefaultsServiceTest {
             defaultModel: String,
             updatedBy: UUID,
         ) {
-            rows[clubId] = ClubDefault(
-                clubId = clubId,
-                defaultModel = defaultModel,
-                updatedAt = Instant.parse("2026-05-16T00:00:00Z"),
-                updatedBy = updatedBy,
-            )
+            rows[clubId] =
+                ClubDefault(
+                    clubId = clubId,
+                    defaultModel = defaultModel,
+                    updatedAt = Instant.parse("2026-05-16T00:00:00Z"),
+                    updatedBy = updatedBy,
+                )
         }
     }
 
@@ -154,10 +155,13 @@ class ClubAiDefaultsServiceTest {
         override fun allowlisted(): List<ModelId> = allowed.toList()
 
         override fun pricing(id: ModelId): ModelPricing =
-            ModelPricing(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO)
+            ModelPricing(
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+            )
 
-        override fun resolveAlias(alias: String): ModelId? =
-            allowed.firstOrNull { it.name == alias }
+        override fun resolveAlias(alias: String): ModelId? = allowed.firstOrNull { it.name == alias }
 
         override fun isEnabled(id: ModelId): Boolean = id in allowed
     }

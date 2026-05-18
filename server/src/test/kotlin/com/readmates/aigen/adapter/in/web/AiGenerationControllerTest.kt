@@ -475,8 +475,7 @@ class AiGenerationControllerTest {
     private class StubCurrentMemberResolver(
         private val member: CurrentMember,
     ) : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter): Boolean =
-            parameter.parameterType == CurrentMember::class.java
+        override fun supportsParameter(parameter: MethodParameter): Boolean = isAigenCurrentMember(parameter)
 
         override fun resolveArgument(
             parameter: MethodParameter,
@@ -486,3 +485,5 @@ class AiGenerationControllerTest {
         ): Any = member
     }
 }
+
+private fun isAigenCurrentMember(p: MethodParameter): Boolean = p.parameterType == CurrentMember::class.java

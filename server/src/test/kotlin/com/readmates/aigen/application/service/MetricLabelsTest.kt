@@ -18,7 +18,6 @@ import java.time.Duration
  * email) are absolutely forbidden.
  */
 class MetricLabelsTest {
-
     private val allowlist = setOf("provider", "model", "kind", "status", "reason", "direction")
     private val forbidden = setOf("transcript", "hostId", "sessionId", "clubId", "email")
 
@@ -52,11 +51,12 @@ class MetricLabelsTest {
         metrics.recordCapDenial(CapDenialReason.HOST_DAILY)
         metrics.registerQueueDepthGauge { 0 }
 
-        val allTagKeys = registry.meters
-            .filter { it.id.name.startsWith("readmates.aigen") }
-            .flatMap { it.id.tags }
-            .map { it.key }
-            .toSet()
+        val allTagKeys =
+            registry.meters
+                .filter { it.id.name.startsWith("readmates.aigen") }
+                .flatMap { it.id.tags }
+                .map { it.key }
+                .toSet()
 
         assertThat(allTagKeys).isSubsetOf(allowlist)
     }
@@ -76,11 +76,12 @@ class MetricLabelsTest {
         metrics.recordCapDenial(CapDenialReason.CLUB_MONTHLY)
         metrics.registerQueueDepthGauge { 0 }
 
-        val allTagKeys = registry.meters
-            .filter { it.id.name.startsWith("readmates.aigen") }
-            .flatMap { it.id.tags }
-            .map { it.key }
-            .toSet()
+        val allTagKeys =
+            registry.meters
+                .filter { it.id.name.startsWith("readmates.aigen") }
+                .flatMap { it.id.tags }
+                .map { it.key }
+                .toSet()
 
         assertThat(allTagKeys.intersect(forbidden)).isEmpty()
     }

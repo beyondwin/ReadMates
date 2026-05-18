@@ -109,103 +109,50 @@ class AiGenerateApiIntegrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val redis: StringRedisTemplate,
 ) : ReadmatesRedisIntegrationTestSupport() {
-
     @Test
-    fun `full generation lifecycle - start, poll until SUCCEEDED, commit, then Redis keys cleaned`() {
-        val transcript = MockMultipartFile(
-            "transcript",
-            "transcript.txt",
-            "text/plain",
-            "Stub transcript content for the integration test.".toByteArray(),
-        )
-        val body = MockMultipartFile(
-            "body",
-            "body.json",
-            "application/json",
-            """{"model":"claude-sonnet-4-6","authorNameMode":"real","instructions":null}""".toByteArray(),
-        )
-
-        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
-            file(transcript)
-            file(body)
-            with(user(HOST_EMAIL))
-        }.andReturn().response
-
-        assertThat(startResponse.status).isEqualTo(202)
-        val jobId = jobIdFrom(startResponse.contentAsString)
+    fun `full generation lifecycle - start, poll until SUCCEEDED, commit, then Redis payload cleaned`() {
+        val jobId = startJob("claude-sonnet-4-6", "Stub transcript content for the integration test.")
 
         // Wait for the Kafka consumer to dispatch to the worker and the stub to drive
         // the snapshot through the validator + Redis result update.
-        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
-            val status = jobStatusJson(jobId)
-            assertThat(status).contains("\"status\":\"SUCCEEDED\"")
-        }
+        awaitSucceeded(jobId)
 
         // Sanity: the Redis result key exists with the stub snapshot before commit.
         assertThat(redis.hasKey("aigen:job:$jobId:result")).isTrue()
         assertThat(redis.hasKey("aigen:job:$jobId:transcript")).isTrue()
         assertThat(redis.hasKey("aigen:job:$jobId")).isTrue()
 
-        // Commit — no override — must succeed and clean Redis.
-        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
-            with(user(HOST_EMAIL))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"recordVisibility":"MEMBER","result":null}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value(SESSION_ID) }
-            jsonPath("$.publication.summary") { exists() }
-        }
-
-        // All 3 Redis keys must be deleted on commit (spec §7.4).
-        assertThat(redis.hasKey("aigen:job:$jobId")).isFalse()
-        assertThat(redis.hasKey("aigen:job:$jobId:result")).isFalse()
-        assertThat(redis.hasKey("aigen:job:$jobId:transcript")).isFalse()
-
-        // The DB must show the imported publication and a feedback document version.
-        val summary = jdbcTemplate.queryForObject(
-            "select public_summary from public_session_publications where session_id = '$SESSION_ID'",
-            String::class.java,
-        )
-        assertThat(summary).isNotNull
-        assertThat(summary).contains("AI Gen Book")
-        val feedbackCount = jdbcTemplate.queryForObject(
-            "select count(*) from session_feedback_documents where session_id = '$SESSION_ID'",
-            Int::class.java,
-        )
-        assertThat(feedbackCount).isGreaterThanOrEqualTo(1)
-
-        // Audit log has FULL SUCCESS + COMMIT SUCCESS rows.
-        val auditRows = jdbcTemplate.queryForList(
-            """
-            select kind, status from ai_generation_audit_log
-            where session_id = '$SESSION_ID' order by created_at
-            """.trimIndent(),
-        )
-        val kindStatus = auditRows.map { it["kind"] as String to it["status"] as String }
-        assertThat(kindStatus).contains("FULL" to "SUCCESS", "COMMIT" to "SUCCESS")
+        // Commit — no override — must succeed and clean transient Redis payload.
+        commitJob(jobId)
+        assertTerminalHashRetainedAndPayloadDeleted(jobId)
+        assertSessionImportCommitted()
     }
 
     @Test
     fun `regenerate updates the stored result with the patched item`() {
-        val transcript = MockMultipartFile(
-            "transcript",
-            "transcript.txt",
-            "text/plain",
-            "Another stub transcript.".toByteArray(),
-        )
-        val body = MockMultipartFile(
-            "body",
-            "body.json",
-            "application/json",
-            """{"model":"claude-sonnet-4-6","authorNameMode":"real","instructions":null}""".toByteArray(),
-        )
+        val transcript =
+            MockMultipartFile(
+                "transcript",
+                "transcript.txt",
+                "text/plain",
+                "Another stub transcript.".toByteArray(),
+            )
+        val body =
+            MockMultipartFile(
+                "body",
+                "body.json",
+                "application/json",
+                """{"model":"claude-sonnet-4-6","authorNameMode":"real","instructions":null}""".toByteArray(),
+            )
 
-        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
-            file(transcript)
-            file(body)
-            with(user(HOST_EMAIL))
-        }.andReturn().response
+        val startResponse =
+            mockMvc
+                .multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+                    file(transcript)
+                    file(body)
+                    with(user(HOST_EMAIL))
+                }.andReturn()
+                .response
         val jobId = jobIdFrom(startResponse.contentAsString)
 
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
@@ -213,15 +160,16 @@ class AiGenerateApiIntegrationTest(
         }
 
         // Regenerate the summary — stub returns a deterministic regenerated value.
-        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/regenerate") {
-            with(user(HOST_EMAIL))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"item":"SUMMARY","model":null,"instructions":null}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.item") { value("SUMMARY") }
-            jsonPath("$.value") { value("Regenerated summary for AI Gen Book.") }
-        }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/regenerate") {
+                with(user(HOST_EMAIL))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"item":"SUMMARY","model":null,"instructions":null}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.item") { value("SUMMARY") }
+                jsonPath("$.value") { value("Regenerated summary for AI Gen Book.") }
+            }
 
         // Status response must reflect the regenerated summary in `result.summary`.
         val statusJson = jobStatusJson(jobId)
@@ -237,109 +185,60 @@ class AiGenerateApiIntegrationTest(
     @ParameterizedTest(name = "full generation lifecycle - provider {0}")
     @ValueSource(strings = ["claude-sonnet-4-6", "gpt-5.4-mini"])
     fun `full generation lifecycle - provider matrix`(model: String) {
-        val transcript = MockMultipartFile(
-            "transcript",
-            "transcript.txt",
-            "text/plain",
-            "Stub transcript for provider matrix ($model).".toByteArray(),
-        )
-        val body = MockMultipartFile(
-            "body",
-            "body.json",
-            "application/json",
-            """{"model":"$model","authorNameMode":"real","instructions":null}""".toByteArray(),
-        )
-
-        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
-            file(transcript)
-            file(body)
-            with(user(HOST_EMAIL))
-        }.andReturn().response
-
-        assertThat(startResponse.status).isEqualTo(202)
-        val jobId = jobIdFrom(startResponse.contentAsString)
-
-        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
-            val status = jobStatusJson(jobId)
-            assertThat(status).contains("\"status\":\"SUCCEEDED\"")
-        }
+        val jobId = startJob(model, "Stub transcript for provider matrix ($model).")
+        awaitSucceeded(jobId)
 
         assertThat(redis.hasKey("aigen:job:$jobId:result")).isTrue()
         assertThat(redis.hasKey("aigen:job:$jobId:transcript")).isTrue()
         assertThat(redis.hasKey("aigen:job:$jobId")).isTrue()
 
-        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
-            with(user(HOST_EMAIL))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"recordVisibility":"MEMBER","result":null}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.sessionId") { value(SESSION_ID) }
-            jsonPath("$.publication.summary") { exists() }
-        }
-
-        assertThat(redis.hasKey("aigen:job:$jobId")).isFalse()
-        assertThat(redis.hasKey("aigen:job:$jobId:result")).isFalse()
-        assertThat(redis.hasKey("aigen:job:$jobId:transcript")).isFalse()
-
-        val summary = jdbcTemplate.queryForObject(
-            "select public_summary from public_session_publications where session_id = '$SESSION_ID'",
-            String::class.java,
-        )
-        assertThat(summary).isNotNull
-        assertThat(summary).contains("AI Gen Book")
-        val feedbackCount = jdbcTemplate.queryForObject(
-            "select count(*) from session_feedback_documents where session_id = '$SESSION_ID'",
-            Int::class.java,
-        )
-        assertThat(feedbackCount).isGreaterThanOrEqualTo(1)
-
-        val auditRows = jdbcTemplate.queryForList(
-            """
-            select kind, status from ai_generation_audit_log
-            where session_id = '$SESSION_ID' order by created_at
-            """.trimIndent(),
-        )
-        val kindStatus = auditRows.map { it["kind"] as String to it["status"] as String }
-        assertThat(kindStatus).contains("FULL" to "SUCCESS", "COMMIT" to "SUCCESS")
+        commitJob(jobId)
+        assertTerminalHashRetainedAndPayloadDeleted(jobId)
+        assertSessionImportCommitted()
     }
 
     @ParameterizedTest(name = "regenerate updates stored result - provider {0}")
     @ValueSource(strings = ["claude-sonnet-4-6", "gpt-5.4-mini"])
     fun `regenerate updates the stored result - provider matrix`(model: String) {
-        val transcript = MockMultipartFile(
-            "transcript",
-            "transcript.txt",
-            "text/plain",
-            "Another stub transcript ($model).".toByteArray(),
-        )
-        val body = MockMultipartFile(
-            "body",
-            "body.json",
-            "application/json",
-            """{"model":"$model","authorNameMode":"real","instructions":null}""".toByteArray(),
-        )
+        val transcript =
+            MockMultipartFile(
+                "transcript",
+                "transcript.txt",
+                "text/plain",
+                "Another stub transcript ($model).".toByteArray(),
+            )
+        val body =
+            MockMultipartFile(
+                "body",
+                "body.json",
+                "application/json",
+                """{"model":"$model","authorNameMode":"real","instructions":null}""".toByteArray(),
+            )
 
-        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
-            file(transcript)
-            file(body)
-            with(user(HOST_EMAIL))
-        }.andReturn().response
+        val startResponse =
+            mockMvc
+                .multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+                    file(transcript)
+                    file(body)
+                    with(user(HOST_EMAIL))
+                }.andReturn()
+                .response
         val jobId = jobIdFrom(startResponse.contentAsString)
 
         await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
             assertThat(jobStatusJson(jobId)).contains("\"status\":\"SUCCEEDED\"")
         }
 
-        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/regenerate") {
-            with(user(HOST_EMAIL))
-            contentType = MediaType.APPLICATION_JSON
-            content = """{"item":"SUMMARY","model":null,"instructions":null}"""
-        }.andExpect {
-            status { isOk() }
-            jsonPath("$.item") { value("SUMMARY") }
-            jsonPath("$.value") { value("Regenerated summary for AI Gen Book.") }
-        }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/regenerate") {
+                with(user(HOST_EMAIL))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"item":"SUMMARY","model":null,"instructions":null}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.item") { value("SUMMARY") }
+                jsonPath("$.value") { value("Regenerated summary for AI Gen Book.") }
+            }
 
         val statusJson = jobStatusJson(jobId)
         assertThat(statusJson).contains("\"summary\":\"Regenerated summary for AI Gen Book.\"")
@@ -352,105 +251,167 @@ class AiGenerateApiIntegrationTest(
 
     @Test
     fun `start with unknown model returns typed AI disabled problem`() {
-        val transcript = MockMultipartFile(
-            "transcript",
-            "transcript.txt",
-            "text/plain",
-            "Stub transcript content.".toByteArray(),
-        )
-        val body = MockMultipartFile(
-            "body",
-            "body.json",
-            "application/json",
-            """{"model":"not-allowlisted-model","authorNameMode":"real","instructions":null}""".toByteArray(),
-        )
+        val transcript =
+            MockMultipartFile(
+                "transcript",
+                "transcript.txt",
+                "text/plain",
+                "Stub transcript content.".toByteArray(),
+            )
+        val body =
+            MockMultipartFile(
+                "body",
+                "body.json",
+                "application/json",
+                """{"model":"not-allowlisted-model","authorNameMode":"real","instructions":null}""".toByteArray(),
+            )
 
-        mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
-            file(transcript)
-            file(body)
-            with(user(HOST_EMAIL))
-        }.andExpect {
-            status { isServiceUnavailable() }
-            jsonPath("$.code") { value("AI_DISABLED") }
-            jsonPath("$.detail") { value("Requested model is not enabled") }
-        }
+        mockMvc
+            .multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+                file(transcript)
+                file(body)
+                with(user(HOST_EMAIL))
+            }.andExpect {
+                status { isServiceUnavailable() }
+                jsonPath("$.code") { value("AI_DISABLED") }
+                jsonPath("$.detail") { value("Requested model is not enabled") }
+            }
     }
 
     @Test
     fun `commit override with unknown author returns typed author name mismatch problem`() {
-        val transcript = MockMultipartFile(
-            "transcript",
-            "transcript.txt",
-            "text/plain",
-            "Stub transcript for override test.".toByteArray(),
-        )
-        val body = MockMultipartFile(
-            "body",
-            "body.json",
-            "application/json",
-            """{"model":"claude-sonnet-4-6","authorNameMode":"real","instructions":null}""".toByteArray(),
-        )
-
-        val startResponse = mockMvc.multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
-            file(transcript)
-            file(body)
-            with(user(HOST_EMAIL))
-        }.andReturn().response
-        assertThat(startResponse.status).isEqualTo(202)
-        val jobId = jobIdFrom(startResponse.contentAsString)
-
-        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
-            assertThat(jobStatusJson(jobId)).contains("\"status\":\"SUCCEEDED\"")
-        }
+        val jobId = startJob("claude-sonnet-4-6", "Stub transcript for override test.")
+        awaitSucceeded(jobId)
 
         // Override result with an author not present in the seeded session's
         // expectedAuthorNames. The validator emits
         //   "Unknown authorName(s) not in expectedAuthorNames: [Injected Person]"
         // — we match the prefix so the offender list ordering stays free.
-        val overrideJson = """
-            {
-              "recordVisibility": "MEMBER",
-              "result": {
-                "format": "readmates-session-import:v1",
-                "sessionNumber": 8861,
-                "bookTitle": "AI Gen Book",
-                "meetingDate": "2026-05-14",
-                "summary": "Override summary for AI Gen Book.",
-                "highlights": [
-                  {"authorName": "Injected Person", "text": "Untrusted highlight 1."},
-                  {"authorName": "Injected Person", "text": "Untrusted highlight 2."},
-                  {"authorName": "Injected Person", "text": "Untrusted highlight 3."}
-                ],
-                "oneLineReviews": [
-                  {"authorName": "Injected Person", "text": "Untrusted review."}
-                ],
-                "feedbackDocumentFileName": "session-8861-feedback.md",
-                "feedbackDocumentMarkdown": "<!-- readmates-feedback:v1 -->\n\n# 독서모임 8861차 피드백\n\nOverride body."
-              }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
+                with(user(HOST_EMAIL))
+                contentType = MediaType.APPLICATION_JSON
+                content = unknownAuthorOverrideJson()
+            }.andExpect {
+                status { isUnprocessableEntity() }
+                jsonPath("$.code") { value("AUTHOR_NAME_MISMATCH") }
+                jsonPath("$.detail") {
+                    value(org.hamcrest.Matchers.startsWith("Unknown authorName(s) not in expectedAuthorNames:"))
+                }
             }
-        """.trimIndent()
-
-        mockMvc.post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
-            with(user(HOST_EMAIL))
-            contentType = MediaType.APPLICATION_JSON
-            content = overrideJson
-        }.andExpect {
-            status { isUnprocessableEntity() }
-            jsonPath("$.code") { value("AUTHOR_NAME_MISMATCH") }
-            jsonPath("$.detail") {
-                value(org.hamcrest.Matchers.startsWith("Unknown authorName(s) not in expectedAuthorNames:"))
-            }
-        }
     }
 
     private fun jobStatusJson(jobId: UUID): String =
-        mockMvc.get("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId") {
-            with(user(HOST_EMAIL))
-        }.andReturn().response.contentAsString
+        mockMvc
+            .get("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId") {
+                with(user(HOST_EMAIL))
+            }.andReturn()
+            .response.contentAsString
+
+    private fun startJob(
+        model: String,
+        transcriptText: String,
+    ): UUID {
+        val transcript =
+            MockMultipartFile("transcript", "transcript.txt", "text/plain", transcriptText.toByteArray())
+        val body =
+            MockMultipartFile(
+                "body",
+                "body.json",
+                "application/json",
+                """{"model":"$model","authorNameMode":"real","instructions":null}""".toByteArray(),
+            )
+        val response =
+            mockMvc
+                .multipart("/api/host/sessions/$SESSION_ID/ai-generate/jobs") {
+                    file(transcript)
+                    file(body)
+                    with(user(HOST_EMAIL))
+                }.andReturn()
+                .response
+        assertThat(response.status).isEqualTo(202)
+        return jobIdFrom(response.contentAsString)
+    }
+
+    private fun awaitSucceeded(jobId: UUID) {
+        await().atMost(Duration.ofSeconds(30)).pollInterval(Duration.ofMillis(250)).untilAsserted {
+            val status = jobStatusJson(jobId)
+            assertThat(status).contains("\"status\":\"SUCCEEDED\"")
+        }
+    }
+
+    private fun commitJob(jobId: UUID) {
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/ai-generate/jobs/$jobId/commit") {
+                with(user(HOST_EMAIL))
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"recordVisibility":"MEMBER","result":null}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(SESSION_ID) }
+                jsonPath("$.publication.summary") { exists() }
+            }
+    }
+
+    private fun assertTerminalHashRetainedAndPayloadDeleted(jobId: UUID) {
+        assertThat(redis.hasKey("aigen:job:$jobId")).isTrue()
+        assertThat(redis.hasKey("aigen:job:$jobId:result")).isFalse()
+        assertThat(redis.hasKey("aigen:job:$jobId:transcript")).isFalse()
+        assertThat(jobStatusJson(jobId)).contains("\"status\":\"COMMITTED\"")
+    }
+
+    private fun assertSessionImportCommitted() {
+        val summary =
+            jdbcTemplate.queryForObject(
+                "select public_summary from public_session_publications where session_id = '$SESSION_ID'",
+                String::class.java,
+            )
+        val feedbackCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from session_feedback_documents where session_id = '$SESSION_ID'",
+                Int::class.java,
+            )
+        val auditRows =
+            jdbcTemplate.queryForList(
+                """
+                select kind, status from ai_generation_audit_log
+                where session_id = '$SESSION_ID' order by created_at
+                """.trimIndent(),
+            )
+        val kindStatus = auditRows.map { it["kind"] as String to it["status"] as String }
+        assertThat(summary).isNotNull.contains("AI Gen Book")
+        assertThat(feedbackCount).isGreaterThanOrEqualTo(1)
+        assertThat(kindStatus).contains("FULL" to "SUCCESS", "COMMIT" to "SUCCESS")
+    }
+
+    private fun unknownAuthorOverrideJson(): String =
+        """
+        {
+          "recordVisibility": "MEMBER",
+          "result": {
+            "format": "readmates-session-import:v1",
+            "sessionNumber": 8861,
+            "bookTitle": "AI Gen Book",
+            "meetingDate": "2026-05-14",
+            "summary": "Override summary for AI Gen Book.",
+            "highlights": [
+              {"authorName": "Injected Person", "text": "Untrusted highlight 1."},
+              {"authorName": "Injected Person", "text": "Untrusted highlight 2."},
+              {"authorName": "Injected Person", "text": "Untrusted highlight 3."}
+            ],
+            "oneLineReviews": [
+              {"authorName": "Injected Person", "text": "Untrusted review."}
+            ],
+            "feedbackDocumentFileName": "session-8861-feedback.md",
+            "feedbackDocumentMarkdown": "<!-- readmates-feedback:v1 -->\n\n# 독서모임 8861차 피드백\n\nOverride body."
+          }
+        }
+        """.trimIndent()
 
     private fun jobIdFrom(json: String): UUID {
-        val match = Regex("\"jobId\":\"([0-9a-f-]{36})\"").find(json)
-            ?: error("No jobId in response: $json")
+        val match =
+            Regex("\"jobId\":\"([0-9a-f-]{36})\"").find(json)
+                ?: error("No jobId in response: $json")
         return UUID.fromString(match.groupValues[1])
     }
 
@@ -476,14 +437,19 @@ class AiGenerateApiIntegrationTest(
             registry.add("readmates.aigen.kafka.consumer-group") { "aigen-int-test-$RUN_ID" }
         }
 
-        private fun createTopic(bootstrapServers: String, topic: String) {
-            AdminClient.create(
-                mapOf(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers),
-            ).use { admin ->
-                admin.createTopics(listOf(NewTopic(topic, 1, 1.toShort())))
-                    .all()
-                    .get(10, TimeUnit.SECONDS)
-            }
+        private fun createTopic(
+            bootstrapServers: String,
+            topic: String,
+        ) {
+            AdminClient
+                .create(
+                    mapOf(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers),
+                ).use { admin ->
+                    admin
+                        .createTopics(listOf(NewTopic(topic, 1, 1.toShort())))
+                        .all()
+                        .get(10, TimeUnit.SECONDS)
+                }
         }
     }
 }

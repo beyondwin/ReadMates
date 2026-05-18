@@ -42,7 +42,7 @@ import java.util.UUID
  *  3. Validate via [SessionImportV1Validator] — Violation → FAILED audit + throw.
  *  4. Convert to a [SessionImportCommand] and delegate to
  *     [CommitValidatedSessionImportUseCase.commitValidated].
- *  5. Delete the Redis job keys, write a COMMIT SUCCESS audit row, return the result.
+ *  5. Delete transient Redis payload, write a COMMIT SUCCESS audit row, return the result.
  *
  * Trust boundary: the validator runs here, so the downstream `commitValidated`
  * skips schema validation but still loads the target and replaces records.

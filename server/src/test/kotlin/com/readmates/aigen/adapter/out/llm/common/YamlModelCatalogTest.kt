@@ -13,22 +13,26 @@ import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 
 class YamlModelCatalogTest {
-
-    private fun pricing(input: String, cached: String = "0", output: String) =
-        AiGenerationProperties.Pricing(
-            inputPerMTokenUsd = BigDecimal(input),
-            cachedInputPerMTokenUsd = BigDecimal(cached),
-            outputPerMTokenUsd = BigDecimal(output),
-        )
+    private fun pricing(
+        input: String,
+        cached: String = "0",
+        output: String,
+    ) = AiGenerationProperties.Pricing(
+        inputPerMTokenUsd = BigDecimal(input),
+        cachedInputPerMTokenUsd = BigDecimal(cached),
+        outputPerMTokenUsd = BigDecimal(output),
+    )
 
     @Test
     fun `empty enabledProviders means kill switch - allowlisted is empty`() {
-        val props = AiGenerationProperties(
-            enabledProviders = emptySet(),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = emptySet(),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -37,13 +41,15 @@ class YamlModelCatalogTest {
 
     @Test
     fun `claude prefix models are derived as CLAUDE provider and allowlisted`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-                "claude-opus-4-7" to pricing("15", "1.50", "75"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                        "claude-opus-4-7" to pricing("15", "1.50", "75"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -55,13 +61,15 @@ class YamlModelCatalogTest {
 
     @Test
     fun `disabled provider excludes its models even if pricing present`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-                "gpt-4o" to pricing("5", "0", "15"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                        "gpt-4o" to pricing("5", "0", "15"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -72,13 +80,15 @@ class YamlModelCatalogTest {
 
     @Test
     fun `enabledProviders case-insensitive matches Provider name`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("openai"),
-            pricing = mapOf(
-                "gpt-5.4-mini" to pricing("2", "0.50", "8"),
-                "o1" to pricing("15", "0", "60"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("openai"),
+                pricing =
+                    mapOf(
+                        "gpt-5.4-mini" to pricing("2", "0.50", "8"),
+                        "o1" to pricing("15", "0", "60"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -90,12 +100,14 @@ class YamlModelCatalogTest {
 
     @Test
     fun `gemini prefix maps to GEMINI provider`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("GEMINI"),
-            pricing = mapOf(
-                "gemini-3-flash" to pricing("1.25", "0", "10"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("GEMINI"),
+                pricing =
+                    mapOf(
+                        "gemini-3-flash" to pricing("1.25", "0", "10"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -107,14 +119,16 @@ class YamlModelCatalogTest {
 
     @Test
     fun `unknown model prefix is skipped without crashing`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE", "OPENAI", "GEMINI"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-                "gpt-4o" to pricing("5", "0", "15"),
-                "foo-bar" to pricing("1", "0", "1"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE", "OPENAI", "GEMINI"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                        "gpt-4o" to pricing("5", "0", "15"),
+                        "foo-bar" to pricing("1", "0", "1"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -123,12 +137,14 @@ class YamlModelCatalogTest {
 
     @Test
     fun `pricing returns ModelPricing for allowlisted model`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -140,12 +156,14 @@ class YamlModelCatalogTest {
 
     @Test
     fun `pricing throws IllegalStateException when model not in catalog`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -156,12 +174,14 @@ class YamlModelCatalogTest {
 
     @Test
     fun `resolveAlias returns ModelId when alias matches allowlisted name`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -172,13 +192,15 @@ class YamlModelCatalogTest {
 
     @Test
     fun `resolveAlias returns null when alias not allowlisted`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-                "gpt-4o" to pricing("5", "0", "15"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                        "gpt-4o" to pricing("5", "0", "15"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 
@@ -188,13 +210,15 @@ class YamlModelCatalogTest {
 
     @Test
     fun `isEnabled true for allowlisted model and false otherwise`() {
-        val props = AiGenerationProperties(
-            enabledProviders = setOf("CLAUDE"),
-            pricing = mapOf(
-                "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
-                "gpt-4o" to pricing("5", "0", "15"),
-            ),
-        )
+        val props =
+            AiGenerationProperties(
+                enabledProviders = setOf("CLAUDE"),
+                pricing =
+                    mapOf(
+                        "claude-sonnet-4-6" to pricing("3", "0.30", "15"),
+                        "gpt-4o" to pricing("5", "0", "15"),
+                    ),
+            )
 
         val catalog = YamlModelCatalog(props)
 

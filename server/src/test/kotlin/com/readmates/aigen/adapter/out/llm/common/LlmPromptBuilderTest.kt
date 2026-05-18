@@ -11,28 +11,30 @@ import java.time.LocalDate
 import java.util.UUID
 
 class LlmPromptBuilderTest {
-    private val meta = SessionMeta(
-        sessionId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
-        clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
-        sessionNumber = 7,
-        bookTitle = "데미안",
-        bookAuthor = "헤르만 헤세",
-        meetingDate = LocalDate.of(2026, 5, 16),
-        expectedAuthorNames = listOf("김우승", "박지민", "이서연"),
-        authorNameMode = AuthorNameMode.REAL,
-    )
+    private val meta =
+        SessionMeta(
+            sessionId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
+            sessionNumber = 7,
+            bookTitle = "데미안",
+            bookAuthor = "헤르만 헤세",
+            meetingDate = LocalDate.of(2026, 5, 16),
+            expectedAuthorNames = listOf("김우승", "박지민", "이서연"),
+            authorNameMode = AuthorNameMode.REAL,
+        )
 
-    private val snapshot = SessionImportV1Snapshot(
-        format = "readmates-session-import:v1",
-        sessionNumber = 7,
-        bookTitle = "데미안",
-        meetingDate = LocalDate.of(2026, 5, 16),
-        summary = "기존 summary 내용",
-        highlights = emptyList(),
-        oneLineReviews = emptyList(),
-        feedbackDocumentFileName = "feedback.md",
-        feedbackDocumentMarkdown = "<!-- readmates-feedback:v1 -->\n# 독서모임 7차 피드백",
-    )
+    private val snapshot =
+        SessionImportV1Snapshot(
+            format = "readmates-session-import:v1",
+            sessionNumber = 7,
+            bookTitle = "데미안",
+            meetingDate = LocalDate.of(2026, 5, 16),
+            summary = "기존 summary 내용",
+            highlights = emptyList(),
+            oneLineReviews = emptyList(),
+            feedbackDocumentFileName = "feedback.md",
+            feedbackDocumentMarkdown = "<!-- readmates-feedback:v1 -->\n# 독서모임 7차 피드백",
+        )
 
     @Test
     fun `full system prompt contains all 5 hallucination prevention rules verbatim`() {
@@ -75,12 +77,13 @@ class LlmPromptBuilderTest {
 
     @Test
     fun `regen prompt for SUMMARY mentions only summary field`() {
-        val prompt = LlmPromptBuilder.buildRegenSystemPrompt(
-            meta = meta,
-            item = GenerationItem.SUMMARY,
-            instructions = null,
-            currentSnapshot = snapshot,
-        )
+        val prompt =
+            LlmPromptBuilder.buildRegenSystemPrompt(
+                meta = meta,
+                item = GenerationItem.SUMMARY,
+                instructions = null,
+                currentSnapshot = snapshot,
+            )
         assertTrue(prompt.contains("summary"), "must direct summary regen")
         assertTrue(prompt.contains("다른 필드는 출력하지 말 것"), "must restrict output to summary")
         assertFalse(prompt.contains("다음 항목만 다시 생성: highlights"))
@@ -88,47 +91,51 @@ class LlmPromptBuilderTest {
 
     @Test
     fun `regen prompt for HIGHLIGHTS mentions only highlights field`() {
-        val prompt = LlmPromptBuilder.buildRegenSystemPrompt(
-            meta = meta,
-            item = GenerationItem.HIGHLIGHTS,
-            instructions = null,
-            currentSnapshot = snapshot,
-        )
+        val prompt =
+            LlmPromptBuilder.buildRegenSystemPrompt(
+                meta = meta,
+                item = GenerationItem.HIGHLIGHTS,
+                instructions = null,
+                currentSnapshot = snapshot,
+            )
         assertTrue(prompt.contains("highlights"))
         assertTrue(prompt.contains("다른 필드는 출력하지 말 것"))
     }
 
     @Test
     fun `regen prompt for ONE_LINE_REVIEWS mentions only oneLineReviews field`() {
-        val prompt = LlmPromptBuilder.buildRegenSystemPrompt(
-            meta = meta,
-            item = GenerationItem.ONE_LINE_REVIEWS,
-            instructions = null,
-            currentSnapshot = snapshot,
-        )
+        val prompt =
+            LlmPromptBuilder.buildRegenSystemPrompt(
+                meta = meta,
+                item = GenerationItem.ONE_LINE_REVIEWS,
+                instructions = null,
+                currentSnapshot = snapshot,
+            )
         assertTrue(prompt.contains("oneLineReviews"))
     }
 
     @Test
     fun `regen prompt for FEEDBACK_DOCUMENT mentions feedback marker`() {
-        val prompt = LlmPromptBuilder.buildRegenSystemPrompt(
-            meta = meta,
-            item = GenerationItem.FEEDBACK_DOCUMENT,
-            instructions = null,
-            currentSnapshot = snapshot,
-        )
+        val prompt =
+            LlmPromptBuilder.buildRegenSystemPrompt(
+                meta = meta,
+                item = GenerationItem.FEEDBACK_DOCUMENT,
+                instructions = null,
+                currentSnapshot = snapshot,
+            )
         assertTrue(prompt.contains("feedbackDocumentMarkdown") || prompt.contains("feedback"))
         assertTrue(prompt.contains("<!-- readmates-feedback:v1 -->"))
     }
 
     @Test
     fun `regen prompt still includes hallucination prevention rules 1 through 4`() {
-        val prompt = LlmPromptBuilder.buildRegenSystemPrompt(
-            meta = meta,
-            item = GenerationItem.SUMMARY,
-            instructions = null,
-            currentSnapshot = snapshot,
-        )
+        val prompt =
+            LlmPromptBuilder.buildRegenSystemPrompt(
+                meta = meta,
+                item = GenerationItem.SUMMARY,
+                instructions = null,
+                currentSnapshot = snapshot,
+            )
         assertTrue(prompt.contains("녹취록에 없는 사실"))
         assertTrue(prompt.contains("참석자 이름은 정확히 다음 목록에서만 선택"))
         assertTrue(prompt.contains("공개 요약·하이라이트에 이메일·연락처·주소·사적 관계·의료·재정 정보 포함 금지"))

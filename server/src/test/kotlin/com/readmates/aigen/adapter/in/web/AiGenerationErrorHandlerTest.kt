@@ -127,9 +127,10 @@ class AiGenerationErrorHandlerTest {
     @Test
     fun `unknown handler scrubs invalid session import details from response`() {
         val handler = AiGenerationErrorHandler()
-        val error = InvalidSessionImportException(
-            listOf(SessionImportIssue("AUTHOR_NOT_FOUND", "작성자 'Private Name'을 찾을 수 없습니다.")),
-        )
+        val error =
+            InvalidSessionImportException(
+                listOf(SessionImportIssue("AUTHOR_NOT_FOUND", "작성자 'Private Name'을 찾을 수 없습니다.")),
+            )
 
         val response = handler.handleUnknown(error)
 
